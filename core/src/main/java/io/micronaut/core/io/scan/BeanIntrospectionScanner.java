@@ -19,7 +19,6 @@ import java.util.Objects;
 import java.util.stream.Stream;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.util.StringUtils;
 
@@ -33,7 +32,7 @@ import io.micronaut.core.util.StringUtils;
 @Internal
 public class BeanIntrospectionScanner implements AnnotationScanner {
     @Override
-    public @NonNull Stream<Class<?>> scan(@NonNull String annotation, @NonNull String pkg) {
+    public Stream<Class<?>> scan(String annotation, String pkg) {
         Objects.requireNonNull(annotation, "Annotation type cannot be null");
         Objects.requireNonNull(pkg, "Package to scan cannot be null");
 

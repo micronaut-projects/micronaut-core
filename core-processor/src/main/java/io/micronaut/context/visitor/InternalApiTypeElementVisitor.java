@@ -18,7 +18,6 @@ package io.micronaut.context.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -60,7 +59,6 @@ public class InternalApiTypeElementVisitor implements TypeElementVisitor<Object,
         return Set.of(MICRONAUT_PROCESSING_INTERNAL_WARNINGS);
     }
 
-    @NonNull
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;

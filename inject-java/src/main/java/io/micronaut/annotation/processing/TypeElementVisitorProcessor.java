@@ -21,7 +21,6 @@ import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.NextMajorVersion;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
@@ -57,9 +56,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -82,6 +84,7 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING;
     VisitorContext.MICRONAUT_PROCESSING_MODULE
 })
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
+
     private static final Set<String> VISITOR_WARNINGS;
     private static final Set<String> SUPPORTED_ANNOTATION_NAMES;
 
@@ -110,7 +113,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         }
     }
 
+    @Nullable
     private List<LoadedVisitor> loadedVisitors;
+    @Nullable
     private Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors;
 
     /**
@@ -196,7 +201,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
     @Override
     public Set<String> getSupportedAnnotationTypes() {
-        if (loadedVisitors.isEmpty()) {
+        if (loadedVisitors == null || loadedVisitors.isEmpty()) {
             return Collections.emptySet();
         } else {
             return super.getSupportedAnnotationTypes();
@@ -213,7 +218,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             .flatMap(Collection::stream);
         Stream<String> visitorsAnnotationsOptions = typeElementVisitors
             .stream()
-            .filter(tev -> tev.getClass().isAnnotationPresent(SupportedOptions.class))
+            .filter(this::hasSupportedOptionsAnnotation)
             .map(TypeElementVisitor::getClass)
             .map(cls -> (SupportedOptions) cls.getAnnotation(SupportedOptions.class))
             .flatMap((SupportedOptions supportedOptions) -> Arrays.stream(supportedOptions.value()));
@@ -222,11 +227,19 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             .collect(Collectors.toSet());
     }
 
+    private boolean hasSupportedOptionsAnnotation(TypeElementVisitor<?, ?> visitor) {
+        try {
+            return visitor.getClass().isAnnotationPresent(SupportedOptions.class);
+        } catch (UnsupportedOperationException e) {
+            return false;
+        }
+    }
+
     @NextMajorVersion("`roundEnv.getRootElements()` should be removed in Micronaut 4. " +
         "It should not be possible to process elements without at least one annotation present and this call breaks that assumption")
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        if (!loadedVisitors.isEmpty() && !processingGeneratedAnnotation(annotations)) {
+        if (loadedVisitors != null && !loadedVisitors.isEmpty() && !processingGeneratedAnnotation(annotations)) {
 
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
@@ -423,27 +436,42 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
      *
      * @return A collection of type element visitors.
      */
-    @NonNull
     protected synchronized Collection<? extends TypeElementVisitor<?, ?>> findTypeElementVisitors() {
         if (typeElementVisitors == null) {
-            for (String visitorWarning : VISITOR_WARNINGS) {
-                warning(visitorWarning);
-            }
+            reportWarnings();
             typeElementVisitors = findCoreTypeElementVisitors(null);
         }
         return typeElementVisitors;
     }
 
-    @NonNull
+    private void reportWarnings() {
+        for (String visitorWarning : VISITOR_WARNINGS) {
+            warning(visitorWarning);
+        }
+    }
+
     private static Collection<? extends TypeElementVisitor<?, ?>> findCoreTypeElementVisitors(@Nullable Set<String> warnings) {
-        return SoftServiceLoader.load(TypeElementVisitor.class, TypeElementVisitorProcessor.class.getClassLoader())
-            .disableFork()
-            .collectAll(visitor -> {
+        ClassLoader classLoader = TypeElementVisitorProcessor.class.getClassLoader();
+        if (Boolean.getBoolean(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER)) {
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            if (contextClassLoader != null) {
+                classLoader = contextClassLoader;
+            }
+        }
+        return loadTypeElementVisitors(classLoader, warnings)
+            .stream()
+            .filter(visitor -> {
                 if (!visitor.isEnabled()) {
                     return false;
                 }
 
-                final Requires requires = visitor.getClass().getAnnotation(Requires.class);
+                final Requires requires;
+                try {
+                    requires = visitor.getClass().getAnnotation(Requires.class);
+                } catch (UnsupportedOperationException e) {
+                    // Crema can throw UnsupportedOperationException for runtime annotation lookup; ignore @Requires checks in that case.
+                    return true;
+                }
                 if (requires != null) {
                     final Requires.Sdk sdk = requires.sdk();
                     if (sdk == Requires.Sdk.MICRONAUT) {
@@ -461,10 +489,37 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     }
                 }
                 return true;
-            }).stream()
-            .filter(Objects::nonNull)
-            .<TypeElementVisitor<?, ?>>map(e -> e)
-            // remove duplicate classes
-            .collect(Collectors.toMap(Object::getClass, v -> v, (a, b) -> a)).values();
+            })
+            // remove duplicate classes, preserving encounter order via LinkedHashMap
+            .collect(Collectors.toMap(Object::getClass, v -> v, (a, b) -> a, LinkedHashMap::new)).values();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<TypeElementVisitor<?, ?>> loadTypeElementVisitors(ClassLoader classLoader, @Nullable Set<String> warnings) {
+        List<TypeElementVisitor<?, ?>> visitors = (List) SoftServiceLoader.load(TypeElementVisitor.class, classLoader)
+            .disableFork()
+            .collectAll();
+        if (!visitors.isEmpty()) {
+            return visitors;
+        }
+        visitors = new ArrayList<>();
+        Iterator<ServiceLoader.Provider<TypeElementVisitor>> it = ServiceLoader.load(TypeElementVisitor.class, classLoader).stream().iterator();
+        while (it.hasNext()) {
+            Class<? extends TypeElementVisitor> type = null;
+            try {
+                ServiceLoader.Provider<TypeElementVisitor> provider = it.next();
+                type = provider.type();
+                visitors.add(provider.get());
+            } catch (Throwable e) {
+                if (e instanceof VirtualMachineError virtualMachineError) {
+                    throw virtualMachineError;
+                } else {
+                    if (warnings != null) {
+                        warnings.add("Error loading TypeElementVisitor " + (type != null ? type.getSimpleName() : "") + ": " + e.getMessage());
+                    }
+                }
+            }
+        }
+        return visitors;
     }
 }

@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.exceptions;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.exceptions.response.Error;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
@@ -43,7 +42,6 @@ public class UnsatisfiedRouteHandler extends ErrorExceptionHandler<UnsatisfiedRo
     }
 
     @Override
-    @NonNull
     protected Error error(UnsatisfiedRouteException exception) {
         return new Error() {
             @Override

@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty.cors
 
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Requires
-import org.jspecify.annotations.Nullable
 import io.micronaut.core.util.StringUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -30,6 +29,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.server.util.HttpHostResolver
 import jakarta.inject.Singleton
+import org.jspecify.annotations.Nullable
 import reactor.core.publisher.Flux
 
 import static io.micronaut.http.HttpHeaders.ACCEPT
@@ -93,7 +93,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         !headerNames.contains(ACCESS_CONTROL_ALLOW_METHODS)
         !headerNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
         !headerNames.contains(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK)
-        response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true'
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
     }
 
     void "test cors request with controlled method"() {
@@ -115,7 +115,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         !headerNames.contains(ACCESS_CONTROL_ALLOW_METHODS)
         !headerNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
         !headerNames.contains(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK)
-        response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true'
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
     }
 
     void "test cors request with controlled headers"() {
@@ -230,7 +230,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
         response.header(VARY) == ORIGIN
         !headerNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
-        response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true'
+        !headerNames.contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
     }
 
     void "test preflight request with controlled headers"() {

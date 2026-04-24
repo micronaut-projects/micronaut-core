@@ -17,14 +17,13 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,8 +34,8 @@ import java.io.InputStream;
  * <p>Implementors can defined beans that are annotated with {@link io.micronaut.http.annotation.Consumes} to restrict the applicable content types.</p>
  * <p>Use {@link io.micronaut.core.annotation.Order} to specify the precedence of the reader with lower order corresponding to higher precedence.</p>
  *
- * @see io.micronaut.http.annotation.Consumes
  * @param <T> The generic type.
+ * @see io.micronaut.http.annotation.Consumes
  * @since 4.0.0
  */
 @Experimental
@@ -44,29 +43,30 @@ import java.io.InputStream;
 public interface MessageBodyReader<T> {
     /**
      * Is the type readable.
-     * @param type The type
+     *
+     * @param type      The type
      * @param mediaType The media type, can be {@code null}
      * @return True if is readable
      */
-    default boolean isReadable(@NonNull Argument<T> type, @Nullable MediaType mediaType) {
+    default boolean isReadable(Argument<T> type, @Nullable MediaType mediaType) {
         return true;
     }
 
     /**
      * Reads an object from the given byte buffer.
      *
-     * @param type The type being decoded.
-     * @param mediaType The media type, can be {@code null}
+     * @param type        The type being decoded.
+     * @param mediaType   The media type, can be {@code null}
      * @param httpHeaders The HTTP headers
-     * @param byteBuffer The byte buffer
+     * @param byteBuffer  The byte buffer
      * @return The read object or {@code null}
      * @throws CodecException If an error occurs decoding
      */
     default @Nullable T read(
-        @NonNull Argument<T> type,
+        Argument<T> type,
         @Nullable MediaType mediaType,
-        @NonNull Headers httpHeaders,
-        @NonNull ByteBuffer<?> byteBuffer) throws CodecException {
+        Headers httpHeaders,
+        ByteBuffer<?> byteBuffer) throws CodecException {
         T read;
         try (InputStream inputStream = byteBuffer.toInputStream()) {
             read = read(type, mediaType, httpHeaders, inputStream);
@@ -82,16 +82,16 @@ public interface MessageBodyReader<T> {
     /**
      * Reads an object from the given byte buffer.
      *
-     * @param type The type being decoded.
-     * @param mediaType The media type, can be {@code null}
+     * @param type        The type being decoded.
+     * @param mediaType   The media type, can be {@code null}
      * @param httpHeaders The HTTP headers
      * @param inputStream The input stream
      * @return The read object or {@code null}
      * @throws CodecException If an error occurs decoding
      */
     @Nullable T read(
-        @NonNull Argument<T> type,
+        Argument<T> type,
         @Nullable MediaType mediaType,
-        @NonNull Headers httpHeaders,
-        @NonNull InputStream inputStream) throws CodecException;
+        Headers httpHeaders,
+        InputStream inputStream) throws CodecException;
 }

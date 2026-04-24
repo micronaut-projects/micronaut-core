@@ -16,7 +16,6 @@
 package io.micronaut.context.exceptions;
 
 import io.micronaut.context.Qualifier;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 
@@ -36,14 +35,14 @@ public class NoSuchBeanException extends BeanContextException {
     /**
      * @param beanType The bean type
      */
-    public NoSuchBeanException(@NonNull Class<?> beanType) {
+    public NoSuchBeanException(Class<?> beanType) {
         super(MESSAGE_PREFIX + beanType.getName() + MESSAGE_SUFFIX + additionalMessage());
     }
 
     /**
      * @param beanType The bean type
      */
-    public NoSuchBeanException(@NonNull Argument<?> beanType) {
+    public NoSuchBeanException(Argument<?> beanType) {
         super(MESSAGE_PREFIX + beanType.getTypeName() + MESSAGE_SUFFIX + additionalMessage());
     }
 
@@ -52,7 +51,7 @@ public class NoSuchBeanException extends BeanContextException {
      * @param qualifier The qualifier
      * @param <T>       The type
      */
-    public <T> NoSuchBeanException(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> NoSuchBeanException(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         super(MESSAGE_PREFIX + beanType.getName() + MESSAGE_EXISTS + (qualifier != null ? MESSAGE_FOR_THE_GIVEN_QUALIFIER + qualifier : "") + "." + additionalMessage());
     }
 
@@ -61,7 +60,7 @@ public class NoSuchBeanException extends BeanContextException {
      * @param qualifier The qualifier
      * @param <T>       The type
      */
-    public <T> NoSuchBeanException(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    public <T> NoSuchBeanException(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         super(MESSAGE_PREFIX + beanType.getTypeName() + MESSAGE_EXISTS + (qualifier != null ? MESSAGE_FOR_THE_GIVEN_QUALIFIER + qualifier : "") + "." + additionalMessage());
     }
 
@@ -72,7 +71,7 @@ public class NoSuchBeanException extends BeanContextException {
      * @param <T>       The type
      * @since 4.0.0
      */
-    public <T> NoSuchBeanException(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier, String message) {
+    public <T> NoSuchBeanException(Argument<T> beanType, @Nullable Qualifier<T> qualifier, String message) {
         super(MESSAGE_PREFIX + beanType.getTypeName() + MESSAGE_EXISTS + (qualifier != null ? MESSAGE_FOR_THE_GIVEN_QUALIFIER + qualifier : "") + ". " + message);
     }
 
@@ -83,7 +82,6 @@ public class NoSuchBeanException extends BeanContextException {
         super(message);
     }
 
-    @NonNull
     private static String additionalMessage() {
         return " Make sure the bean is not disabled by bean requirements (enable trace logging for 'io.micronaut.context.condition' to check) and if the bean is enabled then ensure the class is declared a bean and annotation processing is enabled (for Java and Kotlin the 'micronaut-inject-java' dependency should be configured as an annotation processor).";
     }

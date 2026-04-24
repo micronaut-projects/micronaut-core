@@ -19,4 +19,7 @@
  * @author James Kleeh
  * @since 1.1.0
  */
+@NullMarked
 package io.micronaut.web.router.version;
+
+import org.jspecify.annotations.NullMarked;

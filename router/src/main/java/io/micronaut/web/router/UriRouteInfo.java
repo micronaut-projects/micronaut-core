@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.web.router;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -62,7 +60,7 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
      * @return A null or a {@link RouteMatch}
      */
     @Nullable
-    default UriRouteMatch<T, R> tryMatch(@NonNull URI uri) {
+    default UriRouteMatch<T, R> tryMatch(URI uri) {
         return tryMatch(uri.toString());
     }
 
@@ -82,7 +80,7 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
      * @return A null or a {@link RouteMatch}
      */
     @Nullable
-    UriRouteMatch<T, R> tryMatch(@NonNull String uri);
+    UriRouteMatch<T, R> tryMatch(String uri);
 
     /**
      * @return The port the route listens to, or null if the default port

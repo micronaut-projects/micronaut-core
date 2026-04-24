@@ -16,7 +16,6 @@
 package io.micronaut.http.server.util.locale;
 
 import io.micronaut.context.annotation.Requires;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import jakarta.inject.Singleton;
@@ -47,8 +46,7 @@ public class CookieLocaleResolver extends HttpAbstractLocaleResolver {
     }
 
     @Override
-    @NonNull
-    public Optional<Locale> resolve(@NonNull HttpRequest<?> request) {
+    public Optional<Locale> resolve(HttpRequest<?> request) {
         return request.getCookies().get(cookieName, Locale.class);
     }
 }

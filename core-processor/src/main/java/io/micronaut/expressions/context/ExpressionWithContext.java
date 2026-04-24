@@ -16,7 +16,6 @@
 package io.micronaut.expressions.context;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 
 import java.util.Objects;
@@ -32,15 +31,14 @@ import java.util.Objects;
  * @since 4.0.0
  */
 @Internal
-public record ExpressionWithContext(@NonNull EvaluatedExpressionReference expressionReference,
-                                    @NonNull ExpressionEvaluationContext evaluationContext) {
+public record ExpressionWithContext(EvaluatedExpressionReference expressionReference,
+                                    ExpressionEvaluationContext evaluationContext) {
 
     /**
      * Provides initial annotation value treated as evaluated expression.
      *
      * @return initial annotation value
      */
-    @NonNull
     public Object annotationValue() {
         return expressionReference.annotationValue();
     }
@@ -50,7 +48,6 @@ public record ExpressionWithContext(@NonNull EvaluatedExpressionReference expres
      *
      * @return expression class name
      */
-    @NonNull
     public String expressionClassName() {
         return expressionReference.expressionClassName();
     }

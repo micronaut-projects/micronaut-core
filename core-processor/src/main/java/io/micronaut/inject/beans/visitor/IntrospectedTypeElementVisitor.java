@@ -23,7 +23,6 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -40,6 +39,7 @@ import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -49,6 +49,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -118,7 +119,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     return;
                 }
                 int introspectionIndex = index.getAndIncrement();
-                processBuilderDefinition(ce, context, ce.findAnnotation(Introspected.class).orElse(introspected), introspectionIndex, targetPackage);
+                processBuilderDefinition(ce, context, ce.findAnnotation(Introspected.class).orElse(introspected), introspectionIndex, targetPackage, true);
                 final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                     targetPackage,
                     element.getName(),
@@ -149,7 +150,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                             continue;
                         }
                         int introspectionIndex = j++;
-                        processBuilderDefinition(classElement, context, classElement.findAnnotation(Introspected.class).orElse(introspected), introspectionIndex, targetPackage);
+                        processBuilderDefinition(classElement, context, classElement.findAnnotation(Introspected.class).orElse(introspected), introspectionIndex, targetPackage, true);
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                             targetPackage,
                             element.getName(),
@@ -170,7 +171,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 }
             }
         } else {
-            processBuilderDefinition(element, context, introspected, 0, targetPackage);
+            processBuilderDefinition(element, context, introspected, 0, targetPackage, element.hasAnnotation(ImportedClass.class));
             final BeanIntrospectionWriter writer;
             if (element.hasAnnotation(ImportedClass.class)) {
                 ClassElement originatingElement = context.getClassElement(element.stringValue(ImportedClass.class, "originatingElement").orElseThrow()).orElseThrow();
@@ -196,7 +197,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         }
     }
 
-    private void processBuilderDefinition(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected, int index, String targetPackage) {
+    private void processBuilderDefinition(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected, int index, String targetPackage, boolean useLongBuilderName) {
         AnnotationValue<Introspected.IntrospectionBuilder> builder = introspected.getAnnotation("builder", Introspected.IntrospectionBuilder.class).orElse(null);
         if (builder != null) {
             String builderMethod = builder.stringValue("builderMethod").orElse(null);
@@ -213,10 +214,11 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 builderMethod,
                 creatorMethod,
                 writePrefixes,
-                builderClass
+                builderClass,
+                useLongBuilderName
             );
         } else if (element.hasDeclaredAnnotation(ANN_LOMBOK_BUILDER)) {
-            AnnotationValue<Annotation> lombokBuilder = element.getAnnotation(ANN_LOMBOK_BUILDER);
+            AnnotationValue<Annotation> lombokBuilder = Objects.requireNonNull(element.getDeclaredAnnotation(ANN_LOMBOK_BUILDER));
             String lombokBuilderAccessType = lombokBuilder.stringValue("access").orElse("");
             if ("PRIVATE".equals(lombokBuilderAccessType)) {
                 return;
@@ -242,12 +244,13 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 builderMethod,
                 creatorMethod,
                 writePrefixes,
-                null
+                null,
+                useLongBuilderName
             );
         }
     }
 
-    private void processBuilderDefinition(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected, int index, String targetPackage, String builderMethod, String creatorMethod, String[] writePrefixes, AnnotationClassValue<?> builderClass) {
+    private void processBuilderDefinition(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected, int index, String targetPackage, @Nullable String builderMethod, @Nullable String creatorMethod, String[] writePrefixes, @Nullable AnnotationClassValue<?> builderClass, boolean useLongBuilderName) {
         if (builderMethod != null) {
             MethodElement methodElement = element
                 .getEnclosedElement(ElementQuery.ALL_METHODS.onlyStatic()
@@ -272,7 +275,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         returnType,
                         methodMetadata,
                         index,
-                        targetPackage
+                        targetPackage,
+                        useLongBuilderName
                     );
                 } else {
                     throw new ProcessingException(methodElement, "Builder return type is not public. The method must be static and accessible.");
@@ -297,7 +301,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     builderClassElement,
                     builderClassElement.getTargetAnnotationMetadata(),
                     index,
-                    targetPackage);
+                    targetPackage,
+                    useLongBuilderName);
             } else {
                 throw new ProcessingException(element, "Builder class not found on compilation classpath: " + builderClass.getName());
             }
@@ -306,7 +311,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         }
     }
 
-    @NonNull
     private static PropertyElementQuery getExternalPropertyElementQuery(ClassElement defined,
                                                                         ClassElement current,
                                                                         boolean ignoreSettersWithDifferingType) {
@@ -314,7 +318,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         return PropertyElementQuery.of(hierarchy).ignoreSettersWithDifferingType(ignoreSettersWithDifferingType);
     }
 
-    @NonNull
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
@@ -359,13 +362,15 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     private void handleBuilder(
         ClassElement classToBuild,
         VisitorContext context,
-        String creatorMethod,
+        @Nullable String creatorMethod,
         String[] writePrefixes,
-        MethodElement primaryConstructor,
-        MethodElement defaultConstructor,
+        @Nullable MethodElement primaryConstructor,
+        @Nullable MethodElement defaultConstructor,
         ClassElement builderType,
-        AnnotationMetadata builderMetadata,
-        int index, String targetPackage) {
+        @Nullable AnnotationMetadata builderMetadata,
+        int index,
+        String targetPackage,
+        boolean useLongBuilderName) {
         if (builderMetadata == null) {
             builderMetadata = AnnotationMetadata.EMPTY_METADATA;
         }
@@ -381,15 +386,25 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
             MethodElement creatorMethodElement = builderType.getEnclosedElement(buildMethodQuery).orElse(null);
             if (creatorMethodElement != null) {
-                final BeanIntrospectionWriter builderWriter = new BeanIntrospectionWriter(
-                    targetPackage,
-                    builderType.getName(),
-                    index,
-                    classToBuild,
-                    builderType,
-                    builderMetadata,
-                    context
-                );
+                final BeanIntrospectionWriter builderWriter;
+                if (useLongBuilderName) {
+                    builderWriter = new BeanIntrospectionWriter(
+                        targetPackage,
+                        builderType.getName(),
+                        index,
+                        classToBuild,
+                        builderType,
+                        builderMetadata,
+                        context
+                    );
+                } else {
+                    builderWriter = new BeanIntrospectionWriter(
+                        targetPackage,
+                        builderType,
+                        builderMetadata,
+                        context
+                    );
+                }
                 ClassElement callingType = ClassElement.of(builderWriter.getIntrospectionName());
                 if (defaultConstructor != null) {
                     if (defaultConstructor.isAccessible(callingType)) {

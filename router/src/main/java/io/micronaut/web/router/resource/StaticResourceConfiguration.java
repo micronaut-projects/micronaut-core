@@ -61,7 +61,7 @@ public class StaticResourceConfiguration implements Toggleable {
     private String mapping = DEFAULT_MAPPING;
 
     private final ResourceResolver resourceResolver;
-    private final ServerContextPathProvider contextPathProvider;
+    private final @Nullable ServerContextPathProvider contextPathProvider;
 
     /**
      * @param resourceResolver The {@linkplain ResourceResolver}

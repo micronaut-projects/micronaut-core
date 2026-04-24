@@ -16,7 +16,6 @@
 package io.micronaut.inject.ast.beans;
 
 import io.micronaut.core.annotation.AnnotationValue;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ParameterElement;
 
@@ -40,15 +39,13 @@ public interface BeanParameterElement extends ParameterElement, InjectableElemen
         return InjectableElement.super.injectValue(expression);
     }
 
-    @NonNull
     @Override
     default BeanParameterElement qualifier(@Nullable String qualifier) {
         return (BeanParameterElement) InjectableElement.super.qualifier(qualifier);
     }
 
-    @NonNull
     @Override
-    default BeanParameterElement qualifier(@NonNull AnnotationValue<?> qualifier) {
+    default BeanParameterElement qualifier(AnnotationValue<?> qualifier) {
         return (BeanParameterElement) InjectableElement.super.qualifier(qualifier);
     }
 }

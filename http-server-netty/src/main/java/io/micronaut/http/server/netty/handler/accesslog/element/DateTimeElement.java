@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.handler.accesslog.element;
 
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -45,6 +46,7 @@ final class DateTimeElement implements LogElement {
 
     private final DateTimeFormatter formatter;
     private final Set<Event> events;
+    @Nullable
     private final String dateFormat;
 
     /**
@@ -54,7 +56,7 @@ final class DateTimeElement implements LogElement {
      * If the format starts with begin: (default) the time is taken at the beginning of the request processing.
      * If it starts with end: it is the time when the log entry gets written, close to the end of the request processing.
      */
-    DateTimeElement(final String dateFormat) {
+    DateTimeElement(@Nullable final String dateFormat) {
         boolean fromStart;
         String format;
         if (dateFormat == null) {
@@ -88,7 +90,7 @@ final class DateTimeElement implements LogElement {
     }
 
     @Override
-    public String onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
+    public String onRequestHeaders(@Nullable SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
         if (events.contains(Event.ON_REQUEST_HEADERS)) {
             return ZonedDateTime.now().format(formatter);
         } else {

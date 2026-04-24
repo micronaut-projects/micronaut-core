@@ -29,7 +29,7 @@ class RefreshEventSpec: AnnotationSpec() {
 
     @BeforeEach
     fun setup() {
-        embeddedServer = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to RefreshEventSpec::class.simpleName), Environment.TEST)
+        embeddedServer = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to RefreshEventSpec::class.simpleName as Any), Environment.TEST)
         client = HttpClient.create(embeddedServer.url)
     }
 

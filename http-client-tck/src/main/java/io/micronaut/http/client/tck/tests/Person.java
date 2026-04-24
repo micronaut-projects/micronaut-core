@@ -16,7 +16,6 @@
 package io.micronaut.http.client.tck.tests;
 
 import io.micronaut.core.annotation.Introspected;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -25,7 +24,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @ReflectiveAccess
 class Person {
 
-    @NonNull
     private final String name;
 
     private final int age;

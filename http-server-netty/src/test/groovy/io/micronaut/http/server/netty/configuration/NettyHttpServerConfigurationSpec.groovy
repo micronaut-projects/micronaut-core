@@ -363,7 +363,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         config.cors.configurations.get('foo').allowedMethods == [HttpMethod.GET]
         config.cors.configurations.get('foo').allowedHeaders == ['*']
         !config.cors.configurations.get('foo').exposedHeaders
-        config.cors.configurations.get('foo').allowCredentials
+        !config.cors.configurations.get('foo').allowCredentials
         config.cors.configurations.get('foo').allowPrivateNetwork
         config.cors.configurations.get('foo').maxAge == -1
         config.cors.configurations.containsKey('bar')

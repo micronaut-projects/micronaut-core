@@ -16,7 +16,6 @@
 package io.micronaut.core.bind;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.type.Argument;
@@ -55,8 +54,7 @@ public interface ArgumentBinder<T, S> {
      * @return The specific binder
      * @since 4.8
      */
-    @NonNull
-    default ArgumentBinder<T, S> createSpecific(@NonNull Argument<T> argument) {
+    default ArgumentBinder<T, S> createSpecific(Argument<T> argument) {
         return this;
     }
 
@@ -146,8 +144,7 @@ public interface ArgumentBinder<T, S> {
          * @since 4.0.0
          */
         @Experimental
-        @NonNull
-        default <R> BindingResult<R> flatMap(@NonNull Function<T, BindingResult<R>> transform) {
+        default <R> BindingResult<R> flatMap(Function<T, BindingResult<R>> transform) {
             return new MappedBindingResult<>(this, transform);
         }
 

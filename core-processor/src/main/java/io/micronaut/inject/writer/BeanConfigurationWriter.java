@@ -30,6 +30,7 @@ import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.StatementDef;
+import org.jspecify.annotations.NullUnmarked;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
@@ -50,6 +51,7 @@ import static io.micronaut.inject.annotation.AnnotationMetadataGenUtils.createGe
  * @see io.micronaut.context.annotation.Configuration
  * @since 1.0
  */
+@NullUnmarked
 @Internal
 public class BeanConfigurationWriter implements ClassOutputWriter {
 

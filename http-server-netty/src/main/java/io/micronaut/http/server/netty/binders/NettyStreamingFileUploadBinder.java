@@ -15,16 +15,19 @@
  */
 package io.micronaut.http.server.netty.binders;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.server.multipart.FormFactory;
+import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
-import io.netty.handler.codec.http.multipart.FileUpload;
 import reactor.core.publisher.Mono;
 
 import java.util.Optional;
@@ -41,10 +44,10 @@ final class NettyStreamingFileUploadBinder implements TypedRequestArgumentBinder
 
     private static final Argument<StreamingFileUpload> STREAMING_FILE_UPLOAD_ARGUMENT = Argument.of(StreamingFileUpload.class);
 
-    private final NettyStreamingFileUpload.Factory fileUploadFactory;
+    private final BeanProvider<FormFactory> formFactory;
 
-    NettyStreamingFileUploadBinder(NettyStreamingFileUpload.Factory fileUploadFactory) {
-        this.fileUploadFactory = fileUploadFactory;
+    NettyStreamingFileUploadBinder(BeanProvider<FormFactory> formFactory) {
+        this.formFactory = formFactory;
     }
 
     @Override
@@ -54,8 +57,11 @@ final class NettyStreamingFileUploadBinder implements TypedRequestArgumentBinder
         Argument<StreamingFileUpload> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
-        CompletableFuture<? extends StreamingFileUpload> completableFuture = Mono.from(
-            request.formRouteCompleter().claimFields(inputName, (data, publisher) -> fileUploadFactory.create((FileUpload) data, publisher))).toFuture();
+        CompletableFuture<? extends StreamingFileUpload> completableFuture =
+            Mono.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_START, argument)))
+                .map(raw -> formFactory.get().streamFileUpload(raw))
+                .toFuture();
+        BasicHttpAttributes.addRouteWaitsFor(request, CompletableFutureExecutionFlow.just(completableFuture));
 
         return new PendingRequestBindingResult<>() {
 

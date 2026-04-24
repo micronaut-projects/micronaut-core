@@ -17,7 +17,6 @@ package io.micronaut.context.visitor;
 
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -30,7 +29,6 @@ import io.micronaut.inject.visitor.VisitorContext;
 @Internal
 public class ConfigurationReaderVisitor extends ConfigurationMetadataWriterVisitor implements TypeElementVisitor<ConfigurationReader, Object> {
 
-    @NonNull
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;

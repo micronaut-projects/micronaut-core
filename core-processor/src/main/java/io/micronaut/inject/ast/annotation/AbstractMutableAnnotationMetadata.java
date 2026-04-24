@@ -18,8 +18,6 @@ package io.micronaut.inject.ast.annotation;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-
 import java.lang.annotation.Annotation;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -39,81 +37,69 @@ public abstract class AbstractMutableAnnotationMetadata<R> implements MutableAnn
      *
      * @return the return instance
      */
-    @NonNull
     protected abstract R getReturnInstance();
 
     /**
      * @return The annotation metadata to modify
      */
-    @NonNull
     protected abstract MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite();
 
     @Override
-    @NonNull
-    public <T extends Annotation> R annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    public <T extends Annotation> R annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
         getAnnotationMetadataToWrite().annotate(annotationType, consumer);
         return getReturnInstance();
     }
 
     @Override
-    @NonNull
-    public R removeAnnotation(@NonNull String annotationType) {
+    public R removeAnnotation(String annotationType) {
         getAnnotationMetadataToWrite().removeAnnotation(annotationType);
         return getReturnInstance();
     }
 
     @Override
-    @NonNull
-    public <T extends Annotation> R removeAnnotation(@NonNull Class<T> annotationType) {
+    public <T extends Annotation> R removeAnnotation(Class<T> annotationType) {
         getAnnotationMetadataToWrite().removeAnnotation(annotationType);
         return getReturnInstance();
     }
 
     @Override
-    @NonNull
-    public <T extends Annotation> R removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+    public <T extends Annotation> R removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
         getAnnotationMetadataToWrite().removeAnnotationIf(predicate);
         return getReturnInstance();
     }
 
     @Override
-    @NonNull
-    public R removeStereotype(@NonNull String annotationType) {
+    public R removeStereotype(String annotationType) {
         getAnnotationMetadataToWrite().removeStereotype(annotationType);
         return getReturnInstance();
     }
 
     @Override
-    @NonNull
-    public <T extends Annotation> R removeStereotype(@NonNull Class<T> annotationType) {
+    public <T extends Annotation> R removeStereotype(Class<T> annotationType) {
         getAnnotationMetadataToWrite().removeStereotype(annotationType);
         return getReturnInstance();
     }
 
     @Override
-    @NonNull
-    public R annotate(@NonNull String annotationType) {
+    public R annotate(String annotationType) {
         getAnnotationMetadataToWrite().annotate(annotationType);
         return getReturnInstance();
     }
 
     @Override
-    @NonNull
-    public <T extends Annotation> R annotate(@NonNull Class<T> annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+    public <T extends Annotation> R annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
         getAnnotationMetadataToWrite().annotate(annotationType, consumer);
         return getReturnInstance();
     }
 
     @Override
-    @NonNull
-    public <T extends Annotation> R annotate(@NonNull Class<T> annotationType) {
+    public <T extends Annotation> R annotate(Class<T> annotationType) {
         getAnnotationMetadataToWrite().annotate(annotationType);
         return getReturnInstance();
     }
 
     @Override
-    @NonNull
-    public <T extends Annotation> R annotate(@NonNull AnnotationValue<T> annotationValue) {
+    public <T extends Annotation> R annotate(AnnotationValue<T> annotationValue) {
         getAnnotationMetadataToWrite().annotate(annotationValue);
         return getReturnInstance();
     }

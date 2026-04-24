@@ -15,12 +15,13 @@
  */
 package io.micronaut.http.server.netty.jackson
 
-import tools.jackson.core.json.JsonFactory
-import tools.jackson.databind.ObjectMapper
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
+import tools.jackson.core.json.JsonFactory
+import tools.jackson.databind.ObjectMapper
+
 /**
  * @author Vladislav Chernogorov
  * @since 1.0
@@ -43,7 +44,7 @@ class JsonFactorySetupSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
-                'jackson.factory.fail-on-symbol-hash-overflow': false
+                'jackson.json-factory-features.fail-on-symbol-hash-overflow': false
         ))
         applicationContext.start()
 

@@ -20,6 +20,9 @@
  * @since 1.0
  */
 @Configuration
+@NullMarked
 package io.micronaut.management.endpoint;
 
+
+import org.jspecify.annotations.NullMarked;
 import io.micronaut.context.annotation.Configuration;

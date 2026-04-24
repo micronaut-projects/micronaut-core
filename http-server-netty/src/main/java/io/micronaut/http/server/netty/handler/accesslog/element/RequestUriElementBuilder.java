@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Builder for RequestUriElement.
  *
@@ -24,9 +26,16 @@ package io.micronaut.http.server.netty.handler.accesslog.element;
 public final class RequestUriElementBuilder implements LogElementBuilder {
 
     @Override
-    public LogElement build(String token, String param) {
+    @Nullable
+    public LogElement build(String token, @Nullable String param) {
         if (RequestUriElement.REQUEST_URI.equals(token)) {
             return RequestUriElement.INSTANCE;
+        }
+        if (QueryStringElement.QUERY_STRING.equals(token)) {
+            return QueryStringElement.INSTANCE;
+        }
+        if (RequestedUrlPathElement.REQUESTED_URL_PATH.equals(token)) {
+            return RequestedUrlPathElement.INSTANCE;
         }
         return null;
     }

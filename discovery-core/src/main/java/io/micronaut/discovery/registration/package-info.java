@@ -19,5 +19,7 @@
  * @author graemerocher
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.discovery.registration;
 
+import org.jspecify.annotations.NullMarked;

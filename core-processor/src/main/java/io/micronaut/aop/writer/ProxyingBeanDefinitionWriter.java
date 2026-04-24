@@ -39,7 +39,7 @@ import io.micronaut.inject.writer.ClassOutputWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.File;
@@ -60,6 +60,7 @@ import java.util.stream.IntStream;
  * @author Denis Stepanov
  * @since 5.0
  */
+@NullUnmarked
 @Internal
 public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefinitionVisitor, ClassOutputWriter {
 
@@ -236,11 +237,6 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
     }
 
     @Override
-    public boolean isSingleton() {
-        return proxyBeanDefinitionWriter.isSingleton();
-    }
-
-    @Override
     public boolean isInterface() {
         return targetType.isInterface();
     }
@@ -319,7 +315,6 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
         );
     }
 
-    @NonNull
     @Override
     public String getBeanDefinitionReferenceClassName() {
         return proxyBeanDefinitionWriter.getBeanDefinitionReferenceClassName();
@@ -331,6 +326,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
      * @param declaringBean The declaring bean of the method.
      * @param methodElement The method element
      */
+    @Override
     public void visitIntroductionMethod(TypedElement declaringBean,
                                         MethodElement methodElement) {
         visitAroundMethod(declaringBean, methodElement);
@@ -342,6 +338,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
      * @param beanType      The bean type.
      * @param methodElement The method element
      **/
+    @Override
     public void visitAroundMethod(TypedElement beanType,
                                   MethodElement methodElement) {
 
@@ -392,7 +389,6 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
     public void postConstructor() {
     }
 
-    @NonNull
     @Override
     public ClassElement[] getTypeArguments() {
         return proxyBeanDefinitionWriter.getTypeArguments();
@@ -605,6 +601,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
      *
      * @param interceptorBinding the interceptor binding
      */
+    @Override
     public void visitInterceptorBinding(AnnotationValue<?>... interceptorBinding) {
         if (interceptorBinding != null) {
             for (AnnotationValue<?> annotationValue : interceptorBinding) {
@@ -632,7 +629,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
     }
 
     @Override
-    public @NonNull Element[] getOriginatingElements() {
+    public Element[] getOriginatingElements() {
         return originatingElements.getOriginatingElements();
     }
 

@@ -15,6 +15,7 @@
  */
 package io.micronaut.jackson.core.env;
 
+import org.jspecify.annotations.Nullable;
 import tools.jackson.core.exc.StreamReadException;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.MapPropertySource;
@@ -66,6 +67,7 @@ public class CloudFoundryVcapApplicationPropertySourceLoader extends EnvJsonProp
         return Collections.singleton(VCAP_APPLICATION);
     }
 
+    @Nullable
     @Override
     protected String getEnvValue() {
         return CachedEnvironment.getenv(VCAP_APPLICATION);

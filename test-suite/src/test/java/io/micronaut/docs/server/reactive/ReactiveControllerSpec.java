@@ -62,26 +62,6 @@ class ReactiveControllerSpec {
 
         assertEquals("Hello world", body);
 
-        body = client.toBlocking().retrieve("/reactive/rxjava2-single");
-
-        assertEquals("Hello world", body);
-
-        body = client.toBlocking().retrieve("/reactive/rxjava2-maybe");
-
-        assertEquals("Hello world", body);
-
-        body = client.toBlocking().retrieve("/reactive/rxjava2-flowable");
-
-        assertEquals("[Hello world]", body);
-
-        body = client.toBlocking().retrieve("/reactive/rxjava2-flowable-single");
-
-        assertEquals("Hello world", body);
-
-        var response = client.toBlocking().exchange("/reactive/rxjava2-flowable-completable");
-
-        assertNull(response.body());
-
         body = client.toBlocking().retrieve("/reactive/rxjava3-single");
 
         assertEquals("Hello world", body);
@@ -98,7 +78,7 @@ class ReactiveControllerSpec {
 
         assertEquals("Hello world", body);
 
-        response = client.toBlocking().exchange("/reactive/rxjava3-flowable-completable");
+        var response = client.toBlocking().exchange("/reactive/rxjava3-flowable-completable");
 
         assertNull(response.body());
 

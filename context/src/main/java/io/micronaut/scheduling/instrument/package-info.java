@@ -20,6 +20,9 @@
  * @since 1.0
  */
 @Experimental
+@NullMarked
 package io.micronaut.scheduling.instrument;
 
+
+import org.jspecify.annotations.NullMarked;
 import io.micronaut.core.annotation.Experimental;

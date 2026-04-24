@@ -36,9 +36,9 @@ class HttpClientTraceLoggingSpec extends Specification {
 
         when:
         client.exchange("/get-full")
-
+ 
         then:
-        appender.list.formattedMessage.any { it.contains('foo') }
+        new ArrayList<>(appender.list).formattedMessage.any { it.contains('foo') }
 
         cleanup:
         client.close()

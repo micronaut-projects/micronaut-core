@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.handler.accesslog.element;
 
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -54,7 +55,7 @@ public final class ConstantElement implements LogElement {
     }
 
     @Override
-    public String onRequestHeaders(SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
+    public String onRequestHeaders(@Nullable SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
         return value;
     }
 

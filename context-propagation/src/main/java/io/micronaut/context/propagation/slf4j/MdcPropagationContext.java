@@ -17,6 +17,7 @@ package io.micronaut.context.propagation.slf4j;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.propagation.ThreadPropagatedContextElement;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.MDC;
 
 import java.util.Map;
@@ -43,11 +44,11 @@ public record MdcPropagationContext(Map<String, String> state) implements Thread
     }
 
     @Override
-    public void restoreThreadContext(Map<String, String> oldState) {
+    public void restoreThreadContext(@Nullable Map<String, String> oldState) {
         setCurrent(oldState);
     }
 
-    private void setCurrent(Map<String, String> contextMap) {
+    private void setCurrent(@Nullable Map<String, String> contextMap) {
         if (contextMap == null) {
             MDC.clear();
         } else {

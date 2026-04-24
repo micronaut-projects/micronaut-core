@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty;
-
-import org.jspecify.annotations.NonNull;
-
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -48,7 +45,7 @@ final class NonReentrantLock extends Semaphore implements Lock {
     }
 
     @Override
-    public boolean tryLock(long time, @NonNull TimeUnit unit) throws InterruptedException {
+    public boolean tryLock(long time, TimeUnit unit) throws InterruptedException {
         return tryAcquire(time, unit);
     }
 
@@ -57,7 +54,6 @@ final class NonReentrantLock extends Semaphore implements Lock {
         release();
     }
 
-    @NonNull
     @Override
     public Condition newCondition() {
         throw new UnsupportedOperationException();

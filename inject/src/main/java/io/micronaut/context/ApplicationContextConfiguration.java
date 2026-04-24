@@ -15,13 +15,14 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.env.ConfigImportPropertySourcesLocator;
 import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
 import io.micronaut.context.env.PropertySourcesLocator;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.MutableConversionService;
+import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -49,7 +50,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     /**
      * @return The environment names
      */
-    @NonNull List<String> getEnvironments();
+    List<String> getEnvironments();
 
     /**
      * If set to {@code true} (the default is {@code true}) Micronaut will attempt to automatically deduce the environment
@@ -143,7 +144,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      *
      * @return The classpath resource loader
      */
-    default @NonNull ClassPathResourceLoader getResourceLoader() {
+    default ClassPathResourceLoader getResourceLoader() {
         return ClassPathResourceLoader.defaultLoader(getClassLoader());
     }
 
@@ -194,7 +195,6 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      * @return The application name
      * @since 5.0
      */
-    @NonNull
     default String getApplicationName() {
         return "application";
     }
@@ -204,7 +204,30 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      * @since 5.0
      */
     default Collection<PropertySourcesLocator> getPropertySourcesLocators() {
-        return Collections.emptyList();
+        if (isConfigImportEnabled()) {
+            return List.of(new ConfigImportPropertySourcesLocator());
+        }
+        return List.of();
+    }
+
+    /**
+     * Defines how configuration resources are loaded when duplicates exist on the classpath.
+     *
+     * @return The configuration loading strategy
+     * @since 5.0.0
+     */
+    default ResourceLoadStrategy getConfigurationLoadingStrategy() {
+        return ResourceLoadStrategy.defaultStrategy();
+    }
+
+    /**
+     * Whether is the config import 'micronaut.config.import' processing enabled. Enabled by default.
+     *
+     * @return Returns {@code true} if the config import is enabled.
+     * @since 5.0
+     */
+    default boolean isConfigImportEnabled() {
+        return true;
     }
 
 }

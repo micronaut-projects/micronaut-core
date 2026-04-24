@@ -13,9 +13,12 @@ dependencies {
     implementation(libs.managed.reactor)
     compileOnly(libs.managed.kotlinx.coroutines.core)
     compileOnly(libs.managed.kotlinx.coroutines.reactor)
-    compileOnly(libs.managed.netty.pkitesting)
+    compileOnly(libs.managed.netty.pkitesting) {
+        exclude(group = "org.bouncycastle")
+    }
 
     compileOnly(libs.managed.jackson.annotations)
+    compileOnly(libs.managed.jspecify)
 
     testCompileOnly(projects.micronautInjectGroovy)
     testAnnotationProcessor(projects.micronautInjectJava)

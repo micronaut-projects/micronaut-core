@@ -16,7 +16,6 @@
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 
 import java.util.Collection;
@@ -35,7 +34,7 @@ public interface ReturnType<T> extends TypeInformation<T>, AnnotationMetadataPro
      * @return The return type as an argument
      */
     @Override
-    default @NonNull Argument<T> asArgument() {
+    default Argument<T> asArgument() {
         Collection<Argument<?>> values = getTypeVariables().values();
         return Argument.of(getType(), values.toArray(Argument.ZERO_ARGUMENTS));
     }

@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -103,7 +104,7 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
         return BindingResult.empty();
     }
 
-    static RuntimeException extractError(Object message, ArgumentConversionContext<?> conversionContext) {
+    static RuntimeException extractError(@Nullable Object message, ArgumentConversionContext<?> conversionContext) {
         Optional<ConversionError> lastError = conversionContext.getLastError();
         if (lastError.isPresent()) {
             if (LOG.isDebugEnabled()) {

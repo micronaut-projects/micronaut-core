@@ -15,16 +15,19 @@
  */
 package io.micronaut.jackson.core.parser;
 
-import tools.jackson.core.json.JsonFactory;
-import tools.jackson.core.JsonParser;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.type.Argument;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.ObjectReadContext;
+import tools.jackson.core.json.JsonFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.function.Function;
 
 /**
  * Helper class for implementing
@@ -33,8 +36,10 @@ import java.io.InputStream;
  *
  * @author Jonas Konrad
  * @since 4.0.0
+ * @deprecated Implement {@link io.micronaut.json.JsonMapper#readValue(ReadBuffer, Argument)} instead. The implementation can use {@link ReadBuffer#useFastHeapBuffer(Function)}.
  */
 @Internal
+@Deprecated(since = "5.0.0")
 public final class JacksonCoreParserFactory {
 
     private static final boolean HAS_NETTY_BUFFER;
@@ -60,7 +65,9 @@ public final class JacksonCoreParserFactory {
      * @param buffer The input data
      * @return The created parser
      * @throws IOException On failure of jackson createParser methods
+     * @deprecated Use method with {@link ObjectReadContext} instead
      */
+    @Deprecated(since = "5.0.0")
     public static JsonParser createJsonParser(JsonFactory factory, ByteBuffer<?> buffer) throws IOException {
         if (!HAS_NETTY_BUFFER || !(buffer.asNativeBuffer() instanceof ByteBuf byteBuf)) {
             return factory.createParser(buffer.toByteArray());
@@ -70,6 +77,27 @@ public final class JacksonCoreParserFactory {
             return factory.createParser(byteBuf.array(), byteBuf.readerIndex() + byteBuf.arrayOffset(), byteBuf.readableBytes());
         } else {
             return factory.createParser((InputStream) new ByteBufInputStream(byteBuf));
+        }
+    }
+
+    /**
+     * Create a jackson {@link JsonParser} for the given input bytes.
+     *
+     * @param factory     The jackson {@link JsonFactory} for parse features
+     * @param readContext The jackson read context
+     * @param buffer      The input data
+     * @return The created parser
+     * @throws IOException On failure of jackson createParser methods
+     */
+    public static JsonParser createJsonParser(JsonFactory factory, ObjectReadContext readContext, ByteBuffer<?> buffer) throws IOException {
+        if (!HAS_NETTY_BUFFER || !(buffer.asNativeBuffer() instanceof ByteBuf byteBuf)) {
+            return factory.createParser(readContext, buffer.toByteArray());
+        }
+
+        if (byteBuf.hasArray()) {
+            return factory.createParser(readContext, byteBuf.array(), byteBuf.readerIndex() + byteBuf.arrayOffset(), byteBuf.readableBytes());
+        } else {
+            return factory.createParser(readContext, (InputStream) new ByteBufInputStream(byteBuf));
         }
     }
 }

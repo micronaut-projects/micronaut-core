@@ -16,16 +16,22 @@
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Sinks;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -52,6 +58,7 @@ public class Publishers {
     private static final List<Class<?>> REACTIVE_TYPES;
     private static final List<Class<?>> SINGLE_TYPES;
     private static final List<Class<?>> COMPLETABLE_TYPES;
+    private static final Logger LOG = LoggerFactory.getLogger(Publishers.class);
 
     static {
         List<Class<?>> reactiveTypes;
@@ -93,7 +100,6 @@ public class Publishers {
         COMPLETABLE_TYPES = completableTypes;
     }
 
-    @NonNull
     private static List<String> getSingleTypeNames() {
         return List.of(
             "io.micronaut.core.async.publisher.CompletableFuturePublisher",
@@ -107,7 +113,6 @@ public class Publishers {
         );
     }
 
-    @NonNull
     private static List<String> getCompletableTypeNames() {
         return List.of(
             "io.reactivex.Completable",
@@ -116,7 +121,6 @@ public class Publishers {
         );
     }
 
-    @NonNull
     private static List<String> getNonSpecificReactiveTypeNames() {
         return List.of(
             "io.reactivex.Observable",
@@ -127,7 +131,6 @@ public class Publishers {
         );
     }
 
-    @NonNull
     public static List<String> getReactiveTypeNames() {
         return Stream.of(
             getNonSpecificReactiveTypeNames(),
@@ -459,7 +462,7 @@ public class Publishers {
      * @param object The object
      * @return True if it is
      */
-    public static boolean isConvertibleToPublisher(Object object) {
+    public static boolean isConvertibleToPublisher(@Nullable Object object) {
         if (object == null ||
             // check some common types for performance
             object instanceof String || object instanceof byte[]) {
@@ -524,8 +527,7 @@ public class Publishers {
      * @return The Resulting in publisher
      * @since 4.6.0
      */
-    @NonNull
-    public static <T> Publisher<T> convertToPublisher(@NonNull ConversionService conversionService, @NonNull Object object) {
+    public static <T> Publisher<T> convertToPublisher(ConversionService conversionService, @Nullable Object object) {
         Objects.requireNonNull(object, "Argument [object] cannot be null");
         if (object instanceof Publisher<?> publisher) {
             return (Publisher<T>) publisher;
@@ -572,6 +574,68 @@ public class Publishers {
     }
 
     /**
+     * Eagerly subscribe to the given publisher, buffering elements until read from the returned
+     * publisher.
+     *
+     * @param source The source to read from
+     * @param <E> The element type
+     * @return The publisher to consume the buffered elements
+     * @since 5.0.0
+     */
+    public static <E> Publisher<E> bufferNow(@NonNull Publisher<E> source) {
+        Sinks.Many<E> sink = Sinks.many().unicast().onBackpressureBuffer();
+        var subscriber = new Subscriber<E>() {
+            @Nullable
+            volatile Subscription subscription;
+
+            void cancel() {
+                // best effort...
+                Subscription subscription = this.subscription;
+                if (subscription != null) {
+                    subscription.cancel();
+                }
+            }
+
+            @Override
+            public void onSubscribe(Subscription s) {
+                this.subscription = s;
+                s.request(Long.MAX_VALUE);
+            }
+
+            @Override
+            public void onNext(E e) {
+                if (sink.tryEmitNext(e).isFailure()) {
+                    discard(e);
+                }
+            }
+
+            void discard(Object e) {
+                if (e instanceof Closeable cl) {
+                    try {
+                        cl.close();
+                    } catch (IOException ex) {
+                        LOG.debug("Failed to close discarded item", ex);
+                    }
+                }
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                sink.tryEmitError(t);
+            }
+
+            @Override
+            public void onComplete() {
+                sink.tryEmitComplete();
+            }
+        };
+        source.subscribe(subscriber);
+        return sink.asFlux()
+            .doOnCancel(subscriber::cancel)
+            .doOnDiscard(Object.class, subscriber::discard);
+    }
+
+    /**
      * Maps the next result or supplies an empty result.
      *
      * @param <T> The next type
@@ -586,15 +650,13 @@ public class Publishers {
          * @param result The next value.
          * @return The mapped value.
          */
-        @NonNull
-        R map(@NonNull T result);
+        R map(T result);
 
         /**
          * Supplies an empty value if there is no next value.
          *
          * @return The result.
          */
-        @NonNull
         R supplyEmpty();
 
     }

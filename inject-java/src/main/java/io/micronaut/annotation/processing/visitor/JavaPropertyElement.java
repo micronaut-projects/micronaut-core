@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
@@ -56,6 +55,7 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
     @Nullable
     private final String doc;
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     JavaPropertyElement(ClassElement owningElement,
                         ClassElement type,
                         @Nullable MethodElement getter,
@@ -111,9 +111,9 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
         return (PropertyElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
-    private static JavaNativeElement selectNativeType(MethodElement getter,
-                                                      MethodElement setter,
-                                                      FieldElement field) {
+    private static JavaNativeElement selectNativeType(@Nullable MethodElement getter,
+                                                      @Nullable MethodElement setter,
+                                                      @Nullable FieldElement field) {
         if (getter != null) {
             return (JavaNativeElement) getter.getNativeType();
         }
@@ -137,12 +137,12 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
     }
 
     @Override
-    public @NonNull ClassElement getType() {
+    public ClassElement getType() {
         return type;
     }
 
     @Override
-    public @NonNull ClassElement getGenericType() {
+    public ClassElement getGenericType() {
         return type; // Already generic
     }
 
@@ -177,7 +177,7 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return name;
     }
 

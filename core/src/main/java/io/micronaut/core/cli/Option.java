@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.cli;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Represents a command line option.
  *
@@ -23,15 +25,15 @@ package io.micronaut.core.cli;
  */
 public class Option {
 
-    private String name;
-    private String description;
+    private final String name;
+    private final String description;
 
     /**
      * @param name        The name
      * @param description The description
      */
-    public Option(String name, String description) {
-        if (name == null || name.length() == 0) {
+    public Option(@Nullable String name, @Nullable String description) {
+        if (name == null || name.isEmpty()) {
             throw new IllegalArgumentException("illegal option specified");
         }
 

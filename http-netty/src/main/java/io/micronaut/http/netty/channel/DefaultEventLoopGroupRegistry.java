@@ -25,7 +25,6 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.netty.channel.loom.LoomCarrierGroup;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -182,14 +181,13 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
         return createGroup(new DefaultEventLoopGroupConfiguration(), EventLoopGroupConfiguration.DEFAULT, new ThreadPerTaskExecutor(threadFactory));
     }
 
-    @NonNull
     @Override
     public EventLoopGroup getDefaultEventLoopGroup() {
         return beanLocator.getBean(EventLoopGroup.class);
     }
 
     @Override
-    public Optional<EventLoopGroup> getEventLoopGroup(@NonNull String name) {
+    public Optional<EventLoopGroup> getEventLoopGroup(String name) {
         ArgumentUtils.requireNonNull("name", name);
         if (EventLoopGroupConfiguration.DEFAULT.equals(name)) {
             return beanLocator.findBean(EventLoopGroup.class);
@@ -199,7 +197,7 @@ public class DefaultEventLoopGroupRegistry implements EventLoopGroupRegistry {
     }
 
     @Override
-    public Optional<EventLoopGroupConfiguration> getEventLoopGroupConfiguration(@NonNull String name) {
+    public Optional<EventLoopGroupConfiguration> getEventLoopGroupConfiguration(String name) {
         ArgumentUtils.requireNonNull("name", name);
         return beanLocator.findBean(EventLoopGroupConfiguration.class, Qualifiers.byName(name));
     }

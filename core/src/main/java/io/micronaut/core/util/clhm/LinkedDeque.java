@@ -16,6 +16,8 @@
 
 package io.micronaut.core.util.clhm;
 
+import org.jspecify.annotations.NullUnmarked;
+
 import java.util.AbstractCollection;
 import java.util.Collection;
 import java.util.Deque;
@@ -44,6 +46,7 @@ import java.util.NoSuchElementException;
  * @see <a href="https://code.google.com/p/concurrentlinkedhashmap/">
  *      https://code.google.com/p/concurrentlinkedhashmap/</a>
  */
+@NullUnmarked
 //@NotThreadSafe
 final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> implements Deque<E> {
 

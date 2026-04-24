@@ -18,7 +18,6 @@ package io.micronaut.context.env;
 import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.convert.MutableConversionService;
@@ -223,8 +222,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, R
      * @return a new instance of {@link Environment}, never null
      * @since 5.0
      */
-    @NonNull
-    static Environment create(@NonNull ApplicationContextConfiguration configuration) {
+    static Environment create(ApplicationContextConfiguration configuration) {
         return new DefaultEnvironment(configuration);
     }
 
@@ -388,7 +386,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, R
      * @since 4.8.0
      */
     @Experimental
-    default Optional<PropertyEntry> getPropertyEntry(@NonNull String name) {
+    default Optional<PropertyEntry> getPropertyEntry(String name) {
         return Optional.empty();
     }
 

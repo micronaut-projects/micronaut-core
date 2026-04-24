@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.websocket;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 
 import java.util.Objects;
@@ -33,7 +31,7 @@ public final class WebSocketPongMessage {
     /**
      * @param content The content of the pong message.
      */
-    public WebSocketPongMessage(@NonNull ByteBuffer<?> content) {
+    public WebSocketPongMessage(ByteBuffer<?> content) {
         Objects.requireNonNull(content, "content");
         this.content = content;
     }
@@ -41,7 +39,6 @@ public final class WebSocketPongMessage {
     /**
      * @return The content of the pong message. This buffer may be released after the message handler has completed.
      */
-    @NonNull
     public ByteBuffer<?> getContent() {
         return content;
     }

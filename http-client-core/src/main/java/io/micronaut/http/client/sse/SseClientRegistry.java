@@ -17,7 +17,6 @@ package io.micronaut.http.client.sse;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
@@ -41,11 +40,10 @@ public interface SseClientRegistry<E extends SseClient> {
      * @param beanContext    The bean context to use
      * @return The SSE HTTP Client
      */
-    @NonNull
     E resolveSseClient(@Nullable InjectionPoint<?> injectionPoint,
                        @Nullable LoadBalancer loadBalancer,
                        @Nullable HttpClientConfiguration configuration,
-                       @NonNull BeanContext beanContext);
+                       BeanContext beanContext);
 
     /**
      * Return the client for the given annotation metadata.
@@ -53,8 +51,7 @@ public interface SseClientRegistry<E extends SseClient> {
      * @param annotationMetadata The annotation metadata.
      * @return The client
      */
-    @NonNull
-    E getSseClient(@NonNull AnnotationMetadata annotationMetadata);
+    E getSseClient(AnnotationMetadata annotationMetadata);
 
     /**
      * Dispose of the client defined by the given metadata.

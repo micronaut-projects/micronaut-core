@@ -17,9 +17,11 @@ package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.body.ByteBody;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -52,11 +54,12 @@ final class StreamPair {
      * For SLOWEST mode, if one side is currently waiting for the other, this contains the demand
      * information.
      */
-    private Slowest.SlowestDemand slowestDemand = null;
+    private Slowest. @Nullable SlowestDemand slowestDemand = null;
 
     /**
      * For all modes except SLOWEST, the queue of unprocessed bytes for the slower side.
      */
+    @Nullable
     private ByteQueue queue;
     /**
      * For FASTEST mode, this is the {@link Side#left} flag of the side that is currently slower,
@@ -70,6 +73,7 @@ final class StreamPair {
     /**
      * For ORIGINAL and NEW modes, any read exception.
      */
+    @Nullable
     private IOException singleSideException;
 
     private StreamPair(ExtendedInputStream upstream) {
@@ -142,6 +146,7 @@ final class StreamPair {
         }
 
         @Override
+        @SuppressWarnings("LabelledBreakTarget")
         public int read(byte[] b, int off, int len) throws IOException {
             lock.lock();
             lockBody: try {
@@ -219,6 +224,7 @@ final class StreamPair {
             final int off;
             final int len;
             boolean fulfilled;
+            @Nullable
             IOException exception;
             int actualLength;
 
@@ -242,7 +248,7 @@ final class StreamPair {
         public int read(byte[] b, int off, int len) throws IOException {
             lock.lock();
             try {
-                if (!queue.isEmpty() && fastModeSlowerSide == left) {
+                if (!Objects.requireNonNull(queue).isEmpty() && fastModeSlowerSide == left) {
                     return queue.take(b, off, len);
                 } else {
                     int n = upstream.read(b, off, len);
@@ -281,10 +287,10 @@ final class StreamPair {
                 if (n == -1) {
                     singleSideComplete = true;
                 } else if (!isOtherSideCancelled()) {
-                    queue.addCopy(b, off, n);
+                    Objects.requireNonNull(queue).addCopy(b, off, n);
                 } else {
                     // discard queue here because we already hold the lock
-                    queue.clear();
+                    Objects.requireNonNull(queue).clear();
                 }
                 // in case other side is waiting, wake them
                 wakeup.signalAll();
@@ -325,7 +331,7 @@ final class StreamPair {
             lock.lock();
             try {
                 while (true) {
-                    if (!queue.isEmpty()) {
+                    if (!Objects.requireNonNull(queue).isEmpty()) {
                         return queue.take(b, off, len);
                     }
                     if (singleSideException != null) {

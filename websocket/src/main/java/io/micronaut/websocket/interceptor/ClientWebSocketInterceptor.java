@@ -25,8 +25,10 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketClientException;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;
+import java.util.Objects;
 
 /**
  * Intercepts unimplemented {@link io.micronaut.websocket.annotation.ClientWebSocket} methods.
@@ -38,6 +40,7 @@ import java.io.Closeable;
 public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Object> {
 
     private final ConversionService conversionService;
+    @Nullable
     private WebSocketSession webSocketSession;
 
     /**
@@ -48,10 +51,11 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
     }
 
     @Override
+    @Nullable
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         Class<?> declaringType = context.getDeclaringType();
         if (declaringType == WebSocketSessionAware.class) {
-            Object[] values = context.getParameterValues();
+            @Nullable Object[] values = context.getParameterValues();
             if (ArrayUtils.isNotEmpty(values)) {
                 Object o = values[0];
                 if (o instanceof WebSocketSession session) {
@@ -78,7 +82,7 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
                     return context.proceed();
                 }
                 try {
-                    Object[] parameterValues = context.getParameterValues();
+                    @Nullable Object[] parameterValues = context.getParameterValues();
                     switch (parameterValues.length) {
                         case 0 -> throw new IllegalArgumentException("At least 1 parameter is required to a send method");
                         case 1 -> {
@@ -100,7 +104,9 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
         return context.proceed();
     }
 
+    @Nullable
     private Object send(InterceptedMethod interceptedMethod, Object message, MediaType mediaType) {
+        Objects.requireNonNull(webSocketSession);
         switch (interceptedMethod.resultType()) {
             case COMPLETION_STAGE -> {
                 return interceptedMethod.handleResult(webSocketSession.sendAsync(message, mediaType));

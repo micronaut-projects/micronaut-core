@@ -5,6 +5,8 @@ import tools.jackson.databind.node.JsonNodeFactory
 import tools.jackson.databind.node.ObjectNode
 import groovy.transform.CompileStatic
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.type.Argument
+import io.micronaut.core.type.MutableHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -12,14 +14,18 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Produces
+import io.micronaut.http.body.MessageBodyWriter
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.codec.CodecException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.server.types.files.FileCustomizableResponseType
 import io.micronaut.http.server.types.files.StreamedFile
 import io.micronaut.http.server.types.files.SystemFile
 import jakarta.inject.Inject
 import jakarta.inject.Named
+import jakarta.inject.Singleton
 import reactor.core.publisher.Mono
 import spock.lang.IgnoreIf
 
@@ -30,6 +36,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ExecutorService
+import java.io.OutputStream
 
 import static io.micronaut.http.HttpHeaders.ACCEPT_RANGES
 import static io.micronaut.http.HttpHeaders.CACHE_CONTROL
@@ -239,6 +246,37 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         file.delete()
     }
 
+    void "test when HttpResponse FileCustomizableResponseType returns StreamedFile with JSON media type"() {
+        when:
+        def response = httpClient.toBlocking().exchange('/test-stream/response-json-stream', String)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.body() == tempFileContents
+    }
+
+    void "test when HttpResponse FileCustomizableResponseType returns SystemFile with JSON media type"() {
+        when:
+        def response = httpClient.toBlocking().exchange('/test-stream/response-json-system', String)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.body() == tempFileContents
+    }
+
+    void "test when HttpResponse FileCustomizableResponseType returns custom type with custom writer"() {
+        when:
+        def response = httpClient.toBlocking().exchange('/test-stream/response-json-custom', String)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.body() == "custom-body"
+    }
+
     void "test when an attached file is returned with a name"() {
         when:
         def response = httpClient.toBlocking().exchange('/test/different-name', String)
@@ -420,6 +458,60 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         @Get('/reactive-system')
         Mono<FileCustomizableResponseType> reactiveStream(@QueryValue Path path) {
             Mono.just(new SystemFile(path.toFile(), MediaType.TEXT_PLAIN_TYPE))
+        }
+
+        @Get('/response-json-stream')
+        HttpResponse<FileCustomizableResponseType> responseJsonStream() {
+            def stream = new ByteArrayInputStream(tempFileContents.bytes)
+            HttpResponse.ok(new StreamedFile(stream, MediaType.APPLICATION_JSON_TYPE))
+        }
+
+        @Get('/response-json-system')
+        HttpResponse<FileCustomizableResponseType> responseJsonSystem() {
+            HttpResponse.ok(new SystemFile(tempFile, MediaType.APPLICATION_JSON_TYPE))
+        }
+
+        @Get('/response-json-custom')
+        HttpResponse<FileCustomizableResponseType> responseJsonCustom() {
+            HttpResponse.ok(new CustomFileResponseType("custom-body")).contentType(MediaType.APPLICATION_JSON_TYPE)
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'FileTypeHandlerSpec')
+    @Singleton
+    @Produces(MediaType.APPLICATION_JSON)
+    static class CustomFileResponseTypeBodyWriter implements MessageBodyWriter<CustomFileResponseType> {
+
+        @Override
+        void writeTo(Argument<CustomFileResponseType> type,
+                     MediaType mediaType,
+                     CustomFileResponseType object,
+                     MutableHeaders outgoingHeaders,
+                     OutputStream outputStream) throws CodecException {
+            outputStream.write(object.content.bytes)
+        }
+    }
+
+    static class CustomFileResponseType implements FileCustomizableResponseType {
+        final String content
+
+        CustomFileResponseType(String content) {
+            this.content = content
+        }
+
+        @Override
+        long getLastModified() {
+            return 0
+        }
+
+        @Override
+        long getLength() {
+            return content.bytes.length
+        }
+
+        @Override
+        MediaType getMediaType() {
+            return MediaType.APPLICATION_JSON_TYPE
         }
     }
 

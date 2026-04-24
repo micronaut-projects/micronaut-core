@@ -17,7 +17,7 @@ import java.util.Collections
 class HelloControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-        ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to HelloControllerSpec::class.simpleName))
+        ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to HelloControllerSpec::class.simpleName as Any))
     )
 
     val client = autoClose(
@@ -56,7 +56,7 @@ class HelloControllerSpec: StringSpec() {
             ))
             // end::jsonmap[]
 
-            response.blockFirst()["text"] shouldBe "Hello John"
+            response.blockFirst()!!["text"] shouldBe "Hello John"
 
             // tag::jsonmaptypes[]
             response = Flux.from(client.retrieve(
@@ -65,7 +65,7 @@ class HelloControllerSpec: StringSpec() {
             ))
             // end::jsonmaptypes[]
 
-            response.blockFirst()["text"] shouldBe "Hello John"
+            response.blockFirst()!!["text"] shouldBe "Hello John"
         }
 
         "test retrieve with POJO" {
@@ -74,7 +74,7 @@ class HelloControllerSpec: StringSpec() {
                     GET<Any>("/greet/John"), Message::class.java
             ))
 
-            response.blockFirst().text shouldBe "Hello John"
+            response.blockFirst()!!.text shouldBe "Hello John"
             // end::jsonpojo[]
         }
 
@@ -84,7 +84,7 @@ class HelloControllerSpec: StringSpec() {
                     GET<Any>("/greet/John"), Message::class.java // <1>
             )
 
-            val response = Flux.from(call).blockFirst()
+            val response = Flux.from(call).blockFirst()!!
             val message = response.getBody(Message::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.OK // <3>
@@ -103,7 +103,7 @@ class HelloControllerSpec: StringSpec() {
             )
             // end::poststring[]
 
-            val response = Flux.from(call).blockFirst()
+            val response = Flux.from(call).blockFirst()!!
             val message = response.getBody(String::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.CREATED // <3>
@@ -119,7 +119,7 @@ class HelloControllerSpec: StringSpec() {
             )
             // end::postpojo[]
 
-            val response = Flux.from(call).blockFirst()
+            val response = Flux.from(call).blockFirst()!!
             val message = response.getBody(Message::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.CREATED // <3>

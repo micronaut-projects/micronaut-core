@@ -377,7 +377,7 @@ internal open class KotlinClassElement(
 
     override fun getMethods() = internalMethods
 
-    override fun findMethod(name: String?) = Optional.ofNullable(
+    override fun findMethod(name: String) = Optional.ofNullable(
         internalMethods.firstOrNull { it.name == name }
     )
 

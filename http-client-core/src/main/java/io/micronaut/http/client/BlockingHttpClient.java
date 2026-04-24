@@ -22,6 +22,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;
 import java.util.Optional;
@@ -55,11 +56,11 @@ public interface BlockingHttpClient extends Closeable, LifeCycle<BlockingHttpCli
      * @return The full {@link HttpResponse} object
      * @throws HttpClientResponseException when an error status is returned
      */
-    <I, O, E> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType);
+    <I, O, E> HttpResponse<O> exchange(HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType);
 
     /**
-     * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
-     * {@link org.reactivestreams.Publisher} and converting the response body to the specified type.</p>
+     * <p>Perform an HTTP request for the given request object emitting the full HTTP response
+     * and converting the response body to the specified type.</p>
      *
      * <p>This method will send a {@code Content-Length} header and except a content length header the response and
      * is designed for simple non-streaming exchanges of data</p>
@@ -74,7 +75,7 @@ public interface BlockingHttpClient extends Closeable, LifeCycle<BlockingHttpCli
      * @return The full {@link HttpResponse} object
      * @throws HttpClientResponseException when an error status is returned
      */
-    default <I, O> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType) {
+    default <I, O> HttpResponse<O> exchange(HttpRequest<I> request, @Nullable Argument<O> bodyType) {
         return exchange(request, bodyType, HttpClient.DEFAULT_ERROR_TYPE);
     }
 

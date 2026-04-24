@@ -17,7 +17,6 @@ package io.micronaut.context;
 
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
@@ -47,7 +46,7 @@ public interface BeanDefinitionRegistry {
      * @param <T>       The concrete type
      * @return True if it is
      */
-    <T> boolean containsBean(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
+    <T> boolean containsBean(Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Return whether the bean of the given type is contained within this context.
@@ -58,7 +57,7 @@ public interface BeanDefinitionRegistry {
      * @return True if it is
      * @since 3.0.0
      */
-    default <T> boolean containsBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    default <T> boolean containsBean(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return containsBean(
                 Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
                 qualifier
@@ -73,7 +72,7 @@ public interface BeanDefinitionRegistry {
      * @return True if it is
      * @since 3.0.0
      */
-    default <T> boolean containsBean(@NonNull Argument<T> beanType) {
+    default <T> boolean containsBean(Argument<T> beanType) {
         return containsBean(
                 Objects.requireNonNull(beanType, "Bean type cannot be null"),
                 null
@@ -87,7 +86,6 @@ public interface BeanDefinitionRegistry {
      * @return The registry
      * @since 4.8.0
      */
-    @NonNull
     @Experimental
     default BeanDefinitionRegistry registerBeanConfiguration(BeanConfiguration configuration) {
         throw new UnsupportedOperationException("This implementation of BeanDefinitionRegistry doesn't support runtime registration of bean configurations");
@@ -103,9 +101,8 @@ public interface BeanDefinitionRegistry {
      * @param <B> The bean type
      * @since 3.6.0
      */
-    @NonNull
     @Experimental
-    default <B> BeanDefinitionRegistry registerBeanDefinition(@NonNull RuntimeBeanDefinition<B> definition) {
+    default <B> BeanDefinitionRegistry registerBeanDefinition(RuntimeBeanDefinition<B> definition) {
         throw new UnsupportedOperationException("This implementation of BeanDefinitionRegistry doesn't support runtime registration of bean definitions");
     }
 
@@ -126,10 +123,8 @@ public interface BeanDefinitionRegistry {
      * @param <T>       The concrete type
      * @return This bean context
      */
-    @NonNull <T> BeanDefinitionRegistry registerSingleton(
-        @NonNull
+    <T> BeanDefinitionRegistry registerSingleton(
         Class<T> type,
-        @NonNull
         T singleton,
         @Nullable
         Qualifier<T> qualifier,
@@ -142,7 +137,7 @@ public interface BeanDefinitionRegistry {
      * @param configurationName The configuration name
      * @return An optional with the configuration either present or not
      */
-    @NonNull Optional<BeanConfiguration> findBeanConfiguration(@NonNull String configurationName);
+    Optional<BeanConfiguration> findBeanConfiguration(String configurationName);
 
     /**
      * Obtain a {@link BeanDefinition} for the given type.
@@ -154,7 +149,7 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    @NonNull <T> Optional<BeanDefinition<T>> findBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
+    <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Obtain a {@link BeanDefinition} for the given type.
@@ -167,7 +162,7 @@ public interface BeanDefinitionRegistry {
      *                                                                for the given type
      * @since 3.0.0
      */
-    default @NonNull <T> Optional<BeanDefinition<T>> findBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    default <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return findBeanDefinition(
                 Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
                 qualifier
@@ -184,7 +179,7 @@ public interface BeanDefinitionRegistry {
      *                                                                for the given type
      * @since 3.0.0
      */
-    default @NonNull <T> Optional<BeanDefinition<T>> findBeanDefinition(@NonNull Argument<T> beanType) {
+    default <T> Optional<BeanDefinition<T>> findBeanDefinition(Argument<T> beanType) {
         return findBeanDefinition(beanType, null);
     }
 
@@ -197,7 +192,7 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    @NonNull <T> Optional<BeanRegistration<T>> findBeanRegistration(@NonNull T bean);
+    <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean);
 
     /**
      * Obtain a {@link BeanDefinition} for the given bean.
@@ -209,8 +204,7 @@ public interface BeanDefinitionRegistry {
      *                                                                for the given type
      * @since 4.3.0
      */
-    @NonNull
-    default <T> Optional<BeanDefinition<T>> findBeanDefinition(@NonNull T bean) {
+    default <T> Optional<BeanDefinition<T>> findBeanDefinition(T bean) {
         return findBeanRegistration(bean).map(BeanRegistration::getBeanDefinition);
     }
 
@@ -224,7 +218,7 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    @NonNull <T> Collection<BeanDefinition<T>> getBeanDefinitions(@NonNull Class<T> beanType);
+    <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType);
 
     /**
      * Obtain a {@link BeanDefinition} for the given type.
@@ -236,7 +230,7 @@ public interface BeanDefinitionRegistry {
      * bean definitions exist for the given type
      * @since 3.0.0
      */
-    default @NonNull <T> Collection<BeanDefinition<T>> getBeanDefinitions(@NonNull Argument<T> beanType) {
+    default <T> Collection<BeanDefinition<T>> getBeanDefinitions(Argument<T> beanType) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         return getBeanDefinitions(beanType.getType(), null);
     }
@@ -251,7 +245,7 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    @NonNull <T> Collection<BeanDefinition<T>> getBeanDefinitions(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
+    <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Obtain a {@link BeanDefinition} for the given type.
@@ -264,7 +258,7 @@ public interface BeanDefinitionRegistry {
      * bean definitions exist for the given type
      * @since 3.0.0
      */
-    default @NonNull <T> Collection<BeanDefinition<T>> getBeanDefinitions(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    default <T> Collection<BeanDefinition<T>> getBeanDefinitions(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         return getBeanDefinitions(beanType.getType(), qualifier);
     }
@@ -276,21 +270,21 @@ public interface BeanDefinitionRegistry {
      * @param qualifier The qualifier
      * @return The bean definitions
      */
-    @NonNull Collection<BeanDefinition<Object>> getBeanDefinitions(@NonNull Qualifier<Object> qualifier);
+    Collection<BeanDefinition<Object>> getBeanDefinitions(Qualifier<Object> qualifier);
 
     /**
      * Get all registered {@link BeanDefinition}.
      *
      * @return The bean definitions
      */
-    @NonNull Collection<BeanDefinition<Object>> getAllBeanDefinitions();
+    Collection<BeanDefinition<Object>> getAllBeanDefinitions();
 
     /**
      * Get all enabled {@link BeanDefinitionReference}.
      *
      * @return The bean definitions
      */
-    @NonNull Collection<BeanDefinitionReference<Object>> getBeanDefinitionReferences();
+    Collection<BeanDefinitionReference<Object>> getBeanDefinitionReferences();
 
     /**
      * Get all disabled {@link DisabledBean}.
@@ -298,7 +292,7 @@ public interface BeanDefinitionRegistry {
      * @return The disabled bean definitions
      * @since 4.0.0
      */
-    default @NonNull Collection<DisabledBean<?>> getDisabledBeans() {
+    default Collection<DisabledBean<?>> getDisabledBeans() {
         return Collections.emptyList();
     }
 
@@ -309,7 +303,7 @@ public interface BeanDefinitionRegistry {
      * @param qualifier The qualifier
      * @return The beans
      */
-    @NonNull Collection<BeanRegistration<?>> getActiveBeanRegistrations(@NonNull Qualifier<?> qualifier);
+    Collection<BeanRegistration<?>> getActiveBeanRegistrations(Qualifier<?> qualifier);
 
     /**
      * Find active {@link jakarta.inject.Singleton} beans for the given bean type. Note that
@@ -319,7 +313,7 @@ public interface BeanDefinitionRegistry {
      * @param <T>      The concrete type
      * @return The beans
      */
-    @NonNull <T> Collection<BeanRegistration<T>> getActiveBeanRegistrations(@NonNull Class<T> beanType);
+    <T> Collection<BeanRegistration<T>> getActiveBeanRegistrations(Class<T> beanType);
 
     /**
      * Find and if necessary initialize {@link jakarta.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
@@ -329,7 +323,7 @@ public interface BeanDefinitionRegistry {
      * @param <T>      The concrete type
      * @return The beans
      */
-    @NonNull <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Class<T> beanType);
+    <T> Collection<BeanRegistration<T>> getBeanRegistrations(Class<T> beanType);
 
     /**
      * Find and if necessary initialize {@link jakarta.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
@@ -341,7 +335,7 @@ public interface BeanDefinitionRegistry {
      * @return The beans
      * @since 2.4.0
      */
-    @NonNull <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
+    <T> Collection<BeanRegistration<T>> getBeanRegistrations(Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Find and if necessary initialize {@link jakarta.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
@@ -353,7 +347,7 @@ public interface BeanDefinitionRegistry {
      * @return The beans
      * @since 3.0.0
      */
-    default @NonNull <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    default <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return getBeanRegistrations(
                 Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
                 qualifier
@@ -370,7 +364,7 @@ public interface BeanDefinitionRegistry {
      * @throws NoSuchBeanException if the bean doesn't exist
      * @since 2.4.0
      */
-    @NonNull <T> BeanRegistration<T> getBeanRegistration(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
+    <T> BeanRegistration<T> getBeanRegistration(Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Find a bean registration for the given bean type and optional qualifier.
@@ -382,7 +376,7 @@ public interface BeanDefinitionRegistry {
      * @throws NoSuchBeanException if the bean doesn't exist
      * @since 3.0.0
      */
-    default @NonNull <T> BeanRegistration<T> getBeanRegistration(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    default <T> BeanRegistration<T> getBeanRegistration(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return getBeanRegistration(
                 Objects.requireNonNull(beanType, "Bean type cannot be null").getType(),
                 qualifier
@@ -398,8 +392,7 @@ public interface BeanDefinitionRegistry {
      * @throws NoSuchBeanException if the bean doesn't exist
      * @since 3.5.0
      */
-    @NonNull
-    <T> BeanRegistration<T> getBeanRegistration(@NonNull BeanDefinition<T> beanDefinition);
+    <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<T> beanDefinition);
 
     /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
@@ -411,7 +404,7 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    @NonNull <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
+    <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Obtain the original {@link BeanDefinition} for a {@link io.micronaut.inject.ProxyBeanDefinition}.
@@ -423,7 +416,7 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    default @NonNull <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    default <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         Objects.requireNonNull(beanType, "Bean type cannot be null");
         return findProxyTargetBeanDefinition(
                 beanType.getType(),
@@ -440,7 +433,7 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist for the given type
      * @since 3.5.0
      */
-    default @NonNull <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@NonNull BeanDefinition<T> proxyBeanDefinition) {
+    default <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(BeanDefinition<T> proxyBeanDefinition) {
         Objects.requireNonNull(proxyBeanDefinition, "Proxy bean definition cannot be null");
         if (proxyBeanDefinition instanceof ProxyBeanDefinition<T> beanDefinition) {
             return findProxyTargetBeanDefinition(
@@ -461,7 +454,7 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    default @NonNull <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    default <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return findProxyBeanDefinition(Argument.of(beanType), qualifier);
     }
 
@@ -475,7 +468,7 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    @NonNull <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+    <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
@@ -493,9 +486,8 @@ public interface BeanDefinitionRegistry {
      * @return This bean context
      * @deprecated Use {@link #registerBeanDefinition(RuntimeBeanDefinition)}
      */
-    @NonNull
     @Deprecated(forRemoval = true, since = "5.0")
-    default <T> BeanDefinitionRegistry registerSingleton(@NonNull Class<T> type, @NonNull T singleton, @Nullable Qualifier<T> qualifier) {
+    default <T> BeanDefinitionRegistry registerSingleton(Class<T> type, T singleton, @Nullable Qualifier<T> qualifier) {
         return registerSingleton(type, singleton, qualifier, true);
     }
 
@@ -514,9 +506,8 @@ public interface BeanDefinitionRegistry {
      * @return This bean context
      * @deprecated Use {@link #registerBeanDefinition(RuntimeBeanDefinition)}
      */
-    @NonNull
     @Deprecated(forRemoval = true, since = "5.0")
-    default <T> BeanDefinitionRegistry registerSingleton(@NonNull Class<T> type, @NonNull T singleton) {
+    default <T> BeanDefinitionRegistry registerSingleton(Class<T> type, T singleton) {
         return registerSingleton(type, singleton, null);
     }
 
@@ -533,9 +524,8 @@ public interface BeanDefinitionRegistry {
      * @return This bean context
      * @deprecated Use {@link #registerBeanDefinition(RuntimeBeanDefinition)}
      */
-    @NonNull
     @Deprecated(forRemoval = true, since = "5.0")
-    default BeanDefinitionRegistry registerSingleton(@NonNull Object singleton) {
+    default BeanDefinitionRegistry registerSingleton(Object singleton) {
         ArgumentUtils.requireNonNull("singleton", singleton);
         Class type = singleton.getClass();
         return registerSingleton(type, singleton);
@@ -555,9 +545,8 @@ public interface BeanDefinitionRegistry {
      * @return This bean context
      * @deprecated Use {@link #registerBeanDefinition(RuntimeBeanDefinition)}
      */
-    @NonNull
     @Deprecated(forRemoval = true, since = "5.0")
-    default BeanDefinitionRegistry registerSingleton(@NonNull Object singleton, boolean inject) {
+    default BeanDefinitionRegistry registerSingleton(Object singleton, boolean inject) {
         ArgumentUtils.requireNonNull("singleton", singleton);
         Class type = singleton.getClass();
         return registerSingleton(
@@ -579,7 +568,7 @@ public interface BeanDefinitionRegistry {
      *                                                                for the given type
      * @throws NoSuchBeanException                                    If the bean cannot be found
      */
-    default @NonNull <T> BeanDefinition<T> getBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    default <T> BeanDefinition<T> getBeanDefinition(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return findBeanDefinition(beanType, qualifier).orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
     }
 
@@ -595,7 +584,7 @@ public interface BeanDefinitionRegistry {
      * @throws NoSuchBeanException                                    If the bean cannot be found
      * @since 3.0.
      */
-    default @NonNull <T> BeanDefinition<T> getBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    default <T> BeanDefinition<T> getBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return findBeanDefinition(beanType, qualifier).orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
     }
 
@@ -610,7 +599,7 @@ public interface BeanDefinitionRegistry {
      *                                                                for the given type
      * @throws NoSuchBeanException                                    If the bean cannot be found
      */
-    default @NonNull <T> BeanDefinition<T> getProxyTargetBeanDefinition(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+    default <T> BeanDefinition<T> getProxyTargetBeanDefinition(Class<T> beanType, @Nullable Qualifier<T> qualifier) {
         return findProxyTargetBeanDefinition(beanType, qualifier).orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
     }
 
@@ -626,7 +615,7 @@ public interface BeanDefinitionRegistry {
      * @throws NoSuchBeanException                                    If the bean cannot be found
      * @since 3.0.0
      */
-    default @NonNull <T> BeanDefinition<T> getProxyTargetBeanDefinition(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+    default <T> BeanDefinition<T> getProxyTargetBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return findProxyTargetBeanDefinition(beanType, qualifier).orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
     }
 
@@ -640,7 +629,7 @@ public interface BeanDefinitionRegistry {
      *                                                                for the given type
      * @throws NoSuchBeanException                                    If the bean cannot be found
      */
-    default @NonNull <T> BeanDefinition<T> getBeanDefinition(@NonNull Class<T> beanType) {
+    default <T> BeanDefinition<T> getBeanDefinition(Class<T> beanType) {
         return findBeanDefinition(beanType, null).orElseThrow(() -> new NoSuchBeanException(beanType));
     }
 
@@ -655,7 +644,7 @@ public interface BeanDefinitionRegistry {
      * @throws NoSuchBeanException                                    If the bean cannot be found
      * @since 3.0.0
      */
-    default @NonNull <T> BeanDefinition<T> getBeanDefinition(@NonNull Argument<T> beanType) {
+    default <T> BeanDefinition<T> getBeanDefinition(Argument<T> beanType) {
         return getBeanDefinition(beanType, null);
     }
 
@@ -668,7 +657,7 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    default @NonNull <T> Optional<BeanDefinition<T>> findBeanDefinition(@NonNull Class<T> beanType) {
+    default <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType) {
         return findBeanDefinition(beanType, null);
     }
 
@@ -679,7 +668,7 @@ public interface BeanDefinitionRegistry {
      * @return True if it is
      */
     @SuppressWarnings("ConstantConditions")
-    default boolean containsBean(@NonNull Class<?> beanType) {
+    default boolean containsBean(Class<?> beanType) {
         return beanType != null && containsBean(beanType, null);
     }
 }

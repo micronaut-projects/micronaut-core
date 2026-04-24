@@ -59,7 +59,7 @@ internal class KotlinElementAnnotationMetadataFactory(
         )
     }
 
-    override fun getNativeElement(element: Element?): KSAnnotated {
+    override fun getNativeElement(element: Element): KSAnnotated {
         return if (element is AbstractKotlinElement<*>) element.nativeType.element else empty
     }
 
@@ -91,7 +91,7 @@ internal class KotlinElementAnnotationMetadataFactory(
         }
     }
 
-    override fun lookupForClass(classElement: ClassElement?): CachedAnnotationMetadata {
+    override fun lookupForClass(classElement: ClassElement): CachedAnnotationMetadata {
         val kotlinClassElement = classElement as KotlinClassElement
         return metadataBuilder.lookupOrBuild(
             getClassDefinitionCacheKey(kotlinClassElement),
@@ -99,7 +99,7 @@ internal class KotlinElementAnnotationMetadataFactory(
         )
     }
 
-    override fun lookupTypeAnnotationsForClass(classElement: ClassElement): CachedAnnotationMetadata? {
+    override fun lookupTypeAnnotationsForClass(classElement: ClassElement): CachedAnnotationMetadata {
         val kotlinClassElement = classElement as KotlinClassElement
         if (kotlinClassElement.nativeType.type == null) {
             throw ProcessingException(classElement, "Type annotations aren't supported!")
@@ -113,7 +113,7 @@ internal class KotlinElementAnnotationMetadataFactory(
         )
     }
 
-    override fun lookupTypeAnnotationsForGenericPlaceholder(placeholderElement: GenericPlaceholderElement): CachedAnnotationMetadata? {
+    override fun lookupTypeAnnotationsForGenericPlaceholder(placeholderElement: GenericPlaceholderElement): CachedAnnotationMetadata {
         val kotlinPlaceholderElement = placeholderElement as KotlinGenericPlaceholderElement
         if (kotlinPlaceholderElement.genericNativeType.owner == null) {
             throw ProcessingException(placeholderElement, "Type annotations an a generic placeholder require the owner element to be specified!")
@@ -124,7 +124,7 @@ internal class KotlinElementAnnotationMetadataFactory(
         )
     }
 
-    override fun lookupTypeAnnotationsForWildcard(wildcardElement: WildcardElement): CachedAnnotationMetadata? {
+    override fun lookupTypeAnnotationsForWildcard(wildcardElement: WildcardElement): CachedAnnotationMetadata {
         val kotlinWildcardElement = wildcardElement as KotlinWildcardElement
         if (kotlinWildcardElement.genericNativeType.owner == null) {
             throw ProcessingException(wildcardElement, "Type annotations on a wildcard require the owner element to be specified!")
@@ -135,11 +135,11 @@ internal class KotlinElementAnnotationMetadataFactory(
         )
     }
 
-    override fun lookupForPackage(packageElement: PackageElement?): CachedAnnotationMetadata? {
+    override fun lookupForPackage(packageElement: PackageElement): CachedAnnotationMetadata {
         return metadataBuilder.lookupOrBuildForType(getNativeElement(packageElement))
     }
 
-    override fun lookupForParameter(parameterElement: ParameterElement): CachedAnnotationMetadata? {
+    override fun lookupForParameter(parameterElement: ParameterElement): CachedAnnotationMetadata {
         val kotlinParameterElement = parameterElement as KotlinParameterElement
         val owner = kotlinParameterElement.methodElement.owningType
         return metadataBuilder.lookupOrBuild(
@@ -152,7 +152,7 @@ internal class KotlinElementAnnotationMetadataFactory(
         )
     }
 
-    override fun lookupForField(fieldElement: FieldElement): CachedAnnotationMetadata? {
+    override fun lookupForField(fieldElement: FieldElement): CachedAnnotationMetadata {
         val kotlinFieldElement = fieldElement as AbstractKotlinElement<*>
         val owner: KotlinClassElement
         if (kotlinFieldElement is KotlinFieldElement) {
@@ -171,7 +171,7 @@ internal class KotlinElementAnnotationMetadataFactory(
         )
     }
 
-    override fun lookupForMethod(methodElement: MethodElement): CachedAnnotationMetadata? {
+    override fun lookupForMethod(methodElement: MethodElement): CachedAnnotationMetadata {
         val kotlinMethodElement = methodElement as AbstractKotlinMethodElement<*>
         val owner = kotlinMethodElement.owningType
         return metadataBuilder.lookupOrBuild(

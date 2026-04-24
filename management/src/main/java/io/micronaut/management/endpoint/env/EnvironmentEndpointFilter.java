@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.management.endpoint.env;
-
-import org.jspecify.annotations.NonNull;
-
 /**
  * A bean interface that allows hiding or masking of parts of the environment and its property sources when they are
  * displayed in the {@link EnvironmentEndpoint}.
@@ -31,5 +28,5 @@ public interface EnvironmentEndpointFilter {
      *
      * @param specification a specification of which properties are masked or hidden from the endpoint.
      */
-    void specifyFiltering(@NonNull EnvironmentFilterSpecification specification);
+    void specifyFiltering(EnvironmentFilterSpecification specification);
 }

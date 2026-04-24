@@ -19,7 +19,6 @@ import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.context.annotation.Mapper;
 import io.micronaut.core.annotation.AnnotationValue;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.annotation.TypedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -30,7 +29,7 @@ import java.util.List;
  */
 public final class MapperAnnotationMapper implements TypedAnnotationMapper<Mapper> {
 
-    private static final @NonNull AnnotationValue<InterceptorBinding> BINDING = AnnotationValue.builder(InterceptorBinding.class).value(Mapper.class).member("kind", InterceptorKind.INTRODUCTION).build();
+    private static final AnnotationValue<InterceptorBinding> BINDING = AnnotationValue.builder(InterceptorBinding.class).value(Mapper.class).member("kind", InterceptorKind.INTRODUCTION).build();
 
     @Override
     public List<AnnotationValue<?>> map(AnnotationValue<Mapper> annotation, VisitorContext visitorContext) {

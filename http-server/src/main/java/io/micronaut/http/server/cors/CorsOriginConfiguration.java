@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.server.cors;
 
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
+import org.jspecify.annotations.Nullable;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -46,11 +46,12 @@ public class CorsOriginConfiguration {
      */
     public static final boolean DEFAULT_ALLOW_PRIVATE_NETWORK = true;
     private List<String> allowedOrigins = ANY;
+    @Nullable
     private String allowedOriginsRegex;
     private List<HttpMethod> allowedMethods = ANY_METHOD;
     private List<String> allowedHeaders = ANY;
     private List<String> exposedHeaders = Collections.emptyList();
-    private boolean allowCredentials = true;
+    private boolean allowCredentials = false;
     private boolean allowPrivateNetwork = DEFAULT_ALLOW_PRIVATE_NETWORK;
     private Long maxAge = 1800L;
 
@@ -75,7 +76,6 @@ public class CorsOriginConfiguration {
     /**
      * @return a regular expression for matching Allowed Origins.
      */
-    @NonNull
     public Optional<String> getAllowedOriginsRegex() {
         if (allowedOriginsRegex == null || allowedOriginsRegex.equals(StringUtils.EMPTY_STRING)) {
             return Optional.empty();

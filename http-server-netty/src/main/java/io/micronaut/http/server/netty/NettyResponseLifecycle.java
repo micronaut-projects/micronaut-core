@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.subscriber.LazySendingSubscriber;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -36,6 +35,7 @@ import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.ResponseLifecycle;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.util.LeakPresenceDetector;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -87,17 +87,17 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
     }
 
     @Override
-    protected @NonNull CloseableByteBody concatenate(Publisher<ByteBody> items) {
+    protected CloseableByteBody concatenate(Publisher<ByteBody> items) {
         return NettyConcatenatingSubscriber.concatenate(byteBodyFactory(), ConcatenatingSubscriber.Separators.NONE, items);
     }
 
     @Override
-    protected @NonNull CloseableByteBody concatenateJson(Publisher<ByteBody> items) {
+    protected CloseableByteBody concatenateJson(Publisher<ByteBody> items) {
         return NettyConcatenatingSubscriber.concatenate(byteBodyFactory(), NettyConcatenatingSubscriber.JSON_NETTY, items);
     }
 
-    private static final class NettyConcatenatingSubscriber extends ConcatenatingSubscriber implements BufferConsumer {
-        static final Separators JSON_NETTY = Separators.jsonSeparators(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT));
+    private static class NettyConcatenatingSubscriber extends ConcatenatingSubscriber implements BufferConsumer {
+        static final Separators JSON_NETTY = LeakPresenceDetector.staticInitializer(() -> Separators.jsonSeparators(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT)));
 
         private final EventLoopFlow flow;
 
@@ -113,7 +113,7 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
         }
 
         @Override
-        public void add(@NonNull ReadBuffer buffer) {
+        public void add(ReadBuffer buffer) {
             if (flow.executeNow(() -> super.add(buffer))) {
                 super.add(buffer);
             }

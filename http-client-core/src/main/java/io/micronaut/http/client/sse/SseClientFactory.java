@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.sse;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.client.HttpClientConfiguration;
 
@@ -37,7 +36,6 @@ public interface SseClientFactory {
      * @param url The base URL
      * @return The client
      */
-    @NonNull
     SseClient createSseClient(@Nullable URL url);
 
     /**
@@ -49,7 +47,6 @@ public interface SseClientFactory {
      * @return The client
      * @since 2.2.0
      */
-    @NonNull
-    SseClient createSseClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration);
+    SseClient createSseClient(@Nullable URL url, HttpClientConfiguration configuration);
 
 }

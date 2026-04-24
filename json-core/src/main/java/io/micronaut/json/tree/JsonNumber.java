@@ -14,15 +14,11 @@
  * limitations under the License.
  */
 package io.micronaut.json.tree;
-
-import org.jspecify.annotations.NonNull;
-
 final class JsonNumber extends JsonScalar {
 
-    @NonNull
     private final Number value;
 
-    JsonNumber(@NonNull Number value) {
+    JsonNumber(Number value) {
         this.value = value;
     }
 
@@ -37,12 +33,10 @@ final class JsonNumber extends JsonScalar {
     }
 
     @Override
-    @NonNull
     public Number getNumberValue() {
         return value;
     }
 
-    @NonNull
     @Override
     public String coerceStringValue() {
         return value.toString();

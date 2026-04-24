@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.web.router;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -40,8 +38,7 @@ public final class RouteAttributes {
      * @return The route match, if present
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    @NonNull
-    public static Optional<RouteMatch<?>> getRouteMatch(@NonNull HttpRequest<?> request) {
+    public static Optional<RouteMatch<?>> getRouteMatch(HttpRequest<?> request) {
         return (Optional) request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class);
     }
 
@@ -51,7 +48,7 @@ public final class RouteAttributes {
      * @param request    The request
      * @param routeMatch The route match
      */
-    public static void setRouteMatch(@NonNull HttpRequest<?> request, @NonNull RouteMatch<?> routeMatch) {
+    public static void setRouteMatch(HttpRequest<?> request, RouteMatch<?> routeMatch) {
         request.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
     }
 
@@ -61,9 +58,8 @@ public final class RouteAttributes {
      * @param response The response
      * @return The route match, if present
      */
-    @NonNull
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public static Optional<RouteMatch<?>> getRouteMatch(@NonNull HttpResponse<?> response) {
+    public static Optional<RouteMatch<?>> getRouteMatch(HttpResponse<?> response) {
         return (Optional) response.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class);
     }
 
@@ -73,7 +69,7 @@ public final class RouteAttributes {
      * @param response   The response
      * @param routeMatch The route match
      */
-    public static void setRouteMatch(@NonNull HttpResponse<?> response, @NonNull RouteMatch<?> routeMatch) {
+    public static void setRouteMatch(HttpResponse<?> response, RouteMatch<?> routeMatch) {
         response.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
     }
 
@@ -83,9 +79,8 @@ public final class RouteAttributes {
      * @param request The request
      * @return The route info, if present
      */
-    @NonNull
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public static Optional<RouteInfo<?>> getRouteInfo(@NonNull HttpRequest<?> request) {
+    public static Optional<RouteInfo<?>> getRouteInfo(HttpRequest<?> request) {
         return (Optional) request.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class);
     }
 
@@ -95,7 +90,7 @@ public final class RouteAttributes {
      * @param request   The request
      * @param routeInfo The route info
      */
-    public static void setRouteInfo(@NonNull HttpRequest<?> request, @NonNull RouteInfo<?> routeInfo) {
+    public static void setRouteInfo(HttpRequest<?> request, RouteInfo<?> routeInfo) {
         request.setAttribute(HttpAttributes.ROUTE_INFO, routeInfo);
     }
 
@@ -105,9 +100,8 @@ public final class RouteAttributes {
      * @param response The response
      * @return The route info, if present
      */
-    @NonNull
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public static Optional<RouteInfo<?>> getRouteInfo(@NonNull HttpResponse<?> response) {
+    public static Optional<RouteInfo<?>> getRouteInfo(HttpResponse<?> response) {
         // don't convert to RouteInfo to avoid type pollution
         return (Optional) response.getAttribute(HttpAttributes.ROUTE_INFO);
     }
@@ -118,7 +112,7 @@ public final class RouteAttributes {
      * @param response  The response
      * @param routeInfo The route info
      */
-    public static void setRouteInfo(@NonNull HttpResponse<?> response, @NonNull RouteInfo<?> routeInfo) {
+    public static void setRouteInfo(HttpResponse<?> response, RouteInfo<?> routeInfo) {
         response.setAttribute(HttpAttributes.ROUTE_INFO, routeInfo);
     }
 
@@ -128,8 +122,7 @@ public final class RouteAttributes {
      * @param response The response
      * @return The exception, if present
      */
-    @NonNull
-    public static Optional<Throwable> getException(@NonNull HttpResponse<?> response) {
+    public static Optional<Throwable> getException(HttpResponse<?> response) {
         return response.getAttribute(HttpAttributes.EXCEPTION, Throwable.class);
     }
 
@@ -139,7 +132,7 @@ public final class RouteAttributes {
      * @param response  The response
      * @param throwable The exception
      */
-    public static void setException(@NonNull HttpResponse<?> response, @NonNull Throwable throwable) {
+    public static void setException(HttpResponse<?> response, Throwable throwable) {
         response.setAttribute(HttpAttributes.EXCEPTION, throwable);
     }
 
@@ -149,8 +142,7 @@ public final class RouteAttributes {
      * @param response The response
      * @return The discarded body, if present
      */
-    @NonNull
-    public static Optional<Object> getHeadBody(@NonNull HttpResponse<?> response) {
+    public static Optional<Object> getHeadBody(HttpResponse<?> response) {
         return response.getAttribute(HttpAttributes.HEAD_BODY);
     }
 
@@ -160,7 +152,7 @@ public final class RouteAttributes {
      * @param response The response
      * @param body     The body
      */
-    public static void setHeadBody(@NonNull HttpResponse<?> response, @NonNull Object body) {
+    public static void setHeadBody(HttpResponse<?> response, Object body) {
         response.setAttribute(HttpAttributes.HEAD_BODY, body);
     }
 }

@@ -16,6 +16,7 @@
 package io.micronaut.core.async.processor;
 
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
+import org.jspecify.annotations.NullUnmarked;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -32,6 +33,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullUnmarked
 public abstract class SingleSubscriberProcessor<T, R> extends CompletionAwareSubscriber<T> implements Processor<T, R> {
 
     protected static final Subscription EMPTY_SUBSCRIPTION = new Subscription() {

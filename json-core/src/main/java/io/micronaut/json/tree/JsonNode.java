@@ -17,7 +17,6 @@ package io.micronaut.json.tree;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 
@@ -47,7 +46,6 @@ public abstract class JsonNode {
      * @return The {@link JsonNode} representing this value
      * @since 4.0.0
      */
-    @NonNull
     public static JsonNode from(Object value) {
         if (value == null) {
             return JsonNull.INSTANCE;
@@ -82,7 +80,6 @@ public abstract class JsonNode {
     /**
      * @return The singleton node representing {@code null}.
      */
-    @NonNull
     public static JsonNode nullNode() {
         return JsonNull.INSTANCE;
     }
@@ -91,8 +88,7 @@ public abstract class JsonNode {
      * @param nodes The nodes in this array. Must not be modified after this method is called.
      * @return The immutable array node.
      */
-    @NonNull
-    public static JsonNode createArrayNode(@NonNull List<JsonNode> nodes) {
+    public static JsonNode createArrayNode(List<JsonNode> nodes) {
         Objects.requireNonNull(nodes, "nodes");
         return new JsonArray(nodes);
     }
@@ -101,7 +97,6 @@ public abstract class JsonNode {
      * @param nodes The nodes in this object. Must not be modified after this method is called.
      * @return The immutable array node.
      */
-    @NonNull
     public static JsonNode createObjectNode(Map<String, JsonNode> nodes) {
         Objects.requireNonNull(nodes, "nodes");
         return new JsonObject(nodes);
@@ -111,7 +106,6 @@ public abstract class JsonNode {
      * @param value The value of the node.
      * @return A json node representing the given boolean value.
      */
-    @NonNull
     public static JsonNode createBooleanNode(boolean value) {
         return JsonBoolean.valueOf(value);
     }
@@ -120,8 +114,7 @@ public abstract class JsonNode {
      * @param value The value of the node.
      * @return A json node representing the given string value.
      */
-    @NonNull
-    public static JsonNode createStringNode(@NonNull String value) {
+    public static JsonNode createStringNode(String value) {
         Objects.requireNonNull(value, "value");
         return new JsonString(value);
     }
@@ -142,7 +135,6 @@ public abstract class JsonNode {
      * @param value The value of the node.
      * @return A json node representing the given numeric value.
      */
-    @NonNull
     public static JsonNode createNumberNode(int value) {
         return createNumberNodeImpl(value);
     }
@@ -151,7 +143,6 @@ public abstract class JsonNode {
      * @param value The value of the node.
      * @return A json node representing the given numeric value.
      */
-    @NonNull
     public static JsonNode createNumberNode(long value) {
         return createNumberNodeImpl(value);
     }
@@ -160,8 +151,7 @@ public abstract class JsonNode {
      * @param value The value of the node.
      * @return A json node representing the given numeric value.
      */
-    @NonNull
-    public static JsonNode createNumberNode(@NonNull BigDecimal value) {
+    public static JsonNode createNumberNode(BigDecimal value) {
         return createNumberNodeImpl(value);
     }
 
@@ -169,7 +159,6 @@ public abstract class JsonNode {
      * @param value The value of the node.
      * @return A json node representing the given numeric value.
      */
-    @NonNull
     public static JsonNode createNumberNode(float value) {
         return createNumberNodeImpl(value);
     }
@@ -178,7 +167,6 @@ public abstract class JsonNode {
      * @param value The value of the node.
      * @return A json node representing the given numeric value.
      */
-    @NonNull
     public static JsonNode createNumberNode(double value) {
         return createNumberNodeImpl(value);
     }
@@ -187,8 +175,7 @@ public abstract class JsonNode {
      * @param value The value of the node.
      * @return A json node representing the given numeric value.
      */
-    @NonNull
-    public static JsonNode createNumberNode(@NonNull BigInteger value) {
+    public static JsonNode createNumberNode(BigInteger value) {
         return createNumberNodeImpl(value);
     }
 
@@ -212,7 +199,6 @@ public abstract class JsonNode {
      * @return The raw numeric value of this node. Always full precision.
      * @throws IllegalStateException if this is not a number node.
      */
-    @NonNull
     public Number getNumberValue() {
         throw new IllegalStateException("Not a number");
     }
@@ -253,7 +239,6 @@ public abstract class JsonNode {
      * @return The value of this number node, converted to {@link BigInteger}. May lose the decimal part.
      * @throws IllegalStateException if this is not a number node.
      */
-    @NonNull
     public final BigInteger getBigIntegerValue() {
         Number numberValue = getNumberValue();
         if (numberValue instanceof BigInteger integer) {
@@ -269,7 +254,6 @@ public abstract class JsonNode {
      * @return The value of this number node, converted to {@link BigDecimal}.
      * @throws IllegalStateException if this is not a number node.
      */
-    @NonNull
     public final BigDecimal getBigDecimalValue() {
         Number numberValue = getNumberValue();
         if (numberValue instanceof BigInteger integer) {
@@ -295,7 +279,6 @@ public abstract class JsonNode {
      * @return The value of this string node.
      * @throws IllegalStateException if this is not a string node.
      */
-    @NonNull
     public String getStringValue() {
         throw new IllegalStateException("Not a string");
     }
@@ -306,7 +289,6 @@ public abstract class JsonNode {
      * @return The coerced string value.
      * @throws IllegalStateException if this node is not a scalar value
      */
-    @NonNull
     public String coerceStringValue() {
         throw new IllegalStateException("Not a scalar value");
     }
@@ -342,14 +324,12 @@ public abstract class JsonNode {
      * @return An {@link Iterable} of all values of this array or object node.
      * @throws IllegalStateException if this is not a container node.
      */
-    @NonNull
     public abstract Iterable<JsonNode> values();
 
     /**
      * @return An {@link Iterable} of all entries of this object node.
      * @throws IllegalStateException if this is not an object node.
      */
-    @NonNull
     public abstract Iterable<Map.Entry<String, JsonNode>> entries();
 
     /**
@@ -385,7 +365,7 @@ public abstract class JsonNode {
      * @return The field with the given name, or {@code null} if there is no such field or this is not an object.
      */
     @Nullable
-    public abstract JsonNode get(@NonNull String fieldName);
+    public abstract JsonNode get(String fieldName);
 
     /**
      * @param index The index into this array.

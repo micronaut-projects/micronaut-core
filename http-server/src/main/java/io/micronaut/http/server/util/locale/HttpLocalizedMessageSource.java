@@ -17,11 +17,12 @@ package io.micronaut.http.server.util.locale;
 
 import io.micronaut.context.AbstractLocalizedMessageSource;
 import io.micronaut.context.MessageSource;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.LocaleResolver;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.runtime.http.scope.RequestAware;
 import io.micronaut.runtime.http.scope.RequestScope;
+import org.jspecify.annotations.Nullable;
+
 import java.util.Locale;
 
 /**
@@ -31,6 +32,7 @@ import java.util.Locale;
  */
 @RequestScope
 public class HttpLocalizedMessageSource extends AbstractLocalizedMessageSource<HttpRequest<?>> implements RequestAware {
+    @Nullable
     private Locale locale;
 
     /**
@@ -42,7 +44,6 @@ public class HttpLocalizedMessageSource extends AbstractLocalizedMessageSource<H
     }
 
     @Override
-    @NonNull
     protected Locale getLocale() {
         if (locale == null) {
             throw new IllegalStateException("RequestAware::setRequest should have set the locale");

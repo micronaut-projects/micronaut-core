@@ -16,7 +16,6 @@
 package io.micronaut.http.reactive.execution;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -46,8 +45,7 @@ public sealed interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> permit
      * @param <K>       THe flow value type
      * @return a new flow
      */
-    @NonNull
-    static <K> ReactiveExecutionFlow<K> fromPublisher(@NonNull Publisher<K> publisher) {
+    static <K> ReactiveExecutionFlow<K> fromPublisher(Publisher<K> publisher) {
         return (ReactiveExecutionFlow<K>) new ReactorExecutionFlowImpl(publisher);
     }
 
@@ -62,8 +60,7 @@ public sealed interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> permit
      * @return a new flow
      * @since 4.8.0
      */
-    @NonNull
-    static <K> ExecutionFlow<K> fromPublisherEager(@NonNull Publisher<K> publisher, @NonNull PropagatedContext propagatedContext) {
+    static <K> ExecutionFlow<K> fromPublisherEager(Publisher<K> publisher, PropagatedContext propagatedContext) {
         return ReactorExecutionFlowImpl.defuse(publisher, propagatedContext);
     }
 
@@ -75,11 +72,12 @@ public sealed interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> permit
      * @param <K>      The flow value type
      * @return a new flow
      */
-    @NonNull
-    static <K> ReactiveExecutionFlow<K> async(@NonNull Executor executor, @NonNull Supplier<ExecutionFlow<K>> supplier) {
-        Scheduler scheduler = Schedulers.fromExecutor(executor);
+    static <K> ReactiveExecutionFlow<K> async(Executor executor, Supplier<ExecutionFlow<K>> supplier) {
+        PropagatedContext ctx = PropagatedContext.getOrEmpty();
+        Scheduler scheduler = Schedulers.fromExecutor(r -> executor.execute(ctx.wrap(r)));
         return (ReactiveExecutionFlow<K>) new ReactorExecutionFlowImpl(
-            Mono.fromSupplier(supplier).flatMap(ReactorExecutionFlowImpl::toMono).subscribeOn(scheduler)
+            Mono.fromSupplier(supplier).flatMap(ReactorExecutionFlowImpl::toMono)
+                .subscribeOn(scheduler)
         );
     }
 
@@ -90,8 +88,7 @@ public sealed interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> permit
      * @param <K>  THe flow value type
      * @return a new flow
      */
-    @NonNull
-    static <K> ReactiveExecutionFlow<K> fromFlow(@NonNull ExecutionFlow<K> flow) {
+    static <K> ReactiveExecutionFlow<K> fromFlow(ExecutionFlow<K> flow) {
         if (flow instanceof ReactiveExecutionFlow<K> executionFlow) {
             return executionFlow;
         }
@@ -103,7 +100,6 @@ public sealed interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> permit
      *
      * @return The publisher
      */
-    @NonNull
     Publisher<T> toPublisher();
 
     /**
@@ -114,9 +110,8 @@ public sealed interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> permit
      * @param <K>          The element type
      * @return The publisher
      */
-    @NonNull
     @SingleResult
-    static <K> Publisher<K> toPublisher(@NonNull Supplier<@NonNull ExecutionFlow<K>> flowSupplier) {
+    static <K> Publisher<K> toPublisher(Supplier<ExecutionFlow<K>> flowSupplier) {
         return (Publisher<K>) ReactorExecutionFlowImpl.toMono(flowSupplier);
     }
 
@@ -127,9 +122,8 @@ public sealed interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> permit
      * @param <K>  The element type
      * @return The publisher
      */
-    @NonNull
     @SingleResult
-    static <K> Publisher<K> toPublisher(@NonNull ExecutionFlow<K> flow) {
+    static <K> Publisher<K> toPublisher(ExecutionFlow<K> flow) {
         return (Publisher<K>) ReactorExecutionFlowImpl.toMono(flow);
     }
 }

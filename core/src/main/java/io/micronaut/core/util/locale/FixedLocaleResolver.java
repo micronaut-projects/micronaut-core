@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.core.util.locale;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.LocaleResolver;
 
 import java.util.Locale;
@@ -41,14 +39,12 @@ public class FixedLocaleResolver<T> implements LocaleResolver<T> {
     }
 
     @Override
-    @NonNull
-    public Optional<Locale> resolve(@NonNull T context) {
+    public Optional<Locale> resolve(T context) {
         return Optional.of(locale);
     }
 
     @Override
-    @NonNull
-    public Locale resolveOrDefault(@NonNull T context) {
+    public Locale resolveOrDefault(T context) {
         return resolve(context).orElseThrow(() -> new IllegalArgumentException("The fixed locale must be set"));
     }
 }

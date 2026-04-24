@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.web.router.version;
-
-import org.jspecify.annotations.NonNull;
-
 /**
  * Defines a provider of a default Version.
  *
@@ -29,6 +26,5 @@ public interface DefaultVersionProvider {
      *
      * @return Resolves a default Version
      */
-    @NonNull
     String resolveDefaultVersion();
 }

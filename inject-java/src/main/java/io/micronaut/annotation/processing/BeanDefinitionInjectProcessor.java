@@ -52,6 +52,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -240,12 +241,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             }
                         } catch (ProcessingException ex) {
                             JavaNativeElement javaNativeElement = (JavaNativeElement) ex.getOriginatingElement();
-                            error(javaNativeElement != null ? javaNativeElement.element() : typeElement, ex.getMessage());
+                            error(javaNativeElement != null ? javaNativeElement.element() : typeElement, Objects.requireNonNullElse(ex.getMessage(), "Error"));
                         } catch (PostponeToNextRoundException e) {
                             processed.remove(className);
                             postponed.put(className, e);
                         } catch (Exception e) {
-                            error(typeElement, e.getMessage());
+                            error(typeElement, Objects.requireNonNullElse(e.getMessage(), "Error"));
                             throw e;
                         }
                     }

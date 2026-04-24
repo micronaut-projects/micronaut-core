@@ -27,10 +27,19 @@ import io.micronaut.retry.RetryState;
  */
 public class RetryEvent extends ApplicationEvent {
 
+    /**
+     * The retry state for the current attempt.
+     */
     private final RetryState retryState;
+
+    /**
+     * The throwable that triggered the retry.
+     */
     private final Throwable throwable;
 
     /**
+     * Creates a retry event.
+     *
      * @param source The source method invocation context for intercepting method call
      * @param retryState To encapsulate current state into {@link io.micronaut.retry.annotation.Retryable}
      * @param throwable The error
@@ -42,6 +51,8 @@ public class RetryEvent extends ApplicationEvent {
     }
 
     /**
+     * Returns the retry context.
+     *
      * @return The retry context
      */
     public RetryState getRetryState() {
@@ -49,6 +60,8 @@ public class RetryEvent extends ApplicationEvent {
     }
 
     /**
+     * Returns the exception that caused the retry.
+     *
      * @return The exception that caused the retry
      */
     public Throwable getThrowable() {

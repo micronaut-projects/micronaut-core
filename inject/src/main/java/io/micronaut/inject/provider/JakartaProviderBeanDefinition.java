@@ -21,6 +21,7 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import jakarta.inject.Provider;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Implementation for Jakarta bean lookups.
@@ -31,7 +32,7 @@ import jakarta.inject.Provider;
 @Internal
 public final class JakartaProviderBeanDefinition extends AbstractProviderDefinition<Provider<Object>> {
     @Override
-    public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return isTypePresent();
     }
 
@@ -47,9 +48,10 @@ public final class JakartaProviderBeanDefinition extends AbstractProviderDefinit
     }
 
     @Override
-    protected Provider<Object> buildProvider(BeanResolutionContext resolutionContext, BeanContext context, Argument<Object> argument, Qualifier<Object> qualifier, boolean singleton) {
+    protected Provider<Object> buildProvider(BeanResolutionContext resolutionContext, BeanContext context, Argument<Object> argument, @Nullable Qualifier<Object> qualifier, boolean singleton) {
         if (singleton) {
             return new Provider<>() {
+                @Nullable
                 Object bean;
                 @Override
                 public Object get() {

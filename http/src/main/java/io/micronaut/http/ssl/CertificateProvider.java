@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.ssl;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.naming.Named;
 import org.reactivestreams.Publisher;
 
@@ -41,8 +39,7 @@ public interface CertificateProvider extends Named {
      *
      * @return a publisher of {@link KeyStore} updates
      */
-    @NonNull
-    Publisher<@NonNull KeyStore> getKeyStore();
+    Publisher<KeyStore> getKeyStore();
 
     /**
      * Publisher that emits the trust store with trusted certificates. By default,
@@ -50,8 +47,7 @@ public interface CertificateProvider extends Named {
      *
      * @return a publisher of {@link KeyStore} updates for trust material
      */
-    @NonNull
-    default Publisher<@NonNull KeyStore> getTrustStore() {
+    default Publisher<KeyStore> getTrustStore() {
         return getKeyStore();
     }
 }

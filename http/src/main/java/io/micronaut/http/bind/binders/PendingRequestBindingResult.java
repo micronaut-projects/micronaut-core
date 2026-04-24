@@ -16,7 +16,6 @@
 package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.bind.ArgumentBinder;
 
 import java.util.function.Function;
@@ -54,7 +53,7 @@ public interface PendingRequestBindingResult<T> extends ArgumentBinder.BindingRe
     }
 
     @Override
-    default <R> ArgumentBinder.@NonNull BindingResult<R> flatMap(@NonNull Function<T, ArgumentBinder.BindingResult<R>> transform) {
+    default <R> ArgumentBinder. BindingResult<R> flatMap(Function<T, ArgumentBinder.BindingResult<R>> transform) {
         return new MappedPendingRequestBindingResult<>(this, transform);
     }
 }

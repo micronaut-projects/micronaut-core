@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.multipart;
 
-import org.jspecify.annotations.NonNull;
 
 /**
  * The base class representing multiple parts in the {@link MultipartBody} to build a Netty multipart request.
@@ -51,5 +50,5 @@ abstract class Part<D> {
      * @return The multi part data object
      * @param <T> The data
      */
-    abstract @NonNull <T> T getData(@NonNull MultipartDataFactory<T> factory);
+    abstract <T> T getData(MultipartDataFactory<T> factory);
 }

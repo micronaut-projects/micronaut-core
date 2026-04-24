@@ -5,9 +5,9 @@ import io.micronaut.aop.MethodInvocationContext
 import jakarta.inject.Singleton
 
 @Singleton
-class ObservableInterceptor : MethodInterceptor<Any?, Any?> {
+class ObservableInterceptor : MethodInterceptor<Any, Any> {
 
-    override fun intercept(context: MethodInvocationContext<Any?, Any?>?): Any {
+    override fun intercept(context: MethodInvocationContext<Any, Any>): Any {
         return "World"
     }
 }

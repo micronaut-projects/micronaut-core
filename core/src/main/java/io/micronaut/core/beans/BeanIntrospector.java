@@ -17,8 +17,6 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.util.ArgumentUtils;
-
-import org.jspecify.annotations.NonNull;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collection;
@@ -58,8 +56,7 @@ public interface BeanIntrospector {
      * @param filter A filter that receives a {@link BeanIntrospectionReference}
      * @return A collection of introspections
      */
-    @NonNull
-    Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter);
+    Collection<BeanIntrospection<Object>> findIntrospections(Predicate<? super BeanIntrospectionReference<?>> filter);
 
     /**
      * Finds introspections with the given filter.
@@ -67,8 +64,7 @@ public interface BeanIntrospector {
      * @return A collection of introspections
      * @since 3.0
      */
-    @NonNull
-    Collection<Class<?>> findIntrospectedTypes(@NonNull Predicate<? super BeanIntrospectionReference<?>> filter);
+    Collection<Class<?>> findIntrospectedTypes(Predicate<? super BeanIntrospectionReference<?>> filter);
 
     /**
      * Find a {@link BeanIntrospection} for the given bean type.
@@ -77,7 +73,7 @@ public interface BeanIntrospector {
      * @param <T> The bean generic type
      * @return An optional introspection
      */
-    @NonNull <T> Optional<BeanIntrospection<T>> findIntrospection(@NonNull Class<T> beanType);
+ <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType);
 
     /**
      * Finds introspections for classes annotated with the given stereotype.
@@ -85,7 +81,7 @@ public interface BeanIntrospector {
      * @param stereotype The stereotype
      * @return The introspections
      */
-    default @NonNull Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Class<? extends Annotation> stereotype) {
+    default Collection<BeanIntrospection<Object>> findIntrospections(Class<? extends Annotation> stereotype) {
         ArgumentUtils.requireNonNull("stereotype", stereotype);
         return findIntrospections(ref -> ref.getAnnotationMetadata().hasStereotype(stereotype));
     }
@@ -97,7 +93,7 @@ public interface BeanIntrospector {
      * @param packageNames The package names to include in the search
      * @return The introspections
      */
-    default @NonNull Collection<BeanIntrospection<Object>> findIntrospections(@NonNull Class<? extends Annotation> stereotype, @NonNull String... packageNames) {
+    default Collection<BeanIntrospection<Object>> findIntrospections(Class<? extends Annotation> stereotype, String... packageNames) {
         ArgumentUtils.requireNonNull("stereotype", stereotype);
         ArgumentUtils.requireNonNull("packageNames", packageNames);
         return findIntrospections(ref ->
@@ -112,7 +108,7 @@ public interface BeanIntrospector {
      * @return The introspection
      * @throws IntrospectionException If no introspection data is found and the bean is not annotated with {@link io.micronaut.core.annotation.Introspected}
      */
-    default @NonNull <T> BeanIntrospection<T> getIntrospection(@NonNull Class<T> beanType) {
+    default <T> BeanIntrospection<T> getIntrospection(Class<T> beanType) {
         return findIntrospection(beanType).orElseThrow(() -> new IntrospectionException("No bean introspection available for type [" + beanType + "]. Ensure the class is annotated with io.micronaut.core.annotation.Introspected"));
     }
 }

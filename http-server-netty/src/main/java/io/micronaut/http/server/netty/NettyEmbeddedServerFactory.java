@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.ssl.ServerSslConfiguration;
@@ -36,8 +34,7 @@ public interface NettyEmbeddedServerFactory {
      * @param configuration The configuration, never {@code null}
      * @return A {@link io.micronaut.http.server.netty.NettyEmbeddedServer} instance
      */
-    @NonNull
-    NettyEmbeddedServer build(@NonNull NettyHttpServerConfiguration configuration);
+    NettyEmbeddedServer build(NettyHttpServerConfiguration configuration);
 
     /**
      * Builds a {@link io.micronaut.http.server.netty.NettyEmbeddedServer} for the given configuration.
@@ -49,8 +46,7 @@ public interface NettyEmbeddedServerFactory {
      * @return A {@link io.micronaut.http.server.netty.NettyEmbeddedServer} instance
      * @since 3.1.4
      */
-    @NonNull
-    default NettyEmbeddedServer build(@NonNull NettyHttpServerConfiguration configuration, @Nullable ServerSslConfiguration sslConfiguration) {
+    default NettyEmbeddedServer build(NettyHttpServerConfiguration configuration, @Nullable ServerSslConfiguration sslConfiguration) {
         return build(configuration);
     }
 }

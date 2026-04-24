@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.io.buffer.ByteBufferFactory
+import io.micronaut.core.io.buffer.ReadBuffer
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -30,7 +31,6 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.codec.CodecException
-import io.micronaut.http.multipart.PartData
 import io.micronaut.http.multipart.StreamingFileUpload
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
@@ -274,7 +274,7 @@ class DataStreamSpec extends Specification {
             AtomicInteger bytes = new AtomicInteger()
 
             Mono.<HttpResponse<String>>create { emitter ->
-                data.subscribe(new Subscriber<PartData>() {
+                data.streamingBody().toReadBufferPublisher().subscribe(new Subscriber<ReadBuffer>() {
                     private Subscription s
 
                     @Override
@@ -284,8 +284,9 @@ class DataStreamSpec extends Specification {
                     }
 
                     @Override
-                    void onNext(PartData partData) {
-                        bytes.addAndGet(partData.bytes.length)
+                    void onNext(ReadBuffer partData) {
+                        bytes.addAndGet(partData.readable())
+                        partData.close()
                         s.request(1)
                     }
 

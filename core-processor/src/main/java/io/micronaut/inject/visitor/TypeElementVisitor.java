@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.inject.visitor;
-
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
@@ -174,7 +172,7 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
     /**
      * @return The visitor kind.
      */
-    default @NonNull VisitorKind getVisitorKind() {
+    default VisitorKind getVisitorKind() {
         return VisitorKind.AGGREGATING;
     }
 

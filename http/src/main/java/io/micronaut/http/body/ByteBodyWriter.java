@@ -17,7 +17,6 @@ package io.micronaut.http.body;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpRequest;
@@ -39,17 +38,17 @@ import java.io.OutputStream;
 @Internal
 final class ByteBodyWriter implements TypedMessageBodyWriter<ByteBody>, ResponseBodyWriter<ByteBody> {
     @Override
-    public @NonNull CloseableByteBody writePiece(@NonNull ByteBodyFactory bodyFactory, @NonNull HttpRequest<?> request, @NonNull HttpResponse<?> response, @NonNull Argument<ByteBody> type, @NonNull MediaType mediaType, ByteBody object) throws CodecException {
+    public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<ByteBody> type, MediaType mediaType, ByteBody object) throws CodecException {
         return object.move();
     }
 
     @Override
-    public @NonNull Argument<ByteBody> getType() {
+    public Argument<ByteBody> getType() {
         return Argument.of(ByteBody.class);
     }
 
     @Override
-    public void writeTo(@NonNull Argument<ByteBody> type, @NonNull MediaType mediaType, ByteBody object, @NonNull MutableHeaders outgoingHeaders, @NonNull OutputStream outputStream) throws CodecException {
+    public void writeTo(Argument<ByteBody> type, MediaType mediaType, ByteBody object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
         throw new UnsupportedOperationException("Cannot write ByteBody to OutputStream");
     }
 }

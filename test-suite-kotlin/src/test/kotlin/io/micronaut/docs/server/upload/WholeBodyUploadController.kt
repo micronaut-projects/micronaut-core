@@ -26,7 +26,9 @@ import io.micronaut.http.multipart.CompletedPart
 import io.micronaut.http.server.multipart.MultipartBody
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 
 @Controller("/upload")
 class WholeBodyUploadController {
@@ -34,7 +36,7 @@ class WholeBodyUploadController {
     @Post(value = "/whole-body", consumes = [MULTIPART_FORM_DATA], produces = [TEXT_PLAIN]) // <1>
     fun uploadBytes(@Body body: MultipartBody): Mono<String> { // <2>
         return Mono.create { emitter ->
-            body.subscribe(object : Subscriber<CompletedPart> {
+            Flux.from(body).publishOn(Schedulers.boundedElastic()).subscribe(object : Subscriber<CompletedPart> {
                 private var s: Subscription? = null
 
                 override fun onSubscribe(s: Subscription) {
@@ -47,6 +49,7 @@ class WholeBodyUploadController {
                     if (completedPart is CompletedFileUpload) {
                         val originalFileName = completedPart.filename
                     }
+                    completedPart.close()
                 }
 
                 override fun onError(t: Throwable) {

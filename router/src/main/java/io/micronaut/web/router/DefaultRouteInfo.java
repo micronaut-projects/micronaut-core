@@ -17,9 +17,8 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanIntrospector;
+import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
@@ -35,10 +34,13 @@ import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.sse.Event;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -73,7 +75,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     private final Argument<?> bodyType;
     private final boolean isErrorRoute;
     private final boolean isPermitsBody;
-    private final MessageBodyWriter<R> messageBodyWriter;
+    private final @Nullable MessageBodyWriter<R> messageBodyWriter;
 
     public DefaultRouteInfo(ReturnType<? extends R> returnType,
                             Class<?> declaringType,
@@ -156,7 +158,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public MessageBodyWriter<R> getMessageBodyWriter() {
+    public @Nullable MessageBodyWriter<R> getMessageBodyWriter() {
         return messageBodyWriter;
     }
 
@@ -201,7 +203,6 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    @NonNull
     public Argument<?> getResponseBodyType() {
         return bodyType;
     }
@@ -227,7 +228,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public boolean doesConsume(MediaType contentType) {
+    public boolean doesConsume(@Nullable MediaType contentType) {
         return contentType == null || consumesMediaTypesContainsAll || explicitlyConsumes(contentType);
     }
 
@@ -246,7 +247,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         return producesMediaTypesContainsAll || acceptableType == null || acceptableType.equals(MediaType.ALL_TYPE) || producesMediaTypes.contains(acceptableType);
     }
 
-    private boolean anyMediaTypesMatch(List<MediaType> producedMediaTypes, Collection<MediaType> acceptableTypes) {
+    private boolean anyMediaTypesMatch(List<MediaType> producedMediaTypes, @Nullable Collection<MediaType> acceptableTypes) {
         if (CollectionUtils.isEmpty(acceptableTypes)) {
             return true;
         }
@@ -259,13 +260,13 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public boolean explicitlyConsumes(MediaType contentType) {
-        return consumesMediaTypes.contains(contentType);
+    public boolean explicitlyConsumes(@Nullable MediaType contentType) {
+        return contentType != null && consumesMediaTypes.contains(contentType);
     }
 
     @Override
-    public boolean explicitlyProduces(MediaType contentType) {
-        return producesMediaTypes == null || producesMediaTypes.isEmpty() || producesMediaTypes.contains(contentType);
+    public boolean explicitlyProduces(@Nullable MediaType contentType) {
+        return producesMediaTypes == null || producesMediaTypes.isEmpty() || (contentType != null && producesMediaTypes.contains(contentType));
     }
 
     @Override
@@ -314,8 +315,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    @NonNull
-    public HttpStatus findStatus(HttpStatus defaultStatus) {
+    public HttpStatus findStatus(@Nullable HttpStatus defaultStatus) {
         if (definedStatus != null) {
             return definedStatus;
         }
@@ -341,12 +341,16 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public ExecutorService getExecutor(ThreadSelection threadSelection) {
+    public @Nullable ExecutorService getExecutor(@Nullable ThreadSelection threadSelection) {
         return null;
     }
 
     @Override
-    @NonNull
+    public Executor getExecutor(ThreadSelectionConfiguration configuration) {
+        return ImmediateExecutor.INSTANCE;
+    }
+
+    @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }

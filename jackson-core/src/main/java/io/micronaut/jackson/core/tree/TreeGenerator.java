@@ -15,6 +15,7 @@
  */
 package io.micronaut.jackson.core.tree;
 
+import org.jspecify.annotations.Nullable;
 import tools.jackson.core.Base64Variant;
 import tools.jackson.core.exc.StreamWriteException;
 import tools.jackson.core.JacksonException;
@@ -30,7 +31,6 @@ import tools.jackson.core.TreeNode;
 import tools.jackson.core.Version;
 import tools.jackson.core.util.JacksonFeatureSet;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.json.JsonStreamConfig;
 import io.micronaut.json.tree.JsonNode;
 
@@ -45,6 +45,7 @@ import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * A {@link JsonGenerator} that returns tokens as a {@link JsonNode}.
@@ -55,22 +56,23 @@ import java.util.Map;
 @Experimental
 public final class TreeGenerator extends JsonGenerator {
 
-    private ObjectWriteContext codec;
-    private int generatorFeatures;
-
     private final Deque<StructureBuilder> structureStack = new ArrayDeque<>();
+    @Nullable
     private JsonNode completed = null;
+    @Nullable
     private Object currentValue;
 
     TreeGenerator() {
     }
 
     @Override
+    @Nullable
     public ObjectWriteContext objectWriteContext() {
-        return codec;
+        return null;
     }
 
     @Override
+    @Nullable
     public Object streamWriteOutputTarget() {
         return null;
     }
@@ -81,6 +83,7 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     @Override
+    @Nullable
     public Object currentValue() {
         return currentValue;
     }
@@ -101,13 +104,14 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     @Override
+    @Nullable
     public TokenStreamContext streamWriteContext() {
         return null;
     }
 
     @Override
     public boolean isEnabled(StreamWriteFeature f) {
-        return (generatorFeatures & f.getMask()) != 0;
+        return false;
     }
 
     @Override
@@ -162,12 +166,11 @@ public final class TreeGenerator extends JsonGenerator {
      * @return The completed node.
      * @throws IllegalStateException If there is still data missing. Check with {@link #isComplete()}.
      */
-    @NonNull
     public JsonNode getCompletedValue() {
         if (!isComplete()) {
             throw new IllegalStateException("Not completed");
         }
-        return completed;
+        return Objects.requireNonNull(completed);
     }
 
     @Override
@@ -186,6 +189,7 @@ public final class TreeGenerator extends JsonGenerator {
         return writeStartArray();
     }
 
+    @Nullable
     private JsonGenerator writeEndStructure(JsonToken token) throws StreamWriteException {
         checkEmptyNodeStack(token);
         final StructureBuilder current = structureStack.pop();
@@ -198,6 +202,7 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     @Override
+    @Nullable
     public JsonGenerator writeEndArray() {
         return writeEndStructure(JsonToken.END_ARRAY);
     }
@@ -219,6 +224,7 @@ public final class TreeGenerator extends JsonGenerator {
     }
 
     @Override
+    @Nullable
     public JsonGenerator writeEndObject() {
         return writeEndStructure(JsonToken.END_OBJECT);
     }
@@ -226,7 +232,7 @@ public final class TreeGenerator extends JsonGenerator {
     @Override
     public JsonGenerator writeName(String name) {
         checkEmptyNodeStack(JsonToken.PROPERTY_NAME);
-        structureStack.peekFirst().setCurrentFieldName(name);
+        Objects.requireNonNull(structureStack.peekFirst()).setCurrentFieldName(name);
         return this;
     }
 
@@ -378,12 +384,12 @@ public final class TreeGenerator extends JsonGenerator {
 
     @Override
     public JsonGenerator writePOJO(Object pojo) {
-        objectWriteContext().writeValue(this, pojo);
+        Objects.requireNonNull(objectWriteContext()).writeValue(this, pojo);
         return this;
     }
 
     @Override
-    public JsonGenerator writeTree(TreeNode rootNode) {
+    public JsonGenerator writeTree(@Nullable TreeNode rootNode) {
         if (rootNode == null) {
             return writeNull();
         } else if (rootNode instanceof JsonNode node) {
@@ -442,6 +448,7 @@ public final class TreeGenerator extends JsonGenerator {
     private final class ObjectBuilder implements StructureBuilder {
 
         final Map<String, JsonNode> values = new LinkedHashMap<>();
+        @Nullable
         String currentFieldName = null;
 
         @Override

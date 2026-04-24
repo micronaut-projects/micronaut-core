@@ -18,6 +18,7 @@ package io.micronaut.http.reactive.execution;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.core.Fuseable;
@@ -61,7 +62,7 @@ final class FlowAsMono<T> extends Mono<T> implements Fuseable {
 
     private final class SubscriptionImpl implements QueueSubscription<T> {
         @SuppressWarnings("rawtypes")
-        private static final AtomicIntegerFieldUpdater<FlowAsMono.SubscriptionImpl> STATE = AtomicIntegerFieldUpdater.newUpdater(FlowAsMono.SubscriptionImpl.class, "state");
+        private static final AtomicIntegerFieldUpdater<FlowAsMono.SubscriptionImpl> STATE_UPDATER = AtomicIntegerFieldUpdater.newUpdater(FlowAsMono.SubscriptionImpl.class, "state");
         private static final int STATE_WAITING = 0;
         private static final int STATE_SUBSCRIBING = 1;
         private static final int STATE_DONE = 2;
@@ -90,8 +91,8 @@ final class FlowAsMono<T> extends Mono<T> implements Fuseable {
 
         private boolean requested;
 
-        private T result;
-        private Throwable error;
+        private @Nullable T result;
+        private @Nullable Throwable error;
 
         SubscriptionImpl(CoreSubscriber<? super T> actual) {
             this.actual = actual;
@@ -100,7 +101,7 @@ final class FlowAsMono<T> extends Mono<T> implements Fuseable {
         void callOnSubscribe() {
             state = STATE_SUBSCRIBING;
             actual.onSubscribe(this);
-            if (STATE.getAndSet(this, STATE_WAITING) == STATE_DONE) {
+            if (STATE_UPDATER.getAndSet(this, STATE_WAITING) == STATE_DONE) {
                 // onComplete was already called but result held back to avoid reentrancy, need to
                 // forward its result
                 forward(result, error);
@@ -114,7 +115,7 @@ final class FlowAsMono<T> extends Mono<T> implements Fuseable {
                 flow.onComplete((v, e) -> {
                     result = v;
                     error = e;
-                    if (STATE.getAndSet(this, STATE_DONE) == STATE_WAITING) {
+                    if (STATE_UPDATER.getAndSet(this, STATE_DONE) == STATE_WAITING) {
                         // onSubscribe is already done so we can forward immediately
                         forward(v, e);
                     }
@@ -122,7 +123,7 @@ final class FlowAsMono<T> extends Mono<T> implements Fuseable {
             }
         }
 
-        private void forward(T v, Throwable e) {
+        private void forward(@Nullable T v, @Nullable Throwable e) {
             if (v != null) {
                 actual.onNext(v);
             }

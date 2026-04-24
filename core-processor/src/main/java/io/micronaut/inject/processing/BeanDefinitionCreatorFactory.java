@@ -25,7 +25,6 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -40,7 +39,6 @@ import java.util.Collections;
  */
 public abstract class BeanDefinitionCreatorFactory {
 
-    @NonNull
     public static BeanDefinitionCreator produce(ClassElement classElement, VisitorContext visitorContext) {
         boolean isAbstract = classElement.isAbstract();
         boolean isIntroduction = isIntroduction(classElement);

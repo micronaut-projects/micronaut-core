@@ -17,7 +17,6 @@ package io.micronaut.websocket;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
@@ -41,11 +40,10 @@ public interface WebSocketClientRegistry<W extends WebSocketClient> {
      * @param beanContext The bean context to use
      * @return The Streaming HTTP Client
      */
-    @NonNull
     W resolveWebSocketClient(@Nullable InjectionPoint<?> injectionPoint,
                              @Nullable LoadBalancer loadBalancer,
                              @Nullable HttpClientConfiguration configuration,
-                             @NonNull BeanContext beanContext);
+                             BeanContext beanContext);
 
     /**
      * Return the client for the given annotation metadata.
@@ -53,8 +51,7 @@ public interface WebSocketClientRegistry<W extends WebSocketClient> {
      * @param annotationMetadata The annotation metadata.
      * @return The client
      */
-    @NonNull
-    W getWebSocketClient(@NonNull AnnotationMetadata annotationMetadata);
+    W getWebSocketClient(AnnotationMetadata annotationMetadata);
 
     /**
      * @return Return the default Websocket HTTP client.

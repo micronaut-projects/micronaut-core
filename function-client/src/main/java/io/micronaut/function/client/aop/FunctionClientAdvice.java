@@ -107,7 +107,7 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
         }
     }
 
-    private Flux<Object> invokeFn(Object body, String functionName, Flux<FunctionDefinition> functionDefinition, Argument<?> valueType) {
+    private Flux<Object> invokeFn(@Nullable Object body, String functionName, Flux<FunctionDefinition> functionDefinition, Argument<?> valueType) {
         return functionDefinition.next().flatMap(def -> {
             FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
             return Mono.from((Publisher<Object>) functionInvoker.invoke(

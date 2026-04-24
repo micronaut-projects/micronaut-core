@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 package io.micronaut.context;
+import io.micronaut.core.util.CollectionUtils;
 
-import org.jspecify.annotations.NonNull;
-
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -32,9 +30,8 @@ public class MessageSourceUtils {
      * @param args variables
      * @return The variables map.
      */
-    @NonNull
-    public static Map<String, Object> variables(@NonNull Object... args) {
-        Map<String, Object> variables = new HashMap<>();
+    public static Map<String, Object> variables(Object... args) {
+        Map<String, Object> variables = CollectionUtils.newHashMap(args.length);
         int count = 0;
         for (Object value : args) {
             variables.put(String.valueOf(count), value);

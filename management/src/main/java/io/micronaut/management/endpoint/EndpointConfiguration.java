@@ -36,7 +36,9 @@ public class EndpointConfiguration {
     public static final String PREFIX = "endpoints";
     private static final String SLASH = "/";
 
+    @Nullable
     private Boolean enabled;
+    @Nullable
     private Boolean sensitive;
     @Nullable
     private String path;

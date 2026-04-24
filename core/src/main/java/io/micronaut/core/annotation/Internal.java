@@ -16,9 +16,11 @@
 package io.micronaut.core.annotation;
 
 import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * <p>Annotates a class or method regarded as internal and not for public consumption.</p>
@@ -30,6 +32,18 @@ import java.lang.annotation.RetentionPolicy;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Target({
+    ElementType.TYPE,
+    ElementType.FIELD,
+    ElementType.METHOD,
+    ElementType.PARAMETER,
+    ElementType.CONSTRUCTOR,
+    ElementType.LOCAL_VARIABLE,
+    ElementType.ANNOTATION_TYPE,
+    ElementType.PACKAGE,
+    ElementType.MODULE,
+    ElementType.RECORD_COMPONENT
+})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Inherited

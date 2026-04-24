@@ -18,7 +18,6 @@ package io.micronaut.inject.beans.visitor;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.inject.annotation.NamedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -35,7 +34,6 @@ import java.util.List;
  */
 @Internal
 public class EntityReflectiveAccessAnnotationMapper implements NamedAnnotationMapper {
-    @NonNull
     @Override
     public String getName() {
         return "javax.persistence.Entity";

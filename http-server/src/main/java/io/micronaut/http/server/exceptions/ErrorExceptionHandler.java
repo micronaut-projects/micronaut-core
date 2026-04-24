@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.exceptions;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.server.exceptions.response.Error;
@@ -56,6 +55,5 @@ public abstract class ErrorExceptionHandler<T extends Throwable> implements Exce
                 .build(), HttpResponse.badRequest());
     }
 
-    @NonNull
     protected abstract Error error(T exception);
 }

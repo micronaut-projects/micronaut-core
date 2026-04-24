@@ -29,6 +29,7 @@ import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolver;
 import io.micronaut.discovery.metadata.ServiceInstanceMetadataContributor;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.runtime.server.EmbeddedServer;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.util.HashMap;
@@ -52,6 +53,7 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
     private final BeanLocator beanLocator;
     private final ConversionService conversionService;
 
+    @Nullable
     private ConvertibleValues<String> instanceMetadata;
 
     /**

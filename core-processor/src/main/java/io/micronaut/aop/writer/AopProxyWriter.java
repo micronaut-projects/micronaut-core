@@ -54,6 +54,7 @@ import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.ExecutableMethodsDefinitionWriter;
 import io.micronaut.inject.writer.MethodGenUtils;
+import io.micronaut.sourcegen.model.AnnotationDef;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -63,11 +64,14 @@ import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
+import org.jspecify.annotations.NullUnmarked;
 
 import javax.lang.model.element.Modifier;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.annotation.Annotation;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -94,6 +98,7 @@ import static io.micronaut.inject.ast.ParameterElement.ZERO_PARAMETER_ELEMENTS;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullUnmarked
 @Internal
 public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
@@ -438,7 +443,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         MethodElement overriddenBy = findOverriddenBy(methodElement);
         if (overriddenBy != null) {
-            proxyBuilder.addMethod(MethodDef.override(methodElement)
+            proxyBuilder.addMethod(copyRuntimeMethodAnnotations(MethodDef.override(methodElement), methodElement)
                 .build((aThis, methodParameters) -> aThis.invoke(overriddenBy, methodParameters).returning())
             );
             return;
@@ -496,7 +501,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     }
 
     private MethodDef buildMethodOverride(MethodElement methodElement, int index) {
-        return MethodDef.override(methodElement)
+        return copyRuntimeMethodAnnotations(MethodDef.override(methodElement), methodElement)
             .build((aThis, methodParameters) -> {
 
                 ExpressionDef targetArgument;
@@ -544,6 +549,16 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 }
                 return invocation;
             });
+    }
+
+    private MethodDef.MethodDefBuilder copyRuntimeMethodAnnotations(MethodDef.MethodDefBuilder methodBuilder,
+                                                                    MethodElement methodElement) {
+        for (AnnotationValue<Annotation> annotationValue : methodElement.getMethodAnnotationMetadata().getDeclaredAnnotationValuesByType(Annotation.class)) {
+            if (annotationValue.getRetentionPolicy() == RetentionPolicy.RUNTIME) {
+                methodBuilder.addAnnotation(AnnotationDef.of(annotationValue, visitorContext));
+            }
+        }
+        return methodBuilder;
     }
 
     /**

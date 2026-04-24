@@ -18,6 +18,7 @@ package io.micronaut.aop;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
+import org.jspecify.annotations.Nullable;
 
 /**
  * <p>An Interceptor intercepts the execution of a method allowing cross cutting behaviour to be applied to a
@@ -70,5 +71,6 @@ public interface Interceptor<T, R> extends Ordered {
      * @param context The interception context
      * @return result type
      */
+    @Nullable
     R intercept(InvocationContext<T, R> context);
 }

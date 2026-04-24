@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
-
-import org.jspecify.annotations.NonNull;
 import io.netty.handler.codec.http.HttpHeaders;
 
 import java.net.InetSocketAddress;
@@ -49,7 +47,7 @@ final class LocalPortElement implements LogElement {
     }
 
     @Override
-    public String onRequestHeaders(@NonNull ConnectionMetadata metadata, @NonNull String method, @NonNull HttpHeaders headers, @NonNull String uri, @NonNull String protocol) {
+    public String onRequestHeaders(ConnectionMetadata metadata, String method, HttpHeaders headers, String uri, String protocol) {
         SocketAddress localAddress = metadata.localAddress().orElse(null);
         if (localAddress instanceof InetSocketAddress addr) {
             return Integer.toString(addr.getPort());

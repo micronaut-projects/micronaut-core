@@ -416,6 +416,30 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http1 tls works after client refresh'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1Tls()
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1Tls()
+        patch(client, conn1, conn2)
+
+        conn1.testExchangeResponse(conn1.testExchangeRequest(client))
+        client.refresh()
+        conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     def 'http1 plain text customization'() {
         given:
         def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
@@ -1010,6 +1034,43 @@ class ConnectionManagerSpec extends Specification {
         conn2.exchangeSettings()
         conn2.testExchangeResponse(future2)
 
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 goaway before next request opens a new connection'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp2()
+        conn1.setupHttp2Tls()
+        def conn2 = new EmbeddedTestConnectionHttp2()
+        conn2.setupHttp2Tls()
+        patch(client, conn1, conn2)
+
+        when:
+        def first = conn1.testExchangeRequest(client)
+        conn1.exchangeSettings()
+        conn1.testExchangeResponse(first)
+
+        and:
+        conn1.serverChannel.writeOutbound(new DefaultHttp2GoAwayFrame(Http2Error.NO_ERROR, Unpooled.EMPTY_BUFFER))
+        conn1.advance()
+
+        def second = conn2.testExchangeRequest(client)
+        conn2.exchangeSettings()
+
+        then:
+        conn1.serverChannel.readInbound() instanceof DefaultHttp2GoAwayFrame
+        conn1.serverChannel.readInbound() == null
+        conn2.testExchangeResponse(second)
         assertPoolConnections(client, 1)
 
         cleanup:

@@ -27,7 +27,9 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
+import org.jspecify.annotations.Nullable;
 
+import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
@@ -41,8 +43,11 @@ import java.util.function.Consumer;
 final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferConsumer {
     private final StreamingNettyByteBody body;
     private final Consumer<Throwable> errorHandler;
+    @Nullable
     private ChannelHandlerContext ctx;
+    @Nullable
     private EventLoopFlow flow;
+    @Nullable
     private Upstream upstream;
     private long unwritten = 0;
     private boolean completed = false;
@@ -99,7 +104,7 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
 
     @Override
     public void add(ReadBuffer buf) {
-        if (flow.executeNow(() -> add0(buf))) {
+        if (Objects.requireNonNull(flow).executeNow(() -> add0(buf))) {
             add0(buf);
         }
     }
@@ -114,9 +119,10 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
         int readable = buf.readable();
         ctx.writeAndFlush(new DefaultHttpContent(NettyReadBufferFactory.toByteBuf(buf))).addListener((ChannelFutureListener) future -> {
             assert ctx.executor().inEventLoop();
+            Objects.requireNonNull(ctx);
             if (future.isSuccess()) {
                 if (ctx.channel().isWritable()) {
-                    upstream.onBytesConsumed(readable);
+                    Objects.requireNonNull(upstream).onBytesConsumed(readable);
                 } else {
                     unwritten += readable;
                 }
@@ -131,14 +137,14 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
         long unwritten = this.unwritten;
         if (ctx.channel().isWritable() && unwritten != 0) {
             this.unwritten = 0;
-            upstream.onBytesConsumed(unwritten);
+            Objects.requireNonNull(upstream).onBytesConsumed(unwritten);
         }
         super.channelWritabilityChanged(ctx);
     }
 
     @Override
     public void complete() {
-        if (flow.executeNow(this::complete0)) {
+        if (Objects.requireNonNull(flow).executeNow(this::complete0)) {
             complete0();
         }
     }

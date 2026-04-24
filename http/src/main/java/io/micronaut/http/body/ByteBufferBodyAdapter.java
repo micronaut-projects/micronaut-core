@@ -16,7 +16,6 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
@@ -36,11 +35,11 @@ import java.util.OptionalLong;
 @Deprecated(forRemoval = true)
 @Experimental
 public final class ByteBufferBodyAdapter {
-    private static @NonNull ByteBodyFactory byteBodyFactory() {
+    private static ByteBodyFactory byteBodyFactory() {
         return ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
     }
 
-    private static @NonNull Flux<ReadBuffer> toReadBuffers(@NonNull Publisher<ByteBuffer> source) {
+    private static Flux<ReadBuffer> toReadBuffers(Publisher<ByteBuffer> source) {
         return Flux.from(source).map(ReadBufferFactory.getJdkFactory()::adapt);
     }
 
@@ -50,8 +49,7 @@ public final class ByteBufferBodyAdapter {
      * @param source The byte publisher
      * @return A body with those bytes
      */
-    @NonNull
-    static ReactiveByteBufferByteBody adapt(@NonNull Publisher<ByteBuffer> source) {
+    static ReactiveByteBufferByteBody adapt(Publisher<ByteBuffer> source) {
         ByteBodyFactory bbf = byteBodyFactory();
         return (ReactiveByteBufferByteBody) bbf.adapt(toReadBuffers(source));
     }
@@ -63,7 +61,7 @@ public final class ByteBufferBodyAdapter {
      * @param contentLength Optional length of the body, must match the publisher exactly
      * @return The ByteBody fed by the publisher
      */
-    public static CloseableByteBody adapt(@NonNull Publisher<ByteBuffer> publisher, @NonNull OptionalLong contentLength) {
+    public static CloseableByteBody adapt(Publisher<ByteBuffer> publisher, OptionalLong contentLength) {
         ByteBodyFactory bbf = byteBodyFactory();
         return bbf.adapt(toReadBuffers(publisher), contentLength);
     }

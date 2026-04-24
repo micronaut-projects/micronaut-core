@@ -16,7 +16,6 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.BeanDefinition;
@@ -111,24 +110,17 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     /**
      * @return A map of the type arguments for the bean.
      */
-    @NonNull
     Map<String, ClassElement> getTypeArgumentMap();
 
     /**
      * @return The name of the bean definition reference class.
      */
-    @NonNull
     String getBeanDefinitionReferenceClassName();
 
     /**
      * @return Whether the provided type an interface
      */
     boolean isInterface();
-
-    /**
-     * @return Is the bean singleton
-     */
-    boolean isSingleton();
 
     /**
      * Visit a marker interface on the generated bean definition.
@@ -445,7 +437,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @return The generic type arguments for the bean type.
      * @since 3.0.0
      */
-    default @NonNull ClassElement[] getTypeArguments() {
+    default ClassElement[] getTypeArguments() {
         return ClassElement.ZERO_CLASS_ELEMENTS;
     }
 

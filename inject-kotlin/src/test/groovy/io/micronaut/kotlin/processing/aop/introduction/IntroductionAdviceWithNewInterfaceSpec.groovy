@@ -164,13 +164,13 @@ open class MyBean  {
         ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
-        listenerAdviceInterceptor.recievedMessages.clear()
+        listenerAdviceInterceptor.receivedMessages.clear()
 
         then:"the methods are invocable"
-        listenerAdviceInterceptor.recievedMessages.isEmpty()
+        listenerAdviceInterceptor.receivedMessages.isEmpty()
         instance.getFoo() == "good"
         instance.onApplicationEvent(new Object()) == null
-        !listenerAdviceInterceptor.recievedMessages.isEmpty()
+        !listenerAdviceInterceptor.receivedMessages.isEmpty()
 
         cleanup:
         context.close()
@@ -207,13 +207,13 @@ abstract class MyBean  {
         ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
-        listenerAdviceInterceptor.recievedMessages.clear()
+        listenerAdviceInterceptor.receivedMessages.clear()
 
         then:"the methods are invocable"
-        listenerAdviceInterceptor.recievedMessages.isEmpty()
+        listenerAdviceInterceptor.receivedMessages.isEmpty()
         instance.getFoo() == "good"
         instance.onApplicationEvent(new Object()) == null
-        !listenerAdviceInterceptor.recievedMessages.isEmpty()
+        !listenerAdviceInterceptor.receivedMessages.isEmpty()
 
         cleanup:
         context.close()
@@ -253,15 +253,15 @@ interface MyBean  {
         ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
-        listenerAdviceInterceptor.recievedMessages.clear()
+        listenerAdviceInterceptor.receivedMessages.clear()
 
         then:"the methods are invocable"
-        listenerAdviceInterceptor.recievedMessages.isEmpty()
+        listenerAdviceInterceptor.receivedMessages.isEmpty()
         instance.getFoo() == "good"
         instance.getBar() == null
         instance.onApplicationEvent(new Object()) == null
-        !listenerAdviceInterceptor.recievedMessages.isEmpty()
-        listenerAdviceInterceptor.recievedMessages.size() == 1
+        !listenerAdviceInterceptor.receivedMessages.isEmpty()
+        listenerAdviceInterceptor.receivedMessages.size() == 1
 
         cleanup:
         context.close()

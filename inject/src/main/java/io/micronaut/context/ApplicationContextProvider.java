@@ -15,8 +15,6 @@
  */
 package io.micronaut.context;
 
-import org.jspecify.annotations.NonNull;
-
 /**
  * An interface for classes that provide an {@link ApplicationContext}.
  *
@@ -30,5 +28,5 @@ public interface ApplicationContextProvider {
      *
      * @return The {@link ApplicationContext}
      */
-    @NonNull ApplicationContext getApplicationContext();
+    ApplicationContext getApplicationContext();
 }

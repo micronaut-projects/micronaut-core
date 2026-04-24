@@ -327,6 +327,22 @@ class SimpleRetrySpec extends Specification {
         context.stop()
     }
 
+    void "test retry with exception captured by default"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountExceptionDefault()
+
+        then: "retry kicked in because the exception thrown is captured by default"
+        noExceptionThrown()
+        counterService.countExceptionDefault == counterService.countThreshold
+
+        cleanup:
+        context.stop()
+    }
+
     void "test retry with value"() {
         given:
         ApplicationContext context = ApplicationContext.run()
@@ -397,6 +413,7 @@ class SimpleRetrySpec extends Specification {
         int countPreThreshold = 3
         int countThrowable = 0;
         int countThrowableUncaptured = 0;
+        int countExceptionDefault = 0;
 
         @Retryable(attempts = '5', delay = '5ms')
         int getCountSync() {
@@ -543,6 +560,15 @@ class SimpleRetrySpec extends Specification {
                 throw new Throwable()
             }
             return countThrowableUncaptured
+        }
+
+        @Retryable(attempts = '5', delay = '5ms')
+        Integer getCountExceptionDefault() {
+            countExceptionDefault++
+            if(countExceptionDefault < countThreshold - 1) {
+                throw new Exception()
+            }
+            return countExceptionDefault
         }
     }
 }

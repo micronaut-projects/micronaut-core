@@ -16,7 +16,6 @@
 package io.micronaut.discovery;
 
 import io.micronaut.context.env.Environment;
-import org.jspecify.annotations.NonNull;
 
 /**
  * Interface for generating IDs for {@link ServiceInstance}.
@@ -33,6 +32,5 @@ public interface ServiceInstanceIdGenerator {
      * @param serviceInstance The service instance
      * @return The generated ID. Never null
      */
-    @NonNull
     String generateId(Environment environment, ServiceInstance serviceInstance);
 }

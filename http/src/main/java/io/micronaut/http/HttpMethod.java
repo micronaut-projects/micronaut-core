@@ -15,13 +15,15 @@
  */
 package io.micronaut.http;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * An enum containing the valid HTTP methods. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public enum HttpMethod implements CharSequence {
+ public enum HttpMethod implements CharSequence {
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.2.
@@ -168,7 +170,7 @@ public enum HttpMethod implements CharSequence {
         return CUSTOM;
     }
 
-    private static HttpMethod parseString(String httpMethodName) {
+    private static @Nullable HttpMethod parseString(String httpMethodName) {
         switch (httpMethodName) {
             case "OPTIONS":
             case "options":

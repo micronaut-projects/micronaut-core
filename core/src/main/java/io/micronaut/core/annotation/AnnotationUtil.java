@@ -16,6 +16,7 @@
 package io.micronaut.core.annotation;
 
 import io.micronaut.core.util.StringUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
@@ -95,6 +96,7 @@ public class AnnotationUtil {
      */
     public static final AnnotatedElement EMPTY_ANNOTATED_ELEMENT = new AnnotatedElement() {
         @Override
+        @Nullable
         public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
             return null;
         }

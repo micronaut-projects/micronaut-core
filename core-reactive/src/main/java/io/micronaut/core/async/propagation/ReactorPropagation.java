@@ -16,7 +16,6 @@
 package io.micronaut.core.async.propagation;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.propagation.PropagatedContextElement;
 import reactor.util.context.Context;
@@ -49,8 +48,7 @@ public final class ReactorPropagation {
      * @param propagatedContext The propagated context
      * @return The modified context
      */
-    @NonNull
-    public static Context addPropagatedContext(@NonNull Context context, @NonNull PropagatedContext propagatedContext) {
+    public static Context addPropagatedContext(Context context, PropagatedContext propagatedContext) {
         return context.put(
             ReactorPropagation.PROPAGATED_CONTEXT_REACTOR_CONTEXT_VIEW_KEY,
             propagatedContext
@@ -64,8 +62,7 @@ public final class ReactorPropagation {
      * @param contextElement The propagated context element
      * @return The modified context
      */
-    @NonNull
-    public static Context addContextElement(@NonNull Context context, @NonNull PropagatedContextElement contextElement) {
+    public static Context addContextElement(Context context, PropagatedContextElement contextElement) {
         return addPropagatedContext(context, findPropagatedContext(context).orElse(PropagatedContext.getOrEmpty()).plus(contextElement));
     }
 
@@ -77,8 +74,8 @@ public final class ReactorPropagation {
      * @param <E> The element type
      * @return optional context element
      */
-    public static <E extends PropagatedContextElement> Optional<E> findContextElement(@NonNull ContextView contextView,
-                                                                                      @NonNull Class<E> contextElementType) {
+    public static <E extends PropagatedContextElement> Optional<E> findContextElement(ContextView contextView,
+                                                                                      Class<E> contextElementType) {
         return findPropagatedContext(contextView)
             .flatMap(ctx -> ctx.find(contextElementType));
     }
@@ -91,8 +88,8 @@ public final class ReactorPropagation {
      * @param <E> All elements if the type
      * @return optional context element
      */
-    public static <E extends PropagatedContextElement> Stream<E> findAllContextElements(@NonNull ContextView contextView,
-                                                                                        @NonNull Class<E> contextElementType) {
+    public static <E extends PropagatedContextElement> Stream<E> findAllContextElements(ContextView contextView,
+                                                                                        Class<E> contextElementType) {
         return findPropagatedContext(contextView)
             .stream()
             .flatMap(ctx -> ctx.findAll(contextElementType));
@@ -104,7 +101,7 @@ public final class ReactorPropagation {
      * @param contextView The context
      * @return optional propagated context
      */
-    public static Optional<PropagatedContext> findPropagatedContext(@NonNull ContextView contextView) {
+    public static Optional<PropagatedContext> findPropagatedContext(ContextView contextView) {
         return contextView.getOrEmpty(ReactorPropagation.PROPAGATED_CONTEXT_REACTOR_CONTEXT_VIEW_KEY)
             .map(ctx -> (PropagatedContext) ctx);
     }

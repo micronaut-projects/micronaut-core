@@ -20,6 +20,7 @@ import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -39,9 +40,13 @@ class DefaultServiceInstance implements ServiceInstance, ServiceInstance.Builder
 
     private final String id;
     private final URI uri;
+    @Nullable
     private String instanceId;
+    @Nullable
     private String zone;
+    @Nullable
     private String region;
+    @Nullable
     private String group;
     private HealthStatus status = HealthStatus.UP;
     private ConvertibleValues<String> metadata = ConvertibleValues.empty();

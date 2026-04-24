@@ -18,6 +18,7 @@ package io.micronaut.aop.introduction
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Blocking
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
 import spock.lang.Unroll
@@ -96,5 +97,24 @@ interface Test extends DataCrudRepo<@Valid  String, @Min(5) Integer> {
         definition.getRequiredMethod("save", String).getArguments()[0].getAnnotationMetadata().hasAnnotation(Valid)
         definition.getRequiredMethod("findById", Integer).getArguments()[0].getAnnotationMetadata().hasAnnotation(Min)
         definition.getRequiredMethod("findById", Integer).getReturnType().getAnnotationMetadata().hasAnnotation(Valid)
+    }
+
+    void "test method annotation propagation on introduced method"() {
+        def definition = buildBeanDefinition("test.Test\$Intercepted", """
+package test;
+
+import io.micronaut.aop.introduction.Stub;
+import io.micronaut.core.annotation.Blocking;
+
+@Stub
+interface Test {
+    @Blocking
+    String someMethod();
+}
+""")
+
+        expect:
+        definition.getRequiredMethod("someMethod").hasAnnotation(Blocking)
+        definition.getRequiredMethod("someMethod").getAnnotationMetadata().getDeclaredAnnotationNames().contains(Blocking.name)
     }
 }

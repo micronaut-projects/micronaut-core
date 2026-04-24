@@ -65,14 +65,17 @@ public abstract class RegistrationConfiguration implements Toggleable {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_FAILFAST = true;
 
+    @Nullable
     private String healthPath;
     private int retryCount = DEFAULT_RETRY_COUNT;
+    @Nullable
     private Duration timeout;
     private Duration retryDelay = Duration.of(DEFAULT_RETRYDELAY_SECONDS, ChronoUnit.SECONDS);
     private boolean failFast = DEFAULT_FAILFAST;
     private boolean enabled = DEFAULT_ENABLED;
     private boolean deregister = DEFAULT_DEREGISTER;
     private boolean preferIpAddress = false;
+    @Nullable
     private String ipAddr;
 
     /**
@@ -121,7 +124,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
     /**
      * @param timeout The timeout for registration
      */
-    public void setTimeout(Duration timeout) {
+    public void setTimeout(@Nullable Duration timeout) {
         this.timeout = timeout;
     }
 
@@ -216,7 +219,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
     /**
      * @param healthPath The health endpoint path
      */
-    public void setHealthPath(String healthPath) {
+    public void setHealthPath(@Nullable String healthPath) {
         this.healthPath = healthPath;
     }
 }

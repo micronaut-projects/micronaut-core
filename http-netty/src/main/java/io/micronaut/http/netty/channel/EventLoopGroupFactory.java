@@ -16,7 +16,6 @@
 package io.micronaut.http.netty.channel;
 
 import io.micronaut.core.annotation.NextMajorVersion;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.netty.channel.Channel;
@@ -59,7 +58,6 @@ public interface EventLoopGroupFactory {
      * @since 4.9
      * @deprecated Please {@link #createIoHandlerFactory(EventLoopGroupConfiguration) pass a configuration}
      */
-    @NonNull
     @Deprecated(forRemoval = true)
     default IoHandlerFactory createIoHandlerFactory() {
         throw new UnsupportedOperationException();
@@ -72,8 +70,7 @@ public interface EventLoopGroupFactory {
      * @return The handler factory
      * @since 4.9
      */
-    @NonNull
-    default IoHandlerFactory createIoHandlerFactory(@NonNull EventLoopGroupConfiguration configuration) {
+    default IoHandlerFactory createIoHandlerFactory(EventLoopGroupConfiguration configuration) {
         return createIoHandlerFactory();
     }
 
@@ -152,7 +149,6 @@ public interface EventLoopGroupFactory {
      * @deprecated Use {@link #channelClass(NettyChannelType)} instead
      */
     @Deprecated(since = "4.5.0", forRemoval = true)
-    @NonNull
     default Class<? extends ServerSocketChannel> serverSocketChannelClass() {
         return channelClass(NettyChannelType.SERVER_SOCKET).asSubclass(ServerSocketChannel.class);
     }
@@ -164,7 +160,6 @@ public interface EventLoopGroupFactory {
      * @throws UnsupportedOperationException if domain sockets are not supported.
      * @deprecated Use {@link #channelClass(NettyChannelType)} instead
      */
-    @NonNull
     @Deprecated(since = "4.5.0", forRemoval = true)
     default Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass() throws UnsupportedOperationException {
         return channelClass(NettyChannelType.DOMAIN_SERVER_SOCKET).asSubclass(ServerDomainSocketChannel.class);
@@ -177,7 +172,6 @@ public interface EventLoopGroupFactory {
      * @return A channel class.
      * @throws UnsupportedOperationException if domain sockets are not supported.
      */
-    @NonNull
     default Class<? extends Channel> channelClass(NettyChannelType type) throws UnsupportedOperationException {
         return switch (type) {
             case SERVER_SOCKET -> serverSocketChannelClass();
@@ -194,7 +188,7 @@ public interface EventLoopGroupFactory {
      * @deprecated Use {@link #channelClass(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
     @Deprecated(since = "4.5.0", forRemoval = true)
-    default @NonNull Class<? extends ServerSocketChannel> serverSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
+    default Class<? extends ServerSocketChannel> serverSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return channelClass(NettyChannelType.SERVER_SOCKET, configuration).asSubclass(ServerSocketChannel.class);
     }
 
@@ -207,7 +201,7 @@ public interface EventLoopGroupFactory {
      * @deprecated Use {@link #channelClass(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
     @Deprecated(since = "4.5.0", forRemoval = true)
-    default @NonNull Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
+    default Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return channelClass(NettyChannelType.DOMAIN_SERVER_SOCKET, configuration).asSubclass(ServerDomainSocketChannel.class);
     }
 
@@ -219,7 +213,7 @@ public interface EventLoopGroupFactory {
      * @return A channel implementation.
      * @throws UnsupportedOperationException if domain sockets are not supported.
      */
-    default @NonNull Class<? extends Channel> channelClass(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
+    default Class<? extends Channel> channelClass(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
         return switch (type) {
             case SERVER_SOCKET -> serverSocketChannelClass(configuration);
             case CLIENT_SOCKET -> clientSocketChannelClass(configuration);
@@ -236,7 +230,7 @@ public interface EventLoopGroupFactory {
      * @deprecated Use {@link #channelInstance(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
     @Deprecated(since = "4.5.0", forRemoval = true)
-    default @NonNull ServerSocketChannel serverSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+    default ServerSocketChannel serverSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
         return (ServerSocketChannel) channelInstance(NettyChannelType.SERVER_SOCKET, configuration);
     }
 
@@ -249,7 +243,7 @@ public interface EventLoopGroupFactory {
      * @deprecated Use {@link #channelInstance(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
     @Deprecated(since = "4.5.0", forRemoval = true)
-    default @NonNull ServerChannel domainServerSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+    default ServerChannel domainServerSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
         return (ServerChannel) channelInstance(NettyChannelType.DOMAIN_SERVER_SOCKET, configuration);
     }
 
@@ -261,7 +255,7 @@ public interface EventLoopGroupFactory {
      * @return A ServerDomainSocketChannel implementation.
      * @throws UnsupportedOperationException if domain sockets are not supported.
      */
-    default @NonNull Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
+    default Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
         return switch (type) {
             case SERVER_SOCKET -> serverSocketChannelInstance(configuration);
             case CLIENT_SOCKET -> clientSocketChannelInstance(configuration);
@@ -281,7 +275,7 @@ public interface EventLoopGroupFactory {
      * @deprecated Use {@link #channelInstance(NettyChannelType, EventLoopGroupConfiguration, Channel, int)} instead
      */
     @Deprecated(since = "4.4.0")
-    default @NonNull Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, int fd) {
+    default Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, int fd) {
         return channelInstance(type, configuration, null, fd);
     }
 
@@ -295,7 +289,7 @@ public interface EventLoopGroupFactory {
      * @return A channel implementation.
      * @throws UnsupportedOperationException if domain sockets are not supported.
      */
-    default @NonNull Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, @Nullable Channel parent, int fd) {
+    default Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, @Nullable Channel parent, int fd) {
         throw new UnsupportedOperationException("This transport does not support creating channels from file descriptors. Please use kqueue or epoll.");
     }
 
@@ -307,7 +301,6 @@ public interface EventLoopGroupFactory {
      * @deprecated Use {@link #channelClass(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
     @Deprecated(since = "4.5.0", forRemoval = true)
-    @NonNull
     default Class<? extends SocketChannel> clientSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return channelClass(NettyChannelType.CLIENT_SOCKET, configuration).asSubclass(SocketChannel.class);
     }
@@ -320,7 +313,7 @@ public interface EventLoopGroupFactory {
      * @deprecated Use {@link #channelInstance(NettyChannelType, EventLoopGroupConfiguration)} instead
      */
     @Deprecated(since = "4.5.0", forRemoval = true)
-    default @NonNull SocketChannel clientSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
+    default SocketChannel clientSocketChannelInstance(@Nullable EventLoopGroupConfiguration configuration) {
         return (SocketChannel) channelInstance(NettyChannelType.CLIENT_SOCKET, configuration);
     }
 

@@ -20,8 +20,6 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.InjectionPoint;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -49,9 +47,9 @@ public interface BeanDefinitionValidator {
      * @throws BeanInstantiationException if the bean is invalid
      */
     default <T> void validateBeanArgument(
-            @NonNull BeanResolutionContext resolutionContext,
-            @NonNull InjectionPoint injectionPoint,
-            @NonNull Argument<T> argument,
+            BeanResolutionContext resolutionContext,
+            InjectionPoint injectionPoint,
+            Argument<T> argument,
             int index,
             @Nullable T value)
             throws BeanInstantiationException {
@@ -68,10 +66,10 @@ public interface BeanDefinitionValidator {
      * @throws BeanInstantiationException if the bean is invalid
      */
     default <T> void validateBean(
-            @NonNull BeanResolutionContext resolutionContext,
-            @NonNull BeanDefinition<T> definition,
-            @NonNull T bean)
-            throws BeanInstantiationException {
+        BeanResolutionContext resolutionContext,
+        BeanDefinition<T> definition,
+        T bean)
+        throws BeanInstantiationException {
         // no-op
     }
 }

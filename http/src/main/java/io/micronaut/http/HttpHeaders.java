@@ -658,7 +658,7 @@ public interface HttpHeaders extends Headers {
      * @param name The header name
      * @return The date header as a {@link ZonedDateTime} otherwise if it is not present or cannot be parsed null
      */
-    default ZonedDateTime getDate(CharSequence name) {
+    default @Nullable ZonedDateTime getDate(CharSequence name) {
         return findDate(name).orElse(null);
     }
 
@@ -668,7 +668,7 @@ public interface HttpHeaders extends Headers {
      * @param name The header name
      * @return The date header as a {@link ZonedDateTime} otherwise if it is not present or cannot be parsed null
      */
-    default Integer getInt(CharSequence name) {
+    default @Nullable Integer getInt(CharSequence name) {
         return findInt(name).orElse(null);
     }
 

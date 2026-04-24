@@ -16,7 +16,7 @@ class AlertsEndpointSpec: StringSpec() {
 
     init {
         "test adding an alert" {
-            var server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to AlertsEndpointSpec::class.simpleName))
+            var server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to AlertsEndpointSpec::class.simpleName as Any))
             var client = server.applicationContext.createBean(HttpClient::class.java, server.url)
             try {
                 client.toBlocking().exchange(HttpRequest.POST("/alerts", "First alert").contentType(MediaType.TEXT_PLAIN_TYPE), String::class.java)
@@ -28,8 +28,8 @@ class AlertsEndpointSpec: StringSpec() {
 
         "test adding an alert not sensitive" {
             var server = ApplicationContext.run(EmbeddedServer::class.java,
-                    mapOf("spec.name" to AlertsEndpointSpec::class.simpleName,
-                            "endpoints.alerts.add.sensitive" to false)
+                    mapOf("spec.name" to AlertsEndpointSpec::class.simpleName as Any,
+                            "endpoints.alerts.add.sensitive" to false )
             )
             var client = server.applicationContext.createBean(HttpClient::class.java, server.url)
 
@@ -43,7 +43,7 @@ class AlertsEndpointSpec: StringSpec() {
         }
 
         "test clearing alerts" {
-            var server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to AlertsEndpointSpec::class.simpleName))
+            var server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to AlertsEndpointSpec::class.simpleName as Any))
             var client = server.applicationContext.createBean(HttpClient::class.java, server.url)
             try {
                 client.toBlocking().exchange(HttpRequest.DELETE<Any>("/alerts"), String::class.java)

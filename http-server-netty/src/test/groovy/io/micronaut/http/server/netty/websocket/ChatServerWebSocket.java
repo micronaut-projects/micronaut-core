@@ -18,6 +18,8 @@ package io.micronaut.http.server.netty.websocket;
 //tag::clazz[]
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.context.ServerRequestContext;
+import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.OnClose;
@@ -29,6 +31,7 @@ import java.util.function.Predicate;
 
 @Requires(property = "spec.name", value = "SimpleTextWebSocketSpec")
 @ServerWebSocket("/chat/{topic}/{username}") // <1>
+@ExecuteOn(TaskExecutors.BLOCKING)
 public class ChatServerWebSocket {
     private WebSocketBroadcaster broadcaster;
     private String subProtocol;

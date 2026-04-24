@@ -17,7 +17,6 @@ package io.micronaut.http.server.tck.tests.forms;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.http.HttpRequest;
@@ -119,7 +118,7 @@ public class FormUrlEncodedBodyInRequestFilterTest {
         @ExecuteOn(TaskExecutors.BLOCKING)
         @RequestFilter
         @Nullable
-        public HttpResponse<?> csrfFilter(@NonNull HttpRequest<?> request) {
+        public HttpResponse<?> csrfFilter(HttpRequest<?> request) {
             Map<String, Object> body = null;
             try {
                 body = bodyParser.parseBody(request).get();

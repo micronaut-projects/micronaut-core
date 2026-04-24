@@ -16,8 +16,6 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
@@ -30,10 +28,13 @@ import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 
@@ -52,12 +53,16 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final UriMatchTemplate uriMatchTemplate;
     private final UriTemplateMatcher uriTemplateMatcher;
     private final Charset defaultCharset;
-    private final Integer port;
+    private final @Nullable Integer port;
     private final ConversionService conversionService;
     private final ExecutorSelector executorSelector;
+
     @Nullable
     private ExecutorService executorService;
     private boolean noExecutor;
+
+    @Nullable
+    private Executor executor;
 
     @SuppressWarnings("ParameterNumber")
     public DefaultUrlRouteInfo(HttpMethod httpMethod,
@@ -69,7 +74,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                List<MediaType> consumesMediaTypes,
                                List<MediaType> producesMediaTypes,
                                List<Predicate<HttpRequest<?>>> predicates,
-                               Integer port,
+                                @Nullable Integer port,
+
                                ConversionService conversionService,
                                ExecutorSelector executorSelector,
                                MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
@@ -99,7 +105,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     @Override
-    public UriRouteMatch<T, R> tryMatch(@NonNull String uri) {
+    public @Nullable UriRouteMatch<T, R> tryMatch(String uri) {
         UriMatchInfo matchInfo = uriTemplateMatcher.tryMatch(uri);
         if (matchInfo != null) {
             return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
@@ -108,12 +114,12 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     @Override
-    public Integer getPort() {
+    public @Nullable Integer getPort() {
         return port;
     }
 
     @Override
-    public int compareTo(@NonNull UriRouteInfo o) {
+    public int compareTo(UriRouteInfo o) {
         return uriTemplateMatcher.compareTo(((DefaultUrlRouteInfo) o).uriTemplateMatcher);
     }
 
@@ -126,16 +132,26 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     @Override
-    public ExecutorService getExecutor(ThreadSelection threadSelection) {
+    public @Nullable ExecutorService getExecutor(@Nullable ThreadSelection threadSelection) {
         if (executorService != null || noExecutor) {
             return executorService;
         }
-        ExecutorService es = executorSelector.select(getTargetMethod(), threadSelection).orElse(null);
+        ExecutorService es = executorSelector.select(getTargetMethod(), threadSelection == null ? ThreadSelection.AUTO : threadSelection).orElse(null);
         if (es == null) {
             noExecutor = true;
             return null;
         }
         executorService = es;
         return executorService;
+    }
+
+    @Override
+    public Executor getExecutor(ThreadSelectionConfiguration configuration) {
+        Executor executor = this.executor;
+        if (executor == null) {
+            executor = executorSelector.selectExecutor(getTargetMethod(), configuration);
+            this.executor = executor;
+        }
+        return executor;
     }
 }

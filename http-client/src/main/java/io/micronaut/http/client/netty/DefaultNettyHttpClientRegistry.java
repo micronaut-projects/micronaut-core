@@ -24,7 +24,6 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -140,6 +139,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final JsonMapper jsonMapper;
     private final Collection<ChannelPipelineListener> pipelineListeners = new CopyOnWriteArrayList<>();
     private final CompositeNettyClientCustomizer clientCustomizer = new CompositeNettyClientCustomizer();
+    @Nullable
     private final ExecutorService blockingExecutor;
 
     /**
@@ -160,6 +160,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param jsonMapper                      JSON Mapper
      * @param blockingExecutor                Optional executor for blocking operations
      */
+    @SuppressWarnings("checkstyle:ParameterNumber")
     public DefaultNettyHttpClientRegistry(
         HttpClientConfiguration defaultHttpClientConfiguration,
         HttpClientFilterResolver<ClientFilterResolutionContext> httpClientFilterResolver,
@@ -191,9 +192,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         this.blockingExecutor = blockingExecutor;
     }
 
-    @NonNull
     @Override
-    public DefaultHttpClient getClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path) {
+    public DefaultHttpClient getClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path) {
         final ClientKey key = new ClientKey(
                 httpVersion,
                 clientId,
@@ -206,38 +206,33 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     @Override
-    public @NonNull RawHttpClient getRawClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path) {
+    public RawHttpClient getRawClient(HttpVersionSelection httpVersion, String clientId, @Nullable String path) {
         return getClient(httpVersion, clientId, path);
     }
 
     @Override
-    @NonNull
-    public DefaultHttpClient getClient(@NonNull AnnotationMetadata metadata) {
+    public DefaultHttpClient getClient(AnnotationMetadata metadata) {
         final ClientKey key = getClientKey(metadata);
         return getClient(key, beanContext, metadata);
     }
 
     @Override
-    @NonNull
-    public DefaultHttpClient getSseClient(@NonNull AnnotationMetadata metadata) {
+    public DefaultHttpClient getSseClient(AnnotationMetadata metadata) {
         return getClient(metadata);
     }
 
     @Override
-    @NonNull
-    public DefaultHttpClient getStreamingHttpClient(@NonNull AnnotationMetadata metadata) {
+    public DefaultHttpClient getStreamingHttpClient(AnnotationMetadata metadata) {
         return getClient(metadata);
     }
 
     @Override
-    @NonNull
-    public DefaultHttpClient getProxyHttpClient(@NonNull AnnotationMetadata metadata) {
+    public DefaultHttpClient getProxyHttpClient(AnnotationMetadata metadata) {
         return getClient(metadata);
     }
 
     @Override
-    @NonNull
-    public DefaultHttpClient getWebSocketClient(@NonNull AnnotationMetadata metadata) {
+    public DefaultHttpClient getWebSocketClient(AnnotationMetadata metadata) {
         return getClient(metadata);
     }
 
@@ -287,47 +282,42 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     @Override
-    @NonNull
-    public HttpClient resolveClient(@Nullable InjectionPoint<?>  injectionPoint,
+    public HttpClient resolveClient(@Nullable InjectionPoint<?> injectionPoint,
                                     @Nullable LoadBalancer loadBalancer,
                                     @Nullable HttpClientConfiguration configuration,
-                                    @NonNull BeanContext beanContext) {
+                                    BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     @Override
-    @NonNull
-    public ProxyHttpClient resolveProxyHttpClient(@Nullable InjectionPoint<?>  injectionPoint,
+    public ProxyHttpClient resolveProxyHttpClient(@Nullable InjectionPoint<?> injectionPoint,
                                                   @Nullable LoadBalancer loadBalancer,
                                                   @Nullable HttpClientConfiguration configuration,
-                                                  @NonNull BeanContext beanContext) {
+                                                  BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     @Override
-    @NonNull
-    public SseClient resolveSseClient(@Nullable InjectionPoint<?>  injectionPoint,
+    public SseClient resolveSseClient(@Nullable InjectionPoint<?> injectionPoint,
                                       @Nullable LoadBalancer loadBalancer,
                                       @Nullable HttpClientConfiguration configuration,
-                                      @NonNull BeanContext beanContext) {
+                                      BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     @Override
-    @NonNull
-    public StreamingHttpClient resolveStreamingHttpClient(@Nullable InjectionPoint<?>  injectionPoint,
+    public StreamingHttpClient resolveStreamingHttpClient(@Nullable InjectionPoint<?> injectionPoint,
                                                           @Nullable LoadBalancer loadBalancer,
                                                           @Nullable HttpClientConfiguration configuration,
-                                                          @NonNull BeanContext beanContext) {
+                                                          BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     @Override
-    @NonNull
     public WebSocketClient resolveWebSocketClient(@Nullable InjectionPoint<?> injectionPoint,
                                                   @Nullable LoadBalancer loadBalancer,
                                                   @Nullable HttpClientConfiguration configuration,
-                                                  @NonNull BeanContext beanContext) {
+                                                  BeanContext beanContext) {
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
@@ -337,13 +327,13 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     @Override
-    public void doOnConnect(@NonNull ChannelPipelineListener listener) {
+    public void doOnConnect(ChannelPipelineListener listener) {
         Objects.requireNonNull(listener, "listener");
         pipelineListeners.add(listener);
     }
 
     @Override
-    public void register(@NonNull NettyClientCustomizer customizer) {
+    public void register(NettyClientCustomizer customizer) {
         Objects.requireNonNull(customizer, "customizer");
         clientCustomizer.add(customizer);
     }
@@ -365,7 +355,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
             final List<String> filterAnnotations = clientKey.filterAnnotations;
             final String path = clientKey.path;
-            if (clientBean != null && path == null && configurationClass == null && filterAnnotations.isEmpty()) {
+            if (clientBean != null && path == null && configurationClass == null && (filterAnnotations == null || filterAnnotations.isEmpty())) {
                 return clientBean;
             }
 
@@ -413,7 +403,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             final JsonFeatures jsonFeatures = clientKey.jsonFeatures;
             if (jsonFeatures != null) {
                 List<MediaTypeCodec> codecs = new ArrayList<>(2);
-                MediaTypeCodecRegistry codecRegistry = builder.codecRegistry;
+                MediaTypeCodecRegistry codecRegistry = Objects.requireNonNull(builder.codecRegistry);
                 for (MediaTypeCodec codec : codecRegistry.getCodecs()) {
                     if (codec instanceof MapperMediaTypeCodec typeCodec) {
                         codecs.add(typeCodec.cloneWithFeatures(jsonFeatures));
@@ -421,12 +411,12 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                         codecs.add(codec);
                     }
                 }
-                if (!codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE).isPresent()) {
+                if (codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE).isEmpty()) {
                     codecs.add(createNewJsonCodec(this.beanContext, jsonFeatures));
                 }
                 builder.codecRegistry(MediaTypeCodecRegistry.of(codecs));
                 builder.handlerRegistry(new MessageBodyHandlerRegistry() {
-                    final MessageBodyHandlerRegistry delegate = builder.handlerRegistry;
+                    final MessageBodyHandlerRegistry delegate = Objects.requireNonNull(builder.handlerRegistry);
 
                     @SuppressWarnings("unchecked")
                     private <T> T customize(T handler) {
@@ -437,7 +427,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                     }
 
                     @Override
-                    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, List<MediaType> mediaType) {
+                    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, @Nullable List<MediaType> mediaType) {
                         return delegate.findReader(type, mediaType).map(this::customize);
                     }
 
@@ -453,6 +443,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
     private DefaultHttpClientBuilder clientBuilder(
             HttpClientConfiguration configuration,
+            @Nullable
             String clientId,
             BeanContext beanContext,
             AnnotationMetadata annotationMetadata) {
@@ -499,7 +490,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             @Nullable InjectionPoint injectionPoint,
             @Nullable LoadBalancer loadBalancer,
             @Nullable HttpClientConfiguration configuration,
-            @NonNull BeanContext beanContext) {
+            BeanContext beanContext) {
         if (loadBalancer != null) {
             if (configuration == null) {
                 configuration = defaultHttpClientConfiguration;
@@ -576,19 +567,31 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      */
     @Internal
     private static final class ClientKey {
+        @Nullable
         final HttpVersionSelection httpVersion;
+        @Nullable
         final String clientId;
+        @Nullable
         final List<String> filterAnnotations;
+        @Nullable
         final String path;
+        @Nullable
         final Class<?> configurationClass;
+        @Nullable
         final JsonFeatures jsonFeatures;
 
         ClientKey(
-            HttpVersionSelection httpVersion,
+                @Nullable
+                HttpVersionSelection httpVersion,
+                @Nullable
                 String clientId,
+                @Nullable
                 List<String> filterAnnotations,
+                @Nullable
                 String path,
+                @Nullable
                 Class<?> configurationClass,
+                @Nullable
                 JsonFeatures jsonFeatures) {
             this.httpVersion = httpVersion;
             this.clientId = clientId;

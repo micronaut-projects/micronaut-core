@@ -19,21 +19,14 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.CharSequenceToEnumConverter;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
-import io.micronaut.http.multipart.CompletedFileUpload;
-import io.micronaut.http.multipart.CompletedPart;
+import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.multipart.NettyCompletedAttribute;
-import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
-import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.WriteBufferWaterMark;
-import io.netty.handler.codec.http.multipart.Attribute;
-import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.logging.LogLevel;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 
@@ -56,54 +49,9 @@ public final class NettyConvertersSpi implements TypeConverterRegistrar {
         );
 
         conversionService.addConverter(
-                FileUpload.class,
-                CompletedFileUpload.class,
-                (object, targetType, context) -> {
-                    try {
-                        if (!object.isCompleted()) {
-                            return Optional.empty();
-                        }
-
-                        // unlike NettyCompletedAttribute, NettyCompletedFileUpload does a `retain` on
-                        // construct, so we don't need one here
-                        return Optional.of(new NettyCompletedFileUpload(object));
-                    } catch (Exception e3) {
-                        context.reject(e3);
-                        return Optional.empty();
-                    }
-                }
-        );
-
-        conversionService.addConverter(
-                Attribute.class,
-                CompletedPart.class,
-                (object, targetType, context) -> {
-                    try {
-                        if (!object.isCompleted() || !targetType.isAssignableFrom(NettyCompletedAttribute.class)) {
-                            return Optional.empty();
-                        }
-
-                        // converter does not claim the input object, so we need to retain it here. it's
-                        // released by NettyCompletedAttribute.get*
-                        return Optional.of(new NettyCompletedAttribute(object.retain()));
-                    } catch (Exception e2) {
-                        context.reject(e2);
-                        return Optional.empty();
-                    }
-                }
-        );
-
-        conversionService.addConverter(
-                NettyPartData.class,
+                PartData.class,
                 byte[].class,
-                (upload, targetType, context) -> {
-                    try {
-                        return Optional.of(upload.getBytes());
-                    } catch (IOException e2) {
-                        context.reject(e2);
-                        return Optional.empty();
-                    }
-                }
+                (upload, targetType, context) -> Optional.of(upload.getBytes())
         );
 
         conversionService.addConverter(

@@ -23,7 +23,6 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.annotation.TypeHint;
@@ -98,7 +97,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         );
     }
 
-    @NonNull
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;

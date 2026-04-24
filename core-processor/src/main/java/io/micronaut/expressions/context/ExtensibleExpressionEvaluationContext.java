@@ -16,7 +16,6 @@
 package io.micronaut.expressions.context;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 
@@ -33,7 +32,7 @@ public interface ExtensibleExpressionEvaluationContext extends ExpressionEvaluat
      * @param classElement The type that represents this.
      * @return extended context
      */
-    ExtensibleExpressionEvaluationContext withThis(@NonNull ClassElement classElement);
+    ExtensibleExpressionEvaluationContext withThis(ClassElement classElement);
 
     /**
      * Extends compilation context with method element. Compilation context can only include
@@ -43,8 +42,7 @@ public interface ExtensibleExpressionEvaluationContext extends ExpressionEvaluat
      * @param methodElement extending method
      * @return extended context
      */
-    @NonNull
-    ExtensibleExpressionEvaluationContext extendWith(@NonNull MethodElement methodElement);
+    ExtensibleExpressionEvaluationContext extendWith(MethodElement methodElement);
 
     /**
      * Extends compilation context with class element. Compilation context can include
@@ -53,7 +51,6 @@ public interface ExtensibleExpressionEvaluationContext extends ExpressionEvaluat
      * @param classElement extending class
      * @return extended context
      */
-    @NonNull
-    ExtensibleExpressionEvaluationContext extendWith(@NonNull ClassElement classElement);
+    ExtensibleExpressionEvaluationContext extendWith(ClassElement classElement);
 
 }

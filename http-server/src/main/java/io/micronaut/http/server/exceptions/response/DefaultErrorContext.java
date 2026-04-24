@@ -16,7 +16,6 @@
 package io.micronaut.http.server.exceptions.response;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequest;
 
@@ -28,31 +27,29 @@ import java.util.Optional;
 final class DefaultErrorContext implements ErrorContext {
 
     private final HttpRequest<?> request;
+    @Nullable
     private final Throwable cause;
     private final List<Error> jsonErrors;
 
-    private DefaultErrorContext(@NonNull HttpRequest<?> request,
+    private DefaultErrorContext(HttpRequest<?> request,
                                 @Nullable Throwable cause,
-                                @NonNull List<Error> jsonErrors) {
+                                List<Error> jsonErrors) {
         this.request = request;
         this.cause = cause;
         this.jsonErrors = jsonErrors;
     }
 
     @Override
-    @NonNull
     public HttpRequest<?> getRequest() {
         return request;
     }
 
     @Override
-    @NonNull
     public Optional<Throwable> getRootCause() {
         return Optional.ofNullable(cause);
     }
 
     @Override
-    @NonNull
     public List<Error> getErrors() {
         return jsonErrors;
     }
@@ -63,44 +60,41 @@ final class DefaultErrorContext implements ErrorContext {
      * @param request The request
      * @return A new builder
      */
-    public static Builder builder(@NonNull HttpRequest<?> request) {
+    public static Builder builder(HttpRequest<?> request) {
         return new Builder(request);
     }
 
     private static final class Builder implements ErrorContext.Builder {
 
         private final HttpRequest<?> request;
+        @Nullable
         private Throwable cause;
         private final List<Error> jsonErrors = new ArrayList<>();
 
-        private Builder(@NonNull HttpRequest<?> request) {
+        private Builder(HttpRequest<?> request) {
             this.request = request;
         }
 
         @Override
-        @NonNull
         public Builder cause(@Nullable Throwable cause) {
             this.cause = cause;
             return this;
         }
 
         @Override
-        @NonNull
-        public Builder errorMessage(@NonNull String message) {
+        public Builder errorMessage(String message) {
             jsonErrors.add(() -> message);
             return this;
         }
 
         @Override
-        @NonNull
-        public Builder error(@NonNull Error error) {
+        public Builder error(Error error) {
             jsonErrors.add(error);
             return this;
         }
 
         @Override
-        @NonNull
-        public Builder errorMessages(@NonNull List<String> errors) {
+        public Builder errorMessages(List<String> errors) {
             for (String error: errors) {
                 errorMessage(error);
             }
@@ -108,14 +102,12 @@ final class DefaultErrorContext implements ErrorContext {
         }
 
         @Override
-        @NonNull
-        public Builder errors(@NonNull List<Error> errors) {
+        public Builder errors(List<Error> errors) {
             jsonErrors.addAll(errors);
             return this;
         }
 
         @Override
-        @NonNull
         public ErrorContext build() {
             return new DefaultErrorContext(request, cause, jsonErrors);
         }

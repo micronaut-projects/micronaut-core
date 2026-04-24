@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
@@ -62,7 +61,7 @@ public final class InstanceofOperator extends ExpressionNode {
     }
 
     @Override
-    protected TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    protected TypeDef doResolveType(ExpressionVisitorContext ctx) {
         return TypeDef.Primitive.BOOLEAN;
     }
 }

@@ -16,7 +16,6 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.body.ByteBody;
 
 import java.io.Closeable;
@@ -36,7 +35,6 @@ public interface ByteBodyHttpResponse<B> extends HttpResponse<B>, Closeable {
      *
      * @return The bytes
      */
-    @NonNull
     ByteBody byteBody();
 
     /**

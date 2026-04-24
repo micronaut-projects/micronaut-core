@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.exceptions;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
@@ -43,7 +42,6 @@ public class BufferLengthExceededHandler extends ErrorResponseProcessorException
     }
 
     @Override
-    @NonNull
     protected MutableHttpResponse<?> createResponse(BufferLengthExceededException exception) {
         return HttpResponse.status(HttpStatus.REQUEST_ENTITY_TOO_LARGE);
     }

@@ -16,6 +16,8 @@
 package io.micronaut.docs.server.upload;
 
 // tag::class[]
+
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
@@ -25,8 +27,12 @@ import io.micronaut.http.server.multipart.MultipartBody;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import io.micronaut.core.async.annotation.SingleResult;
+import reactor.core.scheduler.Schedulers;
+
+import java.io.IOException;
+
 import static io.micronaut.http.MediaType.MULTIPART_FORM_DATA;
 import static io.micronaut.http.MediaType.TEXT_PLAIN;
 
@@ -38,7 +44,7 @@ public class WholeBodyUploadController {
     public Publisher<String> uploadBytes(@Body MultipartBody body) { // <2>
 
         return Mono.create(emitter -> {
-            body.subscribe(new Subscriber<CompletedPart>() {
+            Flux.from(body).publishOn(Schedulers.boundedElastic()).subscribe(new Subscriber<>() {
                 private Subscription s;
 
                 @Override
@@ -52,6 +58,11 @@ public class WholeBodyUploadController {
                     String partName = completedPart.getName();
                     if (completedPart instanceof CompletedFileUpload upload) {
                         String originalFileName = upload.getFilename();
+                    }
+                    try {
+                        completedPart.close();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
                     }
                 }
 

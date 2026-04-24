@@ -24,9 +24,9 @@ class IntroductionOnConcreteClassSpec extends Specification {
         cc.onApplicationEvent(event)
 
         then:
-        listenerAdviceInterceptor.recievedMessages.contains(event)
+        listenerAdviceInterceptor.receivedMessages.contains(event)
 
         cleanup:
-        listenerAdviceInterceptor.recievedMessages.clear()
+        listenerAdviceInterceptor.receivedMessages.clear()
     }
 }

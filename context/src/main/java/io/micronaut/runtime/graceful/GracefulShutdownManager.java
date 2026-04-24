@@ -17,7 +17,6 @@ package io.micronaut.runtime.graceful;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import jakarta.inject.Singleton;
 
 import java.util.List;
@@ -47,7 +46,6 @@ public final class GracefulShutdownManager {
      * @return A future that completes when all {@link GracefulShutdownCapable} beans have shut
      * down
      */
-    @NonNull
     public CompletionStage<?> shutdownGracefully() {
         return GracefulShutdownCapable.shutdownAll(delegates.stream());
     }
@@ -58,7 +56,6 @@ public final class GracefulShutdownManager {
      *
      * @return The combined number of active tasks
      */
-    @NonNull
     public OptionalLong reportActiveTasks() {
         return GracefulShutdownCapable.combineActiveTasks(delegates);
     }

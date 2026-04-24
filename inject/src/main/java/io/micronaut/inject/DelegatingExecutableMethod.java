@@ -18,6 +18,7 @@ package io.micronaut.inject;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
 
@@ -82,7 +83,8 @@ public interface DelegatingExecutableMethod<T, R> extends ExecutableMethod<T, R>
     }
 
     @Override
-    default R invoke(T instance, Object... arguments) {
+    @Nullable
+    default R invoke(T instance, @Nullable Object... arguments) {
         return getTarget().invoke(instance, arguments);
     }
 

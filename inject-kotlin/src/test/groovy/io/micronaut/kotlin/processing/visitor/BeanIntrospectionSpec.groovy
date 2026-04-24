@@ -1841,6 +1841,28 @@ enum class Test(val number: Int) {
         thrown(ClassNotFoundException)
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12443")
+    void "test introspection getter for primitive override of Any uses boxed JVM signature"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.CmdIntPayload', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+interface InboundCommand {
+    val payload: Any?
+}
+
+@Introspected
+data class CmdIntPayload(
+    override val payload: Int
+) : InboundCommand
+''')
+
+        expect:
+        introspection != null
+        introspection.getRequiredProperty("payload", int).get(introspection.instantiate(123)) == 123
+    }
+
     void "test basic enum bean properties"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.MyEnum', '''
 package test

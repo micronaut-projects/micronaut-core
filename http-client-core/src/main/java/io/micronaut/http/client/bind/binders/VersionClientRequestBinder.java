@@ -20,7 +20,6 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.MutableHttpRequest;
@@ -29,6 +28,7 @@ import io.micronaut.http.client.bind.AnnotatedClientRequestBinder;
 import io.micronaut.http.client.bind.ClientRequestUriContext;
 import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,11 +46,9 @@ public class VersionClientRequestBinder implements AnnotatedClientRequestBinder<
     }
 
     @Override
-    public void bind(
-            @NonNull MethodInvocationContext<Object, Object> context,
-            @NonNull ClientRequestUriContext uriContext,
-            @NonNull MutableHttpRequest<?> request
-    ) {
+    public void bind(MethodInvocationContext<Object, Object> context,
+                     ClientRequestUriContext uriContext,
+                     MutableHttpRequest<?> request) {
         context.findAnnotation(Version.class)
                 .flatMap(AnnotationValue::stringValue)
                 .filter(StringUtils::isNotEmpty)
@@ -66,7 +64,6 @@ public class VersionClientRequestBinder implements AnnotatedClientRequestBinder<
     }
 
     @Override
-    @NonNull
     public Class<Version> getAnnotationType() {
         return Version.class;
     }
@@ -81,6 +78,7 @@ public class VersionClientRequestBinder implements AnnotatedClientRequestBinder<
 
     }
 
+    @Nullable
     private String getClientId(AnnotationMetadata clientAnn) {
         return clientAnn.stringValue(Client.class).orElse(null);
     }

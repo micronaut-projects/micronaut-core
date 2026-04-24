@@ -28,6 +28,7 @@ import io.micronaut.retry.annotation.Fallback;
 import io.micronaut.retry.annotation.Recoverable;
 import io.micronaut.retry.exception.FallbackException;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +59,8 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
     private final BeanContext beanContext;
 
     /**
+     * Creates a recovery interceptor.
+     *
      * @param beanContext The bean context to allow for DI of class annotated with {@link jakarta.inject.Inject}.
      */
     public RecoveryInterceptor(BeanContext beanContext) {
@@ -70,6 +73,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     @Override
+    @Nullable
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         if (context.getAttribute(FALLBACK_NOT_FOUND, Boolean.class).orElse(Boolean.FALSE)) {
             return context.proceed();
@@ -234,6 +238,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
      * @param exception The exception
      * @return Returns the fallback value or throws the original exception
      */
+    @Nullable
     protected Object resolveFallback(MethodInvocationContext<Object, Object> context, RuntimeException exception) {
         if (LOG.isErrorEnabled()) {
             LOG.error("Type [{}] executed with error: {}", context.getTarget().getClass().getName(), exception.getMessage(), exception);

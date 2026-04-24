@@ -16,7 +16,6 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Experimental;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
 
 import java.util.List;
@@ -69,7 +68,7 @@ public interface ElementQuery<T extends Element> {
      *
      * @return This query
      */
-    @NonNull ElementQuery<T> onlyDeclared();
+    ElementQuery<T> onlyDeclared();
 
     /**
      * Search for methods that are injection points.
@@ -82,14 +81,14 @@ public interface ElementQuery<T extends Element> {
      *
      * @return This query
      */
-    @NonNull ElementQuery<T> onlyConcrete();
+    ElementQuery<T> onlyConcrete();
 
     /**
      * Indicates that only abstract members should be returned.
      *
      * @return This query
      */
-    @NonNull ElementQuery<T> onlyAbstract();
+    ElementQuery<T> onlyAbstract();
 
     /**
      * Indicates that only accessible members should be returned. Inaccessible members include:
@@ -102,7 +101,7 @@ public interface ElementQuery<T extends Element> {
      *
      * @return This query
      */
-    @NonNull ElementQuery<T> onlyAccessible();
+    ElementQuery<T> onlyAccessible();
 
     /**
      * Indicates that only accessible members from the given type should be returned. Inaccessible members include:
@@ -116,7 +115,7 @@ public interface ElementQuery<T extends Element> {
      * @param fromType The origin type
      * @return This query
      */
-    @NonNull ElementQuery<T> onlyAccessible(ClassElement fromType);
+    ElementQuery<T> onlyAccessible(ClassElement fromType);
 
     /**
      * Indicates to return only instance (non-static methods).
@@ -168,7 +167,7 @@ public interface ElementQuery<T extends Element> {
      * @param predicate The predicate to use. Should return true to include the element.
      * @return This query
      */
-    @NonNull ElementQuery<T> named(@NonNull Predicate<String> predicate);
+    ElementQuery<T> named(Predicate<String> predicate);
 
     /**
      * Allows filtering elements by name.
@@ -179,7 +178,7 @@ public interface ElementQuery<T extends Element> {
      * @return This query
      * @since 3.5.2
      */
-    default @NonNull ElementQuery<T> named(@NonNull String name) {
+    default ElementQuery<T> named(String name) {
         return named(n -> n.equals(name));
     }
 
@@ -188,21 +187,21 @@ public interface ElementQuery<T extends Element> {
      * @param predicate The predicate to use. Should return true to include the element.
      * @return This query
      */
-    @NonNull ElementQuery<T> typed(@NonNull Predicate<ClassElement> predicate);
+    ElementQuery<T> typed(Predicate<ClassElement> predicate);
 
     /**
      * Allows filtering elements by annotation.
      * @param predicate The predicate to use. Should return true to include the element.
      * @return This query
      */
-    @NonNull ElementQuery<T> annotated(@NonNull Predicate<AnnotationMetadata> predicate);
+    ElementQuery<T> annotated(Predicate<AnnotationMetadata> predicate);
 
     /**
      * Allows filtering by modifiers.
      * @param predicate The predicate to use. Should return true to include the element.
      * @return This query
      */
-    @NonNull ElementQuery<T> modifiers(@NonNull Predicate<Set<ElementModifier>> predicate);
+    ElementQuery<T> modifiers(Predicate<Set<ElementModifier>> predicate);
 
     /**
      * A final filter that allows access to the materialized Element. This method should be used
@@ -210,14 +209,14 @@ public interface ElementQuery<T extends Element> {
      * @param predicate The predicate to use. Should return true to include the element.
      * @return This query
      */
-    @NonNull ElementQuery<T> filter(@NonNull Predicate<T> predicate);
+    ElementQuery<T> filter(Predicate<T> predicate);
 
     /**
      * Build the query result.
      *
      * @return The query result.
      */
-    @NonNull Result<T> result();
+    Result<T> result();
 
     /**
      * Create a new {@link ElementQuery} for the given element type.
@@ -225,7 +224,7 @@ public interface ElementQuery<T extends Element> {
      * @param <T1> The element generic type
      * @return The query
      */
-    static @NonNull <T1 extends Element> ElementQuery<T1> of(@NonNull Class<T1> elementType) {
+    static <T1 extends Element> ElementQuery<T1> of(Class<T1> elementType) {
         return new DefaultElementQuery<>(
                 Objects.requireNonNull(elementType, "Element type cannot be null")
         );
@@ -255,7 +254,7 @@ public interface ElementQuery<T extends Element> {
         /**
          * @return The element type
          */
-        @NonNull Class<T> getElementType();
+        Class<T> getElementType();
 
         /**
          * @return Whether to return only accessible members
@@ -310,29 +309,28 @@ public interface ElementQuery<T extends Element> {
         /**
          * @return The name predicates
          */
-        @NonNull List<Predicate<String>> getNamePredicates();
-
+        List<Predicate<String>> getNamePredicates();
 
         /**
          * @return The name predicates
          * @since 3.0.0
          */
-        @NonNull List<Predicate<ClassElement>> getTypePredicates();
+        List<Predicate<ClassElement>> getTypePredicates();
 
         /**
          * @return The annotation predicates
          */
-        @NonNull List<Predicate<AnnotationMetadata>> getAnnotationPredicates();
+        List<Predicate<AnnotationMetadata>> getAnnotationPredicates();
 
         /**
          * @return The modifier predicate
          */
-        @NonNull List<Predicate<Set<ElementModifier>>> getModifierPredicates();
+        List<Predicate<Set<ElementModifier>>> getModifierPredicates();
 
         /**
          * @return The element predicates
          */
-        @NonNull List<Predicate<T>> getElementPredicates();
+        List<Predicate<T>> getElementPredicates();
 
         /**
          * Creates a copy without the predicates.

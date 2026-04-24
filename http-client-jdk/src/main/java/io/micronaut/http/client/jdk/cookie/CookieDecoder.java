@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client.jdk.cookie;
 
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.cookie.Cookies;
@@ -36,6 +35,5 @@ public interface CookieDecoder extends Ordered {
      * @param request the request
      * @return the cookies or empty if none
      */
-    @NonNull
     Optional<Cookies> decode(HttpRequest<?> request);
 }

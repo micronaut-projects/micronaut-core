@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,7 +34,8 @@ import java.nio.file.Files;
  * @since 1.0
  */
 @Internal
-class FileBackedGeneratedFile implements GeneratedFile {
+@NullUnmarked
+final class FileBackedGeneratedFile implements GeneratedFile {
 
     private final File file;
 

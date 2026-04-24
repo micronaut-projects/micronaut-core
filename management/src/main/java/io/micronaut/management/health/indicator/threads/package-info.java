@@ -19,4 +19,7 @@
  * @author Andreas Brenk
  * @since 4.8.0
  */
+@NullMarked
 package io.micronaut.management.health.indicator.threads;
+
+import org.jspecify.annotations.NullMarked;

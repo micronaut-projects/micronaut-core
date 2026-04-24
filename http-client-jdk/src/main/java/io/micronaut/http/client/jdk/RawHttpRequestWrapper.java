@@ -16,7 +16,6 @@
 package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpRequestWrapper;
@@ -25,6 +24,8 @@ import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.netty.handler.codec.http.HttpRequest;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -37,6 +38,7 @@ import java.io.IOException;
  * @param <B> The body type, mostly unused
  * @since 4.8.0
  */
+@NullUnmarked
 @Internal
 final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implements MutableHttpRequest<B>, ServerHttpRequest<B>, Closeable {
     private final CloseableByteBody byteBody;
@@ -47,12 +49,12 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
     }
 
     @Override
-    public @NonNull ByteBody byteBody() {
+    public ByteBody byteBody() {
         return byteBody;
     }
 
     @Override
-    public <T> MutableHttpRequest<T> body(T body) {
+    public <T> MutableHttpRequest<T> body(@Nullable T body) {
         throw new UnsupportedOperationException("Changing the body of raw requests is currently not supported");
     }
 

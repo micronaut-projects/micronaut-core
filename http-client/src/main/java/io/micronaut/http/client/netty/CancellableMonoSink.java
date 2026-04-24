@@ -16,7 +16,6 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -24,6 +23,7 @@ import org.reactivestreams.Subscription;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
+import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -41,10 +41,13 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     @Nullable
     private final BlockHint blockHint;
 
+    @Nullable
     private T value;
+    @Nullable
     private Throwable failure;
     private boolean complete = false;
     private boolean cancelled = false;
+    @Nullable
     private Subscriber<? super T> subscriber = null;
     private boolean subscriberWaiting = false;
 
@@ -74,8 +77,9 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
 
     private void tryForward() {
         if (subscriberWaiting && complete && !cancelled) {
+            Objects.requireNonNull(subscriber);
             if (failure == null) {
-                if (value != EMPTY) {
+                if (value != EMPTY && value != null) {
                     subscriber.onNext(value);
                 }
                 subscriber.onComplete();
@@ -86,7 +90,7 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     }
 
     @Override
-    public Sinks.@NonNull EmitResult tryEmitValue(T value) {
+    public Sinks.EmitResult tryEmitValue(T value) {
         lock.lock();
         try {
             if (complete) {
@@ -103,18 +107,18 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     }
 
     @Override
-    public void emitValue(T value, Sinks.@NonNull EmitFailureHandler failureHandler) {
+    public void emitValue(T value, Sinks. EmitFailureHandler failureHandler) {
         throw new UnsupportedOperationException();
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public Sinks.@NonNull EmitResult tryEmitEmpty() {
+    public Sinks.EmitResult tryEmitEmpty() {
         return tryEmitValue((T) EMPTY);
     }
 
     @Override
-    public Sinks.@NonNull EmitResult tryEmitError(@NonNull Throwable error) {
+    public Sinks.EmitResult tryEmitError(Throwable error) {
         lock.lock();
         try {
             if (complete) {
@@ -131,12 +135,12 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     }
 
     @Override
-    public void emitEmpty(Sinks.@NonNull EmitFailureHandler failureHandler) {
+    public void emitEmpty(Sinks.EmitFailureHandler failureHandler) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void emitError(@NonNull Throwable error, Sinks.@NonNull EmitFailureHandler failureHandler) {
+    public void emitError(Throwable error, Sinks.EmitFailureHandler failureHandler) {
         throw new UnsupportedOperationException();
     }
 
@@ -150,14 +154,14 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
         }
     }
 
-    @NonNull
     @Override
     public Mono<T> asMono() {
         return Mono.from(this);
     }
 
     @Override
-    public Object scanUnsafe(@NonNull Attr key) {
+    @Nullable
+    public Object scanUnsafe(Attr key) {
         return null;
     }
 

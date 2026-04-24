@@ -21,6 +21,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
@@ -41,6 +42,7 @@ public final class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> i
     private final UriMatchInfo matchInfo;
     private final UriRouteInfo<T, R> uriRouteInfo;
     private final Charset defaultCharset;
+    @Nullable
     private Map<String, Object> variables;
 
     /**

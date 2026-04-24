@@ -17,7 +17,6 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
 
@@ -140,7 +139,7 @@ final class RuntimeTypeInformation {
      * @param <T> The generic type
      * @return The wrapped type
      */
-    static <T> Argument<?> getWrappedType(@NonNull TypeInformation<?> typeInfo) {
+    static <T> Argument<?> getWrappedType(TypeInformation<?> typeInfo) {
         final Argument<?> a = LazyWrappers.WRAPPER_TO_TYPE.get(typeInfo.getType());
         if (a != null) {
             return a;

@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.types;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
@@ -79,7 +78,7 @@ public final class TypeIdentifier extends ExpressionNode {
     }
 
     @Override
-    public TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    public TypeDef doResolveType(ExpressionVisitorContext ctx) {
         String name = this.toString();
         if (PRIMITIVES.containsKey(name)) {
             return PRIMITIVES.get(name);

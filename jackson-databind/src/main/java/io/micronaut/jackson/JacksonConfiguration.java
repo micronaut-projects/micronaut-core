@@ -16,6 +16,16 @@
 package io.micronaut.jackson;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.TypeHint;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.json.JsonConfiguration;
+import org.jspecify.annotations.Nullable;
+import tools.jackson.core.StreamReadFeature;
+import tools.jackson.core.StreamWriteFeature;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.core.json.JsonReadFeature;
 import tools.jackson.core.json.JsonWriteFeature;
@@ -26,15 +36,10 @@ import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.PropertyNamingStrategy;
 import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.cfg.EnumFeature;
+import tools.jackson.databind.cfg.JsonNodeFeature;
 import tools.jackson.databind.type.TypeFactory;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import org.jspecify.annotations.NonNull;
-import io.micronaut.core.annotation.TypeHint;
-import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.ArgumentUtils;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.json.JsonConfiguration;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -71,21 +76,32 @@ public class JacksonConfiguration implements JsonConfiguration {
     public static final String PROPERTY_MODULE_SCAN = "jackson.module-scan";
 
     private boolean moduleScan = true;
+    @Nullable
     private String dateFormat;
+    @Nullable
     private Locale locale;
+    @Nullable
     private TimeZone timeZone;
     private int arraySizeThreshold = DEFAULT_ARRAYSIZETHRESHOLD;
-    private Map<SerializationFeature, Boolean> serialization = Collections.emptyMap();
-    private Map<DeserializationFeature, Boolean> deserialization = Collections.emptyMap();
-    private Map<MapperFeature, Boolean> mapper = Collections.emptyMap();
-    private Map<JsonReadFeature, Boolean> parser = Collections.emptyMap();
-    private Map<JsonWriteFeature, Boolean> generator = Collections.emptyMap();
-    private Map<JsonFactory.Feature, Boolean> factory = Collections.emptyMap();
+    private Map<SerializationFeature, Boolean> serializationFeatures = Collections.emptyMap();
+    private Map<DeserializationFeature, Boolean> deserializationFeatures = Collections.emptyMap();
+    private Map<MapperFeature, Boolean> mapperFeatures = Collections.emptyMap();
+    private Map<JsonReadFeature, Boolean> jsonReadFeatures = Collections.emptyMap();
+    private Map<JsonWriteFeature, Boolean> jsonWriteFeatures = Collections.emptyMap();
+    private Map<JsonFactory.Feature, Boolean> jsonFactoryFeatures = Collections.emptyMap();
+    private Map<StreamReadFeature, Boolean> streamReadFeatures = Collections.emptyMap();
+    private Map<StreamWriteFeature, Boolean> streamWriteFeatures = Collections.emptyMap();
+    private Map<EnumFeature, Boolean> enumFeatures = Collections.emptyMap();
+    private Map<DateTimeFeature, Boolean> dateTimeFeatures = Collections.emptyMap();
+    private Map<JsonNodeFeature, Boolean> jsonNodeFeatures = Collections.emptyMap();
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
+    @Nullable
     private DefaultTyping defaultTyping = null;
+    @Nullable
     private PropertyNamingStrategy propertyNamingStrategy = null;
     private boolean alwaysSerializeErrorsAsList = true;
     private boolean trimStrings = false;
+    private boolean jackson2DatabindAnnotationSupport = true;
 
     /**
      * Whether Jackson modules should be scanned for.
@@ -115,6 +131,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * @return The global defaultTyping using for Polymorphic handling
      */
+    @Nullable
     public DefaultTyping getDefaultTyping() {
         return defaultTyping;
     }
@@ -122,6 +139,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * @return The default locale to use
      */
+    @Nullable
     public Locale getLocale() {
         return locale;
     }
@@ -129,6 +147,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * @return The default time zone to use
      */
+    @Nullable
     public TimeZone getTimeZone() {
         return timeZone;
     }
@@ -136,50 +155,9 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * @return The date format to use for dates
      */
+    @Nullable
     public String getDateFormat() {
         return dateFormat;
-    }
-
-    /**
-     * @return The serialization settings
-     */
-    public Map<SerializationFeature, Boolean> getSerializationSettings() {
-        return serialization;
-    }
-
-    /**
-     * @return The deserialization settings
-     */
-    public Map<DeserializationFeature, Boolean> getDeserializationSettings() {
-        return deserialization;
-    }
-
-    /**
-     * @return Settings for the object mapper
-     */
-    public Map<MapperFeature, Boolean> getMapperSettings() {
-        return mapper;
-    }
-
-    /**
-     * @return Settings for the parser
-     */
-    public Map<JsonReadFeature, Boolean> getParserSettings() {
-        return parser;
-    }
-
-    /**
-     * @return Settings for the generator
-     */
-    public Map<JsonWriteFeature, Boolean> getGeneratorSettings() {
-        return generator;
-    }
-
-    /**
-     * @return Settings for the factory
-     */
-    public Map<JsonFactory.Feature, Boolean> getFactorySettings() {
-        return factory;
     }
 
     /**
@@ -193,6 +171,7 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * @return The property naming strategy
      */
+    @Nullable
     public PropertyNamingStrategy getPropertyNamingStrategy() {
         return propertyNamingStrategy;
     }
@@ -257,67 +236,205 @@ public class JacksonConfiguration implements JsonConfiguration {
     /**
      * Sets the serialization features to use.
      *
-     * @param serialization The serialization features.
+     * @param serializationFeatures The serialization features.
      */
-    public void setSerialization(Map<SerializationFeature, Boolean> serialization) {
-        if (CollectionUtils.isNotEmpty(serialization)) {
-            this.serialization = serialization;
+    public void setSerializationFeatures(Map<SerializationFeature, Boolean> serializationFeatures) {
+        if (CollectionUtils.isNotEmpty(serializationFeatures)) {
+            this.serializationFeatures = serializationFeatures;
         }
     }
 
     /**
      * Sets the deserialization features to use.
      *
-     * @param deserialization The deserialiation features.
+     * @param deserializationFeatures The deserialiation features.
      */
-    public void setDeserialization(Map<DeserializationFeature, Boolean> deserialization) {
-        if (CollectionUtils.isNotEmpty(deserialization)) {
-            this.deserialization = deserialization;
+    public void setDeserializationFeatures(Map<DeserializationFeature, Boolean> deserializationFeatures) {
+        if (CollectionUtils.isNotEmpty(deserializationFeatures)) {
+            this.deserializationFeatures = deserializationFeatures;
         }
     }
 
     /**
      * Sets the object mapper features to use.
      *
-     * @param mapper The object mapper features
+     * @param mapperFeatures The object mapper features
      */
-    public void setMapper(Map<MapperFeature, Boolean> mapper) {
-        if (CollectionUtils.isNotEmpty(mapper)) {
-            this.mapper = mapper;
+    public void setMapperFeatures(Map<MapperFeature, Boolean> mapperFeatures) {
+        if (CollectionUtils.isNotEmpty(mapperFeatures)) {
+            this.mapperFeatures = mapperFeatures;
         }
     }
 
     /**
-     * Sets the parser features to use.
+     * Format-independent stream write features.
      *
-     * @param parser The parser features
+     * @return The stream write features
      */
-    public void setParser(Map<JsonReadFeature, Boolean> parser) {
-        if (CollectionUtils.isNotEmpty(parser)) {
-            this.parser = parser;
-        }
+    public Map<StreamWriteFeature, Boolean> getStreamWriteFeatures() {
+        return streamWriteFeatures;
     }
 
     /**
-     * Sets the generator features to use.
+     * Format-independent stream write features.
      *
-     * @param generator The generator features
+     * @param streamWriteFeatures The stream write features
      */
-    public void setGenerator(Map<JsonWriteFeature, Boolean> generator) {
-        if (CollectionUtils.isNotEmpty(generator)) {
-            this.generator = generator;
-        }
+    public void setStreamWriteFeatures(Map<StreamWriteFeature, Boolean> streamWriteFeatures) {
+        this.streamWriteFeatures = streamWriteFeatures;
     }
 
     /**
-     * Sets the factory features to use.
+     * Format-independent stream read features.
      *
-     * @param factory The generator features
+     * @return The stream read features
      */
-    public void setFactory(Map<JsonFactory.Feature, Boolean> factory) {
-        if (CollectionUtils.isNotEmpty(factory)) {
-            this.factory = factory;
-        }
+    public Map<StreamReadFeature, Boolean> getStreamReadFeatures() {
+        return streamReadFeatures;
+    }
+
+    /**
+     * Format-independent stream read features.
+     *
+     * @param streamReadFeatures The stream read features
+     */
+    public void setStreamReadFeatures(Map<StreamReadFeature, Boolean> streamReadFeatures) {
+        this.streamReadFeatures = streamReadFeatures;
+    }
+
+    /**
+     * JSON factory features.
+     *
+     * @return JSON factory features
+     */
+    public Map<JsonFactory.Feature, Boolean> getJsonFactoryFeatures() {
+        return jsonFactoryFeatures;
+    }
+
+    /**
+     * JSON factory features.
+     *
+     * @param jsonFactoryFeatures JSON factory features
+     */
+    public void setJsonFactoryFeatures(Map<JsonFactory.Feature, Boolean> jsonFactoryFeatures) {
+        this.jsonFactoryFeatures = jsonFactoryFeatures;
+    }
+
+    /**
+     * JSON stream write features.
+     *
+     * @return JSON stream write features
+     */
+    public Map<JsonWriteFeature, Boolean> getJsonWriteFeatures() {
+        return jsonWriteFeatures;
+    }
+
+    /**
+     * JSON stream write features.
+     *
+     * @param jsonWriteFeatures JSON stream write features
+     */
+    public void setJsonWriteFeatures(Map<JsonWriteFeature, Boolean> jsonWriteFeatures) {
+        this.jsonWriteFeatures = jsonWriteFeatures;
+    }
+
+    /**
+     * JSON stream read features.
+     *
+     * @return JSON stream read features
+     */
+    public Map<JsonReadFeature, Boolean> getJsonReadFeatures() {
+        return jsonReadFeatures;
+    }
+
+    /**
+     * JSON stream read features.
+     *
+     * @param jsonReadFeatures JSON stream read features
+     */
+    public void setJsonReadFeatures(Map<JsonReadFeature, Boolean> jsonReadFeatures) {
+        this.jsonReadFeatures = jsonReadFeatures;
+    }
+
+    /**
+     * General mapper features.
+     *
+     * @return General mapper features
+     */
+    public Map<MapperFeature, Boolean> getMapperFeatures() {
+        return mapperFeatures;
+    }
+
+    /**
+     * General deserialization features.
+     *
+     * @return General deserialization features
+     */
+    public Map<DeserializationFeature, Boolean> getDeserializationFeatures() {
+        return deserializationFeatures;
+    }
+
+    /**
+     * General serialization features.
+     *
+     * @return General serialization features
+     */
+    public Map<SerializationFeature, Boolean> getSerializationFeatures() {
+        return serializationFeatures;
+    }
+
+    /**
+     * Enum data binding features.
+     *
+     * @return Enum data binding features
+     */
+    public Map<EnumFeature, Boolean> getEnumFeatures() {
+        return enumFeatures;
+    }
+
+    /**
+     * Enum data binding features.
+     *
+     * @param enumFeatures Enum data binding features
+     */
+    public void setEnumFeatures(Map<EnumFeature, Boolean> enumFeatures) {
+        this.enumFeatures = enumFeatures;
+    }
+
+    /**
+     * Date/time data binding features.
+     *
+     * @return Date/time data binding features
+     */
+    public Map<DateTimeFeature, Boolean> getDateTimeFeatures() {
+        return dateTimeFeatures;
+    }
+
+    /**
+     * Date/time data binding features.
+     *
+     * @param dateTimeFeatures Date/time data binding features
+     */
+    public void setDateTimeFeatures(Map<DateTimeFeature, Boolean> dateTimeFeatures) {
+        this.dateTimeFeatures = dateTimeFeatures;
+    }
+
+    /**
+     * JsonNode data binding features.
+     *
+     * @return JsonNode data binding features
+     */
+    public Map<JsonNodeFeature, Boolean> getJsonNodeFeatures() {
+        return jsonNodeFeatures;
+    }
+
+    /**
+     * JsonNode data binding features.
+     *
+     * @param jsonNodeFeatures JsonNode data binding features
+     */
+    public void setJsonNodeFeatures(Map<JsonNodeFeature, Boolean> jsonNodeFeatures) {
+        this.jsonNodeFeatures = jsonNodeFeatures;
     }
 
     /**
@@ -325,7 +442,7 @@ public class JacksonConfiguration implements JsonConfiguration {
      *
      * @param serializationInclusion The serialization inclusion mode
      */
-    public void setSerializationInclusion(JsonInclude.Include serializationInclusion) {
+    public void setSerializationInclusion(JsonInclude. @Nullable Include serializationInclusion) {
         if (serializationInclusion != null) {
             this.serializationInclusion = serializationInclusion;
         }
@@ -370,6 +487,28 @@ public class JacksonConfiguration implements JsonConfiguration {
     }
 
     /**
+     * Enable support for some jackson-databind 2.x annotations (in the
+     * com.fasterxml.jackson.databind.annotation package). Only works if the annotations are on the
+     * classpath at runtime.
+     *
+     * @return Whether to enable jackson-databind 2.x annotation support
+     */
+    public boolean isJackson2DatabindAnnotationSupport() {
+        return jackson2DatabindAnnotationSupport;
+    }
+
+    /**
+     * Enable support for some jackson-databind 2.x annotations (in the
+     * com.fasterxml.jackson.databind.annotation package). Only works if the annotations are on the
+     * classpath at runtime.
+     *
+     * @param jackson2DatabindAnnotationSupport Whether to enable jackson-databind 2.x annotation support
+     */
+    public void setJackson2DatabindAnnotationSupport(boolean jackson2DatabindAnnotationSupport) {
+        this.jackson2DatabindAnnotationSupport = jackson2DatabindAnnotationSupport;
+    }
+
+    /**
      * Constructors a JavaType for the given argument and type factory.
      *
      * @param type The type
@@ -377,36 +516,33 @@ public class JacksonConfiguration implements JsonConfiguration {
      * @param <T> The generic type
      * @return The JavaType
      */
-    public static <T> JavaType constructType(@NonNull Argument<T> type, @NonNull TypeFactory typeFactory) {
+    public static <T> JavaType constructType(Argument<T> type, TypeFactory typeFactory) {
         ArgumentUtils.requireNonNull("type", type);
         ArgumentUtils.requireNonNull("typeFactory", typeFactory);
         Map<String, Argument<?>> typeVariables = type.getTypeVariables();
         JavaType[] objects = toJavaTypeArray(typeFactory, typeVariables);
         final Class<T> rawType = type.getType();
-        if (ArrayUtils.isNotEmpty(objects)) {
-            final JavaType javaType = typeFactory.constructType(
-                rawType
-            );
-            if (javaType.isCollectionLikeType()) {
-                return typeFactory.constructCollectionLikeType(
-                    rawType,
-                    objects[0]
-                );
-            } else if (javaType.isMapLikeType()) {
-                return typeFactory.constructMapLikeType(
-                    rawType,
-                    objects[0],
-                    objects[1]
-                );
-            } else if (javaType.isReferenceType()) {
-                return typeFactory.constructReferenceType(rawType, objects[0]);
-            }
-            return typeFactory.constructParametricType(rawType, objects);
-        } else {
-            return typeFactory.constructType(
-                rawType
-            );
+        final JavaType javaType = typeFactory.constructType(rawType);
+        if (ArrayUtils.isEmpty(objects)) {
+            return javaType;
         }
+        if (javaType.isCollectionLikeType()) {
+            if (objects.length < 1) {
+                return javaType;
+            }
+            return typeFactory.constructCollectionLikeType(rawType, objects[0]);
+        } else if (javaType.isMapLikeType()) {
+            if (objects.length < 2) {
+                return javaType;
+            }
+            return typeFactory.constructMapLikeType(rawType, objects[0], objects[1]);
+        } else if (javaType.isReferenceType()) {
+            if (objects.length < 1) {
+                return javaType;
+            }
+            return typeFactory.constructReferenceType(rawType, objects[0]);
+        }
+        return typeFactory.constructParametricType(rawType, objects);
     }
 
     private static JavaType[] toJavaTypeArray(TypeFactory typeFactory, Map<String, Argument<?>> typeVariables) {

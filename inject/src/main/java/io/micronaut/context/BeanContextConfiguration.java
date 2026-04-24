@@ -17,7 +17,8 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationUtil;
-import org.jspecify.annotations.NonNull;
+import io.micronaut.inject.BeanConfiguration;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.QualifiedBeanType;
 import jakarta.inject.Singleton;
@@ -33,6 +34,7 @@ import java.util.function.Predicate;
  * @author graemerocher
  * @since 1.1
  */
+@NullMarked
 public interface BeanContextConfiguration {
 
     /**
@@ -42,7 +44,7 @@ public interface BeanContextConfiguration {
      * @see BeanResolutionTraceMode
      * @return The bean resolution debug mode.
      */
-    default @NonNull BeanResolutionTraceConfiguration getTraceConfiguration() {
+    default BeanResolutionTraceConfiguration getTraceConfiguration() {
         return new BeanResolutionTraceConfiguration();
     }
 
@@ -58,7 +60,7 @@ public interface BeanContextConfiguration {
      * The class loader to use.
      * @return The class loader.
      */
-    default @NonNull ClassLoader getClassLoader() {
+    default ClassLoader getClassLoader() {
         return ApplicationContextConfiguration.class.getClassLoader();
     }
 
@@ -114,6 +116,15 @@ public interface BeanContextConfiguration {
      */
     @Nullable
     default Predicate<QualifiedBeanType<?>> beansPredicate() {
+        return null;
+    }
+
+    /**
+     * @return Bean configurations predicate.
+     * @since 5.0
+     */
+    @Nullable
+    default Predicate<BeanConfiguration> beanConfiguraionsPredicate() {
         return null;
     }
 

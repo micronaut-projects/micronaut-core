@@ -17,8 +17,6 @@ package io.micronaut.inject.visitor;
 
 import java.lang.annotation.Annotation;
 import java.util.List;
-
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
@@ -46,7 +44,7 @@ public interface BeanElementVisitor<A extends Annotation> extends Ordered, Toggl
      * @param visitorContext The visitor context
      * @return The bean element or {@code null} if the bean should not be written
      */
-    @Nullable BeanElement visitBeanElement(@NonNull BeanElement beanElement, @NonNull VisitorContext visitorContext);
+    @Nullable BeanElement visitBeanElement(BeanElement beanElement, VisitorContext visitorContext);
 
     /**
      * Called once when visitor processing starts.
@@ -71,7 +69,7 @@ public interface BeanElementVisitor<A extends Annotation> extends Ordered, Toggl
      * @param beanElement The bean element
      * @return True if it does
      */
-    default boolean supports(@NonNull BeanElement beanElement) {
+    default boolean supports(BeanElement beanElement) {
         //noinspection ConstantConditions
         if (beanElement == null) {
             return false;

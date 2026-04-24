@@ -19,4 +19,7 @@
  * @author James Kleeh
  * @since 1.3.0
  */
+@NullMarked
 package io.micronaut.http.server.multipart;
+
+import org.jspecify.annotations.NullMarked;

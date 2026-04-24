@@ -19,6 +19,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.CaseInsensitiveMutableHttpHeaders;
 import io.micronaut.http.MutableHttpHeaders;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -89,7 +90,7 @@ public class SimpleHttpHeaders implements MutableHttpHeaders {
     }
 
     @Override
-    public String get(CharSequence name) {
+    public @Nullable String get(CharSequence name) {
         return headers.get(name.toString());
     }
 
