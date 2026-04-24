@@ -126,7 +126,7 @@ public interface AsyncHttpClient extends Closeable, LifeCycle<AsyncHttpClient> {
      * @param <E>       The error type
      * @return A {@link CompletionStage} that completes with the converted response body
      */
-    default <I, O, E> CompletionStage<O> retrieve(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+    default <I, O, E> CompletionStage<@Nullable O> retrieve(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
         return exchange(request, bodyType, errorType).thenApply(response -> extractBody(response, bodyType));
     }
 
@@ -139,7 +139,7 @@ public interface AsyncHttpClient extends Closeable, LifeCycle<AsyncHttpClient> {
      * @param <O>      The response body type
      * @return A {@link CompletionStage} that completes with the converted response body
      */
-    default <I, O> CompletionStage<O> retrieve(HttpRequest<I> request, Argument<O> bodyType) {
+    default <I, O> CompletionStage<@Nullable O> retrieve(HttpRequest<I> request, Argument<O> bodyType) {
         return retrieve(request, bodyType, HttpClient.DEFAULT_ERROR_TYPE);
     }
 
@@ -152,7 +152,7 @@ public interface AsyncHttpClient extends Closeable, LifeCycle<AsyncHttpClient> {
      * @param <O>      The response body type
      * @return A {@link CompletionStage} that completes with the converted response body
      */
-    default <I, O> CompletionStage<O> retrieve(HttpRequest<I> request, Class<O> bodyType) {
+    default <I, O> CompletionStage<@Nullable O> retrieve(HttpRequest<I> request, Class<O> bodyType) {
         return retrieve(request, Argument.of(bodyType));
     }
 
@@ -163,7 +163,7 @@ public interface AsyncHttpClient extends Closeable, LifeCycle<AsyncHttpClient> {
      * @param <I>     The request body type
      * @return A {@link CompletionStage} that completes with the converted response body
      */
-    default <I> CompletionStage<String> retrieve(HttpRequest<I> request) {
+    default <I> CompletionStage<@Nullable String> retrieve(HttpRequest<I> request) {
         return retrieve(request, String.class);
     }
 
@@ -173,11 +173,11 @@ public interface AsyncHttpClient extends Closeable, LifeCycle<AsyncHttpClient> {
      * @param uri The URI
      * @return A {@link CompletionStage} that completes with the converted response body
      */
-    default CompletionStage<String> retrieve(String uri) {
+    default CompletionStage<@Nullable String> retrieve(String uri) {
         return retrieve(HttpRequest.GET(uri));
     }
 
-    private static <O> @Nullable O extractBody(HttpResponse<O> response, Argument<O> bodyType) {
+    private static <O> @Nullable O extractBody(HttpResponse<O> response, @Nullable Argument<O> bodyType) {
         if (bodyType == null) {
             return response.getBody().orElse(null);
         }
@@ -191,7 +191,7 @@ public interface AsyncHttpClient extends Closeable, LifeCycle<AsyncHttpClient> {
             return status;
         }
         Optional<O> body = response.getBody();
-        if (!body.isPresent() && response.getBody(Argument.of(byte[].class)).isPresent()) {
+        if (body.isEmpty() && response.getBody(Argument.of(byte[].class)).isPresent()) {
             throw new HttpClientResponseException(
                 "Failed to decode the body for the given content type [%s]".formatted(response.getContentType().orElse(null)),
                 response

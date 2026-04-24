@@ -44,7 +44,6 @@ public class DefaultAsyncOverReactiveHttpClient implements AsyncHttpClient {
     }
 
     @Override
-    @SuppressWarnings("NullAway")
     public <I, O, E> CompletionStage<HttpResponse<O>> exchange(HttpRequest<I> request,
                                                                @Nullable Argument<O> bodyType,
                                                                Argument<E> errorType) {

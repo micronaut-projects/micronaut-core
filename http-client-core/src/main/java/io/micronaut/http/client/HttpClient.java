@@ -75,7 +75,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <E>      The error type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    <I, O, E> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType);
+    <I, O, E> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, @Nullable Argument<O> bodyType, Argument<E> errorType);
 
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
