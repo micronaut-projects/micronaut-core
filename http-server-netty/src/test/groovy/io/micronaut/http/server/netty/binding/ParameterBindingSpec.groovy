@@ -88,7 +88,6 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/arrayStyle?param[]=a&param[]=b&param[]=c' | "Parameter Value: [a, b, c]"    | HttpStatus.OK
 
         HttpMethod.GET  | '/parameter/query-object?age=30&title=JavaBook&author=JavaAuthor' | "Parameter Value: 30 JavaBook" | HttpStatus.OK
-        HttpMethod.GET  | '/parameter/query-object'                       | null                        | HttpStatus.BAD_REQUEST
         HttpMethod.GET  | '/parameter/query-object?age=30'                | "Parameter Value: 30 null"  | HttpStatus.OK
         HttpMethod.GET  | '/parameter/query-object-nullable'              | "null"                      | HttpStatus.OK
         HttpMethod.GET  | '/parameter/query-record?page=1&size=123' | "Parameter Value: 1 123" | HttpStatus.OK
@@ -172,6 +171,22 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         expect:
         response.status() == HttpStatus.BAD_REQUEST
         response.body().contains("Required QueryValue [max] not specified")
+    }
+
+    void "test object binding without argument specified"() {
+        given:
+        HttpRequest req = HttpRequest.GET('/parameter/query-object')
+        Flux exchange = Flux.from(httpClient.exchange(req, String))
+        HttpResponse response = exchange.onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.status() == HttpStatus.BAD_REQUEST
+        response.body().contains("Required QueryValue [book] not specified")
     }
 
     void "test named binding without argument specified"() {
