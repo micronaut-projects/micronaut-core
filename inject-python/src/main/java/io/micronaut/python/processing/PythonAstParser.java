@@ -88,6 +88,7 @@ public final class PythonAstParser {
         bindings.putMember("package_name", packageName != null ? packageName : "");
         bindings.putMember("visitor_context", visitorContext);
         bindings.putMember("file_name", "Unknown");
+        bindings.putMember("src_root", "");
         context.eval(Source.create(
             PYTHON,
             getSource()
@@ -163,6 +164,7 @@ public final class PythonAstParser {
                     bindings.putMember("package_name", packageName);
                     bindings.putMember("file_name", "Unnamed");
                     bindings.putMember("visitor_context", visitorContext);
+                    bindings.putMember("src_root", srcDir);
                     context.eval(Source.create(
                         PYTHON,
                         getSource()
@@ -173,6 +175,7 @@ public final class PythonAstParser {
                     bindings.putMember("package_name", packageName);
                     bindings.putMember("file_name", source.getName());
                     bindings.putMember("visitor_context", visitorContext);
+                    bindings.putMember("src_root", srcDir);
                     context.eval(Source.create(
                         PYTHON,
                         getSource()
@@ -285,7 +288,7 @@ public final class PythonAstParser {
             from micronaut_processor import MicronautAstVisitor
 
             tree = ast.parse(src)
-            MicronautAstVisitor(callback, package_name, file_name, visitor_context).visit(tree)
+            MicronautAstVisitor(callback, package_name, file_name, visitor_context, src_root).visit(tree)
             """;
     }
 

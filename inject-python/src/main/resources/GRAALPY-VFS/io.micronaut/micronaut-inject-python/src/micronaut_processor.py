@@ -1,4 +1,5 @@
 import ast
+import os
 import java
 from collections import OrderedDict
 
@@ -60,10 +61,11 @@ def is_static_method(func_node):
 
 class MicronautAstVisitor(ast.NodeVisitor):
 
-    def __init__(self, callback, package_name="", file_name = "Script.py", visitor_context=None):
+    def __init__(self, callback, package_name="", file_name = "Script.py", visitor_context=None, source_root=""):
         self.callback = callback
         self.package_name = package_name
         self.visitor_context = visitor_context
+        self.source_root = source_root or ""
         # maintain insertion order
         self.known_decorators = OrderedDict()
         self.known_decorator_functions = OrderedDict()
@@ -80,6 +82,25 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.current_script_attributes = []
         self.current_script_functions = []
         self.script_name = file_name
+
+    def _resolve_top_level_import(self, module_name, imported_name):
+        """
+        Resolve absolute imports from source-root modules.
+        Source-root files are represented in the synthetic "python" package,
+        while source-root directories map to real packages.
+        """
+        if not self.source_root or "." in module_name:
+            return None
+
+        package_dir = os.path.join(self.source_root, module_name)
+        if os.path.isdir(package_dir):
+            return f"{module_name}.{imported_name}"
+
+        module_file = os.path.join(self.source_root, f"{module_name}.py")
+        if os.path.isfile(module_file):
+            return f"python.{imported_name}"
+
+        return None
 
     def visit(self, node: ast.AST) -> ast.AST:
         match node:
@@ -290,12 +311,16 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
                             full_name = f"{base_pkg}.{alias.name}"
                         else:
-                            # Absolute import: map Python import modules to Java packages
-                            # Micronaut packages (micronaut.*) need 'io.' prefix added back
-                            # Other packages (jakarta.*, user packages) keep their names
-                            if not node.module.startswith('io.') and node.module.startswith('micronaut.'):
-                                base_pkg = f"io.{node.module}"
-                            full_name = f"{base_pkg}.{alias.name}"
+                            local_import = self._resolve_top_level_import(node.module, alias.name)
+                            if local_import is not None:
+                                full_name = local_import
+                            else:
+                                # Absolute import: map Python import modules to Java packages
+                                # Micronaut packages (micronaut.*) need 'io.' prefix added back
+                                # Other packages (jakarta.*, user packages) keep their names
+                                if not node.module.startswith('io.') and node.module.startswith('micronaut.'):
+                                    base_pkg = f"io.{node.module}"
+                                full_name = f"{base_pkg}.{alias.name}"
 
                         if alias.asname:
                             self.imported_types[alias.asname] = full_name

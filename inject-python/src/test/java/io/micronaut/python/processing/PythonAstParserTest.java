@@ -1,9 +1,12 @@
 package io.micronaut.python.processing;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -12,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.inject.ast.ClassElement;
@@ -36,6 +40,7 @@ import io.micronaut.python.processing.visitor.PythonParameterElement;
 import jakarta.inject.Named;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
+import org.graalvm.polyglot.Source;
 
 public class PythonAstParserTest {
 
@@ -524,6 +529,39 @@ class MySingletonService:
                 assertEquals("com.example.mypackage", pythonClass.getPackageName(), "Package name should be correctly translated");
 
             }
+        }
+    }
+
+    @Test
+    void testRootModuleImportsResolveToDefaultPackage(@TempDir Path tempDir) throws IOException {
+        Path dependency = tempDir.resolve("Dependency.py");
+        Path main = tempDir.resolve("Main.py");
+        Files.writeString(dependency, """
+            class Dependency:
+                pass
+            """);
+        Files.writeString(main, """
+            from Dependency import Dependency
+
+            class Main:
+                def __init__(self, dependency: Dependency):
+                    self.dependency = dependency
+            """);
+
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        List<Source> sources = List.of(
+            Source.newBuilder("python", dependency.toFile()).build(),
+            Source.newBuilder("python", main.toFile()).build()
+        );
+
+        try (PythonEnvironment environment = pythonProcessor.parse(sources, List.of(tempDir.toString()), null);
+             PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
+            ClassElement mainClass = processingEnvironment.classes().get("python.Main");
+            assertNotNull(mainClass);
+
+            MethodElement constructor = mainClass.getPrimaryConstructor().orElseThrow();
+            ParameterElement dependencyParameter = constructor.getParameters()[0];
+            assertEquals("python.Dependency", dependencyParameter.getType().getName());
         }
     }
 

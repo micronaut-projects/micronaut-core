@@ -136,7 +136,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
         }
         if (annotationRepeatableContainer != null) {
-            cloned.annotationRepeatableContainer = new HashMap<>(annotationRepeatableContainer);
+            cloned.annotationRepeatableContainer = new LinkedHashMap<>(annotationRepeatableContainer);
         }
         if (sourceRetentionAnnotations != null) {
             cloned.sourceRetentionAnnotations = new HashSet<>(sourceRetentionAnnotations);
@@ -616,7 +616,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private Map<String, Map<CharSequence, Object>> getAllStereotypes() {
         Map<String, Map<CharSequence, Object>> stereotypes = this.allStereotypes;
         if (stereotypes == null) {
-            stereotypes = new HashMap<>(3);
+            stereotypes = new LinkedHashMap<>(3);
             this.allStereotypes = stereotypes;
         }
         return stereotypes;
@@ -626,7 +626,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private Map<String, Map<CharSequence, Object>> getDeclaredStereotypesInternal() {
         Map<String, Map<CharSequence, Object>> stereotypes = this.declaredStereotypes;
         if (stereotypes == null) {
-            stereotypes = new HashMap<>(3);
+            stereotypes = new LinkedHashMap<>(3);
             this.declaredStereotypes = stereotypes;
         }
         return stereotypes;
@@ -636,7 +636,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private Map<String, Map<CharSequence, Object>> getAllAnnotations() {
         Map<String, Map<CharSequence, Object>> annotations = this.allAnnotations;
         if (annotations == null) {
-            annotations = new HashMap<>(3);
+            annotations = new LinkedHashMap<>(3);
             this.allAnnotations = annotations;
         }
         return annotations;
@@ -646,7 +646,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private Map<String, Map<CharSequence, Object>> getDeclaredAnnotationsInternal() {
         Map<String, Map<CharSequence, Object>> annotations = this.declaredAnnotations;
         if (annotations == null) {
-            annotations = new HashMap<>(3);
+            annotations = new LinkedHashMap<>(3);
             this.declaredAnnotations = annotations;
         }
         return annotations;
@@ -660,7 +660,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private Map<String, List<String>> getAnnotationsByStereotypeInternal() {
         Map<String, List<String>> annotations = this.annotationsByStereotype;
         if (annotations == null) {
-            annotations = new HashMap<>(3);
+            annotations = new LinkedHashMap<>(3);
             this.annotationsByStereotype = annotations;
         }
         return annotations;
@@ -674,14 +674,14 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         hasEvaluatedExpressions = computeHasEvaluatedExpressions(annotationValue.getValues(), retentionPolicy);
 
         if (annotationRepeatableContainer == null) {
-            annotationRepeatableContainer = new HashMap<>(2);
+            annotationRepeatableContainer = new LinkedHashMap<>(2);
         }
         annotationRepeatableContainer.put(annotationValue.getAnnotationName(), repeatableAnnotationContainer);
         if (retentionPolicy == RetentionPolicy.SOURCE) {
             addSourceRetentionAnnotation(repeatableAnnotationContainer);
         }
 
-        Map<CharSequence, Object> values = allAnnotations.computeIfAbsent(repeatableAnnotationContainer, s -> new HashMap<>());
+        Map<CharSequence, Object> values = allAnnotations.computeIfAbsent(repeatableAnnotationContainer, s -> new LinkedHashMap<>());
         Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
         if (v != null) {
             if (v.getClass().isArray()) {
@@ -910,7 +910,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         if (target instanceof MutableAnnotationMetadata damTarget && source instanceof MutableAnnotationMetadata damSource) {
             if (damSource.annotationRepeatableContainer != null && !damSource.annotationRepeatableContainer.isEmpty()) {
                 if (damTarget.annotationRepeatableContainer == null) {
-                    damTarget.annotationRepeatableContainer = new HashMap<>(damSource.annotationRepeatableContainer);
+                    damTarget.annotationRepeatableContainer = new LinkedHashMap<>(damSource.annotationRepeatableContainer);
                 } else {
                     damTarget.annotationRepeatableContainer.putAll(damSource.annotationRepeatableContainer);
                 }
