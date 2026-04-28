@@ -132,6 +132,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             .option("python.WarnExperimentalFeatures", "false")
              // Allow access to host classes
              .allowHostAccess(hostAccess)
+             .hostClassLoader(classLoader)
              .engine(engine)
              .allowHostClassLookup(name -> true);
         var pyEnv = System.getenv("PYENV_VERSION");
