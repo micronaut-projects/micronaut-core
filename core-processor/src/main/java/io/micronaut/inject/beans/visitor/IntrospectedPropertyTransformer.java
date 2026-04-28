@@ -42,6 +42,13 @@ public final class IntrospectedPropertyTransformer implements TypedAnnotationTra
         if (value.isEmpty() && name.isEmpty()) {
             return List.of(annotation);
         }
+        if (!value.isEmpty() && !name.isEmpty() && !value.equals(name)) {
+            visitorContext.fail(
+                "The @Introspected.Property value and name members must match when both are declared",
+                null
+            );
+            return List.of(annotation);
+        }
         var builder = annotation.mutate();
         boolean changed = false;
         if (name.isEmpty()) {

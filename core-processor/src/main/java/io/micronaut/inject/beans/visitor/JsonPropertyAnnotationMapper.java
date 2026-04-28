@@ -43,19 +43,20 @@ public final class JsonPropertyAnnotationMapper implements NamedAnnotationMapper
     @Override
     public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         var builder = AnnotationValue.builder(Introspected.Property.class)
-            .member("accessKind", mapAccess(annotation.stringValue(MEMBER_ACCESS).orElse("AUTO")));
+            .member("accessKind", mapAccess(annotation.enumValue(MEMBER_ACCESS, JsonPropertyAccess.class)
+                .orElse(JsonPropertyAccess.AUTO)));
         annotation.stringValue()
             .filter(name -> !name.isEmpty())
             .ifPresent(name -> builder.member("name", name));
         return List.of(builder.build());
     }
 
-    private static Introspected.Property.Access[] mapAccess(String access) {
+    private static Introspected.Property.Access[] mapAccess(JsonPropertyAccess access) {
         return switch (access) {
-            case "READ_ONLY" -> new Introspected.Property.Access[] {
+            case READ_ONLY -> new Introspected.Property.Access[] {
                 Introspected.Property.Access.READ
             };
-            case "WRITE_ONLY" -> new Introspected.Property.Access[] {
+            case WRITE_ONLY -> new Introspected.Property.Access[] {
                 Introspected.Property.Access.WRITE
             };
             default -> new Introspected.Property.Access[] {
@@ -63,5 +64,12 @@ public final class JsonPropertyAnnotationMapper implements NamedAnnotationMapper
                 Introspected.Property.Access.WRITE
             };
         };
+    }
+
+    private enum JsonPropertyAccess {
+        AUTO,
+        READ_ONLY,
+        WRITE_ONLY,
+        READ_WRITE
     }
 }

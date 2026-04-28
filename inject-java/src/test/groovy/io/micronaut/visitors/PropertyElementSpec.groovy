@@ -377,4 +377,55 @@ class Parameters {
                 'io.micronaut.core.annotation.Introspected'
         ]
     }
+
+    void "test conflicting introspected property access kinds fail compilation"() {
+        when:
+        buildBeanIntrospection('test.ConflictingPropertyAccess', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class ConflictingPropertyAccess {
+    private String name;
+
+    @Introspected.Property(accessKind = Introspected.Property.Access.READ)
+    public String getName() {
+        return name;
+    }
+
+    @Introspected.Property(accessKind = Introspected.Property.Access.WRITE)
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains('Conflicting @Introspected.Property accessKind declarations for property [name]')
+    }
+
+    void "test introspected property value and name must match"() {
+        when:
+        buildBeanIntrospection('test.ConflictingPropertyNames', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class ConflictingPropertyNames {
+    private String name;
+
+    @Introspected.Property(value = "external_name", name = "other_name")
+    public String getName() {
+        return name;
+    }
+}
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains('The @Introspected.Property value and name members must match when both are declared')
+    }
 }
