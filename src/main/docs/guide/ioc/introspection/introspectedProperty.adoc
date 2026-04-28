@@ -1,0 +1,97 @@
+The ann:core.annotation.Introspected.Property[] annotation can be used on an introspected field or method to make that member an explicit bean property.
+This is useful when the member does not follow normal JavaBean getter or setter naming rules, or when the property should expose extra metadata such as an external serialized name.
+
+[source,java]
+----
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Book {
+    private String title;
+    private String author;
+
+    @Introspected.Property("book_title")
+    public String title() {
+        return title;
+    }
+
+    @Introspected.Property("book_title")
+    public void title(String title) {
+        this.title = title;
+    }
+
+    @Introspected.Property(
+        value = "author_name",
+        accessKind = Introspected.Property.Access.READ
+    )
+    public String author() {
+        return author;
+    }
+}
+----
+
+In the example above, `title()` and `title(String)` are included as read/write bean property accessors even though they are not JavaBean `getTitle` and `setTitle` methods.
+The `author()` method is included as a read-only property because its `accessKind` only contains `Introspected.Property.Access.READ`.
+
+The `value` member is a shorthand for `name`.
+The `name` member represents an external property name and is available through the property annotation metadata.
+It does not change the Micronaut bean property name used with api:core.beans.BeanIntrospection[] lookup methods.
+
+[source,java]
+----
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.beans.BeanIntrospection;
+
+var introspection = BeanIntrospection.getIntrospection(Book.class);
+var property = introspection.getRequiredProperty("title", String.class);
+var externalName = property.stringValue(Introspected.Property.class, "name");
+----
+
+The `accessKind` member controls whether the annotated member contributes read access, write access, or both:
+
+* `Introspected.Property.Access.READ` allows the property to be read.
+* `Introspected.Property.Access.WRITE` allows the property to be written.
+* The default is both `READ` and `WRITE`.
+
+If both a getter and setter exist, Micronaut can still expose a read/write property. Use `accessKind` when a field or method must restrict one side of access, for example read-only or write-only properties.
+
+== Jackson Annotations
+
+When Jackson annotations are present on an introspected type, Micronaut maps the following annotations to ann:core.annotation.Introspected.Property[] at compile time:
+
+* `com.fasterxml.jackson.annotation.JsonProperty`
+* `com.fasterxml.jackson.annotation.JsonGetter`
+* `com.fasterxml.jackson.annotation.JsonSetter`
+
+This means Jackson-style property names are visible through Micronaut bean property annotation metadata, and Jackson-annotated methods that do not follow JavaBean naming rules can still be recognized as bean properties.
+
+[source,java]
+----
+import com.fasterxml.jackson.annotation.JsonGetter;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class User {
+    private String displayName;
+
+    @JsonGetter("display_name")
+    public String displayName() {
+        return displayName;
+    }
+
+    @JsonSetter("display_name")
+    public void displayName(String displayName) {
+        this.displayName = displayName;
+    }
+}
+----
+
+The `displayName` methods are treated as a bean property, and the external name `display_name` is available from the mapped ann:core.annotation.Introspected.Property[] metadata.
+For `JsonGetter` and `JsonSetter`, read and write availability is determined by the available bean property reader and writer.
+
+For `JsonProperty`, Micronaut also maps Jackson's `access` member:
+
+* `JsonProperty.Access.READ_ONLY` maps to `Introspected.Property.Access.READ`.
+* `JsonProperty.Access.WRITE_ONLY` maps to `Introspected.Property.Access.WRITE`.
+* `JsonProperty.Access.AUTO` and `JsonProperty.Access.READ_WRITE` map to both read and write access.

@@ -92,7 +92,7 @@ public @interface Introspected {
      * @return The access type. Defaults to {@link AccessKind#METHOD}
      * @since 3.0
      */
-    AccessKind[] accessKind() default { AccessKind.METHOD };
+    Introspected.AccessKind[] accessKind() default { Introspected.AccessKind.METHOD };
 
     /**
      * Allows specifying the visibility policy to use to control which fields and methods are included.
@@ -257,6 +257,55 @@ public @interface Introspected {
          * @return The member
          */
         String member() default "";
+    }
+
+    /**
+     * Allows a field or method to be treated as an introspected property.
+     *
+     * @since 5.0.0
+     */
+    @Documented
+    @Retention(RUNTIME)
+    @Target({ElementType.FIELD, ElementType.METHOD, ElementType.ANNOTATION_TYPE})
+    @interface Property {
+        /**
+         * Returns the external property name as a shorthand for {@link #name()}.
+         *
+         * @return The external property name.
+         */
+        String value() default "";
+
+        /**
+         * Returns the external property name.
+         *
+         * @return The external property name.
+         */
+        String name() default "";
+
+        /**
+         * Returns the property access values.
+         *
+         * @return The property access values.
+         */
+        Introspected.Property.Access[] accessKind() default {
+            Introspected.Property.Access.READ,
+            Introspected.Property.Access.WRITE
+        };
+
+        /**
+         * The access values for introspected properties.
+         */
+        enum Access {
+            /**
+             * The property can be read.
+             */
+            READ,
+
+            /**
+             * The property can be written.
+             */
+            WRITE
+        }
     }
 
     /**
