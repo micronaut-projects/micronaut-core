@@ -26,9 +26,13 @@ import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.Cookies;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -91,7 +95,7 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
                         argumentToBind = constructorArgument;
                     }
                     Optional<Object> bindableResult = getBindableResult(source, argumentToBind);
-                    if (bindableResult.isPresent()) {
+                    if (bindableResult.isPresent() && !isContextType(argumentToBind.getType())) {
                         bindingFound = true;
                     }
                     argumentValues[i] = constructorArgument.isOptional() ? bindableResult : bindableResult.orElse(null);
@@ -107,7 +111,7 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
                     Argument<Object> propertyArgument = property.asArgument();
                     Optional<Object> bindableResult = getBindableResult(source, propertyArgument);
                     bindableResults.put(property, bindableResult);
-                    if (bindableResult.isPresent()) {
+                    if (bindableResult.isPresent() && !isContextType(propertyArgument.getType())) {
                         bindingFound = true;
                     }
                 }
@@ -157,6 +161,16 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
             throw new UnsatisfiedArgumentException(argument);
         }
         return result.getValue();
+    }
+
+    private boolean isContextType(Class<?> type) {
+        // Using the classes added in byType map in DefaultRequestBinderRegistry
+        return HttpHeaders.class.isAssignableFrom(type) ||
+            HttpRequest.class.isAssignableFrom(type)    ||
+            HttpParameters.class.isAssignableFrom(type) ||
+            Cookies.class.isAssignableFrom(type)        ||
+            Cookie.class.isAssignableFrom(type);
+
     }
 
 }
