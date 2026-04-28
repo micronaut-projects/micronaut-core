@@ -52,6 +52,7 @@ import java.util.function.Supplier;
 public final class AstBeanPropertiesUtils {
 
     private static final String ANN_INTROSPECTED_PROPERTY = Introspected.Property.class.getName();
+    private static final String MEMBER_IGNORE_OTHER_ACCESSORS = "ignoreOtherAccessors";
 
     private AstBeanPropertiesUtils() {
     }
@@ -150,11 +151,12 @@ public final class AstBeanPropertiesUtils {
                 continue;
             }
             BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+            boolean ignoreOtherAccessors = ignoresOtherAccessors(fieldElement);
             if (allowsPropertyRead(fieldElement)) {
-                resolveReadAccessForField(fieldElement, isAccessor, beanPropertyData);
+                resolveReadAccessForField(fieldElement, isAccessor, beanPropertyData, ignoreOtherAccessors);
             }
             if (allowsPropertyWrite(fieldElement)) {
-                resolveWriteAccessForField(fieldElement, isAccessor, beanPropertyData);
+                resolveWriteAccessForField(fieldElement, isAccessor, beanPropertyData, ignoreOtherAccessors);
             }
             applyIntrospectedPropertyAccess(beanPropertyData, fieldElement);
         }
@@ -184,6 +186,8 @@ public final class AstBeanPropertiesUtils {
                 && value.setter != null
                 && value.setter.getParameters().length > 0) {
                 value.type = value.setter.getParameters()[0].getGenericType();
+            } else if (value.readAccessKind == BeanProperties.AccessKind.FIELD && !value.field.getType().equals(value.type)) {
+                value.type = value.field.getGenericType();
             }
             // In a case when the field's type is the same as the selected property type,
             // and it has more type arguments annotations - use it as the property type
@@ -267,6 +271,11 @@ public final class AstBeanPropertiesUtils {
             }
         }
         return false;
+    }
+
+    private static boolean ignoresOtherAccessors(MemberElement memberElement) {
+        return memberElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY) &&
+            memberElement.booleanValue(ANN_INTROSPECTED_PROPERTY, MEMBER_IGNORE_OTHER_ACCESSORS).orElse(false);
     }
 
     private static void processIntrospectedPropertyAccess(Map<String, BeanPropertyData> props,
@@ -434,8 +443,17 @@ public final class AstBeanPropertiesUtils {
         return type;
     }
 
-    private static void resolveWriteAccessForField(FieldElement fieldElement, boolean isAccessor, BeanPropertyData beanPropertyData) {
+    private static void resolveWriteAccessForField(FieldElement fieldElement,
+                                                   boolean isAccessor,
+                                                   BeanPropertyData beanPropertyData,
+                                                   boolean ignoreOtherAccessors) {
         if (fieldElement.isFinal()) {
+            return;
+        }
+        if (ignoreOtherAccessors) {
+            beanPropertyData.field = fieldElement;
+            beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
+            beanPropertyData.type = fieldElement.getGenericType();
             return;
         }
         ClassElement fieldType = unwrapType(fieldElement.getGenericType());
@@ -445,7 +463,7 @@ public final class AstBeanPropertiesUtils {
             isAccessor = false; // not compatible field or setter is present
         }
         if (beanPropertyData.setter == null && isAccessor) {
-            // Use the field for read
+            // Use the field for write
             beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
         }
         if (beanPropertyData.type == null) {
@@ -453,7 +471,16 @@ public final class AstBeanPropertiesUtils {
         }
     }
 
-    private static void resolveReadAccessForField(FieldElement fieldElement, boolean isAccessor, BeanPropertyData beanPropertyData) {
+    private static void resolveReadAccessForField(FieldElement fieldElement,
+                                                  boolean isAccessor,
+                                                  BeanPropertyData beanPropertyData,
+                                                  boolean ignoreOtherAccessors) {
+        if (ignoreOtherAccessors) {
+            beanPropertyData.field = fieldElement;
+            beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
+            beanPropertyData.type = fieldElement.getGenericType();
+            return;
+        }
         ClassElement fieldType = unwrapType(fieldElement.getGenericType());
         if (beanPropertyData.type == null || fieldType.isAssignable(unwrapType(beanPropertyData.type))) {
             beanPropertyData.field = fieldElement;
@@ -461,7 +488,7 @@ public final class AstBeanPropertiesUtils {
             isAccessor = false; // not compatible field or getter is present
         }
         if (beanPropertyData.getter == null && isAccessor) {
-            // Use the field for write
+            // Use the field for read
             beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
         }
         if (beanPropertyData.type == null) {

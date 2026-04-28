@@ -54,6 +54,11 @@ The `accessKind` member controls whether the annotated member contributes read a
 * The default is both `READ` and `WRITE`.
 
 If both a getter and setter exist, Micronaut can still expose a read/write property. Use `accessKind` when a field or method must restrict one side of access, for example read-only or write-only properties.
+When ann:core.annotation.Introspected.Property[] is declared on a field that belongs to the same bean property as getter or setter methods, Micronaut uses the normal bean accessor precedence: getter methods are used for reads and setter methods are used for writes when they are present.
+The annotated field still contributes the mapped property metadata and can provide field access when a corresponding getter or setter is absent.
+
+Set `ignoreOtherAccessors` to `true` when the annotated member must be used for its access direction even if another field, getter, or setter exists for the same bean property.
+For example, an annotated field with the default read/write `accessKind` will be used for both reads and writes instead of same-name getter and setter methods.
 
 == Jackson Annotations
 
@@ -89,9 +94,16 @@ class User {
 
 The `displayName` methods are treated as a bean property, and the external name `display_name` is available from the mapped ann:core.annotation.Introspected.Property[] metadata.
 For `JsonGetter` and `JsonSetter`, read and write availability is determined by the available bean property reader and writer.
+Jackson annotations do not set `ignoreOtherAccessors`, so Micronaut keeps the same accessor precedence as Jackson Databind: getters are preferred for reads and setters are preferred for writes when they exist.
 
 For `JsonProperty`, Micronaut also maps Jackson's `access` member:
 
 * `JsonProperty.Access.READ_ONLY` maps to `Introspected.Property.Access.READ`.
 * `JsonProperty.Access.WRITE_ONLY` maps to `Introspected.Property.Access.WRITE`.
 * `JsonProperty.Access.AUTO` and `JsonProperty.Access.READ_WRITE` map to both read and write access.
+
+== Jakarta Persistence
+
+Micronaut also maps `jakarta.persistence.Access` on a field or method to ann:core.annotation.Introspected.Property[] with `ignoreOtherAccessors` enabled.
+This allows explicit Jakarta Persistence field-access and property-access attributes to be treated as introspected bean properties.
+When `@Access(AccessType.FIELD)` is declared on a field that also has getter or setter methods, Micronaut uses the field directly for bean property reads and writes.

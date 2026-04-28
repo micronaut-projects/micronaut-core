@@ -68,6 +68,35 @@ class JsonPropertyBeanIntrospectionTest {
         new JsonPropertyBooleanSetterWithoutParameter("debug", "debug_flag"),
         new JsonPropertyBooleanSetterWithoutParameter("methodFlag", "method_flag")
     );
+    private static final List<JsonPropertyAccessorMember> JSON_PROPERTY_ACCESSOR_MEMBERS = List.of(
+        new JsonPropertyAccessorMember(
+            "fieldWithAccessors",
+            "field_with_accessors",
+            "field-with-accessors",
+            true,
+            true,
+            "field-with-accessors-setter",
+            "field-with-accessors-setter-getter"
+        ),
+        new JsonPropertyAccessorMember(
+            "readOnlyFieldWithAccessors",
+            "read_only_field_with_accessors",
+            "read-only-field-with-accessors",
+            true,
+            false,
+            "read-only-field-with-accessors",
+            "read-only-field-with-accessors-getter"
+        ),
+        new JsonPropertyAccessorMember(
+            "writeOnlyFieldWithAccessors",
+            "write_only_field_with_accessors",
+            "write-only-field-with-accessors",
+            false,
+            true,
+            "write-only-field-with-accessors-setter",
+            "write-only-field-with-accessors-setter-getter"
+        )
+    );
     private static final List<JsonGetterSetterMember> JSON_GETTER_SETTER_MEMBERS = List.of(
         new JsonGetterSetterMember("readWriteAccessor", "read_write_accessor", "read-write", true, true),
         new JsonGetterSetterMember("getterWithImplicitSetter", "getter_with_implicit_setter", "getter-with-implicit-setter", true, true),
@@ -296,6 +325,95 @@ class JsonPropertyBeanIntrospectionTest {
     }
 
     @Test
+    void jsonPropertyAnnotatedFieldsUseBeanAccessorsWhenPresent() {
+        BeanIntrospection<JsonPropertyAccessorBean> introspection = BeanIntrospection.getIntrospection(JsonPropertyAccessorBean.class);
+
+        assertEquals(
+            JSON_PROPERTY_ACCESSOR_MEMBERS
+                .stream()
+                .map(JsonPropertyAccessorMember::beanPropertyName)
+                .collect(Collectors.toSet()),
+            introspection.getBeanProperties()
+                .stream()
+                .map(BeanProperty::getName)
+                .collect(Collectors.toSet())
+        );
+
+        JsonPropertyAccessorBean bean = new JsonPropertyAccessorBean();
+
+        for (JsonPropertyAccessorMember member : JSON_PROPERTY_ACCESSOR_MEMBERS) {
+            BeanProperty<JsonPropertyAccessorBean, String> property =
+                introspection.getRequiredProperty(member.beanPropertyName(), String.class);
+            assertEquals(
+                member.jsonPropertyName(),
+                property.stringValue(JsonProperty.class).orElseThrow(),
+                member.beanPropertyName()
+            );
+            assertEquals(
+                member.jsonPropertyName(),
+                property.stringValue(Introspected.Property.class, "name").orElseThrow(),
+                member.beanPropertyName()
+            );
+            assertFalse(
+                property.booleanValue(Introspected.Property.class, "ignoreOtherAccessors").orElse(false),
+                member.beanPropertyName()
+            );
+            assertEquals(!member.writable(), property.isReadOnly(), member.beanPropertyName());
+            assertEquals(!member.readable(), property.isWriteOnly(), member.beanPropertyName());
+
+            if (member.writable()) {
+                BeanWriteProperty<JsonPropertyAccessorBean, String> writeProperty =
+                    introspection.getRequiredWriteProperty(member.beanPropertyName(), String.class);
+                writeProperty.set(bean, member.value());
+                assertEquals(member.storedValue(), readAccessorBeanField(bean, member), member.beanPropertyName());
+            } else {
+                assertThrows(UnsupportedOperationException.class, () -> property.set(bean, member.value()), member.beanPropertyName());
+            }
+
+            if (member.readable()) {
+                BeanReadProperty<JsonPropertyAccessorBean, String> readProperty =
+                    introspection.getRequiredReadProperty(member.beanPropertyName(), String.class);
+                assertEquals(member.readValue(), readProperty.get(bean), member.beanPropertyName());
+                assertEquals(member.readValue(), property.get(bean), member.beanPropertyName());
+            } else {
+                assertThrows(UnsupportedOperationException.class, () -> property.get(bean), member.beanPropertyName());
+            }
+        }
+    }
+
+    @Test
+    void jacksonDatabindUsesBeanAccessorsForJsonPropertyAnnotatedFieldsWhenPresent() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonPropertyAccessorBean bean = new JsonPropertyAccessorBean();
+        JSON_PROPERTY_ACCESSOR_MEMBERS.stream()
+            .filter(JsonPropertyAccessorMember::writable)
+            .forEach(member -> writeAccessorBeanProperty(bean, member));
+
+        JsonNode json = objectMapper.valueToTree(bean);
+
+        for (JsonPropertyAccessorMember member : JSON_PROPERTY_ACCESSOR_MEMBERS) {
+            if (member.readable()) {
+                assertEquals(
+                    member.readValue(),
+                    json.get(member.jsonPropertyName()).asString(),
+                    member.beanPropertyName()
+                );
+            } else {
+                assertFalse(json.has(member.jsonPropertyName()), member.beanPropertyName());
+            }
+        }
+
+        JsonPropertyAccessorBean deserialized = objectMapper.readValue(
+            objectMapper.writeValueAsString(allJsonAccessorProperties()),
+            JsonPropertyAccessorBean.class
+        );
+
+        for (JsonPropertyAccessorMember member : JSON_PROPERTY_ACCESSOR_MEMBERS) {
+            assertEquals(member.storedValue(), readAccessorBeanField(deserialized, member), member.beanPropertyName());
+        }
+    }
+
+    @Test
     void jsonGetterAndJsonSetterMembersAreRecognizedAsBeanProperties() {
         BeanIntrospection<JsonGetterSetterBean> introspection = BeanIntrospection.getIntrospection(JsonGetterSetterBean.class);
 
@@ -459,6 +577,28 @@ class JsonPropertyBeanIntrospectionTest {
         }
     }
 
+    @Test
+    void introspectedPropertyCanIgnoreOtherAccessors() {
+        BeanIntrospection<IntrospectedPropertyIgnoreAccessorsBean> introspection =
+            BeanIntrospection.getIntrospection(IntrospectedPropertyIgnoreAccessorsBean.class);
+        BeanProperty<IntrospectedPropertyIgnoreAccessorsBean, String> property =
+            introspection.getRequiredProperty("memberAccess", String.class);
+        IntrospectedPropertyIgnoreAccessorsBean bean = new IntrospectedPropertyIgnoreAccessorsBean();
+
+        assertEquals(
+            "member_access",
+            property.stringValue(Introspected.Property.class, "name").orElseThrow()
+        );
+        assertEquals(
+            true,
+            property.booleanValue(Introspected.Property.class, "ignoreOtherAccessors").orElseThrow()
+        );
+
+        property.set(bean, "member");
+        assertEquals("member", bean.memberAccess);
+        assertEquals("member", property.get(bean));
+    }
+
     private static Map<String, String> writableJsonProperties() {
         return JSON_PROPERTY_MEMBERS.stream()
             .filter(JsonPropertyMember::writable)
@@ -491,6 +631,16 @@ class JsonPropertyBeanIntrospectionTest {
             ));
     }
 
+    private static Map<String, String> allJsonAccessorProperties() {
+        return JSON_PROPERTY_ACCESSOR_MEMBERS.stream()
+            .collect(Collectors.toMap(
+                JsonPropertyAccessorMember::jsonPropertyName,
+                JsonPropertyAccessorMember::value,
+                (first, second) -> second,
+                LinkedHashMap::new
+            ));
+    }
+
     private static void writeBeanProperty(JsonPropertyBean bean, JsonPropertyMember member) {
         switch (member.beanPropertyName()) {
             case "fieldProperty" -> bean.fieldProperty = member.value();
@@ -513,6 +663,23 @@ class JsonPropertyBeanIntrospectionTest {
             case "readOnlyAccessorProperty" -> bean.getReadOnlyAccessorProperty();
             case "writeOnlyAccessorProperty" -> bean.getWriteOnlyAccessorProperty();
             default -> throw new IllegalArgumentException("No reader for " + member.beanPropertyName());
+        };
+    }
+
+    private static void writeAccessorBeanProperty(JsonPropertyAccessorBean bean, JsonPropertyAccessorMember member) {
+        switch (member.beanPropertyName()) {
+            case "fieldWithAccessors" -> bean.setFieldWithAccessors(member.value());
+            case "writeOnlyFieldWithAccessors" -> bean.setWriteOnlyFieldWithAccessors(member.value());
+            default -> throw new IllegalArgumentException("No writer for " + member.beanPropertyName());
+        }
+    }
+
+    private static String readAccessorBeanField(JsonPropertyAccessorBean bean, JsonPropertyAccessorMember member) {
+        return switch (member.beanPropertyName()) {
+            case "fieldWithAccessors" -> bean.fieldWithAccessors;
+            case "readOnlyFieldWithAccessors" -> bean.readOnlyFieldWithAccessors;
+            case "writeOnlyFieldWithAccessors" -> bean.writeOnlyFieldWithAccessors;
+            default -> throw new IllegalArgumentException("No field for " + member.beanPropertyName());
         };
     }
 
@@ -652,6 +819,17 @@ class JsonPropertyBeanIntrospectionTest {
     ) {
     }
 
+    private record JsonPropertyAccessorMember(
+        String beanPropertyName,
+        String jsonPropertyName,
+        String value,
+        boolean readable,
+        boolean writable,
+        String storedValue,
+        String readValue
+    ) {
+    }
+
     private record JsonPropertyBooleanMember(
         String beanPropertyName,
         String jsonPropertyName,
@@ -733,6 +911,42 @@ class JsonPropertyBeanIntrospectionTest {
         @JsonProperty(value = "write_only_accessor_property", access = JsonProperty.Access.WRITE_ONLY)
         public void setWriteOnlyAccessorProperty(String writeOnlyAccessorProperty) {
             this.writeOnlyAccessorProperty = writeOnlyAccessorProperty;
+        }
+    }
+
+    @Introspected
+    static final class JsonPropertyAccessorBean {
+        @JsonProperty("field_with_accessors")
+        String fieldWithAccessors;
+
+        @JsonProperty(value = "read_only_field_with_accessors", access = JsonProperty.Access.READ_ONLY)
+        String readOnlyFieldWithAccessors = "read-only-field-with-accessors";
+
+        @JsonProperty(value = "write_only_field_with_accessors", access = JsonProperty.Access.WRITE_ONLY)
+        String writeOnlyFieldWithAccessors;
+
+        public String getFieldWithAccessors() {
+            return fieldWithAccessors + "-getter";
+        }
+
+        public void setFieldWithAccessors(String fieldWithAccessors) {
+            this.fieldWithAccessors = fieldWithAccessors + "-setter";
+        }
+
+        public String getReadOnlyFieldWithAccessors() {
+            return readOnlyFieldWithAccessors + "-getter";
+        }
+
+        public void setReadOnlyFieldWithAccessors(String readOnlyFieldWithAccessors) {
+            this.readOnlyFieldWithAccessors = readOnlyFieldWithAccessors + "-setter";
+        }
+
+        public String getWriteOnlyFieldWithAccessors() {
+            return writeOnlyFieldWithAccessors + "-getter";
+        }
+
+        public void setWriteOnlyFieldWithAccessors(String writeOnlyFieldWithAccessors) {
+            this.writeOnlyFieldWithAccessors = writeOnlyFieldWithAccessors + "-setter";
         }
     }
 
@@ -865,6 +1079,20 @@ class JsonPropertyBeanIntrospectionTest {
         @Introspected.Property(name = "named_accessor")
         public void namedAccessor(String namedAccessor) {
             this.namedAccessor = namedAccessor;
+        }
+    }
+
+    @Introspected
+    static final class IntrospectedPropertyIgnoreAccessorsBean {
+        @Introspected.Property(name = "member_access", ignoreOtherAccessors = true)
+        String memberAccess;
+
+        public String getMemberAccess() {
+            return memberAccess + "-getter";
+        }
+
+        public void setMemberAccess(String memberAccess) {
+            this.memberAccess = memberAccess + "-setter";
         }
     }
 }

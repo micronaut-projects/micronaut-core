@@ -293,6 +293,13 @@ public @interface Introspected {
         };
 
         /**
+         * Returns whether this property member should ignore other accessors for the same property.
+         *
+         * @return True if other accessors should be ignored.
+         */
+        boolean ignoreOtherAccessors() default false;
+
+        /**
          * The access values for introspected properties.
          */
         enum Access {
