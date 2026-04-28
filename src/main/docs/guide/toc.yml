@@ -253,6 +253,7 @@ httpClient:
     clientFallback: Client Fallbacks
     netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
+  idempotentRetry: RFC 9110 Idempotent Retry
   clientHttp2: HTTP/2 Support
   clientHttp3: HTTP/3 Support
   clientSample: HTTP Client Sample
