@@ -1553,9 +1553,14 @@ public abstract class HttpClientConfiguration {
          * Sets the initial back-off delay. Default value (500ms).
          *
          * @param delay The initial delay
+         * @throws IllegalArgumentException if {@code delay} is negative
          */
         public void setDelay(Duration delay) {
-            this.delay = Objects.requireNonNull(delay, "delay");
+            Objects.requireNonNull(delay, "delay");
+            if (delay.isNegative()) {
+                throw new IllegalArgumentException("delay cannot be negative");
+            }
+            this.delay = delay;
         }
 
         /**
@@ -1571,8 +1576,12 @@ public abstract class HttpClientConfiguration {
          * Sets the exponential back-off multiplier. Default value (1.5).
          *
          * @param multiplier The multiplier
+         * @throws IllegalArgumentException if {@code multiplier} is negative
          */
         public void setMultiplier(double multiplier) {
+            if (multiplier < 0) {
+                throw new IllegalArgumentException("multiplier cannot be negative");
+            }
             this.multiplier = multiplier;
         }
 
@@ -1589,9 +1598,14 @@ public abstract class HttpClientConfiguration {
          * Sets the maximum back-off delay between retries. Default value (10s).
          *
          * @param maxDelay The maximum delay
+         * @throws IllegalArgumentException if {@code maxDelay} is negative
          */
         public void setMaxDelay(Duration maxDelay) {
-            this.maxDelay = Objects.requireNonNull(maxDelay, "maxDelay");
+            Objects.requireNonNull(maxDelay, "maxDelay");
+            if (maxDelay.isNegative()) {
+                throw new IllegalArgumentException("maxDelay cannot be negative");
+            }
+            this.maxDelay = maxDelay;
         }
 
         /**

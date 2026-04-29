@@ -66,6 +66,75 @@ class HttpClientConfigurationSpec extends Specification {
         Integer.MAX_VALUE | Integer.MAX_VALUE
     }
 
+    void "RetryConfiguration#setDelay rejects negative durations"() {
+        given:
+        def cfg = new RetryConfiguration()
+
+        when: 'negative duration'
+        cfg.delay = Duration.ofMillis(-1)
+
+        then:
+        thrown(IllegalArgumentException)
+
+        when: 'null duration'
+        cfg.delay = null
+
+        then:
+        thrown(NullPointerException)
+
+        when: 'zero accepted (no backoff between retries is a valid choice)'
+        cfg.delay = Duration.ZERO
+
+        then:
+        cfg.delay == Duration.ZERO
+    }
+
+    void "RetryConfiguration#setMaxDelay rejects negative durations"() {
+        given:
+        def cfg = new RetryConfiguration()
+
+        when: 'negative duration'
+        cfg.maxDelay = Duration.ofSeconds(-1)
+
+        then:
+        thrown(IllegalArgumentException)
+
+        when: 'null duration'
+        cfg.maxDelay = null
+
+        then:
+        thrown(NullPointerException)
+
+        when: 'zero accepted'
+        cfg.maxDelay = Duration.ZERO
+
+        then:
+        cfg.maxDelay == Duration.ZERO
+    }
+
+    void "RetryConfiguration#setMultiplier rejects negative values"() {
+        given:
+        def cfg = new RetryConfiguration()
+
+        when:
+        cfg.multiplier = -0.5d
+
+        then:
+        thrown(IllegalArgumentException)
+
+        when: 'zero accepted (degenerate but coherent — every retry at base delay)'
+        cfg.multiplier = 0d
+
+        then:
+        cfg.multiplier == 0d
+
+        when: 'positive accepted'
+        cfg.multiplier = 2.0d
+
+        then:
+        cfg.multiplier == 2.0d
+    }
+
     void "RetryConfiguration#setJitter rejects values outside [0, 1]"() {
         given:
         def cfg = new RetryConfiguration()

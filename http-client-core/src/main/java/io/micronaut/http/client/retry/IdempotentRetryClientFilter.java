@@ -22,6 +22,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.annotation.ClientFilter;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
@@ -33,17 +34,23 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
+import java.io.InputStream;
+import java.io.Reader;
+import java.nio.channels.ReadableByteChannel;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Iterator;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.BaseStream;
 
 /**
  * <a href="https://www.rfc-editor.org/rfc/rfc9110.html">RFC 9110</a>-aware client-side retry
  * filter, opt-in via {@code micronaut.http.client.retry.enabled=true}. Eligibility follows
  * {@link HttpRequestRetryPredicate} and {@link HttpResponseRetryPredicate}; back-off is
  * exponential with jitter, capped by {@link RetryConfiguration#getMaxDelay()} and overridden
- * by {@code Retry-After} when present. Streamed-body requests are bypassed (no replay);
+ * by {@code Retry-After} when present. Requests with a non-replayable body are bypassed
+ * (reactive {@link Publisher} bodies and {@link ServerHttpRequest} raw byte-body wrappers);
  * exhausted retries propagate the final throwable.
  *
  * <p><b>Implementation Note regarding Netty ByteBufs:</b></p>
@@ -54,7 +61,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * block before propagating the {@link HttpClientResponseException}. By the time the failure
  * reaches this filter, the response carries a decoded Java body, the buffer is already
  * released, and the connection is back in the pool. Adding a manual {@code release()} call
- * here would result in an {@link io.netty.util.IllegalReferenceCountException}.</p>
+ * here would result in an {@code IllegalReferenceCountException}.</p>
  *
  *
  * @since 5.0.0
@@ -108,28 +115,69 @@ public final class IdempotentRetryClientFilter implements Ordered {
     @RequestFilter
     public Publisher<HttpResponse<?>> filter(MutableHttpRequest<?> request,
                                              FilterContinuation<Publisher<HttpResponse<?>>> continuation) {
-        if (!config.isEnabled() || config.getAttempts() <= 1
-            || !requestPredicate.isRetryable(request)
-            || hasStreamedBody(request)) {
-            return continuation.proceed();
-        }
-        // Skip re-entries from upstream reactive retries
-        if (Boolean.TRUE.equals(request.getAttributes().get(IN_RETRY_LOOP, Boolean.class).orElse(null))) {
-            return continuation.proceed();
-        }
-        request.setAttribute(IN_RETRY_LOOP, Boolean.TRUE);
-        long retries = (long) config.getAttempts() - 1;
-        AtomicLong attempted = new AtomicLong();
-        // Note: Do not manually release or drain the response body here.
-        // Micronaut's NettyHttpClient safely releases the underlying ByteBuf before
-        // propagating the exception. See class Javadoc for implementation details.
-        return Mono.defer(() -> Mono.from(continuation.proceed()))
-            .retryWhen(buildRetrySpec(retries, attempted))
-            .doFinally(ignored -> request.getAttributes().remove(IN_RETRY_LOOP));
+        return shouldBypassRetry(request)
+            ? continuation.proceed()
+            : setUpRetryPipeline(request, continuation);
     }
 
-    private static boolean hasStreamedBody(MutableHttpRequest<?> request) {
-        return request.getBody().filter(b -> b instanceof Publisher<?>).isPresent();
+    private boolean shouldBypassRetry(MutableHttpRequest<?> request) {
+        return !config.isEnabled()
+            || config.getAttempts() <= 1
+            || !requestPredicate.isRetryable(request)
+            || hasNonReplayableBody(request)
+            || Boolean.TRUE.equals(request.getAttributes().get(IN_RETRY_LOOP, Boolean.class).orElse(null));
+    }
+
+    private Publisher<HttpResponse<?>> setUpRetryPipeline(MutableHttpRequest<?> request,
+                                                          FilterContinuation<Publisher<HttpResponse<?>>> continuation) {
+        request.setAttribute(IN_RETRY_LOOP, Boolean.TRUE);
+        long retries = (long) config.getAttempts() - 1;
+        // Two nested Mono.defers serve different purposes:
+        //   - OUTER defer: each subscription of the returned publisher gets its OWN retry
+        //     counter (AtomicLong). Sharing one counter would let exhausted retries from a
+        //     previous subscription deny retries to a later one.
+        //   - INNER defer: each retryWhen attempt invokes continuation.proceed() afresh,
+        //     producing a fresh downstream publisher (not a cached, single-shot result).
+        // (No manual ByteBuf release needed — see class Javadoc.)
+        return Mono.defer(() -> {
+            AtomicLong attempted = new AtomicLong();
+            return Mono.defer(() -> Mono.from(continuation.proceed()))
+                .retryWhen(buildRetrySpec(retries, attempted));
+        }).doFinally(ignored -> request.removeAttribute(IN_RETRY_LOOP, Boolean.class));
+    }
+
+    private static boolean hasNonReplayableBody(MutableHttpRequest<?> request) {
+        // Framework-level wrapper holding a single-use ByteBody: NettyHttpClient and the JDK
+        // client wrap raw client requests as RawHttpRequestWrapper, which implements
+        // ServerHttpRequest with a CloseableByteBody that closes after the first attempt.
+        // Catching this at the wrapper level (rather than inspecting `getBody()`) avoids
+        // mis-classifying future replayable ByteBody implementations.
+        if (request instanceof ServerHttpRequest) {
+            return true;
+        }
+        return request.getBody().map(IdempotentRetryClientFilter::isNonReplayableBody).orElse(false);
+    }
+
+    /**
+     * User-supplied body shapes that are inherently single-pass / single-subscription. A second
+     * attempt would observe an exhausted source. Replayable shapes ({@code String}, {@code byte[]},
+     * POJOs, {@code Map}, {@code Iterable}, {@code ByteBuffer}, {@code Path}/{@code File}) are
+     * intentionally NOT in this list — re-serialization or re-iteration produces the same bytes.
+     *
+     * <p>Note: this list deliberately does not include
+     * {@code io.micronaut.http.body.CloseableByteBody} or {@code ByteBody}. The framework-level
+     * wrapper check ({@code instanceof ServerHttpRequest}) handles the case where Micronaut
+     * itself uses a single-use {@code ByteBody}; inspecting body content for those types would
+     * couple the filter to evolving transport internals and risk false-positives against any
+     * future buffered/replayable {@code ByteBody} implementations.</p>
+     */
+    private static boolean isNonReplayableBody(Object body) {
+        return body instanceof Publisher<?>                // reactive stream
+            || body instanceof InputStream                 // single-pass byte stream
+            || body instanceof Reader                      // single-pass char stream
+            || body instanceof ReadableByteChannel         // NIO single-use channel
+            || body instanceof Iterator<?>                 // single-pass iterator (Iterable is fine)
+            || body instanceof BaseStream<?, ?>;           // java.util.stream.{Stream,IntStream,...}
     }
 
     private Retry buildRetrySpec(long retries, AtomicLong attempted) {

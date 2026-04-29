@@ -36,11 +36,10 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
  *     <a href="https://www.rfc-editor.org/rfc/rfc9110.html#name-408-request-timeout">RFC 9110 §15.5.9</a></li>
  * </ul>
  *
- * <p>Other 4xx are deliberately excluded: a filter-level retry shares one read-timeout budget
- * with the original request (unlike AOP {@link io.micronaut.retry.annotation.Retryable}, which
- * gets a fresh budget per attempt), so retrying a terminal 4xx burns the budget on back-off
- * delays and surfaces as {@link io.micronaut.http.client.exceptions.ReadTimeoutException}
- * instead of the original status.</p>
+ * <p>Other 4xx are deliberately excluded: a filter-level retry shares one request-timeout
+ * budget with the original request (unlike AOP {@link io.micronaut.retry.annotation.Retryable},
+ * which gets a fresh budget per attempt), so retrying a terminal 4xx burns the budget on
+ * back-off delays and may surface as a timeout instead of the original status.</p>
  *
  * @since 5.0.0
  */

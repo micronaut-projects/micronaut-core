@@ -15,9 +15,9 @@
  */
 package io.micronaut.http.client.retry
 
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
-import io.micronaut.http.HttpStatus
+import io.micronaut.core.convert.ConversionService
+import io.micronaut.http.*
+import io.micronaut.http.body.ByteBody
 import io.micronaut.http.client.HttpClientConfiguration.RetryConfiguration
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -25,12 +25,16 @@ import io.micronaut.http.filter.FilterContinuation
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 import spock.lang.Specification
+import spock.lang.Unroll
 
+import java.nio.channels.Channels
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.stream.IntStream
+import java.util.stream.Stream
 
 class IdempotentRetryClientFilterSpec extends Specification {
 
@@ -251,6 +255,60 @@ class IdempotentRetryClientFilterSpec extends Specification {
         continuation.calls.get() == 1
     }
 
+    @Unroll
+    void "non-replayable body shape is bypassed: #desc"() {
+        given:
+        def continuation = countingContinuation { responseException(HttpStatus.SERVICE_UNAVAILABLE) }
+        def filter = newFilter(attempts: 5, delay: Duration.ZERO)
+        def request = HttpRequest.PUT('/upload', body)
+
+        when:
+        Mono.from(filter.filter(request, continuation)).block()
+
+        then:
+        thrown(HttpClientResponseException)
+        continuation.calls.get() == 1   // single attempt; retry bypassed
+
+        where:
+        desc                | body
+        'InputStream'       | new ByteArrayInputStream('payload'.bytes)
+        'Reader'            | new StringReader('payload')
+        'ReadableByteChannel' | Channels.newChannel(new ByteArrayInputStream('payload'.bytes))
+        'Iterator<?>'       | ['a', 'b', 'c'].iterator()
+        'Stream<?>'         | Stream.of('a', 'b', 'c')
+        'IntStream'         | IntStream.range(0, 5)
+    }
+
+    void "replayable body (String) IS retried — confirms we don't over-block"() {
+        given:
+        def continuation = scriptedContinuation([
+            { responseException(HttpStatus.BAD_GATEWAY) },
+            { Mono.just(HttpResponse.ok('done')) as Publisher }
+        ])
+        def filter = newFilter(attempts: 3, delay: Duration.ZERO)
+
+        when: 'PUT (idempotent) with a String body — replayable, should retry'
+        def response = Mono.from(filter.filter(HttpRequest.PUT('/upload', 'hello'), continuation)).block()
+
+        then:
+        response.status == HttpStatus.OK
+        continuation.calls.get() == 2
+    }
+
+    void "ServerHttpRequest (raw byte-body wrapper) is bypassed (single attempt)"() {
+        given: 'simulates the RawHttpRequestWrapper Netty/JDK clients use for raw requests'
+        def continuation = countingContinuation { responseException(HttpStatus.SERVICE_UNAVAILABLE) }
+        def filter = newFilter(attempts: 5, delay: Duration.ZERO)
+        def rawRequest = new FakeRawRequest(HttpRequest.GET('/x'))
+
+        when:
+        Mono.from(filter.filter(rawRequest, continuation)).block()
+
+        then:
+        thrown(HttpClientResponseException)
+        continuation.calls.get() == 1
+    }
+
     void "IN_RETRY_LOOP request attribute is cleared after successful completion"() {
         given:
         def continuation = scriptedContinuation([
@@ -281,6 +339,33 @@ class IdempotentRetryClientFilterSpec extends Specification {
 
         and: 'doFinally cleared the guard attribute even on the error terminal signal'
         !request.getAttributes().get(IN_RETRY_LOOP_KEY, Boolean.class).isPresent()
+    }
+
+    void "retry counter is per-subscription, not shared across multiple subscribes of the same returned publisher"() {
+        given: 'four scripted responses — one fail+success per subscription'
+        def continuation = scriptedContinuation([
+            { responseException(HttpStatus.BAD_GATEWAY) },                  // sub 1, attempt 1
+            { Mono.just(HttpResponse.ok('first')) as Publisher },           // sub 1, attempt 2 — success
+            { responseException(HttpStatus.BAD_GATEWAY) },                  // sub 2, attempt 1
+            { Mono.just(HttpResponse.ok('second')) as Publisher }           // sub 2, attempt 2 — success
+        ])
+        def filter = newFilter(attempts: 3, delay: Duration.ZERO)
+        def request = HttpRequest.GET('/x')
+        def publisher = filter.filter(request, continuation)
+
+        when: 'first subscription burns 1 retry'
+        def first = Mono.from(publisher).block()
+
+        then:
+        first.status == HttpStatus.OK
+        continuation.calls.get() == 2
+
+        when: 'second subscription on the SAME publisher must retry independently'
+        def second = Mono.from(publisher).block()
+
+        then: 'a shared retry counter would have been at 1 already and prevented the retry'
+        second.status == HttpStatus.OK
+        continuation.calls.get() == 4
     }
 
     void "IN_RETRY_LOOP attribute is cleared after the call so request reuse works"() {
@@ -354,6 +439,23 @@ class IdempotentRetryClientFilterSpec extends Specification {
         def response = HttpResponse.status(status)
         headers.each { k, v -> response.header(k, v) }
         Mono.error(new HttpClientResponseException(status.reason, response))
+    }
+
+    /**
+     * Mirrors the shape of NettyHttpClient/JdkHttpClient {@code RawHttpRequestWrapper} —
+     * a {@link MutableHttpRequest} that ALSO implements {@link ServerHttpRequest}, holding
+     * a {@link ByteBody} that would be consumed/closed on the first attempt. The retry
+     * filter must bypass these to avoid second-attempt failures on a closed body.
+     */
+    private static class FakeRawRequest<B> extends MutableHttpRequestWrapper<B> implements ServerHttpRequest<B> {
+        FakeRawRequest(MutableHttpRequest<B> delegate) {
+            super(ConversionService.SHARED, delegate)
+        }
+
+        @Override
+        ByteBody byteBody() {
+            return null   // unused; the filter inspects the type, not the body contents
+        }
     }
 
     private static class CountingContinuation implements FilterContinuation<Publisher<HttpResponse<?>>> {
