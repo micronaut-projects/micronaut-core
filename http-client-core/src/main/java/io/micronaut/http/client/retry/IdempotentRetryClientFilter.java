@@ -115,6 +115,11 @@ public final class IdempotentRetryClientFilter implements Ordered {
     @RequestFilter
     public Publisher<HttpResponse<?>> filter(MutableHttpRequest<?> request,
                                              FilterContinuation<Publisher<HttpResponse<?>>> continuation) {
+        // Bypass branch invokes continuation.proceed() eagerly — Micronaut filter convention
+        // (see clientFilter.adoc / MethodFilter.ReactiveContinuationImpl). Wrapping in
+        // Mono.defer would change the publisher shape vs. every other filter and defer the
+        // propagated-context pickup that downstream filters expect to be done. The retry
+        // branch defers proceed() per attempt inside setUpRetryPipeline.
         return shouldBypassRetry(request)
             ? continuation.proceed()
             : setUpRetryPipeline(request, continuation);
@@ -130,16 +135,16 @@ public final class IdempotentRetryClientFilter implements Ordered {
 
     private Publisher<HttpResponse<?>> setUpRetryPipeline(MutableHttpRequest<?> request,
                                                           FilterContinuation<Publisher<HttpResponse<?>>> continuation) {
-        request.setAttribute(IN_RETRY_LOOP, Boolean.TRUE);
         long retries = (long) config.getAttempts() - 1;
         // Two nested Mono.defers serve different purposes:
         //   - OUTER defer: each subscription of the returned publisher gets its OWN retry
-        //     counter (AtomicLong). Sharing one counter would let exhausted retries from a
-        //     previous subscription deny retries to a later one.
+        //     counter (AtomicLong) and sets IN_RETRY_LOOP, paired with doFinally cleanup —
+        //     so the request is not mutated unless someone actually subscribes.
         //   - INNER defer: each retryWhen attempt invokes continuation.proceed() afresh,
         //     producing a fresh downstream publisher (not a cached, single-shot result).
         // (No manual ByteBuf release needed — see class Javadoc.)
         return Mono.defer(() -> {
+            request.setAttribute(IN_RETRY_LOOP, Boolean.TRUE);
             AtomicLong attempted = new AtomicLong();
             return Mono.defer(() -> Mono.from(continuation.proceed()))
                 .retryWhen(buildRetrySpec(retries, attempted));

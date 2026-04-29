@@ -29,7 +29,16 @@ import java.util.regex.Pattern;
 /**
  * Parses the {@code Retry-After} header per
  * <a href="https://www.rfc-editor.org/rfc/rfc9110.html#name-retry-after">RFC 9110 §10.2.3</a>,
- * supporting both the delta-seconds form and the HTTP-date form.
+ * supporting the delta-seconds form and the IMF-fixdate (RFC 1123) HTTP-date form.
+ *
+ * <p><b>HTTP-date scope.</b>
+ * <a href="https://www.rfc-editor.org/rfc/rfc9110.html#name-date-time-formats">RFC 9110 §5.6.7</a>
+ * defines three HTTP-date forms — IMF-fixdate (preferred, mandated for senders), and the
+ * obsolete RFC 850 and ANSI C asctime forms. This parser accepts only IMF-fixdate. Modern
+ * servers send IMF-fixdate exclusively (the obsolete forms haven't been emitted in practice
+ * for decades). When a server does send an obsolete form, parsing returns {@code null} and
+ * the retry filter falls back to its configured exponential backoff — graceful degradation,
+ * not a runtime error. Broader HTTP-date parsing is a possible follow-up.</p>
  *
  * @since 5.0.0
  */

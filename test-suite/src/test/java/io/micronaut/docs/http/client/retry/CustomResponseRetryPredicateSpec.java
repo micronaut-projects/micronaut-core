@@ -83,7 +83,7 @@ class CustomResponseRetryPredicateSpec {
     void customPredicateStillRespectsTerminal4xx() {
         // The custom predicate delegates to rfc9110() for non-425 statuses, so 404 is still terminal.
         TooEarlyController controller = server.getApplicationContext().getBean(TooEarlyController.class);
-        controller.reset(0); // never succeed → keep returning 404 from /not-found
+        controller.reset(0);  // reset controller state; /not-found always returns 404 regardless of succeedAt
 
         var ex = assertThrows(HttpClientResponseException.class,
             () -> client.toBlocking().retrieve("/not-found"));

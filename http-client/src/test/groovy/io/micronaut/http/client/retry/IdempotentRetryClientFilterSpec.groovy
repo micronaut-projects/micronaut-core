@@ -309,6 +309,20 @@ class IdempotentRetryClientFilterSpec extends Specification {
         continuation.calls.get() == 1
     }
 
+    void "filter() does NOT mutate the request when the returned publisher is never subscribed"() {
+        given: 'a continuation that would record any proceed() call'
+        def continuation = countingContinuation { Mono.just(HttpResponse.ok('done')) as Publisher }
+        def filter = newFilter(attempts: 3, delay: Duration.ZERO)
+        def request = HttpRequest.GET('/x')
+
+        when: 'the filter is invoked but the resulting publisher is discarded without subscription'
+        filter.filter(request, continuation)
+
+        then: 'no IN_RETRY_LOOP attribute set; no proceed() invoked'
+        !request.getAttributes().get(IN_RETRY_LOOP_KEY, Boolean.class).isPresent()
+        continuation.calls.get() == 0
+    }
+
     void "IN_RETRY_LOOP request attribute is cleared after successful completion"() {
         given:
         def continuation = scriptedContinuation([
