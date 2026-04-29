@@ -9,7 +9,7 @@ classgraph = "4.8.184"
 compile-testing = "0.21.0"
 
 geb = "7.0"
-h2 = "2.2.224"
+h2 = "2.4.240"
 hibernate = "5.5.9.Final"
 htmlunit = "2.70.0"
 htmlsanitycheck = "1.1.6"
