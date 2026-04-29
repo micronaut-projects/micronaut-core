@@ -356,7 +356,6 @@ class CorsFilterSpec extends Specification {
         response.headers.names().stream().anyMatch { it.startsWith("Access-Control-Allow-") }
     }
 
-
     @Property(name = "micronaut.server.cors.configurations.foo.allowed-origins", value = "http://www.foo.com")
     @Property(name = "micronaut.server.cors.configurations.foo.allowed-headers", value = "*")
     void "preflight request succeeds when allowed-headers is configured as wildcard via application configuration"() {
