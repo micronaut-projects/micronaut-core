@@ -52,6 +52,9 @@ class HttpResponseRetryPredicateSpec extends Specification {
         // 2xx / 3xx — not error responses
         200  | false
         301  | false
+        // ≥ 600 — not valid HTTP statuses; bounded out of the 5xx range
+        600  | false
+        700  | false
     }
 
     void "default predicate retries 5xx HttpClientResponseException"() {

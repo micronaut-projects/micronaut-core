@@ -63,7 +63,7 @@ public interface HttpResponseRetryPredicate {
      * @return {@code true} if the status is retryable by default
      */
     static boolean isRetryableStatus(int statusCode) {
-        return statusCode >= HttpStatus.INTERNAL_SERVER_ERROR.getCode()
+        return (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR.getCode() && statusCode < 600)
             || statusCode == HttpStatus.TOO_MANY_REQUESTS.getCode()
             || statusCode == HttpStatus.REQUEST_TIMEOUT.getCode();
     }

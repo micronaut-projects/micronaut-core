@@ -25,7 +25,6 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.retry.HttpResponseRetryPredicate;
 import io.micronaut.runtime.server.EmbeddedServer;
-import jakarta.inject.Singleton;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -95,7 +94,6 @@ class CustomResponseRetryPredicateSpec {
 
     @Requires(property = "spec.name", value = "CustomResponseRetryPredicateSpec")
     @Controller
-    @Singleton
     static class TooEarlyController {
         final AtomicInteger attempts = new AtomicInteger();
         final AtomicInteger notFoundAttempts = new AtomicInteger();

@@ -34,6 +34,10 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class IdempotentRetryClientFilterSpec extends Specification {
 
+    // Mirrors the private constant in IdempotentRetryClientFilter; kept here as a literal so
+    // the test exercises the actual stored attribute name without enlarging public API.
+    private static final String IN_RETRY_LOOP_KEY = 'io.micronaut.http.client.retry.in_loop'
+
     void "non-idempotent POST is not retried on 503"() {
         given:
         def continuation = countingContinuation { responseException(HttpStatus.SERVICE_UNAVAILABLE) }
@@ -247,6 +251,64 @@ class IdempotentRetryClientFilterSpec extends Specification {
         continuation.calls.get() == 1
     }
 
+    void "IN_RETRY_LOOP request attribute is cleared after successful completion"() {
+        given:
+        def continuation = scriptedContinuation([
+            { responseException(HttpStatus.BAD_GATEWAY) },
+            { Mono.just(HttpResponse.ok('done')) as Publisher }
+        ])
+        def filter = newFilter(attempts: 3, delay: Duration.ZERO)
+        def request = HttpRequest.GET('/x')
+
+        when:
+        Mono.from(filter.filter(request, continuation)).block()
+
+        then: 'doFinally cleared the guard attribute'
+        !request.getAttributes().get(IN_RETRY_LOOP_KEY, Boolean.class).isPresent()
+    }
+
+    void "IN_RETRY_LOOP request attribute is cleared after exhaustion (error terminal)"() {
+        given:
+        def continuation = countingContinuation { responseException(HttpStatus.SERVICE_UNAVAILABLE) }
+        def filter = newFilter(attempts: 2, delay: Duration.ZERO)
+        def request = HttpRequest.GET('/x')
+
+        when:
+        Mono.from(filter.filter(request, continuation)).block()
+
+        then:
+        thrown(HttpClientResponseException)
+
+        and: 'doFinally cleared the guard attribute even on the error terminal signal'
+        !request.getAttributes().get(IN_RETRY_LOOP_KEY, Boolean.class).isPresent()
+    }
+
+    void "IN_RETRY_LOOP attribute is cleared after the call so request reuse works"() {
+        given:
+        def continuation = scriptedContinuation([
+            { responseException(HttpStatus.BAD_GATEWAY) },
+            { Mono.just(HttpResponse.ok('first')) as Publisher },
+            { responseException(HttpStatus.BAD_GATEWAY) },
+            { Mono.just(HttpResponse.ok('second')) as Publisher }
+        ])
+        def filter = newFilter(attempts: 3, delay: Duration.ZERO)
+        def request = HttpRequest.GET('/x')
+
+        when: 'first call retries once and succeeds'
+        def first = Mono.from(filter.filter(request, continuation)).block()
+
+        then:
+        first.status == HttpStatus.OK
+        continuation.calls.get() == 2
+
+        when: 'reuse the same request — without cleanup the second call would bypass retry'
+        def second = Mono.from(filter.filter(request, continuation)).block()
+
+        then:
+        second.status == HttpStatus.OK
+        continuation.calls.get() == 4   // two more attempts; retry engaged on the second call
+    }
+
     void "disabled config is a pass-through"() {
         given:
         def continuation = countingContinuation { responseException(HttpStatus.SERVICE_UNAVAILABLE) }
@@ -259,6 +321,8 @@ class IdempotentRetryClientFilterSpec extends Specification {
         thrown(HttpClientResponseException)
         continuation.calls.get() == 1
     }
+
+
 
     private static IdempotentRetryClientFilter newFilter(Map opts) {
         def cfg = new RetryConfiguration()

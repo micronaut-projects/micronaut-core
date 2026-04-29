@@ -1608,8 +1608,12 @@ public abstract class HttpClientConfiguration {
          * Sets the jitter factor applied to back-off delays, in [0, 1]. Default value (0.25).
          *
          * @param jitter The jitter factor
+         * @throws IllegalArgumentException if {@code jitter} is outside {@code [0, 1]}
          */
         public void setJitter(double jitter) {
+            if (jitter < 0 || jitter > 1) {
+                throw new IllegalArgumentException("jitter must be in the range [0, 1]");
+            }
             this.jitter = jitter;
         }
 

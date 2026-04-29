@@ -124,7 +124,8 @@ public final class IdempotentRetryClientFilter implements Ordered {
         // Micronaut's NettyHttpClient safely releases the underlying ByteBuf before
         // propagating the exception. See class Javadoc for implementation details.
         return Mono.defer(() -> Mono.from(continuation.proceed()))
-            .retryWhen(buildRetrySpec(retries, attempted));
+            .retryWhen(buildRetrySpec(retries, attempted))
+            .doFinally(ignored -> request.getAttributes().remove(IN_RETRY_LOOP));
     }
 
     private static boolean hasStreamedBody(MutableHttpRequest<?> request) {
