@@ -76,7 +76,7 @@ jackson2 = "2.21.2"
 #
 # be sure to update graal version in gradle.properties as well
 managed-graal = "25.0.3"
-managed-groovy = "5.0.4"
+managed-groovy = "5.0.5"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "3.1.0"
 managed-jackson-annotations = "2.21"
