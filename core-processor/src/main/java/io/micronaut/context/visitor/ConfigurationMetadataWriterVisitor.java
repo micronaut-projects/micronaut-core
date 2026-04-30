@@ -280,10 +280,13 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                 .getBeanProperties();
             final ParameterElement[] parameters = constructor.getParameters();
             if (beanProperties.size() == parameters.length) {
-                for (int i = 0; i < parameters.length; i++) {
-                    ParameterElement parameter = parameters[i];
-                    final PropertyElement bp = beanProperties.get(i);
-                    if (CONSTRUCTOR_PARAMETERS_INJECTION_ANN.stream().noneMatch(bp::hasStereotype)) {
+                for (ParameterElement parameter : parameters) {
+                    final String paramName = parameter.getName();
+                    final PropertyElement bp = beanProperties.stream()
+                        .filter(p -> p.getName().equals(paramName))
+                        .findFirst()
+                        .orElse(null);
+                    if (bp == null || CONSTRUCTOR_PARAMETERS_INJECTION_ANN.stream().noneMatch(bp::hasStereotype)) {
                         processConfigurationInjectParameter(constructor.getDeclaringType(), parameter, visitorContext);
                     }
                 }
