@@ -18,7 +18,7 @@ package io.micronaut.http.server.tck.tests.forms;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -91,7 +91,8 @@ public class FormsJacksonAnnotationsTest {
     }
 
     @Introspected
-    record Book(@JsonProperty("title") @NonNull String title, @JsonProperty("paginas") @Nullable Integer pages) {
+    @ReflectiveAccess
+    record Book(@JsonProperty("title") String title, @JsonProperty("paginas") @Nullable Integer pages) {
     }
 
 }
