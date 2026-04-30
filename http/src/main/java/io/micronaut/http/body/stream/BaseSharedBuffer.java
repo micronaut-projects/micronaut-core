@@ -255,26 +255,19 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
     /**
      * Optimized version of {@link #subscribe0} for subscribers that want to buffer the full
-     * body. The returned flow will complete when the
-     * input is buffered. The returned flow will always be identical to the {@code targetFlow}
-     * parameter IF {@code canReturnImmediate} is false. If {@code canReturnImmediate} is true,
-     * this method will SOMETIMES return an immediate ExecutionFlow instead as an optimization.
+     * body. The returned flow will complete when the input is buffered.
      *
-     * @param targetFlow The delayed flow to use if {@code canReturnImmediate} is false and/or
-     *                   we have to wait for the result
+     * @param targetFlow The delayed flow to use, or {@code null} if an already-complete
+     *                   result may be returned immediately
      * @param specificUpstream The upstream for the subscriber. This is used to call allowDiscard if there was an error
-     * @param canReturnImmediate Whether we can return an immediate ExecutionFlow instead of
-     *                  {@code targetFlow}, when appropriate
      * @return A flow that will complete when all data has arrived, with a buffer containing that data
      */
-    protected final ExecutionFlow<ReadBuffer> subscribeFull0(DelayedExecutionFlow<ReadBuffer> targetFlow, BufferConsumer.Upstream specificUpstream, boolean canReturnImmediate) {
+    protected final ExecutionFlow<ReadBuffer> subscribeFull0(@Nullable DelayedExecutionFlow<ReadBuffer> targetFlow, BufferConsumer.Upstream specificUpstream) {
         assert !working;
 
         if (reserved <= 0) {
             throw new IllegalStateException("Need to reserve a spot first. This should not happen, StreamingNettyByteBody should guard against it");
         }
-
-        ExecutionFlow<ReadBuffer> ret = targetFlow;
 
         working = true;
         boolean last = --reserved == 0;
@@ -283,35 +276,48 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             error = new BufferLengthExceededException(limits.maxBufferSize(), lengthSoFar);
             specificUpstream.allowDiscard();
         }
-        if (error != null) {
-            if (canReturnImmediate) {
-                ret = ExecutionFlow.error(error);
-            } else {
-                targetFlow.completeExceptionally(error);
+        if (error == null && bufferLimitsExceeded != null) {
+            error = bufferLimitsExceeded;
+            specificUpstream.allowDiscard();
+        }
+        if (error == null && !complete) {
+            if (targetFlow == null) {
+                targetFlow = DelayedExecutionFlow.create();
             }
-        } else if (bufferLimitsExceeded != null) {
-            if (canReturnImmediate) {
-                ret = ExecutionFlow.error(bufferLimitsExceeded);
-            } else {
-                targetFlow.completeExceptionally(bufferLimitsExceeded);
-            }
-        } else if (complete) {
-            ReadBuffer buf = getBufferedData(last);
-            if (canReturnImmediate) {
-                ret = ExecutionFlow.just(buf);
-            } else {
-                targetFlow.complete(buf);
-            }
-        } else {
             if (fullSubscribers == null) {
                 fullSubscribers = new ArrayList<>(1);
             }
             fullSubscribers.add(targetFlow);
-        }
-        afterSubscribe(last);
-        working = false;
 
-        return ret;
+            afterSubscribe(last);
+            working = false;
+
+            return targetFlow;
+        } else if (targetFlow != null) {
+            ReadBuffer buf = error == null ? getBufferedData(last) : null;
+
+            afterSubscribe(last);
+            working = false;
+
+            if (error != null) {
+                targetFlow.completeExceptionally(error);
+            } else {
+                targetFlow.complete(buf);
+            }
+
+            return targetFlow;
+        } else {
+            ReadBuffer buf = error == null ? getBufferedData(last) : null;
+
+            afterSubscribe(last);
+            working = false;
+
+            if (error == null) {
+                return ExecutionFlow.just(buf);
+            } else {
+                return ExecutionFlow.error(error);
+            }
+        }
     }
 
     /**
@@ -323,6 +329,20 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 rb.close();
             }
             buffer = null;
+        }
+    }
+
+    private List<DelayedExecutionFlow<ReadBuffer>> detachFullSubscribers() {
+        List<DelayedExecutionFlow<ReadBuffer>> subscribers = fullSubscribers;
+        fullSubscribers = null;
+        return subscribers;
+    }
+
+    private void completeFullSubscribersExceptionally(@Nullable List<DelayedExecutionFlow<ReadBuffer>> subscribers, Throwable e) {
+        if (subscribers != null) {
+            for (DelayedExecutionFlow<?> subscriber : subscribers) {
+                subscriber.completeExceptionally(e);
+            }
         }
     }
 
@@ -354,6 +374,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 return;
             }
 
+            List<DelayedExecutionFlow<ReadBuffer>> fullSubscribersToFail = null;
             working = true;
             if (subscribers != null) {
                 for (BufferConsumer consumer : subscribers) {
@@ -367,13 +388,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                     discardBuffer();
                     if (bufferLimitsExceeded == null) {
                         bufferLimitsExceeded = new BufferLengthExceededException(limits.maxBufferSize(), lengthSoFar);
-                    if (fullSubscribers != null) {
-                        for (DelayedExecutionFlow<?> fullSubscriber : fullSubscribers) {
-                            fullSubscriber.completeExceptionally(bufferLimitsExceeded);
-                        }
-                        fullSubscribers = null;
-                        }
                     }
+                    fullSubscribersToFail = detachFullSubscribers();
                 } else {
                     if (buffer == null) {
                         buffer = new ArrayList<>();
@@ -382,6 +398,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 }
             }
             working = false;
+            completeFullSubscribersExceptionally(fullSubscribersToFail, bufferLimitsExceeded);
         }
     }
 
@@ -400,13 +417,17 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 subscriber.complete();
             }
         }
-        if (fullSubscribers != null && bufferLimitsExceeded == null) {
+        List<DelayedExecutionFlow<ReadBuffer>> subscribersToComplete = bufferLimitsExceeded == null ? detachFullSubscribers() : null;
+        if (subscribersToComplete != null) {
             boolean last = reserved <= 0;
-            for (Iterator<DelayedExecutionFlow<ReadBuffer>> iterator = fullSubscribers.iterator(); iterator.hasNext(); ) {
-                DelayedExecutionFlow<ReadBuffer> fullSubscriber = iterator.next();
-                fullSubscriber.complete(getBufferedData(last && !iterator.hasNext()));
+            List<ReadBuffer> completedBuffers = new ArrayList<>(subscribersToComplete.size());
+            for (Iterator<DelayedExecutionFlow<ReadBuffer>> iterator = subscribersToComplete.iterator(); iterator.hasNext(); ) {
+                iterator.next();
+                completedBuffers.add(getBufferedData(last && !iterator.hasNext()));
             }
-            fullSubscribers = null;
+            for (int i = 0; i < subscribersToComplete.size(); i++) {
+                subscribersToComplete.get(i).complete(completedBuffers.get(i));
+            }
         }
     }
 
@@ -429,12 +450,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 subscriber.error(e);
             }
         }
-        if (fullSubscribers != null && bufferLimitsExceeded == null) {
-            for (DelayedExecutionFlow<?> fullSubscriber : fullSubscribers) {
-                fullSubscriber.completeExceptionally(e);
-            }
-            fullSubscribers = null;
-        }
+        List<DelayedExecutionFlow<ReadBuffer>> subscribersToFail = bufferLimitsExceeded == null ? detachFullSubscribers() : null;
+        completeFullSubscribersExceptionally(subscribersToFail, e);
     }
 
     /**

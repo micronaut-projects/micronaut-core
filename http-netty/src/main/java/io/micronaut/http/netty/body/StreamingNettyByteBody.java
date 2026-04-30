@@ -227,12 +227,12 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
          * @return A flow that will complete when all data has arrived, with a buffer containing that data
          */
         ExecutionFlow<ReadBuffer> subscribeFull(Upstream specificUpstream, boolean forceDelay) {
-            DelayedExecutionFlow<ReadBuffer> asyncFlow = DelayedExecutionFlow.create();
             if (!forceDelay && eventLoop.inEventLoop() && !adding) {
-                return subscribeFull0(asyncFlow, specificUpstream, true);
+                return subscribeFull0(null, specificUpstream);
             } else {
+                DelayedExecutionFlow<ReadBuffer> asyncFlow = DelayedExecutionFlow.create();
                 eventLoop.execute(() -> {
-                    ExecutionFlow<ReadBuffer> res = subscribeFull0(asyncFlow, specificUpstream, false);
+                    ExecutionFlow<ReadBuffer> res = subscribeFull0(asyncFlow, specificUpstream);
                     assert res == asyncFlow;
                 });
                 return asyncFlow;
