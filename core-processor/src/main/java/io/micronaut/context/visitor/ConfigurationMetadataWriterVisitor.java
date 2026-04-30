@@ -52,6 +52,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -283,10 +284,13 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                 .getBeanProperties();
             final ParameterElement[] parameters = constructor.getParameters();
             if (beanProperties.size() == parameters.length) {
-                for (int i = 0; i < parameters.length; i++) {
-                    ParameterElement parameter = parameters[i];
-                    final PropertyElement bp = beanProperties.get(i);
-                    if (CONSTRUCTOR_PARAMETERS_INJECTION_ANN.stream().noneMatch(bp::hasStereotype)) {
+                final Map<String, PropertyElement> propertiesByName = new HashMap<>(beanProperties.size());
+                for (PropertyElement beanProperty : beanProperties) {
+                    propertiesByName.putIfAbsent(beanProperty.getName(), beanProperty);
+                }
+                for (ParameterElement parameter : parameters) {
+                    final PropertyElement bp = propertiesByName.get(parameter.getName());
+                    if (bp == null || CONSTRUCTOR_PARAMETERS_INJECTION_ANN.stream().noneMatch(bp::hasStereotype)) {
                         processConfigurationInjectParameter(constructor.getDeclaringType(), parameter, visitorContext);
                     }
                 }
