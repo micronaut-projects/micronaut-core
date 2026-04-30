@@ -34,7 +34,7 @@ class ProgrammaticCircuitBreakerSpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
         CircuitBreakerOperationsFactory factory = context.getBean(CircuitBreakerOperationsFactory)
         CircuitBreakerOperations operations = factory.createCircuitBreakerOperations(
-            CircuitBreakerPolicy.builder().maxAttempts(2).delay(Duration.ofMillis(5)).resetTimeout(Duration.ofMillis(100)).build()
+            CircuitBreakerPolicy.builder().maxAttempts(2).delay(Duration.ofMillis(5)).resetTimeout(Duration.ofSeconds(5)).build()
         )
         AtomicInteger counter = new AtomicInteger()
 

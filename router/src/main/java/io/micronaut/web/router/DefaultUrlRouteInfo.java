@@ -16,7 +16,6 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
@@ -29,10 +28,13 @@ import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 
@@ -54,9 +56,13 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final @Nullable Integer port;
     private final ConversionService conversionService;
     private final ExecutorSelector executorSelector;
+
     @Nullable
     private ExecutorService executorService;
     private boolean noExecutor;
+
+    @Nullable
+    private Executor executor;
 
     @SuppressWarnings("ParameterNumber")
     public DefaultUrlRouteInfo(HttpMethod httpMethod,
@@ -137,5 +143,15 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         }
         executorService = es;
         return executorService;
+    }
+
+    @Override
+    public Executor getExecutor(ThreadSelectionConfiguration configuration) {
+        Executor executor = this.executor;
+        if (executor == null) {
+            executor = executorSelector.selectExecutor(getTargetMethod(), configuration);
+            this.executor = executor;
+        }
+        return executor;
     }
 }

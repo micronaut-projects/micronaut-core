@@ -1,5 +1,6 @@
 introduction:
   title: Introduction
+  whatsNew: What's New in Micronaut Framework 5.0.x
   upgrading: Upgrading your Micronaut Application
 quickStart:
   title: Quick Start

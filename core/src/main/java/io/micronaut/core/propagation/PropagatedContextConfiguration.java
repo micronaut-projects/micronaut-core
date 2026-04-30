@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.Internal;
 @Internal
 public final class PropagatedContextConfiguration {
 
-    private static volatile Mode current = Mode.SCOPED_VALUE;
+    private static volatile Mode current = Mode.THREAD_LOCAL;
 
     private PropagatedContextConfiguration() {
     }
@@ -45,10 +45,10 @@ public final class PropagatedContextConfiguration {
     }
 
     /**
-     * Reset to the default {@link Mode#SCOPED_VALUE}.
+     * Reset to the default {@link Mode#THREAD_LOCAL}.
      */
     public static void reset() {
-        current = Mode.SCOPED_VALUE;
+        current = Mode.THREAD_LOCAL;
     }
 
     /**

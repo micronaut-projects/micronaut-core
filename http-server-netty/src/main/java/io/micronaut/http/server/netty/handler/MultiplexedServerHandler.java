@@ -387,9 +387,6 @@ abstract class MultiplexedServerHandler {
         @Override
         public void writeHeadResponse(HttpResponse response) {
             response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
-            if (!PipeliningServerHandler.canHaveBody(response.status())) {
-                response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
-            }
             writeFull(response, Unpooled.EMPTY_BUFFER);
         }
 

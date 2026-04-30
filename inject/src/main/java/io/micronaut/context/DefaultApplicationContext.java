@@ -26,6 +26,7 @@ import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
+import io.micronaut.context.env.ImportCapablePropertySource;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.context.exceptions.ConfigurationException;
@@ -800,7 +801,7 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
      * Bootstrap property source implementation.
      */
     @SuppressWarnings("MagicNumber")
-    private record BootstrapPropertySource(PropertySource delegate) implements PropertySource {
+    private record BootstrapPropertySource(PropertySource delegate) implements ImportCapablePropertySource {
 
         @Override
         public String toString() {
@@ -826,6 +827,11 @@ final class DefaultApplicationContext extends DefaultBeanContext implements Conf
         @Override
         public Iterator<String> iterator() {
             return delegate.iterator();
+        }
+
+        @Override
+        public Origin getOrigin() {
+            return delegate.getOrigin();
         }
 
         @Override

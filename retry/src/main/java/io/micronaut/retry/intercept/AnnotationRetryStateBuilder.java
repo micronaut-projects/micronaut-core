@@ -75,7 +75,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
             .maxAttempts(retry.intValue(ATTEMPTS).orElse(DEFAULT_RETRY_ATTEMPTS))
             .delay(retry.get(DELAY, Duration.class).orElse(Duration.ofSeconds(1)))
             .multiplier(retry.get(MULTIPLIER, Double.class).orElse(0d))
-            .capturedException(retry.classValue(CAPTURED_EXCEPTION, Throwable.class).orElse(RuntimeException.class))
+            .capturedException(retry.classValue(CAPTURED_EXCEPTION, Throwable.class).orElse(Exception.class))
             .jitter(retry.get(JITTER, Double.class).orElse(0d));
         if (maxDelay != null) {
             builder.maxDelay(maxDelay);

@@ -111,9 +111,9 @@ public @interface Retryable {
      *
      * @return The exception type that should be intercepted for retry handling. Once an exception is captured,
      * it is still evaluated by {@link Retryable#includes}, {@link Retryable#excludes}, or
-     * {@link Retryable#predicate()} to decide whether to retry. Defaults to {@link RuntimeException}.
+     * {@link Retryable#predicate()} to decide whether to retry. Defaults to {@link Exception}.
      */
-    Class<? extends Throwable> capturedException() default RuntimeException.class;
+    Class<? extends Throwable> capturedException() default Exception.class;
 
     /**
      * Returns the jitter factor used to apply random deviation to retry delays.

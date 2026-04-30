@@ -26,7 +26,6 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -54,6 +53,7 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.CustomHttpMethod;
 import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClient;
@@ -71,7 +71,6 @@ import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -91,6 +90,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 
 /**
@@ -105,6 +106,7 @@ import java.util.function.Supplier;
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpClientIntroductionAdvice.class);
+    private static final String HTTP_ERROR_RESPONSE_LOG_MESSAGE = "Client [{}] received HTTP error response: {}";
 
     /**
      * The default Accept-Types.
@@ -257,64 +259,45 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                          Argument<?> valueType,
                                          Class<?> reactiveValueType,
                                          Class<?> declaringType) {
-
-        Publisher<RequestBinderResult> csRequestPublisher = Mono.fromCallable(() ->
-            bindRequest(context, httpMethod, httpMethodName, uriToBind, interceptedMethod, annotationMetadata));
-        Publisher<?> csPublisher = httpClientResponsePublisher(httpClient, csRequestPublisher, returnType, errorType, valueType);
-        CompletableFuture<Object> future = new CompletableFuture<>();
-        csPublisher.subscribe(new CompletionAwareSubscriber<Object>() {
-            @Nullable
-            Object message;
-            @Nullable
-            Subscription subscription;
-
-            @Override
-            protected void doOnSubscribe(Subscription subscription) {
-                this.subscription = subscription;
-                subscription.request(Long.MAX_VALUE);
-            }
-
-            @Override
-            protected void doOnNext(Object message) {
-                if (Void.class != reactiveValueType) {
-                    this.message = message;
-                }
-                // we only want the first item
-                if (subscription != null) {
-                    subscription.cancel();
-                }
-                doOnComplete();
-            }
-
-            @Override
-            protected void doOnError(Throwable t) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Client [{}] received HTTP error response: {}", declaringType.getName(), t.getMessage(), t);
-                }
-
-                if (t instanceof HttpClientResponseException e) {
-                    if (e.code() == HttpStatus.NOT_FOUND.getCode()) {
-                        if (reactiveValueType == Optional.class) {
-                            future.complete(Optional.empty());
-                        } else if (HttpResponse.class.isAssignableFrom(reactiveValueType)) {
-                            future.complete(e.getResponse());
-                        } else {
-                            future.complete(null);
+        try {
+            RequestBinderResult binderResult = bindRequest(context, httpMethod, httpMethodName, uriToBind, interceptedMethod, annotationMetadata);
+            CompletableFuture<@Nullable Object> future = new CompletableFuture<>();
+            if (binderResult.isError()) {
+                future.complete(binderResult.errorResult());
+            } else {
+                MutableHttpRequest<?> request = Objects.requireNonNull(binderResult.request());
+                AsyncHttpClient asyncHttpClient = httpClient.toAsync();
+                CompletionStage<?> responseStage = httpClientResponseStage(asyncHttpClient, request, returnType, errorType, valueType);
+                responseStage.whenComplete((result, throwable) -> {
+                    if (throwable != null) {
+                        Throwable cause = (throwable instanceof CompletionException completionException && completionException.getCause() != null)
+                            ? completionException.getCause()
+                            : throwable;
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug(HTTP_ERROR_RESPONSE_LOG_MESSAGE, declaringType.getName(), cause.getMessage(), cause);
                         }
-                        return;
+                        if (cause instanceof HttpClientResponseException e && e.code() == HttpStatus.NOT_FOUND.getCode()) {
+                            if (reactiveValueType == Optional.class) {
+                                future.complete(Optional.empty());
+                                return;
+                            } else if (HttpResponse.class.isAssignableFrom(reactiveValueType)) {
+                                future.complete(e.getResponse());
+                                return;
+                            } else {
+                                future.complete(null);
+                                return;
+                            }
+                        }
+                        future.completeExceptionally(cause);
+                    } else {
+                        future.complete(result);
                     }
-                }
-
-                future.completeExceptionally(t);
+                });
             }
-
-            @Override
-            protected void doOnComplete() {
-                // can be called twice
-                future.complete(message);
-            }
-        });
-        return interceptedMethod.handleResult(future);
+            return interceptedMethod.handleResult(future);
+        } catch (Exception e) {
+            return interceptedMethod.handleException(e);
+        }
     }
 
     @Nullable
@@ -346,7 +329,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         if (LOG.isDebugEnabled()) {
             publisher = Flux.from(publisher).doOnError(t ->
-                LOG.debug("Client [{}] received HTTP error response: {}", declaringType.getName(), t.getMessage(), t)
+                LOG.debug(HTTP_ERROR_RESPONSE_LOG_MESSAGE, declaringType.getName(), t.getMessage(), t)
             );
         }
 
@@ -547,7 +530,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                                      Argument<?> errorType,
                                                      Argument<?> reactiveValueArgument) {
         Flux<RequestBinderResult> requestFlux = Flux.from(requestPublisher);
-        return requestFlux.filter(result -> !result.isError).map(RequestBinderResult::request).flatMap(request -> {
+        return requestFlux.filter(result -> !result.isError()).map(RequestBinderResult::request).flatMap(request -> {
             Class<?> argumentType = reactiveValueArgument.getType();
             if (Void.class == argumentType || returnType.isVoid()) {
                 request.getHeaders().remove(HttpHeaders.ACCEPT);
@@ -604,6 +587,22 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }).switchIfEmpty(requestFlux.mapNotNull(RequestBinderResult::errorResult));
     }
 
+    private CompletionStage<?> httpClientResponseStage(AsyncHttpClient asyncHttpClient,
+                                                       MutableHttpRequest<?> request,
+                                                       ReturnType<?> returnType,
+                                                       Argument<?> errorType,
+                                                       Argument<?> reactiveValueArgument) {
+        Class<?> argumentType = reactiveValueArgument.getType();
+        if (Void.class == argumentType || returnType.isVoid()) {
+            request.getHeaders().remove(HttpHeaders.ACCEPT);
+            return asyncHttpClient.retrieve(request, Argument.VOID, errorType);
+        } else if (HttpResponse.class.isAssignableFrom(argumentType)) {
+            return asyncHttpClient.exchange(request, reactiveValueArgument, errorType);
+        } else {
+            return asyncHttpClient.retrieve(request, reactiveValueArgument, errorType);
+        }
+    }
+
     @Nullable
     private Object getValue(Argument<?> argument,
                             MethodInvocationContext<?, ?> context,
@@ -643,7 +642,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
         } catch (RuntimeException t) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Client [{}] received HTTP error response: {}", clientName, t.getMessage(), t);
+                LOG.debug(HTTP_ERROR_RESPONSE_LOG_MESSAGE, clientName, t.getMessage(), t);
             }
 
             if (t instanceof HttpClientResponseException exception && exception.code() == HttpStatus.NOT_FOUND.getCode()) {

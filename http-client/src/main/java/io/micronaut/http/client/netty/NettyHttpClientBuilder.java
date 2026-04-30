@@ -1,0 +1,277 @@
+/*
+ * Copyright 2017-2024 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.http.client.netty;
+
+import io.micronaut.context.BeanProvider;
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.HttpVersionSelection;
+import io.micronaut.http.client.LoadBalancer;
+import io.micronaut.http.client.filter.ClientFilterResolutionContext;
+import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
+import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
+import io.micronaut.http.client.netty.ssl.NettyClientSslFactory;
+import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.filter.HttpClientFilter;
+import io.micronaut.http.filter.HttpClientFilterResolver;
+import io.micronaut.http.filter.HttpFilterResolver;
+import io.micronaut.http.ssl.CertificateProvider;
+import io.micronaut.websocket.context.WebSocketBeanRegistry;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFactory;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.socket.nio.NioDatagramChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.resolver.AddressResolverGroup;
+
+import java.net.URI;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadFactory;
+
+/**
+ * Internal builder for configuring and constructing {@link NettyHttpClient} instances.
+ * <p>
+ * This type is not part of the public API. If functionality from this builder is needed outside
+ * this package, expose it through an appropriate supported public API instead of documenting this
+ * class for external use.
+ *
+ * @author Jonas Konrad
+ * @since 4.7.0
+ */
+@Internal
+final class NettyHttpClientBuilder {
+    @Nullable
+    LoadBalancer loadBalancer = null;
+    @Nullable
+    HttpVersionSelection explicitHttpVersion = null;
+    @Nullable
+    HttpClientConfiguration configuration;
+    @Nullable
+    String contextPath = null;
+    AnnotationMetadataResolver annotationMetadataResolver = AnnotationMetadataResolver.DEFAULT;
+    @Nullable
+    HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
+    @Nullable
+    List<HttpFilterResolver.FilterEntry> clientFilterEntries = null;
+    @Nullable
+    ThreadFactory threadFactory;
+    @Nullable
+    ClientSslBuilder nettyClientSslBuilder;
+    @Nullable
+    NettyClientSslFactory sslFactory;
+    @Nullable
+    BeanProvider<CertificateProvider> certificateProviders;
+    @Nullable
+    MediaTypeCodecRegistry codecRegistry;
+    @Nullable
+    MessageBodyHandlerRegistry handlerRegistry;
+    WebSocketBeanRegistry webSocketBeanRegistry = WebSocketBeanRegistry.EMPTY;
+    @Nullable
+    RequestBinderRegistry requestBinderRegistry;
+    @Nullable
+    EventLoopGroup eventLoopGroup = null;
+    ChannelFactory<? extends Channel> socketChannelFactory = NioSocketChannel::new;
+    ChannelFactory<? extends Channel> udpChannelFactory = NioDatagramChannel::new;
+    NettyClientCustomizer clientCustomizer = CompositeNettyClientCustomizer.EMPTY;
+    @Nullable
+    String informationalServiceId = null;
+    ConversionService conversionService = ConversionService.SHARED;
+    @Nullable
+    AddressResolverGroup<?> resolverGroup = null;
+    @Nullable
+    ExecutorService blockingExecutor = null;
+
+    NettyHttpClientBuilder() {
+    }
+
+    NettyHttpClientBuilder loadBalancer(@Nullable LoadBalancer loadBalancer) {
+        this.loadBalancer = loadBalancer;
+        return this;
+    }
+
+    /**
+     * Set the optional URI for this client to use as the root.
+     *
+     * @param uri The URI
+     * @return This builder
+     */
+    public NettyHttpClientBuilder uri(@Nullable URI uri) {
+        return loadBalancer(uri == null ? null : LoadBalancer.fixed(uri));
+    }
+
+    NettyHttpClientBuilder explicitHttpVersion(@Nullable HttpVersionSelection explicitHttpVersion) {
+        this.explicitHttpVersion = explicitHttpVersion;
+        return this;
+    }
+
+    /**
+     * Set the configuration.
+     *
+     * @param configuration The client configuration
+     * @return This builder
+     */
+    public NettyHttpClientBuilder configuration(HttpClientConfiguration configuration) {
+        ArgumentUtils.requireNonNull("configuration", configuration);
+        this.configuration = configuration;
+        return this;
+    }
+
+    NettyHttpClientBuilder contextPath(@Nullable String contextPath) {
+        this.contextPath = contextPath;
+        return this;
+    }
+
+    NettyHttpClientBuilder filterResolver(HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver) {
+        ArgumentUtils.requireNonNull("filterResolver", filterResolver);
+        this.filterResolver = filterResolver;
+        return this;
+    }
+
+    NettyHttpClientBuilder annotationMetadataResolver(@Nullable AnnotationMetadataResolver annotationMetadataResolver) {
+        if (annotationMetadataResolver != null) {
+            this.annotationMetadataResolver = annotationMetadataResolver;
+        }
+        return this;
+    }
+
+    NettyHttpClientBuilder filters(HttpClientFilter... filters) {
+        return filterResolver(new DefaultHttpClientFilterResolver(null, annotationMetadataResolver, Arrays.asList(filters)));
+    }
+
+    NettyHttpClientBuilder clientFilterEntries(@Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries) {
+        this.clientFilterEntries = clientFilterEntries;
+        return this;
+    }
+
+    NettyHttpClientBuilder threadFactory(@Nullable ThreadFactory threadFactory) {
+        this.threadFactory = threadFactory;
+        return this;
+    }
+
+    /**
+     * The netty SSL context builder. Used by the micronaut-oracle-cloud OKE workload identity
+     * client.
+     *
+     * @param nettyClientSslBuilder The SSL context builder
+     * @return This builder
+     */
+    public NettyHttpClientBuilder nettyClientSslBuilder(ClientSslBuilder nettyClientSslBuilder) {
+        ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
+        this.nettyClientSslBuilder = nettyClientSslBuilder;
+        return this;
+    }
+
+    public NettyHttpClientBuilder sslFactory(NettyClientSslFactory sslFactory, BeanProvider<CertificateProvider> certificateProviders) {
+        ArgumentUtils.requireNonNull("sslFactory", sslFactory);
+        ArgumentUtils.requireNonNull("certificateProviders", certificateProviders);
+        this.sslFactory = sslFactory;
+        this.certificateProviders = certificateProviders;
+        return this;
+    }
+
+    /**
+     * Set the codec registry. This has mostly been replaced by body handlers by now.
+     *
+     * @param codecRegistry The codec registry
+     * @return This builder
+     * @deprecated Use body handlers instead
+     */
+    @Deprecated
+    NettyHttpClientBuilder codecRegistry(MediaTypeCodecRegistry codecRegistry) {
+        ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
+        this.codecRegistry = codecRegistry;
+        return this;
+    }
+
+    NettyHttpClientBuilder handlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
+        ArgumentUtils.requireNonNull("handlerRegistry", handlerRegistry);
+        this.handlerRegistry = handlerRegistry;
+        return this;
+    }
+
+    NettyHttpClientBuilder webSocketBeanRegistry(WebSocketBeanRegistry webSocketBeanRegistry) {
+        ArgumentUtils.requireNonNull("webSocketBeanRegistry", webSocketBeanRegistry);
+        this.webSocketBeanRegistry = webSocketBeanRegistry;
+        return this;
+    }
+
+    NettyHttpClientBuilder requestBinderRegistry(RequestBinderRegistry requestBinderRegistry) {
+        ArgumentUtils.requireNonNull("requestBinderRegistry", requestBinderRegistry);
+        this.requestBinderRegistry = requestBinderRegistry;
+        return this;
+    }
+
+    NettyHttpClientBuilder eventLoopGroup(@Nullable EventLoopGroup eventLoopGroup) {
+        this.eventLoopGroup = eventLoopGroup;
+        return this;
+    }
+
+    NettyHttpClientBuilder socketChannelFactory(ChannelFactory<? extends Channel> socketChannelFactory) {
+        ArgumentUtils.requireNonNull("socketChannelFactory", socketChannelFactory);
+        this.socketChannelFactory = socketChannelFactory;
+        return this;
+    }
+
+    NettyHttpClientBuilder udpChannelFactory(ChannelFactory<? extends Channel> udpChannelFactory) {
+        ArgumentUtils.requireNonNull("udpChannelFactory", udpChannelFactory);
+        this.udpChannelFactory = udpChannelFactory;
+        return this;
+    }
+
+    NettyHttpClientBuilder clientCustomizer(NettyClientCustomizer clientCustomizer) {
+        ArgumentUtils.requireNonNull("clientCustomizer", clientCustomizer);
+        this.clientCustomizer = clientCustomizer;
+        return this;
+    }
+
+    NettyHttpClientBuilder informationalServiceId(@Nullable String informationalServiceId) {
+        this.informationalServiceId = informationalServiceId;
+        return this;
+    }
+
+    NettyHttpClientBuilder conversionService(ConversionService conversionService) {
+        ArgumentUtils.requireNonNull("conversionService", conversionService);
+        this.conversionService = conversionService;
+        return this;
+    }
+
+    NettyHttpClientBuilder resolverGroup(@Nullable AddressResolverGroup<?> resolverGroup) {
+        this.resolverGroup = resolverGroup;
+        return this;
+    }
+
+    NettyHttpClientBuilder blockingExecutor(@Nullable ExecutorService blockingExecutor) {
+        this.blockingExecutor = blockingExecutor;
+        return this;
+    }
+
+    /**
+     * Build the final HTTP client. This method may only be called once.
+     *
+     * @return The client
+     */
+    NettyHttpClient build() {
+        return new NettyHttpClient(this);
+    }
+}

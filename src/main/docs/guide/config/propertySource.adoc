@@ -23,6 +23,7 @@ Micronaut framework by default contains `PropertySourceLoader` implementations t
 
 NOTE: 'micronaut.config.files' will be ignored in bootstrap.yml or application.yml.
 
+[[configImport]]
 === Importing Additional Configuration
 
 You can import additional configuration directly from a configuration file using `micronaut.config.import`.
@@ -60,6 +61,7 @@ When multiple resources with the same classpath name are present:
 
 IMPORTANT: `file:///tmp/bar.properties` (with three slashes) resolves to the absolute path `/tmp/bar.properties`.
 
+[[customPropertySourceImporter]]
 === Implementing a Custom PropertySourceImporter
 
 You can add support for a custom import protocol by implementing api:io.micronaut.context.env.PropertySourceImporter[] and registering it with Java ServiceLoader. Each importer declares its provider with `getProvider()`, converts the parsed api:io.micronaut.core.util.ConnectionString[] into a typed declaration via `newImportDeclaration(..)`, and then reads configuration from `importPropertySource(..)`.

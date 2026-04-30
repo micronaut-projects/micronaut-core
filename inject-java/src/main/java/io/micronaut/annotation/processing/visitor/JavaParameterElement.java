@@ -163,7 +163,7 @@ final class JavaParameterElement extends AbstractTypeAwareJavaElement implements
     @Nullable
     private static String findParameterDoc(String javadocString, String name) {
         try {
-            Javadoc javadoc = StaticJavaParser.parseJavadoc(javadocString);
+            Javadoc javadoc = StaticJavaParser.parseJavadoc(javadocString, false);
             if (javadoc == null) {
                 return null;
             }

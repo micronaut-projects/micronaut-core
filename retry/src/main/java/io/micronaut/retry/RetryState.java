@@ -99,7 +99,7 @@ public interface RetryState {
     }
 
     /**
-     * Returns the captured exception type, which defaults to {@link RuntimeException}.
+     * Returns the captured exception type, which defaults to {@link Exception}.
      *
      * @return The captured exception type
      */

@@ -105,6 +105,19 @@ Executable methods annotated with `@Parallel` will not trigger parallel executio
 
 `@Scheduled` is no longer processed in parallel, this reduced the complexity of the method processor and removed unnecessary overhead.
 
+==== HTTP server thread selection now applies across more request stages
+
+Micronaut 5 extends server `thread-selection` handling so that it applies not only to route execution, but also to server filters and request event listeners.
+
+As a result, applications that previously observed different threads for filters, event listeners, and controllers may now see those stages executed more consistently on the executor selected by the server configuration.
+
+The `micronaut.server.netty.redispatch-non-blocking-only` setting now controls whether Micronaut redispatches again after request processing has already moved from the initial non-blocking event-loop thread to a blocking-capable thread:
+
+* `true` skips repeated redispatch once execution is already on a blocking-capable thread. This reduces executor hops and avoids creating additional virtual threads for every filter, event listener, and controller stage.
+* `false` applies the configured executor at each stage even if the current thread is already blocking-capable. This more closely matches the previous behavior, but may introduce more thread hops and, when using virtual threads, more virtual thread creation during one request.
+
+If your application depends on specific thread transitions between filters, event listeners, and route handlers, review this setting and test request-processing behavior after upgrading.
+
 ==== Jackson Bean Introspection Module removed
 
 NOTE: This change only affects users using <<serializationUsingJacksonDatabind, Micronaut Jackson Databind>>
@@ -416,7 +429,9 @@ Since Micronaut 3.0 the `OncePerRequestHttpServerFilter` class was deprecated an
 
 ==== CORS support with the `@CrossOrigin` annotation
 
-Micronaut Framework 4 changes `@CrossOrigin`  behavior to match configuration-based CORS behavior. A method annotated with `@CrossOrigin` allows any origin if you don't specify any value for the `allowedOrigins` and `allowedOriginsRegex` members.
+Micronaut Framework 4 changes `@CrossOrigin` behavior to match configuration-based CORS behavior. A method annotated with `@CrossOrigin` allows any origin if you don't specify any value for the `allowedOrigins` and `allowedOriginsRegex` members.
+
+Micronaut Framework 5 changes the default value of `@CrossOrigin.allowCredentials` from `true` to `false`. If your application relies on credentialed cross-origin requests, set `allowCredentials = true` explicitly.
 
 ==== `@EachBean` requires a `@Named qualifier
 
@@ -429,3 +444,15 @@ In Micronaut Framework 4, users need to extend the <<contextPropagation, propaga
 ==== Micronaut 3 libraries not compatible with Micronaut 4 applications
 
 In order for Micronaut 3 library beans to be discoverable in an application running Micronaut 4, the library must be recompiled with Micronaut 4 - https://github.com/micronaut-projects/micronaut-core/discussions/9758
+
+==== @Retryable Default Exception Type
+
+The default exception type used by `@Retryable` has changed.
+Previously, `@Retryable` would retry only when a `RuntimeException` (or subclass) was thrown.
+In Micronaut 5, the default has been changed to `Exception`. As a result, checked exceptions will now also trigger retry behavior.
+If the previous behavior is desired, configure the retryable annotation explicitly:
+
+[source,java]
+----
+@Retryable(includes = RuntimeException.class)
+----

@@ -27,7 +27,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class MapPropertySource implements PropertySource {
+public class MapPropertySource implements ImportCapablePropertySource {
 
     private final String name;
     private final Map<String, ?> map;

@@ -168,7 +168,7 @@ public class ConnectionManager {
 
     private final HttpVersionSelection httpVersion;
     private final Logger log;
-    private final Map<DefaultHttpClient.RequestKey, PoolHolder> pools = new ConcurrentHashMap<>();
+    private final Map<NettyHttpClient.RequestKey, PoolHolder> pools = new ConcurrentHashMap<>();
     private final ClientSslBuilder nettyClientSslBuilder;
     private final NettyClientSslFactory sslFactory;
     private final BeanProvider<CertificateProvider> certificateProviders;
@@ -223,7 +223,7 @@ public class ConnectionManager {
     ConnectionManager(
         Logger log,
         HttpClientConfiguration configuration,
-        DefaultHttpClientBuilder builder) {
+        NettyHttpClientBuilder builder) {
 
         this.httpVersion = builder.explicitHttpVersion == null ? HttpVersionSelection.forClientConfiguration(configuration) : builder.explicitHttpVersion;
         this.log = log;
@@ -456,7 +456,7 @@ public class ConnectionManager {
      * @param eventLoop          Event loop this connection should be created on
      * @return Future that terminates when the TCP connection is established.
      */
-    ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer, EventLoopGroup eventLoop) {
+    ChannelFuture doConnect(NettyHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer, EventLoopGroup eventLoop) {
         String host = requestKey.getHost();
         int port = requestKey.getPort();
         Bootstrap localBootstrap = Objects.requireNonNull(bootstrap).clone();
@@ -477,7 +477,7 @@ public class ConnectionManager {
      * @return The {@link SslContext} instance
      */
     @Nullable
-    private SslContext buildSslContext(DefaultHttpClient.RequestKey requestKey) {
+    private SslContext buildSslContext(NettyHttpClient.RequestKey requestKey) {
         final SslContext sslCtx;
         if (requestKey.isSecure()) {
             SslContextHolder holder = sslContextWrapper.takeRetained();
@@ -500,7 +500,7 @@ public class ConnectionManager {
      *                   request
      * @return A mono that will complete once the channel is ready for transmission
      */
-    public final ExecutionFlow<PoolHandle> connect(DefaultHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint) {
+    public final ExecutionFlow<PoolHandle> connect(NettyHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint) {
         return connect(requestKey, blockHint, null);
     }
 
@@ -514,7 +514,7 @@ public class ConnectionManager {
      *                           as it becomes available
      * @return A mono that will complete once the channel is ready for transmission
      */
-    public final ExecutionFlow<PoolHandle> connect(DefaultHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
+    public final ExecutionFlow<PoolHandle> connect(NettyHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
         return pools.computeIfAbsent(requestKey, rk -> createPool(rk, group)).acquire(blockHint, preferredScheduler);
     }
 
@@ -524,7 +524,7 @@ public class ConnectionManager {
      * @return The {@link SslContext} instance
      */
     @Nullable
-    private SslContext buildWebsocketSslContext(DefaultHttpClient.RequestKey requestKey) {
+    private SslContext buildWebsocketSslContext(NettyHttpClient.RequestKey requestKey) {
         if (requestKey.isSecure()) {
             if (configuration.getSslConfiguration().isEnabled()) {
                 if (!wsContextLoaded) {
@@ -548,7 +548,7 @@ public class ConnectionManager {
      * @param handler The websocket message handler
      * @return A mono that will complete when the handshakes complete
      */
-    final Mono<?> connectForWebsocket(DefaultHttpClient.RequestKey requestKey, ChannelHandler handler) {
+    final Mono<?> connectForWebsocket(NettyHttpClient.RequestKey requestKey, ChannelHandler handler) {
         Sinks.Empty<Object> initial = new CancellableMonoSink<>(null);
 
         ChannelFuture connectFuture = doConnect(requestKey, new CustomizerAwareInitializer() {
@@ -675,7 +675,7 @@ public class ConnectionManager {
             try {
                 final LogLevel nettyLevel =
                     LogLevel.valueOf(logLevel.name());
-                builder.frameLogger(new Http2FrameLogger(nettyLevel, DefaultHttpClient.class));
+                builder.frameLogger(new Http2FrameLogger(nettyLevel, NettyHttpClient.class));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
             }
@@ -715,7 +715,7 @@ public class ConnectionManager {
             try {
                 final LogLevel nettyLevel =
                     LogLevel.valueOf(logLevel.name());
-                ch.pipeline().addLast(new LoggingHandler(DefaultHttpClient.class, nettyLevel));
+                ch.pipeline().addLast(new LoggingHandler(NettyHttpClient.class, nettyLevel));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
             }
@@ -888,7 +888,7 @@ public class ConnectionManager {
      * @param group
      * @return The pool
      */
-    PoolHolder createPool(DefaultHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
+    PoolHolder createPool(NettyHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
         return new PoolHolder(requestKey, group);
     }
 
@@ -1211,7 +1211,7 @@ public class ConnectionManager {
 
     /**
      * This class represents one pool, and matches to exactly one
-     * {@link DefaultHttpClient.RequestKey} (i.e. host, port and
+     * {@link NettyHttpClient.RequestKey} (i.e. host, port and
      * protocol are the same for one pool).
      * <p>
      * The superclass {@link Pool49} handles pool size management, this class just implements
@@ -1220,7 +1220,7 @@ public class ConnectionManager {
     final class PoolHolder implements Pool.Listener {
         final Pool pool;
 
-        private final DefaultHttpClient.RequestKey requestKey;
+        private final NettyHttpClient.RequestKey requestKey;
 
         /**
          * {@link ChannelHandler} that is added to a connection to report failures during
@@ -1233,7 +1233,7 @@ public class ConnectionManager {
             }
         };
 
-        PoolHolder(DefaultHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
+        PoolHolder(NettyHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
             this.requestKey = requestKey;
             this.pool = switch (configuration.getConnectionPoolConfiguration().getVersion()) {
                 case V4_0 -> new Pool40(this, log, configuration.getConnectionPoolConfiguration(), (EventLoopGroup) group);

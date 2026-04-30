@@ -49,7 +49,6 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import org.jspecify.annotations.Nullable;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
@@ -223,11 +222,13 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 }
             }
 
-            Flux.from(callOpenMethod(ctx)).subscribe(
-                o -> { },
-                error -> completion.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + error.getMessage(), error)),
-                () -> completion.tryEmitValue(targetBean)
-            );
+            callOpenMethod(ctx).onComplete((v, t) -> {
+                if (t != null) {
+                    completion.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + t.getMessage(), t));
+                } else {
+                    completion.tryEmitValue(targetBean);
+                }
+            });
             return;
         }
 

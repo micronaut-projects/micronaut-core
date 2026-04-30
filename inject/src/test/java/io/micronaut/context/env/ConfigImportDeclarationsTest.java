@@ -3,6 +3,8 @@ package io.micronaut.context.env;
 import io.micronaut.context.exceptions.ConfigurationException;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -118,5 +120,58 @@ class ConfigImportDeclarationsTest {
 
         ConfigurationException e = assertThrows(ConfigurationException.class, () -> locator.normalize(source));
         assertTrue(e.getMessage().contains("Cannot combine scalar and structured indexed"));
+    }
+
+    @Test
+    void doesNotIterateLazyNonMapPropertySourceWithoutDirectImportKey() {
+        PropertySource source = new PropertySource() {
+            @Override
+            public String getName() {
+                return "test resources";
+            }
+
+            @Override
+            public Object get(String key) {
+                throw new AssertionError("get should not be called");
+            }
+
+            @Override
+            public Iterator<String> iterator() {
+                throw new AssertionError("iterator should not be called");
+            }
+        };
+
+        ConfigImportPropertySourcesLocator.ResolvedImportDeclarations parsed = locator.normalize(source);
+
+        assertEquals(Collections.emptyList(), parsed.imports());
+    }
+
+    @Test
+    void normalizesImportCapableNonMapPropertySource() {
+        PropertySource source = new ImportCapablePropertySource() {
+            private final Map<String, Object> values = Map.of(
+                "micronaut.config.import", "file://foo/one.properties",
+                "app.name", "demo"
+            );
+
+            @Override
+            public String getName() {
+                return "test resources";
+            }
+
+            @Override
+            public Object get(String key) {
+                return values.get(key);
+            }
+
+            @Override
+            public Iterator<String> iterator() {
+                return values.keySet().iterator();
+            }
+        };
+
+        ConfigImportPropertySourcesLocator.ResolvedImportDeclarations parsed = locator.normalize(source);
+
+        assertEquals(1, parsed.imports().size());
     }
 }
