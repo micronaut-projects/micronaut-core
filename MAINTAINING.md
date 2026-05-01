@@ -2,7 +2,7 @@
 
 ## Triage incoming issues
 
-New issues need to be categorised. At least with one of the following labels:
+New issues need to be categorized. At least with one of the following labels:
 
 * `type: bug`: when something is not working as designed.
 * `type: improvement`: a minor improvement over an existing feature.
@@ -38,7 +38,7 @@ There are sometimes where we are not sure whether we want or can solve an issue.
   revisited in the future.
 * `status: next major version`: it is a breaking change and therefore needs to be implemented in the next major version.
 
-There are also a bunch of `relates-to` labels that can be used to further categorise issues. This is helpful in projects
+There are also a bunch of `relates-to` labels that can be used to further categorize issues. This is helpful in projects
 with a lot of issues, or projects where different people work on different parts or modules.
 
 The majority of the issues are defined in the
@@ -48,7 +48,7 @@ If you want new labels:
 * If they can be beneficial to several repos, send a pull request to the management repo.
 * If they are repo-specific, just go ahead and create them with the GitHub UI.
 
-Finally, issues (especially bugs) should be prioritised with either `priority: high`, `priority: medium` or
+Finally, issues (especially bugs) should be prioritized with either `priority: high`, `priority: medium` or
 `priority: low`. Checkout the
 [Issue Priority Labels](https://github.com/micronaut-projects/micronaut-core/wiki/Issue-Priority-Labels) document for
 guidelines about when to use each of them.
@@ -146,8 +146,8 @@ executed.
 The "Java CI" (`gradle.yml`) workflow does have the ability to have an optional setup step, though. If there is a `setup.sh`
 file in the project root, it will be executed before invoking Gradle.
 
-There are projects, such as micronaut-gcp and micronaut-kubernetes, that have made customisations to sync'ed workflows
-because it's absolutely necessary. In those projects, the sync pull requests are manually merged so that the customisations
+There are projects, such as micronaut-gcp and micronaut-kubernetes, that have made customizations to sync'ed workflows
+because it's absolutely necessary. In those projects, the sync pull requests are manually merged so that the customizations
 aren't lost.
 
 Note that it is perfectly possible to have new workflows that aren't part of the sync process.
