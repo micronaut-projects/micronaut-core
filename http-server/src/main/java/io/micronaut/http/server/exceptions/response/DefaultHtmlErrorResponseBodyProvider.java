@@ -34,7 +34,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import static io.micronaut.http.HttpStatus.*;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
+import static io.micronaut.http.HttpStatus.REQUEST_ENTITY_TOO_LARGE;
 
 /**
  * It generates HTML error response page for a given {@link HttpStatus}.
