@@ -147,21 +147,7 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
 
     @Override
     public BlockingHttpClient toBlocking() {
-        return new JdkBlockingHttpClient(
-            loadBalancer,
-            httpVersion,
-            configuration,
-            contextPath,
-            filterResolver,
-            clientFilterEntries,
-            mediaTypeCodecRegistry,
-            messageBodyHandlerRegistry,
-            requestBinderRegistry,
-            clientId,
-            conversionService,
-            sslBuilder,
-            cookieDecoder
-        );
+        return new JdkBlockingHttpClient(this);
     }
 
     @Override
