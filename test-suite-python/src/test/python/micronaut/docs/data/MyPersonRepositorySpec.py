@@ -4,6 +4,7 @@ from org.junit.jupiter.api import Test, Disabled
 from jakarta.inject import Inject
 from typing import Annotated
 from .MyPersonRepository import MyPersonRepository
+from .MyPersonRepository import MyPersonRepositoryInitializer
 from .MyPersonRepository import MyPerson
 
 
@@ -14,9 +15,11 @@ from .MyPersonRepository import MyPerson
 @Property(name = "datasources.default.dialect", value = "H2")
 class MyPersonRepositorySpec:
     myPersonRepository : Annotated[MyPersonRepository, Inject] = None
+    initializer : Annotated[MyPersonRepositoryInitializer, Inject] = None
 
     @Test
     def testDBAccess(self) -> None:
+        assert self.initializer is not None
         # print(f"REPOSITORY TYPE {self.myPersonRepository.getClass().getName()}")
         self.myPersonRepository.save(MyPerson(-1, "Denis", 123))
         self.myPersonRepository.savePerson(MyPerson(-2, "Graeme", 456))
