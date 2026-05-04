@@ -19,9 +19,18 @@
       ],
       "matchCurrentVersion": "!/^0/",
       "automerge": true,
-      "matchPackageNames": [
-        "/actions.*/"
-      ]
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions dependencies"
+    },
+    {
+      "matchDatasources": [
+        "maven"
+      ],
+      "matchManagers": [
+        "maven",
+        "gradle"
+      ],
+      "allowedVersions": "!/.+-SNAPSHOT$/"
     },
     {
       "matchUpdateTypes": [
@@ -29,6 +38,12 @@
       ],
       "matchCurrentVersion": "!/^0/",
       "automerge": true
+    },
+    {
+      "matchPackageNames": [
+        "/.*micronaut.*/"
+      ],
+      "groupName": "Micronaut dependencies"
     }
   ]
 }
