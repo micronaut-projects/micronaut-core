@@ -422,8 +422,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     }
 
     private static boolean isAnyMethod(List<HttpMethod> allowedMethods) {
-        return allowedMethods == CorsOriginConfiguration.ANY_METHOD
-            || (allowedMethods != null && allowedMethods.isEmpty());
+        return Objects.equals(allowedMethods, CorsOriginConfiguration.ANY_METHOD);
     }
 
     private boolean methodAllowed(CorsOriginConfiguration config,
