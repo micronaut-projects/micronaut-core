@@ -71,6 +71,9 @@ final class GraalPyHostAccessFactory {
                 if (v == null || v.isNull()) {
                     return false;
                 }
+                if (!v.hasMembers()) {
+                    return false;
+                }
                 Value cls = v.getMember(CLASS_META);
                 if (cls == null) {
                     return false;

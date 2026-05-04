@@ -1579,21 +1579,16 @@ def extract_call_arguments_with_defaults(funcdef, call, visitor=None):
     if funcdef is None:
         # For Java annotations used as decorators (funcdef is None),
         # we need to map positional args to parameter names.
-        # For single-arg annotations, assume the parameter is named "value"
-        if len(call.args) == 1 and len(call.keywords) == 0:
-            # Single positional argument - assume it's the "value" parameter
-            value = convert_ast_value(call.args[0], visitor)
-            result["value"] = value
-        else:
-            # Multiple args or keyword args - use positional indices as fallback
-            for i, arg in enumerate(call.args):
-                value = convert_ast_value(arg, visitor)
-                result[i] = value
-            # Handle keyword arguments
-            for kw in call.keywords:
-                if kw.arg is not None:
-                    value = convert_ast_value(kw.value, visitor)
-                    result[kw.arg] = value
+        # Java annotations conventionally use "value" for the first positional argument,
+        # including mixed calls like @Get("/path", produces="text/plain").
+        for i, arg in enumerate(call.args):
+            value = convert_ast_value(arg, visitor)
+            result["value" if i == 0 else f"arg{i}"] = value
+        # Handle keyword arguments
+        for kw in call.keywords:
+            if kw.arg is not None:
+                value = convert_ast_value(kw.value, visitor)
+                result[kw.arg] = value
     else:
         # Get parameter names from function definition
         try:
@@ -1605,15 +1600,9 @@ def extract_call_arguments_with_defaults(funcdef, call, visitor=None):
         # Special handling for Java annotations that use *args, **kwargs
         # If no named parameters but we have positional args, assume single arg uses "value"
         if len(param_names) == 0:
-            if len(call.args) == 1 and len(call.keywords) == 0:
-                # Single positional argument - assume it's the "value" parameter
-                value = convert_ast_value(call.args[0], visitor)
-                result["value"] = value
-            else:
-                # Multiple args or keyword args - handle as before
-                for i, arg in enumerate(call.args):
-                    value = convert_ast_value(arg, visitor)
-                    result[i] = value
+            for i, arg in enumerate(call.args):
+                value = convert_ast_value(arg, visitor)
+                result["value" if i == 0 else f"arg{i}"] = value
             # Handle keyword arguments
             for kw in call.keywords:
                 if kw.arg is not None:

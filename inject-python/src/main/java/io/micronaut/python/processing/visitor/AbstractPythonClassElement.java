@@ -15,12 +15,14 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
@@ -151,7 +153,63 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
 
     @Override
     public <T extends Element> List<T> getEnclosedElements(ElementQuery<T> query) {
-        return enclosedElementsQuery.getEnclosedElements(this, query);
+        List<T> elements = enclosedElementsQuery.getEnclosedElements(this, query);
+        return appendJavaInterfaceMethods(elements, query);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T extends Element> List<T> appendJavaInterfaceMethods(List<T> elements, ElementQuery<T> query) {
+        ElementQuery.Result<T> result = query.result();
+        Class<T> elementType = result.getElementType();
+        if (result.isOnlyDeclared() || elementType != MethodElement.class && elementType != MemberElement.class) {
+            return elements;
+        }
+
+        List<MethodElement> inheritedMethods = new ArrayList<>();
+        for (ClassElement anInterface : getInterfaces()) {
+            if (anInterface instanceof AbstractPythonClassElement) {
+                continue;
+            }
+            if (elementType == MethodElement.class) {
+                inheritedMethods.addAll(anInterface.getEnclosedElements((ElementQuery<MethodElement>) query));
+            } else {
+                for (MemberElement memberElement : anInterface.getEnclosedElements((ElementQuery<MemberElement>) query)) {
+                    if (memberElement instanceof MethodElement methodElement) {
+                        inheritedMethods.add(methodElement);
+                    }
+                }
+            }
+        }
+        if (inheritedMethods.isEmpty()) {
+            return elements;
+        }
+
+        List<T> allElements = new ArrayList<>(elements);
+        for (MethodElement inheritedMethod : inheritedMethods) {
+            if (!isInterfaceMethodAlreadyRepresented(allElements, inheritedMethod)) {
+                allElements.add((T) decorateInheritedInterfaceMethod(inheritedMethod));
+            }
+        }
+        return allElements;
+    }
+
+    private MethodElement decorateInheritedInterfaceMethod(MethodElement inheritedMethod) {
+        if (hasStereotype(InterceptorBinding.class)) {
+            return inheritedMethod.withAnnotationMetadata(
+                new AnnotationMetadataHierarchy(true, getAnnotationMetadata(), inheritedMethod.getAnnotationMetadata())
+            );
+        }
+        return inheritedMethod;
+    }
+
+    private static boolean isInterfaceMethodAlreadyRepresented(List<? extends Element> elements, MethodElement inheritedMethod) {
+        for (Element element : elements) {
+            if (element instanceof MethodElement methodElement &&
+                (methodElement.overrides(inheritedMethod) || methodElement.isSubSignature(inheritedMethod))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

@@ -354,7 +354,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
 
         String docComment = visitorContext.getElements().getDocComment(executableElement);
         ClassElement returnClassElement = newClassElement(getNativeType(), returnType, genericInfo, findReturnDoc(docComment));
-        if (canBeMarkedWithNonNull(returnClassElement)) {
+        if (returnClassElement instanceof AbstractJavaElement && canBeMarkedWithNonNull(returnClassElement)) {
             returnClassElement.getTypeAnnotationMetadata().annotate(NonNull.class);
         }
         return returnClassElement;

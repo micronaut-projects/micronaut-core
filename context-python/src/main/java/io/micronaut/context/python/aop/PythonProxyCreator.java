@@ -21,40 +21,33 @@ import io.micronaut.aop.runtime.RuntimeProxyCreator;
 import io.micronaut.aop.runtime.RuntimeProxyDefinition;
 import io.micronaut.context.python.ContextHolder;
 import io.micronaut.context.python.ValueCoercible;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import jakarta.inject.Singleton;
-import net.bytebuddy.ByteBuddy;
-import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
-import net.bytebuddy.implementation.MethodDelegation;
-import net.bytebuddy.implementation.bind.annotation.AllArguments;
-import net.bytebuddy.implementation.bind.annotation.Origin;
-import net.bytebuddy.implementation.bind.annotation.RuntimeType;
-import net.bytebuddy.implementation.bind.annotation.This;
-import net.bytebuddy.matcher.ElementMatchers;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 @Internal
 @Singleton
 @NullMarked
 public final class PythonProxyCreator implements RuntimeProxyCreator {
-
-    private final Map<Class<?>, Class<?>> abstractProxyTypes = new ConcurrentHashMap<>();
 
     @Override
     public <T> T createProxy(RuntimeProxyDefinition<T> proxyDefinition) {
@@ -126,6 +119,13 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 }
                 yield newList;
             }
+            case Set<?> set -> {
+                Set<Object> newSet = new LinkedHashSet<>(set.size());
+                for (Object o : set) {
+                    newSet.add(unbox(o));
+                }
+                yield newSet;
+            }
             case Map<?, ?> map -> {
                 Map<Object, Object> newMap = new java.util.HashMap<>(map.size());
                 for (Map.Entry<?, ?> entry : map.entrySet()) {
@@ -133,82 +133,37 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 }
                 yield newMap;
             }
+            case Object[] array -> {
+                Object[] newArray = new Object[array.length];
+                for (int i = 0; i < array.length; i++) {
+                    newArray[i] = unbox(array[i]);
+                }
+                yield newArray;
+            }
+            case Iterable<?> iterable -> {
+                List<Object> newList = new ArrayList<>();
+                for (Object o : iterable) {
+                    newList.add(unbox(o));
+                }
+                yield newList;
+            }
+            case Stream<?> stream -> stream.map(this::unbox);
+            case Optional<?> optional -> optional.map(this::unbox);
+            case CompletionStage<?> completionStage -> completionStage.thenApply(this::unbox);
+            case Publisher<?> publisher -> Publishers.map(publisher, this::unbox);
             default -> result;
         };
     }
 
     private <T> T box(Class<T> type, Value value) {
+        if (type.isPrimitive()) {
+            return value.as(type);
+        }
         try {
             return type.getDeclaredConstructor(Value.class).newInstance(value);
         } catch (Exception e) {
-            if (Modifier.isAbstract(type.getModifiers())) {
-                return createAbstractTypeProxy(type, value);
-            }
             return value.as(type);
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    private <T> T createAbstractTypeProxy(Class<T> type, Value value) {
-        Class<? extends T> proxyType = (Class<? extends T>) abstractProxyTypes.computeIfAbsent(type, this::generateAbstractProxyType);
-        try {
-            return proxyType.getDeclaredConstructor(Value.class).newInstance(value);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to instantiate ByteBuddy proxy for abstract type: " + type.getName(), e);
-        }
-    }
-
-    private Class<?> generateAbstractProxyType(Class<?> type) {
-        try {
-            MethodHandles.Lookup privateLookup;
-            try {
-                privateLookup = MethodHandles.privateLookupIn(type, MethodHandles.lookup());
-            } catch (IllegalAccessException e) {
-                privateLookup = MethodHandles.lookup();
-            }
-            return new ByteBuddy()
-                .subclass(type)
-                .name(type.getName() + "$PythonRuntimeProxy")
-                .method(ElementMatchers.isAbstract())
-                .intercept(MethodDelegation.to(new AbstractMethodInterceptor(this)))
-                .make()
-                .load(type.getClassLoader(), ClassLoadingStrategy.UsingLookup.of(privateLookup))
-                .getLoaded();
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to generate ByteBuddy proxy for abstract type: " + type.getName(), e);
-        }
-    }
-
-    @Nullable
-    private static Object defaultValue(Class<?> returnType) {
-        if (!returnType.isPrimitive()) {
-            return null;
-        }
-        if (returnType == boolean.class) {
-            return false;
-        }
-        if (returnType == byte.class) {
-            return (byte) 0;
-        }
-        if (returnType == short.class) {
-            return (short) 0;
-        }
-        if (returnType == int.class) {
-            return 0;
-        }
-        if (returnType == long.class) {
-            return 0L;
-        }
-        if (returnType == float.class) {
-            return 0F;
-        }
-        if (returnType == double.class) {
-            return 0D;
-        }
-        if (returnType == char.class) {
-            return '\0';
-        }
-        return null;
     }
 
     private void fillAllAbstractMethods(Value pythonClass) {
@@ -250,33 +205,5 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             out[i] = box(argType.getType(), arg);
         }
         return out;
-    }
-
-    public static final class AbstractMethodInterceptor {
-
-        private final PythonProxyCreator owner;
-
-        public AbstractMethodInterceptor(PythonProxyCreator owner) {
-            this.owner = owner;
-        }
-
-        @RuntimeType
-        @Nullable
-        public Object intercept(
-            @This ValueCoercible proxy,
-            @Origin Method method,
-            @AllArguments Object[] args
-        ) {
-            Value value = proxy.asPolyglotValue();
-            Value function = value.getMember(method.getName());
-            if (function == null || !function.canExecute()) {
-                return defaultValue(method.getReturnType());
-            }
-            Value result = function.execute(owner.toPolyglotArray(args, value.getContext()));
-            if (method.getReturnType() == void.class) {
-                return null;
-            }
-            return owner.box(method.getReturnType(), result);
-        }
     }
 }

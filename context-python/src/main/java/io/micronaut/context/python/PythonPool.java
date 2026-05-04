@@ -44,6 +44,7 @@ import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
@@ -71,7 +72,9 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
     private final Map<Context, Map<String, Value>> cache = new ConcurrentHashMap<>();
 
     private final AtomicInteger size = new AtomicInteger(0);
+    private final AtomicReference<Thread> warmupThread = new AtomicReference<>();
     private final int targetSize;
+    private volatile boolean closed;
 
     @Inject
     PythonPool(@Named(GraalPyRuntimeUtil.PYTHON) Engine engine,
@@ -130,6 +133,9 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
             Thread t = new Thread(() -> {
                 try {
                     for (int i = 1; i < toCreate; i++) {
+                        if (closed) {
+                            return;
+                        }
                         addPooledContext();
                     }
                 } catch (IllegalStateException ignored) {
@@ -137,6 +143,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
                 }
             }, "python-pool-warmup");
             t.setDaemon(true);
+            warmupThread.set(t);
             t.start();
         }
     }
@@ -223,7 +230,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
     }
 
     private synchronized void addPooledContext() {
-        if (size.get() >= targetSize) {
+        if (closed || size.get() >= targetSize) {
             return;
         }
         Context c;
@@ -235,6 +242,14 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
             );
         } catch (IOException e) {
             throw new ApplicationStartupException("Failed to create Python context: " + e.getMessage(), e);
+        }
+        if (closed) {
+            try {
+                c.close(false);
+            } catch (Exception e) {
+                LOG.warn("Error while closing context: " + e.getMessage(), e);
+            }
+            return;
         }
         pooledContexts.add(c);
         cache.put(c, new ConcurrentHashMap<>());
@@ -289,6 +304,11 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
 
     @Override
     public void onDestroyed(@NonNull BeanDestroyedEvent<Context> event) {
+        closed = true;
+        Thread thread = warmupThread.getAndSet(null);
+        if (thread != null) {
+            thread.interrupt();
+        }
         List<Context> snapshot = snapshot();
         pooledContexts.removeAll(snapshot);
         pooledQueue.removeAll(snapshot);

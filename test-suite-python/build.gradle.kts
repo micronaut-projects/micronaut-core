@@ -47,3 +47,7 @@ dependencies {
     testImplementation("jakarta.data:jakarta.data-api:1.1.0-M1")
     testImplementation(libs.managed.snakeyaml)
 }
+
+tasks.withType<Test>().configureEach {
+    systemProperty("micronaut.python.pool.enabled", "false")
+}

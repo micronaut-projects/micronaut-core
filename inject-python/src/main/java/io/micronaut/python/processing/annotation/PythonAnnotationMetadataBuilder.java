@@ -33,10 +33,10 @@ import org.jetbrains.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Builder for creating annotation metadata from Python decorators and elements.
@@ -211,27 +211,33 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             return Map.of();
         }
         ClassElement javaAnnotationType = getJavaAnnotationType(annotationName);
-        return decoratorDef.members().entrySet().stream().collect(Collectors.toMap(
-            entry -> {
-                String memberName = entry.getKey();
-                return resolveMemberDef(javaAnnotationType, memberName);
-            },
-            Map.Entry::getValue
-        ));
+        Map<ElementDef, Object> defaultValues = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : decoratorDef.members().entrySet()) {
+            String memberName = normalizeAnnotationMemberName(entry.getKey());
+            defaultValues.put(resolveMemberDef(javaAnnotationType, memberName), entry.getValue());
+        }
+        return defaultValues;
     }
 
     @Override
     protected Map<? extends ElementDef, ?> readAnnotationRawValues(DecoratorDef annotationMirror) {
-        Map<String, Value> members = annotationMirror.members();
+        Map<?, ?> members = annotationMirror.members();
         ClassElement javaAnnotationType = getJavaAnnotationType(annotationMirror);
 
-        return members.entrySet().stream().collect(Collectors.toMap(
-            entry -> {
-                String memberName = entry.getKey();
-                return resolveMemberDef(javaAnnotationType, memberName);
-            },
-            Map.Entry::getValue
-        ));
+        Map<ElementDef, Object> rawValues = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : members.entrySet()) {
+            String memberName = normalizeAnnotationMemberName(entry.getKey());
+            rawValues.put(resolveMemberDef(javaAnnotationType, memberName), entry.getValue());
+        }
+        return rawValues;
+    }
+
+    private static String normalizeAnnotationMemberName(Object memberName) {
+        if (memberName instanceof Number number) {
+            int index = number.intValue();
+            return index == 0 ? AnnotationMetadata.VALUE_MEMBER : "arg" + index;
+        }
+        return memberName.toString();
     }
 
     private @Nullable ClassElement getJavaAnnotationType(DecoratorDef annotationMirror) {

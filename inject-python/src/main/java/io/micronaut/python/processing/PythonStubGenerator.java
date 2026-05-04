@@ -178,10 +178,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     boolean isIntrospectedBean = element.hasStereotype(Introspected.class);
                     final boolean isIntroductionBean = element.hasStereotype(Introduction.class);
-                    final boolean skipInterfaceMethodBridges = isDeclaredBean && isIntroductionBean && !element.getInterfaces().isEmpty();
-                    if (skipInterfaceMethodBridges) {
-                        builder.addModifiers(Modifier.ABSTRACT);
-                    }
 
                     List<PropertyElement> beanProperties = element.getBeanProperties();
                     Map<String, FieldDef> propertyFields = new LinkedHashMap<>();
@@ -214,22 +210,31 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         for (ClassElement anInterface : interfaces) {
                             TypeDef interfaceTypeDef = parameterizedTypeDef(anInterface);
                             builder.addSuperinterface(interfaceTypeDef);
-                            if (skipInterfaceMethodBridges) {
-                                continue;
-                            }
                             List<MethodElement> methods = anInterface.getMethods();
                             Set<MethodElement> methodSet = new LinkedHashSet<>();
                             for (MethodElement method : methods) {
                                 if (methodSet.contains(method) || method.isDefault()) {
                                     continue;
                                 }
-                                if (method.hasDeclaredStereotype(InterceptorBinding.class)) {
-                                    isAopProxy = true;
-                                }
-                                addBridgeMethod(method, builder, context, false, false, addedMethodNames);
-                                methodSet.add(method);
+                            if (method.hasDeclaredStereotype(InterceptorBinding.class)) {
+                                isAopProxy = true;
                             }
+                            addBridgeMethod(method, builder, context, false, false, addedMethodNames);
+                            methodSet.add(method);
                         }
+                    }
+
+                    if (isIntroductionBean) {
+                        List<MethodElement> abstractDeclaredMethods = element.getEnclosedElements(
+                            ElementQuery.ALL_METHODS
+                                .onlyAccessible()
+                                .onlyInstance()
+                                .onlyDeclared()
+                                .filter(MethodElement::isAbstract));
+                        for (MethodElement method : abstractDeclaredMethods) {
+                            addBridgeMethod(method, builder, context, false, false, addedMethodNames);
+                        }
+                    }
                     }
 
                     boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(ann -> ann.hasDeclaredAnnotation(JUNIT_TEST))).isPresent();
@@ -354,9 +359,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     .isTrue()
                                     .doIfElse(
                                         ExpressionDef.nullValue().returning(),
-                                        skipInterfaceMethodBridges
-                                            ? val.invoke("as", thisType, thisType.getStaticField("class", TypeDef.CLASS)).returning()
-                                            : thisType.instantiate(methodParameters).returning()
+                                        thisType.instantiate(methodParameters).returning()
                                     );
                             }))
                         );
@@ -801,7 +804,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         boolean isScript,
         Set<String> addedMethodNames) {
         String pythonFunctionName = methodElement.getName();
-        String key = methodElement.getDescription(true);
+        String key = bridgeMethodKey(methodElement);
         // Check if method name has already been added to avoid duplicates
         if (addedMethodNames.contains(key)) {
             return;
@@ -846,7 +849,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         @NonNull ParameterElement[] parameters = methodElement.getParameters();
         for (@NonNull ParameterElement parameter : parameters) {
             ParameterDef parameterDef = ParameterDef
-                .builder(parameter.getName(), TypeDef.of(parameter.getGenericType())).build();
+                .builder(parameter.getName(), erasedType(parameter.getGenericType())).build();
             methodBuilder.addParameter(parameterDef);
         }
 
@@ -876,6 +879,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     }
                 }
             })));
+    }
+
+    private static String bridgeMethodKey(MethodElement methodElement) {
+        StringBuilder key = new StringBuilder(methodElement.getName()).append('(');
+        for (ParameterElement parameter : methodElement.getParameters()) {
+            key.append(parameter.getType().getName()).append(';');
+        }
+        return key.append(')').toString();
     }
 
     private static String beanGetterName(String name, ClassElement type) {
