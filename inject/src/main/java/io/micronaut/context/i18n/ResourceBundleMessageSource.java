@@ -37,6 +37,7 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
 
     private static final Logger LOG = LoggerFactory.getLogger(ResourceBundleMessageSource.class);
     private static final int DEFAULT_ORDER = 0;
+    private static final int MAX_CACHE_SIZE = 100;
     private final String baseName;
     private final Map<MessageKey, Optional<String>> messageCache =
                 buildMessageCache();
@@ -142,7 +143,7 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
     @NonNull
     protected Map<MessageKey, Optional<String>> buildMessageCache() {
         return new ConcurrentLinkedHashMap.Builder<MessageKey, Optional<String>>()
-                .maximumWeightedCapacity(100)
+                .maximumWeightedCapacity(MAX_CACHE_SIZE)
                 .build();
     }
 
@@ -153,7 +154,9 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      */
     @NonNull
     protected Map<MessageKey, Optional<ResourceBundle>> buildBundleCache() {
-        return new ConcurrentHashMap<>(18);
+        return new ConcurrentLinkedHashMap.Builder<MessageKey, Optional<ResourceBundle>>()
+            .maximumWeightedCapacity(MAX_CACHE_SIZE)
+            .build();
     }
 
     @NonNull

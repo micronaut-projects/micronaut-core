@@ -13,9 +13,7 @@ dependencies {
     compileOnly(libs.managed.kotlinx.coroutines.core)
     compileOnly(libs.managed.kotlinx.coroutines.reactor)
     compileOnly(libs.managed.netty.pkitesting)
-
     compileOnly(libs.managed.jackson.annotations)
-
     testCompileOnly(projects.micronautInjectGroovy)
     testAnnotationProcessor(projects.micronautInjectJava)
     testImplementation(projects.micronautJacksonDatabind)
@@ -27,6 +25,14 @@ dependencies {
     testImplementation(libs.junit.jupiter.params)
     testImplementation(libs.micronaut.test.junit5) {
         exclude(group= "io.micronaut")
+    }
+    constraints {
+        compileOnly("org.bouncycastle:bcpkix-jdk18on") {
+            version {
+                require("1.84")
+            }
+            because("netty-pkitesting 4.2.12.Final depends on Bouncy Castle 1.83 which is vulnerable")
+        }
     }
 }
 
