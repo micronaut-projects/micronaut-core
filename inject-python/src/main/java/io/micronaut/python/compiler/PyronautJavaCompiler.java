@@ -95,13 +95,14 @@ final class PyronautJavaCompiler {
                              List<String> compilerOptions,
                              JavaFileManager fileManager,
                              DiagnosticCollector<JavaFileObject> diagnosticCollector) {
+        List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
         List<String> options = buildCompilerOptions(classpath, bootclasspath, annotationProcessorPath, compilerOptions);
-        ClassLoader classLoader = createAnnotationProcessorClassLoader(annotationProcessorPath);
+        ClassLoader classLoader = createAnnotationProcessorClassLoader(processorClasspath);
         System.setProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
         ClassLoader previous = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(classLoader);
 
-        List<Processor> processors = getAnnotationProcessors(annotationProcessorPath);
+        List<Processor> processors = getAnnotationProcessors(classLoader, processorClasspath != null && !processorClasspath.isEmpty());
 
         try {
             JavaCompiler.CompilationTask task = compiler.getTask(
@@ -176,13 +177,28 @@ final class PyronautJavaCompiler {
                                               List<File> annotationProcessorPath,
                                               List<String> compilerOptions) {
         List<String> options = new ArrayList<>();
-        addClasspathOption("-classpath", classpath, options);
+        addClasspathOption("-classpath", mergeClasspath(annotationProcessorPath, classpath), options);
         addClasspathOption("-bootclasspath", bootClasspath, options);
-        addClasspathOption("-processorpath", annotationProcessorPath, options);
         if (compilerOptions != null) {
             options.addAll(compilerOptions);
         }
         return options;
+    }
+
+    private static List<File> mergeClasspath(List<File> first, List<File> second) {
+        if (first == null || first.isEmpty()) {
+            return second;
+        }
+        if (second == null || second.isEmpty()) {
+            return first;
+        }
+        List<File> merged = new ArrayList<>(first);
+        for (File file : second) {
+            if (!merged.contains(file)) {
+                merged.add(file);
+            }
+        }
+        return merged;
     }
 
     private static void addClasspathOption(String option,
@@ -208,12 +224,46 @@ final class PyronautJavaCompiler {
      *
      * @return The processors
      */
-    private List<Processor> getAnnotationProcessors(List<File> annotationProcessorPath) {
-        if (annotationProcessorPath == null || annotationProcessorPath.isEmpty()) {
-            ClassLoader classLoader = createAnnotationProcessorClassLoader(annotationProcessorPath);
-            return getAnnotationProcessors(classLoader);
-        } else {
-            return List.of();
+    private List<Processor> getAnnotationProcessors(ClassLoader classLoader, boolean isolated) {
+        if (isolated) {
+            return getAnnotationProcessorsFromClassLoader(classLoader);
+        }
+        return getAnnotationProcessors(classLoader);
+    }
+
+    private @NonNull List<Processor> getAnnotationProcessorsFromClassLoader(ClassLoader classLoader) {
+        List<Processor> processors = new ArrayList<>();
+        processors.add(instantiateProcessor(classLoader, MixinVisitorProcessor.class.getName()));
+        processors.add(instantiateProcessor(classLoader, PackageElementVisitorProcessor.class.getName()));
+        processors.add(instantiateProcessor(classLoader, TypeElementVisitorProcessor.class.getName()));
+        processors.add(instantiateProcessor(classLoader, AggregatingTypeElementVisitorProcessor.class.getName()));
+        processors.add(instantiateProcessor(classLoader, BeanDefinitionInjectProcessor.class.getName()));
+
+        Processor pythonProcessor = instantiateProcessor(classLoader, PythonAnnotationProcessor.class.getName());
+        invoke(pythonProcessor, "setClassLoader", new Class<?>[] { ClassLoader.class }, classLoader);
+        if (classElementCallback != null) {
+            invoke(pythonProcessor, "setClassElementCallback", new Class<?>[] { Consumer.class }, classElementCallback);
+        }
+        processors.add(pythonProcessor);
+        return processors;
+    }
+
+    private static Processor instantiateProcessor(ClassLoader classLoader, String processorName) {
+        try {
+            return Class.forName(processorName, true, classLoader)
+                .asSubclass(Processor.class)
+                .getDeclaredConstructor()
+                .newInstance();
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Failed to load annotation processor [" + processorName + "]", e);
+        }
+    }
+
+    private static void invoke(Object target, String method, Class<?>[] parameterTypes, Object... args) {
+        try {
+            target.getClass().getMethod(method, parameterTypes).invoke(target, args);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("Failed to invoke " + method + " on [" + target.getClass().getName() + "]", e);
         }
     }
 
@@ -247,7 +297,8 @@ final class PyronautJavaCompiler {
                     return Stream.empty();
                 }
             }).toList();
-            classLoader = new URLClassLoader(cp.toArray(new URL[0]), classLoader);
+            ClassLoader parent = annotationProcessorPath.isEmpty() ? classLoader : ClassLoader.getPlatformClassLoader();
+            classLoader = new URLClassLoader(cp.toArray(new URL[0]), parent);
         }
         return classLoader;
     }

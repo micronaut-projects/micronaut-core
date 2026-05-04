@@ -46,13 +46,17 @@ public final class PythonAstParser {
     private final Context context;
 
     public PythonAstParser() {
+        this(PythonAstParser.class.getClassLoader());
+    }
+
+    PythonAstParser(ClassLoader classLoader) {
         this.context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                 .resourceDirectory(INJECT_RESOURCES)
                 .resourceLoadingClass(PythonAstParser.class)
                 .build())
             // TODO: constrain this in future
             .allowHostAccess(HostAccess.ALL)
-            .hostClassLoader(PythonAstParser.class.getClassLoader())
+            .hostClassLoader(classLoader)
             .allowHostClassLookup(name -> name.startsWith("io.micronaut"))
             .build();
         context.initialize(PYTHON);

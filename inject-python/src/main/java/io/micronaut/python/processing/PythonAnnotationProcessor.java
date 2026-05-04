@@ -78,11 +78,13 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
-        parser = new PythonAstParser();
-        classLoader = Thread.currentThread().getContextClassLoader();
         if (classLoader == null) {
-            classLoader = PythonAnnotationProcessor.class.getClassLoader();
+            classLoader = Thread.currentThread().getContextClassLoader();
+            if (classLoader == null) {
+                classLoader = PythonAnnotationProcessor.class.getClassLoader();
+            }
         }
+        parser = new PythonAstParser(classLoader);
     }
 
     @Override
@@ -92,6 +94,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        if (roundEnv.processingOver()) {
+            parser.close();
+            return false;
+        }
         if (annotations.isEmpty()) {
             return false;
         }
@@ -101,12 +107,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 processPythonApplications(roundEnv);
             }
         }
-        if (roundEnv.processingOver()) {
-            parser.close();
-            return false;
-        } else {
-            return true;
-        }
+        return false;
     }
 
     private void processPythonApplications(RoundEnvironment roundEnv) {

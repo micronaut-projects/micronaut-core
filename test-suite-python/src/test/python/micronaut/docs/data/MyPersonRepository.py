@@ -34,4 +34,4 @@ class MyPersonRepository(CrudRepository[MyPerson, int]):
 @Singleton
 class MyPersonRepositoryInitializer:
     def __init__(self, repository: MyPersonRepository):
-        repository.savePerson(MyPerson(-3, "Constructor"))
+        repository.savePerson(MyPerson(-3, "Constructor", 20))
