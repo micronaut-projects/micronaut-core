@@ -205,6 +205,10 @@ public final class ContextHolder {
 
             Value updateAbstractMethods = context.getBindings(PYTHON).getMember("update_abstractmethods");
             updateAbstractMethods.execute(pythonClass);
+            Value isProtocol = pythonClass.getMember("_is_protocol");
+            if (isProtocol != null && isProtocol.isBoolean() && isProtocol.asBoolean()) {
+                pythonClass.putMember("_is_protocol", false);
+            }
         }
         return instantiate(packageName, simpleName, args, pythonClass);
     }

@@ -185,6 +185,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             }
             Value emptyAbstractMethods = context.eval("python", "frozenset()");
             pythonClass.putMember("__abstractmethods__", emptyAbstractMethods);
+            Value isProtocol = pythonClass.getMember("_is_protocol");
+            if (isProtocol != null && isProtocol.isBoolean() && isProtocol.asBoolean()) {
+                pythonClass.putMember("_is_protocol", false);
+            }
         }
     }
 

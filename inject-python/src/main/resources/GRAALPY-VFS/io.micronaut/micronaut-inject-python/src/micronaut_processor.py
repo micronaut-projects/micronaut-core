@@ -45,6 +45,23 @@ def is_abstract_method(funcdef):
             return True
     return False
 
+def is_placeholder_method(funcdef):
+    """
+    Returns True if the function body is only a declaration placeholder.
+    """
+    body = funcdef.body
+    if len(body) == 1:
+        stmt = body[0]
+        if isinstance(stmt, ast.Pass):
+            return True
+        if isinstance(stmt, ast.Expr):
+            value = stmt.value
+            if isinstance(value, ast.Constant) and value.value is Ellipsis:
+                return True
+            if isinstance(value, ast.Ellipsis):
+                return True
+    return False
+
 def is_static_method(func_node):
     """
     Check if a function node represents a static method (has @staticmethod or @classmethod decorator).
@@ -57,6 +74,12 @@ def is_static_method(func_node):
             if decorator.attr in ("staticmethod", "classmethod"):
                 return True
     return False
+
+def is_protocol_type_name(type_name):
+    """
+    Returns True if the type name references typing.Protocol.
+    """
+    return type_name in ("typing.Protocol", "typing_extensions.Protocol", "Protocol")
 
 
 class MicronautAstVisitor(ast.NodeVisitor):
@@ -257,8 +280,11 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         # Extract function docstring
                         func_doc = self._extract_docstring(node)
 
-                        # Check if function is abstract
-                        is_abstract = is_abstract_method(node)
+                        is_abstract = (
+                            is_abstract_method(node) or
+                            self._current_class_is_protocol() or
+                            (is_placeholder_method(node) and self._current_class_has_external_base())
+                        )
                         is_static = is_static_method(node)
 
                         func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static)
@@ -1149,6 +1175,32 @@ class MicronautAstVisitor(ast.NodeVisitor):
         Handles simple names like 'str' and subscripted types like 'MyBase[str]'.
         """
         return self._parse_type(base_node)
+
+    def _current_class_is_protocol(self):
+        """
+        Returns True if the current class directly extends typing.Protocol.
+        """
+        if self.current_class is None:
+            return False
+        for base in self.current_class.bases():
+            if is_protocol_type_name(base.name()):
+                return True
+        return False
+
+    def _current_class_has_external_base(self):
+        """
+        Returns True if the current class extends a non-local base type.
+        """
+        if self.current_class is None:
+            return False
+        for base in self.current_class.bases():
+            name = base.name()
+            if name in ("object", "abc.ABC") or is_protocol_type_name(name):
+                continue
+            simple_name = name.rsplit(".", 1)[-1]
+            if simple_name not in self.local_classes:
+                return True
+        return False
 
     def _parse_type(self, type_node):
         """

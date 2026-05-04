@@ -263,6 +263,79 @@ class ResultShapeCaller:
         context?.close()
     }
 
+    void "test introduction advice supports Python protocol methods"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Introduction
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+from typing import Protocol
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@dataclass(frozen=True)
+class MyPerson:
+    id: int
+    name: str
+
+@Introduction
+def RepoIntro(cls):
+    return cls
+
+@InterceptorBean(RepoIntro)
+@Singleton
+class RepoIntroInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        method_name = context.getMethodName()
+        if method_name == "findName":
+            return "protocol-name"
+        if method_name == "save":
+            return context.getParameterValues()[0]
+        raise RuntimeError("Unexpected method " + method_name)
+
+@RepoIntro
+class MyPersonRepository(Protocol):
+    def findName(self, id: int) -> str:
+        ...
+
+    def save(self, person: MyPerson) -> MyPerson:
+        ...
+
+@Singleton
+class ProtocolCaller:
+    def __init__(self, repository: MyPersonRepository):
+        self.repository = repository
+
+    @Executable
+    def find_name(self) -> str:
+        return self.repository.findName(1)
+
+    @Executable
+    def save_name(self) -> str:
+        saved = self.repository.save(MyPerson(1, "Denis"))
+        if hasattr(saved, "asPolyglotValue"):
+            raise RuntimeError("Generated Java wrapper leaked from protocol introduction")
+        if not isinstance(saved, MyPerson):
+            raise RuntimeError("Protocol introduction returned " + str(type(saved)))
+        return saved.name
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def repository = getBean(context, "python.MyPersonRepository").asPolyglotValue()
+        def caller = getBean(context, "python.ProtocolCaller").asPolyglotValue()
+
+        then:
+        repository.invokeMember("findName", 1).asString() == "protocol-name"
+        caller.invokeMember("find_name").asString() == "protocol-name"
+        caller.invokeMember("save_name").asString() == "Denis"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test micronaut data CrudRepository generic inheritance compiles"() {
         given:
         def pythonCode = '''

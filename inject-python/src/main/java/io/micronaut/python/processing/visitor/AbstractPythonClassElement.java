@@ -107,8 +107,16 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
 
     @Override
     public boolean isAbstract() {
-        return getNativeType()
-            .bases().stream().anyMatch(b -> b.name().equals("abc.ABC"));
+        ClassDef nativeType = getNativeType();
+        return nativeType
+            .bases().stream().anyMatch(b -> b.name().equals("abc.ABC") || isProtocolType(b.name()))
+            || nativeType.functions().stream().anyMatch(FunctionDef::isAbstract);
+    }
+
+    private static boolean isProtocolType(String typeName) {
+        return typeName.equals("typing.Protocol")
+            || typeName.equals("typing_extensions.Protocol")
+            || typeName.equals("Protocol");
     }
 
     @Override
