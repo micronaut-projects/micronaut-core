@@ -6,17 +6,6 @@ from typing import Annotated
 from .MyPersonRepository import MyPersonRepository
 from .MyPersonRepository import MyPersonRepositoryInitializer
 from .MyPersonRepository import MyPerson
-import java
-
-
-ArrayList = java.type("java.util.ArrayList")
-
-
-def java_list(*values):
-    result = ArrayList()
-    for value in values:
-        result.add(value)
-    return result
 
 
 def unwrap_optional(value):
@@ -139,10 +128,10 @@ class MyPersonRepositorySpec:
 
     @Test
     def testBulkCrudMethods(self) -> None:
-        batch_saved = self.myPersonRepository.saveAll(java_list(
+        batch_saved = self.myPersonRepository.saveAll([
             MyPerson(-1, "Crud Save All A", 30),
             MyPerson(-1, "Crud Save All B", 31),
-        ))
+        ])
         assert len(batch_saved) == 2
 
         batch_saved[0].name = "Crud Update All A"
@@ -155,5 +144,5 @@ class MyPersonRepositorySpec:
         self.myPersonRepository.delete(batch_updated[0])
         assert self.myPersonRepository.count() == before_delete - 1
 
-        self.myPersonRepository.deleteAll(java_list(batch_updated[1]))
+        self.myPersonRepository.deleteAll([batch_updated[1]])
         assert self.myPersonRepository.count() == before_delete - 2
