@@ -1083,23 +1083,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             String referenceTypeName = returnType.getName();
             return switch (referenceTypeName) {
                 case "java.lang.Integer" ->
-                    invokedValue.invoke("asInt", TypeDef.Primitive.INT);
+                    convertNullableValue(invokedValue, invokedValue.invoke("asInt", TypeDef.Primitive.INT));
                 case "java.lang.Boolean" ->
-                    invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
+                    convertNullableValue(invokedValue, invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN));
                 case "java.lang.Double" ->
-                    invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE);
+                    convertNullableValue(invokedValue, invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE));
                 case "java.lang.Float" ->
-                    invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT);
+                    convertNullableValue(invokedValue, invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT));
                 case "java.lang.Long" ->
-                    invokedValue.invoke("asLong", TypeDef.Primitive.LONG);
+                    convertNullableValue(invokedValue, invokedValue.invoke("asLong", TypeDef.Primitive.LONG));
                 case "java.lang.Short" ->
-                    invokedValue.invoke("asShort", TypeDef.Primitive.SHORT);
+                    convertNullableValue(invokedValue, invokedValue.invoke("asShort", TypeDef.Primitive.SHORT));
                 case "java.lang.Byte" ->
-                    invokedValue.invoke("asByte", TypeDef.Primitive.BYTE);
-                case "java.lang.Character" -> invokedValue.invoke("asString", ClassTypeDef.STRING)
-                    .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+                    convertNullableValue(invokedValue, invokedValue.invoke("asByte", TypeDef.Primitive.BYTE));
+                case "java.lang.Character" ->
+                    convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING)
+                        .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case "java.lang.String" ->
-                    invokedValue.invoke("asString", ClassTypeDef.STRING);
+                    convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING));
                 default -> {
                     // Check for collection types
                     if (returnType.isAssignable(List.class)) {
@@ -1143,6 +1144,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 }
             };
         }
+    }
+
+    private static ExpressionDef convertNullableValue(ExpressionDef value, ExpressionDef nonNullValue) {
+        return value.invoke("isNull", TypeDef.Primitive.BOOLEAN)
+            .isTrue()
+            .doIfElse(ExpressionDef.nullValue(), nonNullValue);
     }
 
     private static ExpressionDef toClassExpression(@Nullable ClassElement componentType) {
@@ -1249,23 +1256,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             String referenceTypeName = type.getName();
             switch (referenceTypeName) {
                 case "java.lang.Integer":
-                    return member.invoke("asInt", TypeDef.Primitive.INT);
+                    return convertNullableValue(member, member.invoke("asInt", TypeDef.Primitive.INT));
                 case "java.lang.Boolean":
-                    return member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
+                    return convertNullableValue(member, member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN));
                 case "java.lang.Double":
-                    return member.invoke("asDouble", TypeDef.Primitive.DOUBLE);
+                    return convertNullableValue(member, member.invoke("asDouble", TypeDef.Primitive.DOUBLE));
                 case "java.lang.Float":
-                    return member.invoke("asFloat", TypeDef.Primitive.FLOAT);
+                    return convertNullableValue(member, member.invoke("asFloat", TypeDef.Primitive.FLOAT));
                 case "java.lang.Long":
-                    return member.invoke("asLong", TypeDef.Primitive.LONG);
+                    return convertNullableValue(member, member.invoke("asLong", TypeDef.Primitive.LONG));
                 case "java.lang.Short":
-                    return member.invoke("asShort", TypeDef.Primitive.SHORT);
+                    return convertNullableValue(member, member.invoke("asShort", TypeDef.Primitive.SHORT));
                 case "java.lang.Byte":
-                    return member.invoke("asByte", TypeDef.Primitive.BYTE);
+                    return convertNullableValue(member, member.invoke("asByte", TypeDef.Primitive.BYTE));
                 case "java.lang.Character":
-                    return member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+                    return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case "java.lang.String":
-                    return member.invoke("asString", ClassTypeDef.STRING);
+                    return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING));
                 default:
                     if (type.isAssignable(List.class)) {
                         ClassElement componentType = type.getFirstTypeArgument().orElse(null);

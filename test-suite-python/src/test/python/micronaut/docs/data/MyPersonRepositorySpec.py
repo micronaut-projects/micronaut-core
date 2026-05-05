@@ -29,8 +29,8 @@ class MyPersonRepositorySpec:
     def testDBAccess(self) -> None:
         assert self.initializer is not None
         # print(f"REPOSITORY TYPE {self.myPersonRepository.getClass().getName()}")
-        self.myPersonRepository.save(MyPerson(-1, "Denis", 123))
-        self.myPersonRepository.savePerson(MyPerson(-2, "Graeme", 456))
+        self.myPersonRepository.save(MyPerson(None, "Denis", 123))
+        self.myPersonRepository.savePerson(MyPerson(None, "Graeme", 456))
         print(self.myPersonRepository)
         print("Load all")
         people = self.myPersonRepository.findAll()
@@ -49,7 +49,7 @@ class MyPersonRepositorySpec:
 
     @Test
     def testCustomSaveMethodAndFinder(self) -> None:
-        self.myPersonRepository.savePerson(MyPerson(-1, "Custom Save", 20))
+        self.myPersonRepository.savePerson(MyPerson(None, "Custom Save", 20))
 
         custom_saved = self.myPersonRepository.findByName("Custom Save")
         assert custom_saved is not None
@@ -63,7 +63,7 @@ class MyPersonRepositorySpec:
     def testSaveCountAndFindAll(self) -> None:
         before = self.myPersonRepository.count()
 
-        crud_saved = self.myPersonRepository.save(MyPerson(-1, "Crud Save", 21))
+        crud_saved = self.myPersonRepository.save(MyPerson(None, "Crud Save", 21))
         assert crud_saved.id > 0
         assert crud_saved.name == "Crud Save"
 
@@ -75,18 +75,18 @@ class MyPersonRepositorySpec:
 
     @Test
     def testExistsById(self) -> None:
-        crud_saved = self.myPersonRepository.save(MyPerson(-1, "Crud Exists", 22))
+        crud_saved = self.myPersonRepository.save(MyPerson(None, "Crud Exists", 22))
         assert self.myPersonRepository.existsById(crud_saved.id)
 
     @Test
     def testFindById(self) -> None:
-        crud_saved = self.myPersonRepository.save(MyPerson(-1, "Crud Find By Id", 23))
+        crud_saved = self.myPersonRepository.save(MyPerson(None, "Crud Find By Id", 23))
         found_by_id = unwrap_optional(self.myPersonRepository.findById(crud_saved.id))
         assert found_by_id.name == "Crud Find By Id"
 
     @Test
     def testUpdate(self) -> None:
-        crud_saved = self.myPersonRepository.save(MyPerson(-1, "Crud Save For Update", 24))
+        crud_saved = self.myPersonRepository.save(MyPerson(None, "Crud Save For Update", 24))
 
         updated = self.myPersonRepository.update(MyPerson(crud_saved.id, "Crud Update", 25))
         assert updated.id == crud_saved.id
@@ -95,7 +95,7 @@ class MyPersonRepositorySpec:
 
     @Test
     def testDeleteById(self) -> None:
-        crud_saved = self.myPersonRepository.save(MyPerson(-1, "Crud Delete By Id", 26))
+        crud_saved = self.myPersonRepository.save(MyPerson(None, "Crud Delete By Id", 26))
         before = self.myPersonRepository.count()
 
         self.myPersonRepository.deleteById(crud_saved.id)
@@ -105,7 +105,7 @@ class MyPersonRepositorySpec:
 
     @Test
     def testDeleteEntity(self) -> None:
-        crud_saved = self.myPersonRepository.save(MyPerson(-1, "Crud Delete", 27))
+        crud_saved = self.myPersonRepository.save(MyPerson(None, "Crud Delete", 27))
         before = self.myPersonRepository.count()
 
         self.myPersonRepository.delete(crud_saved)
@@ -115,8 +115,8 @@ class MyPersonRepositorySpec:
 
     @Test
     def testDeleteAll(self) -> None:
-        saved_a = self.myPersonRepository.save(MyPerson(-1, "Crud Delete All A", 28))
-        saved_b = self.myPersonRepository.save(MyPerson(-1, "Crud Delete All B", 29))
+        saved_a = self.myPersonRepository.save(MyPerson(None, "Crud Delete All A", 28))
+        saved_b = self.myPersonRepository.save(MyPerson(None, "Crud Delete All B", 29))
         before = self.myPersonRepository.count()
 
         self.myPersonRepository.deleteAll()
@@ -129,8 +129,8 @@ class MyPersonRepositorySpec:
     @Test
     def testBulkCrudMethods(self) -> None:
         batch_saved = self.myPersonRepository.saveAll([
-            MyPerson(-1, "Crud Save All A", 30),
-            MyPerson(-1, "Crud Save All B", 31),
+            MyPerson(None, "Crud Save All A", 30),
+            MyPerson(None, "Crud Save All B", 31),
         ])
         assert len(batch_saved) == 2
 

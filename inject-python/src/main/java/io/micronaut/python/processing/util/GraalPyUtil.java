@@ -317,6 +317,7 @@ public final class GraalPyUtil {
         if (typeAnnotation == null || typeAnnotation.isBlank()) {
             return visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class));
         }
+        typeAnnotation = typeAnnotation.trim();
 
         // Handle Annotated types by extracting the base type
         if (typeAnnotation.startsWith("Annotated[")) {
@@ -326,6 +327,11 @@ public final class GraalPyUtil {
                 String baseType = typeAnnotation.substring(bracketStart + 1, firstComma).trim();
                 return resolvePythonTypeToJava(baseType, visitorContext, boundGenerics);
             }
+        }
+
+        ClassElement nullableUnionType = resolveNullableUnionType(typeAnnotation, visitorContext, boundGenerics);
+        if (nullableUnionType != null) {
+            return nullableUnionType;
         }
 
         // Handle generic types like list[int], dict[str, int], etc.
@@ -347,13 +353,66 @@ public final class GraalPyUtil {
                 visitorContext.getClassElement(List.class).orElse(ClassElement.of(List.class));
             case "typing.Optional" ->
                 visitorContext.getClassElement(Optional.class).orElse(ClassElement.of(Optional.class));
-            default ->
+            default -> {
+                String finalTypeAnnotation = typeAnnotation;
                 // Fall back to visitor context lookup
-                visitorContext.getClassElement(typeAnnotation).orElseGet(() -> {
-                    ClassElement classElement = boundGenerics.get(typeAnnotation);
+                yield visitorContext.getClassElement(finalTypeAnnotation).orElseGet(() -> {
+                    ClassElement classElement = boundGenerics.get(finalTypeAnnotation);
                     return Objects.requireNonNullElseGet(classElement, () -> ClassElement.of(Object.class));
                 });
+            }
         };
+    }
+
+    private static @Nullable ClassElement resolveNullableUnionType(
+        String typeAnnotation,
+        PythonVisitorContext visitorContext,
+        Map<String, ClassElement> boundGenerics
+    ) {
+        if (!typeAnnotation.contains("|")) {
+            return null;
+        }
+        List<String> unionTypes = parseUnionTypes(typeAnnotation);
+        List<String> nonNoneTypes = new ArrayList<>(unionTypes.size());
+        boolean nullable = false;
+        for (String unionType : unionTypes) {
+            String type = unionType.trim();
+            if ("None".equals(type)) {
+                nullable = true;
+            } else if (!type.isEmpty()) {
+                nonNoneTypes.add(type);
+            }
+        }
+        if (!nullable || nonNoneTypes.size() != 1) {
+            return null;
+        }
+        ClassElement resolvedType = resolvePythonTypeToJava(nonNoneTypes.get(0), visitorContext, boundGenerics);
+        return boxPrimitiveTypeIfNeeded(resolvedType, visitorContext);
+    }
+
+    private static List<String> parseUnionTypes(String typeAnnotation) {
+        List<String> types = new ArrayList<>();
+        int start = 0;
+        int bracketCount = 0;
+        for (int i = 0; i < typeAnnotation.length(); i++) {
+            char c = typeAnnotation.charAt(i);
+            if (c == '[') {
+                bracketCount++;
+            } else if (c == ']') {
+                bracketCount--;
+            } else if (c == '|' && bracketCount == 0) {
+                String type = typeAnnotation.substring(start, i).trim();
+                if (!type.isEmpty()) {
+                    types.add(type);
+                }
+                start = i + 1;
+            }
+        }
+        String lastType = typeAnnotation.substring(start).trim();
+        if (!lastType.isEmpty()) {
+            types.add(lastType);
+        }
+        return types;
     }
 
     /**

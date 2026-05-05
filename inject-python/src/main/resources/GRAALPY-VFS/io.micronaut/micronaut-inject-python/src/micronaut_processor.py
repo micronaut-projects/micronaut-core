@@ -895,10 +895,14 @@ class MicronautAstVisitor(ast.NodeVisitor):
         """
         if isinstance(type_annotation, str):
             # Legacy string handling
-            return ' | None' in type_annotation or type_annotation == 'None'
+            return type_annotation == 'None' or any(part.strip() == 'None' for part in type_annotation.split('|'))
         elif hasattr(type_annotation, 'name'):
             # TypeRef object
-            return type_annotation.name() == 'None'
+            return (
+                type_annotation.name() == 'None'
+                or any(part.strip() == 'None' for part in type_annotation.name().split('|'))
+                or any(self._is_nullable_type_annotation(type_arg) for type_arg in type_annotation.typeArguments())
+            )
         else:
             return False
 
@@ -1231,6 +1235,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # Recursively parse each type argument
             type_arg_defs = [self._parse_type(arg) for arg in type_args]
             return TypeRef(base_name, type_arg_defs)
+        elif isinstance(type_node, ast.BinOp) and isinstance(type_node.op, ast.BitOr):
+            # Preserve nullable PEP 604 unions so Java type resolution can box primitives.
+            return TypeRef(self._extract_union_type_annotation(type_node))
         else:
             # Fallback for other expression types
             try:
@@ -1238,6 +1245,13 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 return TypeRef(name)
             except:
                 return None
+
+    def _extract_union_type_annotation(self, type_node):
+        if isinstance(type_node, ast.BinOp) and isinstance(type_node.op, ast.BitOr):
+            left = self._extract_union_type_annotation(type_node.left)
+            right = self._extract_union_type_annotation(type_node.right)
+            return f"{left} | {right}"
+        return self._extract_type_name(type_node)
 
     def _track_java_type_assignments(self, node):
         """

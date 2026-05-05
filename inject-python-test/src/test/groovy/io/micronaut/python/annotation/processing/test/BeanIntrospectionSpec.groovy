@@ -28,6 +28,38 @@ import io.micronaut.python.compiler.Serdeable
  */
 class BeanIntrospectionSpec extends AbstractPythonTypeElementSpec {
 
+    void "test nullable annotated generated id resolves to boxed Integer"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from typing import Annotated
+from micronaut.data.annotation import MappedEntity
+from micronaut.data.annotation import Id
+from micronaut.data.annotation import GeneratedValue
+
+@dataclass
+@MappedEntity
+class MyPerson:
+    id : Annotated[int | None, Id, GeneratedValue]
+    name : str
+    age : int
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.MyPerson")
+        def idProperty = introspection.getRequiredProperty("id", Integer)
+
+        then:
+        introspection != null
+        idProperty.type == Integer
+        idProperty.hasAnnotation("io.micronaut.data.annotation.Id")
+        idProperty.hasAnnotation("io.micronaut.data.annotation.GeneratedValue")
+
+        cleanup:
+        context?.close()
+    }
+
     void "test @Introspected on Python @dataclass"() {
         given:
         def pythonCode = '''

@@ -16,7 +16,7 @@ from jakarta.inject import Singleton
 @dataclass
 @MappedEntity
 class MyPerson:
-    id : Annotated[int, Id, GeneratedValue]
+    id : Annotated[int | None, Id, GeneratedValue]
     name : str
     age : int
 
@@ -36,4 +36,4 @@ class MyPersonRepository(CrudRepository[MyPerson, int]):
 @Singleton
 class MyPersonRepositoryInitializer:
     def __init__(self, repository: MyPersonRepository):
-        repository.savePerson(MyPerson(-3, "Constructor", 20))
+        repository.savePerson(MyPerson(None, "Constructor", 20))
