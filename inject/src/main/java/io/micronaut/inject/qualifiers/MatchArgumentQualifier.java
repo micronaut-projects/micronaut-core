@@ -186,6 +186,7 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
     private <BT extends BeanType<T>> List<BT> filterMatching(Argument<?> argument,
                                                              Collection<BT> candidates,
                                                              Function<BT, @Nullable Argument<?>> typeArgumentExtractor) {
+        candidates = filterRawTypeVariableParameterCandidates(argument, candidates, typeArgumentExtractor);
         List<BT> selectedDirect = null;
         boolean directMatch = false;
         List<Map.Entry<Class<?>, List<BT>>> closestMatches = null;
@@ -274,6 +275,55 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
             return result;
         }
         return List.of();
+    }
+
+    private <BT extends BeanType<T>> Collection<BT> filterRawTypeVariableParameterCandidates(Argument<?> argument,
+                                                                                             Collection<BT> candidates,
+                                                                                             Function<BT, @Nullable Argument<?>> typeArgumentExtractor) {
+        if (!isRawGenericType(argument)) {
+            return candidates;
+        }
+        Class<?> argumentTypeClass = argument.getType();
+        if (argumentTypeClass.isPrimitive()) {
+            argumentTypeClass = ReflectionUtils.getWrapperType(argumentTypeClass);
+        }
+        List<BT> genericCandidates = null;
+        for (BT candidate : candidates) {
+            Argument<?> candidateArgument = typeArgumentExtractor.apply(candidate);
+            if (candidateArgument != null
+                && hasOnlyUnboundedTypeVariableParameters(candidateArgument)
+                && matchesRawArgument(argument, argumentTypeClass, candidateArgument)) {
+                if (genericCandidates == null) {
+                    genericCandidates = new ArrayList<>(candidates.size());
+                }
+                genericCandidates.add(candidate);
+            }
+        }
+        return genericCandidates == null ? candidates : genericCandidates;
+    }
+
+    private boolean matchesRawArgument(Argument<?> argument,
+                                       Class<?> argumentTypeClass,
+                                       Argument<?> candidateArgument) {
+        Class<?> candidateType = candidateArgument.getType();
+        if (argumentTypeClass.equals(candidateType)) {
+            return matchesArgumentTypeParameters(argument, candidateArgument);
+        }
+        return doesMatch(candidateArgument, candidateType, argument, argumentTypeClass);
+    }
+
+    private static boolean isRawGenericType(Argument<?> argument) {
+        return argument.getTypeParameters().length == 0 && argument.getType().getTypeParameters().length > 0;
+    }
+
+    private static boolean hasOnlyUnboundedTypeVariableParameters(Argument<?> argument) {
+        Argument<?>[] typeParameters = argument.getTypeParameters();
+        for (Argument<?> typeParameter : typeParameters) {
+            if (!typeParameter.isTypeVariable() || !typeParameter.getType().equals(Object.class)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean doesMatch(Argument<?> candidateArgument,

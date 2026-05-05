@@ -107,6 +107,28 @@ class MatchArgumentSpec extends Specification {
             beanDefinitions[0].getBeanType() == ListArrayListLongSerializer
     }
 
+    void "test match raw serialize argument prefers generic type variable candidate"() {
+        when:
+            def beanDefinitions = context.getBeanDefinitions(MySerializer,
+                    MatchArgumentQualifier.contravariant(MySerializer, Argument.of(List))
+            )
+
+        then:
+            beanDefinitions.size() == 1
+            beanDefinitions[0].getBeanType() == ListGenericSerializer
+    }
+
+    void "test match raw subtype serialize argument prefers generic fallback over concrete closer candidate"() {
+        when:
+            def beanDefinitions = context.getBeanDefinitions(MyRawCollectionSerializer,
+                    MatchArgumentQualifier.contravariant(MyRawCollectionSerializer, Argument.of(ArrayList))
+            )
+
+        then:
+            beanDefinitions.size() == 1
+            beanDefinitions[0].getBeanType() == GenericRawIterableSerializer
+    }
+
     void "test match serialize Collection String argument"() {
         when:
             def beanDefinitions = context.getBeanDefinitions(MySerializer,
@@ -241,6 +263,14 @@ class MatchArgumentSpec extends Specification {
 
     @Singleton
     static class IterableSerializer<T> implements MySerializer<Iterable<T>> {}
+
+    interface MyRawCollectionSerializer<E> {}
+
+    @Singleton
+    static class ConcreteRawListSerializer implements MyRawCollectionSerializer<List<MyType1>> {}
+
+    @Singleton
+    static class GenericRawIterableSerializer<T> implements MyRawCollectionSerializer<Iterable<T>> {}
 
     interface MyDeserializer<E> {}
 
