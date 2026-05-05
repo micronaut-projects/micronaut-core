@@ -101,28 +101,33 @@ public final class AstBeanPropertiesUtils {
             if (methodName.equals("getMetaClass")) {
                 continue;
             }
-            boolean isAccessor = canMethodBeUsedForAccess(methodElement, accessKinds, visibility) ||
-                isIntrospectedPropertyMethod(methodElement, visibility);
+            boolean isIntrospectedPropertyMethod = isIntrospectedPropertyMethod(methodElement, visibility);
             if (isRecord) {
+                boolean isAccessor = canMethodBeUsedForAccess(methodElement, accessKinds, visibility) ||
+                    isIntrospectedPropertyMethod;
                 if (!isAccessor) {
                     continue;
                 }
                 String propertyName = methodElement.getSimpleName();
                 processRecord(props, methodElement, propertyName);
-            } else if (NameUtils.isReaderName(methodName, readPrefixes)
+            } else if (isReaderName(configuration, methodElement, methodName, readPrefixes)
                 && methodElement.getParameters().length == 0) {
                 String propertyName = customReaderPropertyNameResolver.apply(methodElement)
-                    .orElseGet(() -> NameUtils.getPropertyNameForGetter(methodName, readPrefixes));
+                    .orElseGet(() -> getPropertyNameForGetter(methodName, readPrefixes));
+                boolean isAccessor = canMethodBeUsedForRead(methodElement, methodName, accessKinds, visibility, configuration) ||
+                    isIntrospectedPropertyMethod;
                 processGetter(props, methodElement, propertyName, isAccessor, configuration);
-            } else if (NameUtils.isWriterName(methodName, writePrefixes)
+            } else if (isWriterName(configuration, methodName, writePrefixes)
                 && canMethodBeUsedForWrite(methodElement, configuration)) {
                 String propertyName = customWriterPropertyNameResolver.apply(methodElement)
-                    .orElseGet(() -> NameUtils.getPropertyNameForSetter(methodName, writePrefixes));
+                    .orElseGet(() -> getPropertyNameForSetter(methodName, writePrefixes));
+                boolean isAccessor = canMethodBeUsedForWriteAccess(methodElement, accessKinds, visibility, configuration) ||
+                    isIntrospectedPropertyMethod;
                 processSetter(classElement, props, methodElement, propertyName, isAccessor, configuration);
             } else if (isIntrospectedPropertyReader(methodElement)) {
-                processGetter(props, methodElement, methodName, isAccessor, configuration);
+                processGetter(props, methodElement, methodName, isIntrospectedPropertyMethod, configuration);
             } else if (isIntrospectedPropertyWriter(methodElement)) {
-                processSetter(classElement, props, methodElement, methodName, isAccessor, configuration);
+                processSetter(classElement, props, methodElement, methodName, isIntrospectedPropertyMethod, configuration);
             }
         }
         for (FieldElement fieldElement : fieldSupplier.get()) {
@@ -132,7 +137,7 @@ public final class AstBeanPropertiesUtils {
             String propertyName = fieldElement.getSimpleName();
             boolean isAccessor = propertyFields.contains(propertyName) ||
                 isIntrospectedPropertyField(fieldElement, visibility) ||
-                canFieldBeUsedForAccess(fieldElement, accessKinds, visibility);
+                canFieldBeUsedForAccess(fieldElement, accessKinds, visibility, configuration);
             if (!isAccessor && !props.containsKey(propertyName)) {
                 continue;
             }
@@ -216,6 +221,54 @@ public final class AstBeanPropertiesUtils {
         return methodElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY) &&
             (methodElement.getParameters().length == 1 ||
                 (methodElement.getParameters().length == 0 && methodElement.getReturnType().isVoid()));
+    }
+
+    private static boolean isReaderName(PropertyElementQuery configuration,
+                                        MethodElement methodElement,
+                                        String methodName,
+                                        String[] readPrefixes) {
+        return NameUtils.isReaderName(methodName, readPrefixes) ||
+            (configuration.isJsonAutoDetectConfigured() && configuration.isJsonAutoDetectReaderName(methodElement, methodName));
+    }
+
+    private static String getPropertyNameForGetter(String methodName, String[] readPrefixes) {
+        if (NameUtils.isReaderName(methodName, readPrefixes)) {
+            return NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
+        }
+        return NameUtils.getPropertyNameForGetter(methodName);
+    }
+
+    private static boolean isWriterName(PropertyElementQuery configuration, String methodName, String[] writePrefixes) {
+        return NameUtils.isWriterName(methodName, writePrefixes) ||
+            (configuration.isJsonAutoDetectConfigured() && configuration.isJsonAutoDetectWriterName(methodName));
+    }
+
+    private static String getPropertyNameForSetter(String methodName, String[] writePrefixes) {
+        if (NameUtils.isWriterName(methodName, writePrefixes)) {
+            return NameUtils.getPropertyNameForSetter(methodName, writePrefixes);
+        }
+        return NameUtils.getPropertyNameForSetter(methodName);
+    }
+
+    private static boolean canMethodBeUsedForRead(MethodElement methodElement,
+                                                  String methodName,
+                                                  Set<BeanProperties.AccessKind> accessKinds,
+                                                  BeanProperties.Visibility visibility,
+                                                  PropertyElementQuery configuration) {
+        if (configuration.isJsonAutoDetectConfigured()) {
+            return configuration.isJsonAutoDetectGetterVisible(methodElement, methodName);
+        }
+        return canMethodBeUsedForAccess(methodElement, accessKinds, visibility);
+    }
+
+    private static boolean canMethodBeUsedForWriteAccess(MethodElement methodElement,
+                                                         Set<BeanProperties.AccessKind> accessKinds,
+                                                         BeanProperties.Visibility visibility,
+                                                         PropertyElementQuery configuration) {
+        if (configuration.isJsonAutoDetectConfigured()) {
+            return configuration.isJsonAutoDetectSetterVisible(methodElement);
+        }
+        return canMethodBeUsedForAccess(methodElement, accessKinds, visibility);
     }
 
     private static boolean canMethodBeUsedForWrite(MethodElement methodElement, PropertyElementQuery configuration) {
@@ -443,7 +496,7 @@ public final class AstBeanPropertiesUtils {
         } else {
             isAccessor = false; // not compatible field or setter is present
         }
-        if (beanPropertyData.setter == null && isAccessor) {
+        if (beanPropertyData.writeAccessKind == null && isAccessor) {
             // Use the field for write
             beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
         }
@@ -468,7 +521,7 @@ public final class AstBeanPropertiesUtils {
         }  else {
             isAccessor = false; // not compatible field or getter is present
         }
-        if (beanPropertyData.getter == null && isAccessor) {
+        if (beanPropertyData.readAccessKind == null && isAccessor) {
             // Use the field for read
             beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
         }
@@ -479,9 +532,13 @@ public final class AstBeanPropertiesUtils {
 
     private static boolean canFieldBeUsedForAccess(FieldElement fieldElement,
                                                    Set<BeanProperties.AccessKind> accessKinds,
-                                                   BeanProperties.Visibility visibility) {
+                                                   BeanProperties.Visibility visibility,
+                                                   PropertyElementQuery configuration) {
         if (fieldElement.getOwningType().isRecord()) {
             return false;
+        }
+        if (configuration.isJsonAutoDetectConfigured()) {
+            return configuration.isJsonAutoDetectFieldVisible(fieldElement);
         }
         if (accessKinds.contains(BeanProperties.AccessKind.FIELD)) {
             return isAccessible(fieldElement, visibility);
