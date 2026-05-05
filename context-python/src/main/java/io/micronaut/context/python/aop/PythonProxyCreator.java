@@ -33,8 +33,10 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -63,13 +65,22 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         }
         AtomicReference<Object> targetBeanRef = new AtomicReference<>();
         boolean isIntroduction = proxyDefinition.introduction();
+        Map<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> interceptedMethodsByName = new LinkedHashMap<>();
         for (RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod : proxyDefinition.interceptedMethods()) {
-            ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
-            Interceptor<T, ?>[] interceptors = interceptedMethod.interceptors();
-
-            String methodName = executableMethod.getMethodName();
+            interceptedMethodsByName.computeIfAbsent(
+                interceptedMethod.executableMethod().getMethodName(),
+                ignored -> new ArrayList<>()
+            ).add(interceptedMethod);
+        }
+        for (Map.Entry<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> entry : interceptedMethodsByName.entrySet()) {
+            String methodName = entry.getKey();
+            List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods = entry.getValue();
             Value originalFunction = value.getMember(methodName);
             ProxyExecutable proxiedFunction = args -> {
+                RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = findInterceptedMethod(methodName, interceptedMethods, args);
+                ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
+                Interceptor<T, ?>[] interceptors = interceptedMethod.interceptors();
+
                 Object[] javaArgs = fromPolyglotArray(args, executableMethod.getArguments());
                 Interceptor<T, ?>[] finalInterceptors;
                 if (isIntroduction) {
@@ -97,6 +108,9 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             fillAllAbstractMethods(value);
             Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
             T target = box(type, value.newInstance());
+            if (target == null) {
+                throw new IllegalStateException("Introduction proxy target cannot be null");
+            }
             targetBeanRef.set(target);
             return target;
         }
@@ -104,6 +118,19 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             throw new IllegalStateException("Target bean is null for non-introduction proxy");
         }
         return targetBean;
+    }
+
+    private <T> RuntimeProxyDefinition.InterceptedMethod<T> findInterceptedMethod(
+        String methodName,
+        List<RuntimeProxyDefinition.InterceptedMethod<T>> methods,
+        Value[] args
+    ) {
+        for (RuntimeProxyDefinition.InterceptedMethod<T> method : methods) {
+            if (method.executableMethod().getArguments().length == args.length) {
+                return method;
+            }
+        }
+        throw new IllegalArgumentException("No overload found for method " + methodName + " with " + args.length + " arguments");
     }
 
     @Nullable
@@ -155,7 +182,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         };
     }
 
-    private <T> T box(Class<T> type, Value value) {
+    private <T> @Nullable T box(Class<T> type, Value value) {
+        if (value.isNull()) {
+            return null;
+        }
         if (type.isPrimitive()) {
             return value.as(type);
         }
@@ -164,6 +194,52 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         } catch (Exception e) {
             return value.as(type);
         }
+    }
+
+    @Nullable
+    private Object box(Argument<?> argument, Value value) {
+        if (value.isNull()) {
+            return null;
+        }
+        Class<?> type = argument.getType();
+        if (Iterable.class.isAssignableFrom(type)) {
+            Argument<?> elementType = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            if (elementType == Argument.OBJECT_ARGUMENT) {
+                return value.as(type);
+            }
+            List<Object> values = new ArrayList<>();
+            if (value.hasArrayElements()) {
+                long size = value.getArraySize();
+                for (long i = 0; i < size; i++) {
+                    values.add(box(elementType, value.getArrayElement(i)));
+                }
+            } else if (value.hasIterator()) {
+                Value iterator = value.getIterator();
+                while (iterator.hasIteratorNextElement()) {
+                    values.add(box(elementType, iterator.getIteratorNextElement()));
+                }
+            } else {
+                Iterable<?> iterable = value.as(Iterable.class);
+                for (Object element : iterable) {
+                    values.add(box(elementType, value.getContext().asValue(element)));
+                }
+            }
+            if (Set.class.isAssignableFrom(type)) {
+                return new LinkedHashSet<>(values);
+            }
+            return values;
+        }
+        if (type.isArray()) {
+            Class<?> componentType = type.getComponentType();
+            long size = value.getArraySize();
+            Object array = Array.newInstance(componentType, (int) size);
+            Argument<?> componentArgument = argument.getFirstTypeVariable().orElseGet(() -> Argument.of(componentType));
+            for (int i = 0; i < size; i++) {
+                Array.set(array, i, box(componentArgument, value.getArrayElement(i)));
+            }
+            return array;
+        }
+        return box(type, value);
     }
 
     private void fillAllAbstractMethods(Value pythonClass) {
@@ -206,7 +282,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         for (int i = 0; i < in.length; i++) {
             Value arg = in[i];
             Argument<?> argType = arguments[i];
-            out[i] = box(argType.getType(), arg);
+            out[i] = box(argType, arg);
         }
         return out;
     }

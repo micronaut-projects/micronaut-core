@@ -213,6 +213,7 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     private static boolean isInterfaceMethodAlreadyRepresented(List<? extends Element> elements, MethodElement inheritedMethod) {
         for (Element element : elements) {
             if (element instanceof MethodElement methodElement &&
+                methodElement.getName().equals(inheritedMethod.getName()) &&
                 (methodElement.overrides(inheritedMethod) || methodElement.isSubSignature(inheritedMethod))) {
                 return true;
             }

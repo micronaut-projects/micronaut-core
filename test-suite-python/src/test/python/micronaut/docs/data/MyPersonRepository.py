@@ -30,6 +30,8 @@ class MyPersonRepository(CrudRepository[MyPerson, int]):
 
     def findAllById(self, id: int) -> MyPerson: ...
 
+    def findByName(self, name: str) -> MyPerson: ...
+
 
 @Singleton
 class MyPersonRepositoryInitializer:
