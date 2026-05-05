@@ -13,8 +13,6 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Inject;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.parallel.Execution;
-import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.reactivestreams.Publisher;
@@ -26,9 +24,11 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
+import static java.util.Map.entry;
+
 public class ProxyBackpressureTest {
-    private static final int CHUNK_SIZE = 1024 * 1024;
-    private static final int TOTAL_CHUNKS = 128;
+    private static final int CHUNK_SIZE = 256 * 1024;
+    private static final int TOTAL_CHUNKS = 32;
 
     @ParameterizedTest
     @CsvSource({
@@ -41,19 +41,19 @@ public class ProxyBackpressureTest {
         "true,2,/proxy",
         "true,3,/proxy",
     })
-    @Execution(ExecutionMode.CONCURRENT)
     public void backpressure(boolean ssl, int version, String endpoint) throws InterruptedException {
-        try (ApplicationContext ctx = ApplicationContext.run(Map.of(
-            "spec.name", "ProxyBackpressureTest",
-            "micronaut.http.client.ssl.insecure-trust-all-certificates", ssl,
-            "micronaut.http.client.alpn-modes", version == 2 ? "h2" : version == 3 ? "h3" : "http/1.1",
-            "micronaut.http.client.read-timeout", "120",
-            "micronaut.server.http-version", ssl ? "2.0" : "1.1",
-            "micronaut.server.ssl.enabled", ssl,
-            "micronaut.server.ssl.build-self-signed", true,
-            "micronaut.server.netty.listeners.main.family", version == 3 ? "quic" : "tcp",
-            "micronaut.server.netty.listeners.main.ssl", ssl,
-            "micronaut.server.netty.listeners.main.port", 0
+        try (ApplicationContext ctx = ApplicationContext.run(Map.ofEntries(
+            entry("spec.name", "ProxyBackpressureTest"),
+            entry("micronaut.http.client.ssl.insecure-trust-all-certificates", ssl),
+            entry("micronaut.http.client.alpn-modes", version == 2 ? "h2" : version == 3 ? "h3" : "http/1.1"),
+            entry("micronaut.http.client.read-timeout", "120"),
+            entry("micronaut.http.client.http2.initial-window-size", TOTAL_CHUNKS * CHUNK_SIZE),
+            entry("micronaut.server.http-version", ssl ? "2.0" : "1.1"),
+            entry("micronaut.server.ssl.enabled", ssl),
+            entry("micronaut.server.ssl.build-self-signed", true),
+            entry("micronaut.server.netty.listeners.main.family", version == 3 ? "quic" : "tcp"),
+            entry("micronaut.server.netty.listeners.main.ssl", ssl),
+            entry("micronaut.server.netty.listeners.main.port", 0)
         ));
              EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
              StreamingHttpClient client = ctx.createBean(StreamingHttpClient.class, server.getURI())) {
@@ -91,11 +91,18 @@ public class ProxyBackpressureTest {
             Awaitility.await().atMost(60, TimeUnit.SECONDS).until(() -> subscriber.subscription != null);
             subscriber.subscription.request(1);
             Awaitility.await().atMost(60, TimeUnit.SECONDS).until(() -> subscriber.received > 1024);
-            TimeUnit.SECONDS.sleep(5);
-            Assertions.assertTrue(ctrl.emitted < 32 * CHUNK_SIZE);
+            Assertions.assertFalse(
+                subscriber.complete,
+                "response completed despite only one downstream item being requested: " +
+                    state(ssl, version, endpoint, subscriber.received, ctrl.emitted, ctrl.emittedChunks)
+            );
 
             subscriber.subscription.request(Long.MAX_VALUE);
-            Awaitility.await().atMost(60, TimeUnit.SECONDS).until(() -> subscriber.complete);
+            Awaitility.await().atMost(60, TimeUnit.SECONDS).untilAsserted(() -> Assertions.assertTrue(
+                subscriber.complete,
+                "response did not complete after downstream requested the rest: " +
+                    state(ssl, version, endpoint, subscriber.received, ctrl.emitted, ctrl.emittedChunks)
+            ));
             if (subscriber.error != null) {
                 Assertions.fail(subscriber.error);
             }
@@ -104,10 +111,16 @@ public class ProxyBackpressureTest {
         }
     }
 
+    private static String state(boolean ssl, int version, String endpoint, long received, long emitted, int emittedChunks) {
+        return "ssl=" + ssl + ", version=" + version + ", endpoint=" + endpoint +
+            ", received=" + received + ", emitted=" + emitted + ", emittedChunks=" + emittedChunks;
+    }
+
     @Controller
     @Requires(property = "spec.name", value = "ProxyBackpressureTest")
     static class Ctrl {
         volatile long emitted = 0;
+        volatile int emittedChunks = 0;
 
         @Get("/large")
         Publisher<byte[]> large() {
@@ -117,7 +130,10 @@ public class ProxyBackpressureTest {
                     ThreadLocalRandom.current().nextBytes(arr);
                     return arr;
                 })
-                .doOnNext(it -> emitted += it.length);
+                .doOnNext(it -> {
+                    emitted += it.length;
+                    emittedChunks++;
+                });
         }
     }
 

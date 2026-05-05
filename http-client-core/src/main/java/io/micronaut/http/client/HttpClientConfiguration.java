@@ -1288,6 +1288,8 @@ public abstract class HttpClientConfiguration {
 
         private int maxHeaderListSize = DEFAULT_MAX_HEADER_LIST_SIZE;
 
+        private Integer initialWindowSize;
+
         /**
          * For HTTP/2 connections, the interval from the last inbound message to when an automated ping
          * should be sent. This can be used to keep low-traffic connections alive.
@@ -1368,6 +1370,25 @@ public abstract class HttpClientConfiguration {
          */
         public void setMaxHeaderListSize(@ReadableBytes int maxHeaderListSize) {
             this.maxHeaderListSize = maxHeaderListSize;
+        }
+
+        /**
+         * [available in the Netty HTTP client].
+         *
+         * @return The HTTP/2 initial flow-control window size, or {@code null} to use the Netty default
+         */
+        @Nullable
+        public Integer getInitialWindowSize() {
+            return initialWindowSize;
+        }
+
+        /**
+         * Sets the HTTP/2 initial flow-control window size. The default value is provided by Netty.
+         *
+         * @param initialWindowSize The HTTP/2 initial flow-control window size
+         */
+        public void setInitialWindowSize(@Nullable @ReadableBytes Integer initialWindowSize) {
+            this.initialWindowSize = initialWindowSize;
         }
     }
 

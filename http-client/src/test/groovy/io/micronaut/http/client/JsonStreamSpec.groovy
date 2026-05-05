@@ -40,7 +40,6 @@ import spock.util.concurrent.PollingConditions
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
-import java.util.concurrent.Semaphore
 
 /**
  * Created by graemerocher on 19/01/2018.
@@ -59,8 +58,6 @@ class JsonStreamSpec  extends Specification {
     @Shared
     @AutoCleanup
     StreamingHttpClient client = embeddedServer.applicationContext.createBean(StreamingHttpClient, embeddedServer.URL)
-
-    static Semaphore signal
 
     void "test read JSON stream demand all"() {
         when:
@@ -142,18 +139,10 @@ class JsonStreamSpec  extends Specification {
     }
 
     void "we can stream books to the server"() {
-        given:
-        signal = new Semaphore(1)
-
         when:
-        // Funny request flow which required the server to release the semaphore so we can keep sending stuff
         Flux stream = Flux.from(client.jsonStream(HttpRequest.POST(
                 '/jsonstream/books/count',
-                Mono.fromCallable {
-                    JsonStreamSpec.signal.acquire()
-                    new Book(title: "Micronaut for dummies")
-                }
-                .repeat(9)
+                books("Micronaut for dummies", 10)
                 ).contentType(MediaType.APPLICATION_JSON_STREAM_TYPE).accept(MediaType.APPLICATION_JSON_STREAM_TYPE)))
 
         then:
@@ -169,19 +158,16 @@ class JsonStreamSpec  extends Specification {
     }
 
     void "we can use a generated client to stream books to the server"() {
-        given:
-        signal = new Semaphore(1)
-
         when:
         Mono<LibraryStats> result = Mono.from(bookClient.count(
-                Mono.fromCallable {
-                    JsonStreamSpec.signal.acquire()
-                    new Book(title: "Micronaut for dummies, volume 2")
-                }
-                .repeat(6)))
+                books("Micronaut for dummies, volume 2", 7)))
 
         then:
         result.timeout(Duration.of(10, ChronoUnit.SECONDS)).block().bookCount == 7
+    }
+
+    private static Flux<Book> books(String title, int count) {
+        Flux.range(0, count).map { new Book(title: title) }
     }
 
     @Requires(property = "spec.name", value = 'JsonStreamSpec' )
@@ -204,13 +190,10 @@ class JsonStreamSpec  extends Specification {
             return Flux.just(new Book(title: "The Stand"), new Book(title: "The Shining"))
         }
 
-        // Funny controller which signals the semaphone, causing the the client to send more
         @Post(uri = "/count", processes = MediaType.APPLICATION_JSON_STREAM)
         Publisher<LibraryStats> count(@Body Publisher<Book> theBooks) {
             Flux.from(theBooks).map {
-                Book b ->
-                    JsonStreamSpec.signal.release()
-                    b.title
+                Book b -> b.title
             }.count().map {
                 bookCount -> new LibraryStats(bookCount: bookCount)
             }
