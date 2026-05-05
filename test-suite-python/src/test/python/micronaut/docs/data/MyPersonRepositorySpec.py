@@ -27,9 +27,9 @@ class MyPersonRepositorySpec:
         print("Load all")
         people = self.myPersonRepository.findAll()
         print(people)
-        assert len(people) == 2
+        assert len(people) == 3
         person_by_name = {person.name: person for person in people}
-        assert set(person_by_name.keys()) == {"Denis", "Graeme"}
+        assert set(person_by_name.keys()) == {"Constructor", "Denis", "Graeme"}
         person = person_by_name["Denis"]
         print("Load by id")
         denis = self.myPersonRepository.findAllById(person.id)

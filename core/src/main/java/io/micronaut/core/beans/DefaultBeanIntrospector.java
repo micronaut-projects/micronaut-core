@@ -43,6 +43,7 @@ import java.util.stream.Collectors;
 class DefaultBeanIntrospector implements BeanIntrospector {
 
     private static final Logger LOG = ClassUtils.getLogger(DefaultBeanIntrospector.class);
+    private static final String MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
 
     @Nullable
     private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
@@ -104,21 +105,16 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     }
 
     private Map<String, BeanIntrospectionReference<Object>> getIntrospections() {
+        ClassLoader effectiveClassLoader = resolveClassLoader();
+        if (effectiveClassLoader != classLoader) {
+            return resolveIntrospections(effectiveClassLoader);
+        }
         Map<String, BeanIntrospectionReference<Object>> resolvedIntrospectionMap = this.introspectionMap;
         if (resolvedIntrospectionMap == null) {
             synchronized (this) { // double check
                 resolvedIntrospectionMap = this.introspectionMap;
                 if (resolvedIntrospectionMap == null) {
-                    resolvedIntrospectionMap = new HashMap<>(30);
-                    @SuppressWarnings("unchecked") final SoftServiceLoader<BeanIntrospectionReference<Object>> services = loadReferences();
-                    List<BeanIntrospectionReference<Object>> beanIntrospectionReferences = new ArrayList<>(300);
-                    services.collectAll(
-                            beanIntrospectionReferences,
-                            BeanIntrospectionReference::isPresent
-                    );
-                    for (BeanIntrospectionReference<Object> reference : beanIntrospectionReferences) {
-                        resolvedIntrospectionMap.put(reference.getName(), reference);
-                    }
+                    resolvedIntrospectionMap = resolveIntrospections(classLoader);
                     this.introspectionMap = resolvedIntrospectionMap;
                 }
             }
@@ -126,8 +122,32 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         return resolvedIntrospectionMap;
     }
 
+    private ClassLoader resolveClassLoader() {
+        if (Boolean.getBoolean(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER)) {
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            if (contextClassLoader != null) {
+                return contextClassLoader;
+            }
+        }
+        return classLoader;
+    }
+
+    private Map<String, BeanIntrospectionReference<Object>> resolveIntrospections(ClassLoader classLoader) {
+        Map<String, BeanIntrospectionReference<Object>> resolvedIntrospectionMap = new HashMap<>(30);
+        @SuppressWarnings("unchecked") final SoftServiceLoader<BeanIntrospectionReference<Object>> services = loadReferences(classLoader);
+        List<BeanIntrospectionReference<Object>> beanIntrospectionReferences = new ArrayList<>(300);
+        services.collectAll(
+                beanIntrospectionReferences,
+                BeanIntrospectionReference::isPresent
+        );
+        for (BeanIntrospectionReference<Object> reference : beanIntrospectionReferences) {
+            resolvedIntrospectionMap.put(reference.getName(), reference);
+        }
+        return resolvedIntrospectionMap;
+    }
+
     @SuppressWarnings("java:S3740")
-    private SoftServiceLoader loadReferences() {
+    private SoftServiceLoader loadReferences(ClassLoader classLoader) {
         return SoftServiceLoader.load(BeanIntrospectionReference.class, classLoader);
     }
 }

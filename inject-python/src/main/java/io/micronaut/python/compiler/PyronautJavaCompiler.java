@@ -53,6 +53,8 @@ import java.util.stream.Stream;
  */
 final class PyronautJavaCompiler {
 
+    private static final String MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
+
     private final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
     private Consumer<ClassElement> classElementCallback;
 
@@ -99,10 +101,11 @@ final class PyronautJavaCompiler {
         List<String> options = buildCompilerOptions(classpath, bootclasspath, annotationProcessorPath, compilerOptions);
         ClassLoader classLoader = createAnnotationProcessorClassLoader(processorClasspath);
         System.setProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
+        System.setProperty(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
         ClassLoader previous = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(classLoader);
 
-        List<Processor> processors = getAnnotationProcessors(classLoader, processorClasspath != null && !processorClasspath.isEmpty());
+        List<Processor> processors = getAnnotationProcessors(classLoader);
 
         try {
             JavaCompiler.CompilationTask task = compiler.getTask(
@@ -126,6 +129,7 @@ final class PyronautJavaCompiler {
         } finally {
             Thread.currentThread().setContextClassLoader(previous);
             System.clearProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER);
+            System.clearProperty(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER);
             shutdownProcessors(processors);
         }
     }
@@ -224,49 +228,6 @@ final class PyronautJavaCompiler {
      *
      * @return The processors
      */
-    private List<Processor> getAnnotationProcessors(ClassLoader classLoader, boolean isolated) {
-        if (isolated) {
-            return getAnnotationProcessorsFromClassLoader(classLoader);
-        }
-        return getAnnotationProcessors(classLoader);
-    }
-
-    private @NonNull List<Processor> getAnnotationProcessorsFromClassLoader(ClassLoader classLoader) {
-        List<Processor> processors = new ArrayList<>();
-        processors.add(instantiateProcessor(classLoader, MixinVisitorProcessor.class.getName()));
-        processors.add(instantiateProcessor(classLoader, PackageElementVisitorProcessor.class.getName()));
-        processors.add(instantiateProcessor(classLoader, TypeElementVisitorProcessor.class.getName()));
-        processors.add(instantiateProcessor(classLoader, AggregatingTypeElementVisitorProcessor.class.getName()));
-        processors.add(instantiateProcessor(classLoader, BeanDefinitionInjectProcessor.class.getName()));
-
-        Processor pythonProcessor = instantiateProcessor(classLoader, PythonAnnotationProcessor.class.getName());
-        invoke(pythonProcessor, "setClassLoader", new Class<?>[] { ClassLoader.class }, classLoader);
-        if (classElementCallback != null) {
-            invoke(pythonProcessor, "setClassElementCallback", new Class<?>[] { Consumer.class }, classElementCallback);
-        }
-        processors.add(pythonProcessor);
-        return processors;
-    }
-
-    private static Processor instantiateProcessor(ClassLoader classLoader, String processorName) {
-        try {
-            return Class.forName(processorName, true, classLoader)
-                .asSubclass(Processor.class)
-                .getDeclaredConstructor()
-                .newInstance();
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Failed to load annotation processor [" + processorName + "]", e);
-        }
-    }
-
-    private static void invoke(Object target, String method, Class<?>[] parameterTypes, Object... args) {
-        try {
-            target.getClass().getMethod(method, parameterTypes).invoke(target, args);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("Failed to invoke " + method + " on [" + target.getClass().getName() + "]", e);
-        }
-    }
-
     private @NonNull List<Processor> getAnnotationProcessors(ClassLoader classLoader) {
         List<Processor> processors = new ArrayList<>();
         processors.add(new MixinVisitorProcessor());
@@ -297,8 +258,7 @@ final class PyronautJavaCompiler {
                     return Stream.empty();
                 }
             }).toList();
-            ClassLoader parent = annotationProcessorPath.isEmpty() ? classLoader : ClassLoader.getPlatformClassLoader();
-            classLoader = new URLClassLoader(cp.toArray(new URL[0]), parent);
+            classLoader = new URLClassLoader(cp.toArray(new URL[0]), classLoader);
         }
         return classLoader;
     }
