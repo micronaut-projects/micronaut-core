@@ -15,7 +15,11 @@
  */
 package io.micronaut.scheduling.io.watch;
 
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.util.StringUtils;
 import org.slf4j.Logger;
