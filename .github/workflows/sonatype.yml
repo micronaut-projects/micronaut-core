@@ -3,37 +3,38 @@
 # https://github.com/micronaut-projects/micronaut-project-template/tree/master/.github/workflows
 #
 # and edit them there. Note that it will be sync'ed to all the Micronaut repos
-name: Sonatype Vuln Scan
+name: Vulnerability Audit
 on:
-  push:
-    branches:
-      - master
-      - '[0-9]+.[0-9]+.x'
   pull_request:
     branches:
-      - master
       - '[0-9]+.[0-9]+.x'
+    paths:
+      - '**/*.gradle'
+      - '**/*.gradle.kts'
+      - 'gradle.properties'
+      - 'settings.gradle'
+      - 'settings.gradle.kts'
+      - 'gradle/libs.versions.toml'
+      - 'gradle/wrapper/**'
+      - 'buildSrc/**'
+      - 'gradle/**'
+      - '**/gradle.lockfile'
+      - '**/versions.lock'
+      - 'osv-scanner.toml'
+      - '.github/workflows/sonatype.yml'
+      - '.github/workflows/release.yml'
+      - '.github/scripts/vulnerability-audit.sh'
 jobs:
-  build:
+  audit:
     if: github.repository != 'micronaut-projects/micronaut-project-template'
     runs-on: ubuntu-latest
     strategy:
       matrix:
         java: ['25']
     env:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-      DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-      DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
-      GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
-      GH_USERNAME: ${{ secrets.GH_USERNAME }}
       TESTCONTAINERS_RYUK_DISABLED: true
-      PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      OSS_INDEX_USERNAME: ${{ secrets.OSS_INDEX_USERNAME }}
-      OSS_INDEX_PASSWORD: ${{ secrets.OSS_INDEX_PASSWORD }}
     steps:
-      # https://github.com/actions/virtual-environments/issues/709
+       # https://github.com/actions/virtual-environments/issues/709
       - name: Remove system JDKs
         run: |
           sudo rm -rf /usr/lib/jvm/*
@@ -41,38 +42,43 @@ jobs:
           export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
       - name: "🗑 Free disk space"
         run: |
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo rm -rf "/opt/ghc"
-          sudo rm -rf "/usr/share/dotnet"
-          sudo rm -rf "/usr/local/lib/android"
-          sudo apt-get clean
-          df -h
+         sudo rm -rf "/usr/local/share/boost"
+         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+         sudo rm -rf "/opt/ghc"
+         sudo rm -rf "/usr/share/dotnet"
+         sudo rm -rf "/usr/local/lib/android"
+         sudo apt-get clean
+         df -h
 
       - name: "📥 Checkout repository"
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
 
       - name: "🔧 Setup GraalVM CE"
-        uses: graalvm/setup-graalvm@v1
+        uses: graalvm/setup-graalvm@60c26726de13f8b90771df4bc1641a52a3159994 # v1
         with:
           distribution: 'graalvm'
           java-version: ${{ matrix.java }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: "🔧 Setup Gradle"
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6
 
       - name: "❓ Optional setup step"
         run: |
           [ -f ./setup.sh ] && ./setup.sh || [ ! -f ./setup.sh ]
 
-      - name: "🚔 Sonatype Scan"
-        if: env.OSS_INDEX_PASSWORD != '' && matrix.java == '25'
-        id: sonatypescan
+      - name: "🚔 Vulnerability Audit"
+        if: matrix.java == '25'
+        env:
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+          DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
+          DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
+          GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
         run: |
-          ./gradlew ossIndexAudit --no-parallel --info
+          .github/scripts/vulnerability-audit.sh
 
       - name: "❓ Optional cleanup step"
         run: |
