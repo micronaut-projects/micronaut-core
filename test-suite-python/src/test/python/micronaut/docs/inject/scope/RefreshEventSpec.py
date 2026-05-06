@@ -42,8 +42,9 @@ class WeatherController:
 
     @Post("/evict")
     def evict(self) -> dict[str, str]:
-        self.context.publishEvent()
+        # tag::publishEvent[]
+        self.context.publishEvent(RefreshEvent())
+        # end::publishEvent[]
         return {
             "msg" : "Ok"
         }
-

@@ -6,5 +6,5 @@ from micronaut.core.annotation import Introspected
 @Introspected
 class Person:
     name : str
-    age : int
+    age : int = 18
 # end::class[]
