@@ -2,6 +2,7 @@ from typing import Annotated
 
 import java
 from micronaut.context.annotation import Requires
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.http import HttpRequest, HttpResponse
 from micronaut.http.annotation import Body, Controller, Error, Get, Post
 from micronaut.http.hateoas import JsonError, Link
@@ -32,8 +33,7 @@ class PersonController:
         return self.inMemoryDatastore.values()
 
     @Get("/{name}")
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     def get(self, name: str) -> Publisher:
         if self.inMemoryDatastore.containsKey(name):
             return Mono.just(self.inMemoryDatastore.get(name))
@@ -41,8 +41,7 @@ class PersonController:
 
     # tag::single[]
     @Post("/saveReactive")
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     def saveReactive(self, person: Annotated[Publisher, Body]) -> Publisher:  # <1>
         def save_reactive_person(p):
             self.inMemoryDatastore.put(self.firstName(p), p)  # <2>

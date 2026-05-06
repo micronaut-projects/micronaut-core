@@ -355,7 +355,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             .returns(thisType)
                             .build(((aThis, methodParameters) -> {
                                 var val = methodParameters.get(0);
-                                return val.invoke("isNull", TypeDef.Primitive.BOOLEAN)
+                                return RUNTIME_UTIL.invokeStatic("isNone", TypeDef.Primitive.BOOLEAN, val)
                                     .isTrue()
                                     .doIfElse(
                                         ExpressionDef.nullValue().returning(),
@@ -1147,7 +1147,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static ExpressionDef convertNullableValue(ExpressionDef value, ExpressionDef nonNullValue) {
-        return value.invoke("isNull", TypeDef.Primitive.BOOLEAN)
+        return RUNTIME_UTIL.invokeStatic("isNone", TypeDef.Primitive.BOOLEAN, value)
             .isTrue()
             .doIfElse(ExpressionDef.nullValue(), nonNullValue);
     }

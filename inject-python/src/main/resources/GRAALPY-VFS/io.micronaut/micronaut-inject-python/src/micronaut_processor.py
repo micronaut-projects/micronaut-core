@@ -1,4 +1,5 @@
 import ast
+import keyword
 import os
 import java
 from collections import OrderedDict
@@ -344,8 +345,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
                                 # Absolute import: map Python import modules to Java packages
                                 # Micronaut packages (micronaut.*) need 'io.' prefix added back
                                 # Other packages (jakarta.*, user packages) keep their names
-                                if not node.module.startswith('io.') and node.module.startswith('micronaut.'):
-                                    base_pkg = f"io.{node.module}"
+                                base_pkg = self._to_java_import_module(base_pkg)
+                                if not node.module.startswith('io.') and base_pkg.startswith('micronaut.'):
+                                    base_pkg = f"io.{base_pkg}"
                                 full_name = f"{base_pkg}.{alias.name}"
 
                         if alias.asname:
@@ -360,6 +362,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 for alias in node.names:
                     mod_name = alias.name
                     # Normalize Micronaut packages to io.micronaut.*
+                    mod_name = self._to_java_import_module(mod_name)
                     if not mod_name.startswith('io.') and mod_name.startswith('micronaut.'):
                         mod_name = f"io.{mod_name}"
                     if alias.asname:
@@ -777,9 +780,20 @@ class MicronautAstVisitor(ast.NodeVisitor):
         tail = parts[1:]
         base = self.imported_types.get(root, root)
         full = ".".join([base] + tail) if tail else base
+        if full.startswith("micronaut.") or full.startswith("io.micronaut."):
+            full = self._to_java_import_module(full)
         if full.startswith("micronaut."):
             full = f"io.{full}"
         return full
+
+    def _to_java_import_module(self, module_name):
+        """
+        Convert Python-safe Java package segments such as async_ back to async.
+        """
+        return ".".join(
+            part[:-1] if part.endswith("_") and keyword.iskeyword(part[:-1]) else part
+            for part in module_name.split(".")
+        )
 
     def _extract_type_name(self, type_node):
         """

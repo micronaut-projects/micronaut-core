@@ -1,4 +1,5 @@
 import ast
+import keyword
 import re
 from typing import Optional, Dict, List, Any
 
@@ -70,21 +71,23 @@ class MicronautTransformer(ast.NodeTransformer):
         if not node.module:
             return node
 
+        java_module = self._to_java_import_module(node.module)
+
         # Special handling for io. prefixed imports to avoid conflict with Python's builtin io module
-        transformed_module = node.module
-        if node.module.startswith('io.'):
-            transformed_module = node.module[3:]  # Remove 'io.' prefix
+        transformed_module = self._to_python_import_module(node.module)
+        if transformed_module.startswith('io.'):
+            transformed_module = transformed_module[3:]  # Remove 'io.' prefix
 
         # Collect imports to transform - check if JavaVisitorContext.getClassElements returns annotations
         transformed_any = False
         for alias in node.names:
             if alias.name == '*':
                 # Handle star imports - scan the entire package
-                if self._handle_star_import(node.module, transformed_module):
+                if self._handle_star_import(java_module, transformed_module):
                     transformed_any = True
             else:
                 # Handle specific imports
-                if self._handle_specific_import(node.module, transformed_module, alias):
+                if self._handle_specific_import(java_module, transformed_module, alias):
                     transformed_any = True
 
         # If any imports were transformed, replace the import with the transformed module name
@@ -122,9 +125,10 @@ class MicronautTransformer(ast.NodeTransformer):
 
         for alias in node.names:
             original_module_name = alias.name
+            java_module_name = self._to_java_import_module(original_module_name)
             # Scan the entire package for annotation types
             try:
-                class_elements = self.callback_get_class_elements(original_module_name)
+                class_elements = self.callback_get_class_elements(java_module_name)
             except Exception:
                 class_elements = None
             if class_elements:
@@ -417,9 +421,9 @@ def micronaut_annotation(name, repeated=None):
                 meta_simple_name = meta_annotation_name.split('.')[-1]
 
                 # Transform io. prefixed packages to avoid conflict with Python's builtin io module
-                import_package = meta_package
-                if meta_package.startswith('io.'):
-                    import_package = meta_package[3:]  # Remove 'io.' prefix
+                import_package = self._to_python_import_module(meta_package)
+                if import_package.startswith('io.'):
+                    import_package = import_package[3:]  # Remove 'io.' prefix
 
                 # Use absolute import path of the function
                 import_lines.append(f"from {import_package} import {meta_simple_name}")
@@ -637,6 +641,24 @@ def {decorator_name}({param_signature}):
             'class_name': full_class_name
         })
 
+    def _to_java_import_module(self, module_name: str) -> str:
+        """
+        Convert Python-safe package segments such as async_ back to Java package segments.
+        """
+        return '.'.join(
+            part[:-1] if part.endswith('_') and keyword.iskeyword(part[:-1]) else part
+            for part in module_name.split('.')
+        )
+
+    def _to_python_import_module(self, module_name: str) -> str:
+        """
+        Convert Java package segments that are Python keywords to importable Python segments.
+        """
+        return '.'.join(
+            f'{part}_' if keyword.iskeyword(part) else part
+            for part in module_name.split('.')
+        )
+
     def _to_python_case(self, java_name: str) -> str:
         """
         Convert Java PascalCase to Python snake_case.
@@ -662,5 +684,4 @@ def {decorator_name}({param_signature}):
         Get the list of types (classes/functions) that have Micronaut decorators.
         """
         return self.exported_types
-
 

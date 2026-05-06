@@ -8,7 +8,8 @@ from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.http.client.exceptions import HttpClientResponseException
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
+from org.junit.jupiter.api import Assertions
 
 Flux = java.type("reactor.core.publisher.Flux")
 HttpRequest = java.type("io.micronaut.http.HttpRequest")
@@ -88,16 +89,14 @@ class PersonControllerSpec:
         assert response.getStatus() == HttpStatus.CREATED
 
     @Test
-    @Disabled("Python Publisher empty results are not mapped to the Java-equivalent 404 response")
     def test_person_not_found(self):
-        try:
-            getattr(Flux, "from")(self.client.exchange("/people/Sally", Map)).blockFirst()
-            assert False
-        except HttpClientResponseException as e:
-            response = e.getResponse()
-
-            assert response.getBody().get().get("message") == "Person Not Found"
-            assert response.getStatus() == HttpStatus.NOT_FOUND
+        e = Assertions.assertThrows(
+            HttpClientResponseException,
+            lambda: getattr(Flux, "from")(self.client.exchange("/people/Sally", Map)).blockFirst(),
+        )
+        response = e.getResponse()
+        Assertions.assertEquals("Person Not Found", response.getBody().get().get("message"), str(response.getBody()))
+        Assertions.assertEquals(HttpStatus.NOT_FOUND, response.getStatus())
 
     @Test
     def test_save_invalid_json(self):

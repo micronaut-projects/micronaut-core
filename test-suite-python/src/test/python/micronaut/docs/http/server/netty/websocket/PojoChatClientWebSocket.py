@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 import java
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.websocket.annotation import ClientWebSocket, OnMessage, OnOpen
 
 from .Message import Message
@@ -45,8 +46,7 @@ class PojoChatClientWebSocket(ABC):
     def sendAsync(self, message: Message) -> Future:
         pass
 
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     @abstractmethod
     def sendRx(self, message: Message) -> Publisher:
         pass

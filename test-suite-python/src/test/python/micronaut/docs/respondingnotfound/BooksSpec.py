@@ -19,7 +19,6 @@ class BooksSpec:
     client: Annotated[HttpClient, Inject, Client("/")]
 
     @Test
-    @Disabled("Python None controller results are not mapped to the Java-equivalent 404 response")
     def test_returning_null_returns_404(self):
         try:
             self.client.toBlocking().exchange(HttpRequest.GET("/books/stock/XXXXX"))
@@ -30,7 +29,6 @@ class BooksSpec:
         assert response.getStatus() == HttpStatus.NOT_FOUND
 
     @Test
-    @Disabled("Python cannot express @SingleResult import from io.micronaut.core.async.annotation yet")
     def test_returning_mono_empty_returns_404(self):
         try:
             self.client.toBlocking().exchange(HttpRequest.GET("/books/maybestock/XXXXX"))

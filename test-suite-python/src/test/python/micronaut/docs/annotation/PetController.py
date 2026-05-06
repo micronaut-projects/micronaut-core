@@ -4,6 +4,7 @@ from .Pet import Pet
 from .PetOperations import PetOperations
 
 # tag::imports[]
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.http.annotation import Controller, Post
 # end::imports[]
 
@@ -15,8 +16,7 @@ Publisher = java.type("org.reactivestreams.Publisher")
 @Controller("/pets")
 class PetController(PetOperations):
 
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     @Post
     def save(self, name: str, age: int) -> Publisher:
         pet = Pet(name=name, age=age)

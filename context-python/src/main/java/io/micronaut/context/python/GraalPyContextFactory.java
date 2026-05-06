@@ -106,7 +106,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
             return ContextHolder.getContext();
         }
-        var context = buildContext(HostAccess.ALL, Engine.create(), classLoader, options);
+        var context = buildContext(HostAccess.ALL, GraalPyEngineFactory.buildPythonEngine(), classLoader, options);
         ContextHolder.setReuseContext(true);
         ContextHolder.setContext(context);
         return context;

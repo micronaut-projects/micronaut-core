@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 
 import java
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.http import MediaType
 from micronaut.http.annotation import Get
 from micronaut.http.client.annotation import Client
@@ -15,8 +16,7 @@ Publisher = java.type("org.reactivestreams.Publisher")
 class HelloClient(ABC):
 
     @Get(consumes=MediaType.TEXT_PLAIN)  # <2>
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     @abstractmethod
     def hello(self) -> Publisher:  # <3>
         pass

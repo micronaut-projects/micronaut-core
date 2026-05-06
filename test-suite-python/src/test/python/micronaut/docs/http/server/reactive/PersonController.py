@@ -2,6 +2,7 @@ from typing import Annotated
 
 # tag::imports[]
 from jakarta.inject import Named
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.docs.ioc.beans.Person import Person
 from micronaut.http.annotation import Controller, Get
 from micronaut.scheduling import TaskExecutors
@@ -29,8 +30,7 @@ class PersonController:
         self.personService = personService
 
     @Get("/{name}")
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     def byName(self, name: str) -> Publisher:
         return (
             Mono.fromCallable(lambda: self.personService.findByName(name))  # <2>

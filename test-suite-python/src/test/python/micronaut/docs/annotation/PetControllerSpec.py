@@ -26,7 +26,7 @@ class PetControllerSpec:
         # end::post[]
 
     @Test
-    @Disabled("GraalPy exception matching fails while catching the Java validation exception")
+    @Disabled("Python client-side validation metadata is not applied to the generated Publisher client method yet")
     def testPostPetValidation(self) -> None:
         try:
             getattr(Mono, "from")(self.client.save("Fred", -1)).block()

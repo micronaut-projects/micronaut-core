@@ -6,6 +6,7 @@ import java
 from .Pet import Pet
 
 # tag::imports[]
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.http.annotation import Post
 from micronaut.validation import Validated
 from jakarta.validation.constraints import Min, NotBlank
@@ -19,8 +20,7 @@ Publisher = java.type("org.reactivestreams.Publisher")
 class PetOperations(ABC):
     # tag::save[]
     @Post
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     @abstractmethod
     def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> Publisher:
         pass

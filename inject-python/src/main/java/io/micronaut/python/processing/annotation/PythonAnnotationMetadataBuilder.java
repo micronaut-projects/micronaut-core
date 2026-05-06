@@ -164,12 +164,30 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         Object annotationValue) {
         if (annotationValue instanceof Value value) {
             if (member instanceof AnnotationMemberDef memberDef && memberDef.memberType() != null) {
-                return GraalPyUtil.convertValueToJava(value, memberDef.memberType(), visitorContext);
+                return normalizeAnnotationValue(memberDef, GraalPyUtil.convertValueToJava(value, memberDef.memberType(), visitorContext));
             } else {
                 return GraalPyUtil.convertValueToJava(value, visitorContext);
             }
         }
+        if (member instanceof AnnotationMemberDef memberDef) {
+            return normalizeAnnotationValue(memberDef, annotationValue);
+        }
         return annotationValue;
+    }
+
+    private static Object normalizeAnnotationValue(AnnotationMemberDef memberDef, Object annotationValue) {
+        ClassElement memberType = memberDef.memberType();
+        if (annotationValue instanceof String stringValue && isEnumMember(memberType)) {
+            int lastDot = stringValue.lastIndexOf('.');
+            if (lastDot > -1) {
+                return stringValue.substring(lastDot + 1);
+            }
+        }
+        return annotationValue;
+    }
+
+    private static boolean isEnumMember(@Nullable ClassElement memberType) {
+        return memberType != null && (memberType.isEnum() || memberType.isAssignable(Enum.class));
     }
 
     @Override

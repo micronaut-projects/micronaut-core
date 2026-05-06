@@ -60,6 +60,12 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     public static final String APPLICATION_PATH = "GRAALPY-VFS/micronaut-application/";
     public static final String APPLICATION_SRC_PATH = "GRAALPY-VFS/micronaut-application/src/";
     public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_SRC_PATH + "__main__.py";
+    private static final Set<String> PYTHON_KEYWORDS = Set.of(
+        "False", "None", "True", "and", "as", "assert", "async", "await", "break",
+        "class", "continue", "def", "del", "elif", "else", "except", "finally",
+        "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal",
+        "not", "or", "pass", "raise", "return", "try", "while", "with", "yield"
+    );
 
     private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
@@ -480,7 +486,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 String decoratorCode = entry.getValue();
 
                 // Transform io. prefixed package names to avoid conflict with Python's builtin io module
-                String transformedDecoratorName = decoratorName.startsWith("io.") ? decoratorName.substring(3) : decoratorName;
+                String transformedDecoratorName = toPythonImportName(decoratorName);
 
                 // Split into package and simple name
                 int lastDotIndex = transformedDecoratorName.lastIndexOf('.');
@@ -520,7 +526,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         // Process Java class imports
         if (javaClassImports != null && !javaClassImports.isEmpty()) {
             javaClassImports.forEach((packageName, imports) -> {
-                Map<String, String> classMappings = javaClassesByPackage.computeIfAbsent(packageName, (k) ->
+                String pythonPackageName = toPythonImportName(packageName);
+                Map<String, String> classMappings = javaClassesByPackage.computeIfAbsent(pythonPackageName, (k) ->
                     new LinkedHashMap<>()
                 );
                 for (Map<String, String> importInfo : imports) {
@@ -616,6 +623,13 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
     private static @NotNull String toListOfString(List<String> allNames) {
         return "[" + String.join(",", allNames.stream().map(n -> "\"" + n + "\"").toList()) + "]";
+    }
+
+    private static String toPythonImportName(String qualifiedName) {
+        String name = qualifiedName.startsWith("io.") ? qualifiedName.substring(3) : qualifiedName;
+        return Arrays.stream(name.split("\\."))
+            .map(part -> PYTHON_KEYWORDS.contains(part) ? part + "_" : part)
+            .collect(Collectors.joining("."));
     }
 
     private static void collectPackageNames(Set<String> decoratorsByPackage, Set<String> allPackages) {

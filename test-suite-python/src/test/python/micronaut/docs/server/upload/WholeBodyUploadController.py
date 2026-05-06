@@ -3,6 +3,7 @@ from typing import Annotated
 import java
 
 # tag::class[]
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.http import MediaType
 from micronaut.http.annotation import Body, Controller, Post
 from micronaut.http.multipart import CompletedFileUpload
@@ -18,8 +19,7 @@ Schedulers = java.type("reactor.core.scheduler.Schedulers")
 class WholeBodyUploadController:
 
     @Post(value="/whole-body", consumes=MediaType.MULTIPART_FORM_DATA, produces=MediaType.TEXT_PLAIN)  # <1>
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     def uploadBytes(self, body: Annotated[MultipartBody, Body]) -> Publisher:  # <2>
         def close_part(completedPart):
             partName = completedPart.getName()

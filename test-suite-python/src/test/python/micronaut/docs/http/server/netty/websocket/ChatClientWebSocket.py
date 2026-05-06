@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import java
 
 # tag::imports[]
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.http import HttpRequest
 from micronaut.websocket import WebSocketSession
 from micronaut.websocket.annotation import ClientWebSocket, OnMessage, OnOpen
@@ -62,8 +63,7 @@ class ChatClientWebSocket(ABC):  # <2>
     def sendAsync(self, message: str) -> Future:
         pass
 
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     @abstractmethod
     def sendRx(self, message: str) -> Publisher:
         pass

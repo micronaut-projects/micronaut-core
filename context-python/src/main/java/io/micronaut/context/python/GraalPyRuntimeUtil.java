@@ -39,6 +39,35 @@ public final class GraalPyRuntimeUtil {
     public static final String PYTHON = "python";
 
     /**
+     * Returns whether the value represents Java null or Python None.
+     *
+     * @param value The polyglot value
+     * @return Whether the value represents Java null or Python None
+     */
+    public static boolean isNone(@Nullable Value value) {
+        if (value == null || value.isNull()) {
+            return true;
+        }
+        try {
+            Value metaObject = value.getMetaObject();
+            if (metaObject != null && metaObject.isMetaObject() && "NoneType".equals(metaObject.getMetaSimpleName())) {
+                return true;
+            }
+        } catch (Exception e) {
+            // Ignore and fall back to the conservative textual check below.
+        }
+        try {
+            return !value.isBoolean()
+                && !value.isNumber()
+                && !value.isString()
+                && !value.hasArrayElements()
+                && "None".equals(value.toString());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
      * Coerce a map of types that may extend from {@link ValueCoercible} back to a native value map.
      * @param map The map
      * @param <V> The value type of the map
@@ -81,9 +110,9 @@ public final class GraalPyRuntimeUtil {
      * @param <T> the expected list element type
      * @return a Java List with converted elements
      */
-    public static <T> List<T> convertList(Value graalValue, Class<T> elementType) {
-        if (graalValue == null || graalValue.isNull()) {
-            return new ArrayList<>();
+    public static <T> @Nullable List<T> convertList(Value graalValue, Class<T> elementType) {
+        if (isNone(graalValue)) {
+            return null;
         }
         try {
             if (graalValue.isHostObject()) {
@@ -126,9 +155,9 @@ public final class GraalPyRuntimeUtil {
      * @param <V> the expected value type
      * @return a Java Map with converted keys and values
      */
-    public static <K, V> Map<K, V> convertMap(Value graalValue, Class<K> keyType, Class<V> valueType) {
-        if (graalValue == null || graalValue.isNull()) {
-            return new HashMap<>();
+    public static <K, V> @Nullable Map<K, V> convertMap(Value graalValue, Class<K> keyType, Class<V> valueType) {
+        if (isNone(graalValue)) {
+            return null;
         }
         try {
             if (graalValue.isHostObject()) {
@@ -183,12 +212,7 @@ public final class GraalPyRuntimeUtil {
      */
     @SuppressWarnings("unchecked")
     public static <T> java.util.Optional<T> convertOptional(Value graalValue, Class<T> elementType) {
-        if (graalValue == null || graalValue.isNull()) {
-            return java.util.Optional.empty();
-        }
-
-        // Check if the value is Python None
-        if (graalValue.isNull()) {
+        if (isNone(graalValue)) {
             return java.util.Optional.empty();
         }
 
@@ -210,10 +234,10 @@ public final class GraalPyRuntimeUtil {
      * @param <T> the expected set element type
      * @return a Java Set with converted elements
      */
-    public static <T> Set<T> convertSet(Value graalValue, Class<T> elementType) {
+    public static <T> @Nullable Set<T> convertSet(Value graalValue, Class<T> elementType) {
         // TODO: Ideally a custom Set implementation that doesn't create a new map would be better here
-        if (graalValue == null || graalValue.isNull()) {
-            return new java.util.HashSet<>();
+        if (isNone(graalValue)) {
+            return null;
         }
 
         java.util.Set<T> result = new java.util.HashSet<>();
@@ -247,7 +271,9 @@ public final class GraalPyRuntimeUtil {
                 Value listValue = graalValue.invokeMember("list");
                 if (listValue != null) {
                     List<T> list = convertList(listValue, elementType);
-                    result.addAll(list);
+                    if (list != null) {
+                        result.addAll(list);
+                    }
                 }
             } catch (Exception ex) {
                 // If conversion fails, return empty set
@@ -268,7 +294,7 @@ public final class GraalPyRuntimeUtil {
      */
     @SuppressWarnings("unchecked")
     public static <T> @Nullable T convertValue(Value value, Class<T> targetType) {
-        if (value == null || value.isNull()) {
+        if (isNone(value)) {
             return null;
         }
 

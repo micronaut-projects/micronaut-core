@@ -59,7 +59,7 @@ class BindHttpClientExceptionBodySpec:
             assert not jsonError.isPresent()
 
     @Test
-    @Disabled("GraalPy exception matching fails while catching the HTTP client response bind error")
+    @Disabled("Python HTTP client body binding does not currently reproduce the Java decode-failure exception")
     def verifyBindErrorIsThrown(self):
         try:
             self.client.toBlocking().exchange(

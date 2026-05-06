@@ -1,6 +1,7 @@
 import java
 
 # tag::class[]
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.http import HttpResponse, HttpStatus, MediaType
 from micronaut.http.annotation import Controller, Post
 from micronaut.http.multipart import StreamingFileUpload
@@ -17,8 +18,7 @@ class UploadController:
 
     # tag::file[]
     @Post(value="/", consumes=MediaType.MULTIPART_FORM_DATA, produces=MediaType.TEXT_PLAIN)  # <1>
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     def upload(self, file: StreamingFileUpload) -> Publisher:  # <2>
         tempFile = File.createTempFile(file.getFilename(), "temp")
         uploadPublisher = file.transferTo(tempFile)  # <3>
@@ -32,8 +32,7 @@ class UploadController:
 
     # tag::outputStream[]
     @Post(value="/outputStream", consumes=MediaType.MULTIPART_FORM_DATA, produces=MediaType.TEXT_PLAIN)  # <1>
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     def uploadOutputStream(self, file: StreamingFileUpload) -> Publisher:  # <2>
         outputStream = ByteArrayOutputStream()  # <3>
         uploadPublisher = file.transferTo(outputStream)  # <4>

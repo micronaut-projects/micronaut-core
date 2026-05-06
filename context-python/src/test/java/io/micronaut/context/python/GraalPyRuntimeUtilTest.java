@@ -24,6 +24,7 @@ import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -114,8 +115,16 @@ class GraalPyRuntimeUtilTest {
         // Test conversion with null value
         List<Integer> result = GraalPyRuntimeUtil.convertList(null, Integer.class);
 
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
+        assertNull(result);
+    }
+
+    @Test
+    void testConvertListPythonNone() {
+        // Test conversion with Python None value
+        Value none = context.eval("python", "lambda: None").execute();
+        List<Integer> result = GraalPyRuntimeUtil.convertList(none, Integer.class);
+
+        assertNull(result);
     }
 
     @Test
@@ -169,8 +178,15 @@ class GraalPyRuntimeUtilTest {
         // Test conversion with null value
         Map<String, Integer> result = GraalPyRuntimeUtil.convertMap(null, String.class, Integer.class);
 
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
+        assertNull(result);
+    }
+
+    @Test
+    void testConvertMapPythonNone() {
+        // Test conversion with Python None value
+        Map<String, Integer> result = GraalPyRuntimeUtil.convertMap(context.eval("python", "lambda: None").execute(), String.class, Integer.class);
+
+        assertNull(result);
     }
 
     @Test
@@ -222,8 +238,15 @@ class GraalPyRuntimeUtilTest {
         // Test conversion with null value
         Set<Integer> result = GraalPyRuntimeUtil.convertSet(null, Integer.class);
 
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
+        assertNull(result);
+    }
+
+    @Test
+    void testConvertSetPythonNone() {
+        // Test conversion with Python None value
+        Set<Integer> result = GraalPyRuntimeUtil.convertSet(context.eval("python", "lambda: None").execute(), Integer.class);
+
+        assertNull(result);
     }
 
     @Test

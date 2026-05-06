@@ -9,6 +9,8 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.TypeHint
 import io.micronaut.core.annotation.Nullable
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.annotation.Error
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
@@ -36,6 +38,33 @@ class Test:
         metadata.enumValue(Requires, "sdk", Requires.Sdk).get() == Requires.Sdk.JAVA
         metadata.getValue(Requires, "sdk", Requires.Sdk).get() == Requires.Sdk.JAVA
         metadata.getValue(Requires, "version").get() == "1.8"
+    }
+
+    void "test read enum constants from java type references"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+import java
+from jakarta.inject import Singleton
+from micronaut.http.annotation import Error
+
+HttpStatus = java.type("io.micronaut.http.HttpStatus")
+
+@Singleton
+class Test:
+
+    @Error(status=HttpStatus.NOT_FOUND)
+    def notFound(self):
+        pass
+''')
+
+        when:
+        def method = definition.getRequiredMethod("notFound")
+        def metadata = method.getAnnotationMetadata()
+
+        then:
+        metadata.hasAnnotation(Error)
+        metadata.getValue(Error, "status", String).get() == "NOT_FOUND"
+        metadata.enumValue(Error, "status", HttpStatus).get() == HttpStatus.NOT_FOUND
     }
 
     void "test read external constants"() {

@@ -7,6 +7,7 @@ from micronaut.http import HttpResponse, MediaType
 from micronaut.http.annotation import Body, Controller, Post
 # end::imports[]
 # tag::importsreactive[]
+from micronaut.core.async_.annotation import SingleResult
 # end::importsreactive[]
 
 Flux = java.type("reactor.core.publisher.Flux")
@@ -26,8 +27,7 @@ class MessageController:
 
     # tag::echoReactive[]
     @Post(value="/echo-publisher", consumes=MediaType.TEXT_PLAIN)  # <1>
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     def echoFlow(self, text: Annotated[Publisher, Body]) -> Publisher:  # <2>
         return getattr(Flux, "from")(text).collect(lambda: [], lambda buffer, value: buffer.append(value)).map(  # <3>
             lambda buffer: HttpResponse.ok("".join(buffer))

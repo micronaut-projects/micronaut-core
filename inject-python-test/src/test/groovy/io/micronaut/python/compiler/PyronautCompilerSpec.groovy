@@ -251,6 +251,54 @@ class MyRepeatableService:
         tempDir.deleteDir()
     }
 
+    def "test Python keyword-safe Micronaut imports are normalized"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.core.async_.annotation import SingleResult
+from micronaut.core.async_.propagation import ReactorPropagation
+import java
+
+Mono = java.type("reactor.core.publisher.Mono")
+
+@Singleton
+class AsyncImportService:
+    @Executable
+    @SingleResult
+    def maybe(self) -> object:
+        return Mono.empty()
+
+    @Executable
+    def propagation(self) -> object:
+        return ReactorPropagation
+'''
+        def tempDir = File.createTempDir("pyronaut-test-keyword-import", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def metaInfDir = new File(tempDir, "META-INF")
+        def singleResultFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/async_/annotation/SingleResult.py")
+        singleResultFile.exists()
+        singleResultFile.text.contains('@micronaut_annotation("io.micronaut.core.async.annotation.SingleResult")')
+
+        def propagationInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/async_/propagation/__init__.py")
+        propagationInit.exists()
+        propagationInit.text.contains("ReactorPropagation = java.type('io.micronaut.core.async.propagation.ReactorPropagation')")
+
+        def coreInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/__init__.py")
+        coreInit.text.contains("from . import async_")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
     def "test Python sources in multiple distinct packages are processed"() {
         given:
         def tempDir = File.createTempDir("pyronaut-test-multi-package", "")

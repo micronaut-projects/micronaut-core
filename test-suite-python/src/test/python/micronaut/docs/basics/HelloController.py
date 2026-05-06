@@ -4,6 +4,7 @@ import java
 from jakarta.inject import Inject
 from micronaut.context.annotation import Requires
 # tag::imports[]
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.http import HttpRequest, HttpStatus, MediaType
 from micronaut.http.annotation import Body, Controller, Get, Post, Status
 from micronaut.http.client import HttpClient
@@ -23,8 +24,7 @@ class HelloController:
 
     # tag::nonblocking[]
     @Get("/hello/{name}")
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     def hello(self, name: str) -> Publisher:  # <1>
         return getattr(Mono, "from")(
             self.httpClient.retrieve(HttpRequest.GET("/hello/" + name))

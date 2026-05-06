@@ -1,5 +1,6 @@
 import java
 from micronaut.context.annotation import Requires
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.http import MediaType
 from micronaut.http.annotation import Controller, Get, Produces
 
@@ -25,15 +26,13 @@ class TextPlainController:
 
     @Get("/boolean/mono")
     @Produces(MediaType.TEXT_PLAIN)  # <1>
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     def monoBool(self) -> Publisher:
         return Mono.just("true")  # <2>
 
     @Get("/boolean/flux")
     @Produces(MediaType.TEXT_PLAIN)
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     def fluxBool(self) -> Publisher:
         return Flux.just("true")
 

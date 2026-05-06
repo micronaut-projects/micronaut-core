@@ -1,4 +1,4 @@
-from org.junit.jupiter.api import Test, Disabled
+from org.junit.jupiter.api import Test
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from micronaut.context import ApplicationContext
 from micronaut.context.annotation import Property
@@ -16,7 +16,6 @@ class EngineSpec:
     context : Annotated[ApplicationContext, Inject] = None
 
     @Test
-    @Disabled("GR-71643: There is a bug in GraalPy with interop with Java exceptions")
     def test_engine(self):
         # tag::start[]
         Engine = java.type("micronaut.docs.factories.nullable.Engine")

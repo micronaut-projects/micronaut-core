@@ -5,6 +5,7 @@ import java
 from micronaut.docs.annotation.PetOperations import PetOperations
 
 # tag::imports[]
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.http.client.annotation import Client
 from micronaut.retry.annotation import Retryable
 # end::imports[]
@@ -17,8 +18,7 @@ Publisher = java.type("org.reactivestreams.Publisher")
 @Retryable
 class PetClient(PetOperations):
 
-    # TODO: Re-enable @SingleResult when Python can import io.micronaut.core.async.annotation.SingleResult.
-    # @SingleResult
+    @SingleResult
     @abstractmethod
     def save(self, name: str, age: int) -> Publisher:
         pass
