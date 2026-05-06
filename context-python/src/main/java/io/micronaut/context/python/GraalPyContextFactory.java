@@ -103,10 +103,25 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
     public static @NonNull Context bootstrapReusableContext(@NonNull ClassLoader classLoader,
                                                             @NonNull Map<String, String> options) throws IOException {
+        return bootstrapReusableContext(classLoader, options, APPLICATION_MAIN);
+    }
+
+    /**
+     * Create a reusable GraalPy context and evaluate the requested application bootstrap script.
+     *
+     * @param classLoader The application class loader
+     * @param options Additional GraalPy context options
+     * @param applicationMain The Python source resource to evaluate after the generated launcher
+     * @return The initialized GraalPy context
+     * @throws IOException If the context cannot load application resources
+     */
+    public static @NonNull Context bootstrapReusableContext(@NonNull ClassLoader classLoader,
+                                                            @NonNull Map<String, String> options,
+                                                            @NonNull String applicationMain) throws IOException {
         if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
             return ContextHolder.getContext();
         }
-        var context = buildContext(HostAccess.ALL, Engine.create(), classLoader, options);
+        var context = buildContext(HostAccess.ALL, Engine.create(), classLoader, options, applicationMain);
         ContextHolder.setReuseContext(true);
         ContextHolder.setContext(context);
         return context;
@@ -120,6 +135,14 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                                                  Engine engine,
                                                  ClassLoader classLoader,
                                                  Map<String, String> options) throws IOException {
+        return buildContext(hostAccess, engine, classLoader, options, APPLICATION_MAIN);
+    }
+
+    private static @NonNull Context buildContext(HostAccess hostAccess,
+                                                 Engine engine,
+                                                 ClassLoader classLoader,
+                                                 Map<String, String> options,
+                                                 String applicationMain) throws IOException {
         var beacon = findBeacon(classLoader);
         System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
         System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
@@ -150,7 +173,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
         // Try to load the generated pyronaut_application.py from META-INF
         evaluateMain(classLoader, INTERNAL_MAIN, context);
-        evaluateMain(classLoader, APPLICATION_MAIN, context);
+        evaluateMain(classLoader, applicationMain, context);
         return context;
     }
 
