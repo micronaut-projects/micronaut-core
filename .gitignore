@@ -7,6 +7,7 @@ build/
 !build-logic/src/main/java/io/micronaut/build
 !build-logic/src/main/kotlin/io/micronaut/build
 classes/
+checkouts/
 out/
 *.db
 *.log
