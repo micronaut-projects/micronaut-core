@@ -31,7 +31,7 @@ dependencies {
             version {
                 require("1.84")
             }
-            because("netty-pkitesting 4.2.13.Final depends on Bouncy Castle 1.83 which is vulnerable")
+            because("netty-pkitesting depends on Bouncy Castle 1.83 which is vulnerable")
         }
     }
 }
