@@ -81,6 +81,65 @@ public class RequestFilterTest {
     }
 
     @Test
+    public void requestFilterBindingMultipleBodyReaders() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.POST("/request-filter/binding-multiple", "{\"foo\":10}").contentType(MediaType.APPLICATION_JSON_TYPE))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("application/json {\"foo\":10}")
+                    .build());
+                Assertions.assertEquals(
+                    List.of(
+                        "binding-multiple-1 application/json {\"foo\":10}",
+                        "binding-multiple-2 application/json {\"foo\":10}"
+                    ),
+                    server.getApplicationContext().getBean(MyServerFilter.class).events
+                );
+            })
+            .run();
+    }
+
+    @Test
+    public void requestFilterBindingMultipleStringBodyReaders() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(HttpRequest.POST("/request-filter/binding-multiple-string", "{\"foo\":10}").contentType(MediaType.APPLICATION_JSON_TYPE))
+            .assertion((server, request) -> {
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("application/json {\"foo\":10}")
+                    .build());
+                Assertions.assertEquals(
+                    List.of(
+                        "binding-multiple-string-1 application/json {\"foo\":10}",
+                        "binding-multiple-string-2 application/json {\"foo\":10}"
+                    ),
+                    server.getApplicationContext().getBean(MyServerFilter.class).events
+                );
+            })
+            .run();
+    }
+
+    @Test
+    public void requestFilterBindingMultipleStringBodyReadersRepeatedRequests() throws IOException {
+        TestScenario.builder()
+            .specName(SPEC_NAME)
+            .request(server -> HttpRequest.POST("/request-filter/binding-multiple-string", "{\"foo\":10}").contentType(MediaType.APPLICATION_JSON_TYPE))
+            .assertion((server, request) -> {
+                for (int i = 0; i < 25; i++) {
+                    AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .body("application/json {\"foo\":10}")
+                        .build());
+                }
+                Assertions.assertEquals(50, server.getApplicationContext().getBean(MyServerFilter.class).events.size());
+            })
+            .run();
+    }
+
+    @Test
     public void requestFilterImmediateRequestParameter() throws IOException {
         TestScenario.builder()
             .specName(SPEC_NAME)
@@ -454,6 +513,46 @@ public class RequestFilterTest {
             continuation.proceed();
         }
 
+        @RequestFilter("/request-filter/binding-multiple")
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        public void requestFilterBindingMultiple1(
+            @Header String contentType,
+            @Body byte[] bytes,
+            FilterContinuation<HttpResponse<?>> continuation) {
+            events.add("binding-multiple-1 " + contentType + " " + new String(bytes, StandardCharsets.UTF_8));
+            continuation.proceed();
+        }
+
+        @RequestFilter("/request-filter/binding-multiple")
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        public void requestFilterBindingMultiple2(
+            @Header String contentType,
+            @Body byte[] bytes,
+            FilterContinuation<HttpResponse<?>> continuation) {
+            events.add("binding-multiple-2 " + contentType + " " + new String(bytes, StandardCharsets.UTF_8));
+            continuation.proceed();
+        }
+
+        @RequestFilter("/request-filter/binding-multiple-string")
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        public void requestFilterBindingMultipleString1(
+            @Header String contentType,
+            @Nullable @Body String body,
+            FilterContinuation<HttpResponse<?>> continuation) {
+            events.add("binding-multiple-string-1 " + contentType + " " + body);
+            continuation.proceed();
+        }
+
+        @RequestFilter("/request-filter/binding-multiple-string")
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        public void requestFilterBindingMultipleString2(
+            @Header String contentType,
+            @Nullable @Body String body,
+            FilterContinuation<HttpResponse<?>> continuation) {
+            events.add("binding-multiple-string-2 " + contentType + " " + body);
+            continuation.proceed();
+        }
+
         @RequestFilter("/request-filter/immediate-mutable-request-parameter")
         public void requestFilterImmediateMutableRequestParameter(MutableHttpRequest<?> request) {
             request.setAttribute("foo", "bar");
@@ -584,6 +683,11 @@ public class RequestFilterTest {
     @Controller
     @Requires(property = "spec.name", value = SPEC_NAME)
     public static class MyController {
+        @Post("/request-filter/binding-multiple-string")
+        public String requestFilterBindingMultipleString(@Header String contentType, @Body String body) {
+            return contentType + " " + body;
+        }
+
         @Get("/request-filter/immediate-request-parameter")
         public String requestFilterImmediateRequestParameter() {
             return "foo";
@@ -661,6 +765,11 @@ public class RequestFilterTest {
 
         @Post("/request-filter/binding")
         public String requestFilterBinding(@Header String contentType, @Body byte[] bytes) {
+            return contentType + " " + new String(bytes, StandardCharsets.UTF_8);
+        }
+
+        @Post("/request-filter/binding-multiple")
+        public String requestFilterBindingMultiple(@Header String contentType, @Body byte[] bytes) {
             return contentType + " " + new String(bytes, StandardCharsets.UTF_8);
         }
 
