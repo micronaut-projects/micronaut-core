@@ -84,10 +84,7 @@ public class FuzzyInputTest {
 
     private static void writeInboundIfOpen(EmbeddedChannel channel, ByteBuf buffer) {
         if (channel.isOpen()) {
-            boolean accepted = channel.writeInbound(buffer);
-            if (!accepted) {
-                buffer.release();
-            }
+            channel.writeInbound(buffer);
         } else {
             buffer.release();
         }
