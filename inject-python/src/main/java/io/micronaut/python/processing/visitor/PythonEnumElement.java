@@ -94,6 +94,6 @@ public final class PythonEnumElement extends AbstractPythonClassElement implemen
 
     @Override
     public boolean isAssignable(String type) {
-        return getName().equals(type);
+        return Object.class.getName().equals(type) || getName().equals(type);
     }
 }

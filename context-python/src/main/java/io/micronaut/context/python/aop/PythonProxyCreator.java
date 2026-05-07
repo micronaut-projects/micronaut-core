@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python.aop;
 
+import io.micronaut.aop.Adapter;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.aop.runtime.RuntimeProxyCreator;
@@ -47,6 +48,8 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
+import static io.micronaut.aop.Adapter.InternalAttributes.ADAPTED_BEAN;
+
 @Internal
 @Singleton
 @NullMarked
@@ -57,8 +60,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         @Nullable T targetBean;
         Value value;
         if (proxyDefinition.introduction()) {
-            Class<T> beanType = proxyDefinition.proxyBeanDefinition().getBeanType();
-            value = ContextHolder.findClass(beanType.getPackageName(), beanType.getSimpleName());
+            Class<?> pythonBeanType = resolvePythonBeanType(proxyDefinition);
+            value = ContextHolder.findClass(pythonBeanType.getPackageName(), pythonBeanType.getSimpleName());
             targetBean = null;
         } else {
             targetBean = proxyDefinition.targetBean();
@@ -124,6 +127,16 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             throw new IllegalStateException("Target bean is null for non-introduction proxy");
         }
         return targetBean;
+    }
+
+    private Class<?> resolvePythonBeanType(RuntimeProxyDefinition<?> proxyDefinition) {
+        for (RuntimeProxyDefinition.InterceptedMethod<?> interceptedMethod : proxyDefinition.interceptedMethods()) {
+            Optional<Class> adaptedBean = interceptedMethod.executableMethod().classValue(Adapter.class, ADAPTED_BEAN);
+            if (adaptedBean.isPresent()) {
+                return adaptedBean.get();
+            }
+        }
+        return proxyDefinition.proxyBeanDefinition().getBeanType();
     }
 
     private <T> RuntimeProxyDefinition.InterceptedMethod<T> findInterceptedMethod(

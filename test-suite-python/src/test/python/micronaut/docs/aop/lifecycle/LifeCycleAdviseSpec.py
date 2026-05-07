@@ -1,5 +1,7 @@
-from org.junit.jupiter.api import Disabled, Test
+from typing import Annotated
 
+from jakarta.inject import Inject
+from org.junit.jupiter.api import Test
 from micronaut.context import ApplicationContext
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 
@@ -9,21 +11,19 @@ from .ProductService import ProductService
 
 @MicronautTest
 class LifeCycleAdviseSpec:
+    application_context: Annotated[ApplicationContext, Inject] = None
+    product_service: Annotated[ProductService, Inject] = None
+
     @Test
-    @Disabled("Python lifecycle @InterceptorBinding metadata for AroundConstruct/PostConstruct/PreDestroy is not fully supported yet")
     def test_life_cycle_advise(self):
-        context = ApplicationContext.run()
-        try:
-            # tag::test[]
-            product_service = context.getBean(ProductService)
+        # tag::test[]
+        product_service = self.product_service
 
-            product = context.createBean(Product, "Apple")  # <1>
-            assert product.is_active()
-            assert product_service.find_product("APPLE") is not None
+        product = self.application_context.createBean(Product, "Apple")  # <1>
+        assert product.is_active()
+        assert product_service.find_product("APPLE") is not None
 
-            context.destroyBean(product)  # <2>
-            assert not product.is_active()
-            assert product_service.find_product("APPLE") is None
-            # end::test[]
-        finally:
-            context.close()
+        self.application_context.destroyBean(product)  # <2>
+        assert not product.is_active()
+        assert product_service.find_product("APPLE") is None
+        # end::test[]

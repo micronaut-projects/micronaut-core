@@ -144,7 +144,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
 
     @Override
     public boolean isAssignable(String type) {
-        if (getName().equals(type)) {
+        if (Object.class.getName().equals(type) || getName().equals(type)) {
             return true;
         }
         for (TypeRef base : getNativeType().bases()) {

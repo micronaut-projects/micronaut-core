@@ -93,8 +93,7 @@ public final class PythonGenericPlaceholderElement extends AbstractPythonClassEl
 
     @Override
     public boolean isAssignable(String type) {
-        // A type variable is only assignable to itself
-        return getName().equals(type);
+        return Object.class.getName().equals(type) || getName().equals(type);
     }
 
     @Override

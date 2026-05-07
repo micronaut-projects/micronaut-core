@@ -310,14 +310,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
     }
 
     private static Value loadClass(Context ctx, @Nullable String packageName, String simpleName) {
-        if (packageName == null || PYTHON.equals(packageName)) {
-            Value v = ctx.getBindings(PYTHON).getMember(simpleName);
-            if (v == null) {
-                return ctx.eval(PYTHON, "import " + simpleName + "; " + simpleName).getMember(simpleName);
-            }
-            return v;
-        }
-        return ctx.eval(PYTHON, "from " + packageName + " import " + simpleName + "; " + simpleName);
+        return ContextHolder.findClass(packageName, simpleName, ctx);
     }
 
     private static Value loadScript(Context ctx, String packageName, String scriptName) {

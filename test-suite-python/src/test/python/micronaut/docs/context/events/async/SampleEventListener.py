@@ -12,9 +12,7 @@ class SampleEventListener:
     def __init__(self) -> None:
         self.invocation_counter = 0
 
-    # TODO: Re-enable @EventListener when Python event listener method
-    # adaptation with event arguments compiles.
-    # @EventListener
+    @EventListener
     @Async
     def on_sample_event(self, event: SampleEvent) -> None:
         self.invocation_counter += 1

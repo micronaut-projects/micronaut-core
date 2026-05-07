@@ -12,13 +12,9 @@ from org.zalando.logbook.netty import LogbookServerHandler
 # tag::class[]
 @Requires(beans=Logbook)
 @Singleton
-class LogbookNettyServerCustomizer:  # <1>
-    # TODO: Re-enable this direct port when Python BeanCreatedEventListener
-    # generic adaptation generates a valid bean definition.
-    # class LogbookNettyServerCustomizer(
-    #     BeanCreatedEventListener[NettyServerCustomizer.Registry]
-    # ):
-
+class LogbookNettyServerCustomizer(
+    BeanCreatedEventListener[NettyServerCustomizer.Registry]
+):  # <1>
     def __init__(self, logbook: Logbook):
         self.logbook = logbook
 

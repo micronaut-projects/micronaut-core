@@ -1,5 +1,5 @@
 # tag::class[]
-# TODO: Re-enable when Python request argument binder adapters compile nested BindingResult return types.
+# TODO: Re-enable when Python custom annotation stereotypes can resolve as Java annotation types for request binders.
 # import java
 # from jakarta.inject import Singleton
 # from micronaut.core.bind import ArgumentBinder
@@ -38,8 +38,10 @@
 #         parameterName = (
 #             context.getAnnotationMetadata()
 #             .stringValue(ShoppingCartClass)
-#             .orElse(context.getArgument().getName())
+#             .orElse("")
 #         )
+#         if parameterName == "":
+#             parameterName = context.getArgument().getName()
 #
 #         cookie = source.getCookies().get("shoppingCart")
 #         if cookie is None:

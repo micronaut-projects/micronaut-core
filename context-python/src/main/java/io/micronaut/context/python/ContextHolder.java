@@ -311,11 +311,10 @@ public final class ContextHolder {
         }
 
         String importName = rootName(simpleName);
-        String source = "from " + packageName + " import " + importName + "; " + importName;
         try {
-            return nestedMember(ctx.eval(PYTHON, source), simpleName);
+            return nestedMember(importPackageMember(ctx, packageName, importName), simpleName);
         } catch (Exception e) {
-            throw new InstantiationException("Failed to import Python class [" + source + "]: " + e.getMessage(), e);
+            throw new InstantiationException("Failed to import Python class [" + packageName + "." + simpleName + "]: " + e.getMessage(), e);
         }
     }
 
@@ -333,8 +332,7 @@ public final class ContextHolder {
         String importName = rootName(simpleName);
         Value v = ctx.getBindings(PYTHON).getMember(importName);
         if (v == null) {
-            Value member = ctx.eval(PYTHON, "import " + importName + "; " + importName)
-                .getMember(importName);
+            Value member = importModule(ctx, importName).getMember(importName);
             if (member == null) {
                 throw new InstantiationException("Cannot find Python class: " + simpleName);
             }
@@ -389,20 +387,10 @@ public final class ContextHolder {
                 if ("Unnamed".equals(scriptName)) {
                     return v;
                 } else {
-                    Value member = ctx.eval(PYTHON, "import " + scriptName)
-                        .getMember(scriptName);
-                    if (member == null) {
-                        throw new InstantiationException("Cannot find Python module: " + packageName);
-                    }
-                    return member;
+                    return importModule(ctx, scriptName);
                 }
             } else {
-                Value member = ctx.eval(PYTHON, "from " + packageName + " import " + scriptName)
-                    .getMember(scriptName);
-                if (member == null) {
-                    throw new InstantiationException("Cannot find Python module: " + packageName);
-                }
-                return member;
+                return importModule(ctx, packageName + "." + scriptName);
             }
         } else {
             throw new InstantiationException("Cannot find Python module: " + packageName);
@@ -423,9 +411,7 @@ public final class ContextHolder {
             return invokeStaticMethod(simpleName, methodName, args);
         } else {
             Context ctx = getContext();
-            String importName = rootName(simpleName);
-            Value pythonClass = nestedMember(ctx.eval(PYTHON, "from " + packageName + " import " + importName + "; " + importName), simpleName);
-            return pythonClass.invokeMember(methodName, args);
+            return findClass(packageName, simpleName, ctx).invokeMember(methodName, args);
         }
     }
 
@@ -444,14 +430,37 @@ public final class ContextHolder {
         if (v != null) {
             return nestedMember(v, simpleName).invokeMember(methodName, args);
         } else {
-            Value member = ctx.eval(PYTHON, "import " + importName + "; " + importName)
-                .getMember(importName);
+            Value member = importModule(ctx, importName).getMember(importName);
             if (member == null) {
                 throw new InstantiationException("Cannot find Python class: " + simpleName);
             }
             return nestedMember(member, simpleName)
                 .invokeMember(methodName, args);
         }
+    }
+
+    private static Value importPackageMember(Context ctx, String packageName, String importName) {
+        Value module = importModule(ctx, packageName);
+        Value member = module.getMember(importName);
+        if (member != null) {
+            return member;
+        }
+        Value submodule = importModule(ctx, packageName + "." + importName);
+        member = submodule.getMember(importName);
+        if (member != null) {
+            return member;
+        }
+        throw new InstantiationException("Cannot find Python member: " + packageName + "." + importName);
+    }
+
+    private static Value importModule(Context ctx, String moduleName) {
+        Value bindings = ctx.getBindings(PYTHON);
+        Value importModule = bindings.getMember("__micronaut_import_module");
+        if (importModule == null) {
+            ctx.eval(PYTHON, "import importlib\n__micronaut_import_module = importlib.import_module");
+            importModule = bindings.getMember("__micronaut_import_module");
+        }
+        return importModule.execute(moduleName);
     }
 
     /**

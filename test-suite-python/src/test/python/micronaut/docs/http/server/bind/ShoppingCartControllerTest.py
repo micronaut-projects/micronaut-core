@@ -16,11 +16,11 @@ String = java.type("java.lang.String")
 
 
 @MicronautTest
-@Disabled("Python request argument binder adapters generate an invalid nested BindingResult import")
 class ShoppingCartControllerTest:
     client: Annotated[HttpClient, Inject, Client("/")]
 
     @Test
+    @Disabled("Python custom annotation stereotypes are not resolved as Java annotation types for AnnotatedRequestArgumentBinder yet")
     def test_binding_bad_credentials(self):
         request = HttpRequest.GET("/customBinding/annotated").cookie(
             Cookie.of("shoppingCart", "{}")
@@ -37,6 +37,7 @@ class ShoppingCartControllerTest:
             assert message == "Required ShoppingCart [sessionId] not specified"
 
     @Test
+    @Disabled("Python custom annotation stereotypes are not resolved as Java annotation types for AnnotatedRequestArgumentBinder yet")
     def test_annotation_binding(self):
         request = HttpRequest.GET("/customBinding/annotated").cookie(
             Cookie.of("shoppingCart", "{\"sessionId\": 5}")

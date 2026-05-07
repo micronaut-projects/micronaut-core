@@ -859,6 +859,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return t.getName().replace('$', '.');
     }
 
+    private static ClassTypeDef javaClassType(ClassElement t) {
+        return ClassTypeDef.of(javaTypeName(t.getRawClassElement()));
+    }
+
     private static String pythonSimpleName(ClassElement element) {
         if (element instanceof AbstractPythonClassElement pythonClassElement) {
             return pythonClassElement.getNativeType().name().replace('$', '.');
@@ -1269,8 +1273,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         } else {
                             yield RUNTIME_UTIL
                                 .invokeStatic("convertValue", ClassTypeDef.OBJECT,
-                                    invokedValue, ClassTypeDef.of(returnType.getRawClassElement().getName()).getStaticField("class", TypeDef.CLASS))
-                                .cast(TypeDef.of(returnType));
+                                    invokedValue, javaClassType(returnType).getStaticField("class", TypeDef.CLASS))
+                                .cast(erasedType(returnType));
                         }
                     }
                 }
@@ -1289,7 +1293,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (componentType == null) {
             genericType = CLASS_OBJECT;
         } else {
-            genericType = ClassTypeDef.of(componentType).getStaticField("class", TypeDef.CLASS);
+            genericType = javaClassType(componentType).getStaticField("class", TypeDef.CLASS);
         }
         return genericType;
     }
@@ -1426,7 +1430,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     } else if (allClasses.containsKey(type.getName())) {
                         return ClassTypeDef.of(type).invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, member);
                     } else {
-                        return RUNTIME_UTIL.invokeStatic("convertValue", ClassTypeDef.OBJECT, member, ClassTypeDef.of(type.getRawClassElement().getName()).getStaticField("class", TypeDef.CLASS)).cast(TypeDef.of(type));
+                        return RUNTIME_UTIL.invokeStatic("convertValue", ClassTypeDef.OBJECT, member, javaClassType(type).getStaticField("class", TypeDef.CLASS)).cast(erasedType(type));
                     }
             }
         }
