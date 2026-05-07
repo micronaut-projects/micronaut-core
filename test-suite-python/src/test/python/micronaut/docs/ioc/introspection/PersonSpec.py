@@ -1,13 +1,12 @@
 import java
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 
 @MicronautTest(startApplication=False)
 class PersonSpec:
 
     @Test
-    @Disabled("Python BeanIntrospection instantiate currently returns a generated Java wrapper instead of a Python dataclass instance")
     def testPersonIntrospection(self) -> None:
         # tag::usage[]
         BeanIntrospection = java.type("io.micronaut.core.beans.BeanIntrospection")

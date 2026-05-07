@@ -42,9 +42,72 @@ class GraalPyExceptionHandlerTest {
         }
     }
 
+    @Test
+    void hostRuntimeExceptionsAreRethrownByContextHandler() {
+        try (Engine engine = Engine.newBuilder()
+                 .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+                 .build();
+             Context context = Context.newBuilder(PYTHON)
+                 .allowAllAccess(true)
+                 .engine(engine)
+                 .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+                 .build()) {
+            context.getBindings(PYTHON).putMember("thrower", new Thrower());
+            Value callback = context.eval(PYTHON, "lambda: thrower.throwRuntime()");
+
+            IllegalStateException exception = assertThrows(IllegalStateException.class, callback::execute);
+
+            assertEquals("boom", exception.getMessage());
+        }
+    }
+
+    @Test
+    void guestRuntimeExceptionsAreRethrownAsGeneratedWrappers() {
+        try (Engine engine = Engine.newBuilder()
+                 .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+                 .build();
+             Context context = Context.newBuilder(PYTHON)
+                 .allowAllAccess(true)
+                 .engine(engine)
+                 .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+                 .build()) {
+            context.getBindings(PYTHON).putMember("pythonBoomClass", PythonBoom.class.getName());
+            context.eval(PYTHON, """
+                import java
+                RuntimeException = java.type("java.lang.RuntimeException")
+
+                class PythonBoom(RuntimeException):
+                    pass
+
+                PythonBoom.__module__ = pythonBoomClass
+
+                def raise_boom():
+                    raise PythonBoom()
+                """);
+            Value callback = context.getBindings(PYTHON).getMember("raise_boom");
+
+            PythonBoom exception = assertThrows(PythonBoom.class, callback::execute);
+
+            assertEquals("PythonBoom", exception.asPolyglotValue().getMetaObject().getMetaSimpleName());
+        }
+    }
+
     public static final class Thrower {
         public void throwRuntime() {
             throw new IllegalStateException("boom");
+        }
+    }
+
+    public static final class PythonBoom extends RuntimeException implements ValueCoercible {
+        private final Value value;
+
+        public PythonBoom(Value value) {
+            this.value = value;
+        }
+
+        @Override
+        public Value asPolyglotValue() {
+            return value;
         }
     }
 }

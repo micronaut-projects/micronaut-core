@@ -134,6 +134,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
              .allowHostAccess(hostAccess)
              .hostClassLoader(classLoader)
              .engine(engine)
+             .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
              .allowHostClassLookup(name -> true);
         var pyEnv = System.getenv("PYENV_VERSION");
         var venv = System.getenv("VIRTUAL_ENV");

@@ -70,6 +70,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
     private final BlockingDeque<Context> pooledQueue = new LinkedBlockingDeque<>();
     private final List<Context> pooledContexts = new ArrayList<>();
     private final Map<Context, Map<String, Value>> cache = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, Object>> scriptInjections = new ConcurrentHashMap<>();
 
     private final AtomicInteger size = new AtomicInteger(0);
     private final AtomicReference<Thread> warmupThread = new AtomicReference<>();
@@ -203,6 +204,10 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         return getOrCreateClass(c, packageName, simpleName);
     }
 
+    Value getClass(Context context, @Nullable String packageName, String simpleName) {
+        return getOrCreateClass(context, packageName, simpleName);
+    }
+
     Value getAnyScript(String packageName, String scriptName) {
         Context c = pooledQueue.peekFirst();
         if (c == null) {
@@ -211,22 +216,23 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         return getOrCreateScript(c, packageName, scriptName);
     }
 
-    /**
-     * Injects an attribute value into the most recently created pooled context for a given script.
-     * This avoids broadcasting to all contexts and aligns with synchronous object creation flows.
-     */
-    void injectMostRecent(String packageName, String scriptName, String attribute, Object value) {
-        Context target;
-        if (!pooledQueue.isEmpty()) {
-            target = pooledQueue.getFirst();
-        } else {
-            // fallback to primary if no pooled contexts exist yet
-            target = primaryContext;
-        }
-        Map<String, Value> m = cache.computeIfAbsent(target, k -> new ConcurrentHashMap<>());
+    Value getScript(Context context, String packageName, String scriptName) {
+        return getOrCreateScript(context, packageName, scriptName);
+    }
+
+    void injectScript(String packageName, String scriptName, String attribute, Object value) {
         String key = scriptKey(packageName, scriptName);
-        Value script = m.computeIfAbsent(key, k -> loadScript(target, packageName, scriptName));
-        script.putMember(attribute, value);
+        scriptInjections.computeIfAbsent(key, ignored -> new ConcurrentHashMap<>()).put(attribute, value);
+        for (Context context : snapshotIncludingPrimary()) {
+            Map<String, Value> values = cache.get(context);
+            if (values == null) {
+                continue;
+            }
+            Value script = values.get(key);
+            if (script != null) {
+                script.putMember(attribute, coerceInjectedValue(context, value));
+            }
+        }
     }
 
     private synchronized void addPooledContext() {
@@ -261,6 +267,13 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         return new ArrayList<>(pooledContexts);
     }
 
+    private List<Context> snapshotIncludingPrimary() {
+        List<Context> contexts = new ArrayList<>(pooledContexts.size() + 1);
+        contexts.add(primaryContext);
+        contexts.addAll(pooledContexts);
+        return contexts;
+    }
+
     private Value getOrCreateClass(Context c, @Nullable String packageName, String simpleName) {
         Map<String, Value> m = cache.computeIfAbsent(c, k -> new ConcurrentHashMap<>());
         String key = classInstanceKey(packageName, simpleName);
@@ -276,7 +289,16 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
     private Value getOrCreateScript(Context c, String packageName, String scriptName) {
         Map<String, Value> m = cache.computeIfAbsent(c, k -> new ConcurrentHashMap<>());
         String key = scriptKey(packageName, scriptName);
-        return m.computeIfAbsent(key, k -> loadScript(c, packageName, scriptName));
+        return m.computeIfAbsent(key, k -> {
+            Value script = loadScript(c, packageName, scriptName);
+            scriptInjections.getOrDefault(key, Map.of())
+                .forEach((attribute, value) -> script.putMember(attribute, coerceInjectedValue(c, value)));
+            return script;
+        });
+    }
+
+    private static @Nullable Object coerceInjectedValue(Context context, Object value) {
+        return GraalPyRuntimeUtil.coerceToContext(value, context);
     }
 
     private static String classInstanceKey(@Nullable String pkg, String simple) {
@@ -313,6 +335,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         pooledContexts.removeAll(snapshot);
         pooledQueue.removeAll(snapshot);
         cache.clear();
+        scriptInjections.clear();
         for (Context context : snapshot) {
             try {
                 context.close(false);

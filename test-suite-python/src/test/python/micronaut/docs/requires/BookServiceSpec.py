@@ -15,7 +15,10 @@ class BookServiceSpec:
     @Test
     def test_book_service(self):
         assert self.book_service is not None, "should have a book service"
-        assert self.book_service.__class__.__name__ == 'JdbcBookService', "should be a JDBC book service"
+        book_service = self.book_service
+        if hasattr(book_service, "asPolyglotValue"):
+            book_service = book_service.asPolyglotValue()
+        assert book_service.__class__.__name__ == 'JdbcBookService', "should be a JDBC book service"
         assert self.book_service.data_source is not None, "should have a datasource"
 
     @MockBean

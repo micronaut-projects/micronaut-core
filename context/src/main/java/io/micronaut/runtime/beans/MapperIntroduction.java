@@ -83,7 +83,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        if (context.hasDeclaredAnnotation(Mapper.class)) {
+        if (context.hasDeclaredAnnotation(Mapper.class) && context.getArguments().length > 0) {
             ExecutableMethod<Object, Object> key = context.getExecutableMethod();
             MapInvocation invocation = cachedInvocations.get(key);
             if (invocation == null) {

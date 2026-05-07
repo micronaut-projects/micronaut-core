@@ -11,6 +11,13 @@ from .ChristmasTypes import ChristmasPresent, Present, PresentPackaging
 from micronaut.context.annotation import Mapper
 
 
+@dataclass
+@ReflectiveAccess
+@Introspected
+class Card:
+    greeting_card: str
+
+
 class AdditionalMappers(ABC):
     @Mapper  # <1>
     @abstractmethod
@@ -18,12 +25,12 @@ class AdditionalMappers(ABC):
         self,
         packaging: PresentPackaging,
         present: Present,
-        christmas_card: "Card",
+        christmas_card: Card,
     ) -> ChristmasPresent:
         pass
 
     @Mapper.Mapping(
-        **{"from": "#{updateFields.get('christmasCard') + '!!'}", "to": "greetingCard"}
+        **{"from": "#{update_fields['christmas_card'] + '!!'}", "to": "greeting_card"}
     )  # <2>
     @abstractmethod
     def update(
@@ -35,7 +42,7 @@ class AdditionalMappers(ABC):
 
     @Mapper(
         mergeStrategy="add-numbers",
-        value=[Mapper.Mapping(**{"from": "packaging.color", "to": "packagingColor"})],
+        value=[Mapper.Mapping(**{"from": "packaging.color", "to": "packaging_color"})],
     )  # <3>
     @abstractmethod
     def merge_with_merge_strategy(
@@ -60,11 +67,4 @@ class MyMergeStrategy(Mapper.MergeStrategy):
         if isinstance(current_value, float) and isinstance(value, float):
             return current_value + value
         return value
-
-
-@dataclass
-@ReflectiveAccess
-@Introspected
-class Card:
-    greeting_card: str
 # end::mapper[]

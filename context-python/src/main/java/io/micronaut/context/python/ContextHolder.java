@@ -77,6 +77,21 @@ public final class ContextHolder {
     }
 
     /**
+     * Obtain a pooled Python class instance from a specific context.
+     * @param packageName The Python package (or null/python for top-level)
+     * @param simpleName The class simple name
+     * @param context The context
+     * @return The pooled class instance (Value)
+     */
+    @UsedByGeneratedCode
+    public static Value findPooledClass(@Nullable String packageName, String simpleName, Context context) {
+        if (isReuseContext() || pythonPool == null) {
+            return findClass(packageName, simpleName, context);
+        }
+        return getPythonPool().getClass(context, packageName, simpleName);
+    }
+
+    /**
      * Execute a function with a borrowed pooled class instance.
      * @param packageName The Python package
      * @param simpleName The class name
@@ -107,6 +122,21 @@ public final class ContextHolder {
     }
 
     /**
+     * Obtain a pooled Python script/module object from a specific context.
+     * @param packageName The Python package
+     * @param scriptName The script/module name
+     * @param context The context
+     * @return A pooled script Value
+     */
+    @UsedByGeneratedCode
+    public static Value findPooledScript(String packageName, String scriptName, Context context) {
+        if (isReuseContext() || pythonPool == null) {
+            return findScript(packageName, scriptName, context);
+        }
+        return getPythonPool().getScript(context, packageName, scriptName);
+    }
+
+    /**
      * Execute a function with a borrowed pooled script/module object.
      * @param packageName The package
      * @param scriptName The script name
@@ -123,9 +153,6 @@ public final class ContextHolder {
     }
 
     /**
-     * Injects an attribute value into the most recently created pooled context for a given script.
-     * This avoids broadcasting to all contexts and aligns with synchronous object creation flows.
-     *
      * @param packageName The package
      * @param scriptName The script name
      * @param attribute The attribute name
@@ -135,10 +162,10 @@ public final class ContextHolder {
     public static void injectPooledScript(String packageName, String scriptName, String attribute, Object value) {
         if (isReuseContext() || pythonPool == null) {
             Value script = findScript(packageName, scriptName);
-            script.putMember(attribute, (value instanceof Value v) ? v : Value.asValue(value));
+            script.putMember(attribute, GraalPyRuntimeUtil.coerceToContext(value, script.getContext()));
             return;
         }
-        getPythonPool().injectMostRecent(packageName, scriptName, attribute, value);
+        getPythonPool().injectScript(packageName, scriptName, attribute, value);
     }
 
     /**
@@ -150,8 +177,10 @@ public final class ContextHolder {
      * @return The polyglot result
      */
     @UsedByGeneratedCode
-    public static Value invokePooled(String packageName, String simpleName, String methodName, Object... args) {
-        return withPooled(packageName, simpleName, v -> v.getMember(methodName).execute(args));
+    public static Value invokePooled(@Nullable String packageName, String simpleName, String methodName, Object... args) {
+        return withPooled(packageName, simpleName, v -> v.getMember(methodName).execute(
+            GraalPyRuntimeUtil.coerceArgumentsToContext(v.getContext(), args)
+        ));
     }
 
     /**
@@ -164,7 +193,9 @@ public final class ContextHolder {
      */
     @UsedByGeneratedCode
     public static Value invokePooledScript(String packageName, String scriptName, String methodName, Object... args) {
-        return withPooledScript(packageName, scriptName, v -> v.getMember(methodName).execute(args));
+        return withPooledScript(packageName, scriptName, v -> v.getMember(methodName).execute(
+            GraalPyRuntimeUtil.coerceArgumentsToContext(v.getContext(), args)
+        ));
     }
 
     public static Context getContext() {
@@ -243,7 +274,7 @@ public final class ContextHolder {
         Value instance = instantiate(packageName, simpleName, new Object[0], pythonClass);
         if (props != null && !props.isEmpty()) {
             for (java.util.Map.Entry<String, Object> e : props.entrySet()) {
-                instance.putMember(e.getKey(), e.getValue());
+                instance.putMember(e.getKey(), GraalPyRuntimeUtil.coerceToContext(e.getValue(), instance.getContext()));
             }
         }
         return instance;
@@ -251,7 +282,7 @@ public final class ContextHolder {
 
     private static Value instantiate(@Nullable String packageName, String simpleName, Object[] args, Value pythonClass) {
         if (pythonClass.canInstantiate()) {
-            return pythonClass.newInstance(args);
+            return pythonClass.newInstance(GraalPyRuntimeUtil.coerceArgumentsToContext(pythonClass.getContext(), args));
         } else {
             String qualifiedName = packageName == null || PYTHON.equals(packageName) ? simpleName :  packageName + "." + simpleName;
             throw new InstantiationException("Cannot instantiate class: " + qualifiedName + ". Ensure the class is a valid Python class and is non-abstract.");
@@ -271,11 +302,14 @@ public final class ContextHolder {
     }
 
     public static Value findClass(@org.jspecify.annotations.Nullable String packageName, String simpleName) {
+        return findClass(packageName, simpleName, getContext());
+    }
+
+    static Value findClass(@org.jspecify.annotations.Nullable String packageName, String simpleName, Context ctx) {
         if (packageName == null || PYTHON.equals(packageName)) {
-            return findClass(simpleName);
+            return findClass(simpleName, ctx);
         }
 
-        Context ctx = getContext();
         String source = "from " + packageName + " import " + simpleName + "; " + simpleName;
         try {
             return ctx.eval(PYTHON, source);
@@ -291,7 +325,10 @@ public final class ContextHolder {
      */
     @UsedByGeneratedCode
     public static Value findClass(String simpleName) {
-        Context ctx = getContext();
+        return findClass(simpleName, getContext());
+    }
+
+    static Value findClass(String simpleName, Context ctx) {
         Value v = ctx.getBindings(PYTHON).getMember(simpleName);
         if (v == null) {
             Value member = ctx.eval(PYTHON, "import " + simpleName + "; " + simpleName)

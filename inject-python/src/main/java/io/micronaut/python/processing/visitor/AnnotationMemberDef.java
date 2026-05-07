@@ -35,10 +35,17 @@ import java.util.Objects;
  */
 public record AnnotationMemberDef(String name,
                                   @Nullable ClassElement memberType,
-                                  @Nullable AnnotationMetadata annotationMetadata) implements ElementDef, AnnotationMetadataProvider {
+                                  @Nullable AnnotationMetadata annotationMetadata,
+                                  @Nullable List<DecoratorDef> decorators) implements ElementDef, AnnotationMetadataProvider {
+    public AnnotationMemberDef(String name,
+                               @Nullable ClassElement memberType,
+                               @Nullable AnnotationMetadata annotationMetadata) {
+        this(name, memberType, annotationMetadata, List.of());
+    }
+
     @Override
     public List<DecoratorDef> decorators() {
-        return List.of();
+        return decorators;
     }
 
     @Override
@@ -51,5 +58,10 @@ public record AnnotationMemberDef(String name,
 
     public AnnotationMemberDef {
         Objects.requireNonNull(name, "Annotation member name cannot be null");
+        if (decorators == null) {
+            decorators = List.of();
+        } else {
+            decorators = List.copyOf(decorators);
+        }
     }
 }

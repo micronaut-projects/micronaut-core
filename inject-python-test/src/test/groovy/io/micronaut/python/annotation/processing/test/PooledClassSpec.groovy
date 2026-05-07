@@ -7,7 +7,7 @@ import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementS
 
 class PooledClassSpec extends AbstractPythonTypeElementSpec {
 
-    void "pooled class yields multiple context ids and map/list conversions"() {
+    void "pooled class rotates directly and injects into target context"() {
         given:
         def python = '''
 from jakarta.inject import Singleton as S
@@ -46,15 +46,24 @@ class PoolController:
 '''
         Map<String, Object> props = ["micronaut.python.pool.size": 4, "micronaut.python.pool.sync-init": true]
         ApplicationContext context = buildContext(python, true, props)
+        def readerClass = context.classLoader.loadClass("python.CtxReader")
+        def reader = context.getBean(readerClass)
         def server = context.getBean(EmbeddedServer)
         server.start()
         def client = context.createBean(HttpClient, server.URL)
 
         when:
-        def ids = (1..12).collect { client.toBlocking().retrieve("/classpool/ctx") }.toSet()
+        def getCtxId = readerClass.getMethod("get_ctx_id")
+        def ids = (1..12).collect { getCtxId.invoke(reader) }.toSet()
 
         then:
         ids.size() >= 2
+
+        when:
+        def responseIds = (1..4).collect { client.toBlocking().retrieve("/classpool/ctx") }.toSet()
+
+        then:
+        responseIds.size() == 1
 
         when:
         def mapJson = client.toBlocking().retrieve("/classpool/map")

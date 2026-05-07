@@ -462,4 +462,53 @@ class NamedQualifierService:
         cleanup: "Ensure context is properly closed"
         context?.close()
     }
+
+    void "test constructor injection with non binding annotation member qualifier"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton, Qualifier
+from micronaut.context.annotation import NonBinding
+from typing import Annotated
+
+@Qualifier
+def Cylinders(value: int, description: Annotated[str, NonBinding] = ""):
+    def decorator(func):
+        return func
+    return decorator
+
+class Engine:
+    def start(self) -> str:
+        return "Engine"
+
+@Singleton
+@Cylinders(value=6, description="6-cylinder V6 engine")
+class V6Engine(Engine):
+    def start(self) -> str:
+        return "Starting V6"
+
+@Singleton
+@Cylinders(value=8, description="8-cylinder V8 engine")
+class V8Engine(Engine):
+    def start(self) -> str:
+        return "Starting V8"
+
+@Singleton
+class Vehicle:
+    def __init__(self, engine: Annotated[Engine, Cylinders(value=8)]):
+        self.engine = engine
+
+    def start(self) -> str:
+        return self.engine.start()
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def vehicle = getBean(context, "python.Vehicle").asPolyglotValue()
+
+        then:
+        vehicle.invokeMember("start").asString() == "Starting V8"
+
+        cleanup:
+        context?.close()
+    }
 }

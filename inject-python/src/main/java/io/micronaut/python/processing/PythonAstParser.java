@@ -256,6 +256,7 @@ public final class PythonAstParser {
             }
             Map map = result.as(Map.class);
             String code = map.containsKey("code") ? map.get("code").toString() : null;
+            String runtimeCode = map.containsKey("runtimeCode") ? map.get("runtimeCode").toString() : code;
             Map<String, String> decorators = map.containsKey("decorators") ? (Map<String, String>) map.get("decorators") : null;
             Map<String, java.util.List<Map<String, String>>> javaClassImports =
                 map.containsKey("javaClassImports") ? (Map<String, java.util.List<Map<String, String>>>) map.get("javaClassImports") : null;
@@ -264,6 +265,7 @@ public final class PythonAstParser {
             results.add(new TransformResult(
                 source,
                 code,
+                runtimeCode,
                 decorators,
                 javaClassImports,
                 exportedTypes,
@@ -304,8 +306,12 @@ public final class PythonAstParser {
             tree = ast.parse(src)
             transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements)
             transformed_tree = transformer.visit(tree)
+            runtime_tree = ast.parse(src)
+            runtime_transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, True)
+            transformed_runtime_tree = runtime_transformer.visit(runtime_tree)
             {
                 "code": unparse(transformed_tree),
+                "runtimeCode": unparse(transformed_runtime_tree),
                 "decorators": transformer.get_generated_decorator_code(),
                 "javaClassImports": transformer.java_class_imports,
                 "exportedTypes": transformer.get_exported_types(),
@@ -323,6 +329,7 @@ public final class PythonAstParser {
      *
      * @param originalSource   The original source
      * @param code             The transformed code
+     * @param runtimeCode      The runtime code
      * @param decorators       The decorators
      * @param javaClassImports The Java class imports
      * @param exportedTypes    The types that have Micronaut decorators
@@ -331,12 +338,21 @@ public final class PythonAstParser {
     public record TransformResult(
         Source originalSource,
         String code,
+        String runtimeCode,
         Map<String, String> decorators,
         Map<String, java.util.List<Map<String, String>>> javaClassImports,
         java.util.List<String> exportedTypes,
         java.util.List<String> allClassNames) {
 
         public Source transformedSource() {
+            return sourceWithContent(code);
+        }
+
+        public Source runtimeSource() {
+            return sourceWithContent(runtimeCode);
+        }
+
+        private Source sourceWithContent(String content) {
             try {
                 Source.Builder builder;
                 if (originalSource.getURL() != null) {
@@ -349,7 +365,7 @@ public final class PythonAstParser {
                 }
                 return builder
                     .name(originalSource.getName())
-                    .content(code)
+                    .content(content)
                     .build();
             } catch (IOException e) {
                 throw new ProcessingException(null, "Unable to create transformed source for " + originalSource, e);

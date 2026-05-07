@@ -23,7 +23,6 @@ class BindHttpClientExceptionBodySpec:
 
     # tag::test[]
     @Test
-    @Disabled("Python HTTP client returns generated Java wrapper objects for bound error bodies instead of Python dataclass objects")
     def afterAnHttpClientExceptionTheResponseBodyCanBeBoundToAPOJO(self):
         try:
             self.client.toBlocking().exchange(

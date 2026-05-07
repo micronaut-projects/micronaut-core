@@ -25,8 +25,10 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
+import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
 import java.util.ArrayList;
@@ -111,6 +113,7 @@ public class PythonTypeElementVisitorProcessor {
                         );
                     }
                     visitor.visitClass(element, pythonVisitorContext);
+                    visitMethods(loadedVisitor, element, pythonVisitorContext);
                 }
             }
             // Also process script elements
@@ -123,12 +126,26 @@ public class PythonTypeElementVisitorProcessor {
                         );
                     }
                     visitor.visitClass(scriptElement, pythonVisitorContext);
+                    visitMethods(loadedVisitor, scriptElement, pythonVisitorContext);
                 }
             }
         }
 
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             loadedVisitor.getVisitor().finish(pythonVisitorContext);
+        }
+    }
+
+    private void visitMethods(LoadedVisitor loadedVisitor, ClassElement element, PythonVisitorContext pythonVisitorContext) {
+        TypeElementVisitor<?, ?> visitor = loadedVisitor.getVisitor();
+        TypeElementQuery query = visitor.query();
+        if (!query.includesMethods()) {
+            return;
+        }
+        for (MethodElement method : element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())) {
+            if (loadedVisitor.matchesElement(method.getAnnotationMetadata())) {
+                visitor.visitMethod(method, pythonVisitorContext);
+            }
         }
     }
 

@@ -98,6 +98,38 @@ class TestDataClass:
         context?.close()
     }
 
+    void "test @Introspected excludes merge generated proxy properties"() {
+        given:
+        def pythonCode = '''
+from micronaut.core.annotation import Introspected
+from dataclasses import dataclass
+
+@Introspected(excludes=["ignored"])
+@dataclass
+class TestDataClass:
+    name: str
+    ignored: str
+
+'''
+
+        when:
+        def excludes = buildClassElement(pythonCode, "TestDataClass") { classElement ->
+            classElement.getAnnotationMetadata().stringValues(Introspected, "excludes") as Set
+        }
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.TestDataClass")
+
+        then:
+        introspection != null
+        introspection.getProperty("name").isPresent()
+        introspection.getProperty("ignored").isEmpty()
+        introspection.getProperty("memberKeys").isEmpty()
+        excludes == ["ignored", "memberKeys"] as Set
+
+        cleanup:
+        context?.close()
+    }
+
     void "test @Introspected on regular Python class with attributes no constructor"() {
         given:
         def pythonCode = '''

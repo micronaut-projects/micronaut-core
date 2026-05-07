@@ -81,7 +81,10 @@ public class PythonVisitorContext implements VisitorContext {
 
     @Override
     public ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
-        throw new UnsupportedOperationException("Expressions not yet supported");
+        if (javaVisitorContext != null) {
+            return javaVisitorContext.getExpressionCompilationContextFactory();
+        }
+        throw new UnsupportedOperationException("Expressions require a Java visitor context");
     }
 
     @Override

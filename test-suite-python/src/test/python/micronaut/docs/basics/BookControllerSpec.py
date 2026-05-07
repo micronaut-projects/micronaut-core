@@ -6,7 +6,7 @@ from micronaut.http import HttpRequest, HttpStatus, MediaType
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 from .Book import Book
 
@@ -19,7 +19,6 @@ class BookControllerSpec:
     client: Annotated[HttpClient, Inject, Client("/")]
 
     @Test
-    @Disabled("Python @Status on controller methods is ignored, returning OK with the expected body")
     def testPostWithURITemplate(self):
         # tag::posturitemplate[]
         call = getattr(Flux, "from")(
@@ -37,7 +36,6 @@ class BookControllerSpec:
         assert "The Stand" == message.get().title
 
     @Test
-    @Disabled("Python @Status on controller methods is ignored, returning OK with the expected body")
     def testPostFormData(self):
         # tag::postform[]
         call = getattr(Flux, "from")(

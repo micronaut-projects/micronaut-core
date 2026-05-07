@@ -46,6 +46,7 @@ import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
 import org.jspecify.annotations.Nullable;
+import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.context.annotation.Executable;
@@ -79,6 +80,7 @@ import io.micronaut.python.processing.util.ObjectHelper;
 public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     public static final TypeDef POLYGLOT_VALUE = TypeDef.of(Value.class);
+    public static final TypeDef POLYGLOT_CONTEXT = TypeDef.of(Context.class);
     public static final VariableDef.StaticField CLASS_OBJECT = ClassTypeDef.of(Object.class).getStaticField("class", TypeDef.CLASS);
     public static final String AS_POLYGLOT_VALUE = "asPolyglotValue";
     public static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
@@ -171,13 +173,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // Check if this class extends another PythonClassElement
                     ClassElement superType = element.getSuperType().orElse(null);
                     boolean extendsPythonClass = superType instanceof AbstractPythonClassElement;
-                    if (superType instanceof AbstractPythonClassElement) {
-                        ClassTypeDef superClassType = ClassTypeDef.of(superType.getName());
-                        builder.superclass(superClassType);
+                    boolean extendsHostThrowable = superType != null
+                        && !extendsPythonClass
+                        && superType.isAssignable(Throwable.class.getName());
+                    if (extendsPythonClass || extendsHostThrowable) {
+                        builder.superclass(ClassTypeDef.of(superType.getName()));
                     }
 
                     boolean isIntrospectedBean = element.hasStereotype(Introspected.class);
                     final boolean isIntroductionBean = element.hasStereotype(Introduction.class);
+                    boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(ann -> ann.hasDeclaredAnnotation(JUNIT_TEST))).isPresent();
 
                     List<PropertyElement> beanProperties = element.getBeanProperties();
                     Map<String, FieldDef> propertyFields = new LinkedHashMap<>();
@@ -185,7 +190,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         for (PropertyElement beanProperty : beanProperties) {
                             FieldDef field = FieldDef.builder(beanProperty.getName())
                                 .ofType(TypeDef.of(beanProperty.getType()))
-                                .addModifiers(Modifier.PRIVATE)
+                                .addModifiers(Modifier.PUBLIC)
                                 .build();
                             builder.addField(field);
                             propertyFields.put(beanProperty.getName(), field);
@@ -193,9 +198,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     }
 
                     FieldDef pythonValue = null;
-                    if (!isIntrospectedBean && !extendsPythonClass) {
-                        pythonValue = FieldDef.builder("graalpyInternalValue")
-                            .ofType(POLYGLOT_VALUE).addModifiers(Modifier.FINAL, Modifier.PROTECTED).build();
+                    if (!extendsPythonClass) {
+                        FieldDef.FieldDefBuilder pythonValueBuilder = FieldDef.builder("graalpyInternalValue")
+                            .ofType(POLYGLOT_VALUE)
+                            .addModifiers(Modifier.PROTECTED);
+                        if (!isIntrospectedBean && !isJunit5Test) {
+                            pythonValueBuilder.addModifiers(Modifier.FINAL);
+                        }
+                        pythonValue = pythonValueBuilder.build();
                         builder.addField(pythonValue);
                     }
 
@@ -205,17 +215,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // Track method names that have been added to avoid duplicates
                     Set<String> addedMethodNames = stubEntry.bridgedMethods();
 
-                    if (isDeclaredBean) {
-
-                        for (ClassElement anInterface : interfaces) {
-                            TypeDef interfaceTypeDef = parameterizedTypeDef(anInterface);
-                            builder.addSuperinterface(interfaceTypeDef);
-                            List<MethodElement> methods = anInterface.getMethods();
-                            Set<MethodElement> methodSet = new LinkedHashSet<>();
-                            for (MethodElement method : methods) {
-                                if (methodSet.contains(method) || method.isDefault()) {
-                                    continue;
-                                }
+                    for (ClassElement anInterface : interfaces) {
+                        TypeDef interfaceTypeDef = parameterizedTypeDef(anInterface);
+                        builder.addSuperinterface(interfaceTypeDef);
+                        List<MethodElement> methods = anInterface.getMethods();
+                        Set<MethodElement> methodSet = new LinkedHashSet<>();
+                        for (MethodElement method : methods) {
+                            if (methodSet.contains(method) || method.isDefault()) {
+                                continue;
+                            }
                             if (method.hasDeclaredStereotype(InterceptorBinding.class)) {
                                 isAopProxy = true;
                             }
@@ -224,20 +232,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         }
                     }
 
-                    if (isIntroductionBean) {
-                        List<MethodElement> abstractDeclaredMethods = element.getEnclosedElements(
-                            ElementQuery.ALL_METHODS
-                                .onlyAccessible()
-                                .onlyInstance()
-                                .onlyDeclared()
-                                .filter(MethodElement::isAbstract));
-                        for (MethodElement method : abstractDeclaredMethods) {
-                            addBridgeMethod(method, builder, context, false, false, addedMethodNames);
+                    if (isDeclaredBean) {
+                        if (isIntroductionBean) {
+                            List<MethodElement> abstractDeclaredMethods = element.getEnclosedElements(
+                                ElementQuery.ALL_METHODS
+                                    .onlyAccessible()
+                                    .onlyInstance()
+                                    .onlyDeclared()
+                                    .filter(MethodElement::isAbstract));
+                            for (MethodElement method : abstractDeclaredMethods) {
+                                addBridgeMethod(method, builder, context, false, false, addedMethodNames);
+                            }
                         }
                     }
-                    }
-
-                    boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(ann -> ann.hasDeclaredAnnotation(JUNIT_TEST))).isPresent();
 
                     // Constructor from polyglot Value
                     final FieldDef pythonValueFinal = pythonValue;
@@ -256,6 +263,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             List<StatementDef> assigns = new ArrayList<>();
                                             if (extendsPythonClass) {
                                                 assigns.add(aThis.superRef().invokeConstructor(val));
+                                            } else if (pythonValueFinal != null) {
+                                                assigns.add(aThis.field(pythonValueFinal).assign(val));
                                             }
                                             for (PropertyElement beanProperty : beanProperties) {
                                                 FieldDef field = propertyFields.get(beanProperty.getName());
@@ -295,6 +304,25 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                             .addModifiers(Modifier.PUBLIC)
                             .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> {
+                                    if (beanProperties.isEmpty() && pythonValueFinal != null) {
+                                        ExpressionDef storedValue = aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field"));
+                                        ExpressionDef newValue = CONTEXT_HOLDER.invokeStatic(
+                                            isAbstractIntro ? "newIntroduction" : "newInstance",
+                                            POLYGLOT_VALUE,
+                                            List.of(
+                                                ExpressionDef.constant(element.getPackageName()),
+                                                ExpressionDef.constant(element.getSimpleName())
+                                            )
+                                        );
+                                        return storedValue.isNonNull().doIfElse(
+                                            storedValue.returning(),
+                                            StatementDef.multi(
+                                                aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(newValue),
+                                                aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).returning()
+                                            )
+                                        );
+                                    }
+                                    ExpressionDef reconstructedValue;
                                     var primaryCtor = element.getPrimaryConstructor().orElse(null);
                                     if (primaryCtor == null) {
                                         // No explicit constructor: instantiate with no args and set members via map
@@ -307,7 +335,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         }
                                         ExpressionDef propsMap = ClassTypeDef.of(AnnotationUtil.class)
                                             .invokeStatic("mapOf", TypeDef.of(Map.class), mapEntries);
-                                        return CONTEXT_HOLDER.invokeStatic(
+                                        reconstructedValue = CONTEXT_HOLDER.invokeStatic(
                                             "newInstance",
                                             POLYGLOT_VALUE,
                                             List.of(
@@ -315,7 +343,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 ExpressionDef.constant(element.getSimpleName()),
                                                 propsMap
                                             )
-                                        ).returning();
+                                        );
                                     } else {
                                         // Constructor present: use positional args
                                         List<ExpressionDef> args = new ArrayList<>();
@@ -328,14 +356,33 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         }ExpressionDef fieldRef = aThis.field(field);
                                             args.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT));
                                         }
-                                        return CONTEXT_HOLDER.invokeStatic(isAbstractIntro ? "newIntroduction" : "newInstance", POLYGLOT_VALUE, args).returning();
+                                        reconstructedValue = CONTEXT_HOLDER.invokeStatic(isAbstractIntro ? "newIntroduction" : "newInstance", POLYGLOT_VALUE, args);
                                     }
+                                    return reconstructedValue.returning();
                                 })
                             ));
                     } else {
                         builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                             .addModifiers(Modifier.PUBLIC)
                             .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> {
+                                if (isJunit5Test) {
+                                    ExpressionDef storedValue = aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field"));
+                                    ExpressionDef newValue = CONTEXT_HOLDER.invokeStatic(
+                                        "newInstance",
+                                        POLYGLOT_VALUE,
+                                        List.of(
+                                            ExpressionDef.constant(element.getPackageName()),
+                                            ExpressionDef.constant(element.getSimpleName())
+                                        )
+                                    );
+                                    return storedValue.isNonNull().doIfElse(
+                                        storedValue.returning(),
+                                        StatementDef.multi(
+                                            aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(newValue),
+                                            aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).returning()
+                                        )
+                                    );
+                                }
                                 if (pythonValueFinal != null) {
                                     return aThis.field(pythonValueFinal).returning();
                                 } else {
@@ -450,7 +497,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
                         final boolean isAbstractIntroNoArg = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
                         builder.addMethod(constructor.build(((aThis, methodParameters) -> {
-                            if (isIntrospectedBean) {
+                            if (isJunit5Test || isIntrospectedBean) {
                                 return StatementDef.multi();
                             } else {
                                 ExpressionDef pythonInstance = CONTEXT_HOLDER
@@ -476,18 +523,39 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             .onlyDeclared()
                             .annotated(ann -> isJunit5Test ||
                                 ann.hasStereotype(Executable.class) ||
+                                ann.hasAnnotation("io.micronaut.context.annotation.Mapper") ||
+                                ann.hasAnnotation("io.micronaut.context.annotation.Mapper$Mapping") ||
                                 ann.hasAnnotation(AnnotationUtil.PRE_DESTROY) ||
                                 ann.hasAnnotation(AnnotationUtil.POST_CONSTRUCT) ||
                                 ann.hasStereotype(Around.class) ||
+                                ann.hasStereotype(InterceptorBinding.class) ||
                                 element.hasStereotype(Around.class) ||
                                 ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
                                 ann.hasDeclaredStereotype(Bean.class)));
 
+                    boolean hasIntroductionAdviceMethod = false;
                     for (MethodElement methodElement : methodsToBridge) {
-                        if (methodElement.hasDeclaredStereotype(InterceptorBinding.class)) {
+                        if (methodElement.hasStereotype(InterceptorBinding.class)) {
                             isAopProxy = true;
                         }
+                        if (methodElement.hasStereotype(InterceptorBinding.class) ||
+                            methodElement.hasAnnotation("io.micronaut.context.annotation.Mapper") ||
+                            methodElement.hasAnnotation("io.micronaut.context.annotation.Mapper$Mapping")) {
+                            hasIntroductionAdviceMethod = true;
+                        }
                         addBridgeMethod(methodElement, builder, context, methodElement.hasDeclaredAnnotation(JUNIT_TEST), false, addedMethodNames);
+                    }
+                    if (hasIntroductionAdviceMethod) {
+                        List<MethodElement> concreteDeclaredMethods = element.getEnclosedElements(
+                            ElementQuery.ALL_METHODS
+                                .onlyAccessible()
+                                .onlyInstance()
+                                .onlyDeclared()
+                                .filter(method -> !method.isAbstract())
+                        );
+                        for (MethodElement methodElement : concreteDeclaredMethods) {
+                            addBridgeMethod(methodElement, builder, context, methodElement.hasDeclaredAnnotation(JUNIT_TEST), false, addedMethodNames);
+                        }
                     }
 
                     // Find injection methods (annotated with @Inject)
@@ -515,6 +583,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                         builder.addMethod(injectionMethodBuilder
                             .build(((aThis, methodParameters) -> {
+                                var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
+                                var targetContext = targetValue.invoke("getContext", POLYGLOT_CONTEXT);
                                 List<ExpressionDef> parameters = new ArrayList<>();
                                 parameters.add(ExpressionDef.constant(injectionMethod.getName()));
 
@@ -522,11 +592,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 for (int i = 0; i < injectionMethod.getParameters().length; i++) {
                                     ParameterElement param = injectionMethod.getParameters()[i];
                                     VariableDef.MethodParameter methodParam = methodParameters.get(i);
-                                    coerceParameterToPolyglotValue(param, parameters, methodParam);
+                                    coerceParameterToPolyglotValue(param, parameters, methodParam, targetContext);
                                 }
 
-                                var invokedValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
-                                    .invoke("invokeMember", POLYGLOT_VALUE, parameters);
+                                var invokedValue = targetValue.invoke("invokeMember", POLYGLOT_VALUE, parameters);
 
                                 // For injection methods, just invoke without explicit return
                                 ClassElement returnType = injectionMethod.getReturnType();
@@ -735,36 +804,45 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     static TypeDef erasedType(ClassElement t) {
-        var parameterType = !t.getTypeArguments().isEmpty() ? ClassTypeDef.of(t.getName()) : TypeDef.of(t);
-        return parameterType;
+        if (t.isPrimitive() || t.isArray()) {
+            return TypeDef.of(t);
+        }
+        String javaTypeName = javaTypeName(t);
+        if (!t.getTypeArguments().isEmpty() || !javaTypeName.equals(t.getName())) {
+            return ClassTypeDef.of(javaTypeName);
+        }
+        return TypeDef.of(t);
+    }
+
+    private static String javaTypeName(ClassElement t) {
+        return t.getName().replace('$', '.');
     }
 
     static void coerceParameterToPolyglotValue(
         TypedElement param,
         List<ExpressionDef> parameters,
         VariableDef.MethodParameter methodParam) {
+        coerceParameterToPolyglotValue(param, parameters, methodParam, null);
+    }
+
+    static void coerceParameterToPolyglotValue(
+        TypedElement param,
+        List<ExpressionDef> parameters,
+        VariableDef.MethodParameter methodParam,
+        @Nullable ExpressionDef targetContext) {
+        ExpressionDef parameter;
         ClassElement genericType = param.getGenericType();
         if (genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement) {
-            parameters.add(RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), methodParam));
+            parameter = RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), methodParam);
         } else if (genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement) {
-            parameters.add(RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), methodParam));
-        } else if (genericType instanceof PythonClassElement pce) {
-            boolean isPooled = pce.hasStereotype("io.micronaut.context.python.scope.ContextPooled");
-            if (isPooled) {
-                // For pooled Python classes, inject the Java stub (host object), not the polyglot Value.
-                // This ensures method calls go through the Java wrapper which proxies to pooled contexts.
-                parameters.add(methodParam);
-            } else if (param.hasAnnotation("jakarta.annotation.Nullable")) {
-                parameters.add(methodParam.isNull().doIfElse(
-                        ExpressionDef.nullValue(),
-                        methodParam.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
-                ));
-            } else {
-                parameters.add(methodParam.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE));
-            }
+            parameter = RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), methodParam);
         } else {
-            parameters.add(methodParam);
+            parameter = methodParam;
         }
+        if (targetContext != null) {
+            parameter = RUNTIME_UTIL.invokeStatic("coerceToContext", TypeDef.OBJECT, parameter, targetContext);
+        }
+        parameters.add(parameter);
     }
 
     private static ExpressionDef coerceTypedElementToPolyglotValue(TypedElement element, ExpressionDef expr) {
@@ -773,11 +851,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), expr);
         } else if (genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement) {
             return RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), expr);
-        } else if (genericType instanceof PythonClassElement) {
-            return expr.isNull().doIfElse(
-                ExpressionDef.nullValue(),
-                expr.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
-            );
         } else {
             return expr;
         }
@@ -855,16 +928,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         builder.addMethod(methodBuilder
             .build(((aThis, methodParameters) -> {
+                var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
+                var targetContext = targetValue.invoke("getContext", POLYGLOT_CONTEXT);
                 List<ExpressionDef> parameterExpressions = new ArrayList<>();
                 for (int i = 0; i < parameters.length; i++) {
                     @NonNull ParameterElement parameter = parameters[i];
                     VariableDef.MethodParameter methodParameter = methodParameters.get(i);
-                    coerceParameterToPolyglotValue(parameter, parameterExpressions, methodParameter);
+                    coerceParameterToPolyglotValue(parameter, parameterExpressions, methodParameter, targetContext);
                 }
 
                 // Get the return type to determine appropriate conversion method
                 var returnType = methodElement.getGenericReturnType();
-                var invokedValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
+                var invokedValue = targetValue
                     .invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(pythonFunctionName))
                     .invoke("execute", POLYGLOT_VALUE, parameterExpressions);
 
@@ -975,14 +1050,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
 
         builder.addMethod(propertySetter.build(((aThis, methodParameters) -> {
+            var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
+            var targetContext = targetValue.invoke("getContext", POLYGLOT_CONTEXT);
             List<ExpressionDef> parameters = new ArrayList<>();
             parameters.add(ExpressionDef.constant(beanProperty.getName()));
             coerceParameterToPolyglotValue(
                 beanProperty,
                 parameters,
-                methodParameters.getFirst()
+                methodParameters.getFirst(),
+                targetContext
             );
-            return aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).invoke(
+            return targetValue.invoke(
                 "putMember",
                 TypeDef.VOID,
                 parameters
@@ -1001,14 +1079,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
 
         builder.addMethod(propertySetter.build(((aThis, methodParameters) -> {
+            var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
+            var targetContext = targetValue.invoke("getContext", POLYGLOT_CONTEXT);
             List<ExpressionDef> parameters = new ArrayList<>();
             parameters.add(ExpressionDef.constant(beanProperty.getName()));
             coerceParameterToPolyglotValue(
                 beanProperty,
                 parameters,
-                methodParameters.getFirst()
+                methodParameters.getFirst(),
+                targetContext
             );
-            return aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).invoke(
+            return targetValue.invoke(
                 "putMember",
                 TypeDef.VOID,
                 parameters
@@ -1048,14 +1129,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
 
         builder.addMethod(propertySetter.build(((aThis, methodParameters) -> {
+            var targetValue = aThis.field(pythonValue);
+            var targetContext = targetValue.invoke("getContext", POLYGLOT_CONTEXT);
             List<ExpressionDef> parameters = new ArrayList<>();
             parameters.add(ExpressionDef.constant(beanProperty.getName()));
             coerceParameterToPolyglotValue(
                 beanProperty,
                 parameters,
-                methodParameters.getFirst()
+                methodParameters.getFirst(),
+                targetContext
             );
-            ExpressionDef.InvokeInstanceMethod result = aThis.field(pythonValue).invoke(
+            ExpressionDef.InvokeInstanceMethod result = targetValue.invoke(
                 "putMember",
                 TypeDef.VOID,
                 parameters

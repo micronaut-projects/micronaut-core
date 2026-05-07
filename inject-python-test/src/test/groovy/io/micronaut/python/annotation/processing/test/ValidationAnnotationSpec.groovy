@@ -240,6 +240,35 @@ class ProductService:
         classElement != null
     }
 
+    def "test annotated external Java return type"() {
+        given:
+        @Language("python") def pythonCode = '''
+from jakarta.inject import Singleton
+from typing import Annotated
+from jakarta.validation.constraints import NotNull
+import java
+
+URI = java.type("java.net.URI")
+
+@Singleton
+class ExternalReturnService:
+    def current_uri(self) -> Annotated[URI, NotNull]:
+        return URI.create("https://micronaut.io")
+'''
+
+        when:
+        def classElement = buildClassElement(pythonCode) { ClassElement element ->
+            def method = element.findMethod("current_uri").get()
+            def returnType = method.getReturnType()
+            assert returnType.name == "java.net.URI"
+            assert returnType.hasAnnotation(NotNull)
+            return element
+        }
+
+        then:
+        classElement != null
+    }
+
     def "test singleton bean constructor parameters with validation annotations"() {
         given: "Python singleton bean with validated constructor parameters"
         @Language("python") def pythonCode = '''

@@ -9,7 +9,7 @@ from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.http.client.exceptions import HttpClientResponseException
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 HttpStatus = java.type("io.micronaut.http.HttpStatus")
 Map = java.type("java.util.Map")
@@ -17,7 +17,6 @@ Map = java.type("java.util.Map")
 
 @Property(name="spec.name", value="ExceptionHandlerSpec")
 @MicronautTest
-@Disabled("Python exception classes do not extend Java Throwable, so custom ExceptionHandler<T> cannot compile yet")
 class ExceptionHandlerSpec:
     client: Annotated[HttpClient, Inject, Client("/")]
 
@@ -26,7 +25,7 @@ class ExceptionHandlerSpec:
         request = HttpRequest.GET("/books/stock/1234")
 
         try:
-            self.client.toBlocking().exchange(request, Argument.of(int), Argument.of(Map))
+            self.client.toBlocking().exchange(request, Argument.INT, Argument.of(Map))
             assert False
         except HttpClientResponseException as e:
             response = e.getResponse()

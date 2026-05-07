@@ -4,7 +4,7 @@ This file tracks Python docs examples that are present but disabled, or intentio
 
 ## Wave 0 Reconciliation
 
-- Last generated active `@Disabled` count: 66.
+- Last generated active `@Disabled` count: 50.
 - Last generated command: `rg -n "@Disabled\\(" test-suite-python/src/test/python/micronaut/docs`.
 - Last full-suite command: `./gradlew --no-daemon -Dorg.gradle.java.home=/Users/graemerocher/.sdkman/candidates/java/current :test-suite-python:test --max-workers=2`.
 - Last full-suite result: build successful, 180 tests executed, 74 skipped.
@@ -25,16 +25,10 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `aop/advice/AdviceFactorySpec.py` | Python AOP advice on `@Factory` bean methods fails during factory bean processing. |
 | `aop/lifecycle/LifeCycleAdviseSpec.py` | Python lifecycle `@InterceptorBinding` metadata for `AroundConstruct`/`PostConstruct`/`PreDestroy` is not fully supported yet. |
 | `aop/retry/ProgrammaticRetrySpec.py` | Python Java SAM conversion for `RetryOperations` suppliers is not validated yet. |
-| `annotation/PetControllerSpec.py::testPostPet` | Python HTTP client returns generated Java wrapper objects for Python dataclass responses instead of Python objects. |
+| `annotation/PetControllerSpec.py::testPostPet` | Python `@Client Publisher` return type is decoded as `Object` without `Pet` generic element metadata. |
 | `annotation/PetControllerSpec.py::testPostPetValidation` | Python client-side validation metadata is not applied to the generated `Publisher` client method yet. |
-| `annotation/headers/HeaderSpec.py::testSenderHeaders` | Python HTTP client returns generated Java wrapper objects for Python dataclass responses instead of Python objects. |
+| `annotation/headers/HeaderSpec.py::testSenderHeaders` | Python `@Client` introduction inherits an abstract `save` method without an introduction interceptor. |
 | `annotation/retry/PetRetrySpec.py::testFallback` | Python HTTP client `Publisher` return types lose generic element metadata for fallback resolution. |
-| `basics/BookControllerSpec.py::testPostFormData` | Python `@Status(HttpStatus.CREATED)` on controller methods is ignored, returning `OK` with the expected body. |
-| `basics/BookControllerSpec.py::testPostWithURITemplate` | Python `@Status(HttpStatus.CREATED)` on controller methods is ignored, returning `OK` with the expected body. |
-| `basics/HelloControllerSpec.py::testPostRequestWithPOJO` | Python `@Status(HttpStatus.CREATED)` on controller methods is ignored, returning `OK` with the expected body. |
-| `basics/HelloControllerSpec.py::testPostRequestWithString` | Python `@Status(HttpStatus.CREATED)` on controller methods is ignored, returning `OK` with the expected body. |
-| `basics/HelloControllerSpec.py::testRetrieveWithPOJO` | Python HTTP client returns generated Java wrapper objects for Python dataclass responses instead of Python objects. |
-| `basics/HelloControllerSpec.py::testRetrieveWithPOJOResponse` | Python HTTP client returns generated Java wrapper objects for Python dataclass responses instead of Python objects. |
 | `client/ThirdPartyClientFilterSpec.py::aClientFilterIsAppliedToTheRequestAndAddsTheAuthorizationHeader` | Python client filter method support is not validated yet for `@ClientFilter`/`@RequestFilter`. |
 | `client/filter/BasicAuthFilterSpec.py::testTheFilterIsApplied` | Python custom annotation stereotypes are not validated yet for `@FilterMatcher` client matching. |
 | `config/builder/VehicleSpec.py` | Python `@ConfigurationBuilder` binding does not populate builder methods yet. |
@@ -42,7 +36,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `config/env/EachPropertyTest.py::test_each_property` | Python `@EachProperty` named configuration beans are not returned as expected yet. |
 | `config/env/EachPropertyTest.py::test_each_property_list` | Python list-based `@EachProperty @Parameter` index passes an unexpected arity to GraalPy. |
 | `config/immutable/VehicleSpec.py` | Python immutable `@ConfigurationProperties` constructor injection is not resolved yet. |
-| `config/importer/DemoPropertySourceImporterTest.py` | Python `PropertySourceImporter.ImportContext` adaptation is not implemented yet. |
 | `config/properties/VehicleSpec.py` | Python `@ConfigurationProperties` constructor injection resolves imported configuration types as `Object`. |
 | `context/events/application/SampleEventListenerSpec.py` | Generics issues are not fully resolved. |
 | `context/events/async/SampleEventListenerSpec.py` | Python `@EventListener` method adaptation with event argument types is not resolved yet. |
@@ -54,22 +47,16 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `datavalidation/pogo/EmailControllerSpec.py::test_pojo_validation` | Python `@Valid` body validation metadata is generated, but invalid requests are not rejected yet. |
 | `factories/VehicleMockSpec.py` | Beans from fields are not supported in Python at the moment. |
 | `inject/qualifiers/any/VehicleSpec.py` | Generic types are not represented in the AST yet. |
-| `ioc/mappers/MappersSpec.py` | Python `@Mapper` interface introduction is not fully validated yet. |
-| `ioc/mappers/SimpleMapperSpec.py` | Python `@Mapper` interface introduction is not fully validated yet. |
 | `http/server/stream/StreamControllerSpec.py::test_returning_a_stream` | Python `@Body InputStream` binding receives an empty stream for `text/plain` request bodies. |
 | `http/server/netty/websocket/SimpleTextWebSocketSpec.py` | Python `@ClientWebSocket` introduction cannot proxy Python classes yet (`PythonClassElement` cast to `JavaClassElement`). |
 | `http/server/netty/websocket/PojoWebSocketSpec.py` | Python `@ClientWebSocket` introduction cannot proxy Python classes yet (`PythonClassElement` cast to `JavaClassElement`). |
 | `http/server/secondary/SecondaryServerTest.py` | Secondary Python factory starts an eager `NettyEmbeddedServer` before the GraalPy context is initialized. |
 | `http/server/bind/ShoppingCartControllerTest.py` | Python request argument binder adapters generate an invalid nested `ArgumentBinder.BindingResult` import. |
 | `http/client/bind/annotation/AnnotationBinderSpec.py::testBindingToTheRequest` | Python `AnnotatedClientArgumentRequestBinder` compiles but does not add the custom metadata headers yet, resulting in a bad request from the target controller. |
-| `http/client/bind/type/CustomBinderSpec.py::testBindingToTheRequest` | Python `TypedClientArgumentRequestBinder` receives generated Java wrapper objects instead of Python dataclass objects. |
 | `http/client/bind/method/MethodBinderSpec.py::testBindingToTheRequest` | Python `AnnotatedClientRequestBinder` compiles but does not read the custom method annotation value yet. |
-| `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::afterAnHttpClientExceptionTheResponseBodyCanBeBoundToAPOJO` | Python HTTP client returns generated Java wrapper objects for bound error bodies instead of Python dataclass objects. |
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::testExceptionBindingErrorResponse` | Python error-body binding does not currently reproduce the Java bind-failure behavior for dataclasses without defaults. |
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::verifyBindErrorIsThrown` | Python HTTP client body binding does not currently reproduce the Java decode-failure exception. |
 | `i18n/I18nSpec.py::itIsPossibleToCreateAMessageSourceFromResourceBundle` | Python docs test resources are not resolved by `ResourceBundleMessageSource` yet; message lookups return `Optional.empty()`. |
-| `ioc/introspection/PersonSpec.py::testPersonIntrospection` | Python `BeanIntrospection.instantiate` currently returns a generated Java wrapper instead of a Python dataclass instance. |
-| `qualifiers/annotationmember/VehicleSpec.py` | `PythonAnnotationMetadataBuilder.hasAnnotation` needs to handle `NonBinding` definition in `Cylinder`. |
 | `qualifiers/any/VehicleSpec.py` | Generic types are not represented in the Python AST yet for `@Any` injection. |
 | `replaces/BookServiceSpec.py` | `ReplacesDefinition` never loads. |
 | `resources/ResourceLoaderTest.py::testExampleForResourceResolver` | Python docs test classpath resources are not resolved through `ResourceResolver` yet; `classpath:hello.txt` returns empty. |
@@ -79,15 +66,12 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `server/endpoint/CurrentDateEndpointSpec.py::testReadCustomDateEndpoint` | Python management endpoint routing is not validated yet. |
 | `server/endpoint/MessageEndpointSpec.py::testWriteMessageEndpoint` | Python management endpoint write/delete routing is not validated yet. |
 | `server/intro/HelloClientSpec.py::testHelloWorldResponse` | Python `@Client Publisher` return type is decoded as `Object` for this declarative client. |
-| `server/exception/ExceptionHandlerSpec.py` | Python exception classes do not extend Java `Throwable`, so custom `ExceptionHandler<T>` cannot compile yet. |
-| `server/filters/TraceFilterSpec.py` | Python `HttpServerFilter` implementation fails bean instantiation with GraalPy constructor arity error. |
 | `server/routes/IssuesControllerTest.py::test_default_issue` | Python optional URI segment default binding returns 400 for `/issues/default`. |
 | `server/routing/RouteConditionControllerTest.py` | Python `@RouteCondition` route selection returns 400 for conditional routes. |
 | `server/upload/UploadControllerSpec.py::testFileBytesUpload` | Python multipart byte array binding delivers `CompletedFileUpload` instead of byte content. |
 | `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming` | Python `@Client` `Publisher` return types do not retain generic `Event` element metadata for SSE decoding yet. |
 | `streaming/HeadlineControllerSpec.py::testClientAnnotationStreaming` | Python `@Client` `Publisher` return types do not retain generic element metadata for JSON stream decoding yet. |
 | `streaming/HeadlineControllerSpec.py::testStreamingClient` | GraalPy cannot adapt a Python subscriber object to `org.reactivestreams.Subscriber` for `Flux.subscribe`. |
-| `writable/WritableSpec.py` | Python classes extending `Writable` are not generated as Java `Writable` implementations yet. |
 
 ## Commented Unsupported Snippet Ports
 
@@ -105,7 +89,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `http/server/bind/type/ShoppingCartRequestArgumentBinder.py` | Re-enable typed custom request binding when Python binder adapters compile nested `BindingResult` return types. |
 | `http/server/netty/websocket/ChatClientWebSocket.py` | Re-enable `@ClientWebSocket` when Python introduction advice can proxy Python classes. |
 | `http/server/netty/websocket/PojoChatClientWebSocket.py` | Re-enable `@ClientWebSocket` when Python introduction advice can proxy Python classes. |
-| `server/exception/OutOfStockExceptionHandler.py` | Re-enable the custom `ExceptionHandler<OutOfStockException, HttpResponse>` when Python classes can extend Java `Throwable` types. |
 | `netty/LogbookNettyClientCustomizer.py` | Re-enable `BeanCreatedEventListener[NettyClientCustomizer.Registry]` when Python listener generic adaptation generates a valid bean definition. |
 | `netty/LogbookNettyServerCustomizer.py` | Re-enable `BeanCreatedEventListener[NettyServerCustomizer.Registry]` when Python listener generic adaptation generates a valid bean definition. |
 | `server/routes/MyRoutes.py` | Re-enable `DefaultRouteBuilder` example when Python classes can extend/support programmatic routes. |

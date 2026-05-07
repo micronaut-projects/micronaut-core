@@ -62,6 +62,27 @@ public class PythonAstParserTest {
     }
 
     @Test
+    void testParseIgnoresLocalClassesDeclaredInsideFunctions() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        String sources = """
+            class DemoPropertySourceImporterTest:
+                def imports_demo_defaults(self):
+                    class DemoImportContext:
+                        def environment(self):
+                            pass
+                    return DemoImportContext()
+            """;
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(null, sources);
+
+        try (PythonEnvironment environment = pythonProcessor.parse(sources, "micronaut.docs.config.importer")) {
+            assertTrue(environment.classes().containsKey("micronaut.docs.config.importer.DemoPropertySourceImporterTest"));
+            assertFalse(environment.classes().containsKey("micronaut.docs.config.importer.DemoImportContext"));
+            assertEquals(1, environment.classes().size());
+            assertEquals(List.of("DemoPropertySourceImporterTest"), transformResult.allClassNames());
+        }
+    }
+
+    @Test
     void testParseDecorators() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""
@@ -114,6 +135,86 @@ class MySingletonService:
 
             assertTrue(environment.decorators().containsKey(Singleton.class.getName()));
             assertTrue(environment.decorators().containsKey(Scope.class.getName()));
+        }
+    }
+
+    @Test
+    void testDecoratorDictionaryExpansionAndNestedAnnotationValues() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+def micronaut_annotation(name, repeated=None):
+    def decorator(func):
+        return func
+    return decorator
+
+@micronaut_annotation("io.micronaut.context.annotation.Mapper")
+def Mapper(*args, **kwargs):
+    def decorator(func):
+        return func
+    return decorator
+
+@micronaut_annotation(
+    "io.micronaut.context.annotation.Mapper$Mapping",
+    repeated="io.micronaut.context.annotation.Mapper",
+)
+def Mapping(*args, **kwargs):
+    def decorator(func):
+        return func
+    return decorator
+
+Mapper.Mapping = Mapping
+
+class ProductMappers:
+    @Mapper.Mapping(
+        to="price",
+        **{"from": "#{product.price * 2}", "format": "$#.00"},
+    )
+    def to_product_dto(self, product):
+        pass
+
+    @Mapper(
+        value=[Mapper.Mapping(**{"from": "product.manufacturer", "to": "distributor"})],
+    )
+    def to_manufacturer_dto(self, product):
+        pass
+            """)) {
+            ClassDef productMappers = environment.classes().get("ProductMappers");
+            assertNotNull(productMappers);
+
+            FunctionDef productDto = productMappers.functions()
+                .stream()
+                .filter(function -> "to_product_dto".equals(function.name()))
+                .findFirst()
+                .orElseThrow();
+            DecoratorDef directMapping = productDto.decorators()
+                .stream()
+                .filter(decorator -> "io.micronaut.context.annotation.Mapper$Mapping".equals(decorator.annotationName()))
+                .findFirst()
+                .orElseThrow();
+
+            assertEquals("price", directMapping.members().get("to").asString());
+            assertEquals("#{product.price * 2}", directMapping.members().get("from").asString());
+            assertEquals("$#.00", directMapping.members().get("format").asString());
+
+            FunctionDef manufacturerDto = productMappers.functions()
+                .stream()
+                .filter(function -> "to_manufacturer_dto".equals(function.name()))
+                .findFirst()
+                .orElseThrow();
+            DecoratorDef mapper = manufacturerDto.decorators()
+                .stream()
+                .filter(decorator -> "io.micronaut.context.annotation.Mapper".equals(decorator.annotationName()))
+                .findFirst()
+                .orElseThrow();
+
+            org.graalvm.polyglot.Value value = mapper.members().get("value");
+            assertTrue(value.hasArrayElements());
+            Object nested = value.getArrayElement(0).asHostObject();
+            assertInstanceOf(DecoratorDef.class, nested);
+            DecoratorDef nestedMapping = (DecoratorDef) nested;
+            assertEquals("io.micronaut.context.annotation.Mapper$Mapping", nestedMapping.annotationName());
+            assertEquals("product.manufacturer", nestedMapping.members().get("from").asString());
+            assertEquals("distributor", nestedMapping.members().get("to").asString());
         }
     }
 

@@ -16,7 +16,7 @@ class PetControllerSpec:
     client: Annotated[PetClient, Inject]
 
     @Test
-    @Disabled("Python HTTP client returns generated Java wrapper objects for Python dataclass responses instead of Python objects")
+    @Disabled("Python @Client Publisher return type is decoded as Object without Pet generic element metadata")
     def testPostPet(self) -> None:
         # tag::post[]
         pet = getattr(Mono, "from")(self.client.save("Dino", 10)).block()

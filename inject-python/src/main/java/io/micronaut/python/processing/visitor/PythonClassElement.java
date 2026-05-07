@@ -33,19 +33,24 @@ import io.micronaut.python.processing.util.GraalPyUtil;
 import org.jetbrains.annotations.Nullable;
 
 public final class PythonClassElement extends AbstractPythonClassElement {
+    private static final String MEMBER_KEYS_PROPERTY = "memberKeys";
+
     private Map<String, ClassElement> resolvedTypeArguments;
 
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment) {
         super(classDef, environment);
+        excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);
     }
 
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment, int arrayDimensions) {
         super(classDef, environment, arrayDimensions);
+        excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);
     }
 
     PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment, int arrayDimensions, Map<String, ClassElement> resolvedTypeArguments) {
         super(classDef, environment, arrayDimensions);
         this.resolvedTypeArguments = resolvedTypeArguments;
+        excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);
     }
 
     @Override
@@ -64,7 +69,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
     }
 
     public boolean isPythonSource() {
-        return environment.classes().containsKey(getNativeType().name());
+        return environment.classes().containsKey(getName());
     }
 
     @Override
@@ -122,7 +127,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
             if (base.name().equals(type)) {
                 return true;
             }
-            ClassElement baseElement = environment.classes().get(base.name());
+            ClassElement baseElement = findPythonClass(base);
             if (baseElement != null && baseElement.isAssignable(type)) {
                 return true;
             }
@@ -141,7 +146,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         List<TypeRef> bases = getNativeType().bases();
         List<ClassElement> interfaces = new ArrayList<>();
         for (TypeRef basis : bases) {
-            ClassElement baseElement = environment.classes().get(basis.name());
+            ClassElement baseElement = findPythonClass(basis);
             // python types can't be interfaces so skip if null and search java
             if (baseElement == null) {
                 ClassElement javaInterface = toJavaType(basis).orElse(null);
@@ -159,7 +164,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
 
         if (!bases.isEmpty()) {
             for (TypeRef base : bases) {
-                ClassElement baseElement = environment.classes().get(base.name());
+                ClassElement baseElement = findPythonClass(base);
                 if (baseElement != null) {
                     List<? extends GenericPlaceholderElement> declaredGenericPlaceholders = baseElement.getDeclaredGenericPlaceholders();
                     List<TypeRef> typeArguments = base.typeArguments();
@@ -225,4 +230,5 @@ public final class PythonClassElement extends AbstractPythonClassElement {
             })
             .toList();
     }
+
 }

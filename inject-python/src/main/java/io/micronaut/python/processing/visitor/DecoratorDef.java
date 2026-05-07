@@ -37,7 +37,8 @@ public record DecoratorDef(
     String annotationName,
     @Nullable String repeatedName,
     @Nullable Map<String, Value> members,
-    @Nullable List<DecoratorDef> stereotypes) {
+    @Nullable List<DecoratorDef> stereotypes,
+    @Nullable Map<String, List<DecoratorDef>> memberDecorators) {
 
     /**
      * Simplified constructor with just the name.
@@ -46,7 +47,7 @@ public record DecoratorDef(
      * @param annotationName The micronaut annotation name
      */
     public DecoratorDef(String name, String annotationName) {
-        this(name, annotationName, null, Map.of(), List.of());
+        this(name, annotationName, null, Map.of(), List.of(), Map.of());
     }
 
     /**
@@ -57,7 +58,24 @@ public record DecoratorDef(
      * @param members        The members
      */
     public DecoratorDef(String name, String annotationName, Map<String, Value> members) {
-        this(name, annotationName, null, members, List.of());
+        this(name, annotationName, null, members, List.of(), Map.of());
+    }
+
+    /**
+     * Constructor without member decorators.
+     *
+     * @param name           The decorator name
+     * @param annotationName The micronaut annotation name
+     * @param repeatedName   The repeatable annotation container name
+     * @param members        The members
+     * @param stereotypes    The stereotypes
+     */
+    public DecoratorDef(String name,
+                        String annotationName,
+                        @Nullable String repeatedName,
+                        @Nullable Map<String, Value> members,
+                        @Nullable List<DecoratorDef> stereotypes) {
+        this(name, annotationName, repeatedName, members, stereotypes, Map.of());
     }
 
     public DecoratorDef {
@@ -72,6 +90,11 @@ public record DecoratorDef(
             stereotypes = List.of();
         } else {
             stereotypes = Collections.unmodifiableList(stereotypes);
+        }
+        if (memberDecorators == null) {
+            memberDecorators = Map.of();
+        } else {
+            memberDecorators = Collections.unmodifiableMap(memberDecorators);
         }
     }
 

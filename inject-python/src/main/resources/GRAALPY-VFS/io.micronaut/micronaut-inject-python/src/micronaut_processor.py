@@ -129,6 +129,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
     def visit(self, node: ast.AST) -> ast.AST:
         match node:
             case ast.ClassDef():
+                if self.in_function or self.current_class is not None:
+                    return node
+
                 # Track class names for local type resolution
                 self.local_classes.add(node.name)
 
@@ -244,6 +247,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     # Only check for micronaut decorators on top-level functions (not nested)
                     if self.current_class is None and not was_in_function and is_micronaut_decorator(node, self):
                         arg_dict = extract_arg_defaults(node)
+                        member_decorators = extract_arg_decorators(self, node)
                         # Filter out micronaut_annotation decorators as they are internal helpers
                         stereotypes = [
                             decorator_to_function(self, d)
@@ -262,7 +266,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         if annotation_name:
                             self.java_type_assignments[node.name] = annotation_name
 
-                        decorator_def = DecoratorDef(node.name, annotation_name, repeated_name, arg_dict, stereotypes)
+                        decorator_def = DecoratorDef(node.name, annotation_name, repeated_name, arg_dict, stereotypes, member_decorators)
                         self.known_decorators[node.name] = decorator_def
                         self.callback.apply(decorator_def)
                         return node
@@ -778,7 +782,15 @@ class MicronautAstVisitor(ast.NodeVisitor):
             return ""
         root = parts[0]
         tail = parts[1:]
-        base = self.imported_types.get(root, root)
+        base = self.imported_types.get(root) or self.java_type_assignments.get(root, root)
+        if len(tail) == 1:
+            nested_type = self.java_type_assignments.get(tail[0])
+            if nested_type and (
+                base == root
+                or nested_type.startswith(f"{base}.")
+                or nested_type.startswith(f"{base}$")
+            ):
+                return nested_type
         full = ".".join([base] + tail) if tail else base
         if full.startswith("micronaut.") or full.startswith("io.micronaut."):
             full = self._to_java_import_module(full)
@@ -1534,6 +1546,16 @@ def convert_ast_value(node, visitor=None):
     elif isinstance(node, ast.Tuple):
         # Handle tuples
         return tuple(convert_ast_value(elt, visitor) for elt in node.elts)
+    elif isinstance(node, ast.Dict):
+        return {
+            convert_ast_value(key, visitor): convert_ast_value(value, visitor)
+            for key, value in zip(node.keys, node.values)
+            if key is not None
+        }
+    elif isinstance(node, ast.Call):
+        nested_decorator = convert_ast_call_to_decorator(node, visitor)
+        if nested_decorator is not None:
+            return nested_decorator
     elif isinstance(node, ast.Attribute):
         # Handle qualified names like module.Class or constant references like StringUtils.TRUE
         names = []
@@ -1575,6 +1597,55 @@ def convert_ast_value(node, visitor=None):
     except Exception:
         # Fallback to AST dump for complex expressions
         return ast.dump(node) if hasattr(ast, 'dump') else str(node)
+
+def convert_ast_call_to_decorator(node, visitor=None):
+    if visitor is None or not isinstance(node, ast.Call):
+        return None
+    decorator_reference = extract_decorator_name(node.func)
+    if decorator_reference is None:
+        return None
+    simple_name = decorator_reference.split(".")[-1]
+    if (
+        simple_name in visitor.known_decorators
+        or simple_name in visitor.imported_types
+        or decorator_reference in visitor.imported_types
+    ):
+        return decorator_to_function(visitor, node)
+    return None
+
+def merge_keyword_argument(result, kw, visitor=None):
+    if kw.arg is not None:
+        value = convert_ast_value(kw.value, visitor)
+        result[kw.arg] = value
+        return
+
+    for key, value in extract_keyword_expansion(kw.value, visitor).items():
+        result[key] = value
+
+def extract_keyword_expansion(node, visitor=None):
+    if isinstance(node, ast.Dict):
+        result = {}
+        for key_node, value_node in zip(node.keys, node.values):
+            if key_node is None:
+                result.update(extract_keyword_expansion(value_node, visitor))
+                continue
+            key = convert_ast_value(key_node, visitor)
+            if isinstance(key, str):
+                result[key] = convert_ast_value(value_node, visitor)
+        return result
+
+    try:
+        value = ast.literal_eval(node)
+    except Exception:
+        return {}
+
+    if isinstance(value, dict):
+        return {
+            key: val
+            for key, val in value.items()
+            if isinstance(key, str)
+        }
+    return {}
 
 def _resolve_java_constant(visitor, name_parts):
     """
@@ -1648,6 +1719,24 @@ def extract_arg_defaults(func_node):
 
     return arg_dict
 
+def extract_arg_decorators(visitor, func_node):
+    """
+    Given an ast.FunctionDef node for a Python decorator, return decorators applied to its members
+    through typing.Annotated metadata.
+    """
+    member_decorators = {}
+    for arg in func_node.args.args:
+        annotation = getattr(arg, 'annotation', None)
+        if (
+            isinstance(annotation, ast.Subscript)
+            and isinstance(annotation.value, ast.Name)
+            and annotation.value.id == 'Annotated'
+        ):
+            _, decorators = visitor._parse_annotated_type(annotation)
+            if decorators:
+                member_decorators[arg.arg] = decorators
+    return member_decorators
+
 def extract_call_arguments_with_defaults(funcdef, call, visitor=None):
     """
     Given an ast.FunctionDef (can be None) and an ast.Call node,
@@ -1666,9 +1755,7 @@ def extract_call_arguments_with_defaults(funcdef, call, visitor=None):
             result["value" if i == 0 else f"arg{i}"] = value
         # Handle keyword arguments
         for kw in call.keywords:
-            if kw.arg is not None:
-                value = convert_ast_value(kw.value, visitor)
-                result[kw.arg] = value
+            merge_keyword_argument(result, kw, visitor)
     else:
         # Get parameter names from function definition
         try:
@@ -1685,9 +1772,7 @@ def extract_call_arguments_with_defaults(funcdef, call, visitor=None):
                 result["value" if i == 0 else f"arg{i}"] = value
             # Handle keyword arguments
             for kw in call.keywords:
-                if kw.arg is not None:
-                    value = convert_ast_value(kw.value, visitor)
-                    result[kw.arg] = value
+                merge_keyword_argument(result, kw, visitor)
         else:
             # Normal case with named parameters
             # Map positional arguments by their position in the parameter list
@@ -1699,9 +1784,7 @@ def extract_call_arguments_with_defaults(funcdef, call, visitor=None):
 
             # Map keyword arguments by their parameter names
             for kw in call.keywords:
-                if kw.arg is not None:
-                    value = convert_ast_value(kw.value, visitor)
-                    result[kw.arg] = value
+                merge_keyword_argument(result, kw, visitor)
 
     return result
 

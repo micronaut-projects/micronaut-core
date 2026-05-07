@@ -17,7 +17,7 @@ class HeaderSpec:
     client: Annotated[PetClient, Inject]
 
     @Test
-    @Disabled("Python HTTP client returns generated Java wrapper objects for Python dataclass responses instead of Python objects")
+    @Disabled("Python @Client introduction inherits an abstract save method without an introduction interceptor")
     def testSenderHeaders(self) -> None:
         pet = getattr(Mono, "from")(self.client.get("Fred")).block()
 

@@ -20,6 +20,7 @@ import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.aop.runtime.RuntimeProxyCreator;
 import io.micronaut.aop.runtime.RuntimeProxyDefinition;
 import io.micronaut.context.python.ContextHolder;
+import io.micronaut.context.python.GraalPyRuntimeUtil;
 import io.micronaut.context.python.ValueCoercible;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.annotation.Internal;
@@ -75,7 +76,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         for (Map.Entry<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> entry : interceptedMethodsByName.entrySet()) {
             String methodName = entry.getKey();
             List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods = entry.getValue();
-            Value originalFunction = value.getMember(methodName);
+            Value originalFunction = isIntroduction ? getRawClassMember(value, methodName) : value.getMember(methodName);
             ProxyExecutable proxiedFunction = args -> {
                 RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = findInterceptedMethod(methodName, interceptedMethods, args);
                 ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
@@ -83,16 +84,21 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
                 Object[] javaArgs = fromPolyglotArray(args, executableMethod.getArguments());
                 Interceptor<T, ?>[] finalInterceptors;
-                if (isIntroduction) {
+                if (isIntroduction && executableMethod.isAbstract()) {
                     finalInterceptors = interceptors;
                 } else {
                     if (originalFunction == null) {
                         throw new IllegalStateException("No original function found for method: " + executableMethod);
                     }
                     finalInterceptors = Arrays.copyOf(interceptors, interceptors.length + 1, Interceptor[].class);
-                    finalInterceptors[finalInterceptors.length - 1] = invocationContext -> originalFunction.execute(
-                        toPolyglotArray(invocationContext.getParameterValues(), originalFunction.getContext())
-                    );
+                    finalInterceptors[finalInterceptors.length - 1] = invocationContext -> {
+                        Value executable = isIntroduction
+                            ? bindDescriptor(originalFunction, invocationContext.getTarget(), value)
+                            : originalFunction;
+                        return executable.execute(
+                            toPolyglotArray(invocationContext.getParameterValues(), executable.getContext())
+                        );
+                    };
                 }
                 @SuppressWarnings("unchecked")
                 T tb = targetBean != null ? targetBean : (T) targetBeanRef.get();
@@ -131,6 +137,47 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             }
         }
         throw new IllegalArgumentException("No overload found for method " + methodName + " with " + args.length + " arguments");
+    }
+
+    @Nullable
+    private Value getRawClassMember(Value pythonClass, String methodName) {
+        // Read the class dictionary descriptor so Python handles instance/static/class method binding.
+        Value member = getRawClassMemberFunction(pythonClass.getContext()).execute(pythonClass, methodName);
+        if (GraalPyRuntimeUtil.isNone(member)) {
+            return null;
+        }
+        return member;
+    }
+
+    private Value getRawClassMemberFunction(Context context) {
+        String functionName = "__micronaut_get_raw_class_member";
+        Value bindings = context.getBindings(GraalPyRuntimeUtil.PYTHON);
+        Value function = bindings.getMember(functionName);
+        if (GraalPyRuntimeUtil.isNone(function)) {
+            context.eval(
+                GraalPyRuntimeUtil.PYTHON,
+                """
+                def __micronaut_get_raw_class_member(cls, name):
+                    for base in getattr(cls, "__mro__", (cls,)):
+                        namespace = getattr(base, "__dict__", {})
+                        if name in namespace:
+                            return namespace[name]
+                    return None
+                """
+            );
+            function = bindings.getMember(functionName);
+        }
+        return function;
+    }
+
+    private Value bindDescriptor(Value descriptor, Object target, Value owner) {
+        if (target instanceof ValueCoercible valueCoercible) {
+            Value getter = descriptor.getMember("__get__");
+            if (getter != null && getter.canExecute()) {
+                return getter.execute(valueCoercible.asPolyglotValue(), owner);
+            }
+        }
+        return descriptor;
     }
 
     @Nullable

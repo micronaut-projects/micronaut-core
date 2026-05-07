@@ -13,11 +13,17 @@ class PooledControllerSpec extends AbstractPythonTypeElementSpec {
 from micronaut.http.annotation import Get
 from typing import Annotated
 from jakarta.inject import Inject, Singleton
+from micronaut.context.python.scope import ContextPooled
 
+@ContextPooled
 @Singleton
 class MessageService:
     def say_hello(self, name : str) -> str:
         return f"Hello {name}"
+    def ctx_id(self) -> str:
+        import builtins
+        g = globals()
+        return g.get("__MN_CTX_ID__") or builtins.__dict__.get("__MN_CTX_ID__") or "unknown"
 
 message_service : Annotated[MessageService, Inject]
 
@@ -30,6 +36,11 @@ def ctx() -> str:
 @Get("/pool/hello/{name}")
 def hello(name: str) -> str:
     return message_service.say_hello(name)
+
+@Get("/pool/pair")
+def pair() -> str:
+    own = ctx()
+    return own + ":" + message_service.ctx_id()
 '''
         Map<String, Object> props = ["micronaut.python.pool.size": 4, "micronaut.python.pool.sync-init":true]
         ApplicationContext context = buildContext(python, true, props)
@@ -48,6 +59,16 @@ def hello(name: str) -> str:
 
         then:
         msg == "Hello John"
+
+        when:
+        def pairs = (1..12).collect { client.toBlocking().retrieve("/pool/pair") }
+
+        then:
+        pairs.every { pair ->
+            def parts = pair.split(":")
+            parts.length == 2 && parts[0] == parts[1]
+        }
+        pairs.toSet().size() >= 2
 
         cleanup:
         client?.close()

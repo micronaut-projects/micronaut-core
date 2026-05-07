@@ -17,7 +17,7 @@ class ProductMappers(ABC):
     )
     @Mapper.Mapping(
         to="distributor",
-        **{"from": "#{this.getDistributor()}"},
+        **{"from": "#{this.get_distributor()}"},
     )
     @abstractmethod
     def to_product_dto(self, product: Product) -> ProductDTO:

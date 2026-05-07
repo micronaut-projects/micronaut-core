@@ -118,6 +118,12 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected List<? extends DecoratorDef> getAnnotationsForType(ElementDef element) {
+        if (element instanceof AnnotationMemberDef memberDef) {
+            List<DecoratorDef> memberAnnotations = toDecoratorDefs(memberDef.getAnnotationMetadata());
+            if (!memberAnnotations.isEmpty()) {
+                return memberAnnotations;
+            }
+        }
         List<DecoratorDef> decoratorList = element.decorators();
         if (decoratorList.isEmpty()) {
             DecoratorDef decoratorDef = this.decorators.get(element.name());
@@ -130,6 +136,9 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected boolean hasAnnotation(ElementDef element, String annotation) {
+        if (element instanceof AnnotationMemberDef memberDef && memberDef.getAnnotationMetadata().hasAnnotation(annotation)) {
+            return true;
+        }
         List<DecoratorDef> decorators = element.decorators();
         for (DecoratorDef decorator : decorators) {
             if (decorator.annotationName().equals(annotation)) {
@@ -141,6 +150,9 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected boolean hasAnnotation(ElementDef element, Class<? extends Annotation> annotation) {
+        if (element instanceof AnnotationMemberDef memberDef && memberDef.getAnnotationMetadata().hasAnnotation(annotation)) {
+            return true;
+        }
         List<DecoratorDef> decorators = element.decorators();
         for (DecoratorDef decorator : decorators) {
             if (decorator.annotationName().equals(annotation.getName())) {
@@ -152,6 +164,9 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected boolean hasAnnotations(ElementDef element) {
+        if (element instanceof AnnotationMemberDef memberDef && !memberDef.getAnnotationMetadata().isEmpty()) {
+            return true;
+        }
         return !element.decorators().isEmpty();
     }
 
@@ -162,28 +177,109 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         String annotationName,
         String memberName,
         Object annotationValue) {
+        Object resolvedValue;
         if (annotationValue instanceof Value value) {
             if (member instanceof AnnotationMemberDef memberDef && memberDef.memberType() != null) {
-                return normalizeAnnotationValue(memberDef, GraalPyUtil.convertValueToJava(value, memberDef.memberType(), visitorContext));
+                return normalizeAnnotationValue(
+                    originatingElement,
+                    annotationName,
+                    memberName,
+                    memberDef,
+                    GraalPyUtil.convertValueToJava(value, memberDef.memberType(), visitorContext)
+                );
             } else {
-                return GraalPyUtil.convertValueToJava(value, visitorContext);
+                return resolveEvaluatedExpressionReferences(
+                    originatingElement,
+                    annotationName,
+                    memberName,
+                    GraalPyUtil.convertValueToJava(value, visitorContext)
+                );
             }
         }
         if (member instanceof AnnotationMemberDef memberDef) {
-            return normalizeAnnotationValue(memberDef, annotationValue);
+            resolvedValue = normalizeAnnotationValue(originatingElement, annotationName, memberName, memberDef, annotationValue);
+        } else {
+            resolvedValue = annotationValue;
         }
-        return annotationValue;
+        return resolveEvaluatedExpressionReferences(originatingElement, annotationName, memberName, resolvedValue);
     }
 
-    private static Object normalizeAnnotationValue(AnnotationMemberDef memberDef, Object annotationValue) {
+    private Object normalizeAnnotationValue(
+        ElementDef originatingElement,
+        String annotationName,
+        String memberName,
+        AnnotationMemberDef memberDef,
+        Object annotationValue
+    ) {
         ClassElement memberType = memberDef.memberType();
         if (annotationValue instanceof String stringValue && isEnumMember(memberType)) {
             int lastDot = stringValue.lastIndexOf('.');
             if (lastDot > -1) {
-                return stringValue.substring(lastDot + 1);
+                annotationValue = stringValue.substring(lastDot + 1);
+            }
+        }
+        return resolveEvaluatedExpressionReferences(originatingElement, annotationName, memberName, annotationValue);
+    }
+
+    private Object resolveEvaluatedExpressionReferences(
+        ElementDef originatingElement,
+        String annotationName,
+        String memberName,
+        Object annotationValue
+    ) {
+        if (memberName != null && isEvaluatedExpression(annotationValue)) {
+            return buildEvaluatedExpressionReference(originatingElement, annotationName, memberName, annotationValue);
+        }
+        if (annotationValue instanceof AnnotationValue<?> nestedAnnotation) {
+            return resolveNestedEvaluatedExpressionReferences(originatingElement, nestedAnnotation);
+        }
+        if (annotationValue instanceof AnnotationValue<?>[] nestedAnnotations) {
+            AnnotationValue<?>[] resolvedAnnotations = new AnnotationValue<?>[nestedAnnotations.length];
+            for (int i = 0; i < nestedAnnotations.length; i++) {
+                resolvedAnnotations[i] = resolveNestedEvaluatedExpressionReferences(originatingElement, nestedAnnotations[i]);
+            }
+            return resolvedAnnotations;
+        }
+        if (annotationValue instanceof Object[] values) {
+            Object[] resolvedValues = new Object[values.length];
+            boolean changed = false;
+            for (int i = 0; i < values.length; i++) {
+                Object value = values[i];
+                Object resolvedValue = value instanceof AnnotationValue<?> nestedAnnotation
+                    ? resolveNestedEvaluatedExpressionReferences(originatingElement, nestedAnnotation)
+                    : value;
+                resolvedValues[i] = resolvedValue;
+                changed |= resolvedValue != value;
+            }
+            if (changed) {
+                return resolvedValues;
             }
         }
         return annotationValue;
+    }
+
+    private AnnotationValue<?> resolveNestedEvaluatedExpressionReferences(
+        ElementDef originatingElement,
+        AnnotationValue<?> annotationValue
+    ) {
+        Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>();
+        boolean changed = false;
+        for (Map.Entry<CharSequence, Object> entry : annotationValue.getValues().entrySet()) {
+            String memberName = entry.getKey().toString();
+            Object value = entry.getValue();
+            Object resolvedValue = resolveEvaluatedExpressionReferences(
+                originatingElement,
+                annotationValue.getAnnotationName(),
+                memberName,
+                value
+            );
+            resolvedValues.put(memberName, resolvedValue);
+            changed |= resolvedValue != value;
+        }
+        if (!changed) {
+            return annotationValue;
+        }
+        return new AnnotationValue<>(annotationValue.getAnnotationName(), resolvedValues);
     }
 
     private static boolean isEnumMember(@Nullable ClassElement memberType) {
@@ -232,7 +328,7 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         Map<ElementDef, Object> defaultValues = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : decoratorDef.members().entrySet()) {
             String memberName = normalizeAnnotationMemberName(entry.getKey());
-            defaultValues.put(resolveMemberDef(javaAnnotationType, memberName), entry.getValue());
+            defaultValues.put(resolveMemberDef(annotationName, javaAnnotationType, memberName), entry.getValue());
         }
         return defaultValues;
     }
@@ -245,7 +341,7 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         Map<ElementDef, Object> rawValues = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : members.entrySet()) {
             String memberName = normalizeAnnotationMemberName(entry.getKey());
-            rawValues.put(resolveMemberDef(javaAnnotationType, memberName), entry.getValue());
+            rawValues.put(resolveMemberDef(annotationMirror.annotationName(), javaAnnotationType, memberName), entry.getValue());
         }
         return rawValues;
     }
@@ -333,8 +429,42 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         return new DecoratorDef(av.getAnnotationName(), av.getAnnotationName(), null, (Map) av.getValues(), av.getStereotypes() == null ? List.of() : av.getStereotypes().stream().map(this::toDecoratorDef).toList());
     }
 
+    private List<DecoratorDef> toDecoratorDefs(AnnotationMetadata annotationMetadata) {
+        if (annotationMetadata.isEmpty()) {
+            return List.of();
+        }
+        List<DecoratorDef> decoratorDefs = new ArrayList<>();
+        for (String annotationName : annotationMetadata.getDeclaredAnnotationNames()) {
+            AnnotationValue<?> annotationValue = annotationMetadata.getDeclaredAnnotation(annotationName);
+            if (annotationValue != null) {
+                decoratorDefs.add(toDecoratorDef(annotationValue));
+            }
+        }
+        return decoratorDefs;
+    }
+
     @Override
     protected String getOriginatingClassName(ElementDef originating) {
+        if (originating instanceof ClassDef classDef) {
+            return classDef.qualifiedName();
+        }
+        if (originating instanceof FunctionDef functionDef && functionDef.declaringClass() != null) {
+            return functionDef.declaringClass().qualifiedName();
+        }
+        if (originating instanceof ArgumentDef argumentDef
+            && argumentDef.declaringFunction() != null
+            && argumentDef.declaringFunction().declaringClass() != null) {
+            return argumentDef.declaringFunction().declaringClass().qualifiedName();
+        }
+        if (originating instanceof AttributeDef attributeDef && attributeDef.declaringClass() != null) {
+            return attributeDef.declaringClass().qualifiedName();
+        }
+        if (originating instanceof PropertyDef propertyDef && propertyDef.declaringClass() != null) {
+            return propertyDef.declaringClass().qualifiedName();
+        }
+        if (originating instanceof ScriptDef scriptDef) {
+            return scriptDef.qualifiedName();
+        }
         return originating.name();
     }
 
@@ -343,13 +473,28 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         String memberName = member.toString();
         ClassElement javaAnnotationType = getJavaAnnotationType(annotationElement.name());
         if (javaAnnotationType == null) {
-            return null;
+            return resolvePythonAnnotationMember(annotationElement.name(), memberName);
         } else {
-            return resolveMemberDef(javaAnnotationType, memberName);
+            return resolveJavaMemberDef(javaAnnotationType, memberName);
         }
     }
 
-    private static @Nullable AnnotationMemberDef resolveMemberDef(ClassElement javaAnnotationType, String memberName) {
+    private AnnotationMemberDef resolveMemberDef(String annotationName, @Nullable ClassElement javaAnnotationType, String memberName) {
+        if (javaAnnotationType == null) {
+            return resolvePythonAnnotationMember(annotationName, memberName);
+        }
+        return resolveJavaMemberDef(javaAnnotationType, memberName);
+    }
+
+    private AnnotationMemberDef resolvePythonAnnotationMember(String annotationName, String memberName) {
+        DecoratorDef decoratorDef = decorators.get(annotationName);
+        List<DecoratorDef> memberDecorators = decoratorDef == null
+            ? List.of()
+            : decoratorDef.memberDecorators().getOrDefault(memberName, List.of());
+        return new AnnotationMemberDef(memberName, null, null, memberDecorators);
+    }
+
+    private static @Nullable AnnotationMemberDef resolveJavaMemberDef(ClassElement javaAnnotationType, String memberName) {
         MethodElement annotationMember = resolveAnnotationMember(javaAnnotationType, memberName);
         if (annotationMember == null) {
             return new AnnotationMemberDef(memberName, null, null);

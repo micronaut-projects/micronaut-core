@@ -170,8 +170,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             String mainPy;
             StringBuilder filesList = new StringBuilder();
             if (StringUtils.isNotEmpty(values.code())) {
-                mainPy = values.code();
-                // Write original Python code to META-INF
+                mainPy = transformedList.get(0).runtimeCode();
+                // Write runtime Python code to META-INF
                 javaVisitorContext.visitMetaInfFile(APPLICATION_LAUNCHER_PATH, originatingElement)
                     .ifPresent(generatedFile -> {
                         try (var writer = generatedFile.openWriter()) {
@@ -216,10 +216,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 }
                             }
                             filesList.append("/META-INF/").append(targetSource).append("\n");
+                            Source runtimeSource = transformResult.runtimeSource();
                             javaVisitorContext.visitMetaInfFile(targetSource, originatingElement)
                                 .ifPresent(generatedFile -> {
                                     try (var writer = generatedFile.openWriter()) {
-                                        writer.write(source.getCharacters().toString());
+                                        writer.write(runtimeSource.getCharacters().toString());
                                     } catch (IOException e) {
                                         throw new ProcessingException(originatingElement, "Failed to write Python code to [" + targetSource + "]: " + e.getMessage(), e);
                                     }

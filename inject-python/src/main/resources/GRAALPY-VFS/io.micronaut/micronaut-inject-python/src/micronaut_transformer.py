@@ -41,7 +41,7 @@ class MicronautTransformer(ast.NodeTransformer):
     Annotations become decorators, regular Java types become java.type() references.
     """
 
-    def __init__(self, callback_get_class_element, callback_get_class_elements):
+    def __init__(self, callback_get_class_element, callback_get_class_elements, strip_java_interface_bases=False):
         """
         Initialize the transformer.
 
@@ -51,15 +51,19 @@ class MicronautTransformer(ast.NodeTransformer):
         """
         self.callback_get_class_element = callback_get_class_element
         self.callback_get_class_elements = callback_get_class_elements
+        self.strip_java_interface_bases = strip_java_interface_bases
         self.transformed_code = []
         self.java_type_assignments = []
         self.imports_to_transform = []
         self.generated_decorators = set()
         self.generated_decorator_code = {}
         self.java_class_imports = {}
+        self.java_interface_names = set()
         self.has_java_import = False
         self.exported_types = []
         self.all_class_names = []
+        self.class_depth = 0
+        self.function_depth = 0
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         """
@@ -206,15 +210,58 @@ def micronaut_annotation(name, repeated=None):
         """
         Track all class definitions and exported types separately.
         """
-        self.all_class_names.append(node.name)
-        if node.decorator_list:
+        is_module_level_class = self.class_depth == 0 and self.function_depth == 0
+        if is_module_level_class:
+            self.all_class_names.append(node.name)
+        if self.strip_java_interface_bases and node.bases:
+            original_base_count = len(node.bases)
+            node.bases = [
+                base
+                for base in node.bases
+                if not self._is_java_interface_base(base)
+            ]
+            if len(node.bases) != original_base_count:
+                node.keywords = [
+                    keyword
+                    for keyword in node.keywords
+                    if keyword.arg != "new_style"
+                ]
+        if is_module_level_class and node.decorator_list:
             for decorator in node.decorator_list:
                 decorator_name = self._get_decorator_name(decorator)
                 if decorator_name in self.generated_decorators:
                     self.exported_types.append(node.name)
                     break
-        self.generic_visit(node)
-        return node
+        self.class_depth += 1
+        try:
+            self.generic_visit(node)
+            return node
+        finally:
+            self.class_depth -= 1
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.FunctionDef:
+        self.function_depth += 1
+        try:
+            self.generic_visit(node)
+            return node
+        finally:
+            self.function_depth -= 1
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AsyncFunctionDef:
+        self.function_depth += 1
+        try:
+            self.generic_visit(node)
+            return node
+        finally:
+            self.function_depth -= 1
+
+    def visit_Assign(self, node: ast.Assign):
+        """
+        Track direct java.type() aliases so Java interface bases can be stripped
+        from runtime Python classes before GraalPy creates host adapters.
+        """
+        self._track_java_type_assignment(node)
+        return self.generic_visit(node)
 
     def _get_decorator_name(self, decorator) -> Optional[str]:
         """
@@ -256,6 +303,7 @@ def micronaut_annotation(name, repeated=None):
                     self.transformed_code.append(decorator_code)
                     return True
             else:
+                self._track_java_class(variable_name, class_element)
                 # Collect Java class import for VFS generation
                 self._collect_java_class_import(transformed_module_name, variable_name, class_element.getName())
                 # Generate java.type() assignment for regular Java types
@@ -279,6 +327,7 @@ def micronaut_annotation(name, repeated=None):
                             self.transformed_code.append(decorator_code)
                             return True
                     else:
+                        self._track_java_class(variable_name, class_element)
                         # Collect Java class import for VFS generation
                         self._collect_java_class_import(transformed_module_name, variable_name, class_element.getName())
                         # Generate java.type() assignment for regular Java types
@@ -287,6 +336,71 @@ def micronaut_annotation(name, repeated=None):
                         self.has_java_import = True
                         return True
         return False
+
+    def _track_java_type_assignment(self, node: ast.Assign):
+        if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
+            return
+        class_name = self._java_type_name(node.value)
+        if not class_name:
+            return
+        class_element = self.callback_get_class_element(class_name)
+        if class_element:
+            self._track_java_class(node.targets[0].id, class_element)
+
+    def _track_java_class(self, variable_name: str, class_element):
+        try:
+            if class_element.isInterface():
+                self.java_interface_names.add(variable_name)
+        except Exception:
+            pass
+
+    def _is_java_interface_base(self, base: ast.AST) -> bool:
+        class_name = self._java_type_name(base)
+        if class_name:
+            class_element = self.callback_get_class_element(class_name)
+            if class_element:
+                try:
+                    return class_element.isInterface()
+                except Exception:
+                    return False
+        base_name = self._base_name(base)
+        return base_name in self.java_interface_names
+
+    def _java_type_name(self, node: ast.AST) -> Optional[str]:
+        if not isinstance(node, ast.Call):
+            return None
+        func = node.func
+        if not (
+            isinstance(func, ast.Attribute)
+            and func.attr == "type"
+            and isinstance(func.value, ast.Name)
+            and func.value.id == "java"
+        ):
+            return None
+        if len(node.args) != 1:
+            return None
+        arg = node.args[0]
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            return arg.value
+        if isinstance(arg, ast.Str):
+            return arg.s
+        return None
+
+    def _base_name(self, base: ast.AST) -> Optional[str]:
+        if isinstance(base, ast.Subscript):
+            return self._base_name(base.value)
+        if isinstance(base, ast.Name):
+            return base.id
+        if isinstance(base, ast.Attribute):
+            parts = []
+            current = base
+            while isinstance(current, ast.Attribute):
+                parts.insert(0, current.attr)
+                current = current.value
+            if isinstance(current, ast.Name):
+                parts.insert(0, current.id)
+            return ".".join(parts)
+        return None
 
     def _handle_star_import(self, original_module_name: str, transformed_module_name: str) -> bool:
         """
@@ -433,6 +547,7 @@ def micronaut_annotation(name, repeated=None):
 
         # Generate the decorator function with imports, meta-annotations and micronaut_annotation for VFS
         imports_section = '\n'.join(import_lines) + '\n\n' if import_lines else ''
+        nested_members_code = self._generate_nested_members_code(class_element, decorator_name)
 
         decorator_code = f'''
 {imports_section}def micronaut_annotation(name, repeated=None):
@@ -458,6 +573,7 @@ def {decorator_name}({param_signature}):
     else:
         # Called as @Annotation() or @Annotation(param=value) - return decorator
         return decorator
+{nested_members_code}
 '''
 
         # Store the generated code in the dict for extraction (use qualified annotation name as key)
@@ -493,6 +609,7 @@ def {decorator_name}({param_signature}):
         param_handling = param_info['handling']
 
         # Generate the decorator function with custom annotation name and micronaut_annotation
+        nested_members_code = self._generate_nested_members_code(class_element, decorator_name)
         decorator_code = f'''
 def micronaut_annotation(name, repeated=None):
     """
@@ -517,6 +634,7 @@ def {decorator_name}({param_signature}):
     else:
         # Called as @Annotation() or @Annotation(param=value) - return decorator
         return decorator
+{nested_members_code}
 '''
         self.generated_decorator_code[custom_annotation_name] = decorator_code
         # Handle nested annotations (annotations referenced by this annotation's parameters)
@@ -618,16 +736,87 @@ def {decorator_name}({param_signature}):
                                                  annotation_simple_name = nested_annotation_element.getSimpleName()
 
                                              if annotation_simple_name not in self.generated_decorators:
-                                                 # Create a modified ClassElement with the dot notation name for proper annotation name
                                                  original_name = nested_annotation_element.getName()
-                                                 dot_name = original_name.replace('$', '.')
-                                                 modified_annotation_name = dot_name
 
                                                  # Generate the decorator with the correct annotation name
                                                  self._generate_decorator_from_class_element_with_name(
-                                                     nested_annotation_element, annotation_simple_name, modified_annotation_name)
+                                                     nested_annotation_element, annotation_simple_name, original_name)
         except Exception as e:
             print(f"Error generating nested decorators for {class_element.getName()}: {e}")
+
+    def _generate_nested_members_code(self, class_element, parent_name: str) -> str:
+        """
+        Generate Python attributes for Java nested types exposed through an annotation.
+        """
+        lines = []
+        needs_java = False
+        for nested_element in self._get_nested_class_elements(class_element):
+            nested_name = nested_element.getName()
+            simple_name = nested_name.split('$')[-1].split('.')[-1]
+            if self._is_annotation_class(nested_element):
+                repeatable_name = self._get_repeatable_name(nested_element.getAnnotationMetadata(), nested_element)
+                repeatable_info = f', repeated="{repeatable_name}"' if repeatable_name else ''
+                self.generated_decorators.add(simple_name)
+                lines.append(f'''
+
+@micronaut_annotation("{nested_name}"{repeatable_info})
+def {simple_name}(*args, **kwargs):
+    """
+    Micronaut annotation decorator for {nested_name}.
+    """
+    def decorator(func):
+        return func
+
+    if len(args) == 1 and len(kwargs) == 0 and callable(args[0]) and hasattr(args[0], '__name__'):
+        return decorator(args[0])
+    else:
+        return decorator
+
+{parent_name}.{simple_name} = {simple_name}
+''')
+            else:
+                binary_name = self._to_binary_nested_name(class_element.getName(), nested_name)
+                needs_java = True
+                lines.append(f'''
+{simple_name} = java.type("{binary_name}")
+{parent_name}.{simple_name} = {simple_name}
+''')
+
+        if needs_java:
+            lines.insert(0, "\nimport java\n")
+        return ''.join(lines)
+
+    def _get_nested_class_elements(self, class_element):
+        nested_elements = []
+        try:
+            native_type = class_element.getNativeType()
+            if native_type and hasattr(native_type, 'element'):
+                java_element = native_type.element()
+                if java_element and hasattr(java_element, 'getEnclosedElements'):
+                    for enclosed in java_element.getEnclosedElements():
+                        if not (hasattr(enclosed, 'getKind') and hasattr(enclosed.getKind(), 'name')):
+                            continue
+                        kind = enclosed.getKind().name()
+                        if kind not in ('ANNOTATION_TYPE', 'INTERFACE', 'CLASS'):
+                            continue
+                        simple_name = str(enclosed.getSimpleName())
+                        nested_element = (
+                            self.callback_get_class_element(f"{class_element.getName()}${simple_name}") or
+                            self.callback_get_class_element(f"{class_element.getName()}.{simple_name}")
+                        )
+                        if nested_element:
+                            nested_elements.append(nested_element)
+        except Exception as e:
+            print(f"Error generating nested members for {class_element.getName()}: {e}")
+        return nested_elements
+
+    def _to_binary_nested_name(self, parent_name: str, nested_name: str) -> str:
+        if '$' in nested_name:
+            return nested_name
+        prefix = parent_name + '.'
+        if nested_name.startswith(prefix):
+            return parent_name + '$' + nested_name[len(prefix):]
+        return nested_name
 
     def _collect_java_class_import(self, package_name: str, variable_name: str, full_class_name: str):
         """
@@ -684,4 +873,3 @@ def {decorator_name}({param_signature}):
         Get the list of types (classes/functions) that have Micronaut decorators.
         """
         return self.exported_types
-

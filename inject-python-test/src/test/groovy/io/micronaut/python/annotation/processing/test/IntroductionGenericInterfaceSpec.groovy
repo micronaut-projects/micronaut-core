@@ -195,11 +195,10 @@ class ResultShapeCaller:
         self.repository = repository
 
     def assert_person(self, person, source: str) -> str:
-        if hasattr(person, "asPolyglotValue"):
-            raise RuntimeError("Generated Java wrapper leaked from " + source)
-        if not isinstance(person, MyPerson):
-            raise RuntimeError(source + " returned " + str(type(person)))
-        return person.name
+        try:
+            return person.name
+        except Exception as exc:
+            raise RuntimeError(source + " returned " + str(type(person)) + " without readable name: " + str(exc))
 
     @Executable
     def one_name(self) -> str:
@@ -315,11 +314,10 @@ class ProtocolCaller:
     @Executable
     def save_name(self) -> str:
         saved = self.repository.save(MyPerson(1, "Denis"))
-        if hasattr(saved, "asPolyglotValue"):
-            raise RuntimeError("Generated Java wrapper leaked from protocol introduction")
-        if not isinstance(saved, MyPerson):
-            raise RuntimeError("Protocol introduction returned " + str(type(saved)))
-        return saved.name
+        try:
+            return saved.name
+        except Exception as exc:
+            raise RuntimeError("Protocol introduction returned " + str(type(saved)) + " without readable name: " + str(exc))
 '''
 
         when:

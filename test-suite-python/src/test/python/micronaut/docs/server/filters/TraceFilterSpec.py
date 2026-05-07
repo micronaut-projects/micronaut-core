@@ -6,12 +6,11 @@ from micronaut.http import HttpRequest
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 
 @Property(name="spec.filter", value="TraceFilter")
 @MicronautTest
-@Disabled("Python HttpServerFilter implementation fails bean instantiation with GraalPy constructor arity error")
 class TraceFilterSpec:
     client: Annotated[HttpClient, Inject, Client("/")]
 

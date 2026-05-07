@@ -37,7 +37,7 @@ final class GraalPyEngineFactory {
 
     static Engine buildPythonEngine() {
         return Engine.newBuilder()
-            .exceptionHandler(GraalPyExceptionHandler::rethrowHostRuntimeException)
+            .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
             .build();
     }
 }

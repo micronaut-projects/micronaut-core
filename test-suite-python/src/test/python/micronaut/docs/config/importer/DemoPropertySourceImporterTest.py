@@ -3,14 +3,13 @@ from micronaut.context import ApplicationContext
 from micronaut.context.env import PropertySource
 from micronaut.core.util import ConnectionString
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 import java
 
 from .DemoPropertySourceImporter import DemoPropertySourceImporter
 
 
 @MicronautTest
-@Disabled("Python PropertySourceImporter.ImportContext adaptation is not implemented yet")
 class DemoPropertySourceImporterTest:
     @Test
     def imports_demo_defaults(self) -> None:

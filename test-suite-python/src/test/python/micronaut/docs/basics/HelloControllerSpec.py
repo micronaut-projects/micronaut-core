@@ -9,7 +9,7 @@ from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.http.uri import UriBuilder
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 Flux = java.type("reactor.core.publisher.Flux")
 Map = java.type("java.util.Map")
@@ -69,7 +69,6 @@ class HelloControllerSpec:
         assert "Hello John" == response.blockFirst().get("text")
 
     @Test
-    @Disabled("Python HTTP client returns generated Java wrapper objects for Python dataclass responses")
     def testRetrieveWithPOJO(self):
         # tag::jsonpojo[]
         response = getattr(Flux, "from")(
@@ -80,7 +79,6 @@ class HelloControllerSpec:
         # end::jsonpojo[]
 
     @Test
-    @Disabled("Python HTTP client returns generated Java wrapper objects for Python dataclass responses")
     def testRetrieveWithPOJOResponse(self):
         # tag::pojoresponse[]
         call = getattr(Flux, "from")(
@@ -97,7 +95,6 @@ class HelloControllerSpec:
         # end::pojoresponse[]
 
     @Test
-    @Disabled("Python @Status on controller methods is ignored, returning OK with the expected body")
     def testPostRequestWithString(self):
         # tag::poststring[]
         call = getattr(Flux, "from")(
@@ -117,7 +114,6 @@ class HelloControllerSpec:
         assert "Hello John" == message.get()
 
     @Test
-    @Disabled("Python @Status on controller methods is ignored, returning OK with the expected body")
     def testPostRequestWithPOJO(self):
         # tag::postpojo[]
         call = getattr(Flux, "from")(

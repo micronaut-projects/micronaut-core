@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import io.micronaut.core.annotation.Internal;
+import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
 
@@ -77,7 +78,7 @@ public final class GraalPyRuntimeUtil {
         return
             map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, (entry) -> {
                 Object v = entry.getValue();
-                if (v instanceof ValueCoercible valueCoercible) {
+                if (v instanceof ValueCoercible valueCoercible && !(v instanceof PooledValueCoercible)) {
                     return valueCoercible.asPolyglotValue();
                 }
                 return v;
@@ -94,11 +95,71 @@ public final class GraalPyRuntimeUtil {
     public static <E> List<Object> coerceList(List<E> list) {
         return
             list.stream().map(v -> {
-                if (v instanceof ValueCoercible valueCoercible) {
+                if (v instanceof ValueCoercible valueCoercible && !(v instanceof PooledValueCoercible)) {
                     return valueCoercible.asPolyglotValue();
                 }
                 return v;
             }).toList();
+    }
+
+    /**
+     * Coerce values passed into a target Python context.
+     *
+     * @param value The value to coerce
+     * @param context The target context
+     * @return The coerced value
+     */
+    public static @Nullable Object coerceToContext(@Nullable Object value, Context context) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof PooledValueCoercible pooledValueCoercible) {
+            return pooledValueCoercible.asPolyglotValue(context);
+        }
+        if (value instanceof List<?> list) {
+            List<Object> result = new ArrayList<>(list.size());
+            for (Object element : list) {
+                result.add(coerceToContext(element, context));
+            }
+            return result;
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<Object, Object> result = new HashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                result.put(coerceToContext(entry.getKey(), context), coerceToContext(entry.getValue(), context));
+            }
+            return result;
+        }
+        if (value instanceof Set<?> set) {
+            java.util.Set<Object> result = new java.util.HashSet<>();
+            for (Object element : set) {
+                result.add(coerceToContext(element, context));
+            }
+            return result;
+        }
+        if (value instanceof Object[] array) {
+            Object[] result = new Object[array.length];
+            for (int i = 0; i < array.length; i++) {
+                result[i] = coerceToContext(array[i], context);
+            }
+            return result;
+        }
+        return value;
+    }
+
+    /**
+     * Coerce arguments passed into a target Python context.
+     *
+     * @param context The target context
+     * @param args The arguments
+     * @return The coerced arguments
+     */
+    public static Object[] coerceArgumentsToContext(Context context, Object[] args) {
+        Object[] result = new Object[args.length];
+        for (int i = 0; i < args.length; i++) {
+            result[i] = coerceToContext(args[i], context);
+        }
+        return result;
     }
 
     /**
@@ -298,7 +359,29 @@ public final class GraalPyRuntimeUtil {
             return null;
         }
 
+        T mappedWrapper = convertMappedWrapper(value, targetType);
+        if (mappedWrapper != null) {
+            return mappedWrapper;
+        }
+        if (value.isHostObject()) {
+            Object hostObject = value.asHostObject();
+            if (targetType.isInstance(hostObject)) {
+                return targetType.cast(hostObject);
+            }
+        }
         return value.as(targetType);
+    }
+
+    private static <T> @Nullable T convertMappedWrapper(Value value, Class<T> targetType) {
+        try {
+            Object mappedObject = value.as(Object.class);
+            if (mappedObject instanceof ValueCoercible && targetType.isInstance(mappedObject)) {
+                return targetType.cast(mappedObject);
+            }
+        } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
+            return null;
+        }
+        return null;
     }
 
     /**

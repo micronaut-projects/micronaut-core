@@ -119,6 +119,28 @@ class TestClass:
         targetDir.deleteDir()
     }
 
+    def "test Python exception subclass generates Throwable subtype"() {
+        given:
+        def pythonCode = '''
+import java
+
+RuntimeException = java.type("java.lang.RuntimeException")
+
+class OutOfStockException(RuntimeException):
+    pass
+'''
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .build()
+
+        when:
+        def classLoader = compiler.buildClassLoader()
+        def generatedException = classLoader.loadClass("python.OutOfStockException")
+
+        then:
+        RuntimeException.isAssignableFrom(generatedException)
+    }
+
     @PendingFeature(reason = "need to improve inheritance")
     def "test classpath support"() {
         given:
@@ -212,6 +234,42 @@ class MyNamedService:
         tempDir.deleteDir()
     }
 
+    def "test generated JUnit stubs instantiate Python tests lazily"() {
+        given:
+        def pythonCode = '''
+from org.junit.jupiter.api import Test
+
+class MultipleTestSpec:
+    @Test
+    def first(self) -> None:
+        pass
+
+    @Test
+    def second(self) -> None:
+        pass
+'''
+        def tempDir = File.createTempDir("pyronaut-test-junit-stub", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def generated = new File(tempDir, "python/MultipleTestSpec.java")
+        generated.exists()
+        def javaCode = generated.text
+        javaCode.contains('MultipleTestSpec() {\n  }')
+        javaCode.contains('this.graalpyInternalValue = ContextHolder.newInstance("python", "MultipleTestSpec");')
+        javaCode.contains('return this.graalpyInternalValue;')
+        !javaCode.contains('MultipleTestSpec() {\n    this.graalpyInternalValue = ContextHolder.newInstance')
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
     def "test repeatable annotation transformation"() {
         given:
         def pythonCode = '''
@@ -297,6 +355,85 @@ class AsyncImportService:
 
         cleanup:
         tempDir.deleteDir()
+    }
+
+    def "test nested annotation members are generated as Python attributes"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import Mapper
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class Product:
+    name: str
+
+@Introspected
+@dataclass
+class ProductDTO:
+    name: str
+
+class ProductMappers(ABC):
+    @Mapper.Mapping(to="name", **{"from": "product.name"})
+    @abstractmethod
+    def to_product_dto(self, product: Product) -> ProductDTO:
+        pass
+
+class MyMergeStrategy(Mapper.MergeStrategy):
+    def merge(
+        self,
+        current_value: Any,
+        value: Any,
+        value_owner: Any,
+        property_name: str,
+        mapped_property_name: str,
+    ) -> Any:
+        return value
+'''
+        def tempDir = File.createTempDir("pyronaut-test-nested-annotation", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def mapperFile = new File(tempDir, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/context/annotation/Mapper.py")
+        mapperFile.exists()
+        mapperFile.text.contains("def Mapping(")
+        mapperFile.text.contains("Mapper.Mapping = Mapping")
+        mapperFile.text.contains("Mapper.MergeStrategy = MergeStrategy")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
+    def "test generated introspected Python stubs expose public fields for host attribute access"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class Message:
+    text: str
+'''
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .build()
+
+        when:
+        def classLoader = compiler.buildClassLoader()
+        def messageClass = classLoader.loadClass("python.Message")
+
+        then:
+        messageClass.getField("text").type == String
     }
 
     def "test Python sources in multiple distinct packages are processed"() {

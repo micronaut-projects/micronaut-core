@@ -242,7 +242,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                 if (!returnDef.decorators().isEmpty()) {
                     io.micronaut.core.annotation.AnnotationMetadata annotationMetadata =
                         environment.visitorContext().getAnnotationMetadataBuilder().buildDeclared(returnDef);
-                    resolvedGenericReturnType = baseType.withAnnotationMetadata(annotationMetadata);
+                    resolvedGenericReturnType = withReturnAnnotationMetadata(baseType, annotationMetadata);
                 } else {
                     resolvedGenericReturnType = baseType;
                 }
@@ -270,7 +270,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             if (!returnDef.decorators().isEmpty()) {
                 io.micronaut.core.annotation.AnnotationMetadata annotationMetadata =
                     environment.visitorContext().getAnnotationMetadataBuilder().buildDeclared(returnDef);
-                return baseType.withAnnotationMetadata(annotationMetadata);
+                return withReturnAnnotationMetadata(baseType, annotationMetadata);
             }
             if (baseType instanceof AbstractPythonClassElement pythonClassElement) {
                 pythonClassElement.typeAnnotationsKey = functionDef;
@@ -280,6 +280,18 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         }
         // Fall back to void/Object
         return PrimitiveElement.VOID;
+    }
+
+    private static ClassElement withReturnAnnotationMetadata(ClassElement baseType, AnnotationMetadata annotationMetadata) {
+        try {
+            return baseType.withAnnotationMetadata(annotationMetadata);
+        } catch (UnsupportedOperationException e) {
+            Object nativeType = baseType.getNativeType();
+            if (nativeType instanceof Class<?> nativeClass) {
+                return ClassElement.of(nativeClass, annotationMetadata, baseType.getTypeArguments());
+            }
+            return ClassElement.of(baseType.getName(), baseType.isInterface(), annotationMetadata, baseType.getTypeArguments());
+        }
     }
 
     private ParameterElement[] createParameters(FunctionDef functionDef) {
