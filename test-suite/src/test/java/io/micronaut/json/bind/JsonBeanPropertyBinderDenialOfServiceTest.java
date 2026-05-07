@@ -15,12 +15,16 @@ import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
 
 import java.util.List;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Property(name = "spec.name", value = "JsonBeanPropertyBinderDenialOfServiceTest")
 @MicronautTest
@@ -41,6 +45,19 @@ class JsonBeanPropertyBinderDenialOfServiceTest {
         Book b = assertDoesNotThrow(() -> client.retrieve(request, Book.class));
         Book expected = expected();
         assertEquals(expected, b);
+    }
+
+    @org.junit.jupiter.api.Test
+    void arrayIndexExceedingThresholdShouldReturn400() {
+        BlockingHttpClient client = httpClient.toBlocking();
+        // index 999 exceeds the default arraySizeThreshold of 100
+        HttpRequest<?> request = HttpRequest.POST("/poc/book", "authors%5B999%5D.name=foo")
+            .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
+        HttpClientResponseException ex = assertThrows(HttpClientResponseException.class,
+            () -> client.retrieve(request, Book.class));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        String body = ex.getResponse().getBody(String.class).orElse("");
+        assertTrue(body.contains("Array index 999 exceeds the maximum allowed threshold of 100"));
     }
 
     private static Book expected() {
