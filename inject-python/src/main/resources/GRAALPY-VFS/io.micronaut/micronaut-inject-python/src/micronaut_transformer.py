@@ -232,6 +232,10 @@ def micronaut_annotation(name, repeated=None):
                 if decorator_name in self.generated_decorators:
                     self.exported_types.append(node.name)
                     break
+        node.decorator_list = [
+            self._normalize_bare_generated_decorator(decorator)
+            for decorator in node.decorator_list
+        ]
         self.class_depth += 1
         try:
             self.generic_visit(node)
@@ -240,6 +244,10 @@ def micronaut_annotation(name, repeated=None):
             self.class_depth -= 1
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.FunctionDef:
+        node.decorator_list = [
+            self._normalize_bare_generated_decorator(decorator)
+            for decorator in node.decorator_list
+        ]
         self.function_depth += 1
         try:
             self.generic_visit(node)
@@ -248,6 +256,10 @@ def micronaut_annotation(name, repeated=None):
             self.function_depth -= 1
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AsyncFunctionDef:
+        node.decorator_list = [
+            self._normalize_bare_generated_decorator(decorator)
+            for decorator in node.decorator_list
+        ]
         self.function_depth += 1
         try:
             self.generic_visit(node)
@@ -281,6 +293,19 @@ def micronaut_annotation(name, repeated=None):
             if isinstance(decorator.value, ast.Name) and decorator.value.id in self.generated_decorators:
                 return decorator.value.id
         return None
+
+    def _normalize_bare_generated_decorator(self, decorator):
+        """
+        Convert @GeneratedAnnotation to @GeneratedAnnotation() so generated decorators
+        can treat a single callable positional argument as an annotation value.
+        """
+        if isinstance(decorator, ast.Call):
+            return decorator
+        decorator_name = self._get_decorator_name(decorator)
+        if decorator_name in self.generated_decorators:
+            call = ast.Call(func=decorator, args=[], keywords=[])
+            return ast.copy_location(call, decorator)
+        return decorator
 
     def _handle_specific_import(self, original_module_name: str, transformed_module_name: str, alias) -> bool:
         """
@@ -519,7 +544,7 @@ def micronaut_annotation(name, repeated=None):
                         if meta_decorator_code:
                             self.transformed_code.append(meta_decorator_code)
                     # Add the meta-annotation as a decorator
-                    decorator_lines.append(f'@{meta_decorator_name}')
+                    decorator_lines.append(f'@{meta_decorator_name}()')
 
         # Collect imports for meta-annotations
         import_lines = []
@@ -566,13 +591,7 @@ def {decorator_name}({param_signature}):
     def decorator(func):
         return func
 
-    # Handle both @Annotation and @Annotation() usage patterns
-    if len(args) == 1 and len(kwargs) == 0 and callable(args[0]) and hasattr(args[0], '__name__'):
-        # Called as @Annotation (without parentheses) - args[0] is the function
-        return decorator(args[0])
-    else:
-        # Called as @Annotation() or @Annotation(param=value) - return decorator
-        return decorator
+    return decorator
 {nested_members_code}
 '''
 
@@ -627,13 +646,7 @@ def {decorator_name}({param_signature}):
     def decorator(func):
         return func
 
-    # Handle both @Annotation and @Annotation() usage patterns
-    if len(args) == 1 and len(kwargs) == 0 and callable(args[0]) and hasattr(args[0], '__name__'):
-        # Called as @Annotation (without parentheses) - args[0] is the function
-        return decorator(args[0])
-    else:
-        # Called as @Annotation() or @Annotation(param=value) - return decorator
-        return decorator
+    return decorator
 {nested_members_code}
 '''
         self.generated_decorator_code[custom_annotation_name] = decorator_code
@@ -767,10 +780,7 @@ def {simple_name}(*args, **kwargs):
     def decorator(func):
         return func
 
-    if len(args) == 1 and len(kwargs) == 0 and callable(args[0]) and hasattr(args[0], '__name__'):
-        return decorator(args[0])
-    else:
-        return decorator
+    return decorator
 
 {parent_name}.{simple_name} = {simple_name}
 ''')

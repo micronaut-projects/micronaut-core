@@ -73,6 +73,30 @@ public final class PythonClassElement extends AbstractPythonClassElement {
     }
 
     @Override
+    public boolean isInner() {
+        return getNativeType().name().indexOf('$') > -1;
+    }
+
+    @Override
+    public boolean isStatic() {
+        return isInner();
+    }
+
+    @Override
+    public Optional<ClassElement> getEnclosingType() {
+        String name = getNativeType().name();
+        int innerSeparator = name.lastIndexOf('$');
+        if (innerSeparator < 0) {
+            return Optional.empty();
+        }
+        String enclosingName = name.substring(0, innerSeparator);
+        String qualifiedEnclosingName = getNativeType().packageName().isEmpty()
+            ? enclosingName
+            : getPackageName() + "." + enclosingName;
+        return Optional.ofNullable(environment.classes().get(qualifiedEnclosingName));
+    }
+
+    @Override
     protected ClassElement createWithArrayDimensions(int arrayDimensions) {
         return new PythonClassElement(getNativeType(), environment, arrayDimensions);
     }

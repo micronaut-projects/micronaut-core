@@ -310,9 +310,10 @@ public final class ContextHolder {
             return findClass(simpleName, ctx);
         }
 
-        String source = "from " + packageName + " import " + simpleName + "; " + simpleName;
+        String importName = rootName(simpleName);
+        String source = "from " + packageName + " import " + importName + "; " + importName;
         try {
-            return ctx.eval(PYTHON, source);
+            return nestedMember(ctx.eval(PYTHON, source), simpleName);
         } catch (Exception e) {
             throw new InstantiationException("Failed to import Python class [" + source + "]: " + e.getMessage(), e);
         }
@@ -329,16 +330,44 @@ public final class ContextHolder {
     }
 
     static Value findClass(String simpleName, Context ctx) {
-        Value v = ctx.getBindings(PYTHON).getMember(simpleName);
+        String importName = rootName(simpleName);
+        Value v = ctx.getBindings(PYTHON).getMember(importName);
         if (v == null) {
-            Value member = ctx.eval(PYTHON, "import " + simpleName + "; " + simpleName)
-                .getMember(simpleName);
+            Value member = ctx.eval(PYTHON, "import " + importName + "; " + importName)
+                .getMember(importName);
             if (member == null) {
                 throw new InstantiationException("Cannot find Python class: " + simpleName);
             }
             v = member;
         }
-        return v;
+        return nestedMember(v, simpleName);
+    }
+
+    private static String rootName(String simpleName) {
+        int nestedSeparator = simpleName.indexOf('.');
+        return nestedSeparator < 0 ? simpleName : simpleName.substring(0, nestedSeparator);
+    }
+
+    private static Value nestedMember(Value root, String simpleName) {
+        Value value = root;
+        int nestedSeparator = simpleName.indexOf('.');
+        if (nestedSeparator < 0) {
+            return value;
+        }
+        int start = nestedSeparator + 1;
+        while (start < simpleName.length()) {
+            int end = simpleName.indexOf('.', start);
+            String nestedName = end < 0 ? simpleName.substring(start) : simpleName.substring(start, end);
+            value = value.getMember(nestedName);
+            if (value == null) {
+                throw new InstantiationException("Cannot find Python class: " + simpleName);
+            }
+            if (end < 0) {
+                break;
+            }
+            start = end + 1;
+        }
+        return value;
     }
 
     /**
@@ -394,7 +423,8 @@ public final class ContextHolder {
             return invokeStaticMethod(simpleName, methodName, args);
         } else {
             Context ctx = getContext();
-            Value pythonClass = ctx.eval(PYTHON, "from " + packageName + " import " + simpleName + "; " + simpleName);
+            String importName = rootName(simpleName);
+            Value pythonClass = nestedMember(ctx.eval(PYTHON, "from " + packageName + " import " + importName + "; " + importName), simpleName);
             return pythonClass.invokeMember(methodName, args);
         }
     }
@@ -409,16 +439,17 @@ public final class ContextHolder {
      */
     public static Value invokeStaticMethod(String simpleName, String methodName, Object... args) {
         Context ctx = getContext();
-        Value v = ctx.getBindings(PYTHON).getMember(simpleName);
+        String importName = rootName(simpleName);
+        Value v = ctx.getBindings(PYTHON).getMember(importName);
         if (v != null) {
-            return v.invokeMember(methodName);
+            return nestedMember(v, simpleName).invokeMember(methodName, args);
         } else {
-            Value member = ctx.eval(PYTHON, "import " + simpleName + "; " + simpleName)
-                .getMember(simpleName);
+            Value member = ctx.eval(PYTHON, "import " + importName + "; " + importName)
+                .getMember(importName);
             if (member == null) {
                 throw new InstantiationException("Cannot find Python class: " + simpleName);
             }
-            return member
+            return nestedMember(member, simpleName)
                 .invokeMember(methodName, args);
         }
     }

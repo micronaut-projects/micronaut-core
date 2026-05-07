@@ -4,7 +4,7 @@ This file tracks Python docs examples that are present but disabled, or intentio
 
 ## Wave 0 Reconciliation
 
-- Last generated active `@Disabled` count: 42.
+- Last generated active `@Disabled` count: 39.
 - Last generated command: `rg -n "@Disabled\\(" test-suite-python/src/test/python/micronaut/docs`.
 - Last full-suite command: `./gradlew --no-daemon -Dorg.gradle.java.home=/Users/graemerocher/.sdkman/candidates/java/current :test-suite-python:test --max-workers=2`.
 - Last full-suite result: build successful, 180 tests executed, 74 skipped.
@@ -31,7 +31,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `annotation/retry/PetRetrySpec.py::testFallback` | Python HTTP client `Publisher` return types lose generic element metadata for fallback resolution. |
 | `client/ThirdPartyClientFilterSpec.py::aClientFilterIsAppliedToTheRequestAndAddsTheAuthorizationHeader` | Python client filter method support is not validated yet for `@ClientFilter`/`@RequestFilter`. |
 | `client/filter/BasicAuthFilterSpec.py::testTheFilterIsApplied` | Python custom annotation stereotypes are not validated yet for `@FilterMatcher` client matching. |
-| `config/immutable/VehicleSpec.py` | Python immutable `@ConfigurationProperties` nested constructor argument still resolves as `Object`. |
 | `context/events/async/SampleEventListenerSpec.py` | Python `@EventListener` method adaptation with event argument types still resolves against `Object`. |
 | `propagation/MdcServiceSpec.py::testFilterSpec` | GraalPy SAM conversion for `PropagatedContext` propagation helpers is not validated yet. |
 | `propagation/reactor/PropagatedContextTest.py::testMonoRequest` | Python Reactor `contextWrite` Java `Function` adaptation is not validated yet. |
@@ -39,7 +38,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `datavalidation/groups/EmailControllerSpec.py::test_pojo_validation_final_validation_group` | Python validation groups metadata is generated, but invalid requests are not rejected yet. |
 | `datavalidation/params/EmailControllerSpec.py::test_parameters_are_validated` | Python HTTP validation metadata is generated, but invalid parameter requests are not rejected yet. |
 | `datavalidation/pogo/EmailControllerSpec.py::test_pojo_validation` | Python `@Valid` body validation metadata is generated, but invalid requests are not rejected yet. |
-| `factories/VehicleMockSpec.py` | Beans from fields are not supported in Python at the moment. |
 | `http/server/stream/StreamControllerSpec.py::test_returning_a_stream` | Python `@Body InputStream` binding receives an empty stream for `text/plain` request bodies. |
 | `http/server/netty/websocket/SimpleTextWebSocketSpec.py` | Python `@ClientWebSocket` introduction cannot proxy Python classes yet (`PythonClassElement` cast to `JavaClassElement`). |
 | `http/server/netty/websocket/PojoWebSocketSpec.py` | Python `@ClientWebSocket` introduction cannot proxy Python classes yet (`PythonClassElement` cast to `JavaClassElement`). |
@@ -50,7 +48,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::testExceptionBindingErrorResponse` | Python error-body binding does not currently reproduce the Java bind-failure behavior for dataclasses without defaults. |
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::verifyBindErrorIsThrown` | Python HTTP client body binding does not currently reproduce the Java decode-failure exception. |
 | `i18n/I18nSpec.py::itIsPossibleToCreateAMessageSourceFromResourceBundle` | Python docs test resources are not resolved by `ResourceBundleMessageSource` yet; message lookups return `Optional.empty()`. |
-| `replaces/BookServiceSpec.py` | `ReplacesDefinition` never loads. |
 | `resources/ResourceLoaderTest.py::testExampleForResourceResolver` | Python docs test classpath resources are not resolved through `ResourceResolver` yet; `classpath:hello.txt` returns empty. |
 | `server/binding/BindingControllerTest.py::test_header_date_binding` | GraalPy `ForeignDateTime` string conversion fails with datetime `moduleData` null. |
 | `server/binding/BindingControllerTest.py::test_header_nullable_binding` | Python nullable `@Header` binding returns a non-Java-equivalent status for a missing header. |

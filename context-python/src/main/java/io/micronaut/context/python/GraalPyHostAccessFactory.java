@@ -177,10 +177,6 @@ final class GraalPyHostAccessFactory {
         if (simpleName == null || simpleName.isBlank() || simpleName.contains("<locals>")) {
             return null;
         }
-        int nestedSeparator = simpleName.indexOf('.');
-        if (nestedSeparator > -1) {
-            simpleName = simpleName.substring(0, nestedSeparator);
-        }
         if (moduleName != null && !moduleName.isBlank()) {
             Class<?> exact = findMappingForClassName(toGeneratedClassName(moduleName, simpleName), mappings);
             if (exact != null) {
@@ -191,10 +187,11 @@ final class GraalPyHostAccessFactory {
     }
 
     private static String toGeneratedClassName(String moduleName, String simpleName) {
-        if (moduleName.equals(simpleName) || moduleName.endsWith("." + simpleName)) {
+        String generatedSimpleName = simpleName.replace('.', '$');
+        if (moduleName.equals(generatedSimpleName) || moduleName.endsWith("." + generatedSimpleName)) {
             return moduleName;
         }
-        return moduleName + "." + simpleName;
+        return moduleName + "." + generatedSimpleName;
     }
 
     private static @Nullable Class<?> findMappingForClassName(String className, Collection<TargetTypeMapping<?>> mappings) {

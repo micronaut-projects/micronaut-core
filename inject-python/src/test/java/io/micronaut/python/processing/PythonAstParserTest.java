@@ -83,6 +83,57 @@ public class PythonAstParserTest {
     }
 
     @Test
+    void testParseNestedPythonClassConstructorParameterType() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from typing import Annotated
+
+            from micronaut.context.annotation import ConfigurationInject
+            from micronaut.context.annotation import ConfigurationProperties
+            from jakarta.validation.constraints import NotNull
+
+            @ConfigurationProperties("my.engine")
+            class EngineConfig:
+                @ConfigurationProperties("crank-shaft")
+                class CrankShaft:
+                    @ConfigurationInject
+                    def __init__(self, rod_length: float | None = None):
+                        self.rod_length = rod_length
+
+                @ConfigurationInject
+                def __init__(
+                    self,
+                    manufacturer: str,
+                    cylinders: int,
+                    crank_shaft: Annotated[CrankShaft, NotNull],
+                ):
+                    self.manufacturer = manufacturer
+                    self.cylinders = cylinders
+                    self.crank_shaft = crank_shaft
+            """, "micronaut.docs.config.immutable")) {
+            assertTrue(environment.classes().containsKey("micronaut.docs.config.immutable.EngineConfig"));
+            assertTrue(environment.classes().containsKey("micronaut.docs.config.immutable.EngineConfig$CrankShaft"));
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                ClassElement engineConfig = processingEnvironment.classes().get("micronaut.docs.config.immutable.EngineConfig");
+                assertNotNull(engineConfig);
+
+                ClassElement crankShaft = processingEnvironment.classes().get("micronaut.docs.config.immutable.EngineConfig$CrankShaft");
+                assertNotNull(crankShaft);
+                assertTrue(crankShaft.isInner());
+                assertEquals(engineConfig, crankShaft.getEnclosingType().orElseThrow());
+
+                MethodElement constructor = engineConfig.getPrimaryConstructor().orElseThrow();
+                ParameterElement crankShaftParameter = constructor.getParameters()[2];
+                assertEquals(
+                    "micronaut.docs.config.immutable.EngineConfig$CrankShaft",
+                    crankShaftParameter.getType().getName()
+                );
+            }
+        }
+    }
+
+    @Test
     void testParseDecorators() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""

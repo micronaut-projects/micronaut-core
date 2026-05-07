@@ -1,4 +1,4 @@
-from micronaut.docs.requires import JdbcBookService
+from .JdbcBookService import JdbcBookService
 from micronaut.context.annotation import Requires, Replaces
 from .BookService import Book, BookService
 from jakarta.inject import Singleton
@@ -10,5 +10,5 @@ class MockBookService(BookService):
     book_map : dict[str, Book] = {}
 
     def find_book(self, title: str) -> Book:
-        return dict[title]
+        return self.book_map.get(title)
 # end::class[]

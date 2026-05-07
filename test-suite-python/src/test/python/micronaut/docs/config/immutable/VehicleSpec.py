@@ -2,11 +2,10 @@ import java
 
 from micronaut.context import ApplicationContext
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 
 @MicronautTest
-@Disabled("Python immutable @ConfigurationProperties nested constructor argument still resolves as Object")
 class VehicleSpec:
     @Test
     def test_start_vehicle(self) -> None:

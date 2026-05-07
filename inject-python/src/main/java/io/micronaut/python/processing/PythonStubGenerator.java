@@ -160,6 +160,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     }
 
                     String typeName = element.getName();
+                    String pythonSimpleName = pythonSimpleName(classElement);
                     boolean isAopProxy = classElement.hasStereotype(InterceptorBinding.class);
                     boolean isDeclaredBean = BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(classElement) || isAopProxy;
 
@@ -313,7 +314,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             POLYGLOT_VALUE,
                                             List.of(
                                                 ExpressionDef.constant(element.getPackageName()),
-                                                ExpressionDef.constant(element.getSimpleName())
+                                                ExpressionDef.constant(pythonSimpleName)
                                             )
                                         );
                                         return storedValue.isNonNull().doIfElse(
@@ -342,7 +343,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             POLYGLOT_VALUE,
                                             List.of(
                                                 ExpressionDef.constant(element.getPackageName()),
-                                                ExpressionDef.constant(element.getSimpleName()),
+                                                ExpressionDef.constant(pythonSimpleName),
                                                 propsMap
                                             )
                                         );
@@ -350,12 +351,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         // Constructor present: use positional args
                                         List<ExpressionDef> args = new ArrayList<>();
                                         args.add(ExpressionDef.constant(element.getPackageName()));
-                                        args.add(ExpressionDef.constant(element.getSimpleName()));
+                                        args.add(ExpressionDef.constant(pythonSimpleName));
                                         for (PropertyElement beanProperty : beanProperties) {
                                             FieldDef field = propertyFields.get(beanProperty.getName());
                                             if (field == null) {
-                                            continue;
-                                        }ExpressionDef fieldRef = aThis.field(field);
+                                                continue;
+                                            }
+                                            ExpressionDef fieldRef = aThis.field(field);
                                             args.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT));
                                         }
                                         reconstructedValue = CONTEXT_HOLDER.invokeStatic(isAbstractIntro ? "newIntroduction" : "newInstance", POLYGLOT_VALUE, args);
@@ -374,7 +376,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         POLYGLOT_VALUE,
                                         List.of(
                                             ExpressionDef.constant(element.getPackageName()),
-                                            ExpressionDef.constant(element.getSimpleName())
+                                            ExpressionDef.constant(pythonSimpleName)
                                         )
                                     );
                                     return storedValue.isNonNull().doIfElse(
@@ -444,7 +446,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 if (isIntrospectedBean) {
                                     List<ExpressionDef> arguments = new ArrayList<>(List.of(
                                         ExpressionDef.constant(element.getPackageName()),
-                                        ExpressionDef.constant(element.getSimpleName())
+                                        ExpressionDef.constant(pythonSimpleName)
                                     ));
                                     for (int i = 0; i < parameters.length; i++) {
                                         @NonNull ParameterElement parameter = parameters[i];
@@ -462,7 +464,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 } else {
                                     List<ExpressionDef> arguments = new ArrayList<>(List.of(
                                         ExpressionDef.constant(element.getPackageName()),
-                                        ExpressionDef.constant(element.getSimpleName())
+                                        ExpressionDef.constant(pythonSimpleName)
                                     ));
                                     for (int i = 0; i < parameters.length; i++) {
                                         @NonNull ParameterElement parameter = parameters[i];
@@ -505,7 +507,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     .invokeStatic(isAbstractIntroNoArg ? "newIntroduction" : "newInstance", POLYGLOT_VALUE,
                                         List.of(
                                             ExpressionDef.constant(element.getPackageName()),
-                                            ExpressionDef.constant(element.getSimpleName())
+                                            ExpressionDef.constant(pythonSimpleName)
                                         )
                                     );
                                 if (extendsPythonClass) {
@@ -851,7 +853,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static String javaTypeName(ClassElement t) {
+        if (t instanceof AbstractPythonClassElement) {
+            return t.getName();
+        }
         return t.getName().replace('$', '.');
+    }
+
+    private static String pythonSimpleName(ClassElement element) {
+        if (element instanceof AbstractPythonClassElement pythonClassElement) {
+            return pythonClassElement.getNativeType().name().replace('$', '.');
+        }
+        return element.getSimpleName();
     }
 
     static void coerceParameterToPolyglotValue(
@@ -1308,7 +1320,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 // Call the Python static method via CONTEXT_HOLDER
                 List<ExpressionDef> arguments = new ArrayList<>();
                 arguments.add(ExpressionDef.constant(element.getPackageName()));
-                arguments.add(ExpressionDef.constant(element.getSimpleName()));
+                arguments.add(ExpressionDef.constant(pythonSimpleName(element)));
                 arguments.add(ExpressionDef.constant(pythonMethodName));
 
                 // Add method parameters
