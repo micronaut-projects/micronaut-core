@@ -277,21 +277,18 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
         return List.of();
     }
 
-    private <BT extends BeanType<T>> Collection<BT> filterRawTypeVariableParameterCandidates(Argument<?> argument,
-                                                                                             Collection<BT> candidates,
-                                                                                             Function<BT, @Nullable Argument<?>> typeArgumentExtractor) {
+    private <B extends BeanType<T>> Collection<B> filterRawTypeVariableParameterCandidates(Argument<?> argument,
+                                                                                           Collection<B> candidates,
+                                                                                           Function<B, @Nullable Argument<?>> typeArgumentExtractor) {
         if (!isRawGenericType(argument)) {
             return candidates;
         }
         Class<?> argumentTypeClass = argument.getType();
-        if (argumentTypeClass.isPrimitive()) {
-            argumentTypeClass = ReflectionUtils.getWrapperType(argumentTypeClass);
-        }
-        List<BT> genericCandidates = null;
-        for (BT candidate : candidates) {
+        List<B> genericCandidates = null;
+        for (B candidate : candidates) {
             Argument<?> candidateArgument = typeArgumentExtractor.apply(candidate);
             if (candidateArgument != null
-                && hasOnlyUnboundedTypeVariableParameters(candidateArgument)
+                && isUnboundedTypeVariableCandidate(candidateArgument)
                 && matchesRawArgument(argument, argumentTypeClass, candidateArgument)) {
                 if (genericCandidates == null) {
                     genericCandidates = new ArrayList<>(candidates.size());
@@ -316,8 +313,11 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
         return argument.getTypeParameters().length == 0 && argument.getType().getTypeParameters().length > 0;
     }
 
-    private static boolean hasOnlyUnboundedTypeVariableParameters(Argument<?> argument) {
+    private static boolean isUnboundedTypeVariableCandidate(Argument<?> argument) {
         Argument<?>[] typeParameters = argument.getTypeParameters();
+        if (typeParameters.length == 0) {
+            return argument.isTypeVariable() && argument.getType().equals(Object.class);
+        }
         for (Argument<?> typeParameter : typeParameters) {
             if (!typeParameter.isTypeVariable() || !typeParameter.getType().equals(Object.class)) {
                 return false;
