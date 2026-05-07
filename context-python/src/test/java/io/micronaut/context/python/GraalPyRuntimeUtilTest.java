@@ -17,6 +17,7 @@ package io.micronaut.context.python;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import org.graalvm.polyglot.Context;
@@ -187,6 +188,15 @@ class GraalPyRuntimeUtilTest {
         Map<String, Integer> result = GraalPyRuntimeUtil.convertMap(context.eval("python", "lambda: None").execute(), String.class, Integer.class);
 
         assertNull(result);
+    }
+
+    @Test
+    void testConvertHostOptional() {
+        context.getBindings("python").putMember("optional", Optional.of("value"));
+
+        Optional<String> result = GraalPyRuntimeUtil.convertOptional(context.eval("python", "optional"), String.class);
+
+        assertEquals(Optional.of("value"), result);
     }
 
     @Test

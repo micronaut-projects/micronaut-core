@@ -87,6 +87,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final ClassTypeDef RUNTIME_UTIL = ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil");
     public static final ClassTypeDef CONTEXT_HOLDER = ClassTypeDef.of("io.micronaut.context.python.ContextHolder");
     public static final String GENERATOR_NAME = "python";
+    private static final String ANN_CONFIGURATION_BUILDER = "io.micronaut.context.annotation.ConfigurationBuilder";
     private static final Set<String> ANNOTATION_PACKAGES_TO_COPY = Set.of("org.junit.jupiter.api", "io.micronaut.test.extensions.junit5.annotation");
     public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
     public static final String ANN_JSON_PROPERTY = "com.fasterxml.jackson.annotation.JsonProperty";
@@ -183,6 +184,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     boolean isIntrospectedBean = element.hasStereotype(Introspected.class);
                     final boolean isIntroductionBean = element.hasStereotype(Introduction.class);
                     boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(ann -> ann.hasDeclaredAnnotation(JUNIT_TEST))).isPresent();
+                    boolean isConfigurationBuilderType = isConfigurationBuilderType(element);
 
                     List<PropertyElement> beanProperties = element.getBeanProperties();
                     Map<String, FieldDef> propertyFields = new LinkedHashMap<>();
@@ -421,8 +423,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
                         @NonNull ParameterElement[] parameters = pythonConstructor.getParameters();
                         for (@NonNull ParameterElement parameter : parameters) {
-                            ClassElement t = parameter.getType();
-                            var parameterType = erasedType(t);
+                            var parameterType = constructorParameterType(parameter);
                             ParameterDef.ParameterDefBuilder pb = ParameterDef
                                 .builder(parameter.getName(), parameterType);
                             if (jsonPropertyElement.isPresent() && isIntrospectedBean && !parameter.hasDeclaredAnnotation(ANN_JSON_PROPERTY)) {
@@ -525,13 +526,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 ann.hasStereotype(Executable.class) ||
                                 ann.hasAnnotation("io.micronaut.context.annotation.Mapper") ||
                                 ann.hasAnnotation("io.micronaut.context.annotation.Mapper$Mapping") ||
+                                ann.hasAnnotation(ANN_CONFIGURATION_BUILDER) ||
                                 ann.hasAnnotation(AnnotationUtil.PRE_DESTROY) ||
                                 ann.hasAnnotation(AnnotationUtil.POST_CONSTRUCT) ||
                                 ann.hasStereotype(Around.class) ||
                                 ann.hasStereotype(InterceptorBinding.class) ||
                                 element.hasStereotype(Around.class) ||
                                 ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
-                                ann.hasDeclaredStereotype(Bean.class)));
+                                ann.hasDeclaredStereotype(Bean.class) ||
+                                isConfigurationBuilderType));
 
                     boolean hasIntroductionAdviceMethod = false;
                     for (MethodElement methodElement : methodsToBridge) {
@@ -679,6 +682,31 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return interfaceTypeDef;
     }
 
+    private boolean isConfigurationBuilderType(ClassElement element) {
+        for (ClassElement classElement : allClasses.values()) {
+            for (PropertyElement propertyElement : classElement.getBeanProperties()) {
+                if (propertyElement.hasAnnotation(ANN_CONFIGURATION_BUILDER) && sameErasedType(propertyElement.getType(), element)) {
+                    return true;
+                }
+            }
+            List<MethodElement> configurationBuilderMethods = classElement.getEnclosedElements(
+                ElementQuery.ALL_METHODS.onlyDeclared().annotated(ann -> ann.hasAnnotation(ANN_CONFIGURATION_BUILDER))
+            );
+            for (MethodElement methodElement : configurationBuilderMethods) {
+                for (ParameterElement parameter : methodElement.getParameters()) {
+                    if (sameErasedType(parameter.getType(), element)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean sameErasedType(ClassElement left, ClassElement right) {
+        return left.getName().equals(right.getName());
+    }
+
     private void visitScript(PythonScriptElement scriptElement, VisitorContext context) {
         try {
             if (classBuilders.containsKey(scriptElement.getName())) {
@@ -812,6 +840,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return ClassTypeDef.of(javaTypeName);
         }
         return TypeDef.of(t);
+    }
+
+    static TypeDef constructorParameterType(ParameterElement parameter) {
+        ClassElement genericType = parameter.getGenericType();
+        if (!genericType.getTypeArguments().isEmpty() && !(genericType instanceof AbstractPythonClassElement)) {
+            return parameterizedTypeDef(genericType);
+        }
+        return erasedType(parameter.getType());
     }
 
     private static String javaTypeName(ClassElement t) {

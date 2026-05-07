@@ -667,6 +667,43 @@ class ProductMappers:
     }
 
     @Test
+    void testDottedSourcePackageImportsResolveBeforeMicronautJavaNormalization(@TempDir Path tempDir) throws IOException {
+        Path namedPackage = tempDir.resolve("micronaut/docs/inject/qualifiers/named");
+        Path anyPackage = tempDir.resolve("micronaut/docs/inject/qualifiers/any");
+        Files.createDirectories(namedPackage);
+        Files.createDirectories(anyPackage);
+        Path engine = namedPackage.resolve("Engine.py");
+        Path vehicle = anyPackage.resolve("Vehicle.py");
+        Files.writeString(engine, """
+            class Engine:
+                pass
+            """);
+        Files.writeString(vehicle, """
+            from micronaut.docs.inject.qualifiers.named import Engine
+
+            class Vehicle:
+                def __init__(self, engine: Engine):
+                    self.engine = engine
+            """);
+
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        List<Source> sources = List.of(
+            Source.newBuilder("python", engine.toFile()).build(),
+            Source.newBuilder("python", vehicle.toFile()).build()
+        );
+
+        try (PythonEnvironment environment = pythonProcessor.parse(sources, List.of(tempDir.toString()), null);
+             PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
+            ClassElement vehicleClass = processingEnvironment.classes().get("micronaut.docs.inject.qualifiers.any.Vehicle");
+            assertNotNull(vehicleClass);
+
+            MethodElement constructor = vehicleClass.getPrimaryConstructor().orElseThrow();
+            ParameterElement engineParameter = constructor.getParameters()[0];
+            assertEquals("micronaut.docs.inject.qualifiers.named.Engine", engineParameter.getType().getName());
+        }
+    }
+
+    @Test
     void testAbstractMethodDetection() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""
@@ -1484,6 +1521,53 @@ class ProductMappers:
                 assertEquals(PropertyElement.AccessKind.METHOD, descProperty.getReadAccessKind(), "description should be METHOD access");
                 assertFalse(descProperty.getField().isPresent(), "skip fields because they are inaccessible");
                 assertTrue(descProperty.getReadMethod().isPresent(), "description should have synthetic read method");
+            }
+        }
+    }
+
+    @Test
+    void testPropertySetterCarriesConfigurationBuilderMetadata() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from micronaut.context.annotation import ConfigurationBuilder
+
+            class EngineConfig:
+                _spark_plug: SparkPlugBuilder = None
+
+                @property
+                def spark_plug(self) -> SparkPlugBuilder:
+                    return self._spark_plug
+
+                @spark_plug.setter
+                @ConfigurationBuilder(prefixes="with", configurationPrefix="spark-plug")
+                def spark_plug(self, spark_plug: SparkPlugBuilder) -> None:
+                    self._spark_plug = spark_plug
+
+            class SparkPlugBuilder:
+                pass
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                ClassElement classElement = processingEnvironment.classes().get("EngineConfig");
+                assertNotNull(classElement);
+                assertInstanceOf(PythonClassElement.class, classElement);
+
+                PythonClassElement pythonClass = (PythonClassElement) classElement;
+                List<PropertyElement> properties = pythonClass.getBeanProperties();
+                PropertyElement sparkPlug = properties.stream()
+                    .filter(p -> "spark_plug".equals(p.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("spark_plug property should be found"));
+
+                assertEquals(1, properties.size());
+                assertEquals("spark_plug", sparkPlug.getReadMethod().orElseThrow().getName());
+                assertEquals("spark_plug", sparkPlug.getWriteMethod().orElseThrow().getName());
+                assertTrue(sparkPlug.hasAnnotation("io.micronaut.context.annotation.ConfigurationBuilder"));
+                assertTrue(
+                    pythonClass.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+                        .stream()
+                        .noneMatch(method -> "spark_plug".equals(method.getName()))
+                );
             }
         }
     }

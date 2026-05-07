@@ -1,6 +1,8 @@
 from .CrankShaft import CrankShaft
+from .CrankShaft import CrankShaftBuilder
 from .Engine import Engine
 from .SparkPlug import SparkPlug
+from .SparkPlug import SparkPlugBuilder
 
 
 # tag::class[]
@@ -30,29 +32,31 @@ class EngineImpl(Engine):
         )
 
     @staticmethod
-    def builder():
-        return EngineImpl.Builder()
-
-    class Builder:
-        manufacturer: str = "Ford"
-        cylinders: int = 0
-
-        def withManufacturer(self, manufacturer: str):
-            self.manufacturer = manufacturer
-            return self
-
-        def withCylinders(self, cylinders: int):
-            self.cylinders = cylinders
-            return self
-
-        def build(self, crank_shaft: CrankShaft.Builder, spark_plug: SparkPlug.Builder):
-            return EngineImpl(
-                self.manufacturer,
-                self.cylinders,
-                crank_shaft.build(),
-                spark_plug.build(),
-            )
+    def builder() -> "EngineImplBuilder":
+        return EngineImplBuilder()
 # end::class[]
 
 
-Builder = EngineImpl.Builder
+class EngineImplBuilder:
+    manufacturer: str = "Ford"
+    cylinders: int = 0
+
+    def withManufacturer(self, manufacturer: str) -> "EngineImplBuilder":
+        self.manufacturer = manufacturer
+        return self
+
+    def withCylinders(self, cylinders: int) -> "EngineImplBuilder":
+        self.cylinders = cylinders
+        return self
+
+    def build(self, crank_shaft: CrankShaftBuilder, spark_plug: SparkPlugBuilder) -> EngineImpl:
+        return EngineImpl(
+            self.manufacturer,
+            self.cylinders,
+            crank_shaft.build(),
+            spark_plug.build(),
+        )
+
+
+Builder = EngineImplBuilder
+EngineImpl.Builder = EngineImplBuilder

@@ -2,17 +2,17 @@ import java
 
 from micronaut.context import ApplicationContext
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 
 # tag::configSpec[]
 @MicronautTest
-@Disabled("Python TypeConverter<Map, LocalDate> implementation is not validated yet")
 class MyConfigurationPropertiesSpec:
     @Test
     def test_convert_date_from_map(self) -> None:
         # tag::runContext[]
         ctx = ApplicationContext.run({
+            "spec.name": "MyConfigurationPropertiesSpec",
             "myapp.updatedAt": {  # <1>
                 "day": 28,
                 "month": 10,

@@ -15,6 +15,6 @@ class EngineFactory:
     def build_engine(self, engine_config: EngineConfig) -> Engine:
         return engine_config.builder.build(
             engine_config.crank_shaft,
-            engine_config.get_spark_plug(),
+            engine_config.spark_plug,
         )
 # end::class[]

@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -275,6 +276,25 @@ public final class GraalPyRuntimeUtil {
     public static <T> java.util.Optional<T> convertOptional(Value graalValue, Class<T> elementType) {
         if (isNone(graalValue)) {
             return java.util.Optional.empty();
+        }
+        if (graalValue.isHostObject()) {
+            Object hostObject = graalValue.asHostObject();
+            if (hostObject instanceof Optional<?> optional) {
+                if (optional.isEmpty()) {
+                    return java.util.Optional.empty();
+                }
+                Object optionalValue = optional.get();
+                if (optionalValue == null) {
+                    return java.util.Optional.empty();
+                }
+                if (elementType.isInstance(optionalValue)) {
+                    return java.util.Optional.of(elementType.cast(optionalValue));
+                }
+                if (optionalValue instanceof Value value) {
+                    T convertedValue = convertValue(value, elementType);
+                    return convertedValue == null ? java.util.Optional.empty() : java.util.Optional.of(convertedValue);
+                }
+            }
         }
 
         // Convert the value and wrap in Optional

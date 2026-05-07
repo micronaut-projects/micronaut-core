@@ -6,7 +6,7 @@ from org.junit.jupiter.api import Disabled, Test
 
 
 @MicronautTest
-@Disabled("Python immutable @ConfigurationProperties constructor injection is not resolved yet")
+@Disabled("Python immutable @ConfigurationProperties nested constructor argument still resolves as Object")
 class VehicleSpec:
     @Test
     def test_start_vehicle(self) -> None:

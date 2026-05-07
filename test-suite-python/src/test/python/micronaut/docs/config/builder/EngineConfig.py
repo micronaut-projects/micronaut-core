@@ -1,8 +1,11 @@
 from typing import Annotated
 
 from .CrankShaft import CrankShaft
+from .CrankShaft import CrankShaftBuilder
 from .EngineImpl import EngineImpl
+from .EngineImpl import EngineImplBuilder
 from .SparkPlug import SparkPlug
+from .SparkPlug import SparkPlugBuilder
 
 # tag::imports[]
 from micronaut.context.annotation import ConfigurationBuilder
@@ -13,19 +16,21 @@ from micronaut.context.annotation import ConfigurationProperties
 # tag::class[]
 @ConfigurationProperties("my.engine")  # <1>
 class EngineConfig:
-    builder: Annotated[EngineImpl.Builder, ConfigurationBuilder(prefixes="with")] = EngineImpl.builder()  # <2>
+    builder: Annotated[EngineImplBuilder, ConfigurationBuilder(prefixes="with")] = EngineImpl.builder()  # <2>
 
     crank_shaft: Annotated[
-        CrankShaft.Builder,
+        CrankShaftBuilder,
         ConfigurationBuilder(prefixes="with", configurationPrefix="crank-shaft"),
     ] = CrankShaft.builder()  # <3>
 
-    spark_plug: SparkPlug.Builder = SparkPlug.builder()
+    _spark_plug: SparkPlugBuilder = SparkPlug.builder()
 
-    def get_spark_plug(self) -> SparkPlug.Builder:
-        return self.spark_plug
+    @property
+    def spark_plug(self) -> SparkPlugBuilder:
+        return self._spark_plug
 
+    @spark_plug.setter
     @ConfigurationBuilder(prefixes="with", configurationPrefix="spark-plug")  # <4>
-    def set_spark_plug(self, spark_plug: SparkPlug.Builder) -> None:
-        self.spark_plug = spark_plug
+    def spark_plug(self, spark_plug: SparkPlugBuilder) -> None:
+        self._spark_plug = spark_plug
 # end::class[]

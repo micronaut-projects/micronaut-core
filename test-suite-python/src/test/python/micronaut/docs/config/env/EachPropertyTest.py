@@ -1,64 +1,52 @@
 import java
 
+from typing import Annotated
+
+from jakarta.inject import Inject
 from micronaut.context import ApplicationContext
-from micronaut.context.env import PropertySource
+from micronaut.context.annotation import Property
 from micronaut.inject.qualifiers import Qualifiers
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 
+# tag::config[]
+@Property(name="test.datasource.one.url", value="jdbc:mysql://localhost/one")
+@Property(name="test.datasource.two.url", value="jdbc:mysql://localhost/two")
+# end::config[]
+@Property(name="ratelimits[0].period", value="10s")
+@Property(name="ratelimits[0].limit", value="1000")
+@Property(name="ratelimits[1].period", value="1m")
+@Property(name="ratelimits[1].limit", value="5000")
 @MicronautTest
 class EachPropertyTest:
+    context: Annotated[ApplicationContext, Inject] = None
+
     @Test
-    @Disabled("Python @EachProperty named configuration beans are not returned as expected yet")
     def test_each_property(self) -> None:
-        # tag::config[]
-        application_context = ApplicationContext.run(PropertySource.of(
-            "test",
-            {
-                "test.datasource.one.url": "jdbc:mysql://localhost/one",
-                "test.datasource.two.url": "jdbc:mysql://localhost/two",
-            },
-        ))
-        # end::config[]
+        # tag::beans[]
+        DataSourceConfiguration = java.type(
+            "micronaut.docs.config.env.DataSourceConfiguration"
+        )
+        beans_of_type = self.context.getBeansOfType(DataSourceConfiguration)
+        assert 2 == beans_of_type.size()  # <1>
 
-        try:
-            # tag::beans[]
-            DataSourceConfiguration = java.type(
-                "micronaut.docs.config.env.DataSourceConfiguration"
-            )
-            beans_of_type = application_context.getBeansOfType(DataSourceConfiguration)
-            assert 2 == beans_of_type.size()  # <1>
+        first_config = self.context.getBean(
+            DataSourceConfiguration,
+            Qualifiers.byName("one"),  # <2>
+        )
 
-            first_config = application_context.getBean(
-                DataSourceConfiguration,
-                Qualifiers.byName("one"),  # <2>
-            ).asPolyglotValue()
-
-            URI = java.type("java.net.URI")
-            assert URI("jdbc:mysql://localhost/one") == first_config.get_url()
-            # end::beans[]
-        finally:
-            application_context.close()
+        URI = java.type("java.net.URI")
+        assert URI("jdbc:mysql://localhost/one").equals(first_config.url)
+        # end::beans[]
 
     @Test
-    @Disabled("Python list-based @EachProperty @Parameter index passes an unexpected arity to GraalPy")
     def test_each_property_list(self) -> None:
-        application_context = ApplicationContext.run({
-            "ratelimits": [
-                {"period": "10s", "limit": "1000"},
-                {"period": "1m", "limit": "5000"},
-            ],
-        })
+        RateLimitsConfiguration = java.type(
+            "micronaut.docs.config.env.RateLimitsConfiguration"
+        )
+        beans_of_type = self.context.streamOfType(RateLimitsConfiguration).toList()
 
-        try:
-            RateLimitsConfiguration = java.type(
-                "micronaut.docs.config.env.RateLimitsConfiguration"
-            )
-            beans_of_type = application_context.streamOfType(RateLimitsConfiguration).toList()
-
-            assert 2 == beans_of_type.size()
-            assert 1000 == beans_of_type.get(0).asPolyglotValue().get_limit()
-            assert 5000 == beans_of_type.get(1).asPolyglotValue().get_limit()
-        finally:
-            application_context.close()
+        assert 2 == beans_of_type.size()
+        assert 1000 == beans_of_type.get(0).limit
+        assert 5000 == beans_of_type.get(1).limit

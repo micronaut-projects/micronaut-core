@@ -113,16 +113,21 @@ class MicronautAstVisitor(ast.NodeVisitor):
         Source-root files are represented in the synthetic "python" package,
         while source-root directories map to real packages.
         """
-        if not self.source_root or "." in module_name:
+        if not self.source_root:
             return None
 
-        package_dir = os.path.join(self.source_root, module_name)
+        module_path = module_name.replace(".", os.sep)
+        package_dir = os.path.join(self.source_root, module_path)
         if os.path.isdir(package_dir):
-            return f"{module_name}.{imported_name}"
+            imported_module = os.path.join(package_dir, f"{imported_name}.py")
+            if os.path.isfile(imported_module):
+                return f"{module_name}.{imported_name}"
+            return None
 
-        module_file = os.path.join(self.source_root, f"{module_name}.py")
+        module_file = os.path.join(self.source_root, f"{module_path}.py")
         if os.path.isfile(module_file):
-            return f"python.{imported_name}"
+            package_name = module_name.rsplit(".", 1)[0] if "." in module_name else "python"
+            return f"{package_name}.{imported_name}"
 
         return None
 
@@ -1000,6 +1005,17 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         return func_node.name, "deleter"
         return None
 
+    def _is_python_property_decorator(self, decorator, func_name):
+        if isinstance(decorator, ast.Name) and decorator.id == "property":
+            return True
+        if isinstance(decorator, ast.Attribute):
+            return (
+                decorator.attr in ("setter", "deleter")
+                and isinstance(decorator.value, ast.Name)
+                and decorator.value.id == func_name
+            )
+        return False
+
     def _handle_property_function(self, property_name, property_type, func_node):
         """
         Handle a property function (getter, setter, or deleter).
@@ -1019,7 +1035,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
         decorators = [
             decorator_to_function(self, d)
             for d in func_node.decorator_list
-            if decorator_to_function(self, d) is not None
+            if not self._is_python_property_decorator(d, func_node.name)
+            and decorator_to_function(self, d) is not None
         ]
 
         is_abstract = is_abstract_method(func_node)

@@ -9,7 +9,7 @@ from .SampleEventListener import SampleEventListener
 
 # tag::class[]
 @MicronautTest
-@Disabled("Python @EventListener method adaptation with event argument types is not resolved yet")
+@Disabled("Python @EventListener method adaptation with event argument types still resolves against Object")
 class SampleEventListenerSpec:
     @Test
     def test_event_listener_is_notified(self) -> None:

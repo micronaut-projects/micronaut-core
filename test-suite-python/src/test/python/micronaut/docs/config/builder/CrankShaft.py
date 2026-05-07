@@ -6,18 +6,20 @@ class CrankShaft:
         return self.rod_length
 
     @staticmethod
-    def builder():
-        return CrankShaft.Builder()
-
-    class Builder:
-        rod_length: float | None = None
-
-        def withRodLength(self, rod_length: float | None):
-            self.rod_length = rod_length
-            return self
-
-        def build(self):
-            return CrankShaft(self.rod_length)
+    def builder() -> "CrankShaftBuilder":
+        return CrankShaftBuilder()
 
 
-Builder = CrankShaft.Builder
+class CrankShaftBuilder:
+    rod_length: float | None = None
+
+    def withRodLength(self, rod_length: float | None) -> "CrankShaftBuilder":
+        self.rod_length = rod_length
+        return self
+
+    def build(self) -> CrankShaft:
+        return CrankShaft(self.rod_length)
+
+
+Builder = CrankShaftBuilder
+CrankShaft.Builder = CrankShaftBuilder
