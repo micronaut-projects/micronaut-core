@@ -40,7 +40,7 @@ public interface ProxyInterceptedParametrizedInstantiateBeanDefinition<T> extend
     @Override
     default T doInstantiate(BeanResolutionContext resolutionContext, BeanContext context, Map<String, Object> requiredArgumentValues) {
         @Nullable Object[] constructorValues = resolveInstantiationValues(resolutionContext, context, requiredArgumentValues);
-        List<BeanRegistration<Interceptor<T, T>>> interceptors = (List) constructorValues[3];
+        List<BeanRegistration<Interceptor<T, T>>> interceptors = (List) constructorValues[constructorValues.length - 2];
         return ConstructorInterceptorChain.instantiate(
             resolutionContext,
             context,
