@@ -24,6 +24,7 @@ on:
       - '.github/workflows/sonatype.yml'
       - '.github/workflows/release.yml'
       - '.github/scripts/vulnerability-audit.sh'
+      - '.github/scripts/vulnerability-audit-filter.py'
 jobs:
   audit:
     if: github.repository != 'micronaut-projects/micronaut-project-template'
@@ -56,7 +57,7 @@ jobs:
           fetch-depth: 0
 
       - name: "🔧 Setup GraalVM CE"
-        uses: graalvm/setup-graalvm@60c26726de13f8b90771df4bc1641a52a3159994 # v1
+        uses: graalvm/setup-graalvm@bef4b0e916c7dd079bf60fb95d49139f67e32c5f # v1
         with:
           distribution: 'graalvm'
           java-version: ${{ matrix.java }}

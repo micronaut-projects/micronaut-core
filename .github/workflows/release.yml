@@ -41,7 +41,15 @@ jobs:
           DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
-        run: .github/scripts/vulnerability-audit.sh
+          RELEASE_VERSION: ${{ steps.release_version.outputs.release_version }}
+        run: |
+          release_version="${RELEASE_VERSION}"
+          if [[ "${release_version}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+-(M|RC)[0-9]+$ ]]; then
+            echo "Running vulnerability audit in advisory mode for ${release_version}"
+            VULNERABILITY_AUDIT_ENFORCEMENT=advisory .github/scripts/vulnerability-audit.sh
+          else
+            .github/scripts/vulnerability-audit.sh
+          fi
       - name: Run pre-release
         uses: micronaut-projects/github-actions/pre-release@300bf6db7c062dcba77c90bb90e475df31b2acab # master
         env:

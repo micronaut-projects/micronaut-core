@@ -1,6 +1,6 @@
 ---
 name: coding
-description: Implement and review Java code changes for Micronaut framework repositories using maintainer standards. Use when users ask to add or refactor Java code, fix framework bugs, evolve internal APIs, or prepare committer-ready changes with tests and verification.
+description: Implement and review Java code changes for Micronaut framework repositories using maintainer standards, including JSpecify null-safety conventions. Use when users ask to add or refactor Java code, fix framework bugs, evolve internal APIs, or prepare committer-ready changes with tests and verification.
 license: Apache-2.0
 compatibility: Micronaut framework repositories in micronaut-projects generated from micronaut-project-template
 metadata:
@@ -14,7 +14,7 @@ Use this skill for maintainer-facing Java implementation work in Micronaut repos
 
 ## Goal
 
-Deliver minimal, source-backed Java changes that preserve framework quality: binary compatibility, null-safety, reflection-free behavior, and full Gradle verification (`check`, `docs`, and compatibility checks when API-facing).
+Deliver minimal, source-backed Java changes that preserve framework quality: binary compatibility, JSpecify null-safety, reflection-free behavior, and full Gradle verification (`check`, `docs`, and compatibility checks when API-facing).
 
 ## Trigger Examples
 
@@ -50,7 +50,10 @@ Should not trigger:
 
 - Prefer modern Java idioms where they improve clarity (records, sealed types, pattern matching, `var` for local inference), but only when supported by the repository toolchain/target level.
 - Do not use fully qualified class names unless import conflicts force it.
-- Follow the repository's established nullability annotations/defaults; use JSpecify and package-level `@NullMarked` only when that convention already exists in the module.
+- Micronaut Java code uses JSpecify nullness annotations from `org.jspecify.annotations`; use JSpecify for new or modified nullability contracts.
+- New Java packages must include `package-info.java` with `@NullMarked` and `import org.jspecify.annotations.NullMarked`; when touching an existing package without `@NullMarked`, add it unless the local code has an explicit exception.
+- Use `org.jspecify.annotations.Nullable` for nullable values, including nullable parameters, return values, fields, array/component positions such as `String @Nullable []`, nullable collection elements such as `List<@Nullable T>`, and nullable type bounds such as `<T extends @Nullable Object>`.
+- Preserve existing nullability intent when editing older code. Use JSpecify for new or modified contracts, but do not rewrite deliberate compatibility annotations such as `io.micronaut.core.annotation.Nullable` or `jakarta.annotation.Nullable` unless the task is specifically a nullability migration and compatibility impact has been checked.
 - Avoid reflection-oriented implementations in framework code paths; prefer Micronaut compile-time/introspection mechanisms.
 - Use `jakarta.inject` APIs for DI, not `javax.inject`.
 - Prefer constructor injection and immutable state over field injection.
@@ -65,6 +68,8 @@ Should not trigger:
 - When using the deprecate-and-add path, keep deprecated APIs functional, point to replacements in Javadoc, and schedule removals only for the next major version.
 - If breaking public-facing changes are explicitly allowed, document them in the user guide under `src/main/docs/guide` with migration notes, and update `toc.yml` when adding new guide sections.
 - Mark non-user-facing APIs with `@io.micronaut.core.annotation.Internal`.
+- Mark unstable public APIs with `@io.micronaut.core.annotation.Experimental` and avoid presenting them as stable contracts.
+- Mark members directly called by generated code with `@io.micronaut.core.annotation.UsedByGeneratedCode`; preserve those signatures unless the generated-code callers are updated in the same change.
 - Keep visibility as narrow as possible for non-public internals.
 - When deprecating API, provide migration-friendly Javadoc and avoid silent behavioral breaks.
 
@@ -106,6 +111,7 @@ If Spotless fails, run `./gradlew -q spotlessApply` and re-run `spotlessCheck`.
 ## Guardrails
 
 - Do not introduce `javax.inject` usage.
+- Do not introduce legacy or third-party nullability annotations for new or modified Micronaut Java contracts when JSpecify is available, except for deliberate compatibility annotations whose impact has been checked.
 - Do not hard-code dependency versions in module build files.
 - Do not break public APIs without explicit major-version intent.
 - Do not skip tests or docs verification for code changes.
@@ -127,8 +133,8 @@ When finishing implementation work, report:
 
 - [ ] `SKILL.md` frontmatter is valid and `name` matches directory (`coding`).
 - [ ] Guidance is maintainer-focused (not end-user app guidance).
-- [ ] Java conventions include nullability, DI, and reflection-free guidance.
-- [ ] API boundary guidance includes `@Internal` and compatibility checks.
+- [ ] Java conventions include JSpecify nullability (`@NullMarked`, `@Nullable`), DI, and reflection-free guidance.
+- [ ] API boundary guidance includes `@Internal`, `@Experimental`, `@UsedByGeneratedCode`, and compatibility checks.
 - [ ] For public API evolution without breaking changes, deprecations include clear replacement guidance and functional compatibility is preserved.
 - [ ] If breaking changes are allowed, user guide docs in `src/main/docs/guide` are updated with migration notes.
 - [ ] Verification includes tests, style checks, `check`, and `docs`.
