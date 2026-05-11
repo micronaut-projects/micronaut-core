@@ -18,7 +18,7 @@ class PetController(PetOperations):
 
     @SingleResult
     @Post
-    def save(self, name: str, age: int) -> Publisher:
+    def save(self, name: str, age: int) -> Publisher[Pet]:
         pet = Pet(name=name, age=age)
         # save to database or something
         return Mono.just(pet)

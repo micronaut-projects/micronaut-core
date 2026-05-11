@@ -4,10 +4,10 @@ This file tracks Python docs examples that are present but disabled, or intentio
 
 ## Wave 0 Reconciliation
 
-- Last generated active `@Disabled` count: 21.
+- Last generated active `@Disabled` count: 17.
 - Last generated command: `rg -n "@Disabled\\(" test-suite-python/src/test/python/micronaut/docs`.
 - Last full-suite command: `./gradlew --no-daemon -Dorg.gradle.java.home=/Users/graemerocher/.sdkman/candidates/java/current :test-suite-python:test --max-workers=2`.
-- Last full-suite result: build successful, 180 tests executed, 21 skipped.
+- Last full-suite result: build successful, 180 tests executed, 17 skipped.
 - Missing row added in this pass: `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming`.
 - The active rows below currently keep the root-cause summary in `Reason`; explicit subsystem, focused-regression, status, and last-failure columns still need to be expanded as each group is worked.
 
@@ -24,10 +24,7 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | Path | Reason |
 | --- | --- |
 | `aop/advice/AdviceFactorySpec.py` | Python AOP advice on `@Factory` bean methods fails during factory bean processing. |
-| `annotation/PetControllerSpec.py::testPostPet` | Python `@Client Publisher` return type is decoded as `Object` without `Pet` generic element metadata. |
-| `annotation/PetControllerSpec.py::testPostPetValidation` | Python client-side validation metadata is not applied to the generated `Publisher` client method yet. |
-| `annotation/headers/HeaderSpec.py::testSenderHeaders` | Python `@Client` introduction inherits an abstract `save` method without an introduction interceptor. |
-| `annotation/retry/PetRetrySpec.py::testFallback` | Python HTTP client `Publisher` return types lose generic element metadata for fallback resolution. |
+| `annotation/PetControllerSpec.py::testPostPetValidation` | GraalPy Java exception matching currently fails for the propagated `ConstraintViolationException` (`ExceptMatchNode`/`IsSubtypeNode` assertion). |
 | `propagation/MdcServiceSpec.py::testFilterSpec` | GraalPy SAM conversion for `PropagatedContext` propagation helpers is not validated yet. |
 | `propagation/reactor/PropagatedContextTest.py::testMonoRequest` | Python Reactor `contextWrite` Java `Function` adaptation is not validated yet. |
 | `datavalidation/groups/EmailControllerSpec.py::test_pojo_validation_default_group` | Python `@Valid` body validation metadata is generated, but invalid requests are not rejected yet. |
@@ -40,7 +37,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `http/server/secondary/SecondaryServerTest.py` | Secondary Python factory starts an eager `NettyEmbeddedServer` before the GraalPy context is initialized. |
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::testExceptionBindingErrorResponse` | Python error-body binding does not currently reproduce the Java bind-failure behavior for dataclasses without defaults. |
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::verifyBindErrorIsThrown` | Python HTTP client body binding does not currently reproduce the Java decode-failure exception. |
-| `server/intro/HelloClientSpec.py::testHelloWorldResponse` | Python `@Client Publisher` return type is decoded as `Object` for this declarative client. |
 | `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming` | Python `@Client` `Publisher` return types do not retain generic `Event` element metadata for SSE decoding yet. |
 | `streaming/HeadlineControllerSpec.py::testClientAnnotationStreaming` | Python `@Client` `Publisher` return types do not retain generic element metadata for JSON stream decoding yet. |
 | `streaming/HeadlineControllerSpec.py::testStreamingClient` | GraalPy cannot adapt a Python subscriber object to `org.reactivestreams.Subscriber` for `Flux.subscribe`. |

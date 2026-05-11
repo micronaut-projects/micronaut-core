@@ -17,7 +17,7 @@ Publisher = java.type("org.reactivestreams.Publisher")
 class PetFallback(PetOperations):
 
     @SingleResult
-    def save(self, name: str, age: int) -> Publisher:
+    def save(self, name: str, age: int) -> Publisher[Pet]:
         pet = Pet(name=name, age=age)
         return Mono.just(pet)
 # end::class[]

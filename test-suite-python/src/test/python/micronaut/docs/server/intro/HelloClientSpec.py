@@ -10,7 +10,6 @@ from .HelloClient import HelloClient
 
 Mono = java.type("reactor.core.publisher.Mono")
 # end::imports[]
-from org.junit.jupiter.api import Disabled
 
 
 # tag::class[]
@@ -19,9 +18,6 @@ class HelloClientSpec:
     client: Annotated[HelloClient, Inject]  # <2>
 
     @Test
-# end::class[]
-    @Disabled("Python @Client Publisher return type is decoded as Object for this declarative client")
-# tag::class[]
     def testHelloWorldResponse(self) -> None:
         assert "Hello World" == getattr(Mono, "from")(self.client.hello()).block()  # <3>
 # end::class[]

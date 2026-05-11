@@ -2,6 +2,7 @@ from abc import abstractmethod
 
 import java
 
+from micronaut.docs.annotation.Pet import Pet
 from micronaut.docs.annotation.PetOperations import PetOperations
 
 # tag::imports[]
@@ -20,12 +21,12 @@ class PetClient(PetOperations):
 
     @SingleResult
     @abstractmethod
-    def save(self, name: str, age: int) -> Publisher:
+    def save(self, name: str, age: int) -> Publisher[Pet]:
         pass
 
     @SingleResult
     @Get("/{name}")
     @abstractmethod
-    def get(self, name: str) -> Publisher:
+    def get(self, name: str) -> Publisher[Pet]:
         pass
 # end::class[]

@@ -3,7 +3,7 @@ from typing import Annotated
 import java
 from jakarta.inject import Inject
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 from .PetClient import PetClient
 
@@ -15,7 +15,6 @@ class PetRetrySpec:
     client: Annotated[PetClient, Inject]
 
     @Test
-    @Disabled("Python HTTP client Publisher return types lose generic element metadata for fallback resolution")
     def testFallback(self) -> None:
         pet = getattr(Mono, "from")(self.client.save("Dino", 10)).block()
 

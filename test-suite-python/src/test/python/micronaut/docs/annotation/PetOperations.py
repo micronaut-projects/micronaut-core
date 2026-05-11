@@ -22,7 +22,7 @@ class PetOperations(ABC):
     @Post
     @SingleResult
     @abstractmethod
-    def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> Publisher:
+    def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> Publisher[Pet]:
         pass
     # end::save[]
 # end::class[]

@@ -16,7 +16,6 @@ class PetControllerSpec:
     client: Annotated[PetClient, Inject]
 
     @Test
-    @Disabled("Python @Client Publisher return type is decoded as Object without Pet generic element metadata")
     def testPostPet(self) -> None:
         # tag::post[]
         pet = getattr(Mono, "from")(self.client.save("Dino", 10)).block()
@@ -26,7 +25,7 @@ class PetControllerSpec:
         # end::post[]
 
     @Test
-    @Disabled("Python client-side validation metadata is not applied to the generated Publisher client method yet")
+    @Disabled("GraalPy Java exception matching currently fails for the propagated ConstraintViolationException")
     def testPostPetValidation(self) -> None:
         try:
             getattr(Mono, "from")(self.client.save("Fred", -1)).block()

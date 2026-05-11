@@ -4,7 +4,7 @@ import java
 from jakarta.inject import Inject
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from micronaut.context.annotation import Property
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 from .PetClient import PetClient
 
@@ -17,7 +17,6 @@ class HeaderSpec:
     client: Annotated[PetClient, Inject]
 
     @Test
-    @Disabled("Python @Client introduction inherits an abstract save method without an introduction interceptor")
     def testSenderHeaders(self) -> None:
         pet = getattr(Mono, "from")(self.client.get("Fred")).block()
 

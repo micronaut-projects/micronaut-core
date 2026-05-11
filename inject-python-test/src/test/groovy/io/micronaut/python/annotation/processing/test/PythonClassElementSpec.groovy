@@ -16,11 +16,18 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.python.ContextHolder
+import io.micronaut.aop.InterceptorBinding
+import io.micronaut.aop.InterceptorKind
+import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Mapper
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.expressions.EvaluatedExpressionReference
 import io.micronaut.core.type.Argument
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
 import io.micronaut.python.compiler.RepeatableAnnotation
@@ -664,6 +671,124 @@ class TypeTestService:
             assert parameter.genericType.array
             assert parameter.genericType.arrayDimensions == 1
             return element
+        }
+    }
+
+    def "test override method inherits annotations from python base method"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+import java
+from micronaut.core.async_.annotation import SingleResult
+from micronaut.http.annotation import Post
+
+Publisher = java.type("org.reactivestreams.Publisher")
+
+class Pet:
+    pass
+
+class PetOperations(ABC):
+    @Post
+    @SingleResult
+    @abstractmethod
+    def save(self, name: str) -> Publisher[Pet]:
+        pass
+
+class PetClient(PetOperations):
+    @SingleResult
+    @abstractmethod
+    def save(self, name: str) -> Publisher[Pet]:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "PetClient") { ClassElement element ->
+            def method = element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+                .find { it.name == "save" }
+
+            assert method.annotationMetadata.hasAnnotation("io.micronaut.core.async.annotation.SingleResult")
+            assert method.annotationMetadata.hasAnnotation("io.micronaut.http.annotation.Post")
+            assert method.annotationMetadata.hasStereotype("io.micronaut.http.annotation.HttpMethodMapping")
+            assert method.methodAnnotationMetadata.hasAnnotation("io.micronaut.core.async.annotation.SingleResult")
+            assert method.methodAnnotationMetadata.hasAnnotation("io.micronaut.http.annotation.Post")
+            return element
+        }
+    }
+
+    def "test client override with class header keeps client interceptor binding"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+import java
+from micronaut.core.async_.annotation import SingleResult
+from micronaut.http.annotation import Header, Post
+from micronaut.http.client.annotation import Client
+
+Publisher = java.type("org.reactivestreams.Publisher")
+
+class Pet:
+    pass
+
+class PetOperations(ABC):
+    @Post
+    @SingleResult
+    @abstractmethod
+    def save(self, name: str) -> Publisher[Pet]:
+        pass
+
+@Client("/pets")
+@Header(name="X-Pet-Client", value="${pet.client.id}")
+class PetClient(PetOperations):
+    @SingleResult
+    @abstractmethod
+    def save(self, name: str) -> Publisher[Pet]:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "PetClient") { ClassElement element ->
+            def saves = element.getEnclosedElements(ElementQuery.ALL_METHODS)
+                .findAll { it.name == "save" }
+            def method = saves.find { it.declaringType.name == "PetClient" } ?: saves.first()
+
+            assert saves.size() == 1
+            assert method.declaringType.name == "python.PetClient"
+            assert method.annotationMetadata.hasAnnotation("io.micronaut.http.client.annotation.Client")
+            assert method.annotationMetadata.hasAnnotation("io.micronaut.http.annotation.Headers")
+            assert method.annotationMetadata.hasAnnotation("io.micronaut.http.annotation.Post")
+            assert method.annotationMetadata.hasStereotype("io.micronaut.aop.Introduction")
+            assert method.annotationMetadata.getAnnotationValuesByType(InterceptorBinding)*.stringValue()*.orElse(null)
+                .contains("io.micronaut.http.client.annotation.Client")
+            return element
+        }
+        def definition = buildBeanDefinition("python", "PetClient\$RuntimeProxy", pythonCode)
+        definition.executableMethods
+            .find { it.methodName == "save" }
+            .annotationMetadata
+            .getAnnotationValuesByType(InterceptorBinding)*.stringValue()*.orElse(null)
+            .contains("io.micronaut.http.client.annotation.Client")
+        definition.executableMethods
+            .find { it.methodName == "save" }
+            .annotationMetadata
+            .getAnnotationValuesByName("io.micronaut.aop.InterceptorBinding")*.stringValue()*.orElse(null)
+            .contains("io.micronaut.http.client.annotation.Client")
+        def executableMethods = definition.executableMethods.toArray(new io.micronaut.inject.ExecutableMethod[0])
+        new AnnotationMetadataHierarchy(executableMethods)
+            .getAnnotationValuesByName("io.micronaut.aop.InterceptorBinding")*.stringValue()*.orElse(null)
+            .contains("io.micronaut.http.client.annotation.Client")
+        Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(executableMethods)).toString()
+            .contains("Client")
+
+        def context = ApplicationContext.builder(["pet.client.id": "11"]).build()
+        try {
+            definition.configure(context.environment)
+            def configuredExecutableMethods = definition.executableMethods.toArray(new io.micronaut.inject.ExecutableMethod[0])
+            assert configuredExecutableMethods
+                .collectMany { InterceptedMethodUtil.resolveInterceptorBinding(it.annotationMetadata, InterceptorKind.INTRODUCTION).toList() }
+                *.stringValue()*.orElse(null)
+                .contains("io.micronaut.http.client.annotation.Client")
+        } finally {
+            context.close()
         }
     }
 

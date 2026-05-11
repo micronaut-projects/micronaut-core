@@ -18,6 +18,6 @@ class HelloClient(ABC):
     @Get(consumes=MediaType.TEXT_PLAIN)  # <2>
     @SingleResult
     @abstractmethod
-    def hello(self) -> Publisher:  # <3>
+    def hello(self) -> Publisher[str]:  # <3>
         pass
 # end::class[]

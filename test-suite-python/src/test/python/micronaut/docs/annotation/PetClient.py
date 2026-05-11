@@ -3,6 +3,7 @@ from typing import Annotated
 
 import java
 
+from .Pet import Pet
 from .PetOperations import PetOperations
 
 # tag::imports[]
@@ -22,6 +23,6 @@ class PetClient(PetOperations):  # <2>
     @SingleResult
     @Post
     @abstractmethod
-    def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> Publisher:  # <3>
+    def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> Publisher[Pet]:  # <3>
         pass
 # end::class[]
