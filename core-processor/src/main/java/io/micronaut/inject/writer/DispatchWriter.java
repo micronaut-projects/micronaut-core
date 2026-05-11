@@ -23,9 +23,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
-import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.sourcegen.model.ClassTypeDef;
@@ -154,8 +152,8 @@ public final class DispatchWriter implements ClassOutputWriter {
     }
 
     private DispatchTarget findDispatchTarget(TypedElement declaringType, MethodElement methodElement, boolean useOneDispatch) {
-        List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
-        boolean isKotlinDefault = argumentTypes.stream().anyMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
+        MethodElement kotlinDefaultMethod = findKotlinDefaultMethod(methodElement);
+        boolean isKotlinDefault = kotlinDefaultMethod != null;
         ClassElement declaringClassType = (ClassElement) declaringType;
         if (methodElement.isReflectionRequired(ClassElement.of(thisType))) {
             if (isKotlinDefault) {
@@ -163,9 +161,25 @@ public final class DispatchWriter implements ClassOutputWriter {
             }
             return new MethodReflectionDispatchTarget(declaringType, methodElement, dispatchTargets.size(), useOneDispatch);
         } else if (isKotlinDefault) {
-            return new KotlinMethodWithDefaultsDispatchTarget(declaringClassType, methodElement, useOneDispatch);
+            return new KotlinMethodWithDefaultsDispatchTarget(declaringClassType, methodElement, kotlinDefaultMethod, useOneDispatch);
         }
         return new MethodDispatchTarget(declaringClassType, methodElement, useOneDispatch);
+    }
+
+    @Nullable
+    private MethodElement findKotlinDefaultMethod(MethodElement methodElement) {
+        if (MethodGenUtils.hasKotlinDefaultsParameters(Arrays.asList(methodElement.getSuspendParameters()))
+            && methodElement.getOverriddenMethods().isEmpty()) {
+            return methodElement;
+        }
+        List<MethodElement> defaultMethods = new ArrayList<>();
+        for (MethodElement overriddenMethod : methodElement.getOverriddenMethods()) {
+            MethodElement defaultMethod = findKotlinDefaultMethod(overriddenMethod);
+            if (defaultMethod != null && defaultMethods.stream().noneMatch(existing -> existing.getDeclaringType().equals(defaultMethod.getDeclaringType()))) {
+                defaultMethods.add(defaultMethod);
+            }
+        }
+        return defaultMethods.size() == 1 ? defaultMethods.get(0) : null;
     }
 
     /**
@@ -738,13 +752,16 @@ public final class DispatchWriter implements ClassOutputWriter {
     public static final class KotlinMethodWithDefaultsDispatchTarget extends AbstractDispatchTarget {
         final ClassElement declaringType;
         final MethodElement methodElement;
+        final MethodElement kotlinDefaultMethod;
         private final boolean useOneDispatch;
 
         private KotlinMethodWithDefaultsDispatchTarget(ClassElement targetType,
                                                        MethodElement methodElement,
+                                                       MethodElement kotlinDefaultMethod,
                                                        boolean useOneDispatch) {
             this.declaringType = targetType;
             this.methodElement = methodElement;
+            this.kotlinDefaultMethod = kotlinDefaultMethod;
             this.useOneDispatch = useOneDispatch;
         }
 
@@ -770,12 +787,12 @@ public final class DispatchWriter implements ClassOutputWriter {
 
         @Override
         public ExpressionDef dispatchMultiExpression(ExpressionDef target, List<? extends ExpressionDef> values) {
-            return MethodGenUtils.invokeKotlinDefaultMethod(declaringType, methodElement, target, values);
+            return MethodGenUtils.invokeKotlinDefaultMethod(kotlinDefaultMethod.getDeclaringType(), kotlinDefaultMethod, target, values);
         }
 
         @Override
         public ExpressionDef dispatchOneExpression(ExpressionDef target, ExpressionDef value) {
-            return MethodGenUtils.invokeKotlinDefaultMethod(declaringType, methodElement, target, List.of(value));
+            return MethodGenUtils.invokeKotlinDefaultMethod(kotlinDefaultMethod.getDeclaringType(), kotlinDefaultMethod, target, List.of(value));
         }
     }
 
