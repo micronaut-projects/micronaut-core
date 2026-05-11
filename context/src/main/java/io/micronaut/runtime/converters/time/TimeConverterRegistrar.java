@@ -23,7 +23,6 @@ import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 
 import java.time.DateTimeException;
 import java.time.Duration;
@@ -52,6 +51,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -122,9 +123,9 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         .toFormatter();
 
     private static final int MAX_CACHE_SIZE = 100;
-    private final Map<String, DateTimeFormatter> formattersCache = new ConcurrentLinkedHashMap.Builder<String, DateTimeFormatter>()
-        .maximumWeightedCapacity(MAX_CACHE_SIZE)
-        .build();
+    private final Map<String, DateTimeFormatter> formattersCache = new ConcurrentHashMap<>(MAX_CACHE_SIZE);
+    private final AtomicReferenceArray<String> evictionQueue = new AtomicReferenceArray<>(MAX_CACHE_SIZE);
+    private final AtomicInteger evictionIndex = new AtomicInteger();
 
     @NextMajorVersion("Consider deletion of LocalDate and LocalDateTime converters")
     @Override
@@ -442,6 +443,13 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             return cachedFormatter;
         }
         var formatter = DateTimeFormatter.ofPattern(pattern, context.getLocale());
+
+        int idx = (evictionIndex.getAndIncrement() & Integer.MAX_VALUE) % MAX_CACHE_SIZE;
+        String oldKey = evictionQueue.getAndSet(idx, key);
+
+        if (oldKey != null) {
+            formattersCache.remove(oldKey);
+        }
         formattersCache.put(key, formatter);
 
         return formatter;
