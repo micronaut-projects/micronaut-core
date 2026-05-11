@@ -4,7 +4,7 @@ import java
 from jakarta.inject import Inject
 from micronaut.context.annotation import Property
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 MessageContext = java.type("io.micronaut.context.MessageSource$MessageContext")
 MessageSource = java.type("io.micronaut.context.MessageSource")
@@ -17,7 +17,6 @@ class I18nSpec:
     messageSource: Annotated[MessageSource, Inject]
 
     @Test
-    @Disabled("Python docs test resources are not resolved by ResourceBundleMessageSource yet")
     def itIsPossibleToCreateAMessageSourceFromResourceBundle(self) -> None:
         # tag::test[]
         assert self.messageSource.getMessage("hello", MessageContext.of(Locale("es"))).get() == "Hola"

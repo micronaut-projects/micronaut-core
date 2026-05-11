@@ -4,10 +4,10 @@ This file tracks Python docs examples that are present but disabled, or intentio
 
 ## Wave 0 Reconciliation
 
-- Last generated active `@Disabled` count: 28.
+- Last generated active `@Disabled` count: 26.
 - Last generated command: `rg -n "@Disabled\\(" test-suite-python/src/test/python/micronaut/docs`.
 - Last full-suite command: `./gradlew --no-daemon -Dorg.gradle.java.home=/Users/graemerocher/.sdkman/candidates/java/current :test-suite-python:test --max-workers=2`.
-- Last full-suite result: build successful, 180 tests executed, 30 skipped.
+- Last full-suite result: build successful, 180 tests executed, 28 skipped.
 - Missing row added in this pass: `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming`.
 - The active rows below currently keep the root-cause summary in `Reason`; explicit subsystem, focused-regression, status, and last-failure columns still need to be expanded as each group is worked.
 
@@ -40,8 +40,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `http/server/secondary/SecondaryServerTest.py` | Secondary Python factory starts an eager `NettyEmbeddedServer` before the GraalPy context is initialized. |
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::testExceptionBindingErrorResponse` | Python error-body binding does not currently reproduce the Java bind-failure behavior for dataclasses without defaults. |
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::verifyBindErrorIsThrown` | Python HTTP client body binding does not currently reproduce the Java decode-failure exception. |
-| `i18n/I18nSpec.py::itIsPossibleToCreateAMessageSourceFromResourceBundle` | Python docs test resources are not resolved by `ResourceBundleMessageSource` yet; message lookups return `Optional.empty()`. |
-| `resources/ResourceLoaderTest.py::testExampleForResourceResolver` | Python docs test classpath resources are not resolved through `ResourceResolver` yet; `classpath:hello.txt` returns empty. |
 | `server/endpoint/AlertsEndpointSpec.py::testAddingAnAlert` | Python management endpoint sensitivity handling is not validated yet. |
 | `server/endpoint/CurrentDateEndpointSpec.py::testReadCustomDateEndpoint` | Python management endpoint routing is not validated yet. |
 | `server/endpoint/MessageEndpointSpec.py::testWriteMessageEndpoint` | Python management endpoint write/delete routing is not validated yet. |
