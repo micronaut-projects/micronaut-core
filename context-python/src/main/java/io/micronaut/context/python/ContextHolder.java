@@ -178,7 +178,9 @@ public final class ContextHolder {
      */
     @UsedByGeneratedCode
     public static Value invokePooled(@Nullable String packageName, String simpleName, String methodName, Object... args) {
-        return withPooled(packageName, simpleName, v -> v.getMember(methodName).execute(
+        return withPooled(packageName, simpleName, v -> GraalPyRuntimeUtil.invokePythonMethod(
+            v,
+            methodName,
             GraalPyRuntimeUtil.coerceArgumentsToContext(v.getContext(), args)
         ));
     }

@@ -1307,9 +1307,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                 // Get the return type to determine appropriate conversion method
                 var returnType = methodElement.getGenericReturnType();
-                var invokedValue = targetValue
-                    .invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(pythonFunctionName))
-                    .invoke("execute", POLYGLOT_VALUE, parameterExpressions);
+                var invokedValue = RUNTIME_UTIL.invokeStatic(
+                    "invokePythonMethod",
+                    POLYGLOT_VALUE,
+                    targetValue,
+                    ExpressionDef.constant(pythonFunctionName),
+                    TypeDef.OBJECT.array().instantiate(parameterExpressions)
+                );
 
                 if (isJunit5Test) {
                     return invokedValue;

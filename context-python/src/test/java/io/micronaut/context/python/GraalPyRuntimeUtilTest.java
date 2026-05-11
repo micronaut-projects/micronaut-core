@@ -83,6 +83,44 @@ class GraalPyRuntimeUtilTest {
     }
 
     @Test
+    void testInvokePythonMethodBindsClassDescriptorWhenAttributeShadowsMethod() {
+        Value instance = context.eval("python", """
+            class Example:
+                def __init__(self):
+                    self.currentDate = "field"
+                    self.className = "field"
+                    self.staticName = "field"
+
+                def currentDate(self):
+                    return "method:" + self.currentDate
+
+                @classmethod
+                def className(cls):
+                    return cls.__name__
+
+                @staticmethod
+                def staticName():
+                    return "static"
+
+            Example()
+            """);
+
+        assertEquals("field", instance.getMember("currentDate").asString());
+        assertEquals(
+            "method:field",
+            GraalPyRuntimeUtil.invokePythonMethod(instance, "currentDate", new Object[0]).asString()
+        );
+        assertEquals(
+            "Example",
+            GraalPyRuntimeUtil.invokePythonMethod(instance, "className", new Object[0]).asString()
+        );
+        assertEquals(
+            "static",
+            GraalPyRuntimeUtil.invokePythonMethod(instance, "staticName", new Object[0]).asString()
+        );
+    }
+
+    @Test
     @Disabled("not yet implemented")
     void testConvertListWithMixedTypes() {
         // Create a Python list with mixed types

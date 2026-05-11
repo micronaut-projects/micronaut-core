@@ -1,7 +1,9 @@
+from typing import Annotated
+
 from micronaut.context.annotation import Requires
 
 # tag::imports[]
-from micronaut.http.annotation import Controller, Get
+from micronaut.http.annotation import Controller, Get, PathVariable
 # end::imports[]
 
 
@@ -23,7 +25,7 @@ class IssuesController:
 
     # tag::defaultvalue[]
     @Get("/default{/number}")  # <1>
-    def issue_from_id_or_default(self, number: int = 0) -> str:  # <2>
+    def issue_from_id_or_default(self, number: Annotated[int, PathVariable(defaultValue="0")]) -> str:  # <2>
         return f"Issue # {number}!"
     # end::defaultvalue[]
 

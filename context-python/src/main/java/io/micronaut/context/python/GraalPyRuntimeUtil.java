@@ -164,6 +164,90 @@ public final class GraalPyRuntimeUtil {
     }
 
     /**
+     * Invoke a generated bridge method on a Python receiver.
+     *
+     * @param receiver The Python receiver
+     * @param name The method name
+     * @param arguments The method arguments
+     * @return The invocation result
+     */
+    public static Value invokePythonMethod(Value receiver, String name, Object[] arguments) {
+        Value member = receiver.getMember(name);
+        if (member != null && member.canExecute()) {
+            return member.execute(arguments);
+        }
+        Value pythonClass = receiver.getMember("__class__");
+        Value rawMember = pythonClass == null ? null : getRawClassMember(pythonClass, name);
+        if (rawMember != null) {
+            Value boundMember = bindPythonDescriptor(rawMember, receiver, pythonClass);
+            if (boundMember.canExecute()) {
+                return boundMember.execute(arguments);
+            }
+        }
+        if (member == null) {
+            throw new IllegalArgumentException("No Python member [" + name + "] found");
+        }
+        return member.execute(arguments);
+    }
+
+    /**
+     * Read a Python class member directly from the MRO dictionaries, bypassing descriptor binding.
+     *
+     * @param pythonClass The Python class
+     * @param name The member name
+     * @return The raw member, or null if none exists
+     */
+    public static @Nullable Value getRawClassMember(Value pythonClass, String name) {
+        Value member = getRawClassMemberFunction(pythonClass.getContext()).execute(pythonClass, name);
+        if (isNone(member)) {
+            return null;
+        }
+        return member;
+    }
+
+    /**
+     * Bind a raw Python descriptor to a receiver when the descriptor protocol is available.
+     *
+     * @param descriptor The raw descriptor
+     * @param receiver The receiver object
+     * @param owner The owner class
+     * @return The bound descriptor, or the original descriptor if it cannot be bound
+     */
+    public static Value bindPythonDescriptor(Value descriptor, Object receiver, Value owner) {
+        Value getter = descriptor.getMember("__get__");
+        if (getter != null && getter.canExecute()) {
+            Value receiverValue = receiver instanceof Value value
+                ? value
+                : receiver instanceof ValueCoercible valueCoercible ? valueCoercible.asPolyglotValue() : null;
+            if (receiverValue != null) {
+                return getter.execute(receiverValue, owner);
+            }
+        }
+        return descriptor;
+    }
+
+    private static Value getRawClassMemberFunction(Context context) {
+        String functionName = "__micronaut_get_raw_class_member";
+        Value bindings = context.getBindings(PYTHON);
+        Value function = bindings.getMember(functionName);
+        if (isNone(function)) {
+            context.eval(
+                PYTHON,
+                """
+                def __micronaut_get_raw_class_member(cls, name):
+                    for base in getattr(cls, "__mro__", (cls,)):
+                        namespace = getattr(base, "__dict__", {})
+                        if name in namespace:
+                            return namespace[name]
+                    return None
+                """
+            );
+            function = bindings.getMember(functionName);
+        }
+        return function;
+    }
+
+    /**
      * Convert a GraalPy Value representing a list to a Java List.
      * Recursively converts nested collections.
      *
