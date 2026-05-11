@@ -1,5 +1,7 @@
 import java
+from typing import Annotated
 
+from micronaut.http.annotation import Body
 from micronaut.context.annotation import Requires
 from micronaut.websocket import WebSocketBroadcaster, WebSocketSession
 from micronaut.websocket.annotation import OnClose, OnMessage, OnOpen, ServerWebSocket
@@ -28,7 +30,7 @@ class ReactivePojoChatServerWebSocket:
     # tag::onmessage[]
     @OnMessage
     def onMessage(
-        self, topic: str, username: str, message: Message, session: WebSocketSession
+        self, topic: str, username: str, message: Annotated[Message, Body], session: WebSocketSession
     ) -> Publisher:
         text = "[" + username + "] " + message.getText()
         newMessage = Message(text)

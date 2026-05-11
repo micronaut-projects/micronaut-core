@@ -1,11 +1,19 @@
-from org.junit.jupiter.api import Disabled, Test
+from typing import Annotated
 
+from jakarta.inject import Inject
+from micronaut.context import ApplicationContext
+from micronaut.docs.aop.advice.MyBean import MyBean
 from micronaut.test.extensions.junit5.annotation import MicronautTest
+from org.junit.jupiter.api import Test
 
 
 @MicronautTest
 class AdviceFactorySpec:
+    context: Annotated[ApplicationContext, Inject] = None
+
     @Test
-    @Disabled("Python AOP advice on @Factory bean methods fails during factory bean processing")
     def test_aop_advice_on_factory_beans(self):
-        pass
+        beans = self.context.getBeansOfType(MyBean)
+
+        assert len(beans) == 2
+        assert all(bean.do_work() == "Done" for bean in beans)

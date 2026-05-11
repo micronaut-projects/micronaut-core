@@ -9,15 +9,16 @@ from micronaut.websocket import WebSocketSession
 from micronaut.websocket.annotation import ClientWebSocket, OnMessage, OnOpen
 
 ConcurrentLinkedQueue = java.type("java.util.concurrent.ConcurrentLinkedQueue")
+AutoCloseable = java.type("java.lang.AutoCloseable")
+Collection = java.type("java.util.Collection")
 Future = java.type("java.util.concurrent.Future")
 Publisher = java.type("org.reactivestreams.Publisher")
 # end::imports[]
 
 
 # tag::class[]
-# TODO: Re-enable when Python @ClientWebSocket introduction can proxy Python classes.
-# @ClientWebSocket("/chat/{topic}/{username}")  # <1>
-class ChatClientWebSocket(ABC):  # <2>
+@ClientWebSocket("/chat/{topic}/{username}")  # <1>
+class ChatClientWebSocket(ABC, AutoCloseable):  # <2>
 
     def __init__(self):
         self.session = None
@@ -41,7 +42,7 @@ class ChatClientWebSocket(ABC):  # <2>
     def getUsername(self) -> str:
         return self.username
 
-    def getReplies(self):
+    def getReplies(self) -> Collection[str]:
         return self.replies
 
     def getSession(self) -> WebSocketSession:
@@ -60,10 +61,10 @@ class ChatClientWebSocket(ABC):  # <2>
         pass
 
     @abstractmethod
-    def sendAsync(self, message: str) -> Future:
+    def sendAsync(self, message: str) -> Future[str]:
         pass
 
     @SingleResult
     @abstractmethod
-    def sendRx(self, message: str) -> Publisher:
+    def sendRx(self, message: str) -> Publisher[str]:
         pass

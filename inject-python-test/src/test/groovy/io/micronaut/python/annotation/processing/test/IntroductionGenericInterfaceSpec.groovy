@@ -6,6 +6,25 @@ import spock.lang.PendingFeature
 
 class IntroductionGenericInterfaceSpec extends AbstractPythonTypeElementSpec {
 
+    void "test introduction interfaces declared by annotation are implemented by python class"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from micronaut.websocket.annotation import ClientWebSocket
+
+@ClientWebSocket("/chat/{topic}/{username}")
+class ChatClient(ABC):
+    @abstractmethod
+    def send(self, message: str) -> None:
+        pass
+'''
+
+        expect:
+        def definition = buildBeanDefinition("python", "ChatClient\$RuntimeProxy", pythonCode)
+        definition != null
+        definition.executableMethods*.methodName.contains("setWebSocketSession")
+    }
+
     void "test introduction bean inheriting generic Java repository interface compiles"() {
         given:
         def pythonCode = '''

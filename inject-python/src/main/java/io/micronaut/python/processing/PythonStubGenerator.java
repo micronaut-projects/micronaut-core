@@ -473,7 +473,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         }
                         final boolean isAbstractIntroCtor = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
                         builder.addMethod(
-                            constructor.build(((aThis, methodParameters) -> {
+                            constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                                 if (isIntrospectedBean) {
                                     List<ExpressionDef> arguments = new ArrayList<>(List.of(
                                         ExpressionDef.constant(element.getPackageName()),
@@ -530,7 +530,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                         MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
                         final boolean isAbstractIntroNoArg = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
-                        builder.addMethod(constructor.build(((aThis, methodParameters) -> {
+                        builder.addMethod(constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                             if (isJunit5Test || isIntrospectedBean) {
                                 return StatementDef.multi();
                             } else {

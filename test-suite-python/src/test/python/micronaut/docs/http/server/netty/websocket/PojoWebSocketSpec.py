@@ -6,7 +6,7 @@ from micronaut.context.annotation import Property
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from micronaut.websocket import WebSocketClient
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 from .Message import Message
 
@@ -17,7 +17,6 @@ PojoChatClientClass = java.type("micronaut.docs.http.server.netty.websocket.Pojo
 
 @Property(name="spec.name", value="PojoWebSocketSpec")
 @MicronautTest
-@Disabled("Python @ClientWebSocket introduction cannot proxy Python classes yet")
 class PojoWebSocketSpec:
     wsClient: Annotated[WebSocketClient, Inject, Client("/")]
 

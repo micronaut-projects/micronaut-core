@@ -25,7 +25,7 @@ class Person:
         expect:
         assertGeneratedSourceContains(pythonCode, """
   @JsonCreator
-  Person(@JsonProperty("name") String name, @JsonProperty("age") int age, @JsonProperty("address") Address address) {
+  public Person(@JsonProperty("name") String name, @JsonProperty("age") int age, @JsonProperty("address") Address address) {
     this(ContextHolder.newInstance("python", "Person", (Object) name, (Object) age, (Object) address));
   }
 

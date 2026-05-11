@@ -6,7 +6,7 @@ from micronaut.context.annotation import Property
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from micronaut.websocket import WebSocketClient
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 Flux = java.type("reactor.core.publisher.Flux")
 TimeUnit = java.type("java.util.concurrent.TimeUnit")
@@ -15,7 +15,6 @@ ChatClientClass = java.type("micronaut.docs.http.server.netty.websocket.ChatClie
 
 @Property(name="spec.name", value="SimpleTextWebSocketSpec")
 @MicronautTest
-@Disabled("Python @ClientWebSocket introduction cannot proxy Python classes yet")
 class SimpleTextWebSocketSpec:
     wsClient: Annotated[WebSocketClient, Inject, Client("/")]
 

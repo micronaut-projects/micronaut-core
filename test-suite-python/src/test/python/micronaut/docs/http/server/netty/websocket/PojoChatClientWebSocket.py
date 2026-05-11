@@ -1,19 +1,22 @@
 from abc import ABC, abstractmethod
+from typing import Annotated
 
 import java
 from micronaut.core.async_.annotation import SingleResult
+from micronaut.http.annotation import Body
 from micronaut.websocket.annotation import ClientWebSocket, OnMessage, OnOpen
 
 from .Message import Message
 
 ConcurrentLinkedQueue = java.type("java.util.concurrent.ConcurrentLinkedQueue")
+AutoCloseable = java.type("java.lang.AutoCloseable")
+Collection = java.type("java.util.Collection")
 Future = java.type("java.util.concurrent.Future")
 Publisher = java.type("org.reactivestreams.Publisher")
 
 
-# TODO: Re-enable when Python @ClientWebSocket introduction can proxy Python classes.
-# @ClientWebSocket("/pojo/chat/{topic}/{username}")
-class PojoChatClientWebSocket(ABC):
+@ClientWebSocket("/pojo/chat/{topic}/{username}")
+class PojoChatClientWebSocket(ABC, AutoCloseable):
 
     def __init__(self):
         self.topic = None
@@ -31,11 +34,11 @@ class PojoChatClientWebSocket(ABC):
     def getUsername(self) -> str:
         return self.username
 
-    def getReplies(self):
+    def getReplies(self) -> Collection[Message]:
         return self.replies
 
     @OnMessage
-    def onMessage(self, message: Message) -> None:
+    def onMessage(self, message: Annotated[Message, Body]) -> None:
         self.replies.add(message)
 
     @abstractmethod
@@ -43,10 +46,10 @@ class PojoChatClientWebSocket(ABC):
         pass
 
     @abstractmethod
-    def sendAsync(self, message: Message) -> Future:
+    def sendAsync(self, message: Message) -> Future[Message]:
         pass
 
     @SingleResult
     @abstractmethod
-    def sendRx(self, message: Message) -> Publisher:
+    def sendRx(self, message: Message) -> Publisher[Message]:
         pass

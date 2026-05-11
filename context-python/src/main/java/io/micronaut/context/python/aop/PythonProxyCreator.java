@@ -76,51 +76,38 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 ignored -> new ArrayList<>()
             ).add(interceptedMethod);
         }
+        Map<String, ProxyExecutable> introductionFunctions = new LinkedHashMap<>();
         for (Map.Entry<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> entry : interceptedMethodsByName.entrySet()) {
             String methodName = entry.getKey();
             List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods = entry.getValue();
             Value originalFunction = isIntroduction ? GraalPyRuntimeUtil.getRawClassMember(value, methodName) : value.getMember(methodName);
-            ProxyExecutable proxiedFunction = args -> {
-                RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = findInterceptedMethod(methodName, interceptedMethods, args);
-                ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
-                Interceptor<T, ?>[] interceptors = interceptedMethod.interceptors();
-
-                Object[] javaArgs = fromPolyglotArray(args, executableMethod.getArguments());
-                Interceptor<T, ?>[] finalInterceptors;
-                if (isIntroduction && executableMethod.isAbstract()) {
-                    finalInterceptors = interceptors;
-                } else {
-                    if (originalFunction == null) {
-                        throw new IllegalStateException("No original function found for method: " + executableMethod);
-                    }
-                    finalInterceptors = Arrays.copyOf(interceptors, interceptors.length + 1, Interceptor[].class);
-                    finalInterceptors[finalInterceptors.length - 1] = invocationContext -> {
-                        Value executable = isIntroduction
-                            ? GraalPyRuntimeUtil.bindPythonDescriptor(originalFunction, invocationContext.getTarget(), value)
-                            : originalFunction;
-                        return executable.execute(
-                            toPolyglotArray(invocationContext.getParameterValues(), executable.getContext())
-                        );
-                    };
-                }
-                @SuppressWarnings("unchecked")
-                T tb = targetBean != null ? targetBean : (T) targetBeanRef.get();
-                if (tb == null) {
-                    throw new IllegalStateException("Target bean has not been initialized yet");
-                }
-                Object result = new MethodInterceptorChain(finalInterceptors, tb, executableMethod, javaArgs).proceed();
-                return unbox(result);
-            };
-            value.putMember(methodName, proxiedFunction);
+            ProxyExecutable proxiedFunction = createProxiedFunction(
+                isIntroduction,
+                value,
+                targetBean,
+                targetBeanRef,
+                methodName,
+                interceptedMethods,
+                originalFunction
+            );
+            if (isIntroduction) {
+                introductionFunctions.put(methodName, proxiedFunction);
+            } else {
+                value.putMember(methodName, proxiedFunction);
+            }
         }
         if (isIntroduction) {
             fillAllAbstractMethods(value);
             Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
-            T target = box(type, value.newInstance());
+            Value targetValue = value.newInstance();
+            T target = box(type, targetValue);
             if (target == null) {
                 throw new IllegalStateException("Introduction proxy target cannot be null");
             }
             targetBeanRef.set(target);
+            for (Map.Entry<String, ProxyExecutable> entry : introductionFunctions.entrySet()) {
+                targetValue.putMember(entry.getKey(), entry.getValue());
+            }
             return target;
         }
         if (targetBean == null) {
@@ -137,6 +124,48 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             }
         }
         return proxyDefinition.proxyBeanDefinition().getBeanType();
+    }
+
+    private <T> ProxyExecutable createProxiedFunction(
+        boolean isIntroduction,
+        Value owner,
+        @Nullable T targetBean,
+        AtomicReference<Object> targetBeanRef,
+        String methodName,
+        List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods,
+        @Nullable Value originalFunction
+    ) {
+        return args -> {
+            RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = findInterceptedMethod(methodName, interceptedMethods, args);
+            ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
+            Interceptor<T, ?>[] interceptors = interceptedMethod.interceptors();
+
+            Object[] javaArgs = fromPolyglotArray(args, executableMethod.getArguments());
+            @SuppressWarnings("unchecked")
+            T tb = targetBean != null ? targetBean : (T) targetBeanRef.get();
+            if (tb == null) {
+                throw new IllegalStateException("Target bean has not been initialized yet");
+            }
+            Interceptor<T, ?>[] finalInterceptors;
+            if (isIntroduction && executableMethod.isAbstract()) {
+                finalInterceptors = interceptors;
+            } else {
+                if (originalFunction == null) {
+                    throw new IllegalStateException("No original function found for method: " + executableMethod);
+                }
+                finalInterceptors = Arrays.copyOf(interceptors, interceptors.length + 1, Interceptor[].class);
+                finalInterceptors[finalInterceptors.length - 1] = invocationContext -> {
+                    Value executable = isIntroduction
+                        ? GraalPyRuntimeUtil.bindPythonDescriptor(originalFunction, tb, owner)
+                        : originalFunction;
+                    return executable.execute(
+                        toPolyglotArray(invocationContext.getParameterValues(), executable.getContext())
+                    );
+                };
+            }
+            Object result = new MethodInterceptorChain(finalInterceptors, tb, executableMethod, javaArgs).proceed();
+            return unbox(result);
+        };
     }
 
     private <T> RuntimeProxyDefinition.InterceptedMethod<T> findInterceptedMethod(
