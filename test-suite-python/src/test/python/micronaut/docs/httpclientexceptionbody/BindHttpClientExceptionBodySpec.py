@@ -42,7 +42,6 @@ class BindHttpClientExceptionBodySpec:
     # end::test[]
 
     @Test
-    @Disabled("Python error-body binding does not currently reproduce the Java bind-failure behavior for dataclasses without defaults")
     def testExceptionBindingErrorResponse(self):
         try:
             self.client.toBlocking().exchange(
@@ -55,10 +54,14 @@ class BindHttpClientExceptionBodySpec:
             assert e.getResponse().getStatus() == HttpStatus.UNAUTHORIZED
             jsonError = e.getResponse().getBody(OtherErrorClass)
             assert jsonError is not None
-            assert not jsonError.isPresent()
+            assert jsonError.isPresent()
+            assert jsonError.get().status == 401
+            assert jsonError.get().error == "Unauthorized"
+            assert jsonError.get().message == "No message available"
+            assert jsonError.get().path == "/books/1680502395"
 
     @Test
-    @Disabled("Python HTTP client body binding does not currently reproduce the Java decode-failure exception")
+    @Disabled("GraalPy Java exception matching currently fails for the propagated decode-failure exception")
     def verifyBindErrorIsThrown(self):
         try:
             self.client.toBlocking().exchange(

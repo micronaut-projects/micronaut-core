@@ -4,10 +4,10 @@ This file tracks Python docs examples that are present but disabled, or intentio
 
 ## Wave 0 Reconciliation
 
-- Last generated active `@Disabled` count: 14.
+- Last generated active `@Disabled` count: 13.
 - Last generated command: `rg -n "@Disabled\\(" test-suite-python/src/test/python/micronaut/docs`.
 - Last full-suite command: `./gradlew --no-daemon -Dorg.gradle.java.home=/Users/graemerocher/.sdkman/candidates/java/current :test-suite-python:test --max-workers=2`.
-- Last full-suite result: build successful, 180 tests executed, 14 skipped.
+- Last full-suite result: build successful, 180 tests executed, 13 skipped.
 - Missing row added in this pass: `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming`.
 - The active rows below currently keep the root-cause summary in `Reason`; explicit subsystem, focused-regression, status, and last-failure columns still need to be expanded as each group is worked.
 
@@ -34,8 +34,7 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `http/server/netty/websocket/SimpleTextWebSocketSpec.py` | Python `@ClientWebSocket` introduction cannot proxy Python classes yet (`PythonClassElement` cast to `JavaClassElement`). |
 | `http/server/netty/websocket/PojoWebSocketSpec.py` | Python `@ClientWebSocket` introduction cannot proxy Python classes yet (`PythonClassElement` cast to `JavaClassElement`). |
 | `http/server/secondary/SecondaryServerTest.py` | Secondary Python factory starts an eager `NettyEmbeddedServer` before the GraalPy context is initialized. |
-| `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::testExceptionBindingErrorResponse` | Python error-body binding does not currently reproduce the Java bind-failure behavior for dataclasses without defaults. |
-| `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::verifyBindErrorIsThrown` | Python HTTP client body binding does not currently reproduce the Java decode-failure exception. |
+| `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::verifyBindErrorIsThrown` | GraalPy Java exception matching currently fails for the propagated decode-failure exception (`ExceptMatchNode`/`IsSubtypeNode` assertion). |
 | `streaming/HeadlineControllerSpec.py::testStreamingClient` | GraalPy cannot adapt a Python subscriber object to `org.reactivestreams.Subscriber` for `Flux.subscribe`. |
 
 ## Commented Unsupported Snippet Ports
