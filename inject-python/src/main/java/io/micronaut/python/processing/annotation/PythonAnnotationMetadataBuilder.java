@@ -19,6 +19,7 @@ import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -47,6 +48,8 @@ import java.util.Optional;
  * @since 5.0.0
  */
 public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<ElementDef, DecoratorDef> {
+    private static final String DEFAULT_VALUE_MEMBER = "defaultValue";
+
     private final Map<String, DecoratorDef> decorators;
     private final PythonVisitorContext visitorContext;
 
@@ -125,6 +128,9 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             }
         }
         List<DecoratorDef> decoratorList = element.decorators();
+        if (element instanceof ArgumentDef argumentDef) {
+            decoratorList = withBindableDefaultValue(argumentDef, decoratorList);
+        }
         if (decoratorList.isEmpty()) {
             DecoratorDef decoratorDef = this.decorators.get(element.name());
             if (decoratorDef != null) {
@@ -145,6 +151,9 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                 return true;
             }
         }
+        if (Bindable.class.getName().equals(annotation) && hasSyntheticBindableDefaultValue(element)) {
+            return true;
+        }
         return false;
     }
 
@@ -159,6 +168,9 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                 return true;
             }
         }
+        if (annotation == Bindable.class && hasSyntheticBindableDefaultValue(element)) {
+            return true;
+        }
         return false;
     }
 
@@ -167,7 +179,85 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (element instanceof AnnotationMemberDef memberDef && !memberDef.getAnnotationMetadata().isEmpty()) {
             return true;
         }
-        return !element.decorators().isEmpty();
+        return !element.decorators().isEmpty() || hasSyntheticBindableDefaultValue(element);
+    }
+
+    private static List<DecoratorDef> withBindableDefaultValue(ArgumentDef argumentDef, List<DecoratorDef> decoratorList) {
+        String defaultValue = toBindableDefaultValue(argumentDef.defaultValue());
+        if (defaultValue == null || hasExplicitDefaultValue(decoratorList)) {
+            return decoratorList;
+        }
+        List<DecoratorDef> updatedDecorators = new ArrayList<>(decoratorList);
+        updatedDecorators.add(bindableDefaultValueDecorator(defaultValue));
+        return updatedDecorators;
+    }
+
+    private static boolean hasSyntheticBindableDefaultValue(ElementDef element) {
+        return element instanceof ArgumentDef argumentDef
+            && toBindableDefaultValue(argumentDef.defaultValue()) != null
+            && !hasExplicitDefaultValue(argumentDef.decorators());
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static DecoratorDef bindableDefaultValueDecorator(String defaultValue) {
+        return new DecoratorDef(
+            "Bindable",
+            Bindable.class.getName(),
+            null,
+            (Map) Map.of(DEFAULT_VALUE_MEMBER, defaultValue),
+            List.of()
+        );
+    }
+
+    private static boolean hasExplicitDefaultValue(List<DecoratorDef> decoratorList) {
+        for (DecoratorDef decorator : decoratorList) {
+            if (decorator.members().keySet().stream()
+                .map(PythonAnnotationMetadataBuilder::normalizeAnnotationMemberName)
+                .anyMatch(DEFAULT_VALUE_MEMBER::equals)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static @Nullable String toBindableDefaultValue(@Nullable Object defaultValue) {
+        if (defaultValue == null) {
+            return null;
+        }
+        if (defaultValue instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return null;
+            }
+            if (polyglotValue.isString()) {
+                return polyglotValue.asString();
+            }
+            if (polyglotValue.isBoolean()) {
+                return Boolean.toString(polyglotValue.asBoolean());
+            }
+            if (polyglotValue.fitsInInt()) {
+                return Integer.toString(polyglotValue.asInt());
+            }
+            if (polyglotValue.fitsInLong()) {
+                return Long.toString(polyglotValue.asLong());
+            }
+            if (polyglotValue.fitsInDouble()) {
+                return Double.toString(polyglotValue.asDouble());
+            }
+            return null;
+        }
+        if (defaultValue instanceof CharSequence charSequence) {
+            return charSequence.toString();
+        }
+        if (defaultValue instanceof Boolean bool) {
+            return Boolean.toString(bool);
+        }
+        if (defaultValue instanceof Number number) {
+            return number.toString();
+        }
+        if (defaultValue instanceof Character character) {
+            return character.toString();
+        }
+        return null;
     }
 
     @Override

@@ -4,10 +4,10 @@ This file tracks Python docs examples that are present but disabled, or intentio
 
 ## Wave 0 Reconciliation
 
-- Last generated active `@Disabled` count: 32.
+- Last generated active `@Disabled` count: 30.
 - Last generated command: `rg -n "@Disabled\\(" test-suite-python/src/test/python/micronaut/docs`.
 - Last full-suite command: `./gradlew --no-daemon -Dorg.gradle.java.home=/Users/graemerocher/.sdkman/candidates/java/current :test-suite-python:test --max-workers=2`.
-- Last full-suite result: build successful, 180 tests executed, 34 skipped.
+- Last full-suite result: build successful, 180 tests executed, 32 skipped.
 - Missing row added in this pass: `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming`.
 - The active rows below currently keep the root-cause summary in `Reason`; explicit subsystem, focused-regression, status, and last-failure columns still need to be expanded as each group is worked.
 
@@ -28,7 +28,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `annotation/PetControllerSpec.py::testPostPetValidation` | Python client-side validation metadata is not applied to the generated `Publisher` client method yet. |
 | `annotation/headers/HeaderSpec.py::testSenderHeaders` | Python `@Client` introduction inherits an abstract `save` method without an introduction interceptor. |
 | `annotation/retry/PetRetrySpec.py::testFallback` | Python HTTP client `Publisher` return types lose generic element metadata for fallback resolution. |
-| `client/ThirdPartyClientFilterSpec.py::aClientFilterIsAppliedToTheRequestAndAddsTheAuthorizationHeader` | Python client filter method support is not validated yet for `@ClientFilter`/`@RequestFilter`. |
 | `propagation/MdcServiceSpec.py::testFilterSpec` | GraalPy SAM conversion for `PropagatedContext` propagation helpers is not validated yet. |
 | `propagation/reactor/PropagatedContextTest.py::testMonoRequest` | Python Reactor `contextWrite` Java `Function` adaptation is not validated yet. |
 | `datavalidation/groups/EmailControllerSpec.py::test_pojo_validation_default_group` | Python `@Valid` body validation metadata is generated, but invalid requests are not rejected yet. |
@@ -49,7 +48,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `server/endpoint/CurrentDateEndpointSpec.py::testReadCustomDateEndpoint` | Python management endpoint routing is not validated yet. |
 | `server/endpoint/MessageEndpointSpec.py::testWriteMessageEndpoint` | Python management endpoint write/delete routing is not validated yet. |
 | `server/intro/HelloClientSpec.py::testHelloWorldResponse` | Python `@Client Publisher` return type is decoded as `Object` for this declarative client. |
-| `server/routes/IssuesControllerTest.py::test_default_issue` | Python optional URI segment default binding returns 400 for `/issues/default`. |
 | `server/routing/RouteConditionControllerTest.py` | Python `@RouteCondition` route selection returns 400 for conditional routes. |
 | `server/upload/UploadControllerSpec.py::testFileBytesUpload` | Python multipart byte array binding delivers `CompletedFileUpload` instead of byte content. |
 | `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming` | Python `@Client` `Publisher` return types do not retain generic `Event` element metadata for SSE decoding yet. |

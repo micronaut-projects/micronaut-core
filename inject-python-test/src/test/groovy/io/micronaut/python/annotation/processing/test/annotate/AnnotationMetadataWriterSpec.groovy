@@ -441,6 +441,57 @@ class Test:
         metadata.getValue(Requires, "property").get() == 'TEST'
     }
 
+    void "test read local class constants in annotation expressions"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import Requires
+from jakarta.inject import Singleton
+
+class Constants:
+    URL = "https://example.com"
+
+Constants.URL = "/"
+
+@Requires(property=Constants.URL)
+@Singleton
+class Test:
+    pass
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.getAnnotationMetadata()
+
+        then:
+        metadata != null
+        metadata.getValue(Requires, "property").isPresent()
+        metadata.getValue(Requires, "property").get() == '/'
+    }
+
+    void "test python parameter defaults are exposed as bindable metadata"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+
+@Singleton
+class Test:
+    @Executable
+    def find(self, limit: int = 10, enabled: bool = True, label: str = "all") -> str:
+        return label
+''')
+
+        when:
+        def method = definition.getRequiredMethod("find", int.class, boolean.class, String.class)
+        AnnotationMetadata limitMetadata = method.arguments[0].annotationMetadata
+        AnnotationMetadata enabledMetadata = method.arguments[1].annotationMetadata
+        AnnotationMetadata labelMetadata = method.arguments[2].annotationMetadata
+
+        then:
+        limitMetadata.stringValue(Bindable, "defaultValue").get() == "10"
+        enabledMetadata.stringValue(Bindable, "defaultValue").get() == "true"
+        labelMetadata.stringValue(Bindable, "defaultValue").get() == "all"
+    }
+
     void "test annotation metadata with primitive arrays via PrimitiveTypesAnnotation"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', """

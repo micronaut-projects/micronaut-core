@@ -8,7 +8,7 @@ from micronaut.http.annotation import ClientFilter, Controller, Get, Header, Req
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 Flux = java.type("reactor.core.publisher.Flux")
 String = java.type("java.lang.String")
@@ -21,6 +21,8 @@ username = "john"
 class BintrayApi:
     URL = "https://api.bintray.com"
 # end::bintrayApiConstants[]
+
+BintrayApi.URL = "/"
 
 
 @Requires(property="spec.name", value="ThirdPartyClientFilterSpec")
@@ -73,7 +75,6 @@ class ThirdPartyClientFilterSpec:
     bintrayService: Annotated[BintrayService, Inject]
 
     @Test
-    @Disabled("Python client filter method support is not validated yet for @ClientFilter/@RequestFilter")
     def aClientFilterIsAppliedToTheRequestAndAddsTheAuthorizationHeader(self) -> None:
         result = self.bintrayService.fetchRepositories().blockFirst().body()
 

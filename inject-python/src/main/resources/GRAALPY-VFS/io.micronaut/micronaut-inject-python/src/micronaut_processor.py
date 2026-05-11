@@ -101,6 +101,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.java_type_assignments = {}  # Track java.type() assignments: variable_name -> full_qualified_name
         self.imported_types = {}  # Track imported types: simple_name -> full_qualified_name
         self.local_classes = set()  # Track class names defined in this file
+        self.local_constant_values = {}  # Track local class constants visible to annotation expressions
         self.current_class_nested_types = {}  # Track nested classes visible in the current class body
         # Script handling
         self.current_script = None
@@ -221,6 +222,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             case ast.Assign():
                 # Track java.type() assignments first
                 self._track_java_type_assignments(node)
+                self._track_local_constant_assignment(node)
                 # Handle class attribute assignments (only at class body level, not inside methods)
                 if self.current_class is not None and not self.in_function:
                     self._handle_assign(node)
@@ -229,6 +231,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     self._handle_script_assign(node)
                 return node
             case ast.AnnAssign():
+                self._track_local_constant_assignment(node)
                 # Handle annotated assignments (type hints) only at class body level, not inside methods
                 if self.current_class is not None and not self.in_function:
                     self._handle_ann_assign(node)
@@ -464,6 +467,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 is_static = False  # Regular Python attributes should be writable
                 type_name = None  # No type annotation for simple assignments
 
+                self._track_current_class_constant(attr_name, node.value)
                 attr_def = JavaAttributeDef(attr_name, None, type_name, value, [], None, is_static, None)
                 self.current_class_attributes.append(attr_def)
 
@@ -519,9 +523,57 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 # For Micronaut properties, treat annotated attributes as instance fields
                 is_static = False
 
+                if node.value:
+                    self._track_current_class_constant(attr_name, node.value)
                 attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, decorators, None, is_static, None)
                 self.current_class_attributes.append(attr_def)
                 self.last_attribute = attr_def
+
+    def _literal_constant_value(self, value_node):
+        try:
+            return True, ast.literal_eval(value_node)
+        except Exception:
+            return False, None
+
+    def _track_current_class_constant(self, attr_name, value_node):
+        if self.current_class is None:
+            return
+        resolved, value = self._literal_constant_value(value_node)
+        if not resolved:
+            return
+        class_name = self.current_class.name().replace("$", ".")
+        self.local_constant_values[f"{class_name}.{attr_name}"] = value
+
+    def _track_local_constant_assignment(self, node):
+        if self.in_function:
+            return
+        targets = []
+        value_node = None
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+            value_node = node.value
+        elif isinstance(node, ast.AnnAssign):
+            targets = [node.target]
+            value_node = node.value
+        if value_node is None:
+            return
+
+        resolved, value = self._literal_constant_value(value_node)
+        if not resolved:
+            return
+
+        for target in targets:
+            if not isinstance(target, ast.Attribute):
+                continue
+            names = []
+            current = target
+            while isinstance(current, ast.Attribute):
+                names.insert(0, current.attr)
+                current = current.value
+            if isinstance(current, ast.Name):
+                names.insert(0, current.id)
+            if names and names[0] in self.local_classes:
+                self.local_constant_values[".".join(names)] = value
 
     def _handle_field_docstring(self, node):
         """
@@ -1422,8 +1474,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     # Try to evaluate the value
                     default_value = ast.literal_eval(default_value)
                 except Exception:
-                    # For non-literal defaults, keep as is or dump
-                    default_value = ast.dump(default_value)
+                    default_value = None
 
             # Get parameter documentation
             param_doc = param_docs.get(arg_name, None)
@@ -1629,6 +1680,10 @@ def convert_ast_value(node, visitor=None):
 
         # Check if this might be a Java constant reference (e.g., StringUtils.TRUE)
         if visitor is not None and len(names) >= 2:
+            constant_key = '.'.join(names)
+            if hasattr(visitor, 'local_constant_values') and constant_key in visitor.local_constant_values:
+                return visitor.local_constant_values[constant_key]
+
             # Try to resolve as a Java constant
             constant_value = _resolve_java_constant(visitor, names)
             if constant_value is not None:

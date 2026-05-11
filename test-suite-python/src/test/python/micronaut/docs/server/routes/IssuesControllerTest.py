@@ -6,7 +6,7 @@ from micronaut.context.annotation import Property
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 # end::imports[]
 
 import java
@@ -55,7 +55,6 @@ class IssuesControllerTest:
 
     # tag::defaultvalue[]
     @Test
-    @Disabled("Python optional URI segment default binding returns 400 for /issues/default")
     def test_default_issue(self):
         body = self.client.toBlocking().retrieve("/issues/default")
 
