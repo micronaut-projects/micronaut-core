@@ -5,6 +5,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.event.ApplicationEventPublisher
 import io.micronaut.core.type.Argument
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -14,39 +15,40 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.server.netty.NettyHttpRequest
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
+import io.netty.channel.ChannelPipeline
 import io.netty.handler.ssl.SslHandler
-import spock.lang.Shared
 import spock.lang.Specification
 
+import javax.net.ssl.SSLEngine
 import java.security.cert.X509Certificate
 
 class SslRefreshSpec extends Specification {
 
-    @Shared List<String> ciphers = ['TLS_RSA_WITH_AES_128_CBC_SHA',
-                                    'TLS_RSA_WITH_AES_256_CBC_SHA',
-                                    'TLS_RSA_WITH_AES_128_GCM_SHA256',
-                                    'TLS_RSA_WITH_AES_256_GCM_SHA384',
-                                    'TLS_DHE_RSA_WITH_AES_128_GCM_SHA256',
-                                    'TLS_DHE_RSA_WITH_AES_256_GCM_SHA384',
-                                    'TLS_DHE_DSS_WITH_AES_128_GCM_SHA256',
-                                    'TLS_DHE_DSS_WITH_AES_256_GCM_SHA384']
-    @Shared Map<String, Object> config = [
-            'spec.name': 'SslRefreshSpec',
-            'micronaut.ssl.enabled': true,
-            'micronaut.server.ssl.port':-1,
-            'micronaut.server.ssl.client-authentication': 'NEED',
-            'micronaut.server.ssl.key-store.path': 'classpath:certs/server.p12',
-            'micronaut.server.ssl.key-store.password': 'secret',
-            'micronaut.server.ssl.trust-store.path': 'classpath:certs/truststore',
-            'micronaut.server.ssl.trust-store.password': 'secret',
-            'micronaut.server.ssl.ciphers': ciphers,
-            'micronaut.http.client.ssl.client-authentication': 'NEED',
-            'micronaut.http.client.ssl.key-store.path': 'classpath:certs/client1.p12',
-            'micronaut.http.client.ssl.key-store.password': 'secret',
-            'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
-    ]
-
     void "test ssl refresh"() {
+        given:
+        List<String> ciphers = ['TLS_RSA_WITH_AES_128_CBC_SHA',
+                                'TLS_RSA_WITH_AES_256_CBC_SHA',
+                                'TLS_RSA_WITH_AES_128_GCM_SHA256',
+                                'TLS_RSA_WITH_AES_256_GCM_SHA384',
+                                'TLS_DHE_RSA_WITH_AES_128_GCM_SHA256',
+                                'TLS_DHE_RSA_WITH_AES_256_GCM_SHA384',
+                                'TLS_DHE_DSS_WITH_AES_128_GCM_SHA256',
+                                'TLS_DHE_DSS_WITH_AES_256_GCM_SHA384']
+        Map<String, Object> config = [
+                'spec.name': 'SslRefreshSpec',
+                'micronaut.ssl.enabled': true,
+                'micronaut.server.ssl.port': -1,
+                'micronaut.server.ssl.client-authentication': 'NEED',
+                'micronaut.server.ssl.key-store.path': 'classpath:certs/server.p12',
+                'micronaut.server.ssl.key-store.password': 'secret',
+                'micronaut.server.ssl.trust-store.path': 'classpath:certs/truststore',
+                'micronaut.server.ssl.trust-store.password': 'secret',
+                'micronaut.server.ssl.ciphers': ciphers,
+                'micronaut.http.client.ssl.client-authentication': 'NEED',
+                'micronaut.http.client.ssl.key-store.path': 'classpath:certs/client1.p12',
+                'micronaut.http.client.ssl.key-store.password': 'secret',
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+        ]
         EmbeddedServer embeddedServer = ApplicationContext
                 .builder()
                 .propertySources(PropertySource.of(config))
@@ -56,7 +58,7 @@ class SslRefreshSpec extends Specification {
                 .createBean(HttpClient, embeddedServer.getURI())
 
         when:
-        def response = client.toBlocking().exchange(HttpRequest.GET('/ssl/refresh'), Map)
+        HttpResponse<Map> response = client.toBlocking().exchange(HttpRequest.GET('/ssl/refresh'), Map)
 
         then:
         response.status() == HttpStatus.OK
@@ -85,19 +87,19 @@ class SslRefreshSpec extends Specification {
     }
 
     @Controller("/ssl/refresh")
-    @Requires(property = 'spec.name',value = 'SslRefreshSpec')
+    @Requires(property = 'spec.name', value = 'SslRefreshSpec')
     static class TestSslRefresh {
         @Get
         HttpResponse<Map<String, Object>> test(HttpRequest request) {
-            def pipeline = (request as NettyHttpRequest).getChannelHandlerContext().pipeline()
-            def sslHandler = pipeline.get(SslHandler)
-
-            def engine = sslHandler.engine()
+            ChannelPipeline pipeline = (request as NettyHttpRequest).getChannelHandlerContext().pipeline()
+            SslHandler sslHandler = pipeline.get(SslHandler)
+            SSLEngine engine = sslHandler.engine()
             X509Certificate cert = engine.getSession().getLocalCertificates()[0]
             return HttpResponse.ok([
                     ciphers: engine.enabledCipherSuites,
                     subjectDN: cert.subjectDN.toString()
             ] as Map<String, Object>)
+                    .header(HttpHeaders.CONNECTION, 'close')
         }
     }
 }
