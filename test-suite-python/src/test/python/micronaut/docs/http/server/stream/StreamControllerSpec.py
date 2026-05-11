@@ -6,7 +6,7 @@ from micronaut.http import MediaType
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 HttpRequest = java.type("io.micronaut.http.HttpRequest")
 String = java.type("java.lang.String")
@@ -23,7 +23,6 @@ class StreamControllerSpec:
         assert response == "test"
 
     @Test
-    @Disabled("Python @Body InputStream binding receives an empty stream for text/plain request bodies")
     def test_returning_a_stream(self):
         body = "My body"
         response = self.client.toBlocking().retrieve(

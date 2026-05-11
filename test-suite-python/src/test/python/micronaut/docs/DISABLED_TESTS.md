@@ -4,11 +4,11 @@ This file tracks Python docs examples that are present but disabled, or intentio
 
 ## Wave 0 Reconciliation
 
-- Last generated active `@Disabled` count: 9.
+- Last generated active `@Disabled` count: 8.
 - Last generated command: `rg -n "@Disabled\\(" test-suite-python/src/test/python/micronaut/docs`.
 - Last full-suite command: `./gradlew --no-daemon -Dorg.gradle.java.home=/Users/graemerocher/.sdkman/candidates/java/current :test-suite-python:test --max-workers=2`.
-- Last full-suite result: build successful, 180 tests executed, 9 skipped.
-- Last focused result: `SecondaryServerTest`, `MdcServiceSpec`, `PropagatedContextTest`, and `HeadlineControllerSpec` passed.
+- Last full-suite result: build successful, 180 tests executed, 8 skipped.
+- Last focused result: `StreamControllerSpec` passed after bridge return values were changed to invoke Python methods once before conversion.
 - Missing row added in this pass: `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming`.
 - The active rows below currently keep the root-cause summary in `Reason`; explicit subsystem, focused-regression, status, and last-failure columns still need to be expanded as each group is worked.
 
@@ -29,7 +29,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `datavalidation/groups/EmailControllerSpec.py::test_pojo_validation_default_group` | GraalPy Java exception matching currently fails for the propagated body validation exception (`ExceptMatchNode`/`IsSubtypeNode` assertion). |
 | `datavalidation/groups/EmailControllerSpec.py::test_pojo_validation_final_validation_group` | GraalPy Java exception matching currently fails for the propagated validation group exception (`ExceptMatchNode`/`IsSubtypeNode` assertion). |
 | `datavalidation/pogo/EmailControllerSpec.py::test_pojo_validation` | GraalPy Java exception matching currently fails for the propagated body validation exception (`ExceptMatchNode`/`IsSubtypeNode` assertion). |
-| `http/server/stream/StreamControllerSpec.py::test_returning_a_stream` | Python `@Body InputStream` binding receives an empty stream for `text/plain` request bodies. |
 | `http/server/netty/websocket/SimpleTextWebSocketSpec.py` | Python `@ClientWebSocket` introduction cannot proxy Python classes yet (`PythonClassElement` cast to `JavaClassElement`). |
 | `http/server/netty/websocket/PojoWebSocketSpec.py` | Python `@ClientWebSocket` introduction cannot proxy Python classes yet (`PythonClassElement` cast to `JavaClassElement`). |
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::verifyBindErrorIsThrown` | GraalPy Java exception matching currently fails for the propagated decode-failure exception (`ExceptMatchNode`/`IsSubtypeNode` assertion). |

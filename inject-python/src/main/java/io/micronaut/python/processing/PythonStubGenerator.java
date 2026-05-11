@@ -1318,11 +1318,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 if (isJunit5Test) {
                     return invokedValue;
                 } else {
-                    ExpressionDef expressionDef = handleReturnType(allClasses, returnType, invokedValue);
                     if (returnType.isVoid()) {
                         return invokedValue;
                     } else {
-                        return expressionDef.returning();
+                        return returnConvertedValue(allClasses, returnType, invokedValue);
                     }
                 }
             })));
@@ -1389,7 +1388,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 POLYGLOT_VALUE,
                 ExpressionDef.constant(beanProperty.getName())
             );
-            return handleReturnType(allClasses, beanProperty.getType(), invokedValue).returning();
+            return returnConvertedValue(allClasses, beanProperty.getType(), invokedValue);
         })));
     }
 
@@ -1407,7 +1406,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 POLYGLOT_VALUE,
                 ExpressionDef.constant(beanProperty.getName())
             );
-            return handleReturnType(allClasses, beanProperty.getType(), invokedValue).returning();
+            return returnConvertedValue(allClasses, beanProperty.getType(), invokedValue);
         })));
     }
 
@@ -1484,7 +1483,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 POLYGLOT_VALUE,
                 ExpressionDef.constant(beanProperty.getName())
             );
-            return handleReturnType(allClasses, beanProperty.getType(), invokedValue).returning();
+            return returnConvertedValue(allClasses, beanProperty.getType(), invokedValue);
         })));
     }
 
@@ -1600,6 +1599,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 }
             };
         }
+    }
+
+    private static StatementDef returnConvertedValue(Map<String, ClassElement> allClasses, ClassElement returnType, ExpressionDef invokedValue) {
+        return invokedValue.newLocal("pythonResult", result ->
+            handleReturnType(allClasses, returnType, result).returning()
+        );
     }
 
     private static ExpressionDef convertNullableValue(ExpressionDef value, ExpressionDef nonNullValue) {
