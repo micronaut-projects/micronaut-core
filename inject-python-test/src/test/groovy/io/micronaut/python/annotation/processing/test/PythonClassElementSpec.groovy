@@ -644,6 +644,29 @@ class TypeTestService:
         }
     }
 
+    def "test method parameter bytes type resolves to byte array"() {
+        given:
+        def pythonCode = '''
+class TypeTestService:
+    def save(self, data: bytes) -> object:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "TypeTestService") { ClassElement element ->
+            def method = element.findMethod("save").get()
+            def parameter = method.parameters[0]
+
+            assert parameter.type.name == "byte"
+            assert parameter.type.array
+            assert parameter.type.arrayDimensions == 1
+            assert parameter.genericType.name == "byte"
+            assert parameter.genericType.array
+            assert parameter.genericType.arrayDimensions == 1
+            return element
+        }
+    }
+
     def "test annotation expression values are converted to evaluated expression references"() {
         given:
         def pythonCode = '''

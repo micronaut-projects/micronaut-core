@@ -5,12 +5,11 @@ from micronaut.context.annotation import Property
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 
 @Property(name="spec.name", value="RouteConditionControllerSpec")
 @MicronautTest
-@Disabled("Python @RouteCondition route selection returns 400 for conditional routes")
 class RouteConditionControllerTest:
     client: Annotated[HttpClient, Inject, Client("/")]
 

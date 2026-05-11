@@ -4,10 +4,10 @@ This file tracks Python docs examples that are present but disabled, or intentio
 
 ## Wave 0 Reconciliation
 
-- Last generated active `@Disabled` count: 23.
+- Last generated active `@Disabled` count: 21.
 - Last generated command: `rg -n "@Disabled\\(" test-suite-python/src/test/python/micronaut/docs`.
 - Last full-suite command: `./gradlew --no-daemon -Dorg.gradle.java.home=/Users/graemerocher/.sdkman/candidates/java/current :test-suite-python:test --max-workers=2`.
-- Last full-suite result: build successful, 180 tests executed, 25 skipped.
+- Last full-suite result: build successful, 180 tests executed, 21 skipped.
 - Missing row added in this pass: `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming`.
 - The active rows below currently keep the root-cause summary in `Reason`; explicit subsystem, focused-regression, status, and last-failure columns still need to be expanded as each group is worked.
 
@@ -41,8 +41,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::testExceptionBindingErrorResponse` | Python error-body binding does not currently reproduce the Java bind-failure behavior for dataclasses without defaults. |
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::verifyBindErrorIsThrown` | Python HTTP client body binding does not currently reproduce the Java decode-failure exception. |
 | `server/intro/HelloClientSpec.py::testHelloWorldResponse` | Python `@Client Publisher` return type is decoded as `Object` for this declarative client. |
-| `server/routing/RouteConditionControllerTest.py` | Python `@RouteCondition` route selection returns 400 for conditional routes. |
-| `server/upload/UploadControllerSpec.py::testFileBytesUpload` | Python multipart byte array binding delivers `CompletedFileUpload` instead of byte content. |
 | `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming` | Python `@Client` `Publisher` return types do not retain generic `Event` element metadata for SSE decoding yet. |
 | `streaming/HeadlineControllerSpec.py::testClientAnnotationStreaming` | Python `@Client` `Publisher` return types do not retain generic element metadata for JSON stream decoding yet. |
 | `streaming/HeadlineControllerSpec.py::testStreamingClient` | GraalPy cannot adapt a Python subscriber object to `org.reactivestreams.Subscriber` for `Flux.subscribe`. |

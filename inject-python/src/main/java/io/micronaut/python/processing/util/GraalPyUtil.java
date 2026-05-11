@@ -401,6 +401,7 @@ public final class GraalPyUtil {
             case "float" -> PrimitiveElement.DOUBLE;
             case "bool" -> PrimitiveElement.BOOLEAN;
             case "None" -> PrimitiveElement.VOID;
+            case "bytes", "bytearray" -> PrimitiveElement.BYTE.toArray();
             case "str" ->
                 visitorContext.getClassElement(String.class).orElse(ClassElement.of(String.class));
             case "dict", "typing.Dict" ->
