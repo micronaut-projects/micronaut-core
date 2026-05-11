@@ -21,7 +21,7 @@ class EmailControllerSpec:
 
     # tag::pojovalidated[]
     @Test
-    @Disabled("Python @Valid body validation metadata is generated, but invalid requests are not rejected yet")
+    @Disabled("GraalPy Java exception matching currently fails for the propagated body validation exception")
     def test_pojo_validation(self):
         try:
             email = Email()

@@ -21,7 +21,7 @@ class EmailControllerSpec:
 
     # tag::pojovalidateddefault[]
     @Test
-    @Disabled("Python @Valid body validation metadata is generated, but invalid requests are not rejected yet")
+    @Disabled("GraalPy Java exception matching currently fails for the propagated body validation exception")
     def test_pojo_validation_default_group(self):
         try:
             email = Email()
@@ -44,7 +44,7 @@ class EmailControllerSpec:
 
     # tag::pojovalidatedfinal[]
     @Test
-    @Disabled("Python validation groups metadata is generated, but invalid requests are not rejected yet")
+    @Disabled("GraalPy Java exception matching currently fails for the propagated validation group exception")
     def test_pojo_validation_final_validation_group(self):
         try:
             email = Email()
