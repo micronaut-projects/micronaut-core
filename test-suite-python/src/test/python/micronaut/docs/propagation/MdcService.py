@@ -19,8 +19,8 @@ class MdcService:
             newUserId = UUID.randomUUID()
             MDC.put("userId", str(newUserId))
             return PropagatedContext.getOrEmpty() \
-                .plus(MdcPropagationContext()) \
-                .propagate(lambda: self.createUserInternal(newUserId, name))
+                .plus(MdcPropagationContext(MDC.getCopyOfContextMap())) \
+                .propagateCall(lambda: self.createUserInternal(newUserId, name))
         finally:
             MDC.remove("userId")
     # end::createUser[]

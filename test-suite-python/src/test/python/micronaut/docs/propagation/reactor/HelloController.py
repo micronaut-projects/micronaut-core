@@ -20,7 +20,7 @@ PropagatedContextElement = java.type("io.micronaut.core.propagation.PropagatedCo
 class HelloController:
 
     @Get("/hello")
-    def hello(self, name: Annotated[str, QueryValue("name")]):
+    def hello(self, name: Annotated[str, QueryValue("name")]) -> Mono[str]:
         propagatedContext = PropagatedContext.get().plus(MyContextElement(name))  # <1>
         return Mono.just("Hello, " + name) \
             .contextWrite(lambda ctx: ReactorPropagation.addPropagatedContext(ctx, propagatedContext))  # <2>

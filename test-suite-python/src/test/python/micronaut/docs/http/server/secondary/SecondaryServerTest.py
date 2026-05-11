@@ -9,7 +9,7 @@ from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.runtime.server import EmbeddedServer
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 from .SecondaryNettyServer import SecondaryNettyServer
 
@@ -17,7 +17,6 @@ from .SecondaryNettyServer import SecondaryNettyServer
 @MicronautTest
 @Property(name="secondary.enabled", value=StringUtils.TRUE)
 @Property(name="micronaut.http.client.ssl.insecure-trust-all-certificates", value=StringUtils.TRUE)
-@Disabled("Secondary Python factory starts an eager NettyEmbeddedServer before the GraalPy context is initialized")
 class SecondaryServerTest:
     # tag::inject[]
     httpClient: Annotated[

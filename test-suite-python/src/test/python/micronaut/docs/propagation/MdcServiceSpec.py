@@ -7,7 +7,7 @@ from micronaut.http.annotation import Controller, Get
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 from .MdcService import MdcService
 
@@ -30,7 +30,6 @@ class MdcServiceSpec:
     client: Annotated[HttpClient, Inject, Client("/")]
 
     @Test
-    @Disabled("GraalPy SAM conversion for PropagatedContext propagation helpers is not validated yet")
     def testFilterSpec(self) -> None:
         response = self.client.toBlocking().retrieve("/mdc/test")
         assert response.startswith("New user id: ")
