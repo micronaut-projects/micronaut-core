@@ -18,7 +18,7 @@ class HeadlineController:
 
     # tag::streaming[]
     @Get(value="/headlines", processes=MediaType.TEXT_EVENT_STREAM)  # <1>
-    def streamHeadlines(self) -> Publisher:
+    def streamHeadlines(self) -> Publisher[Event[Headline]]:
         def build_event():
             headline = Headline("Latest Headline at " + str(ZonedDateTime.now()))
             return Event.of(headline)

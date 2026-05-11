@@ -4,10 +4,10 @@ This file tracks Python docs examples that are present but disabled, or intentio
 
 ## Wave 0 Reconciliation
 
-- Last generated active `@Disabled` count: 17.
+- Last generated active `@Disabled` count: 15.
 - Last generated command: `rg -n "@Disabled\\(" test-suite-python/src/test/python/micronaut/docs`.
 - Last full-suite command: `./gradlew --no-daemon -Dorg.gradle.java.home=/Users/graemerocher/.sdkman/candidates/java/current :test-suite-python:test --max-workers=2`.
-- Last full-suite result: build successful, 180 tests executed, 17 skipped.
+- Last full-suite result: build successful, 180 tests executed, 15 skipped.
 - Missing row added in this pass: `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming`.
 - The active rows below currently keep the root-cause summary in `Reason`; explicit subsystem, focused-regression, status, and last-failure columns still need to be expanded as each group is worked.
 
@@ -37,8 +37,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `http/server/secondary/SecondaryServerTest.py` | Secondary Python factory starts an eager `NettyEmbeddedServer` before the GraalPy context is initialized. |
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::testExceptionBindingErrorResponse` | Python error-body binding does not currently reproduce the Java bind-failure behavior for dataclasses without defaults. |
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::verifyBindErrorIsThrown` | Python HTTP client body binding does not currently reproduce the Java decode-failure exception. |
-| `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming` | Python `@Client` `Publisher` return types do not retain generic `Event` element metadata for SSE decoding yet. |
-| `streaming/HeadlineControllerSpec.py::testClientAnnotationStreaming` | Python `@Client` `Publisher` return types do not retain generic element metadata for JSON stream decoding yet. |
 | `streaming/HeadlineControllerSpec.py::testStreamingClient` | GraalPy cannot adapt a Python subscriber object to `org.reactivestreams.Subscriber` for `Flux.subscribe`. |
 
 ## Commented Unsupported Snippet Ports

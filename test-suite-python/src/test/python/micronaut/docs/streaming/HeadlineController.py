@@ -20,7 +20,7 @@ class HeadlineController:
 
     # tag::streaming[]
     @Get(value="/headlines", processes=MediaType.APPLICATION_JSON_STREAM)  # <1>
-    def streamHeadlines(self) -> Publisher:
+    def streamHeadlines(self) -> Publisher[Headline]:
         def build_headline():
             return Headline("Latest Headline at " + str(ZonedDateTime.now()))
 

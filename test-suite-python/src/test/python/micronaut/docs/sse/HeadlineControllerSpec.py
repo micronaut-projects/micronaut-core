@@ -4,7 +4,7 @@ import java
 from jakarta.inject import Inject
 from micronaut.context.annotation import Property
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 from .HeadlineClient import HeadlineClient
 
@@ -18,7 +18,6 @@ class HeadlineControllerSpec:
 
     # tag::streamingClient[]
     @Test
-    @Disabled("Python @Client Publisher return types do not retain generic Event element metadata for SSE decoding yet")
     def testClientAnnotationStreaming(self):
         headline = getattr(Mono, "from")(self.headlineClient.streamHeadlines()).block()
 

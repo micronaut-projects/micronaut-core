@@ -27,7 +27,6 @@ class HeadlineControllerSpec:
 
     # tag::streamingClient[]
     @Test
-    @Disabled("Python @Client Publisher return types do not retain generic element metadata for JSON stream decoding yet")
     def testClientAnnotationStreaming(self):
         firstHeadline = getattr(Mono, "from")(self.headlineClient.streamHeadlines())  # <2>
 
