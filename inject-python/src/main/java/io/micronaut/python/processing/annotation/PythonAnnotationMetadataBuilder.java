@@ -18,9 +18,11 @@ package io.micronaut.python.processing.annotation;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
@@ -154,6 +156,9 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (Bindable.class.getName().equals(annotation) && hasSyntheticBindableDefaultValue(element)) {
             return true;
         }
+        if (AnnotationUtil.NULLABLE.equals(annotation) && hasSyntheticNullable(element)) {
+            return true;
+        }
         return false;
     }
 
@@ -171,6 +176,9 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (annotation == Bindable.class && hasSyntheticBindableDefaultValue(element)) {
             return true;
         }
+        if (AnnotationUtil.NULLABLE.equals(annotation.getName()) && hasSyntheticNullable(element)) {
+            return true;
+        }
         return false;
     }
 
@@ -179,7 +187,14 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (element instanceof AnnotationMemberDef memberDef && !memberDef.getAnnotationMetadata().isEmpty()) {
             return true;
         }
-        return !element.decorators().isEmpty() || hasSyntheticBindableDefaultValue(element);
+        return !element.decorators().isEmpty() || hasSyntheticBindableDefaultValue(element) || hasSyntheticNullable(element);
+    }
+
+    @Override
+    protected void postProcess(MutableAnnotationMetadata annotationMetadata, ElementDef element) {
+        if (hasSyntheticNullable(element) && !annotationMetadata.hasDeclaredStereotype(AnnotationUtil.NON_NULL)) {
+            annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, Map.of());
+        }
     }
 
     private static List<DecoratorDef> withBindableDefaultValue(ArgumentDef argumentDef, List<DecoratorDef> decoratorList) {
@@ -258,6 +273,53 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             return character.toString();
         }
         return null;
+    }
+
+    private static boolean hasSyntheticNullable(ElementDef element) {
+        TypeRef typeRef = switch (element) {
+            case ArgumentDef argumentDef -> argumentDef.typeAnnotation();
+            case AttributeDef attributeDef -> attributeDef.typeName();
+            case ReturnDef returnDef -> returnDef.typeAnnotation();
+            default -> null;
+        };
+        return isNullableUnion(typeRef);
+    }
+
+    private static boolean isNullableUnion(@Nullable TypeRef typeRef) {
+        return typeRef != null && isNullableUnion(typeRef.name());
+    }
+
+    private static boolean isNullableUnion(@Nullable String typeName) {
+        if (typeName == null || typeName.indexOf('|') == -1) {
+            return false;
+        }
+        List<String> unionTypes = parseUnionTypes(typeName);
+        return unionTypes.size() > 1 && unionTypes.stream().anyMatch("None"::equals);
+    }
+
+    private static List<String> parseUnionTypes(String typeName) {
+        List<String> types = new ArrayList<>();
+        int start = 0;
+        int bracketCount = 0;
+        for (int i = 0; i < typeName.length(); i++) {
+            char c = typeName.charAt(i);
+            if (c == '[') {
+                bracketCount++;
+            } else if (c == ']') {
+                bracketCount--;
+            } else if (c == '|' && bracketCount == 0) {
+                String type = typeName.substring(start, i).trim();
+                if (!type.isEmpty()) {
+                    types.add(type);
+                }
+                start = i + 1;
+            }
+        }
+        String lastType = typeName.substring(start).trim();
+        if (!lastType.isEmpty()) {
+            types.add(lastType);
+        }
+        return types;
     }
 
     @Override

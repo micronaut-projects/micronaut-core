@@ -294,6 +294,31 @@ class Test:
         !method.arguments[1].isNullable()
     }
 
+    void "test PEP 604 nullable annotated parameter is captured in method parameter metadata"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import Executable
+from micronaut.http.annotation import Header
+from jakarta.inject import Singleton
+from typing import Annotated
+
+@Singleton
+class Test:
+
+    @Executable
+    def testMethod(self, name: Annotated[str | None, Header], age: int) -> None:
+        pass
+''')
+
+        when:
+        def method = definition.executableMethods.find { it.methodName == "testMethod" }
+        assert method != null
+
+        then:
+        method.arguments[0].isNullable()
+        !method.arguments[1].isNullable()
+    }
+
     void "test Python annotation decorator is generated as Java annotation type"() {
         given:
         def context = buildContext('''

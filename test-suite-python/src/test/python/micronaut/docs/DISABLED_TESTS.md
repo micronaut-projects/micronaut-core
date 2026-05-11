@@ -4,10 +4,10 @@ This file tracks Python docs examples that are present but disabled, or intentio
 
 ## Wave 0 Reconciliation
 
-- Last generated active `@Disabled` count: 30.
+- Last generated active `@Disabled` count: 29.
 - Last generated command: `rg -n "@Disabled\\(" test-suite-python/src/test/python/micronaut/docs`.
 - Last full-suite command: `./gradlew --no-daemon -Dorg.gradle.java.home=/Users/graemerocher/.sdkman/candidates/java/current :test-suite-python:test --max-workers=2`.
-- Last full-suite result: build successful, 180 tests executed, 32 skipped.
+- Last full-suite result: build successful, 180 tests executed, 31 skipped.
 - Missing row added in this pass: `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming`.
 - The active rows below currently keep the root-cause summary in `Reason`; explicit subsystem, focused-regression, status, and last-failure columns still need to be expanded as each group is worked.
 
@@ -43,7 +43,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `i18n/I18nSpec.py::itIsPossibleToCreateAMessageSourceFromResourceBundle` | Python docs test resources are not resolved by `ResourceBundleMessageSource` yet; message lookups return `Optional.empty()`. |
 | `resources/ResourceLoaderTest.py::testExampleForResourceResolver` | Python docs test classpath resources are not resolved through `ResourceResolver` yet; `classpath:hello.txt` returns empty. |
 | `server/binding/BindingControllerTest.py::test_header_date_binding` | GraalPy `ForeignDateTime` string conversion fails with datetime `moduleData` null. |
-| `server/binding/BindingControllerTest.py::test_header_nullable_binding` | Python nullable `@Header` binding returns a non-Java-equivalent status for a missing header. |
 | `server/endpoint/AlertsEndpointSpec.py::testAddingAnAlert` | Python management endpoint sensitivity handling is not validated yet. |
 | `server/endpoint/CurrentDateEndpointSpec.py::testReadCustomDateEndpoint` | Python management endpoint routing is not validated yet. |
 | `server/endpoint/MessageEndpointSpec.py::testWriteMessageEndpoint` | Python management endpoint write/delete routing is not validated yet. |

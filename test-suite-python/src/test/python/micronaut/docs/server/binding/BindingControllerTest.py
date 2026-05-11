@@ -58,7 +58,6 @@ class BindingControllerTest:
         assert body == "test"
 
     @Test
-    @Disabled("Python nullable @Header binding returns a non-Java-equivalent status for a missing header")
     def test_header_nullable_binding(self):
         try:
             self.client.toBlocking().retrieve(HttpRequest.GET("/binding/headerNullable"))
