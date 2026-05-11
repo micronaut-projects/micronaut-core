@@ -5,7 +5,7 @@ from jakarta.inject import Inject
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 Cookie = java.type("io.micronaut.http.cookie.Cookie")
 HashSet = java.type("java.util.HashSet")
@@ -66,7 +66,6 @@ class BindingControllerTest:
             assert e.getResponse().getStatus() == HttpStatus.NOT_FOUND
 
     @Test
-    @Disabled("GraalPy ForeignDateTime string conversion fails with datetime moduleData null")
     def test_header_date_binding(self):
         body = self.client.toBlocking().retrieve(
             HttpRequest.GET("/binding/date").header("date", "Tue, 3 Jun 2008 11:05:30 GMT")

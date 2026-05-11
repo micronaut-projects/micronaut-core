@@ -5,6 +5,7 @@ from micronaut.core.convert.format import Format
 from micronaut.http.annotation import Controller, CookieValue, Get, Header
 
 ZonedDateTime = java.type("java.time.ZonedDateTime")
+DateTimeFormatter = java.type("java.time.format.DateTimeFormatter")
 
 
 @Controller("/binding")
@@ -73,7 +74,7 @@ class BindingController:
     def date(self, date: Annotated[ZonedDateTime, Header]) -> str:
         # ...
         # end::format1[]
-        return str(date)
+        return DateTimeFormatter.ISO_ZONED_DATE_TIME.format(date)
         # tag::format1[]
     # end::format1[]
 
@@ -82,6 +83,6 @@ class BindingController:
     def date_format(self, date: Annotated[ZonedDateTime, Header, Format("dd/MM/yyyy hh:mm:ss a z")]) -> str:
         # ...
         # end::format2[]
-        return str(date)
+        return DateTimeFormatter.ISO_ZONED_DATE_TIME.format(date)
         # tag::format2[]
     # end::format2[]
