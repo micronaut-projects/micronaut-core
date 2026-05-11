@@ -4,7 +4,7 @@
 - Treat `DISABLED_TESTS.md` as the live bug backlog, but first reconcile it with actual `@Disabled` usage. `sse/HeadlineControllerSpec.py` is currently disabled in the tree and missing from the inventory.
 - Fix one root cause at a time, with a focused `inject-python-test` or `context-python` regression before re-enabling the docs snippet.
 - Do not add docs-side annotation shims, Java-style getters/setters, or package-info equivalents. Keep Python snippets idiomatic and re-enable them only after the compiler/runtime supports them.
-- Whenever a Python docs test uses `ApplicationContext.run()`, first consider converting it to `@MicronautTest` with injected beans unless the snippet specifically documents manual context creation. Manual nested contexts can close the GraalPy context while generated Python test instances or async callbacks are still active.
+- Whenever a Python docs test uses `ApplicationContext.run()`, convert it to `@MicronautTest` with injected beans to avoid GraalPy lifecycle issues, unless the snippet specifically documents manual context creation. Do this as the default first fix every time `ApplicationContext.run()` appears in a docs test; manual nested contexts can close the GraalPy context while generated Python test instances or async callbacks are still active.
 
 ## Important API/Compiler Changes
 - Add an `inject-python` import convention for Java package segments that are Python keywords: allow trailing underscore imports such as `from micronaut.core.async_.annotation import SingleResult`, normalize them to `io.micronaut.core.async.annotation`, and keep decorator generation in `micronaut_transformer.py`.

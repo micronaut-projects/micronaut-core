@@ -155,6 +155,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     if self.current_class is None and not was_in_function and is_micronaut_decorator(node, self):
                         arg_dict = extract_arg_defaults(node)
                         member_decorators = extract_arg_decorators(self, node)
+                        member_types = extract_arg_types(self, node)
                         # Filter out micronaut_annotation decorators as they are internal helpers
                         stereotypes = [
                             decorator_to_function(self, d)
@@ -162,18 +163,24 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             if (decorator_to_function(self, d) is not None and
                                 not is_micronaut_annotation_decorator(d))
                         ]
-                        annotation_name = get_micronaut_annotation_value('name', node)
-                        repeated_name = get_micronaut_annotation_value('repeated', node)
+                        annotation_name = qualify_local_annotation_name(
+                            self,
+                            get_micronaut_annotation_value('name', node)
+                        )
+                        repeated_name = qualify_local_annotation_name(
+                            self,
+                            get_micronaut_annotation_value('repeated', node)
+                        )
 
                         # For decorators defined with Micronaut annotations like @Around, use package naming
                         if annotation_name is None:
-                            annotation_name = f"{self.package_name}.{node.name}"
+                            annotation_name = f"{self.package_name}.{node.name}" if self.package_name else node.name
 
                         # Track the annotation name for type resolution
                         if annotation_name:
                             self.java_type_assignments[node.name] = annotation_name
 
-                        decorator_def = DecoratorDef(node.name, annotation_name, repeated_name, arg_dict, stereotypes, member_decorators)
+                        decorator_def = DecoratorDef(node.name, annotation_name, repeated_name, arg_dict, stereotypes, member_decorators, member_types)
                         self.known_decorators[node.name] = decorator_def
                         self.callback.apply(decorator_def)
                         return node
@@ -989,38 +996,16 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
             # For positional args
             for i, arg in enumerate(call_node.args):
-                try:
-                    value = ast.literal_eval(arg)
-                    # For positional args, use generic names or indices
-                    # For validation constraints, typically the first arg is the value
-                    if i == 0:
-                        members['value'] = value
-                    else:
-                        members[f'arg{i}'] = value
-                except:
-                    # Handle Name nodes (class references) specially
-                    if isinstance(arg, ast.Name):
-                        value = arg.id
-                        if i == 0:
-                            members['value'] = value
-                        else:
-                            members[f'arg{i}'] = value
-                    else:
-                        members[f'arg{i}'] = ast.dump(arg) if hasattr(ast, 'dump') else str(arg)
+                value = convert_ast_value(arg, self)
+                if i == 0:
+                    members['value'] = value
+                else:
+                    members[f'arg{i}'] = value
 
             # For keyword args
             for kw in call_node.keywords:
                 if kw.arg:
-                    try:
-                        value = ast.literal_eval(kw.value)
-                        members[kw.arg] = value
-                    except:
-                        # Handle Name nodes (class references) specially
-                        if isinstance(kw.value, ast.Name):
-                            value = kw.value.id
-                            members[kw.arg] = value
-                        else:
-                            members[kw.arg] = ast.dump(kw.value) if hasattr(ast, 'dump') else str(kw.value)
+                    members[kw.arg] = convert_ast_value(kw.value, self)
 
             # Create DecoratorDef with annotationName = name (assuming it's a Micronaut annotation)
             return self.to_decorator_from_reference_with_members(decorator_name, members)
@@ -1562,6 +1547,10 @@ def decorator_to_function(visitor, node):
                                 resolved_members[key] = imported_name
                                 continue
                             resolved_value = visitor.java_type_assignments.get(value, value)
+                            if resolved_value == value:
+                                local_value = visitor._resolve_local_type_name(value) if hasattr(visitor, '_resolve_local_type_name') else None
+                                if local_value:
+                                    resolved_value = local_value
                             resolved_members[key] = resolved_value
                         else:
                             resolved_members[key] = value
@@ -1595,7 +1584,12 @@ def convert_ast_value(node, visitor=None):
                 return imported_name
             # Then check Java type assignments
             resolved_name = visitor.java_type_assignments.get(name, name)
-            return resolved_name
+            if resolved_name != name:
+                return resolved_name
+            local_name = visitor._resolve_local_type_name(name) if hasattr(visitor, '_resolve_local_type_name') else None
+            if local_name:
+                return local_name
+            return name
         else:
             return name
     elif isinstance(node, ast.List):
@@ -1797,6 +1791,30 @@ def extract_arg_decorators(visitor, func_node):
                 member_decorators[arg.arg] = decorators
     return member_decorators
 
+def extract_arg_types(visitor, func_node):
+    """
+    Given an ast.FunctionDef node for a Python decorator, return the parsed member
+    types keyed by argument name.
+    """
+    member_types = {}
+    for arg in func_node.args.args:
+        annotation = getattr(arg, 'annotation', None)
+        if annotation is None:
+            continue
+        if (
+            isinstance(annotation, ast.Subscript)
+            and isinstance(annotation.value, ast.Name)
+            and annotation.value.id == 'Annotated'
+        ):
+            parsed_type, _ = visitor._parse_annotated_type(annotation)
+            if parsed_type is not None:
+                member_types[arg.arg] = parsed_type
+        else:
+            parsed_type = visitor._parse_type(annotation)
+            if parsed_type is not None:
+                member_types[arg.arg] = parsed_type
+    return member_types
+
 def extract_call_arguments_with_defaults(funcdef, call, visitor=None):
     """
     Given an ast.FunctionDef (can be None) and an ast.Call node,
@@ -1892,10 +1910,22 @@ def is_micronaut_decorator(funcdef, visitor=None):
                 existing_decorator = visitor.known_decorators.get(decorator_name)
                 if existing_decorator:
                     annotation_name = existing_decorator.annotationName()
-                    if annotation_name.startswith('io.micronaut.aop') or annotation_name.startswith('jakarta.inject.'):
+                    if is_annotation_stereotype_for_python_decorator(annotation_name):
                         return True
 
     return False
+
+def is_annotation_stereotype_for_python_decorator(annotation_name):
+    if annotation_name.startswith('io.micronaut.aop') or annotation_name.startswith('jakarta.inject.'):
+        return True
+    return annotation_name in {
+        'io.micronaut.context.annotation.AnnotationExpressionContext',
+        'io.micronaut.context.annotation.Bean',
+        'io.micronaut.context.annotation.Prototype',
+        'io.micronaut.context.annotation.Requires',
+        'io.micronaut.core.bind.annotation.Bindable',
+        'io.micronaut.http.annotation.FilterMatcher',
+    }
 
 def get_micronaut_annotation_value(name, funcdef):
     """
@@ -1932,6 +1962,13 @@ def get_micronaut_annotation_value(name, funcdef):
         elif isinstance(dec, ast.Attribute) and dec.attr == 'micronaut_annotation':
             return None
     return None
+
+def qualify_local_annotation_name(visitor, annotation_name):
+    if annotation_name is None:
+        return None
+    if isinstance(annotation_name, str) and "." not in annotation_name and visitor.package_name:
+        return f"{visitor.package_name}.{annotation_name}"
+    return annotation_name
 
 
 

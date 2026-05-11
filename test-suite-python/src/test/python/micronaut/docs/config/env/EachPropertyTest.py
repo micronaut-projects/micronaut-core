@@ -46,7 +46,10 @@ class EachPropertyTest:
             "micronaut.docs.config.env.RateLimitsConfiguration"
         )
         beans_of_type = self.context.streamOfType(RateLimitsConfiguration).toList()
+        limits_by_index = {
+            beans_of_type.get(i).index: beans_of_type.get(i).limit
+            for i in range(beans_of_type.size())
+        }
 
         assert 2 == beans_of_type.size()
-        assert 1000 == beans_of_type.get(0).limit
-        assert 5000 == beans_of_type.get(1).limit
+        assert {0: 1000, 1: 5000} == limits_by_index

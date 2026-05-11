@@ -5,7 +5,7 @@ from jakarta.inject import Inject
 from micronaut.context.annotation import Property, Requires
 from micronaut.http.annotation import Controller, Get
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 from .BasicAuthClient import BasicAuthClient
 
@@ -27,6 +27,5 @@ class BasicAuthFilterSpec:
     client: Annotated[BasicAuthClient, Inject]
 
     @Test
-    @Disabled("Python custom annotation stereotypes are not validated yet for @FilterMatcher client matching")
     def testTheFilterIsApplied(self) -> None:
         assert self.client.getMessage() == "user:pass"

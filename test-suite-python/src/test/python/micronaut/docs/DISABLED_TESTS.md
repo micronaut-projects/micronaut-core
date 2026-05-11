@@ -4,10 +4,10 @@ This file tracks Python docs examples that are present but disabled, or intentio
 
 ## Wave 0 Reconciliation
 
-- Last generated active `@Disabled` count: 37.
+- Last generated active `@Disabled` count: 32.
 - Last generated command: `rg -n "@Disabled\\(" test-suite-python/src/test/python/micronaut/docs`.
 - Last full-suite command: `./gradlew --no-daemon -Dorg.gradle.java.home=/Users/graemerocher/.sdkman/candidates/java/current :test-suite-python:test --max-workers=2`.
-- Last full-suite result: build successful, 180 tests executed, 74 skipped.
+- Last full-suite result: build successful, 180 tests executed, 34 skipped.
 - Missing row added in this pass: `sse/HeadlineControllerSpec.py::testClientAnnotationStreaming`.
 - The active rows below currently keep the root-cause summary in `Reason`; explicit subsystem, focused-regression, status, and last-failure columns still need to be expanded as each group is worked.
 
@@ -29,7 +29,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `annotation/headers/HeaderSpec.py::testSenderHeaders` | Python `@Client` introduction inherits an abstract `save` method without an introduction interceptor. |
 | `annotation/retry/PetRetrySpec.py::testFallback` | Python HTTP client `Publisher` return types lose generic element metadata for fallback resolution. |
 | `client/ThirdPartyClientFilterSpec.py::aClientFilterIsAppliedToTheRequestAndAddsTheAuthorizationHeader` | Python client filter method support is not validated yet for `@ClientFilter`/`@RequestFilter`. |
-| `client/filter/BasicAuthFilterSpec.py::testTheFilterIsApplied` | Python custom annotation stereotypes are not validated yet for `@FilterMatcher` client matching. |
 | `propagation/MdcServiceSpec.py::testFilterSpec` | GraalPy SAM conversion for `PropagatedContext` propagation helpers is not validated yet. |
 | `propagation/reactor/PropagatedContextTest.py::testMonoRequest` | Python Reactor `contextWrite` Java `Function` adaptation is not validated yet. |
 | `datavalidation/groups/EmailControllerSpec.py::test_pojo_validation_default_group` | Python `@Valid` body validation metadata is generated, but invalid requests are not rejected yet. |
@@ -40,10 +39,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `http/server/netty/websocket/SimpleTextWebSocketSpec.py` | Python `@ClientWebSocket` introduction cannot proxy Python classes yet (`PythonClassElement` cast to `JavaClassElement`). |
 | `http/server/netty/websocket/PojoWebSocketSpec.py` | Python `@ClientWebSocket` introduction cannot proxy Python classes yet (`PythonClassElement` cast to `JavaClassElement`). |
 | `http/server/secondary/SecondaryServerTest.py` | Secondary Python factory starts an eager `NettyEmbeddedServer` before the GraalPy context is initialized. |
-| `http/server/bind/ShoppingCartControllerTest.py::test_binding_bad_credentials` | Python custom annotation stereotypes are not resolved as Java annotation types for `AnnotatedRequestArgumentBinder` yet. |
-| `http/server/bind/ShoppingCartControllerTest.py::test_annotation_binding` | Python custom annotation stereotypes are not resolved as Java annotation types for `AnnotatedRequestArgumentBinder` yet. |
-| `http/client/bind/annotation/AnnotationBinderSpec.py::testBindingToTheRequest` | Python `AnnotatedClientArgumentRequestBinder` compiles but does not add the custom metadata headers yet, resulting in a bad request from the target controller. |
-| `http/client/bind/method/MethodBinderSpec.py::testBindingToTheRequest` | Python `AnnotatedClientRequestBinder` compiles but does not read the custom method annotation value yet. |
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::testExceptionBindingErrorResponse` | Python error-body binding does not currently reproduce the Java bind-failure behavior for dataclasses without defaults. |
 | `httpclientexceptionbody/BindHttpClientExceptionBodySpec.py::verifyBindErrorIsThrown` | Python HTTP client body binding does not currently reproduce the Java decode-failure exception. |
 | `i18n/I18nSpec.py::itIsPossibleToCreateAMessageSourceFromResourceBundle` | Python docs test resources are not resolved by `ResourceBundleMessageSource` yet; message lookups return `Optional.empty()`. |
@@ -68,7 +63,6 @@ This file tracks Python docs examples that are present but disabled, or intentio
 | `aop/advice/Timed.py` | Re-enable `@Around`/`@Executable` when Python AOP advice on `@Factory` beans is supported. |
 | `aop/advice/type/MyFactory.py` | Re-enable class-level `@Timed` factory advice when Python AOP advice on `@Factory` beans is supported. |
 | `aop/advice/method/MyFactory.py` | Re-enable method-level `@Timed` factory advice when Python AOP advice on `@Factory` bean methods is supported. |
-| `http/server/bind/annotation/ShoppingCartRequestArgumentBinder.py` | Re-enable annotated custom request binding when Python custom annotation stereotypes resolve as Java annotation types for request binders. |
 | `http/server/netty/websocket/ChatClientWebSocket.py` | Re-enable `@ClientWebSocket` when Python introduction advice can proxy Python classes. |
 | `http/server/netty/websocket/PojoChatClientWebSocket.py` | Re-enable `@ClientWebSocket` when Python introduction advice can proxy Python classes. |
 | `server/routes/MyRoutes.py` | Re-enable `DefaultRouteBuilder` example when Python classes can extend/support programmatic routes. |

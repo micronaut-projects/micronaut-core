@@ -3,7 +3,7 @@ from typing import Annotated
 import java
 from jakarta.inject import Inject
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 from .MetadataClient import MetadataClient
 
@@ -15,7 +15,6 @@ class AnnotationBinderSpec:
     client: Annotated[MetadataClient, Inject]
 
     @Test
-    @Disabled("Python AnnotatedClientArgumentRequestBinder does not add the custom metadata headers yet")
     def testBindingToTheRequest(self) -> None:
         metadata = LinkedHashMap()
         metadata.put("version", 3.6)

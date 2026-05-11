@@ -341,9 +341,71 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         Map<ElementDef, Object> rawValues = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : members.entrySet()) {
             String memberName = normalizeAnnotationMemberName(entry.getKey());
-            rawValues.put(resolveMemberDef(annotationMirror.annotationName(), javaAnnotationType, memberName), entry.getValue());
+            putRawValue(annotationMirror.annotationName(), javaAnnotationType, rawValues, memberName, entry.getValue());
+            for (String aliasMemberName : resolveSameAnnotationAliasMembers(annotationMirror.annotationName(), memberName)) {
+                putRawValue(annotationMirror.annotationName(), javaAnnotationType, rawValues, aliasMemberName, entry.getValue());
+            }
         }
         return rawValues;
+    }
+
+    private void putRawValue(
+        String annotationName,
+        @Nullable ClassElement javaAnnotationType,
+        Map<ElementDef, Object> rawValues,
+        String memberName,
+        Object value
+    ) {
+        if (rawValues.keySet().stream().noneMatch(member -> memberName.equals(getAnnotationMemberName(member)))) {
+            rawValues.put(resolveMemberDef(annotationName, javaAnnotationType, memberName), value);
+        }
+    }
+
+    private List<String> resolveSameAnnotationAliasMembers(String annotationName, String memberName) {
+        DecoratorDef decoratorDef = decorators.get(annotationName);
+        if (decoratorDef == null) {
+            return List.of();
+        }
+        List<DecoratorDef> memberDecorators = decoratorDef.memberDecorators().getOrDefault(memberName, List.of());
+        if (memberDecorators.isEmpty()) {
+            return List.of();
+        }
+        List<String> aliases = new ArrayList<>();
+        for (DecoratorDef memberDecorator : memberDecorators) {
+            if (!"io.micronaut.context.annotation.AliasFor".equals(memberDecorator.annotationName())) {
+                continue;
+            }
+            if (hasAnnotationAliasTarget(memberDecorator)) {
+                continue;
+            }
+            Object aliasMember = memberDecorator.members().get("member");
+            if (aliasMember == null) {
+                aliasMember = memberDecorator.members().get(AnnotationMetadata.VALUE_MEMBER);
+            }
+            String aliasMemberName = annotationMemberStringValue(aliasMember);
+            if (aliasMemberName != null && !aliasMemberName.isBlank() && !aliasMemberName.equals(memberName)) {
+                aliases.add(aliasMemberName);
+            }
+        }
+        return aliases;
+    }
+
+    private static boolean hasAnnotationAliasTarget(DecoratorDef aliasFor) {
+        Object annotation = aliasFor.members().get("annotation");
+        return annotation != null && annotationMemberStringValue(annotation) != null;
+    }
+
+    private static @Nullable String annotationMemberStringValue(@Nullable Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return null;
+            }
+            return polyglotValue.isString() ? polyglotValue.asString() : polyglotValue.toString();
+        }
+        return value.toString();
     }
 
     private static String normalizeAnnotationMemberName(Object memberName) {

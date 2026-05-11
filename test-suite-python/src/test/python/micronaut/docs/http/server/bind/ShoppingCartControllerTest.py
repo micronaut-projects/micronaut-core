@@ -7,10 +7,11 @@ from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.http.client.exceptions import HttpClientResponseException
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 Cookie = java.type("io.micronaut.http.cookie.Cookie")
 HttpRequest = java.type("io.micronaut.http.HttpRequest")
+Map = java.type("java.util.Map")
 Object = java.type("java.lang.Object")
 String = java.type("java.lang.String")
 
@@ -20,7 +21,6 @@ class ShoppingCartControllerTest:
     client: Annotated[HttpClient, Inject, Client("/")]
 
     @Test
-    @Disabled("Python custom annotation stereotypes are not resolved as Java annotation types for AnnotatedRequestArgumentBinder yet")
     def test_binding_bad_credentials(self):
         request = HttpRequest.GET("/customBinding/annotated").cookie(
             Cookie.of("shoppingCart", "{}")
@@ -30,14 +30,13 @@ class ShoppingCartControllerTest:
             self.client.toBlocking().exchange(request)
             assert False
         except HttpClientResponseException as responseException:
-            body = responseException.getResponse().getBody(dict).get()
+            body = responseException.getResponse().getBody(Map).get()
             embedded = body.get("_embedded")
             message = embedded.get("errors")[0].get("message")
 
             assert message == "Required ShoppingCart [sessionId] not specified"
 
     @Test
-    @Disabled("Python custom annotation stereotypes are not resolved as Java annotation types for AnnotatedRequestArgumentBinder yet")
     def test_annotation_binding(self):
         request = HttpRequest.GET("/customBinding/annotated").cookie(
             Cookie.of("shoppingCart", "{\"sessionId\": 5}")
