@@ -25,9 +25,7 @@ None.
 
 ## Commented Unsupported Snippet Ports
 
-| Path | Reason |
-| --- | --- |
-| `server/routes/MyRoutes.py` | Re-enable `DefaultRouteBuilder` example when Python classes can extend/support programmatic routes. |
+None.
 
 ## Intentionally Unsupported Snippet Targets
 
