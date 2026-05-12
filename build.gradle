@@ -1,3 +1,6 @@
+import io.micronaut.build.docs.PublishGuideTask
+import org.gradle.api.tasks.PathSensitivity
+
 plugins {
     id "io.micronaut.build.internal.parent"
     id "io.micronaut.build.internal.dependency-updates"
@@ -14,6 +17,27 @@ repositories {
         }
     }
     mavenCentral()
+}
+
+def languageSnippetSources = files(
+        fileTree("test-suite/src/test/java") {
+            include "**/*.java"
+        },
+        fileTree("test-suite-groovy/src/test/groovy") {
+            include "**/*.groovy"
+        },
+        fileTree("test-suite-kotlin/src/test/kotlin") {
+            include "**/*.kt"
+        },
+        fileTree("test-suite-python/src/test/python") {
+            include "**/*.py"
+        }
+)
+
+tasks.withType(PublishGuideTask).configureEach {
+    inputs.files(languageSnippetSources)
+            .withPropertyName("languageSnippetSources")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 tasks.named("updateVersionCatalogs") {
