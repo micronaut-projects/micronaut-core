@@ -17,15 +17,19 @@ package io.micronaut.python.annotation.processing.test.inject.factory.beanmethod
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Prototype
+import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.context.python.ContextHolder
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.type.Argument
 import io.micronaut.core.type.TypeInformation
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.python.compiler.InMemoryBeanDefinitionsProvider
 import io.micronaut.python.compiler.PyronautCompiler
 import jakarta.inject.Singleton
 import spock.lang.PendingFeature
+import spock.lang.Unroll
 
 class FactoryBeanMethodSpec extends AbstractPythonTypeElementSpec {
     void "test factory bean with preDestroy"() {
@@ -224,6 +228,123 @@ class MyFactory:
         context?.close()
         tempDir?.deleteDir()
         ContextHolder.resetContext()
+    }
+
+    @Unroll
+    void "test factory method can produce multiple #scopeName beans from list return"() {
+        given:
+        def context = buildContext("""\
+from typing import Annotated, List
+from jakarta.inject import Singleton, Qualifier
+from micronaut.context.annotation import Factory, Bean, Prototype, Executable
+
+import java
+
+BeanProvider = java.type("io.micronaut.context.BeanProvider")
+
+@Qualifier
+def WishList(func):
+    return func
+
+@Qualifier
+def All(func):
+    return func
+
+class Product:
+    def __init__(self, name: str):
+        self.name = name
+
+@Singleton
+class Catalogue:
+    def __init__(
+        self,
+        all_products: Annotated[List[Product], All],
+        wishlist: Annotated[List[Product], WishList],
+        provider: BeanProvider[Product]
+    ):
+        self.all_products = all_products
+        self.wishlist = wishlist
+        self.provider = provider
+
+    @Executable
+    def all_count(self) -> int:
+        return len(self.all_products)
+
+    @Executable
+    def all_names(self) -> str:
+        return ",".join(sorted([product.name for product in self.all_products]))
+
+    @Executable
+    def wishlist_count(self) -> int:
+        return len(self.wishlist)
+
+    @Executable
+    def wishlist_names(self) -> str:
+        return ",".join(sorted([product.name for product in self.wishlist]))
+
+    @Executable
+    def provider_count(self) -> int:
+        return self.provider.stream().count()
+
+@Factory
+class Shop:
+    @Bean
+    @${scopeAnnotation}
+    @All
+    def all_products(self) -> List[Product]:
+        return [Product("one"), Product("two"), Product("three")]
+
+    @Bean
+    @${scopeAnnotation}
+    @WishList
+    def wishlist(self) -> List[Product]:
+        return [Product("four"), Product("five")]
+""")
+
+        when:
+        def productClass = context.classLoader.loadClass("python.Product")
+        def shopClass = context.classLoader.loadClass("python.Shop")
+        def catalogue = getBean(context, "python.Catalogue")
+
+        then:
+        context.getBeanDefinitions(shopClass).size() == 1
+        context.getBeanDefinitions(shopClass, Qualifiers.byStereotype("python.WishList")).size() == 0
+        catalogue.all_count() == 3
+        catalogue.all_names() == "one,three,two"
+        catalogue.wishlist_count() == 2
+        catalogue.wishlist_names() == "five,four"
+        catalogue.provider_count() == 5
+        context.containsBean(productClass)
+
+        when:
+        context.getBean(productClass)
+
+        then:
+        thrown(NonUniqueBeanException)
+
+        when:
+        context.getBean(productClass, Qualifiers.byStereotype("python.WishList"))
+
+        then:
+        thrown(NonUniqueBeanException)
+
+        when:
+        List beans = context.getBean(Argument.listOf(productClass), Qualifiers.byStereotype("python.WishList"))
+
+        then:
+        beans.size() == 2
+        beans.collect { it.asPolyglotValue().getMember("name").asString() }.sort() == ["five", "four"]
+        if (sameContainerInstance) {
+            assert beans.is(context.getBean(Argument.listOf(productClass), Qualifiers.byStereotype("python.WishList")))
+        }
+
+        cleanup:
+        context.close()
+
+        where:
+        scopeName   | scopeAnnotation | sameContainerInstance
+        "prototype" | "Prototype"     | false
+        "singleton" | "Singleton"     | true
     }
 
     @PendingFeature(reason = "support static methods")
