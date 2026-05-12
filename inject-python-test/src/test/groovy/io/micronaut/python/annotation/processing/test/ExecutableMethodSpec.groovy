@@ -190,4 +190,64 @@ class Service:
         cleanup:
         context?.close()
     }
+
+    def "test abstract base with executable method is not a bean"() {
+        when:
+        BeanDefinition definition = buildBeanDefinition("python", "GenericController", '''
+from abc import ABC, abstractmethod
+from typing import Generic, TypeVar
+from micronaut.context.annotation import Executable
+
+T = TypeVar("T")
+
+class GenericController(Generic[T], ABC):
+    @abstractmethod
+    def get_path(self) -> str:
+        pass
+
+    @Executable
+    def save(self, entity: T) -> str:
+        return "parent"
+''')
+
+        then:
+        definition == null
+    }
+
+    def "test inherited executable methods resolve generic arguments"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition("python", "StatusController", '''
+from typing import Generic, TypeVar
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+T = TypeVar("T")
+ID = TypeVar("ID")
+
+class GenericController(Generic[T, ID]):
+    @Executable
+    def save(self, entity: T) -> T:
+        return entity
+
+    @Executable
+    def find(self, id: ID) -> T:
+        return None
+
+    def create(self, id: ID) -> T:
+        raise NotImplementedError()
+
+@Singleton
+@Executable
+class StatusController(GenericController[str, int]):
+    def create(self, id: int) -> str:
+        return str(id)
+''')
+
+        expect:
+        definition != null
+        definition.executableMethods.any { it.methodName == "create" && it.argumentTypes == [Integer.TYPE] as Class[] }
+        definition.executableMethods.any { it.methodName == "save" && it.argumentTypes == [String] as Class[] }
+        definition.executableMethods.any { it.methodName == "find" && it.argumentTypes == [Integer.TYPE] as Class[] }
+        definition.executableMethods.size() == 3
+    }
 }
