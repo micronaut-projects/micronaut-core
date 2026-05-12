@@ -38,8 +38,10 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
 
@@ -168,13 +170,22 @@ public final class DispatchWriter implements ClassOutputWriter {
 
     @Nullable
     private MethodElement findKotlinDefaultMethod(MethodElement methodElement) {
+        return findKotlinDefaultMethod(methodElement, new HashSet<>());
+    }
+
+    @Nullable
+    private MethodElement findKotlinDefaultMethod(MethodElement methodElement, Set<String> visited) {
+        String methodKey = methodElement.getDeclaringType().getName() + '#' + methodElement.getDescription(true);
+        if (!visited.add(methodKey)) {
+            return null;
+        }
         if (MethodGenUtils.hasKotlinDefaultsParameters(Arrays.asList(methodElement.getSuspendParameters()))
             && methodElement.getOverriddenMethods().isEmpty()) {
             return methodElement;
         }
         List<MethodElement> defaultMethods = new ArrayList<>();
         for (MethodElement overriddenMethod : methodElement.getOverriddenMethods()) {
-            MethodElement defaultMethod = findKotlinDefaultMethod(overriddenMethod);
+            MethodElement defaultMethod = findKotlinDefaultMethod(overriddenMethod, visited);
             if (defaultMethod != null && defaultMethods.stream().noneMatch(existing -> existing.getDeclaringType().equals(defaultMethod.getDeclaringType()))) {
                 defaultMethods.add(defaultMethod);
             }
