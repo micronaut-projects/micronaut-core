@@ -89,7 +89,7 @@ class MicronautTransformer(ast.NodeTransformer):
         java_module = self._to_java_import_module(node.module)
 
         # Special handling for io. prefixed imports to avoid conflict with Python's builtin io module
-        transformed_module = self._to_python_import_module(node.module)
+        transformed_module = self._to_python_import_module(java_module)
         if transformed_module.startswith('io.'):
             transformed_module = transformed_module[3:]  # Remove 'io.' prefix
 
@@ -956,6 +956,15 @@ def {simple_name}(*args, **kwargs):
         # General conversion: PascalCase to snake_case
         s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', java_name)
         return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+    def _normalize_keyword_safe_module(self, module_name: str) -> str:
+        """
+        Convert Python-safe package segments such as async_ back to Java names.
+        """
+        return '.'.join(
+            part[:-1] if part.endswith('_') and keyword.iskeyword(part[:-1]) else part
+            for part in module_name.split('.')
+        )
 
     def get_transformed_code(self) -> str:
         """

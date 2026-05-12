@@ -107,6 +107,23 @@ class MySingletonService:
         }
     }
 
+    def "test keyword-safe import segments resolve annotations"() {
+        expect:
+        buildClassElement('''
+from micronaut.core.async_.annotation import SingleResult
+
+class MyController:
+    @SingleResult
+    def stream(self) -> object:
+        pass
+''') { ClassElement element ->
+            def streamMethod = element.getMethods().find { it.name == "stream" }
+            assert streamMethod != null
+            assert streamMethod.hasAnnotation("io.micronaut.core.async.annotation.SingleResult")
+            return element
+        }
+    }
+
     def "test stereotype annotations are correctly resolved"() {
         given:
         def pythonCode = '''

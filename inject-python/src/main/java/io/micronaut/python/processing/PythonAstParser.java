@@ -37,12 +37,19 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 public final class PythonAstParser {
 
     public static final String PYTHON = "python";
     public static final String INJECT_RESOURCES = "GRAALPY-VFS/io.micronaut/micronaut-inject-python";
+    private static final Set<String> PYTHON_KEYWORDS = Set.of(
+        "False", "None", "True", "and", "as", "assert", "async", "await", "break",
+        "class", "continue", "def", "del", "elif", "else", "except", "finally",
+        "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal",
+        "not", "or", "pass", "raise", "return", "try", "while", "with", "yield"
+    );
     private final Context context;
 
     public PythonAstParser() {
@@ -230,12 +237,14 @@ public final class PythonAstParser {
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("callback_get_class_element", (Function<String, Object>) name -> {
             // Transform package names back from "micronaut." to "io.micronaut." for Java lookups
+            name = normalizeKeywordSafePackageName(name);
             String javaName = name.startsWith("micronaut.") ? "io." + name : name;
             var classElement = visitorContext.getClassElement(javaName);
             return classElement.orElse(null);
         });
         bindings.putMember("callback_get_class_elements", (Function<String, Object[]>) packageName -> {
             // Transform package names back from "micronaut." to "io.micronaut." for Java lookups
+            packageName = normalizeKeywordSafePackageName(packageName);
             String javaPackageName = packageName.startsWith("micronaut.") ? "io." + packageName : packageName;
             return visitorContext.getClassElements(javaPackageName, "*");
         });
@@ -273,6 +282,20 @@ public final class PythonAstParser {
             ));
         }
         return results;
+    }
+
+    private static String normalizeKeywordSafePackageName(String name) {
+        String[] parts = name.split("\\.");
+        for (int i = 0; i < parts.length; i++) {
+            String part = parts[i];
+            if (part.endsWith("_")) {
+                String withoutTrailingUnderscore = part.substring(0, part.length() - 1);
+                if (PYTHON_KEYWORDS.contains(withoutTrailingUnderscore)) {
+                    parts[i] = withoutTrailingUnderscore;
+                }
+            }
+        }
+        return String.join(".", parts);
     }
 
     public PythonEnvironment process(@Language("python") String sources, VisitorContext visitorContext) {
