@@ -235,6 +235,7 @@ class Vehicle:
         then: "BeanProvider constructor injection should retain its generic bean type"
         providerArgument.type == BeanProvider
         providerArgument.typeParameters[0].type.name == "python.Engine"
+        definition.requiredComponents.contains(context.classLoader.loadClass("python.Engine"))
         carService.start() == "Vrooom! 8"
 
         cleanup: "Ensure context is properly closed"
@@ -282,6 +283,7 @@ class Vehicle:
         providerArgument.type.name == "jakarta.inject.Provider"
         providerArgument.typeParameters[0].type.name == "python.Engine"
         providerArgument.isProvider()
+        definition.requiredComponents.contains(context.classLoader.loadClass("python.Engine"))
         carService.start() == "Vrooom! 8"
 
         cleanup:
