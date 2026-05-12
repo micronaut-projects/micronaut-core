@@ -180,6 +180,39 @@ class NamedService:
         definition.getDeclaredQualifier() == Qualifiers.byName("foo")
     }
 
+    void "test implicit named qualifier on type"() {
+        given:
+        def definition = buildBeanDefinition("python", "FooBar", '''
+from jakarta.inject import Named
+
+@Named
+class FooBar:
+    pass
+''')
+
+        expect:
+        definition.stringValue(AnnotationUtil.NAMED).get() == "fooBar"
+    }
+
+    void "test implicit named qualifier on type via stereotype"() {
+        given:
+        def definition = buildBeanDefinition("python", "FooBar", '''
+from jakarta.inject import Named, Singleton
+
+@Named
+def Meta(func):
+    return func
+
+@Meta
+@Singleton
+class FooBar:
+    pass
+''')
+
+        expect:
+        definition.stringValue(AnnotationUtil.NAMED).get() == "fooBar"
+    }
+
     void "test no qualifier for scoped bean"() {
         given:
         def definition = buildBeanDefinition("python", "ScopedService", '''
