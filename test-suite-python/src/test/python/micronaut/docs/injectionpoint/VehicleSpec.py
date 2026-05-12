@@ -1,4 +1,4 @@
-from org.junit.jupiter.api import Test, Disabled
+from org.junit.jupiter.api import Test
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from micronaut.context import ApplicationContext
 from jakarta.inject import Inject
@@ -19,5 +19,4 @@ class VehicleSpec:
         # end::start[]
 
         assert "Starting V6" == vehicle.start(), f"{result} should equal Starting V6"
-
 

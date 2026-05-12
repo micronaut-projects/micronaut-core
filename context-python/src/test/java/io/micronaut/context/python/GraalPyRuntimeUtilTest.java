@@ -17,6 +17,7 @@ package io.micronaut.context.python;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import org.graalvm.polyglot.Context;
@@ -24,6 +25,7 @@ import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -81,6 +83,44 @@ class GraalPyRuntimeUtilTest {
     }
 
     @Test
+    void testInvokePythonMethodBindsClassDescriptorWhenAttributeShadowsMethod() {
+        Value instance = context.eval("python", """
+            class Example:
+                def __init__(self):
+                    self.currentDate = "field"
+                    self.className = "field"
+                    self.staticName = "field"
+
+                def currentDate(self):
+                    return "method:" + self.currentDate
+
+                @classmethod
+                def className(cls):
+                    return cls.__name__
+
+                @staticmethod
+                def staticName():
+                    return "static"
+
+            Example()
+            """);
+
+        assertEquals("field", instance.getMember("currentDate").asString());
+        assertEquals(
+            "method:field",
+            GraalPyRuntimeUtil.invokePythonMethod(instance, "currentDate", new Object[0]).asString()
+        );
+        assertEquals(
+            "Example",
+            GraalPyRuntimeUtil.invokePythonMethod(instance, "className", new Object[0]).asString()
+        );
+        assertEquals(
+            "static",
+            GraalPyRuntimeUtil.invokePythonMethod(instance, "staticName", new Object[0]).asString()
+        );
+    }
+
+    @Test
     @Disabled("not yet implemented")
     void testConvertListWithMixedTypes() {
         // Create a Python list with mixed types
@@ -114,8 +154,16 @@ class GraalPyRuntimeUtilTest {
         // Test conversion with null value
         List<Integer> result = GraalPyRuntimeUtil.convertList(null, Integer.class);
 
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
+        assertNull(result);
+    }
+
+    @Test
+    void testConvertListPythonNone() {
+        // Test conversion with Python None value
+        Value none = context.eval("python", "lambda: None").execute();
+        List<Integer> result = GraalPyRuntimeUtil.convertList(none, Integer.class);
+
+        assertNull(result);
     }
 
     @Test
@@ -169,8 +217,24 @@ class GraalPyRuntimeUtilTest {
         // Test conversion with null value
         Map<String, Integer> result = GraalPyRuntimeUtil.convertMap(null, String.class, Integer.class);
 
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
+        assertNull(result);
+    }
+
+    @Test
+    void testConvertMapPythonNone() {
+        // Test conversion with Python None value
+        Map<String, Integer> result = GraalPyRuntimeUtil.convertMap(context.eval("python", "lambda: None").execute(), String.class, Integer.class);
+
+        assertNull(result);
+    }
+
+    @Test
+    void testConvertHostOptional() {
+        context.getBindings("python").putMember("optional", Optional.of("value"));
+
+        Optional<String> result = GraalPyRuntimeUtil.convertOptional(context.eval("python", "optional"), String.class);
+
+        assertEquals(Optional.of("value"), result);
     }
 
     @Test
@@ -222,8 +286,15 @@ class GraalPyRuntimeUtilTest {
         // Test conversion with null value
         Set<Integer> result = GraalPyRuntimeUtil.convertSet(null, Integer.class);
 
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
+        assertNull(result);
+    }
+
+    @Test
+    void testConvertSetPythonNone() {
+        // Test conversion with Python None value
+        Set<Integer> result = GraalPyRuntimeUtil.convertSet(context.eval("python", "lambda: None").execute(), Integer.class);
+
+        assertNull(result);
     }
 
     @Test

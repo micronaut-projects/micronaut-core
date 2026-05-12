@@ -24,7 +24,9 @@ import java.util.Optional;
 
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -62,6 +64,8 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     private final MethodElementAnnotationsHelper helper;
 
     private ClassElement resolvedGenericReturnType;
+    private ElementAnnotationMetadata resolvedMergedMethodAnnotationMetadata;
+    private AnnotationMetadata resolvedInheritedMethodAnnotationMetadata;
 
     /**
      * Constructs a new {@code PythonMethodElement} from the given {@code FunctionDef}.
@@ -129,17 +133,62 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
-        return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
+        return getDeclaredMethodAnnotationMetadata();
     }
 
     @Override
     public ElementAnnotationMetadata getMethodAnnotationMetadata() {
-        return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
+        if (resolvedMergedMethodAnnotationMetadata == null) {
+            ElementAnnotationMetadata declaredMethodAnnotationMetadata = getDeclaredMethodAnnotationMetadata();
+            AnnotationMetadata inheritedAnnotationMetadata = getInheritedMethodAnnotationMetadata();
+            if (inheritedAnnotationMetadata.isEmpty()) {
+                resolvedMergedMethodAnnotationMetadata = declaredMethodAnnotationMetadata;
+            } else {
+                resolvedMergedMethodAnnotationMetadata = elementAnnotationMetadataFactory.buildMutable(
+                    new AnnotationMetadataHierarchy(inheritedAnnotationMetadata, declaredMethodAnnotationMetadata)
+                );
+            }
+        }
+        return resolvedMergedMethodAnnotationMetadata;
     }
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return helper.getAnnotationMetadata(presetAnnotationMetadata);
+    }
+
+    private ElementAnnotationMetadata getDeclaredMethodAnnotationMetadata() {
+        return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
+    }
+
+    private AnnotationMetadata getInheritedMethodAnnotationMetadata() {
+        if (resolvedInheritedMethodAnnotationMetadata == null) {
+            resolvedInheritedMethodAnnotationMetadata = findInheritedMethod()
+                .map(method -> (AnnotationMetadata) method.getMethodAnnotationMetadata())
+                .orElse(AnnotationMetadata.EMPTY_METADATA);
+        }
+        return resolvedInheritedMethodAnnotationMetadata;
+    }
+
+    private Optional<MethodElement> findInheritedMethod() {
+        if (!isAbstract() || !declaringType.equals(owningType)) {
+            return Optional.empty();
+        }
+        List<MethodElement> candidates = new ArrayList<>();
+        owningType.getSuperType()
+            .ifPresent(superType -> candidates.addAll(superType.getEnclosedElements(ElementQuery.ALL_METHODS)));
+        for (ClassElement anInterface : owningType.getInterfaces()) {
+            candidates.addAll(anInterface.getEnclosedElements(ElementQuery.ALL_METHODS));
+        }
+        for (MethodElement candidate : candidates) {
+            if (candidate == this || !getName().equals(candidate.getName())) {
+                continue;
+            }
+            if (overrides(candidate) || isSubSignature(candidate)) {
+                return Optional.of(candidate);
+            }
+        }
+        return Optional.empty();
     }
 
     @Override
@@ -242,7 +291,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                 if (!returnDef.decorators().isEmpty()) {
                     io.micronaut.core.annotation.AnnotationMetadata annotationMetadata =
                         environment.visitorContext().getAnnotationMetadataBuilder().buildDeclared(returnDef);
-                    resolvedGenericReturnType = baseType.withAnnotationMetadata(annotationMetadata);
+                    resolvedGenericReturnType = withReturnAnnotationMetadata(baseType, annotationMetadata);
                 } else {
                     resolvedGenericReturnType = baseType;
                 }
@@ -251,7 +300,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                 resolvedGenericReturnType = PrimitiveElement.VOID;
             }
             if (resolvedGenericReturnType instanceof AbstractPythonClassElement pythonClassElement) {
-                pythonClassElement.typeAnnotationsKey = functionDef;
+                resolvedGenericReturnType = pythonClassElement.withTypeAnnotationsKey(functionDef);
             }
         }
         return resolvedGenericReturnType;
@@ -270,16 +319,28 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             if (!returnDef.decorators().isEmpty()) {
                 io.micronaut.core.annotation.AnnotationMetadata annotationMetadata =
                     environment.visitorContext().getAnnotationMetadataBuilder().buildDeclared(returnDef);
-                return baseType.withAnnotationMetadata(annotationMetadata);
+                return withReturnAnnotationMetadata(baseType, annotationMetadata);
             }
             if (baseType instanceof AbstractPythonClassElement pythonClassElement) {
-                pythonClassElement.typeAnnotationsKey = functionDef;
+                return pythonClassElement.withTypeAnnotationsKey(functionDef);
             }
 
             return baseType;
         }
         // Fall back to void/Object
         return PrimitiveElement.VOID;
+    }
+
+    private static ClassElement withReturnAnnotationMetadata(ClassElement baseType, AnnotationMetadata annotationMetadata) {
+        try {
+            return baseType.withAnnotationMetadata(annotationMetadata);
+        } catch (UnsupportedOperationException e) {
+            Object nativeType = baseType.getNativeType();
+            if (nativeType instanceof Class<?> nativeClass) {
+                return ClassElement.of(nativeClass, annotationMetadata, baseType.getTypeArguments());
+            }
+            return ClassElement.of(baseType.getName(), baseType.isInterface(), annotationMetadata, baseType.getTypeArguments());
+        }
     }
 
     private ParameterElement[] createParameters(FunctionDef functionDef) {
@@ -323,12 +384,13 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         PythonMethodElement that = (PythonMethodElement) o;
 
         return that.getNativeType().name().equals(getNativeType().name()) &&
+            declaringType.equals(that.declaringType) &&
             owningType.equals(that.owningType);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getNativeType().name(), owningType);
+        return Objects.hash(getNativeType().name(), declaringType, owningType);
     }
 
     @Override

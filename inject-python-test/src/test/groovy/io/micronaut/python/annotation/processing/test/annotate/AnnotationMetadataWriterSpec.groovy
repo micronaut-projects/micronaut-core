@@ -4,11 +4,16 @@ import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Requirements
+import io.micronaut.aop.InterceptorBinding
+import io.micronaut.aop.InterceptorKind
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.TypeHint
 import io.micronaut.core.annotation.Nullable
+import io.micronaut.core.bind.annotation.Bindable
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.annotation.Error
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
@@ -36,6 +41,33 @@ class Test:
         metadata.enumValue(Requires, "sdk", Requires.Sdk).get() == Requires.Sdk.JAVA
         metadata.getValue(Requires, "sdk", Requires.Sdk).get() == Requires.Sdk.JAVA
         metadata.getValue(Requires, "version").get() == "1.8"
+    }
+
+    void "test read enum constants from java type references"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+import java
+from jakarta.inject import Singleton
+from micronaut.http.annotation import Error
+
+HttpStatus = java.type("io.micronaut.http.HttpStatus")
+
+@Singleton
+class Test:
+
+    @Error(status=HttpStatus.NOT_FOUND)
+    def notFound(self):
+        pass
+''')
+
+        when:
+        def method = definition.getRequiredMethod("notFound")
+        def metadata = method.getAnnotationMetadata()
+
+        then:
+        metadata.hasAnnotation(Error)
+        metadata.getValue(Error, "status", String).get() == "NOT_FOUND"
+        metadata.enumValue(Error, "status", HttpStatus).get() == HttpStatus.NOT_FOUND
     }
 
     void "test read external constants"() {
@@ -262,6 +294,155 @@ class Test:
         !method.arguments[1].isNullable()
     }
 
+    void "test PEP 604 nullable annotated parameter is captured in method parameter metadata"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import Executable
+from micronaut.http.annotation import Header
+from jakarta.inject import Singleton
+from typing import Annotated
+
+@Singleton
+class Test:
+
+    @Executable
+    def testMethod(self, name: Annotated[str | None, Header], age: int) -> None:
+        pass
+''')
+
+        when:
+        def method = definition.executableMethods.find { it.methodName == "testMethod" }
+        assert method != null
+
+        then:
+        method.arguments[0].isNullable()
+        !method.arguments[1].isNullable()
+    }
+
+    void "test Python annotation decorator is generated as Java annotation type"() {
+        given:
+        def context = buildContext('''
+from typing import Annotated
+
+from jakarta.inject import Singleton
+from micronaut.context.annotation import AliasFor, Executable
+from micronaut.core.bind.annotation import Bindable
+
+@Bindable
+def ShoppingCart(
+    value: Annotated[str, AliasFor(annotation=Bindable, member="value")] = "",
+):
+    def decorator(func):
+        return func
+    return decorator
+
+@Singleton
+class Test:
+
+    @Executable
+    def show(self, sessionId: Annotated[int, ShoppingCart("cartId")]) -> int:
+        return sessionId
+''')
+
+        when:
+        Class<?> shoppingCartType = context.classLoader.loadClass("python.ShoppingCart")
+        BeanDefinition definition = getBeanDefinition(context, "python.Test")
+        def method = definition.executableMethods.find { it.methodName == "show" }
+        def metadata = method.arguments[0].annotationMetadata
+
+        then:
+        shoppingCartType.isAnnotation()
+        metadata.getAnnotationTypeByStereotype(Bindable).get() == shoppingCartType
+        metadata.stringValue(shoppingCartType).get() == "cartId"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test Python annotation decorator stereotypes support enum and class values"() {
+        given:
+        def context = buildContext('''
+import java
+from typing import Annotated
+
+from micronaut.aop import InterceptorBinding
+from micronaut.context.annotation import AnnotationExpressionContext, Requires
+
+DataSource = java.type("javax.sql.DataSource")
+InterceptorKind = java.type("io.micronaut.aop.InterceptorKind")
+
+class AnnotationContext:
+    pass
+
+class AnnotationMemberContext:
+    pass
+
+@Requires(beans=DataSource, classes=AnnotationContext)
+@InterceptorBinding(kind=InterceptorKind.POST_CONSTRUCT)
+@AnnotationExpressionContext(AnnotationContext)
+def CustomAnnotation(
+    value: Annotated[str, AnnotationExpressionContext(AnnotationMemberContext)] = "",
+):
+    def decorator(bean):
+        return bean
+    return decorator
+''')
+
+        when:
+        Class<?> annotationType = context.classLoader.loadClass("python.CustomAnnotation")
+        def requires = annotationType.getAnnotation(Requires)
+        def interceptorBinding = annotationType.getAnnotation(InterceptorBinding)
+
+        then:
+        requires.beans()[0].name == "javax.sql.DataSource"
+        requires.classes()[0].name == "python.AnnotationContext"
+        interceptorBinding.kind() == InterceptorKind.POST_CONSTRUCT
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test Python annotation decorator same annotation aliases are resolved"() {
+        given:
+        def context = buildContext('''
+from typing import Annotated
+
+from jakarta.inject import Singleton
+from micronaut.context.annotation import AliasFor, Executable
+from micronaut.core.bind.annotation import Bindable
+
+@Bindable
+def NameAuthorization(
+    value: Annotated[str, AliasFor(member="name")] = "",
+    name: Annotated[str, AliasFor(member="value")] = "",
+):
+    def decorator(func):
+        return func
+    return decorator
+
+@Singleton
+class Test:
+
+    @Executable
+    @NameAuthorization(name="Bob")
+    def get(self) -> str:
+        return "OK"
+''')
+
+        when:
+        Class<?> nameAuthorizationType = context.classLoader.loadClass("python.NameAuthorization")
+        BeanDefinition definition = getBeanDefinition(context, "python.Test")
+        def method = definition.executableMethods.find { it.methodName == "get" }
+        def metadata = method.annotationMetadata
+
+        then:
+        metadata.stringValue(nameAuthorizationType).get() == "Bob"
+        metadata.stringValue(nameAuthorizationType, "name").get() == "Bob"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test read constants defined at module level"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
@@ -283,6 +464,32 @@ class Test:
         metadata != null
         metadata.getValue(Requires, "property").isPresent()
         metadata.getValue(Requires, "property").get() == 'TEST'
+    }
+
+    void "test read local class constants in annotation expressions"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import Requires
+from jakarta.inject import Singleton
+
+class Constants:
+    URL = "https://example.com"
+
+Constants.URL = "/"
+
+@Requires(property=Constants.URL)
+@Singleton
+class Test:
+    pass
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.getAnnotationMetadata()
+
+        then:
+        metadata != null
+        metadata.getValue(Requires, "property").isPresent()
+        metadata.getValue(Requires, "property").get() == '/'
     }
 
     void "test annotation metadata with primitive arrays via PrimitiveTypesAnnotation"() {

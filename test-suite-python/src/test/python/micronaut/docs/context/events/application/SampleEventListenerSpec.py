@@ -1,5 +1,5 @@
 # tag::imports[]
-from org.junit.jupiter.api import Test, Disabled
+from org.junit.jupiter.api import Test
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from micronaut.context import ApplicationContext
 # end::imports[]
@@ -12,7 +12,6 @@ from micronaut.docs.context.events.SampleEventEmitterBean import SampleEventEmit
 
 # tag::class[]
 @MicronautTest
-@Disabled("Generics issues not fully resolved")
 class SampleEventListenerSpec:
     listener : Annotated[SampleEventListener, Inject]
     emitter : Annotated[SampleEventEmitterBean, Inject]

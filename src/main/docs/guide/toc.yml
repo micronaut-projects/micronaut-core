@@ -333,6 +333,7 @@ languageSupport:
     ide: Configuring an IDE
     retainparameternames: Retaining Parameter Names
   groovy: Micronaut for Groovy
+  python: Micronaut for Python
   kotlin:
     title: Micronaut for Kotlin
     kaptOrKsp: Kotlin support via KAPT or KSP

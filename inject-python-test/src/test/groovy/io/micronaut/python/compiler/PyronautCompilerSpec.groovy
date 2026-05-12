@@ -119,6 +119,28 @@ class TestClass:
         targetDir.deleteDir()
     }
 
+    def "test Python exception subclass generates Throwable subtype"() {
+        given:
+        def pythonCode = '''
+import java
+
+RuntimeException = java.type("java.lang.RuntimeException")
+
+class OutOfStockException(RuntimeException):
+    pass
+'''
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .build()
+
+        when:
+        def classLoader = compiler.buildClassLoader()
+        def generatedException = classLoader.loadClass("python.OutOfStockException")
+
+        then:
+        RuntimeException.isAssignableFrom(generatedException)
+    }
+
     @PendingFeature(reason = "need to improve inheritance")
     def "test classpath support"() {
         given:
@@ -212,6 +234,42 @@ class MyNamedService:
         tempDir.deleteDir()
     }
 
+    def "test generated JUnit stubs instantiate Python tests lazily"() {
+        given:
+        def pythonCode = '''
+from org.junit.jupiter.api import Test
+
+class MultipleTestSpec:
+    @Test
+    def first(self) -> None:
+        pass
+
+    @Test
+    def second(self) -> None:
+        pass
+'''
+        def tempDir = File.createTempDir("pyronaut-test-junit-stub", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def generated = new File(tempDir, "python/MultipleTestSpec.java")
+        generated.exists()
+        def javaCode = generated.text
+        javaCode.contains('MultipleTestSpec() {\n  }')
+        javaCode.contains('this.graalpyInternalValue = ContextHolder.newInstance("python", "MultipleTestSpec");')
+        javaCode.contains('return this.graalpyInternalValue;')
+        !javaCode.contains('MultipleTestSpec() {\n    this.graalpyInternalValue = ContextHolder.newInstance')
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
     def "test repeatable annotation transformation"() {
         given:
         def pythonCode = '''
@@ -249,6 +307,222 @@ class MyRepeatableService:
 
         cleanup:
         tempDir.deleteDir()
+    }
+
+    def "test Python keyword-safe Micronaut imports are normalized"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.core.async_.annotation import SingleResult
+from micronaut.core.async_.propagation import ReactorPropagation
+import java
+
+Mono = java.type("reactor.core.publisher.Mono")
+
+@Singleton
+class AsyncImportService:
+    @Executable
+    @SingleResult
+    def maybe(self) -> object:
+        return Mono.empty()
+
+    @Executable
+    def propagation(self) -> object:
+        return ReactorPropagation
+'''
+        def tempDir = File.createTempDir("pyronaut-test-keyword-import", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def metaInfDir = new File(tempDir, "META-INF")
+        def singleResultFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/async_/annotation/SingleResult.py")
+        singleResultFile.exists()
+        singleResultFile.text.contains('@micronaut_annotation("io.micronaut.core.async.annotation.SingleResult")')
+
+        def propagationInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/async_/propagation/__init__.py")
+        propagationInit.exists()
+        propagationInit.text.contains("ReactorPropagation = java.type('io.micronaut.core.async.propagation.ReactorPropagation')")
+
+        def coreInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/__init__.py")
+        coreInit.text.contains("from . import async_")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
+    def "test Python keyword-safe Java method aliases are rewritten"() {
+        given:
+        def pythonCode = '''
+from java.lang import Thread
+from reactor.core.publisher import Mono
+import java
+
+ThreadAlias = java.type("java.lang.Thread")
+FluxAlias = java.type("reactor.core.publisher.Flux")
+
+class PythonKeywordMethod:
+    def from_(self):
+        return "python"
+
+class KeywordMethodService:
+    def imported(self):
+        return Thread.yield_()
+
+    def assigned(self):
+        return ThreadAlias.yield_()
+
+    def imported_reactor(self, publisher):
+        return Mono.from_(publisher)
+
+    def assigned_reactor(self, publisher):
+        return FluxAlias.from_(publisher)
+
+    def python_method(self):
+        keyword = PythonKeywordMethod()
+        return keyword.from_()
+'''
+        def tempDir = File.createTempDir("pyronaut-test-keyword-method", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def transformedFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
+        transformedFile.exists()
+        def transformedContent = transformedFile.text
+        transformedContent.contains("getattr(Thread, 'yield')()")
+        transformedContent.contains("getattr(ThreadAlias, 'yield')()")
+        transformedContent.contains("getattr(Mono, 'from')(publisher)")
+        transformedContent.contains("getattr(FluxAlias, 'from')(publisher)")
+        transformedContent.contains("keyword.from_()")
+        !transformedContent.contains("Thread.yield_")
+        !transformedContent.contains("ThreadAlias.yield_")
+        !transformedContent.contains("Mono.from_")
+        !transformedContent.contains("FluxAlias.from_")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
+    def "test Python keyword-safe annotation members are rewritten"() {
+        given:
+        def pythonCode = '''
+from micronaut.http.annotation import Controller, Error
+
+@Controller("/errors")
+class ErrorController:
+    @Error(global_=True)
+    def global_error(self) -> str:
+        return "handled"
+'''
+        def tempDir = File.createTempDir("pyronaut-test-keyword-member", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def transformedFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
+        transformedFile.exists()
+        def transformedContent = transformedFile.text
+        transformedContent.contains("@Error(**{'global': True})")
+        !transformedContent.contains("@Error(global_")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
+    def "test nested annotation members are generated as Python attributes"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import Mapper
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class Product:
+    name: str
+
+@Introspected
+@dataclass
+class ProductDTO:
+    name: str
+
+class ProductMappers(ABC):
+    @Mapper.Mapping(to="name", **{"from": "product.name"})
+    @abstractmethod
+    def to_product_dto(self, product: Product) -> ProductDTO:
+        pass
+
+class MyMergeStrategy(Mapper.MergeStrategy):
+    def merge(
+        self,
+        current_value: Any,
+        value: Any,
+        value_owner: Any,
+        property_name: str,
+        mapped_property_name: str,
+    ) -> Any:
+        return value
+'''
+        def tempDir = File.createTempDir("pyronaut-test-nested-annotation", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def mapperFile = new File(tempDir, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/context/annotation/Mapper.py")
+        mapperFile.exists()
+        mapperFile.text.contains("def Mapping(")
+        mapperFile.text.contains("Mapper.Mapping = Mapping")
+        mapperFile.text.contains("Mapper.MergeStrategy = MergeStrategy")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
+    def "test generated introspected Python stubs expose public fields for host attribute access"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class Message:
+    text: str
+'''
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .build()
+
+        when:
+        def classLoader = compiler.buildClassLoader()
+        def messageClass = classLoader.loadClass("python.Message")
+
+        then:
+        messageClass.getField("text").type == String
     }
 
     def "test Python sources in multiple distinct packages are processed"() {

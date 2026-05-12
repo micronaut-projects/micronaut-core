@@ -51,6 +51,7 @@ import static io.micronaut.python.processing.PythonStubGenerator.erasedType;
 import static io.micronaut.python.processing.PythonStubGenerator.handleReturnType;
 
 final class PythonPooledStubGenerator {
+    private static final ClassTypeDef POLYGLOT_CONTEXT = ClassTypeDef.of("org.graalvm.polyglot.Context");
 
     static ClassDef.ClassDefBuilder generatePooledClass(AbstractPythonClassElement element,
                                                         VisitorContext context,
@@ -58,7 +59,7 @@ final class PythonPooledStubGenerator {
         String typeName = element.getName();
         var builder = ClassDef.builder(typeName).addModifiers(Modifier.PUBLIC);
         builder.addAnnotation(Vetoed.class);
-        builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
+        builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
 
         ClassElement superType = element.getSuperType().orElse(null);
         if (superType instanceof AbstractPythonClassElement) {
@@ -84,6 +85,17 @@ final class PythonPooledStubGenerator {
                 .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(
                     ExpressionDef.constant(element.getPackageName()),
                     ExpressionDef.constant(element.getSimpleName())
+                )).returning())));
+
+        builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
+            .addModifiers(Modifier.PUBLIC)
+            .addParameter(POLYGLOT_CONTEXT)
+            .returns(POLYGLOT_VALUE)
+            .build(((aThis, params) -> CONTEXT_HOLDER
+                .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(
+                    ExpressionDef.constant(element.getPackageName()),
+                    ExpressionDef.constant(element.getSimpleName()),
+                    params.getFirst()
                 )).returning())));
 
         ClassTypeDef thisType = ClassTypeDef.of(typeName);
@@ -118,7 +130,7 @@ final class PythonPooledStubGenerator {
         var builder = ClassDef.builder(scriptElement.getPackageName() + "." + scriptElement.getSimpleName())
             .addModifiers(Modifier.PUBLIC);
         builder.addAnnotation(Vetoed.class);
-        builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
+        builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
 
         MethodDef.MethodDefBuilder ctor = MethodDef.constructor();
         builder.addMethod(ctor.build(((aThis, params) -> StatementDef.multi())));
@@ -138,6 +150,15 @@ final class PythonPooledStubGenerator {
             .build(((aThis, params) -> CONTEXT_HOLDER
                 .invokeStatic("findPooledScript", POLYGLOT_VALUE,
                     List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script)))
+                .returning())));
+
+        builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
+            .addModifiers(Modifier.PUBLIC)
+            .addParameter(POLYGLOT_CONTEXT)
+            .returns(POLYGLOT_VALUE)
+            .build(((aThis, params) -> CONTEXT_HOLDER
+                .invokeStatic("findPooledScript", POLYGLOT_VALUE,
+                    List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script), params.getFirst()))
                 .returning())));
 
         builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)

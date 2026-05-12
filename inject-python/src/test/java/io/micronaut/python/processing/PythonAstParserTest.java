@@ -62,6 +62,78 @@ public class PythonAstParserTest {
     }
 
     @Test
+    void testParseIgnoresLocalClassesDeclaredInsideFunctions() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        String sources = """
+            class DemoPropertySourceImporterTest:
+                def imports_demo_defaults(self):
+                    class DemoImportContext:
+                        def environment(self):
+                            pass
+                    return DemoImportContext()
+            """;
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(null, sources);
+
+        try (PythonEnvironment environment = pythonProcessor.parse(sources, "micronaut.docs.config.importer")) {
+            assertTrue(environment.classes().containsKey("micronaut.docs.config.importer.DemoPropertySourceImporterTest"));
+            assertFalse(environment.classes().containsKey("micronaut.docs.config.importer.DemoImportContext"));
+            assertEquals(1, environment.classes().size());
+            assertEquals(List.of("DemoPropertySourceImporterTest"), transformResult.allClassNames());
+        }
+    }
+
+    @Test
+    void testParseNestedPythonClassConstructorParameterType() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from typing import Annotated
+
+            from micronaut.context.annotation import ConfigurationInject
+            from micronaut.context.annotation import ConfigurationProperties
+            from jakarta.validation.constraints import NotNull
+
+            @ConfigurationProperties("my.engine")
+            class EngineConfig:
+                @ConfigurationProperties("crank-shaft")
+                class CrankShaft:
+                    @ConfigurationInject
+                    def __init__(self, rod_length: float | None = None):
+                        self.rod_length = rod_length
+
+                @ConfigurationInject
+                def __init__(
+                    self,
+                    manufacturer: str,
+                    cylinders: int,
+                    crank_shaft: Annotated[CrankShaft, NotNull],
+                ):
+                    self.manufacturer = manufacturer
+                    self.cylinders = cylinders
+                    self.crank_shaft = crank_shaft
+            """, "micronaut.docs.config.immutable")) {
+            assertTrue(environment.classes().containsKey("micronaut.docs.config.immutable.EngineConfig"));
+            assertTrue(environment.classes().containsKey("micronaut.docs.config.immutable.EngineConfig$CrankShaft"));
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                ClassElement engineConfig = processingEnvironment.classes().get("micronaut.docs.config.immutable.EngineConfig");
+                assertNotNull(engineConfig);
+
+                ClassElement crankShaft = processingEnvironment.classes().get("micronaut.docs.config.immutable.EngineConfig$CrankShaft");
+                assertNotNull(crankShaft);
+                assertTrue(crankShaft.isInner());
+                assertEquals(engineConfig, crankShaft.getEnclosingType().orElseThrow());
+
+                MethodElement constructor = engineConfig.getPrimaryConstructor().orElseThrow();
+                ParameterElement crankShaftParameter = constructor.getParameters()[2];
+                assertEquals(
+                    "micronaut.docs.config.immutable.EngineConfig$CrankShaft",
+                    crankShaftParameter.getType().getName()
+                );
+            }
+        }
+    }
+
+    @Test
     void testParseDecorators() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""
@@ -114,6 +186,86 @@ class MySingletonService:
 
             assertTrue(environment.decorators().containsKey(Singleton.class.getName()));
             assertTrue(environment.decorators().containsKey(Scope.class.getName()));
+        }
+    }
+
+    @Test
+    void testDecoratorDictionaryExpansionAndNestedAnnotationValues() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+def micronaut_annotation(name, repeated=None):
+    def decorator(func):
+        return func
+    return decorator
+
+@micronaut_annotation("io.micronaut.context.annotation.Mapper")
+def Mapper(*args, **kwargs):
+    def decorator(func):
+        return func
+    return decorator
+
+@micronaut_annotation(
+    "io.micronaut.context.annotation.Mapper$Mapping",
+    repeated="io.micronaut.context.annotation.Mapper",
+)
+def Mapping(*args, **kwargs):
+    def decorator(func):
+        return func
+    return decorator
+
+Mapper.Mapping = Mapping
+
+class ProductMappers:
+    @Mapper.Mapping(
+        to="price",
+        **{"from": "#{product.price * 2}", "format": "$#.00"},
+    )
+    def to_product_dto(self, product):
+        pass
+
+    @Mapper(
+        value=[Mapper.Mapping(**{"from": "product.manufacturer", "to": "distributor"})],
+    )
+    def to_manufacturer_dto(self, product):
+        pass
+            """)) {
+            ClassDef productMappers = environment.classes().get("ProductMappers");
+            assertNotNull(productMappers);
+
+            FunctionDef productDto = productMappers.functions()
+                .stream()
+                .filter(function -> "to_product_dto".equals(function.name()))
+                .findFirst()
+                .orElseThrow();
+            DecoratorDef directMapping = productDto.decorators()
+                .stream()
+                .filter(decorator -> "io.micronaut.context.annotation.Mapper$Mapping".equals(decorator.annotationName()))
+                .findFirst()
+                .orElseThrow();
+
+            assertEquals("price", directMapping.members().get("to").asString());
+            assertEquals("#{product.price * 2}", directMapping.members().get("from").asString());
+            assertEquals("$#.00", directMapping.members().get("format").asString());
+
+            FunctionDef manufacturerDto = productMappers.functions()
+                .stream()
+                .filter(function -> "to_manufacturer_dto".equals(function.name()))
+                .findFirst()
+                .orElseThrow();
+            DecoratorDef mapper = manufacturerDto.decorators()
+                .stream()
+                .filter(decorator -> "io.micronaut.context.annotation.Mapper".equals(decorator.annotationName()))
+                .findFirst()
+                .orElseThrow();
+
+            org.graalvm.polyglot.Value value = mapper.members().get("value");
+            assertTrue(value.hasArrayElements());
+            Object nested = value.getArrayElement(0).asHostObject();
+            assertInstanceOf(DecoratorDef.class, nested);
+            DecoratorDef nestedMapping = (DecoratorDef) nested;
+            assertEquals("io.micronaut.context.annotation.Mapper$Mapping", nestedMapping.annotationName());
+            assertEquals("product.manufacturer", nestedMapping.members().get("from").asString());
+            assertEquals("distributor", nestedMapping.members().get("to").asString());
         }
     }
 
@@ -562,6 +714,43 @@ class MySingletonService:
             MethodElement constructor = mainClass.getPrimaryConstructor().orElseThrow();
             ParameterElement dependencyParameter = constructor.getParameters()[0];
             assertEquals("python.Dependency", dependencyParameter.getType().getName());
+        }
+    }
+
+    @Test
+    void testDottedSourcePackageImportsResolveBeforeMicronautJavaNormalization(@TempDir Path tempDir) throws IOException {
+        Path namedPackage = tempDir.resolve("micronaut/docs/inject/qualifiers/named");
+        Path anyPackage = tempDir.resolve("micronaut/docs/inject/qualifiers/any");
+        Files.createDirectories(namedPackage);
+        Files.createDirectories(anyPackage);
+        Path engine = namedPackage.resolve("Engine.py");
+        Path vehicle = anyPackage.resolve("Vehicle.py");
+        Files.writeString(engine, """
+            class Engine:
+                pass
+            """);
+        Files.writeString(vehicle, """
+            from micronaut.docs.inject.qualifiers.named import Engine
+
+            class Vehicle:
+                def __init__(self, engine: Engine):
+                    self.engine = engine
+            """);
+
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        List<Source> sources = List.of(
+            Source.newBuilder("python", engine.toFile()).build(),
+            Source.newBuilder("python", vehicle.toFile()).build()
+        );
+
+        try (PythonEnvironment environment = pythonProcessor.parse(sources, List.of(tempDir.toString()), null);
+             PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
+            ClassElement vehicleClass = processingEnvironment.classes().get("micronaut.docs.inject.qualifiers.any.Vehicle");
+            assertNotNull(vehicleClass);
+
+            MethodElement constructor = vehicleClass.getPrimaryConstructor().orElseThrow();
+            ParameterElement engineParameter = constructor.getParameters()[0];
+            assertEquals("micronaut.docs.inject.qualifiers.named.Engine", engineParameter.getType().getName());
         }
     }
 
@@ -1383,6 +1572,53 @@ class MySingletonService:
                 assertEquals(PropertyElement.AccessKind.METHOD, descProperty.getReadAccessKind(), "description should be METHOD access");
                 assertFalse(descProperty.getField().isPresent(), "skip fields because they are inaccessible");
                 assertTrue(descProperty.getReadMethod().isPresent(), "description should have synthetic read method");
+            }
+        }
+    }
+
+    @Test
+    void testPropertySetterCarriesConfigurationBuilderMetadata() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from micronaut.context.annotation import ConfigurationBuilder
+
+            class EngineConfig:
+                _spark_plug: SparkPlugBuilder = None
+
+                @property
+                def spark_plug(self) -> SparkPlugBuilder:
+                    return self._spark_plug
+
+                @spark_plug.setter
+                @ConfigurationBuilder(prefixes="with", configurationPrefix="spark-plug")
+                def spark_plug(self, spark_plug: SparkPlugBuilder) -> None:
+                    self._spark_plug = spark_plug
+
+            class SparkPlugBuilder:
+                pass
+            """)) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                ClassElement classElement = processingEnvironment.classes().get("EngineConfig");
+                assertNotNull(classElement);
+                assertInstanceOf(PythonClassElement.class, classElement);
+
+                PythonClassElement pythonClass = (PythonClassElement) classElement;
+                List<PropertyElement> properties = pythonClass.getBeanProperties();
+                PropertyElement sparkPlug = properties.stream()
+                    .filter(p -> "spark_plug".equals(p.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("spark_plug property should be found"));
+
+                assertEquals(1, properties.size());
+                assertEquals("spark_plug", sparkPlug.getReadMethod().orElseThrow().getName());
+                assertEquals("spark_plug", sparkPlug.getWriteMethod().orElseThrow().getName());
+                assertTrue(sparkPlug.hasAnnotation("io.micronaut.context.annotation.ConfigurationBuilder"));
+                assertTrue(
+                    pythonClass.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+                        .stream()
+                        .noneMatch(method -> "spark_plug".equals(method.getName()))
+                );
             }
         }
     }

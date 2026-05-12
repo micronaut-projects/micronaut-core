@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
+import io.micronaut.core.annotation.Order;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import jakarta.inject.Named;
@@ -73,6 +74,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     @io.micronaut.context.annotation.Context
     @Singleton
     @Named(PYTHON)
+    @Order(Ordered.HIGHEST_PRECEDENCE)
     public org.graalvm.polyglot.Context graalPyContext(
         @Named(PYTHON) HostAccess hostAccess,
         @Named(PYTHON) Engine engine) {
@@ -121,7 +123,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
             return ContextHolder.getContext();
         }
-        var context = buildContext(HostAccess.ALL, Engine.create(), classLoader, options, applicationMain);
+        var context = buildContext(HostAccess.ALL, GraalPyEngineFactory.buildPythonEngine(), classLoader, options, applicationMain);
         ContextHolder.setReuseContext(true);
         ContextHolder.setContext(context);
         return context;
@@ -157,6 +159,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
              .allowHostAccess(hostAccess)
              .hostClassLoader(classLoader)
              .engine(engine)
+             .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
              .allowHostClassLookup(name -> true);
         var pyEnv = System.getenv("PYENV_VERSION");
         var venv = System.getenv("VIRTUAL_ENV");

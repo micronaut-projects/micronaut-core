@@ -145,7 +145,7 @@ public final class PythonScriptElement extends AbstractPythonElement implements 
 
     @Override
     public boolean isAssignable(String type) {
-        return getName().equals(type);
+        return Object.class.getName().equals(type) || getName().equals(type);
     }
 
     @Override

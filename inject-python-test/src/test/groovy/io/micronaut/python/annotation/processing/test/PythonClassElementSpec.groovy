@@ -16,9 +16,18 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.python.ContextHolder
+import io.micronaut.aop.InterceptorBinding
+import io.micronaut.aop.InterceptorKind
+import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Mapper
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.expressions.EvaluatedExpressionReference
 import io.micronaut.core.type.Argument
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
 import io.micronaut.python.compiler.RepeatableAnnotation
@@ -409,6 +418,74 @@ class MyFunction(Function[str, str]):
         }
     }
 
+    def "test nested java interface resolves from imported class attribute base"() {
+        given:
+        def pythonCode = '''
+from typing import Any
+from micronaut.context.annotation import Mapper
+
+class MyMergeStrategy(Mapper.MergeStrategy):
+    def merge(
+        self,
+        current_value: Any,
+        value: Any,
+        value_owner: Any,
+        property_name: str,
+        mapped_property_name: str,
+    ) -> Any:
+        return value
+'''
+
+        expect:
+        buildClassElement(pythonCode, "MyMergeStrategy") { ClassElement element ->
+            def superType = element.getSuperType()
+            assert !superType.isPresent()
+            def interfaces = element.getInterfaces()
+            assert interfaces.size() == 1
+            assert interfaces.iterator().next().name == Mapper.MergeStrategy.name
+            return element
+        }
+    }
+
+    def "test nested mapper annotations resolve from annotation array members"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from micronaut.context.annotation import Mapper
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class ChristmasPresent:
+    packaging_color: str
+
+@Introspected
+@dataclass
+class PresentPackaging:
+    color: str
+
+class ProductMappers(ABC):
+    @Mapper(
+        mergeStrategy="add-numbers",
+        value=[Mapper.Mapping(**{"from": "packaging.color", "to": "packaging_color"})],
+    )
+    @abstractmethod
+    def merge_with_merge_strategy(self, packaging: PresentPackaging, present: object) -> ChristmasPresent:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "ProductMappers") { ClassElement element ->
+            def method = element.findMethod("merge_with_merge_strategy").get()
+            def mappings = method.annotationMetadata.getAnnotationValuesByType(Mapper.Mapping)
+            assert mappings.size() == 1
+            assert mappings[0].stringValue("from").get() == "packaging.color"
+            assert mappings[0].stringValue("to").get() == "packaging_color"
+            return element
+        }
+    }
+
     def "test generic type arguments populated java interface as bean"() {
         given:
         def pythonCode = '''
@@ -542,6 +619,213 @@ class MyDerived(MyBase[dict[str, int]]):
             def superType = element.getSuperType()
             assert superType.isPresent()
             assert superType.get().getSimpleName() == "MyBase"
+            return element
+        }
+    }
+
+    def "test method parameter dict generic type arguments"() {
+        given:
+        def pythonCode = '''
+from typing import Any
+
+class TypeTestService:
+    def update(self, update_fields: dict[str, Any]) -> object:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "TypeTestService") { ClassElement element ->
+            def method = element.findMethod("update").get()
+            def parameter = method.parameters[0]
+            def typeAnnotation = parameter.nativeType.typeAnnotation()
+            def genericType = parameter.genericType
+            def boundGenericTypes = genericType.boundGenericTypes
+
+            assert typeAnnotation.name() == "dict"
+            assert typeAnnotation.typeArguments().size() == 2
+            assert genericType.name == Map.name
+            assert boundGenericTypes.size() == 2
+            assert boundGenericTypes[0].name == String.name
+            assert boundGenericTypes[1].name == Object.name
+            return element
+        }
+    }
+
+    def "test method parameter bytes type resolves to byte array"() {
+        given:
+        def pythonCode = '''
+class TypeTestService:
+    def save(self, data: bytes) -> object:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "TypeTestService") { ClassElement element ->
+            def method = element.findMethod("save").get()
+            def parameter = method.parameters[0]
+
+            assert parameter.type.name == "byte"
+            assert parameter.type.array
+            assert parameter.type.arrayDimensions == 1
+            assert parameter.genericType.name == "byte"
+            assert parameter.genericType.array
+            assert parameter.genericType.arrayDimensions == 1
+            return element
+        }
+    }
+
+    def "test override method inherits annotations from python base method"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+import java
+from micronaut.core.async_.annotation import SingleResult
+from micronaut.http.annotation import Post
+
+Publisher = java.type("org.reactivestreams.Publisher")
+
+class Pet:
+    pass
+
+class PetOperations(ABC):
+    @Post
+    @SingleResult
+    @abstractmethod
+    def save(self, name: str) -> Publisher[Pet]:
+        pass
+
+class PetClient(PetOperations):
+    @SingleResult
+    @abstractmethod
+    def save(self, name: str) -> Publisher[Pet]:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "PetClient") { ClassElement element ->
+            def method = element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+                .find { it.name == "save" }
+
+            assert method.annotationMetadata.hasAnnotation("io.micronaut.core.async.annotation.SingleResult")
+            assert method.annotationMetadata.hasAnnotation("io.micronaut.http.annotation.Post")
+            assert method.annotationMetadata.hasStereotype("io.micronaut.http.annotation.HttpMethodMapping")
+            assert method.methodAnnotationMetadata.hasAnnotation("io.micronaut.core.async.annotation.SingleResult")
+            assert method.methodAnnotationMetadata.hasAnnotation("io.micronaut.http.annotation.Post")
+            return element
+        }
+    }
+
+    def "test client override with class header keeps client interceptor binding"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+import java
+from micronaut.core.async_.annotation import SingleResult
+from micronaut.http.annotation import Header, Post
+from micronaut.http.client.annotation import Client
+
+Publisher = java.type("org.reactivestreams.Publisher")
+
+class Pet:
+    pass
+
+class PetOperations(ABC):
+    @Post
+    @SingleResult
+    @abstractmethod
+    def save(self, name: str) -> Publisher[Pet]:
+        pass
+
+@Client("/pets")
+@Header(name="X-Pet-Client", value="${pet.client.id}")
+class PetClient(PetOperations):
+    @SingleResult
+    @abstractmethod
+    def save(self, name: str) -> Publisher[Pet]:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "PetClient") { ClassElement element ->
+            def saves = element.getEnclosedElements(ElementQuery.ALL_METHODS)
+                .findAll { it.name == "save" }
+            def method = saves.find { it.declaringType.name == "PetClient" } ?: saves.first()
+
+            assert saves.size() == 1
+            assert method.declaringType.name == "python.PetClient"
+            assert method.annotationMetadata.hasAnnotation("io.micronaut.http.client.annotation.Client")
+            assert method.annotationMetadata.hasAnnotation("io.micronaut.http.annotation.Headers")
+            assert method.annotationMetadata.hasAnnotation("io.micronaut.http.annotation.Post")
+            assert method.annotationMetadata.hasStereotype("io.micronaut.aop.Introduction")
+            assert method.annotationMetadata.getAnnotationValuesByType(InterceptorBinding)*.stringValue()*.orElse(null)
+                .contains("io.micronaut.http.client.annotation.Client")
+            return element
+        }
+        def definition = buildBeanDefinition("python", "PetClient\$RuntimeProxy", pythonCode)
+        definition.executableMethods
+            .find { it.methodName == "save" }
+            .annotationMetadata
+            .getAnnotationValuesByType(InterceptorBinding)*.stringValue()*.orElse(null)
+            .contains("io.micronaut.http.client.annotation.Client")
+        definition.executableMethods
+            .find { it.methodName == "save" }
+            .annotationMetadata
+            .getAnnotationValuesByName("io.micronaut.aop.InterceptorBinding")*.stringValue()*.orElse(null)
+            .contains("io.micronaut.http.client.annotation.Client")
+        def executableMethods = definition.executableMethods.toArray(new io.micronaut.inject.ExecutableMethod[0])
+        new AnnotationMetadataHierarchy(executableMethods)
+            .getAnnotationValuesByName("io.micronaut.aop.InterceptorBinding")*.stringValue()*.orElse(null)
+            .contains("io.micronaut.http.client.annotation.Client")
+        Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(executableMethods)).toString()
+            .contains("Client")
+
+        def context = ApplicationContext.builder(["pet.client.id": "11"]).build()
+        try {
+            definition.configure(context.environment)
+            def configuredExecutableMethods = definition.executableMethods.toArray(new io.micronaut.inject.ExecutableMethod[0])
+            assert configuredExecutableMethods
+                .collectMany { InterceptedMethodUtil.resolveInterceptorBinding(it.annotationMetadata, InterceptorKind.INTRODUCTION).toList() }
+                *.stringValue()*.orElse(null)
+                .contains("io.micronaut.http.client.annotation.Client")
+        } finally {
+            context.close()
+        }
+    }
+
+    def "test annotation expression values are converted to evaluated expression references"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from micronaut.context.annotation import Mapper
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class Product:
+    price: float
+
+@Introspected
+@dataclass
+class ProductDTO:
+    price: str
+
+class ProductMappers(ABC):
+    @Mapper.Mapping(to="price", **{"from": "#{product.price * 2}", "format": "$#.00"})
+    @abstractmethod
+    def to_product_dto(self, product: Product) -> ProductDTO:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "ProductMappers") { ClassElement element ->
+            def method = element.findMethod("to_product_dto").get()
+            def mappings = method.annotationMetadata.getAnnotationValuesByType(Mapper.Mapping)
+            def fromValue = mappings[0].values["from"]
+
+            assert fromValue instanceof EvaluatedExpressionReference
+            assert fromValue.annotationValue == "#{product.price * 2}"
+            assert method.annotationMetadata.hasEvaluatedExpressions()
             return element
         }
     }

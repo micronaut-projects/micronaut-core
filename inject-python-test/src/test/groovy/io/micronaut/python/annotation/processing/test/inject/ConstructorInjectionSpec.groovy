@@ -1,11 +1,11 @@
 package io.micronaut.python.annotation.processing.test.inject
 
+import io.micronaut.context.BeanProvider
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.validation.Constraint
 import jakarta.validation.constraints.NotNull
-import spock.lang.PendingFeature
 
 class ConstructorInjectionSpec extends AbstractPythonTypeElementSpec {
     void "test annotated constructor injection - imported type"() {
@@ -195,24 +195,26 @@ class Vehicle:
         context?.close()
     }
 
-    @PendingFeature(reason = "Unclear how to use generics for external Java types")
     void "test constructor injection with bean provider"() {
         given:
         def pythonCode = '''
 from jakarta.inject import Singleton
-from dataclasses import dataclass
 from micronaut.context.annotation import Executable
 
 import java
 
 BeanProvider = java.type("io.micronaut.context.BeanProvider")
 
-@dataclass
 class Engine:
-    cylinders: int
-
+    @Executable
     def start(self) -> str:
-        return f"Vrooom! {self.cylinders}"
+        return "base"
+
+@Singleton
+class V8Engine(Engine):
+    @Executable
+    def start(self) -> str:
+        return "Vrooom! 8"
 
 @Singleton
 class Vehicle:
@@ -227,9 +229,13 @@ class Vehicle:
         when: "Building ApplicationContext and getting the car service"
         def context = buildContext(pythonCode)
         def carService = getBean(context, "python.Vehicle")
+        def definition = getBeanDefinition(context, "python.Vehicle")
+        def providerArgument = definition.constructor.arguments[0]
 
-        then: "Factory method injection should work"
-        carService.start() == "Vrooom! 6"
+        then: "BeanProvider constructor injection should retain its generic bean type"
+        providerArgument.type == BeanProvider
+        providerArgument.typeParameters[0].type.name == "python.Engine"
+        carService.start() == "Vrooom! 8"
 
         cleanup: "Ensure context is properly closed"
         context?.close()
@@ -460,6 +466,55 @@ class NamedQualifierService:
         service.get_thing_two_name() == "two"
 
         cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
+
+    void "test constructor injection with non binding annotation member qualifier"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton, Qualifier
+from micronaut.context.annotation import NonBinding
+from typing import Annotated
+
+@Qualifier
+def Cylinders(value: int, description: Annotated[str, NonBinding] = ""):
+    def decorator(func):
+        return func
+    return decorator
+
+class Engine:
+    def start(self) -> str:
+        return "Engine"
+
+@Singleton
+@Cylinders(value=6, description="6-cylinder V6 engine")
+class V6Engine(Engine):
+    def start(self) -> str:
+        return "Starting V6"
+
+@Singleton
+@Cylinders(value=8, description="8-cylinder V8 engine")
+class V8Engine(Engine):
+    def start(self) -> str:
+        return "Starting V8"
+
+@Singleton
+class Vehicle:
+    def __init__(self, engine: Annotated[Engine, Cylinders(value=8)]):
+        self.engine = engine
+
+    def start(self) -> str:
+        return self.engine.start()
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def vehicle = getBean(context, "python.Vehicle").asPolyglotValue()
+
+        then:
+        vehicle.invokeMember("start").asString() == "Starting V8"
+
+        cleanup:
         context?.close()
     }
 }

@@ -14,5 +14,5 @@ class Engine(Generic[T], ABC): # <1>
 
     @abstractmethod
     def get_cylinder_provider(self) -> T:
-        pass
+        ...
 # end::class[]

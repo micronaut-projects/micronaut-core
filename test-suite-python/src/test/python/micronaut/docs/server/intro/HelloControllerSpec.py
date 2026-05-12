@@ -11,7 +11,7 @@ from typing import Annotated
 
 # tag::class[]
 @MicronautTest # <1>
-class HelloClientSpec:
+class HelloControllerSpec:
     server : Annotated[EmbeddedServer, Inject] # <1>
     client : Annotated[HttpClient, Inject, Client("/")] # <2>
 

@@ -4,7 +4,7 @@ from jakarta.inject import Singleton
 from jakarta.annotation import PostConstruct # <1>
 # end::imports[]
 
-from micronaut.docs.inject.typed import Engine
+from .Engine import Engine
 
 # tag::class[]
 @Singleton

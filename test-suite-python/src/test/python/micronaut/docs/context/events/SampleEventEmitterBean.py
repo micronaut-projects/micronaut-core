@@ -6,8 +6,7 @@ from .SampleEvent import SampleEvent
 
 @Singleton
 class SampleEventEmitterBean:
-    event_publisher : Annotated[ApplicationEventPublisher, Inject]
-    # TODO: fix generics event_publisher : Annotated[ApplicationEventPublisher[SampleEvent], Inject]
+    event_publisher : Annotated[ApplicationEventPublisher[SampleEvent], Inject]
 
     def publish_sample_event(self):
         self.event_publisher.publishEvent(SampleEvent())

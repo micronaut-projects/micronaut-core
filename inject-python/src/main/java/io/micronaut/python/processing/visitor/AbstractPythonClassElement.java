@@ -16,8 +16,11 @@
 package io.micronaut.python.processing.visitor;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -31,6 +34,8 @@ import org.jetbrains.annotations.Nullable;
 
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -103,6 +108,66 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
 
     public final ElementDef getTypeAnnotationsKey() {
         return typeAnnotationsKey;
+    }
+
+    final ClassElement withTypeAnnotationsKey(ElementDef typeAnnotationsKey) {
+        AbstractPythonClassElement copy = (AbstractPythonClassElement) makeCopy();
+        copy.typeAnnotationsKey = typeAnnotationsKey;
+        return copy;
+    }
+
+    protected final @Nullable ClassElement findPythonClass(TypeRef typeRef) {
+        Map<String, ClassElement> classes = environment.classes();
+        ClassElement classElement = classes.get(typeRef.name());
+        if (classElement != null) {
+            return classElement;
+        }
+        if (typeRef.name().indexOf('.') > -1) {
+            return null;
+        }
+        classElement = classes.get(getPackageName() + "." + typeRef.name());
+        if (classElement != null) {
+            return classElement;
+        }
+        return classes.get(PYTHON_DEFAULT_PACKAGE + "." + typeRef.name());
+    }
+
+    protected final void excludeIntrospectedProperties(String... propertyNames) {
+        if (!hasDeclaredIntrospectedDecorator()) {
+            return;
+        }
+        AnnotationValue<Introspected> introspected = getDeclaredAnnotation(Introspected.class);
+        if (introspected == null) {
+            return;
+        }
+        Set<String> excludes = new LinkedHashSet<>(Arrays.asList(introspected.stringValues("excludes")));
+        boolean changed = false;
+        for (String propertyName : propertyNames) {
+            changed |= excludes.add(propertyName);
+        }
+        if (!changed) {
+            return;
+        }
+        removeAnnotation(Introspected.class);
+        annotate(AnnotationValue.builder(introspected)
+            .member("excludes", excludes.toArray(String[]::new))
+            .build()
+        );
+    }
+
+    private boolean hasDeclaredIntrospectedDecorator() {
+        String introspectedName = Introspected.class.getName();
+        String introspectedSimpleName = Introspected.class.getSimpleName();
+        for (DecoratorDef decorator : getNativeType().decorators()) {
+            String annotationName = decorator.annotationName();
+            if (annotationName.equals(introspectedName)
+                || annotationName.equals(introspectedSimpleName)
+                || annotationName.endsWith("." + introspectedSimpleName)
+                || decorator.name().equals(introspectedSimpleName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -439,9 +504,9 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             if (!bases.isEmpty()) {
                 // Find the first base class that exists in our environment
                 for (TypeRef base : bases) {
-                    ClassElement baseElement = environment.classes().get(base.name());
-                    if (baseElement != null) {
-                        return ((PythonClassElement) baseElement).getNativeType();
+                    ClassElement baseElement = findPythonClass(base);
+                    if (baseElement instanceof AbstractPythonClassElement pythonBaseElement && !pythonBaseElement.isInterface()) {
+                        return pythonBaseElement.getNativeType();
                     }
                 }
             }
@@ -451,14 +516,12 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         @Override
         protected List<ClassDef> getInterfaces(ClassDef classNode) {
             List<TypeRef> bases = classNode.bases();
-            if (bases.size() <= 1) {
-                return List.of();
-            }
-            // Return remaining base classes as "interfaces"
-            return bases.subList(1, bases.size()).stream()
+            return bases.stream()
                 .map(base -> {
-                    ClassElement baseElement = environment.classes().get(base.name());
-                    return baseElement != null ? ((PythonClassElement) baseElement).getNativeType() : null;
+                    ClassElement baseElement = findPythonClass(base);
+                    return baseElement instanceof AbstractPythonClassElement pythonBaseElement && pythonBaseElement.isInterface()
+                        ? pythonBaseElement.getNativeType()
+                        : null;
                 })
                 .filter(Objects::nonNull)
                 .toList();

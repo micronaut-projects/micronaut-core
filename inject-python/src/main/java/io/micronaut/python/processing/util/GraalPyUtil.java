@@ -24,12 +24,16 @@ import java.util.Optional;
 import java.util.Set;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
+import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.visitor.PythonClassElement;
+import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.TypeRef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import org.graalvm.polyglot.Value;
@@ -284,23 +288,75 @@ public final class GraalPyUtil {
         String name = typeRef.name();
         ClassElement rawType = resolvePythonTypeToJava(name, visitorContext, boundGenerics);
         List<TypeRef> typeArguments = typeRef.typeArguments();
+        if (!typeArguments.isEmpty()) {
+            ClassElement collectionType = resolveCollectionTypeArguments(rawType, typeArguments, visitorContext, boundGenerics);
+            if (collectionType != null) {
+                return collectionType;
+            }
+        }
         List<? extends GenericPlaceholderElement> declaredGenericPlaceholders = rawType.getDeclaredGenericPlaceholders();
         if (!typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty() && typeArguments.size() == declaredGenericPlaceholders.size()) {
             Map<String, ClassElement> resolvedTypeArguments = new LinkedHashMap<>(declaredGenericPlaceholders.size());
             for (int i = 0; i < declaredGenericPlaceholders.size(); i++) {
                 GenericPlaceholderElement placeHolder = declaredGenericPlaceholders.get(i);
-                TypeRef typeParmeterDef = typeArguments.get(i);
-                ClassElement resolvedType = resolvePythonTypeToJava(typeParmeterDef, visitorContext, boundGenerics);
-                if (resolvedType.isPrimitive()) {
-                    ClassTypeDef boxedType = TypeDescriptors.toBoxedIfNecessary(io.micronaut.sourcegen.model.TypeDef.of(resolvedType));
-                    resolvedType = ClassElement.of(boxedType.getName());
-                }
+                TypeRef typeParameterDef = typeArguments.get(i);
+                ClassElement resolvedType = resolveTypeArgument(typeParameterDef, visitorContext, boundGenerics);
                 String variableName = placeHolder.getVariableName();
                 resolvedTypeArguments.put(variableName, resolvedType);
             }
             return rawType.withTypeArguments(resolvedTypeArguments);
         }
         return rawType;
+    }
+
+    private static @Nullable ClassElement resolveCollectionTypeArguments(
+        ClassElement rawType,
+        List<TypeRef> typeArguments,
+        PythonVisitorContext visitorContext,
+        Map<String, ClassElement> boundGenerics
+    ) {
+        String rawName = rawType.getName();
+        if (Map.class.getName().equals(rawName) && typeArguments.size() >= 2) {
+            LinkedHashMap<String, ClassElement> resolvedTypeArguments = new LinkedHashMap<>(2);
+            resolvedTypeArguments.put("K", resolveTypeArgument(typeArguments.get(0), visitorContext, boundGenerics));
+            resolvedTypeArguments.put("V", resolveTypeArgument(typeArguments.get(1), visitorContext, boundGenerics));
+            return parameterizedType(rawType, Map.class, resolvedTypeArguments);
+        }
+        if (List.class.getName().equals(rawName) && !typeArguments.isEmpty()) {
+            return parameterizedType(rawType, List.class, Map.of("E", resolveTypeArgument(typeArguments.get(0), visitorContext, boundGenerics)));
+        }
+        if (Set.class.getName().equals(rawName) && !typeArguments.isEmpty()) {
+            return parameterizedType(rawType, Set.class, Map.of("E", resolveTypeArgument(typeArguments.get(0), visitorContext, boundGenerics)));
+        }
+        if (Optional.class.getName().equals(rawName) && !typeArguments.isEmpty()) {
+            return parameterizedType(rawType, Optional.class, Map.of("T", resolveTypeArgument(typeArguments.get(0), visitorContext, boundGenerics)));
+        }
+        return null;
+    }
+
+    private static ClassElement parameterizedType(
+        ClassElement rawType,
+        Class<?> rawClass,
+        Map<String, ClassElement> typeArguments
+    ) {
+        try {
+            return rawType.withTypeArguments(typeArguments);
+        } catch (UnsupportedOperationException e) {
+            return ClassElement.of(rawClass, rawType.getAnnotationMetadata(), typeArguments);
+        }
+    }
+
+    private static ClassElement resolveTypeArgument(
+        TypeRef typeParameterDef,
+        PythonVisitorContext visitorContext,
+        Map<String, ClassElement> boundGenerics
+    ) {
+        ClassElement resolvedType = resolvePythonTypeToJava(typeParameterDef, visitorContext, boundGenerics);
+        if (resolvedType.isPrimitive()) {
+            ClassTypeDef boxedType = TypeDescriptors.toBoxedIfNecessary(io.micronaut.sourcegen.model.TypeDef.of(resolvedType));
+            return ClassElement.of(boxedType.getName());
+        }
+        return resolvedType;
     }
 
     /**
@@ -345,6 +401,7 @@ public final class GraalPyUtil {
             case "float" -> PrimitiveElement.DOUBLE;
             case "bool" -> PrimitiveElement.BOOLEAN;
             case "None" -> PrimitiveElement.VOID;
+            case "bytes", "bytearray" -> PrimitiveElement.BYTE.toArray();
             case "str" ->
                 visitorContext.getClassElement(String.class).orElse(ClassElement.of(String.class));
             case "dict", "typing.Dict" ->
@@ -356,12 +413,30 @@ public final class GraalPyUtil {
             default -> {
                 String finalTypeAnnotation = typeAnnotation;
                 // Fall back to visitor context lookup
-                yield visitorContext.getClassElement(finalTypeAnnotation).orElseGet(() -> {
+                yield resolveClassElement(finalTypeAnnotation, visitorContext).orElseGet(() -> {
                     ClassElement classElement = boundGenerics.get(finalTypeAnnotation);
                     return Objects.requireNonNullElseGet(classElement, () -> ClassElement.of(Object.class));
                 });
             }
         };
+    }
+
+    private static Optional<ClassElement> resolveClassElement(String typeName, PythonVisitorContext visitorContext) {
+        Optional<ClassElement> classElement = visitorContext.getClassElement(typeName);
+        if (classElement.isPresent()) {
+            return classElement;
+        }
+        String candidate = typeName;
+        int dotIndex = candidate.lastIndexOf('.');
+        while (dotIndex > 0) {
+            candidate = candidate.substring(0, dotIndex) + "$" + candidate.substring(dotIndex + 1);
+            classElement = visitorContext.getClassElement(candidate);
+            if (classElement.isPresent()) {
+                return classElement;
+            }
+            dotIndex = candidate.lastIndexOf('.', dotIndex - 1);
+        }
+        return Optional.empty();
     }
 
     private static @Nullable ClassElement resolveNullableUnionType(
@@ -438,7 +513,7 @@ public final class GraalPyUtil {
                     // For generics, use boxed types instead of primitives
                     elementType = boxPrimitiveTypeIfNeeded(elementType, visitorContext);
                     // Create parameterized type List<ElementType>
-                    yield listElement.withTypeArguments(java.util.Map.of("E", elementType));
+                    yield parameterizedType(listElement, List.class, java.util.Map.of("E", elementType));
                 }
                 yield listElement;
             }
@@ -459,7 +534,7 @@ public final class GraalPyUtil {
                     LinkedHashMap<String, ClassElement> map = new LinkedHashMap<>();
                     map.put("K", keyType);
                     map.put("V", valueType);
-                    yield mapElement.withTypeArguments(map);
+                    yield parameterizedType(mapElement, Map.class, map);
                 }
                 yield mapElement;
             }
@@ -472,7 +547,7 @@ public final class GraalPyUtil {
                     ClassElement elementType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext, Map.of());
                     // For generics, use boxed types instead of primitives
                     elementType = boxPrimitiveTypeIfNeeded(elementType, visitorContext);
-                    yield setElement.withTypeArguments(java.util.Map.of("E", elementType));
+                    yield parameterizedType(setElement, Set.class, java.util.Map.of("E", elementType));
                 }
                 yield setElement;
             }
@@ -485,7 +560,7 @@ public final class GraalPyUtil {
                     ClassElement elementType = resolvePythonTypeToJava(genericInfo.typeParameters.get(0), visitorContext, Map.of());
                     // For generics, use boxed types instead of primitives
                     elementType = boxPrimitiveTypeIfNeeded(elementType, visitorContext);
-                    yield optionalElement.withTypeArguments(java.util.Map.of("T", elementType));
+                    yield parameterizedType(optionalElement, Optional.class, java.util.Map.of("T", elementType));
                 }
                 yield optionalElement;
             }
@@ -618,6 +693,15 @@ public final class GraalPyUtil {
 
         if (value == null || value.isNull()) {
             return null;
+        }
+        if (value.isHostObject()) {
+            Object hostObject = value.asHostObject();
+            if (hostObject instanceof AnnotationValue<?> annotationValue) {
+                return annotationValue;
+            }
+            if (hostObject instanceof DecoratorDef decoratorDef) {
+                return toAnnotationValue(decoratorDef, classElement, visitorContext);
+            }
         }
 
         // Handle primitive types
@@ -771,6 +855,18 @@ public final class GraalPyUtil {
                             }
                         }
                         return list.toArray(AnnotationClassValue[]::new);
+                    } else if (componentType.isAssignable(java.lang.annotation.Annotation.class)) {
+                        AnnotationValue<?>[] array = new AnnotationValue<?>[(int) size];
+                        for (int i = 0; i < size; i++) {
+                            Value element = value.getArrayElement(i);
+                            if (element != null) {
+                                Object converted = convertValueToJava(element, componentType, visitorContext);
+                                if (converted instanceof AnnotationValue<?> annotationValue) {
+                                    array[i] = annotationValue;
+                                }
+                            }
+                        }
+                        return array;
                     } else {
                         // Handle object arrays
                         Object[] array = new Object[(int) size];
@@ -813,6 +909,46 @@ public final class GraalPyUtil {
 
         // Fall back to the original conversion logic
         return convertValueToJava(value, visitorContext);
+    }
+
+    private static AnnotationValue<?> toAnnotationValue(DecoratorDef decoratorDef,
+                                                        ClassElement fallbackAnnotationType,
+                                                        PythonVisitorContext visitorContext) {
+        ClassElement annotationType = visitorContext
+            .getClassElement(decoratorDef.annotationName())
+            .orElse(fallbackAnnotationType);
+        Map<CharSequence, Object> annotationValues = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : decoratorDef.members().entrySet()) {
+            String memberName = annotationMemberName(entry.getKey());
+            Object memberValue = entry.getValue();
+            if (memberValue instanceof Value value) {
+                ClassElement memberType = resolveAnnotationMemberType(annotationType, memberName);
+                annotationValues.put(
+                    memberName,
+                    memberType == null
+                        ? convertValueToJava(value, visitorContext)
+                        : convertValueToJava(value, memberType, visitorContext)
+                );
+            } else {
+                annotationValues.put(memberName, memberValue);
+            }
+        }
+        return new AnnotationValue<>(decoratorDef.annotationName(), annotationValues);
+    }
+
+    private static String annotationMemberName(Object memberName) {
+        if (memberName instanceof Number number) {
+            int index = number.intValue();
+            return index == 0 ? "value" : "arg" + index;
+        }
+        return memberName.toString();
+    }
+
+    private static @Nullable ClassElement resolveAnnotationMemberType(ClassElement annotationType, String memberName) {
+        MethodElement annotationMember = annotationType
+            .getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().named(memberName))
+            .orElse(null);
+        return annotationMember == null ? null : annotationMember.getReturnType();
     }
 
     private static boolean isAnnotationPrimitive(ClassElement classElement) {

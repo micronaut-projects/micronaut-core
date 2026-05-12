@@ -25,16 +25,16 @@ class Person:
         expect:
         assertGeneratedSourceContains(pythonCode, """
   @JsonCreator
-  Person(@JsonProperty("name") String name, @JsonProperty("age") int age, @JsonProperty("address") Address address) {
-    this(ContextHolder.newInstance("python", "Person", (Object) name, (Object) age, (Object) (address.asPolyglotValue())));
+  public Person(@JsonProperty("name") String name, @JsonProperty("age") int age, @JsonProperty("address") Address address) {
+    this(ContextHolder.newInstance("python", "Person", (Object) name, (Object) age, (Object) address));
   }
 
   public Value asPolyglotValue() {
-    return ContextHolder.newInstance("python", "Person", (Object) this.name, (Object) this.age, this.address == null ? null : this.address.asPolyglotValue());
+    return ContextHolder.newInstance("python", "Person", (Object) this.name, (Object) this.age, (Object) this.address);
   }
 
   public static Person fromPolyglotValue(Value arg1) {
-    if (arg1.isNull()) {
+    if (GraalPyRuntimeUtil.isNone(arg1)) {
       return null;
     } else {
       return new python.Person(arg1);

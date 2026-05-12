@@ -284,6 +284,9 @@ logging:
   loggingConfiguration: Configuration
   logback: Logback
   loggingSystem: Logging System
+languageSupport:
+  title: Language Support
+  python: Micronaut for Python
 management:
   title: Management & Monitoring
   buildingEndpoints:

@@ -3,6 +3,7 @@ package io.micronaut.python.annotation.processing.test.event
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import org.graalvm.polyglot.Value
 import spock.lang.PendingFeature
+import spock.util.concurrent.PollingConditions
 
 class PythonEventListenerSpec extends AbstractPythonTypeElementSpec {
 
@@ -94,6 +95,74 @@ class SampleEventListener2:
         then:
         value.getMember("invocation_count").asInt() == 1
         value2.getMember("invocation_count").asInt() == 1
+    }
+
+    void "test python event listener via annotation with python event"() {
+        given:
+        def context = buildContext('''
+from dataclasses import dataclass
+from jakarta.inject import Singleton
+from micronaut.runtime.event.annotation import EventListener
+
+@dataclass
+class SampleEvent:
+    message : str = "Something happened"
+
+@Singleton
+class SampleEventListener:
+    invocation_count : int = 0
+
+    @EventListener
+    def on_sample_event(self, event : SampleEvent):
+        self.invocation_count += 1
+''')
+
+        when:
+        def event = context.classLoader.loadClass('python.SampleEvent').newInstance("test")
+        context.publishEvent(event)
+        Value value = getBean(context, "python.SampleEventListener").asPolyglotValue()
+
+        then:
+        value.getMember("invocation_count").asInt() == 1
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test async python event listener via annotation with python event"() {
+        given:
+        def context = buildContext('''
+from dataclasses import dataclass
+from jakarta.inject import Singleton
+from micronaut.runtime.event.annotation import EventListener
+from micronaut.scheduling.annotation import Async
+
+@dataclass
+class SampleEvent:
+    message : str = "Something happened"
+
+@Singleton
+class SampleEventListener:
+    invocation_count : int = 0
+
+    @EventListener
+    @Async
+    def on_sample_event(self, event : SampleEvent):
+        self.invocation_count += 1
+''')
+
+        when:
+        def event = context.classLoader.loadClass('python.SampleEvent').newInstance("test")
+        context.publishEvent(event)
+        Value value = getBean(context, "python.SampleEventListener").asPolyglotValue()
+
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            assert value.getMember("invocation_count").asInt() == 1
+        }
+
+        cleanup:
+        context?.close()
     }
 
 }

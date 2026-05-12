@@ -1,4 +1,4 @@
-from org.junit.jupiter.api import Test, Disabled
+from org.junit.jupiter.api import Test
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from micronaut.context import ApplicationContext
 from micronaut.docs.inject.qualifiers.named import Engine
@@ -11,7 +11,6 @@ from typing import Annotated
 # end::imports[]
 
 @MicronautTest
-@Disabled("Generic types not represented in the AST yet")
 class VehicleSpec:
     # tag::any[]
     engine : Annotated[Engine, Inject, Any] = None

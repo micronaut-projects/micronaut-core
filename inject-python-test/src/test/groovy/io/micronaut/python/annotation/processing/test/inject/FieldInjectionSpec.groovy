@@ -4,7 +4,6 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.PendingFeature
 
 class FieldInjectionSpec extends AbstractPythonTypeElementSpec {
     void "test field injection with Annotated[Type, Inject] syntax - imported type"() {
@@ -94,7 +93,6 @@ class MainService:
         context?.close()
     }
 
-    @PendingFeature(reason = "nullable not yet supported on attributes")
     void "test field injection with Annotated[Type, Inject] syntax - nullable"() {
         given: "Python code with field injection"
         def pythonCode = '''

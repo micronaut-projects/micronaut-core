@@ -17,12 +17,14 @@ package io.micronaut.python.processing.annotation;
 
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
 import io.micronaut.python.processing.visitor.ElementDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.FunctionDef;
+import io.micronaut.python.processing.visitor.PythonMethodElement;
 
 /**
  * Factory for creating and managing annotation metadata for Python elements.
@@ -88,6 +90,33 @@ public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnot
 
         }
         return super.lookupTypeAnnotationsForClass(classElement);
+    }
+
+    @Override
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForMethod(MethodElement methodElement) {
+        if (methodElement instanceof PythonMethodElement pythonMethodElement) {
+            return metadataBuilder.lookupOrBuildForMethod(
+                getNativeElement(methodElement.getOwningType()),
+                methodMetadataKey(pythonMethodElement.getNativeType())
+            );
+        }
+        return super.lookupForMethod(methodElement);
+    }
+
+    private static FunctionDef methodMetadataKey(FunctionDef functionDef) {
+        int arity = functionDef.arguments().arguments().size();
+        return new FunctionDef(
+            functionDef.name() + "/" + arity,
+            functionDef.arguments(),
+            functionDef.decorators(),
+            functionDef.returnType(),
+            functionDef.typeComment(),
+            functionDef.typeParams(),
+            functionDef.documentation(),
+            functionDef.isAbstract(),
+            functionDef.isStatic(),
+            functionDef.declaringClass()
+        );
     }
 
     private record TypeAnnotationKey(Object nativeType, Object typeAnnotationsKey) {}

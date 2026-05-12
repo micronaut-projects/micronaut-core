@@ -1,4 +1,4 @@
-from org.junit.jupiter.api import Test, Disabled
+from org.junit.jupiter.api import Test
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from micronaut.context import ApplicationContext
 from jakarta.inject import Inject
@@ -10,7 +10,6 @@ class VehicleSpec:
     context : Annotated[ApplicationContext, Inject] = None
 
     @Test
-    @Disabled("PythonAnnotationMetadataBuilder hasAnnotation needs to handle NonBinding definition in Cylinder")
     def test_start_vehicle(self) -> None:
         # tag::start[]
         Vehicle = java.type("micronaut.docs.qualifiers.annotationmember.Vehicle")
@@ -19,5 +18,4 @@ class VehicleSpec:
         # end::start[]
 
         assert "Starting V8" == vehicle.start()
-
 

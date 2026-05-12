@@ -80,7 +80,7 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
             boundGenerics
         );
         if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
-            pythonClassElement.typeAnnotationsKey = argumentDef;
+            return pythonClassElement.withTypeAnnotationsKey(argumentDef);
         }
         return classElement;
     }
@@ -90,7 +90,7 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
             // Use the same type resolution logic as fields
             ClassElement classElement = GraalPyUtil.resolvePythonTypeToJava(argumentDef.typeAnnotation(), environment.visitorContext(), Map.of());
             if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
-                pythonClassElement.typeAnnotationsKey = argumentDef;
+                return pythonClassElement.withTypeAnnotationsKey(argumentDef);
             }
             return classElement;
         }

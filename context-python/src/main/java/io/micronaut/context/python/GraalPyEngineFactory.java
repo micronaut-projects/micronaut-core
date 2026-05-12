@@ -32,6 +32,12 @@ final class GraalPyEngineFactory {
     Engine pythonEngine() {
         // Keep defaults; options and instruments are configured on contexts.
         // Sharing a single Engine allows sharing compiled code/ASTs across contexts.
-        return Engine.create();
+        return buildPythonEngine();
+    }
+
+    static Engine buildPythonEngine() {
+        return Engine.newBuilder()
+            .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+            .build();
     }
 }

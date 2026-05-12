@@ -19,10 +19,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import io.micronaut.core.annotation.Internal;
+import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
 
@@ -39,6 +41,35 @@ public final class GraalPyRuntimeUtil {
     public static final String PYTHON = "python";
 
     /**
+     * Returns whether the value represents Java null or Python None.
+     *
+     * @param value The polyglot value
+     * @return Whether the value represents Java null or Python None
+     */
+    public static boolean isNone(@Nullable Value value) {
+        if (value == null || value.isNull()) {
+            return true;
+        }
+        try {
+            Value metaObject = value.getMetaObject();
+            if (metaObject != null && metaObject.isMetaObject() && "NoneType".equals(metaObject.getMetaSimpleName())) {
+                return true;
+            }
+        } catch (Exception e) {
+            // Ignore and fall back to the conservative textual check below.
+        }
+        try {
+            return !value.isBoolean()
+                && !value.isNumber()
+                && !value.isString()
+                && !value.hasArrayElements()
+                && "None".equals(value.toString());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
      * Coerce a map of types that may extend from {@link ValueCoercible} back to a native value map.
      * @param map The map
      * @param <V> The value type of the map
@@ -48,7 +79,7 @@ public final class GraalPyRuntimeUtil {
         return
             map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, (entry) -> {
                 Object v = entry.getValue();
-                if (v instanceof ValueCoercible valueCoercible) {
+                if (v instanceof ValueCoercible valueCoercible && !(v instanceof PooledValueCoercible)) {
                     return valueCoercible.asPolyglotValue();
                 }
                 return v;
@@ -65,11 +96,155 @@ public final class GraalPyRuntimeUtil {
     public static <E> List<Object> coerceList(List<E> list) {
         return
             list.stream().map(v -> {
-                if (v instanceof ValueCoercible valueCoercible) {
+                if (v instanceof ValueCoercible valueCoercible && !(v instanceof PooledValueCoercible)) {
                     return valueCoercible.asPolyglotValue();
                 }
                 return v;
             }).toList();
+    }
+
+    /**
+     * Coerce values passed into a target Python context.
+     *
+     * @param value The value to coerce
+     * @param context The target context
+     * @return The coerced value
+     */
+    public static @Nullable Object coerceToContext(@Nullable Object value, Context context) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof PooledValueCoercible pooledValueCoercible) {
+            return pooledValueCoercible.asPolyglotValue(context);
+        }
+        if (value instanceof List<?> list) {
+            List<Object> result = new ArrayList<>(list.size());
+            for (Object element : list) {
+                result.add(coerceToContext(element, context));
+            }
+            return result;
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<Object, Object> result = new HashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                result.put(coerceToContext(entry.getKey(), context), coerceToContext(entry.getValue(), context));
+            }
+            return result;
+        }
+        if (value instanceof Set<?> set) {
+            java.util.Set<Object> result = new java.util.HashSet<>();
+            for (Object element : set) {
+                result.add(coerceToContext(element, context));
+            }
+            return result;
+        }
+        if (value instanceof Object[] array) {
+            Object[] result = new Object[array.length];
+            for (int i = 0; i < array.length; i++) {
+                result[i] = coerceToContext(array[i], context);
+            }
+            return result;
+        }
+        return value;
+    }
+
+    /**
+     * Coerce arguments passed into a target Python context.
+     *
+     * @param context The target context
+     * @param args The arguments
+     * @return The coerced arguments
+     */
+    public static Object[] coerceArgumentsToContext(Context context, Object[] args) {
+        Object[] result = new Object[args.length];
+        for (int i = 0; i < args.length; i++) {
+            result[i] = coerceToContext(args[i], context);
+        }
+        return result;
+    }
+
+    /**
+     * Invoke a generated bridge method on a Python receiver.
+     *
+     * @param receiver The Python receiver
+     * @param name The method name
+     * @param arguments The method arguments
+     * @return The invocation result
+     */
+    public static Value invokePythonMethod(Value receiver, String name, Object[] arguments) {
+        Value member = receiver.getMember(name);
+        if (member != null && member.canExecute()) {
+            return member.execute(arguments);
+        }
+        Value pythonClass = receiver.getMember("__class__");
+        Value rawMember = pythonClass == null ? null : getRawClassMember(pythonClass, name);
+        if (rawMember != null) {
+            Value boundMember = bindPythonDescriptor(rawMember, receiver, pythonClass);
+            if (boundMember.canExecute()) {
+                return boundMember.execute(arguments);
+            }
+        }
+        if (member == null) {
+            throw new IllegalArgumentException("No Python member [" + name + "] found");
+        }
+        return member.execute(arguments);
+    }
+
+    /**
+     * Read a Python class member directly from the MRO dictionaries, bypassing descriptor binding.
+     *
+     * @param pythonClass The Python class
+     * @param name The member name
+     * @return The raw member, or null if none exists
+     */
+    public static @Nullable Value getRawClassMember(Value pythonClass, String name) {
+        Value member = getRawClassMemberFunction(pythonClass.getContext()).execute(pythonClass, name);
+        if (isNone(member)) {
+            return null;
+        }
+        return member;
+    }
+
+    /**
+     * Bind a raw Python descriptor to a receiver when the descriptor protocol is available.
+     *
+     * @param descriptor The raw descriptor
+     * @param receiver The receiver object
+     * @param owner The owner class
+     * @return The bound descriptor, or the original descriptor if it cannot be bound
+     */
+    public static Value bindPythonDescriptor(Value descriptor, Object receiver, Value owner) {
+        Value getter = descriptor.getMember("__get__");
+        if (getter != null && getter.canExecute()) {
+            Value receiverValue = receiver instanceof Value value
+                ? value
+                : receiver instanceof ValueCoercible valueCoercible ? valueCoercible.asPolyglotValue() : null;
+            if (receiverValue != null) {
+                return getter.execute(receiverValue, owner);
+            }
+        }
+        return descriptor;
+    }
+
+    private static Value getRawClassMemberFunction(Context context) {
+        String functionName = "__micronaut_get_raw_class_member";
+        Value bindings = context.getBindings(PYTHON);
+        Value function = bindings.getMember(functionName);
+        if (isNone(function)) {
+            context.eval(
+                PYTHON,
+                """
+                def __micronaut_get_raw_class_member(cls, name):
+                    for base in getattr(cls, "__mro__", (cls,)):
+                        namespace = getattr(base, "__dict__", {})
+                        if name in namespace:
+                            return namespace[name]
+                    return None
+                """
+            );
+            function = bindings.getMember(functionName);
+        }
+        return function;
     }
 
     /**
@@ -81,9 +256,9 @@ public final class GraalPyRuntimeUtil {
      * @param <T> the expected list element type
      * @return a Java List with converted elements
      */
-    public static <T> List<T> convertList(Value graalValue, Class<T> elementType) {
-        if (graalValue == null || graalValue.isNull()) {
-            return new ArrayList<>();
+    public static <T> @Nullable List<T> convertList(Value graalValue, Class<T> elementType) {
+        if (isNone(graalValue)) {
+            return null;
         }
         try {
             if (graalValue.isHostObject()) {
@@ -126,9 +301,9 @@ public final class GraalPyRuntimeUtil {
      * @param <V> the expected value type
      * @return a Java Map with converted keys and values
      */
-    public static <K, V> Map<K, V> convertMap(Value graalValue, Class<K> keyType, Class<V> valueType) {
-        if (graalValue == null || graalValue.isNull()) {
-            return new HashMap<>();
+    public static <K, V> @Nullable Map<K, V> convertMap(Value graalValue, Class<K> keyType, Class<V> valueType) {
+        if (isNone(graalValue)) {
+            return null;
         }
         try {
             if (graalValue.isHostObject()) {
@@ -183,13 +358,27 @@ public final class GraalPyRuntimeUtil {
      */
     @SuppressWarnings("unchecked")
     public static <T> java.util.Optional<T> convertOptional(Value graalValue, Class<T> elementType) {
-        if (graalValue == null || graalValue.isNull()) {
+        if (isNone(graalValue)) {
             return java.util.Optional.empty();
         }
-
-        // Check if the value is Python None
-        if (graalValue.isNull()) {
-            return java.util.Optional.empty();
+        if (graalValue.isHostObject()) {
+            Object hostObject = graalValue.asHostObject();
+            if (hostObject instanceof Optional<?> optional) {
+                if (optional.isEmpty()) {
+                    return java.util.Optional.empty();
+                }
+                Object optionalValue = optional.get();
+                if (optionalValue == null) {
+                    return java.util.Optional.empty();
+                }
+                if (elementType.isInstance(optionalValue)) {
+                    return java.util.Optional.of(elementType.cast(optionalValue));
+                }
+                if (optionalValue instanceof Value value) {
+                    T convertedValue = convertValue(value, elementType);
+                    return convertedValue == null ? java.util.Optional.empty() : java.util.Optional.of(convertedValue);
+                }
+            }
         }
 
         // Convert the value and wrap in Optional
@@ -210,10 +399,10 @@ public final class GraalPyRuntimeUtil {
      * @param <T> the expected set element type
      * @return a Java Set with converted elements
      */
-    public static <T> Set<T> convertSet(Value graalValue, Class<T> elementType) {
+    public static <T> @Nullable Set<T> convertSet(Value graalValue, Class<T> elementType) {
         // TODO: Ideally a custom Set implementation that doesn't create a new map would be better here
-        if (graalValue == null || graalValue.isNull()) {
-            return new java.util.HashSet<>();
+        if (isNone(graalValue)) {
+            return null;
         }
 
         java.util.Set<T> result = new java.util.HashSet<>();
@@ -247,7 +436,9 @@ public final class GraalPyRuntimeUtil {
                 Value listValue = graalValue.invokeMember("list");
                 if (listValue != null) {
                     List<T> list = convertList(listValue, elementType);
-                    result.addAll(list);
+                    if (list != null) {
+                        result.addAll(list);
+                    }
                 }
             } catch (Exception ex) {
                 // If conversion fails, return empty set
@@ -268,11 +459,33 @@ public final class GraalPyRuntimeUtil {
      */
     @SuppressWarnings("unchecked")
     public static <T> @Nullable T convertValue(Value value, Class<T> targetType) {
-        if (value == null || value.isNull()) {
+        if (isNone(value)) {
             return null;
         }
 
+        T mappedWrapper = convertMappedWrapper(value, targetType);
+        if (mappedWrapper != null) {
+            return mappedWrapper;
+        }
+        if (value.isHostObject()) {
+            Object hostObject = value.asHostObject();
+            if (targetType.isInstance(hostObject)) {
+                return targetType.cast(hostObject);
+            }
+        }
         return value.as(targetType);
+    }
+
+    private static <T> @Nullable T convertMappedWrapper(Value value, Class<T> targetType) {
+        try {
+            Object mappedObject = value.as(Object.class);
+            if (mappedObject instanceof ValueCoercible && targetType.isInstance(mappedObject)) {
+                return targetType.cast(mappedObject);
+            }
+        } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
+            return null;
+        }
+        return null;
     }
 
     /**
