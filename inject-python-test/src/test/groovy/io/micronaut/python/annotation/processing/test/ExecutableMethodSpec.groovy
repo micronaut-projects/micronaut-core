@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
 
 /**
@@ -49,6 +50,81 @@ class ExecutableService:
         def executableMethod = beanDefinition.getExecutableMethods().first()
         executableMethod != null
         executableMethod.getMethodName() == "execute_task"
+
+        cleanup:
+        context?.close()
+    }
+
+    def "test class-level @Executable produces executable methods"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from typing import Annotated
+from jakarta.inject import Named
+
+@Singleton
+@Executable
+class ExecutableService:
+    def method_one(self, one: Annotated[str, Named("foo")]) -> str:
+        return "good"
+
+    def method_two(self, one: str, two: str) -> str:
+        return "good"
+
+    def method_zero(self) -> str:
+        return "good"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def beanDefinition = getBeanDefinition(context, "python.ExecutableService")
+
+        then:
+        beanDefinition != null
+        beanDefinition.executableMethods*.methodName == ["method_one", "method_two", "method_zero"]
+        beanDefinition.executableMethods[0].arguments[0].annotationMetadata.stringValue(AnnotationUtil.NAMED).get() == "foo"
+
+        cleanup:
+        context?.close()
+    }
+
+    def "test executable methods can require startup processing"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class ExecutableService:
+    def simple(self) -> None:
+        pass
+
+    @Executable
+    def abc(self) -> None:
+        pass
+
+    @Executable(processOnStartup=True)
+    def foo(self) -> None:
+        pass
+
+    @Executable(processOnStartup=True)
+    def bar(self) -> None:
+        pass
+
+    @Executable
+    def some(self) -> None:
+        pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def beanDefinition = getBeanDefinition(context, "python.ExecutableService")
+
+        then:
+        beanDefinition.executableMethods*.methodName == ["abc", "foo", "bar", "some"]
+        beanDefinition.requiresMethodProcessing()
+        beanDefinition.executableMethodsForProcessing*.methodName == ["foo", "bar"]
 
         cleanup:
         context?.close()

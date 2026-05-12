@@ -65,6 +65,18 @@ class TestClass:
         classElement.getSimpleName() == "TestClass"
     }
 
+    def "test class element exposes generated Python name"() {
+        expect:
+        buildClassElement('''
+class Test:
+    pass
+''') { ClassElement element ->
+            assert element.name == "python.Test"
+            assert element.simpleName == "Test"
+            return element
+        }
+    }
+
     def "test build class element with methods"() {
         given:
         def pythonCode = '''

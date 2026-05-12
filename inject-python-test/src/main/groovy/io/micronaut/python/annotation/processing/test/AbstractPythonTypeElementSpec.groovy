@@ -135,6 +135,18 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
         }
     }
 
+    protected BeanDefinitionReference buildBeanDefinitionReference(String packageName, String className, @Language("python") String pythonCode) {
+        def beanDefName= (className.startsWith('$') ? '' : '$') + className + BeanDefinitionWriter.CLASS_SUFFIX
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        def compiler = PyronautCompiler.builder()
+                .pythonCode(pythonCode)
+                .build()
+
+        ClassLoader pythonClassLoader = compiler.buildClassLoader()
+        (BeanDefinitionReference) pythonClassLoader.loadClass(beanFullName).newInstance()
+    }
+
     /**
      * Builds a class element for the given Python source code.
      * @param pythonCode The Python source code
