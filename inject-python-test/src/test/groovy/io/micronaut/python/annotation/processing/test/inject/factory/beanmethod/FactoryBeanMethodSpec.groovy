@@ -347,6 +347,47 @@ class Shop:
         "singleton" | "Singleton"     | true
     }
 
+    void "test factory method can produce named primitive value bean"() {
+        given:
+        def context = buildContext('''\
+from typing import Annotated
+from jakarta.inject import Inject, Named, Singleton
+from micronaut.context.annotation import Factory, Bean, Executable
+
+@Factory
+class IntFactory:
+    @Bean
+    @Named("total")
+    def total(self) -> int:
+        return 10
+
+@Singleton
+class MyBean:
+    total_from_field: Annotated[int, Inject, Named("total")] = 0
+
+    def __init__(self, total: Annotated[int, Named("total")]):
+        self.total = total
+
+    @Executable
+    def total_value(self) -> int:
+        return self.total
+
+    @Executable
+    def total_field_value(self) -> int:
+        return self.total_from_field
+''')
+
+        when:
+        def bean = getBean(context, "python.MyBean")
+
+        then:
+        bean.total_value() == 10
+        bean.total_field_value() == 10
+
+        cleanup:
+        context.close()
+    }
+
     @PendingFeature(reason = "support static methods")
     void "test a factory bean with static method"() {
         given:
