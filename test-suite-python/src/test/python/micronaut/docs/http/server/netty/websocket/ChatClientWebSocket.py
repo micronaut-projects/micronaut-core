@@ -58,13 +58,13 @@ class ChatClientWebSocket(ABC, AutoCloseable):  # <2>
 # end::class[]
     @abstractmethod
     def send(self, message: str) -> None:
-        pass
+        ...
 
     @abstractmethod
     def sendAsync(self, message: str) -> Future[str]:
-        pass
+        ...
 
     @SingleResult
     @abstractmethod
     def sendRx(self, message: str) -> Publisher[str]:
-        pass
+        ...

@@ -2,12 +2,12 @@ from typing import Annotated
 
 import java
 from jakarta.inject import Inject
+from jakarta.validation import ConstraintViolationException
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 from .PetClient import PetClient
 
-ConstraintViolationException = java.type("jakarta.validation.ConstraintViolationException")
 Mono = java.type("reactor.core.publisher.Mono")
 
 
@@ -25,10 +25,10 @@ class PetControllerSpec:
         # end::post[]
 
     @Test
-    @Disabled("GraalPy Java exception matching currently fails for the propagated ConstraintViolationException")
     def testPostPetValidation(self) -> None:
         try:
             getattr(Mono, "from")(self.client.save("Fred", -1)).block()
-            assert False
         except ConstraintViolationException as ex:
             assert str(ex.getMessage()) == "save.age: must be greater than or equal to 1"
+        else:
+            assert False

@@ -22,5 +22,5 @@ class PetClient(PetOperations):
     @SingleResult
     @abstractmethod
     def save(self, name: str, age: int) -> Publisher[Pet]:
-        pass
+        ...
 # end::class[]

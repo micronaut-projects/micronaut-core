@@ -110,6 +110,12 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         return typeAnnotationsKey;
     }
 
+    final ClassElement withTypeAnnotationsKey(ElementDef typeAnnotationsKey) {
+        AbstractPythonClassElement copy = (AbstractPythonClassElement) makeCopy();
+        copy.typeAnnotationsKey = typeAnnotationsKey;
+        return copy;
+    }
+
     protected final @Nullable ClassElement findPythonClass(TypeRef typeRef) {
         Map<String, ClassElement> classes = environment.classes();
         ClassElement classElement = classes.get(typeRef.name());
@@ -499,7 +505,7 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                 // Find the first base class that exists in our environment
                 for (TypeRef base : bases) {
                     ClassElement baseElement = findPythonClass(base);
-                    if (baseElement instanceof AbstractPythonClassElement pythonBaseElement) {
+                    if (baseElement instanceof AbstractPythonClassElement pythonBaseElement && !pythonBaseElement.isInterface()) {
                         return pythonBaseElement.getNativeType();
                     }
                 }
@@ -510,14 +516,12 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         @Override
         protected List<ClassDef> getInterfaces(ClassDef classNode) {
             List<TypeRef> bases = classNode.bases();
-            if (bases.size() <= 1) {
-                return List.of();
-            }
-            // Return remaining base classes as "interfaces"
-            return bases.subList(1, bases.size()).stream()
+            return bases.stream()
                 .map(base -> {
                     ClassElement baseElement = findPythonClass(base);
-                    return baseElement instanceof AbstractPythonClassElement pythonBaseElement ? pythonBaseElement.getNativeType() : null;
+                    return baseElement instanceof AbstractPythonClassElement pythonBaseElement && pythonBaseElement.isInterface()
+                        ? pythonBaseElement.getNativeType()
+                        : null;
                 })
                 .filter(Objects::nonNull)
                 .toList();

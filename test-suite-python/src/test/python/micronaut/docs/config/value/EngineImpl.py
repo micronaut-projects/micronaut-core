@@ -10,11 +10,11 @@ from micronaut.context.annotation import Requires, Value
 class Engine(ABC):
     @abstractmethod
     def get_cylinders(self) -> int:
-        pass
+        ...
 
     @abstractmethod
     def start(self) -> str:
-        pass
+        ...
 
 
 @Requires(property="spec.name", value="VehicleValueSpec")

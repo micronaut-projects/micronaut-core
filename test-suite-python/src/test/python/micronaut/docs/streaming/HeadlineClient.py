@@ -20,13 +20,13 @@ class HeadlineClient(ABC):
     @Get(value="/headlines", processes=MediaType.APPLICATION_JSON_STREAM)  # <1>
     @abstractmethod
     def streamHeadlines(self) -> Publisher[Headline]:  # <2>
-        pass
+        ...
 # end::class[]
 
     @Get(value="/headlines", processes=MediaType.APPLICATION_JSON_STREAM)  # <1>
     @abstractmethod
     def streamFlux(self) -> Publisher[Headline]:
-        pass
+        ...
 
 # tag::endclass[]
 # end::endclass[]

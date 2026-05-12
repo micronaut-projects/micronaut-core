@@ -4,4 +4,4 @@ from .Driver import Driver
 @Driver
 @Prototype
 class Foo:
-    pass
+    ...

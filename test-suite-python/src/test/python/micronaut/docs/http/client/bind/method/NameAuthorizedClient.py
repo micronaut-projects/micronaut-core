@@ -14,5 +14,5 @@ class NameAuthorizedClient(ABC):
     @NameAuthorization(name="Bob")  # <1>
     @abstractmethod
     def get(self) -> str:
-        pass
+        ...
 # end::clazz[]

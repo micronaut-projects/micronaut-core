@@ -25,14 +25,19 @@ import java.util.Optional;
 import java.util.Set;
 
 import io.micronaut.aop.Introduction;
+import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
 import org.graalvm.polyglot.Value;
@@ -69,7 +74,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         if (typeAnnotationsKey == null) {
             return this;
         }
-        PythonClassElement pythonClassElement = copyThis();
+        PythonClassElement pythonClassElement = (PythonClassElement) makeCopy();
         pythonClassElement.typeAnnotationsKey = null;
         return pythonClassElement;
     }
@@ -192,8 +197,11 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         Set<ClassElement> interfaces = new LinkedHashSet<>(introductionInterfaces);
         for (TypeRef basis : bases) {
             ClassElement baseElement = findPythonClass(basis);
-            // python types can't be interfaces so skip if null and search java
-            if (baseElement == null) {
+            if (baseElement != null) {
+                if (baseElement.isInterface()) {
+                    interfaces.add(resolveTypeArguments(baseElement, basis));
+                }
+            } else {
                 ClassElement javaInterface = toJavaType(basis).orElse(null);
                 if (javaInterface != null && javaInterface.isInterface()) {
                     interfaces.add(javaInterface);
@@ -201,6 +209,49 @@ public final class PythonClassElement extends AbstractPythonClassElement {
             }
         }
         return interfaces;
+    }
+
+    @Override
+    public boolean isInterface() {
+        if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(getAnnotationMetadata())
+            || hasStereotype(InterceptorBinding.class)
+            || hasStereotype(Introspected.class)
+            || getPrimaryConstructor().isPresent()
+            || !getNativeType().attributes().isEmpty()
+            || !getNativeType().properties().isEmpty()) {
+            return false;
+        }
+        List<MethodElement> declaredMethods = getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared());
+        if (declaredMethods.isEmpty()) {
+            return hasInterfaceBase();
+        }
+        return !declaredMethods.isEmpty()
+            && declaredMethods.stream().allMatch(MethodElement::isAbstract)
+            && declaredMethods.stream().noneMatch(PythonClassElement::isIntroductionFactoryMethod);
+    }
+
+    private boolean hasInterfaceBase() {
+        for (TypeRef basis : getNativeType().bases()) {
+            ClassElement baseElement = findPythonClass(basis);
+            if (baseElement != null) {
+                if (baseElement.isInterface()) {
+                    return true;
+                }
+            } else {
+                ClassElement javaInterface = toJavaType(basis).orElse(null);
+                if (javaInterface != null && javaInterface.isInterface()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isIntroductionFactoryMethod(MethodElement method) {
+        return method.hasAnnotation("io.micronaut.context.annotation.Mapper")
+            || method.hasAnnotation("io.micronaut.context.annotation.Mapper$Mapping")
+            || method.hasDeclaredStereotype(Bean.class)
+            || method.hasStereotype(InterceptorBinding.class);
     }
 
     private void moveIntroductionInterfacesToImplementedInterfaces() {
@@ -292,20 +343,8 @@ public final class PythonClassElement extends AbstractPythonClassElement {
             for (TypeRef base : bases) {
                 ClassElement baseElement = findPythonClass(base);
                 if (baseElement != null) {
-                    List<? extends GenericPlaceholderElement> declaredGenericPlaceholders = baseElement.getDeclaredGenericPlaceholders();
-                    List<TypeRef> typeArguments = base.typeArguments();
-                    if (!typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty() && typeArguments.size() == declaredGenericPlaceholders.size()) {
-                        Map<String, ClassElement> resolvedTypeArguments = new HashMap<>(declaredGenericPlaceholders.size());
-                        for (int i = 0; i < declaredGenericPlaceholders.size(); i++) {
-                            GenericPlaceholderElement placeHolder = declaredGenericPlaceholders.get(i);
-                            TypeRef typeRef = typeArguments.get(i);
-                            ClassElement resolvedType = GraalPyUtil.resolvePythonTypeToJava(typeRef, environment.visitorContext(), Map.of());
-                            String variableName = placeHolder.getVariableName();
-                            resolvedTypeArguments.put(variableName, resolvedType);
-                        }
-                        return Optional.of(baseElement.withTypeArguments(resolvedTypeArguments));
-                    } else {
-                        return Optional.of(baseElement);
+                    if (!baseElement.isInterface()) {
+                        return Optional.of(resolveTypeArguments(baseElement, base));
                     }
                 } else  {
                     // maybe a java type
@@ -317,6 +356,23 @@ public final class PythonClassElement extends AbstractPythonClassElement {
             }
         }
         return Optional.empty();
+    }
+
+    private ClassElement resolveTypeArguments(ClassElement baseElement, TypeRef base) {
+        List<? extends GenericPlaceholderElement> declaredGenericPlaceholders = baseElement.getDeclaredGenericPlaceholders();
+        List<TypeRef> typeArguments = base.typeArguments();
+        if (!typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty() && typeArguments.size() == declaredGenericPlaceholders.size()) {
+            Map<String, ClassElement> resolvedTypeArguments = new HashMap<>(declaredGenericPlaceholders.size());
+            for (int i = 0; i < declaredGenericPlaceholders.size(); i++) {
+                GenericPlaceholderElement placeHolder = declaredGenericPlaceholders.get(i);
+                TypeRef typeRef = typeArguments.get(i);
+                ClassElement resolvedType = GraalPyUtil.resolvePythonTypeToJava(typeRef, environment.visitorContext(), Map.of());
+                String variableName = placeHolder.getVariableName();
+                resolvedTypeArguments.put(variableName, resolvedType);
+            }
+            return baseElement.withTypeArguments(resolvedTypeArguments);
+        }
+        return baseElement;
     }
 
     private Optional<ClassElement> toJavaType(TypeRef typeRef) {

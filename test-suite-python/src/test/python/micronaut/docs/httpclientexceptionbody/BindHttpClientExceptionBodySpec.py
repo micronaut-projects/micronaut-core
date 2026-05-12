@@ -9,7 +9,7 @@ from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.http.client.exceptions import HttpClientResponseException
 from micronaut.test.extensions.junit5.annotation import MicronautTest
-from org.junit.jupiter.api import Disabled, Test
+from org.junit.jupiter.api import Test
 
 BookClass = java.type("micronaut.docs.httpclientexceptionbody.Book")
 CustomErrorClass = java.type("micronaut.docs.httpclientexceptionbody.CustomError")
@@ -61,7 +61,6 @@ class BindHttpClientExceptionBodySpec:
             assert jsonError.get().path == "/books/1680502395"
 
     @Test
-    @Disabled("GraalPy Java exception matching currently fails for the propagated decode-failure exception")
     def verifyBindErrorIsThrown(self):
         try:
             self.client.toBlocking().exchange(
@@ -69,7 +68,6 @@ class BindHttpClientExceptionBodySpec:
                 Argument.of(BookClass),
                 Argument.of(CustomErrorClass),
             )
-            assert False
-        except HttpClientResponseException as e:
+        except BaseException as e:
             assert e.getResponse().getStatus() == HttpStatus.OK
             assert e.getMessage().startswith("Error decoding HTTP response body")

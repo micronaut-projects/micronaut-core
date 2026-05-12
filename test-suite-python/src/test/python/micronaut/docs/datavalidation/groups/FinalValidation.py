@@ -1,4 +1,7 @@
 # tag::clazz[]
-class FinalValidation:
-    pass  # <1>
+from jakarta.validation.groups import Default
+
+
+class FinalValidation(Default):
+    ...  # <1>
 # end::clazz[]

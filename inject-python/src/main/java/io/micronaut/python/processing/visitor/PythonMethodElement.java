@@ -177,6 +177,9 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         List<MethodElement> candidates = new ArrayList<>();
         owningType.getSuperType()
             .ifPresent(superType -> candidates.addAll(superType.getEnclosedElements(ElementQuery.ALL_METHODS)));
+        for (ClassElement anInterface : owningType.getInterfaces()) {
+            candidates.addAll(anInterface.getEnclosedElements(ElementQuery.ALL_METHODS));
+        }
         for (MethodElement candidate : candidates) {
             if (candidate == this || !getName().equals(candidate.getName())) {
                 continue;
@@ -297,7 +300,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                 resolvedGenericReturnType = PrimitiveElement.VOID;
             }
             if (resolvedGenericReturnType instanceof AbstractPythonClassElement pythonClassElement) {
-                pythonClassElement.typeAnnotationsKey = functionDef;
+                resolvedGenericReturnType = pythonClassElement.withTypeAnnotationsKey(functionDef);
             }
         }
         return resolvedGenericReturnType;
@@ -319,7 +322,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                 return withReturnAnnotationMetadata(baseType, annotationMetadata);
             }
             if (baseType instanceof AbstractPythonClassElement pythonClassElement) {
-                pythonClassElement.typeAnnotationsKey = functionDef;
+                return pythonClassElement.withTypeAnnotationsKey(functionDef);
             }
 
             return baseType;

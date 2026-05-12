@@ -18,21 +18,21 @@ from jakarta.validation.constraints import NotNull
 class EngineConfig(ABC):
     @abstractmethod
     def getManufacturer(self) -> Annotated[str, Bindable(defaultValue="Ford"), NotBlank]:  # <2> <3>
-        pass
+        ...
 
     @abstractmethod
     def getCylinders(self) -> Annotated[int, Min(1)]:
-        pass
+        ...
 
     @abstractmethod
     def getCrankShaft(self) -> Annotated["CrankShaft", NotNull]:  # <4>
-        pass
+        ...
 
     @ConfigurationProperties("crank-shaft")
     class CrankShaft(ABC):  # <5>
         @abstractmethod
         def getRodLength(self) -> float | None:  # <6>
-            pass
+            ...
 # end::class[]
 
 

@@ -14,5 +14,5 @@ class ChristmasMappers(ABC):
     @Mapper.Mapping(**{"from": "#{'Merry christmas'}", "to": "greeting_card"})
     @abstractmethod
     def merge(self, packaging: PresentPackaging, present: Present) -> ChristmasPresent:
-        pass
+        ...
 # end::mapper[]

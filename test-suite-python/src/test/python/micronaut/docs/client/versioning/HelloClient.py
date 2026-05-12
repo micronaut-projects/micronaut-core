@@ -19,12 +19,12 @@ class HelloClient(ABC):
     @Get("/greeting/{name}")
     @abstractmethod
     def sayHello(self, name: str) -> str:
-        pass
+        ...
 
     @Version("2")
     @Get("/greeting/{name}")
     @SingleResult
     @abstractmethod
     def sayHelloTwo(self, name: str) -> Publisher:  # <2>
-        pass
+        ...
 # end::clazz[]

@@ -43,13 +43,13 @@ class PojoChatClientWebSocket(ABC, AutoCloseable):
 
     @abstractmethod
     def send(self, message: Message) -> None:
-        pass
+        ...
 
     @abstractmethod
     def sendAsync(self, message: Message) -> Future[Message]:
-        pass
+        ...
 
     @SingleResult
     @abstractmethod
     def sendRx(self, message: Message) -> Publisher[Message]:
-        pass
+        ...

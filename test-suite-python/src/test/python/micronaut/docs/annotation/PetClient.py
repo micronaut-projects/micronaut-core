@@ -1,4 +1,3 @@
-from abc import abstractmethod
 from typing import Annotated
 
 import java
@@ -22,7 +21,6 @@ class PetClient(PetOperations):  # <2>
 
     @SingleResult
     @Post
-    @abstractmethod
     def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> Publisher[Pet]:  # <3>
-        pass
+        ...
 # end::class[]

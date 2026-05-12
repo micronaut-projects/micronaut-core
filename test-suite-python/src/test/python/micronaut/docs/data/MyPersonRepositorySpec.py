@@ -1,6 +1,6 @@
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from micronaut.context.annotation import Property
-from org.junit.jupiter.api import Test, Disabled
+from org.junit.jupiter.api import Test
 from jakarta.inject import Inject
 from typing import Annotated
 from .MyPersonRepository import MyPersonRepository

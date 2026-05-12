@@ -11,5 +11,5 @@ class ColorPicker(ABC):
         """
         Returns the color value.
         """
-        pass
+        ...
 # end::clazz[]

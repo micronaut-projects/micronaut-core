@@ -8,5 +8,5 @@ from .ResponseStrategy import ResponseStrategy
 @Singleton
 @Replaces(ResponseStrategy)
 class CustomResponseStrategy(ResponseStrategy):
-    pass
+    ...
 # end::clazz[]

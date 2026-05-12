@@ -19,5 +19,5 @@ class HelloClient(ABC):
     @SingleResult
     @abstractmethod
     def hello(self) -> Publisher[str]:  # <3>
-        pass
+        ...
 # end::class[]

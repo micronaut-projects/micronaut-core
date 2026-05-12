@@ -92,6 +92,50 @@ class GraalPyExceptionHandlerTest {
         }
     }
 
+    @Test
+    void javaExceptionsCanBeCaughtAsPythonBaseException() {
+        try (Context context = Context.newBuilder(PYTHON)
+                 .allowAllAccess(true)
+                 .build()) {
+            context.getBindings(PYTHON).putMember("thrower", new Thrower());
+            context.eval(PYTHON, """
+                def catch_broad():
+                    try:
+                        thrower.throwRuntime()
+                    except BaseException as e:
+                        return e.getMessage()
+                """);
+            Value callback = context.getBindings(PYTHON).getMember("catch_broad");
+
+            assertEquals("boom", callback.execute().asString());
+        }
+    }
+
+    @Test
+    void javaExceptionsCanBeCaughtAsJavaExceptionTypes() {
+        try (Engine engine = GraalPyEngineFactory.buildPythonEngine();
+             Context context = Context.newBuilder(PYTHON)
+                 .allowAllAccess(true)
+                 .engine(engine)
+                 .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+                 .build()) {
+            context.getBindings(PYTHON).putMember("thrower", new Thrower());
+            context.eval(PYTHON, """
+                import java
+                IllegalStateException = java.type("java.lang.IllegalStateException")
+
+                def catch_exact():
+                    try:
+                        thrower.throwRuntime()
+                    except IllegalStateException as e:
+                        return e.getMessage()
+                """);
+            Value callback = context.getBindings(PYTHON).getMember("catch_exact");
+
+            assertEquals("boom", callback.execute().asString());
+        }
+    }
+
     public static final class Thrower {
         public void throwRuntime() {
             throw new IllegalStateException("boom");

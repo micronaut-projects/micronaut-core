@@ -19,5 +19,5 @@ class HeadlineClient(ABC):
     @Get(value="/headlines", processes=MediaType.TEXT_EVENT_STREAM)
     @abstractmethod
     def streamHeadlines(self) -> Publisher[Event[Headline]]:
-        pass
+        ...
 # end::class[]

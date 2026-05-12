@@ -139,7 +139,6 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = findInterceptedMethod(methodName, interceptedMethods, args);
             ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
             Interceptor<T, ?>[] interceptors = interceptedMethod.interceptors();
-
             Object[] javaArgs = fromPolyglotArray(args, executableMethod.getArguments());
             @SuppressWarnings("unchecked")
             T tb = targetBean != null ? targetBean : (T) targetBeanRef.get();
@@ -158,9 +157,13 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                     Value executable = isIntroduction
                         ? GraalPyRuntimeUtil.bindPythonDescriptor(originalFunction, tb, owner)
                         : originalFunction;
-                    return executable.execute(
+                    Value result = executable.execute(
                         toPolyglotArray(invocationContext.getParameterValues(), executable.getContext())
                     );
+                    if (executableMethod.getReturnType().getType() == void.class) {
+                        return null;
+                    }
+                    return box(executableMethod.getReturnType().asArgument(), result);
                 };
             }
             Object result = new MethodInterceptorChain(finalInterceptors, tb, executableMethod, javaArgs).proceed();
@@ -186,7 +189,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         return switch (result) {
             case null -> null;
             case Value value -> value;
-            case ValueCoercible valueCoercible -> valueCoercible.asPolyglotValue();
+            case ValueCoercible valueCoercible -> valueCoercible;
             case List<?> list -> {
                 List<Object> newList = new ArrayList<>(list.size());
                 for (Object o : list) {

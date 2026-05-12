@@ -8,6 +8,6 @@ class Book:
 class BookService(ABC):
     @abstractmethod
     def find_book(self, title: str) -> Book:
-        pass
+        ...
 
 

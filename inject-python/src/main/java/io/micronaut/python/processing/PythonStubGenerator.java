@@ -61,6 +61,7 @@ import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
@@ -76,6 +77,7 @@ import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.FieldDef;
+import io.micronaut.sourcegen.model.InterfaceDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.ObjectDef;
 import io.micronaut.sourcegen.model.ParameterDef;
@@ -101,6 +103,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String ANN_JSON_CREATOR = "com.fasterxml.jackson.annotation.JsonCreator";
 
     private final Map<String, StubEntry> classBuilders = new LinkedHashMap<>();
+    private final Map<String, InterfaceEntry> interfaceDefs = new LinkedHashMap<>();
     private final Map<String, AnnotationEntry> annotationDefs = new LinkedHashMap<>();
     private Map<String, ClassElement> allClasses = Map.of();
 
@@ -118,6 +121,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     ClassDef.ClassDefBuilder builder = entry.builder;
                     sourceGenerator.write(builder.build(), visitorContext, entry.originatingElement);
                 }
+                for (InterfaceEntry entry : interfaceDefs.values()) {
+                    sourceGenerator.write(entry.interfaceDef, visitorContext, entry.originatingElement);
+                }
                 for (AnnotationEntry entry : annotationDefs.values()) {
                     if (entry.originatingElement == null) {
                         sourceGenerator.write(entry.annotationDef, visitorContext);
@@ -128,6 +134,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         } finally {
             classBuilders.clear();
+            interfaceDefs.clear();
             annotationDefs.clear();
         }
     }
@@ -194,13 +201,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     String pythonSimpleName = pythonSimpleName(classElement);
                     boolean isAopProxy = classElement.hasStereotype(InterceptorBinding.class);
                     boolean isDeclaredBean = BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(classElement) || isAopProxy;
+                    Collection<ClassElement> interfaces = classElement.getInterfaces();
+
+                    if (classElement.isInterface()) {
+                        if (interfaceDefs.containsKey(classElement.getName())) {
+                            return;
+                        }
+                        interfaceDefs.put(classElement.getName(), new InterfaceEntry(buildInterfaceDef(classElement, typeName, interfaces), classElement));
+                        return;
+                    }
 
                     var builder = ClassDef.builder(typeName)
                         .addModifiers(Modifier.PUBLIC);
                     builder.addAnnotation(Vetoed.class);
 
                     copyAnnotations(element, builder, ANNOTATION_PACKAGES_TO_COPY, context);
-                    Collection<ClassElement> interfaces = classElement.getInterfaces();
                     builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
 
                     // Check if this class extends another PythonClassElement
@@ -738,6 +753,36 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     private static boolean sameErasedType(ClassElement left, ClassElement right) {
         return left.getName().equals(right.getName());
+    }
+
+    private static InterfaceDef buildInterfaceDef(AbstractPythonClassElement classElement,
+                                                  String typeName,
+                                                  Collection<ClassElement> interfaces) {
+        InterfaceDef.InterfaceDefBuilder interfaceBuilder = InterfaceDef.builder(typeName)
+            .addModifiers(Modifier.PUBLIC);
+        for (GenericPlaceholderElement placeholder : classElement.getDeclaredGenericPlaceholders()) {
+            interfaceBuilder.addTypeVariable(TypeDef.variable(placeholder.getVariableName()));
+        }
+        for (ClassElement anInterface : interfaces) {
+            interfaceBuilder.addSuperinterface(parameterizedTypeDef(anInterface));
+        }
+        Set<String> addedMethodNames = new LinkedHashSet<>();
+        for (MethodElement methodElement : classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyAccessible().onlyInstance())) {
+            String key = bridgeMethodKey(methodElement);
+            if (!addedMethodNames.add(key)) {
+                continue;
+            }
+            MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(methodElement.getName())
+                .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+                .returns(TypeDef.of(methodElement.getGenericReturnType()));
+            for (@NonNull ParameterElement parameter : methodElement.getParameters()) {
+                methodBuilder.addParameter(ParameterDef
+                    .builder(parameter.getName(), erasedType(parameter.getGenericType()))
+                    .build());
+            }
+            interfaceBuilder.addMethod(methodBuilder.build());
+        }
+        return interfaceBuilder.build();
     }
 
     private static @Nullable DecoratorDef findScriptDecorator(PythonScriptElement scriptElement, PythonVisitorContext context) {
@@ -1586,7 +1631,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             .invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class),
                                 invokedValue, genericType);
                     } else {
-                        if (allClasses.containsKey(returnType.getName())) {
+                        if (isGeneratedWrapperType(allClasses, returnType)) {
                             yield ClassTypeDef.of(returnType)
                                 .invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, invokedValue);
                         } else {
@@ -1700,6 +1745,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return field;
     }
 
+    private static boolean isGeneratedWrapperType(Map<String, ClassElement> allClasses, ClassElement type) {
+        return allClasses.containsKey(type.getName()) && !type.isInterface();
+    }
+
     private ExpressionDef convertValueForType(ClassElement type, ExpressionDef member) {
         if (type.isPrimitive()) {
             return switch (type.getName()) {
@@ -1752,7 +1801,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ClassElement componentType = type.getFirstTypeArgument().orElse(null);
                         ExpressionDef genericType = toClassExpression(componentType);
                         return RUNTIME_UTIL.invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class), member, genericType);
-                    } else if (allClasses.containsKey(type.getName())) {
+                    } else if (isGeneratedWrapperType(allClasses, type)) {
                         return ClassTypeDef.of(type).invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, member);
                     } else {
                         return RUNTIME_UTIL.invokeStatic("convertValue", ClassTypeDef.OBJECT, member, javaClassType(type).getStaticField("class", TypeDef.CLASS)).cast(erasedType(type));
@@ -1779,5 +1828,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     record AnnotationEntry(
         ObjectDef annotationDef,
         @Nullable Element originatingElement) {
+    }
+
+    record InterfaceEntry(
+        InterfaceDef interfaceDef,
+        Element originatingElement) {
     }
 }

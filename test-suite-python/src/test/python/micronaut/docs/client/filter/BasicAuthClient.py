@@ -14,5 +14,5 @@ class BasicAuthClient:
     @Get
     @abstractmethod
     def getMessage(self) -> str:
-        pass
+        ...
 # end::class[]

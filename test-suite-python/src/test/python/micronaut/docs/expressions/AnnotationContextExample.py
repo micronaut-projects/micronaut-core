@@ -29,4 +29,4 @@ def CustomAnnotation(
 @Singleton
 @CustomAnnotation(value="#{firstValue() + secondValue()}")  # <1>
 class Example:
-    pass
+    ...

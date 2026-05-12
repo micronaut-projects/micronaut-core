@@ -6,5 +6,5 @@ from .DefaultResponseStrategy import DefaultResponseStrategy
 
 @DefaultImplementation(DefaultResponseStrategy)
 class ResponseStrategy:
-    pass
+    ...
 # end::clazz[]

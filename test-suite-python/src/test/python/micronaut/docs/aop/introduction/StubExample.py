@@ -8,9 +8,9 @@ class StubExample(ABC):
     @abstractmethod
     @Stub("10")
     def get_number(self) -> int:
-        pass
+        ...
 
     @abstractmethod
     def get_date(self) -> datetime:
-        pass
+        ...
 # end::class[]

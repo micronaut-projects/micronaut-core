@@ -13,5 +13,5 @@ class ContactMappers(ABC):
     @Mapper
     @abstractmethod
     def to_entity(self, contact_form: ContactForm) -> ContactEntity:
-        pass
+        ...
 # end::class[]

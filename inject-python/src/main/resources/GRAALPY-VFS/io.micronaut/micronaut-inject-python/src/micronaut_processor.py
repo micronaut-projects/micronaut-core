@@ -53,8 +53,6 @@ def is_placeholder_method(funcdef):
     body = funcdef.body
     if len(body) == 1:
         stmt = body[0]
-        if isinstance(stmt, ast.Pass):
-            return True
         if isinstance(stmt, ast.Expr):
             value = stmt.value
             if isinstance(value, ast.Constant) and value.value is Ellipsis:
@@ -203,7 +201,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         is_abstract = (
                             is_abstract_method(node) or
                             self._current_class_is_protocol() or
-                            (is_placeholder_method(node) and self._current_class_has_external_base())
+                            is_placeholder_method(node)
                         )
                         is_static = is_static_method(node)
 

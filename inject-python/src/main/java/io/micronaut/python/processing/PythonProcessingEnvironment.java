@@ -17,6 +17,7 @@ package io.micronaut.python.processing;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
@@ -39,6 +40,8 @@ import javax.lang.model.element.Element;
  * @param annotationMetadataBuilder The builder for creating annotation metadata from Python elements.
  * @param metadataFactory The factory for creating element annotation metadata.
  * @param visitorContext The visitor context for processing Python elements.
+ * @param classesCache The per-processing-run class element cache.
+ * @param scriptsCache The per-processing-run script element cache.
  * @since 4.8.0
  * @author Micronaut
  */
@@ -48,7 +51,9 @@ public record PythonProcessingEnvironment(
     PythonElementAnnotationMetadataFactory metadataFactory,
     JavaVisitorContext javaVisitorContext,
     PythonVisitorContext visitorContext,
-    Element originatingElement
+    Element originatingElement,
+    AtomicReference<Map<String, ClassElement>> classesCache,
+    AtomicReference<Map<String, ClassElement>> scriptsCache
 ) implements AutoCloseable {
 
     /**
@@ -66,7 +71,27 @@ public record PythonProcessingEnvironment(
             null,
             javaVisitorContext,
             null,
-            originatingElement
+            originatingElement,
+            new AtomicReference<>(),
+            new AtomicReference<>()
+        );
+    }
+
+    public PythonProcessingEnvironment(PythonEnvironment environment,
+                                       PythonAnnotationMetadataBuilder annotationMetadataBuilder,
+                                       PythonElementAnnotationMetadataFactory metadataFactory,
+                                       JavaVisitorContext javaVisitorContext,
+                                       PythonVisitorContext visitorContext,
+                                       Element originatingElement) {
+        this(
+            environment,
+            annotationMetadataBuilder,
+            metadataFactory,
+            javaVisitorContext,
+            visitorContext,
+            originatingElement,
+            new AtomicReference<>(),
+            new AtomicReference<>()
         );
     }
 
@@ -84,7 +109,9 @@ public record PythonProcessingEnvironment(
             null,
             javaVisitorContext,
             null,
-            null
+            null,
+            new AtomicReference<>(),
+            new AtomicReference<>()
         );
     }
 
@@ -102,12 +129,20 @@ public record PythonProcessingEnvironment(
             null,
             null,
             null,
-            null
+            null,
+            new AtomicReference<>(),
+            new AtomicReference<>()
         );
     }
 
     public PythonProcessingEnvironment {
         Objects.requireNonNull(environment, "Python environment cannot be null");
+        if (classesCache == null) {
+            classesCache = new AtomicReference<>();
+        }
+        if (scriptsCache == null) {
+            scriptsCache = new AtomicReference<>();
+        }
 
         if (visitorContext == null) {
             visitorContext = new PythonVisitorContext(environment.decorators(), this, javaVisitorContext);
@@ -126,7 +161,12 @@ public record PythonProcessingEnvironment(
      */
     @Override
     public void close() {
-        environment.close();
+        try {
+            classesCache.set(null);
+            scriptsCache.set(null);
+        } finally {
+            environment.close();
+        }
     }
 
     /**
@@ -136,7 +176,12 @@ public record PythonProcessingEnvironment(
      * @return A map of class names to Python class elements.
      */
     public Map<String, ClassElement> classes() {
-        return toMapOfClassElement(environment.classes(), this);
+        Map<String, ClassElement> cached = classesCache.get();
+        if (cached == null) {
+            cached = toMapOfClassElement(environment.classes(), this);
+            classesCache.set(cached);
+        }
+        return cached;
     }
 
     /**
@@ -146,7 +191,12 @@ public record PythonProcessingEnvironment(
      * @return A map of script names to Python script elements.
      */
     public Map<String, ClassElement> scripts() {
-        return toMapOfScriptElement(environment.scripts(), this);
+        Map<String, ClassElement> cached = scriptsCache.get();
+        if (cached == null) {
+            cached = toMapOfScriptElement(environment.scripts(), this);
+            scriptsCache.set(cached);
+        }
+        return cached;
     }
 
     private static Map<String, ClassElement> toMapOfScriptElement(java.util.Map<String, io.micronaut.python.processing.visitor.ScriptDef> scripts, PythonProcessingEnvironment environment) {

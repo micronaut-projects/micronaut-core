@@ -18,5 +18,5 @@ class MetadataClient(ABC):
     @Get("/client/bind")
     @abstractmethod
     def get(self, metadata: Annotated[Map, Metadata]) -> str:
-        pass
+        ...
 # end::clazz[]

@@ -27,7 +27,7 @@ class AdditionalMappers(ABC):
         present: Present,
         christmas_card: Card,
     ) -> ChristmasPresent:
-        pass
+        ...
 
     @Mapper.Mapping(
         **{"from": "#{update_fields['christmas_card'] + '!!'}", "to": "greeting_card"}
@@ -38,7 +38,7 @@ class AdditionalMappers(ABC):
         present: ChristmasPresent,
         update_fields: dict[str, Any],
     ) -> ChristmasPresent:
-        pass
+        ...
 
     @Mapper(
         mergeStrategy="add-numbers",
@@ -50,7 +50,7 @@ class AdditionalMappers(ABC):
         packaging: PresentPackaging,
         present: Present,
     ) -> ChristmasPresent:
-        pass
+        ...
 
 
 @Singleton

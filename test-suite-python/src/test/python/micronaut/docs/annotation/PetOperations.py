@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from typing import Annotated
 
 import java
@@ -17,12 +16,11 @@ Publisher = java.type("org.reactivestreams.Publisher")
 
 # tag::class[]
 @Validated
-class PetOperations(ABC):
+class PetOperations:
     # tag::save[]
     @Post
     @SingleResult
-    @abstractmethod
     def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> Publisher[Pet]:
-        pass
+        ...
     # end::save[]
 # end::class[]

@@ -13,5 +13,5 @@ class MetadataClient(ABC):
     @Get("/client/bind")
     @abstractmethod
     def get(self, metadata: Metadata) -> str:
-        pass
+        ...
 # end::clazz[]

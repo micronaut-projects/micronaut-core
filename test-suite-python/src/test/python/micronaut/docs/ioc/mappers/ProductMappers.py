@@ -21,7 +21,7 @@ class ProductMappers(ABC):
     )
     @abstractmethod
     def to_product_dto(self, product: Product) -> ProductDTO:
-        pass
+        ...
 
     def get_distributor(self) -> str:
         return "Great Product Company"
