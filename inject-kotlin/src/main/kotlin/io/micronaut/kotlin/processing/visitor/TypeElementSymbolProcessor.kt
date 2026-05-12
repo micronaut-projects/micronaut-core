@@ -94,9 +94,14 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
 
         if (loadedVisitors.isNotEmpty()) {
 
-            val elements = resolver.getAllFiles()
+            val classDeclarations = linkedSetOf<KSClassDeclaration>()
+            resolver.getAllFiles()
                 .flatMap { file: KSFile -> file.declarations }
                 .filterIsInstance<KSClassDeclaration>()
+                .forEach { collectClassDeclarations(it, classDeclarations) }
+
+            val elements = classDeclarations
+                .asSequence()
                 .filter { declaration: KSClassDeclaration ->
                     acceptClass(declaration)
                             && declaration.classKind != ClassKind.ANNOTATION_CLASS
@@ -122,6 +127,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
 
                 for (loadedVisitor in loadedVisitors) {
                     visitorContext.aggregating = loadedVisitor.visitor.visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
+                    val visitedClassNames: MutableSet<String> = HashSet()
                     for (typeElement in elements) {
                         if (!loadedVisitor.matches(typeElement)) {
                             continue
@@ -131,7 +137,8 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                                 ElementVisitor(
                                     loadedVisitor,
                                     typeElement,
-                                    classElementsCache
+                                    classElementsCache,
+                                    visitedClassNames
                                 ),
                                 "ignore"
                             )
@@ -153,6 +160,17 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
             val annotationName = ksAnnotation.annotationType.resolve().declaration.qualifiedName?.asString()
             annotationName == Generated::class.java.name || annotationName == Vetoed::class.java.name
         }
+
+    private fun collectClassDeclarations(
+        declaration: KSClassDeclaration,
+        declarations: MutableSet<KSClassDeclaration>
+    ) {
+        if (declarations.add(declaration)) {
+            declaration.declarations
+                .filterIsInstance<KSClassDeclaration>()
+                .forEach { collectClassDeclarations(it, declarations) }
+        }
+    }
 
     override fun finish() {
         for (loadedVisitor in loadedVisitors) {
@@ -241,7 +259,8 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     private inner class ElementVisitor(
         private val loadedVisitor: LoadedVisitor,
         private val classDeclaration: KSClassDeclaration,
-        private val classElementsCache: MutableMap<KotlinClassNativeElement, ClassElement>
+        private val classElementsCache: MutableMap<KotlinClassNativeElement, ClassElement>,
+        private val visitedClassNames: MutableSet<String>
     ) : KSTopDownVisitor<Any, Any>() {
 
         override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Any): Any {
@@ -283,6 +302,9 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
         }
 
         private fun visitClass(classElement: KotlinClassElement, query: TypeElementQuery) {
+            if (!visitedClassNames.add(classElement.name)) {
+                return
+            }
             try {
                 loadedVisitor.visitor.visitClass(classElement, visitorContext)
             } catch (e: Exception) {
@@ -399,4 +421,3 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
 
     }
 }
-
