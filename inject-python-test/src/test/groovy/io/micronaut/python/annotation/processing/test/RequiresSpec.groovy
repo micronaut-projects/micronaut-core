@@ -17,6 +17,7 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
+import io.micronaut.context.exceptions.NoSuchBeanException
 
 class RequiresSpec extends AbstractPythonTypeElementSpec {
 
@@ -171,6 +172,60 @@ class MyBean:
         context?.close()
     }
 
+    void "test requires bean property presence"() {
+        given:
+        def context = buildContext(requiresBeanPropertyCode(), false, [
+            "config.property": "anyValue"
+        ])
+
+        expect:
+        getBean(context, "python.PresentPropertyDependantBean") != null
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test requires bean property with absent property"() {
+        given:
+        def context = buildContext(requiresBeanPropertyCode())
+
+        when:
+        getBean(context, "python.PresentPropertyDependantBean")
+
+        then:
+        thrown(NoSuchBeanException)
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test requires bean property not equals with value not set"() {
+        given:
+        def context = buildContext(requiresBeanPropertyNotEqualsCode())
+
+        expect:
+        getBean(context, "python.NotConcreteValueBean") != null
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test requires bean property not equals with value set"() {
+        given:
+        def context = buildContext(requiresBeanPropertyNotEqualsCode(), false, [
+            "config.property": "concreteValue"
+        ])
+
+        when:
+        getBean(context, "python.NotConcreteValueBean")
+
+        then:
+        thrown(NoSuchBeanException)
+
+        cleanup:
+        context?.close()
+    }
+
     void "test requires environment"() {
         given:
         def definition = buildBeanDefinition("python", "MyBean", '''
@@ -272,5 +327,37 @@ class MissingAbsentClassBean:
         def context = builder.build()
         context.environment.start()
         context
+    }
+
+    private static String requiresBeanPropertyCode() {
+        '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import ConfigurationProperties, Requires
+
+@ConfigurationProperties("config")
+class Config:
+    property: str = None
+
+@Requires(bean=Config, beanProperty="property")
+@Singleton
+class PresentPropertyDependantBean:
+    pass
+'''
+    }
+
+    private static String requiresBeanPropertyNotEqualsCode() {
+        '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import ConfigurationProperties, Requires
+
+@ConfigurationProperties("config")
+class Config:
+    property: str = None
+
+@Requires(bean=Config, beanProperty="property", notEquals="concreteValue")
+@Singleton
+class NotConcreteValueBean:
+    pass
+'''
     }
 }
