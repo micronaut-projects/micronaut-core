@@ -4,6 +4,7 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.PendingFeature
 
 class FieldInjectionSpec extends AbstractPythonTypeElementSpec {
     void "test field injection generic metadata"() {
@@ -253,6 +254,42 @@ class ListConsumerService:
         listConsumerService.get_item_names() == "ItemA,ItemB"
 
         cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0014")
+    void "test inherited field injection from abstract base class"() {
+        given:
+        def pythonCode = '''
+from abc import ABC
+from typing import Annotated
+from jakarta.inject import Inject, Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class SomeBean:
+    pass
+
+class AbstractListener(ABC):
+    some_bean: Annotated[SomeBean, Inject] = None
+
+@Singleton
+class Listener(AbstractListener):
+    @Executable
+    def has_some_bean(self) -> bool:
+        return self.some_bean is not None
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def abstractListenerClass = context.classLoader.loadClass("python.AbstractListener")
+        def listener = getBean(context, "python.Listener")
+
+        then:
+        context.getBeanDefinitions(abstractListenerClass).every { it.beanType.name != "python.AbstractListener" }
+        listener.has_some_bean()
+
+        cleanup:
         context?.close()
     }
 
