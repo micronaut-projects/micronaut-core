@@ -79,6 +79,47 @@ class TestFactory:
         context.close()
     }
 
+    void "test factory bean with inherited preDestroy method"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory, Bean
+from jakarta.inject import Singleton
+
+class AbstractBar:
+    stopped: bool = False
+
+    def close(self):
+        self.stopped = True
+
+class Bar1(AbstractBar):
+    pass
+
+@Factory
+class TestFactory:
+
+    @Bean(preDestroy="close")
+    @Singleton
+    def bar(self) -> Bar1:
+        return Bar1()
+''')
+
+        when:
+        def wrapper = getBean(context, 'python.Bar1')
+        def bar1 = wrapper.asPolyglotValue()
+
+        then:
+        bar1.getMember('stopped').asBoolean() == false
+
+        when:
+        context.destroyBean(wrapper)
+
+        then:
+        bar1.getMember('stopped').asBoolean() == true
+
+        cleanup:
+        context.close()
+    }
+
     void "test a factory bean with attribute"() {
         given:
         def context = buildContext('''\
