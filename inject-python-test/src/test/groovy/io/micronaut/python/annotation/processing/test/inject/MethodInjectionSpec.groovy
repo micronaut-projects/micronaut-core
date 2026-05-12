@@ -43,6 +43,54 @@ class MainService:
         context?.close()
     }
 
+    void "test builder style method injection returns self"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton, Inject
+from micronaut.context.annotation import Bean, Executable, Factory
+
+import java
+
+URL = java.type("java.net.URL")
+
+@Factory
+class UrlFactory:
+    @Bean
+    def url(self) -> URL:
+        return URL("http://localhost")
+
+@Singleton
+class Test:
+    def __init__(self):
+        self.url = None
+        self.injection_returned_self = False
+
+    @Inject
+    def set_url(self, url: URL):
+        self.url = url
+        self.injection_returned_self = True
+        return self
+
+    @Executable
+    def get_url(self) -> str:
+        return self.url.toString()
+
+    @Executable
+    def did_injection_return_self(self) -> bool:
+        return self.injection_returned_self
+''')
+
+        when:
+        def bean = getBean(context, "python.Test")
+
+        then:
+        bean.get_url() == "http://localhost"
+        bean.did_injection_return_self()
+
+        cleanup:
+        context?.close()
+    }
+
     void "test method injection with typed Dict container type"() {
         given: "Python code with method injection using Dict type"
         def pythonCode = '''
