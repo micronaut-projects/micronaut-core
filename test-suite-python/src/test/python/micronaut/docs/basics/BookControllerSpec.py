@@ -21,7 +21,7 @@ class BookControllerSpec:
     @Test
     def testPostWithURITemplate(self):
         # tag::posturitemplate[]
-        call = getattr(Flux, "from")(
+        call = Flux.from_(
             self.client.exchange(
                 HttpRequest.POST("/amazon/book/{title}", Book("The Stand")),
                 BookClass,
@@ -38,7 +38,7 @@ class BookControllerSpec:
     @Test
     def testPostFormData(self):
         # tag::postform[]
-        call = getattr(Flux, "from")(
+        call = Flux.from_(
             self.client.exchange(
                 HttpRequest.POST("/amazon/book/{title}", Book("The Stand"))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED),

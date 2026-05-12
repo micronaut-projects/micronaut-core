@@ -26,7 +26,7 @@ class PersonControllerSpec:
     @Test
     def test_global_error_handler(self):
         try:
-            getattr(Flux, "from")(self.client.exchange("/people/error", Map)).blockFirst()
+            Flux.from_(self.client.exchange("/people/error", Map)).blockFirst()
             assert False
         except HttpClientResponseException as e:
             response = e.getResponse()
@@ -92,7 +92,7 @@ class PersonControllerSpec:
     def test_person_not_found(self):
         e = Assertions.assertThrows(
             HttpClientResponseException,
-            lambda: getattr(Flux, "from")(self.client.exchange("/people/Sally", Map)).blockFirst(),
+            lambda: Flux.from_(self.client.exchange("/people/Sally", Map)).blockFirst(),
         )
         response = e.getResponse()
         Assertions.assertEquals("Person Not Found", response.getBody().get().get("message"), str(response.getBody()))

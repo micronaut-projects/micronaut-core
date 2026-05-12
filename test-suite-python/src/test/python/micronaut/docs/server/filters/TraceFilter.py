@@ -25,7 +25,7 @@ class TraceFilter(HttpServerFilter):  # <2>
         request: HttpRequest,
         chain: ServerFilterChain,
     ) -> Publisher:
-        return getattr(Flux, "from")(self.traceService.trace(request)).switchMap(  # <4>
+        return Flux.from_(self.traceService.trace(request)).switchMap(  # <4>
             lambda _: chain.proceed(request)  # <5>
         ).doOnNext(
             lambda res: res.getHeaders().add("X-Trace-Enabled", "true")  # <6>

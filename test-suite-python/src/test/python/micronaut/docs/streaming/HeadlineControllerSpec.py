@@ -30,7 +30,7 @@ class HeadlineControllerSpec:
     # tag::streamingClient[]
     @Test
     def testClientAnnotationStreaming(self):
-        firstHeadline = getattr(Mono, "from")(self.headlineClient.streamHeadlines())  # <2>
+        firstHeadline = Mono.from_(self.headlineClient.streamHeadlines())  # <2>
 
         headline = firstHeadline.block()  # <3>
 
@@ -41,7 +41,7 @@ class HeadlineControllerSpec:
     @Test
     def testStreamingClient(self):
         # tag::streaming[]
-        headlineStream = getattr(Flux, "from")(
+        headlineStream = Flux.from_(
             self.client.jsonStream(HttpRequest.GET("/streaming/headlines"), HeadlineClass)
         )  # <1>
         future = CompletableFuture()  # <2>

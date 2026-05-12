@@ -19,7 +19,7 @@ class HeadlineControllerSpec:
     # tag::streamingClient[]
     @Test
     def testClientAnnotationStreaming(self):
-        headline = getattr(Mono, "from")(self.headlineClient.streamHeadlines()).block()
+        headline = Mono.from_(self.headlineClient.streamHeadlines()).block()
 
         assert headline is not None
         assert headline.getData().text.startswith("Latest Headline")

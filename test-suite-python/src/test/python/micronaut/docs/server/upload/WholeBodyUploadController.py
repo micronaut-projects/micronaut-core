@@ -27,7 +27,7 @@ class WholeBodyUploadController:
                 originalFileName = completedPart.getFilename()
             completedPart.close()
 
-        return getattr(Flux, "from")(body).publishOn(
+        return Flux.from_(body).publishOn(
             Schedulers.boundedElastic()
         ).doOnNext(close_part).then(Mono.just("Uploaded"))
 # end::class[]

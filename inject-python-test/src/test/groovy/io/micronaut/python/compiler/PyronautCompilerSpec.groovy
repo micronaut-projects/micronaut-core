@@ -357,6 +357,95 @@ class AsyncImportService:
         tempDir.deleteDir()
     }
 
+    def "test Python keyword-safe Java method aliases are rewritten"() {
+        given:
+        def pythonCode = '''
+from java.lang import Thread
+from reactor.core.publisher import Mono
+import java
+
+ThreadAlias = java.type("java.lang.Thread")
+FluxAlias = java.type("reactor.core.publisher.Flux")
+
+class PythonKeywordMethod:
+    def from_(self):
+        return "python"
+
+class KeywordMethodService:
+    def imported(self):
+        return Thread.yield_()
+
+    def assigned(self):
+        return ThreadAlias.yield_()
+
+    def imported_reactor(self, publisher):
+        return Mono.from_(publisher)
+
+    def assigned_reactor(self, publisher):
+        return FluxAlias.from_(publisher)
+
+    def python_method(self):
+        keyword = PythonKeywordMethod()
+        return keyword.from_()
+'''
+        def tempDir = File.createTempDir("pyronaut-test-keyword-method", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def transformedFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
+        transformedFile.exists()
+        def transformedContent = transformedFile.text
+        transformedContent.contains("getattr(Thread, 'yield')()")
+        transformedContent.contains("getattr(ThreadAlias, 'yield')()")
+        transformedContent.contains("getattr(Mono, 'from')(publisher)")
+        transformedContent.contains("getattr(FluxAlias, 'from')(publisher)")
+        transformedContent.contains("keyword.from_()")
+        !transformedContent.contains("Thread.yield_")
+        !transformedContent.contains("ThreadAlias.yield_")
+        !transformedContent.contains("Mono.from_")
+        !transformedContent.contains("FluxAlias.from_")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
+    def "test Python keyword-safe annotation members are rewritten"() {
+        given:
+        def pythonCode = '''
+from micronaut.http.annotation import Controller, Error
+
+@Controller("/errors")
+class ErrorController:
+    @Error(global_=True)
+    def global_error(self) -> str:
+        return "handled"
+'''
+        def tempDir = File.createTempDir("pyronaut-test-keyword-member", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def transformedFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
+        transformedFile.exists()
+        def transformedContent = transformedFile.text
+        transformedContent.contains("@Error(**{'global': True})")
+        !transformedContent.contains("@Error(global_")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
     def "test nested annotation members are generated as Python attributes"() {
         given:
         def pythonCode = '''

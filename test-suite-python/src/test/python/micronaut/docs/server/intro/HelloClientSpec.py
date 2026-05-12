@@ -19,5 +19,5 @@ class HelloClientSpec:
 
     @Test
     def testHelloWorldResponse(self) -> None:
-        assert "Hello World" == getattr(Mono, "from")(self.client.hello()).block()  # <3>
+        assert "Hello World" == Mono.from_(self.client.hello()).block()  # <3>
 # end::class[]

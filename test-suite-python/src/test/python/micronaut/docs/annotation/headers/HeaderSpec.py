@@ -18,7 +18,7 @@ class HeaderSpec:
 
     @Test
     def testSenderHeaders(self) -> None:
-        pet = getattr(Mono, "from")(self.client.get("Fred")).block()
+        pet = Mono.from_(self.client.get("Fred")).block()
 
         assert pet is not None
         assert pet.age == 11

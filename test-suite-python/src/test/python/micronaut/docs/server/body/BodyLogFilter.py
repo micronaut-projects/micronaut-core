@@ -24,7 +24,7 @@ class BodyLogFilter:
             ByteBody.SplitBackpressureMode.SLOWEST  # <3>
         ).allowDiscard()  # <5>
         try:
-            getattr(Flux, "from")(ourCopy.toByteArrayPublisher()).onErrorComplete(
+            Flux.from_(ourCopy.toByteArrayPublisher()).onErrorComplete(
                 ByteBody.BodyDiscardedException  # <7>
             ).subscribe(
                 lambda array: self.LOG.info(

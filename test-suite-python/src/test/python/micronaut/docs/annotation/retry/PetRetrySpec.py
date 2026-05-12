@@ -16,7 +16,7 @@ class PetRetrySpec:
 
     @Test
     def testFallback(self) -> None:
-        pet = getattr(Mono, "from")(self.client.save("Dino", 10)).block()
+        pet = Mono.from_(self.client.save("Dino", 10)).block()
 
         assert pet.name == "Dino"
         assert pet.age == 10

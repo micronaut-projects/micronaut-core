@@ -23,7 +23,7 @@ class UploadController:
         tempFile = File.createTempFile(file.getFilename(), "temp")
         uploadPublisher = file.transferTo(tempFile)  # <3>
 
-        return getattr(Mono, "from")(uploadPublisher).thenReturn(  # <4>
+        return Mono.from_(uploadPublisher).thenReturn(  # <4>
             HttpResponse.ok("Uploaded")
         ).onErrorReturn(
             HttpResponse.status(HttpStatus.CONFLICT).body("Upload Failed")
@@ -37,7 +37,7 @@ class UploadController:
         outputStream = ByteArrayOutputStream()  # <3>
         uploadPublisher = file.transferTo(outputStream)  # <4>
 
-        return getattr(Mono, "from")(uploadPublisher).thenReturn(  # <5>
+        return Mono.from_(uploadPublisher).thenReturn(  # <5>
             HttpResponse.ok("Uploaded")
         ).onErrorReturn(
             HttpResponse.status(HttpStatus.CONFLICT).body("Upload Failed")

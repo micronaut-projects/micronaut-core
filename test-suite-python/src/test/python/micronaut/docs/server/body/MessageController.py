@@ -29,7 +29,7 @@ class MessageController:
     @Post(value="/echo-publisher", consumes=MediaType.TEXT_PLAIN)  # <1>
     @SingleResult
     def echoFlow(self, text: Annotated[Publisher, Body]) -> Publisher:  # <2>
-        return getattr(Flux, "from")(text).collect(lambda: [], lambda buffer, value: buffer.append(value)).map(  # <3>
+        return Flux.from_(text).collect(lambda: [], lambda buffer, value: buffer.append(value)).map(  # <3>
             lambda buffer: HttpResponse.ok("".join(buffer))
         )
     # end::echoReactive[]

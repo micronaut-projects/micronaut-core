@@ -54,7 +54,7 @@ class MultipartFileUploadSpec:
         )
         # end::multipartBody[]
 
-        flowable = getattr(Flux, "from")(
+        flowable = Flux.from_(
             self.client.exchange(
                 # tag::request[]
                 HttpRequest.POST("/multipart/upload", requestBody)  # <1>
@@ -77,7 +77,7 @@ class MultipartFileUploadSpec:
             .build()
         # end::multipartBodyBytes[]
 
-        flowable = getattr(Flux, "from")(
+        flowable = Flux.from_(
             self.client.exchange(
                 HttpRequest.POST("/multipart/upload", requestBody)
                     .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
@@ -98,7 +98,7 @@ class MultipartFileUploadSpec:
         writer.write(toWrite)
         writer.close()
 
-        flowable = getattr(Flux, "from")(
+        flowable = Flux.from_(
             self.client.exchange(
                 HttpRequest.POST("/multipart/upload", MultipartBody.builder().addPart("data", file.getName(), file).build())
                     .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)

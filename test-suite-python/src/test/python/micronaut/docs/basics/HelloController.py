@@ -26,7 +26,7 @@ class HelloController:
     @Get("/hello/{name}")
     @SingleResult
     def hello(self, name: str) -> Publisher:  # <1>
-        return getattr(Mono, "from")(
+        return Mono.from_(
             self.httpClient.retrieve(HttpRequest.GET("/hello/" + name))
         )  # <2>
     # end::nonblocking[]

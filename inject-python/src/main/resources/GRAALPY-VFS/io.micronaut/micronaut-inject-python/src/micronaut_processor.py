@@ -4,6 +4,16 @@ import os
 import java
 from collections import OrderedDict
 
+PYTHON_KEYWORD_METHOD_ALIASES = {
+    f"{name}_": name
+    for name in keyword.kwlist
+}
+
+def normalize_python_keyword_alias(name):
+    if isinstance(name, str) and name.endswith("_") and keyword.iskeyword(name[:-1]):
+        return name[:-1]
+    return name
+
 JavaClassDef = java.type("io.micronaut.python.processing.visitor.ClassDef")
 JavaFuncDef = java.type("io.micronaut.python.processing.visitor.FunctionDef")
 JavaAttributeDef = java.type("io.micronaut.python.processing.visitor.AttributeDef")
@@ -97,6 +107,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.last_attribute = None  # Track last processed attribute for docstring handling
         self.in_function = False  # Track if we're inside a function definition
         self.java_type_assignments = {}  # Track java.type() assignments: variable_name -> full_qualified_name
+        self.java_keyword_method_aliases = {}  # Track keyword-safe aliases on Java type references
         self.imported_types = {}  # Track imported types: simple_name -> full_qualified_name
         self.local_classes = set()  # Track class names defined in this file
         self.local_constant_values = {}  # Track local class constants visible to annotation expressions
@@ -271,8 +282,10 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
                         if alias.asname:
                             self.imported_types[alias.asname] = full_name
+                            self._track_java_keyword_method_aliases(alias.asname, full_name)
                         else:
                             self.imported_types[alias.name] = full_name
+                            self._track_java_keyword_method_aliases(alias.name, full_name)
 
                 return super().visit(node)
             case ast.Import():
@@ -875,6 +888,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
             nested_name = f"{root}${'$'.join(tail)}"
             return f"{self.package_name}.{nested_name}" if self.package_name else nested_name
         base = self.imported_types.get(root) or self.java_type_assignments.get(root, root)
+        if root in self.java_keyword_method_aliases:
+            tail = [self._java_keyword_member_name(root, part) for part in tail]
         if len(tail) == 1:
             nested_type = self.java_type_assignments.get(tail[0])
             if nested_type and (
@@ -1055,7 +1070,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # For keyword args
             for kw in call_node.keywords:
                 if kw.arg:
-                    members[kw.arg] = convert_ast_value(kw.value, self)
+                    members[normalize_python_keyword_alias(kw.arg)] = convert_ast_value(kw.value, self)
 
             # Create DecoratorDef with annotationName = name (assuming it's a Micronaut annotation)
             return self.to_decorator_from_reference_with_members(decorator_name, members)
@@ -1390,13 +1405,36 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         full_qualified_name = ast.literal_eval(node.value.args[0])
                         if isinstance(full_qualified_name, str):
                             self.java_type_assignments[var_name] = full_qualified_name
+                            self._track_java_keyword_method_aliases(var_name, full_qualified_name, explicit_java_type=True)
                     except (ValueError, TypeError):
                         # Fallback to manual extraction for edge cases
                         arg_node = node.value.args[0]
                         if hasattr(arg_node, 'value') and isinstance(arg_node.value, str):
                             self.java_type_assignments[var_name] = arg_node.value
+                            self._track_java_keyword_method_aliases(var_name, arg_node.value, explicit_java_type=True)
                         elif hasattr(arg_node, 's') and isinstance(arg_node.s, str):
                             self.java_type_assignments[var_name] = arg_node.s
+                            self._track_java_keyword_method_aliases(var_name, arg_node.s, explicit_java_type=True)
+
+    def _track_java_keyword_method_aliases(self, var_name, full_qualified_name, explicit_java_type=False):
+        if explicit_java_type:
+            self.java_keyword_method_aliases[var_name] = PYTHON_KEYWORD_METHOD_ALIASES
+            return
+        if self.visitor_context is None:
+            return
+        try:
+            class_element = self.visitor_context.getClassElement(full_qualified_name).orElse(None)
+            if class_element is None:
+                return
+            self.java_keyword_method_aliases[var_name] = PYTHON_KEYWORD_METHOD_ALIASES
+        except BaseException:
+            pass
+
+    def _java_keyword_member_name(self, root, member_name):
+        aliases = self.java_keyword_method_aliases.get(root)
+        if aliases is None:
+            return member_name
+        return aliases.get(member_name, member_name)
 
     def _extract_docstring(self, node):
         """
@@ -1723,7 +1761,7 @@ def convert_ast_call_to_decorator(node, visitor=None):
 def merge_keyword_argument(result, kw, visitor=None):
     if kw.arg is not None:
         value = convert_ast_value(kw.value, visitor)
-        result[kw.arg] = value
+        result[normalize_python_keyword_alias(kw.arg)] = value
         return
 
     for key, value in extract_keyword_expansion(kw.value, visitor).items():
@@ -1810,8 +1848,9 @@ def extract_arg_defaults(func_node):
     # (here just represent as ast.dump for illustration)
     arg_dict = {}
     for arg, default in zip(arg_names, default_values):
+        member_name = normalize_python_keyword_alias(arg)
         if default is None:
-            arg_dict[arg] = None
+            arg_dict[member_name] = None
         else:
             try:
                 # Try to evaluate the value if it's a constant
@@ -1822,7 +1861,7 @@ def extract_arg_defaults(func_node):
                     val = default.id
                 else:
                     val = ast.dump(default)
-            arg_dict[arg] = val
+            arg_dict[member_name] = val
 
     return arg_dict
 
@@ -1841,7 +1880,7 @@ def extract_arg_decorators(visitor, func_node):
         ):
             _, decorators = visitor._parse_annotated_type(annotation)
             if decorators:
-                member_decorators[arg.arg] = decorators
+                member_decorators[normalize_python_keyword_alias(arg.arg)] = decorators
     return member_decorators
 
 def extract_arg_types(visitor, func_node):
@@ -1861,11 +1900,11 @@ def extract_arg_types(visitor, func_node):
         ):
             parsed_type, _ = visitor._parse_annotated_type(annotation)
             if parsed_type is not None:
-                member_types[arg.arg] = parsed_type
+                member_types[normalize_python_keyword_alias(arg.arg)] = parsed_type
         else:
             parsed_type = visitor._parse_type(annotation)
             if parsed_type is not None:
-                member_types[arg.arg] = parsed_type
+                member_types[normalize_python_keyword_alias(arg.arg)] = parsed_type
     return member_types
 
 def extract_call_arguments_with_defaults(funcdef, call, visitor=None):

@@ -22,10 +22,10 @@ class PojoWebSocketSpec:
 
     @Test
     def test_pojo_websocket_exchange(self):
-        fred = getattr(Flux, "from")(
+        fred = Flux.from_(
             self.wsClient.connect(PojoChatClientClass, "/pojo/chat/stuff/fred")
         ).blockFirst()
-        bob = getattr(Flux, "from")(
+        bob = Flux.from_(
             self.wsClient.connect(PojoChatClientClass, {"topic": "stuff", "username": "bob"})
         ).blockFirst()
 
@@ -43,7 +43,7 @@ class PojoWebSocketSpec:
         assert bob.getReplies().size() == 1
 
         assert fred.sendAsync(Message("foo")).get().getText() == "foo"
-        assert getattr(Flux, "from")(fred.sendRx(Message("bar"))).blockFirst().getText() == "bar"
+        assert Flux.from_(fred.sendRx(Message("bar"))).blockFirst().getText() == "bar"
 
         bob.close()
         fred.close()

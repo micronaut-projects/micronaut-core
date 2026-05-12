@@ -33,12 +33,12 @@ class BintrayService:
     org: Annotated[str, Value("${bintray.organization}")]  # <2>
 
     def fetchRepositories(self):
-        return getattr(Flux, "from")(
+        return Flux.from_(
             self.client.exchange(HttpRequest.GET("/repos/" + self.org), String)
         )  # <2>
 
     def fetchPackages(self, repo: str):
-        return getattr(Flux, "from")(
+        return Flux.from_(
             self.client.exchange(HttpRequest.GET("/repos/" + self.org + "/" + repo + "/packages"), String)
         )  # <2>
 # end::bintrayService[]

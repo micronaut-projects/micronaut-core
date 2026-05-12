@@ -38,7 +38,7 @@ class HelloControllerSpec:
     @Test
     def testRetrieveWithHeaders(self):
         # tag::headers[]
-        response = getattr(Flux, "from")(
+        response = Flux.from_(
             self.client.retrieve(
                 HttpRequest.GET("/hello/John").header("X-My-Header", "SomeValue")
             )
@@ -50,7 +50,7 @@ class HelloControllerSpec:
     @Test
     def testRetrieveWithJSON(self):
         # tag::jsonmap[]
-        response = getattr(Flux, "from")(
+        response = Flux.from_(
             self.client.retrieve(HttpRequest.GET("/greet/John"), Map)
         )
         # end::jsonmap[]
@@ -58,7 +58,7 @@ class HelloControllerSpec:
         assert "Hello John" == response.blockFirst().get("text")
 
         # tag::jsonmaptypes[]
-        response = getattr(Flux, "from")(
+        response = Flux.from_(
             self.client.retrieve(
                 HttpRequest.GET("/greet/John"),
                 Argument.of(Map, String, String),  # <1>
@@ -71,7 +71,7 @@ class HelloControllerSpec:
     @Test
     def testRetrieveWithPOJO(self):
         # tag::jsonpojo[]
-        response = getattr(Flux, "from")(
+        response = Flux.from_(
             self.client.retrieve(HttpRequest.GET("/greet/John"), MessageClass)
         )
 
@@ -81,7 +81,7 @@ class HelloControllerSpec:
     @Test
     def testRetrieveWithPOJOResponse(self):
         # tag::pojoresponse[]
-        call = getattr(Flux, "from")(
+        call = Flux.from_(
             self.client.exchange(
                 HttpRequest.GET("/greet/John"), MessageClass  # <1>
             )
@@ -97,7 +97,7 @@ class HelloControllerSpec:
     @Test
     def testPostRequestWithString(self):
         # tag::poststring[]
-        call = getattr(Flux, "from")(
+        call = Flux.from_(
             self.client.exchange(
                 HttpRequest.POST("/hello", "Hello John")  # <1>
                 .contentType(MediaType.TEXT_PLAIN_TYPE)
@@ -116,7 +116,7 @@ class HelloControllerSpec:
     @Test
     def testPostRequestWithPOJO(self):
         # tag::postpojo[]
-        call = getattr(Flux, "from")(
+        call = Flux.from_(
             self.client.exchange(
                 HttpRequest.POST("/greet", Message("Hello John")),  # <1>
                 MessageClass,  # <2>

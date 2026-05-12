@@ -47,7 +47,7 @@ class PersonController:
             self.inMemoryDatastore.put(self.firstName(p), p)  # <2>
             return HttpResponse.created(p)  # <3>
 
-        return getattr(Mono, "from")(person).map(save_reactive_person)
+        return Mono.from_(person).map(save_reactive_person)
     # end::single[]
 
     # tag::args[]
@@ -101,7 +101,7 @@ class PersonController:
         raise RuntimeException("Something went wrong")
 
     # tag::globalError[]
-    @Error(**{"global": True})  # <1>
+    @Error(global_=True)  # <1>
     def error(self, request: HttpRequest, e: Throwable) -> HttpResponse:
         error = JsonError("Bad Things Happened: " + e.getMessage()).link(  # <2>
             Link.SELF, Link.of(request.getUri())

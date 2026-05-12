@@ -18,7 +18,7 @@ class PetControllerSpec:
     @Test
     def testPostPet(self) -> None:
         # tag::post[]
-        pet = getattr(Mono, "from")(self.client.save("Dino", 10)).block()
+        pet = Mono.from_(self.client.save("Dino", 10)).block()
 
         assert pet.name == "Dino"
         assert pet.age == 10
@@ -27,7 +27,7 @@ class PetControllerSpec:
     @Test
     def testPostPetValidation(self) -> None:
         try:
-            getattr(Mono, "from")(self.client.save("Fred", -1)).block()
+            Mono.from_(self.client.save("Fred", -1)).block()
         except ConstraintViolationException as ex:
             assert str(ex.getMessage()) == "save.age: must be greater than or equal to 1"
         else:

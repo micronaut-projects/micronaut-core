@@ -3,6 +3,7 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.http.annotation.Error
 import io.micronaut.inject.ast.ClassElement
 
 class PythonAnnotationSpec extends AbstractPythonTypeElementSpec {
@@ -101,6 +102,26 @@ class ReplacementService:
             assert classElement.hasAnnotation(AnnotationUtil.SINGLETON)
             assert classElement.hasAnnotation(Replaces)
             assert classElement.getAnnotation(Replaces).annotationClassValue("value").get().name == "python.TargetService"
+            return classElement
+        }
+    }
+
+    void "test Python keyword-safe annotation members are normalized"() {
+        expect:
+        buildClassElement("""
+from micronaut.http.annotation import Controller, Error
+
+@Controller("/errors")
+class ErrorController:
+    @Error(global_=True)
+    def global_error(self) -> str:
+        return "handled"
+""", "ErrorController") { ClassElement classElement ->
+            def method = classElement.getMethods().find { it.name == "global_error" }
+            assert method != null
+            assert method.hasAnnotation(Error)
+            assert method.getAnnotation(Error).booleanValue("global").get()
+            assert !method.getAnnotation(Error).booleanValue("global_").isPresent()
             return classElement
         }
     }

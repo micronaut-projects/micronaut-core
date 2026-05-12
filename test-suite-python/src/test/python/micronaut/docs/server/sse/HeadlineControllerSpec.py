@@ -20,7 +20,7 @@ class HeadlineControllerSpec:
 
     @Test
     def testConsumeEventStreamObject(self):
-        events = getattr(Flux, "from")(
+        events = Flux.from_(
             self.client.eventStream(HttpRequest.GET("/headlines"), HeadlineClass)
         ).collectList().block()
 

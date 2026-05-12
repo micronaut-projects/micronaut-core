@@ -3,6 +3,16 @@ import keyword
 import re
 from typing import Optional, Dict, List, Any
 
+PYTHON_KEYWORD_METHOD_ALIASES = {
+    f"{name}_": name
+    for name in keyword.kwlist
+}
+
+def normalize_python_keyword_alias(name: str) -> str:
+    if name.endswith('_') and keyword.iskeyword(name[:-1]):
+        return name[:-1]
+    return name
+
 # Import ast.unparse if available (Python 3.9+), otherwise use a fallback
 try:
     from ast import unparse
@@ -59,6 +69,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.generated_decorator_code = {}
         self.java_class_imports = {}
         self.java_interface_names = set()
+        self.java_keyword_method_aliases = {}
         self.has_java_import = False
         self.exported_types = []
         self.all_class_names = []
@@ -233,7 +244,7 @@ def micronaut_annotation(name, repeated=None):
                     self.exported_types.append(node.name)
                     break
         node.decorator_list = [
-            self._normalize_bare_generated_decorator(decorator)
+            self._normalize_decorator(decorator)
             for decorator in node.decorator_list
         ]
         self.class_depth += 1
@@ -245,7 +256,7 @@ def micronaut_annotation(name, repeated=None):
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.FunctionDef:
         node.decorator_list = [
-            self._normalize_bare_generated_decorator(decorator)
+            self._normalize_decorator(decorator)
             for decorator in node.decorator_list
         ]
         self.function_depth += 1
@@ -257,7 +268,7 @@ def micronaut_annotation(name, repeated=None):
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AsyncFunctionDef:
         node.decorator_list = [
-            self._normalize_bare_generated_decorator(decorator)
+            self._normalize_decorator(decorator)
             for decorator in node.decorator_list
         ]
         self.function_depth += 1
@@ -274,6 +285,21 @@ def micronaut_annotation(name, repeated=None):
         """
         self._track_java_type_assignment(node)
         return self.generic_visit(node)
+
+    def visit_Attribute(self, node: ast.Attribute):
+        self.generic_visit(node)
+        java_method_name = self._java_keyword_method_name(node)
+        if java_method_name is None:
+            return node
+
+        return ast.copy_location(
+            ast.Call(
+                func=ast.Name(id='getattr', ctx=ast.Load()),
+                args=[node.value, ast.Constant(java_method_name)],
+                keywords=[]
+            ),
+            node
+        )
 
     def _get_decorator_name(self, decorator) -> Optional[str]:
         """
@@ -294,6 +320,19 @@ def micronaut_annotation(name, repeated=None):
                 return decorator.value.id
         return None
 
+    def _normalize_decorator(self, decorator):
+        decorator = self._normalize_bare_generated_decorator(decorator)
+        if isinstance(decorator, ast.Call) and self._is_generated_annotation_call(decorator):
+            self._normalize_annotation_keyword_arguments(decorator)
+        return decorator
+
+    def _is_generated_annotation_call(self, call: ast.Call) -> bool:
+        if isinstance(call.func, ast.Name):
+            return call.func.id in self.generated_decorators
+        if isinstance(call.func, ast.Attribute):
+            return call.func.attr in self.generated_decorators
+        return False
+
     def _normalize_bare_generated_decorator(self, decorator):
         """
         Convert @GeneratedAnnotation to @GeneratedAnnotation() so generated decorators
@@ -306,6 +345,32 @@ def micronaut_annotation(name, repeated=None):
             call = ast.Call(func=decorator, args=[], keywords=[])
             return ast.copy_location(call, decorator)
         return decorator
+
+    def _normalize_annotation_keyword_arguments(self, call: ast.Call):
+        """
+        Rewrite decorator keyword aliases such as global_=True to **{"global": True}
+        so generated runtime Python sources remain syntactically valid.
+        """
+        normalized_keywords = []
+        for kw in call.keywords:
+            if kw.arg is None:
+                normalized_keywords.append(kw)
+                continue
+
+            normalized_name = normalize_python_keyword_alias(kw.arg)
+            if normalized_name == kw.arg:
+                normalized_keywords.append(kw)
+                continue
+
+            expansion = ast.keyword(
+                arg=None,
+                value=ast.Dict(
+                    keys=[ast.Constant(normalized_name)],
+                    values=[kw.value]
+                )
+            )
+            normalized_keywords.append(expansion)
+        call.keywords = normalized_keywords
 
     def _handle_specific_import(self, original_module_name: str, transformed_module_name: str, alias) -> bool:
         """
@@ -368,9 +433,11 @@ def micronaut_annotation(name, repeated=None):
         class_name = self._java_type_name(node.value)
         if not class_name:
             return
+        variable_name = node.targets[0].id
+        self._track_java_keyword_method_aliases(variable_name)
         class_element = self.callback_get_class_element(class_name)
         if class_element:
-            self._track_java_class(node.targets[0].id, class_element)
+            self._track_java_class(variable_name, class_element)
 
     def _track_java_class(self, variable_name: str, class_element):
         try:
@@ -378,6 +445,30 @@ def micronaut_annotation(name, repeated=None):
                 self.java_interface_names.add(variable_name)
         except Exception:
             pass
+        self._track_java_keyword_method_aliases(variable_name)
+
+    def _track_java_keyword_method_aliases(self, variable_name: str):
+        self.java_keyword_method_aliases[variable_name] = PYTHON_KEYWORD_METHOD_ALIASES
+
+    def _java_keyword_method_name(self, node: ast.Attribute) -> Optional[str]:
+        if not isinstance(node.ctx, ast.Load):
+            return None
+        if not node.attr.endswith('_'):
+            return None
+
+        method_name = node.attr[:-1]
+        if not keyword.iskeyword(method_name):
+            return None
+
+        owner_name = self._base_name(node.value)
+        if owner_name is None:
+            return None
+
+        aliases = self.java_keyword_method_aliases.get(owner_name)
+        if aliases is None:
+            return None
+
+        return aliases.get(node.attr)
 
     def _is_java_interface_base(self, base: ast.AST) -> bool:
         class_name = self._java_type_name(base)

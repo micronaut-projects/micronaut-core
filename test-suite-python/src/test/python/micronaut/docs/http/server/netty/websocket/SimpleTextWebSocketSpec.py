@@ -20,10 +20,10 @@ class SimpleTextWebSocketSpec:
 
     @Test
     def test_simple_text_websocket_exchange(self):
-        fred = getattr(Flux, "from")(
+        fred = Flux.from_(
             self.wsClient.connect(ChatClientClass, "/chat/stuff/fred")
         ).blockFirst()
-        bob = getattr(Flux, "from")(
+        bob = Flux.from_(
             self.wsClient.connect(ChatClientClass, {"topic": "stuff", "username": "bob"})
         ).blockFirst()
 
@@ -45,7 +45,7 @@ class SimpleTextWebSocketSpec:
         assert bob.getReplies().size() == 1
 
         assert fred.sendAsync("foo").get() == "foo"
-        assert getattr(Flux, "from")(fred.sendRx("bar")).blockFirst() == "bar"
+        assert Flux.from_(fred.sendRx("bar")).blockFirst() == "bar"
 
         bob.close()
         fred.close()

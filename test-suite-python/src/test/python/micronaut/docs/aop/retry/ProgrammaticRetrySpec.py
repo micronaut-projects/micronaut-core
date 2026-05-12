@@ -25,7 +25,7 @@ class ProgrammaticRetrySpec:
         assert service.list_books()[0].get_title() == "The Stand"
 
         service.reset()
-        assert getattr(Mono, "from")(service.stream_books()).block().get_title() == "The Stand"
+        assert Mono.from_(service.stream_books()).block().get_title() == "The Stand"
 
         service.reset()
         assert service.find_book("The Stand").toCompletableFuture().get().get_title() == "The Stand"
