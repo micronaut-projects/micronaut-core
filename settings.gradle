@@ -109,6 +109,60 @@ boolean isValidZip(File file) {
     }
 }
 
+String xmlEscape(String value) {
+    value
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")
+}
+
+File writeGraalPyBundleMavenSettings(File repoDir, String checkoutSha) {
+    def settingsFile = file("checkouts/maven-bundles/graalpy/${checkoutSha}-settings.xml")
+    settingsFile.parentFile.mkdirs()
+    def repoUrl = xmlEscape(repoDir.toURI().toString())
+    settingsFile.text = """<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
+  <profiles>
+    <profile>
+      <id>graalpy-bundle</id>
+      <repositories>
+        <repository>
+          <id>graalpy-bundle</id>
+          <url>${repoUrl}</url>
+          <releases>
+            <enabled>true</enabled>
+          </releases>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+        </repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>graalpy-bundle</id>
+          <url>${repoUrl}</url>
+          <releases>
+            <enabled>true</enabled>
+          </releases>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+        </pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+  <activeProfiles>
+    <activeProfile>graalpy-bundle</activeProfile>
+  </activeProfiles>
+</settings>
+"""
+    settingsFile
+}
+
 String resolveGraalPyBundleUrl(String graalpyVersion) {
     def configuredUrl = firstGradleProperty("micronaut.graalpy.bundle.url", "pyronaut.graalpy.bundle.url")
     if (configuredUrl != null) {
@@ -228,9 +282,12 @@ File ensureGraalPyBundleRepo(File checkoutDir, String graalpyVersion) {
     }
 
     if (!graalPyExtensionsReady(repoDir, graalpyVersion)) {
+        def settingsFile = writeGraalPyBundleMavenSettings(repoDir, checkoutSha)
         runCommand(
             checkoutDir,
             "./mvnw",
+            "-s",
+            settingsFile.absolutePath,
             "-pl",
             "org.graalvm.python.embedding,org.graalvm.python.embedding.tools",
             "-am",

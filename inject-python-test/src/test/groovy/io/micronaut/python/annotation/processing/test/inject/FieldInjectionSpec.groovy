@@ -6,6 +6,28 @@ import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementS
 import io.micronaut.runtime.server.EmbeddedServer
 
 class FieldInjectionSpec extends AbstractPythonTypeElementSpec {
+    void "test field injection generic metadata"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated, List
+from jakarta.inject import Inject, Singleton
+
+class Bar:
+    pass
+
+@Singleton
+class MainService:
+    bars: Annotated[List[Bar], Inject] = None
+'''
+
+        when:
+        def definition = buildBeanDefinition("python", "MainService", pythonCode)
+        def injectedArgument = definition.injectedMethods.find { it.methodName == "setBars" }.arguments[0]
+
+        then:
+        injectedArgument.asArgument().firstTypeVariable.get().type.name == "python.Bar"
+    }
+
     void "test field injection with Annotated[Type, Inject] syntax - imported type"() {
         given: "Python code with field injection"
         def pythonCode = '''

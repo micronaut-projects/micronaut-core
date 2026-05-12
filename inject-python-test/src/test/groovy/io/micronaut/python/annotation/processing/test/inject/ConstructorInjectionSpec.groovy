@@ -241,6 +241,53 @@ class Vehicle:
         context?.close()
     }
 
+    void "test constructor injection with jakarta provider"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+import java
+
+Provider = java.type("jakarta.inject.Provider")
+
+class Engine:
+    @Executable
+    def start(self) -> str:
+        return "base"
+
+@Singleton
+class V8Engine(Engine):
+    @Executable
+    def start(self) -> str:
+        return "Vrooom! 8"
+
+@Singleton
+class Vehicle:
+    def __init__(self, engine: Provider[Engine]):
+        self.engine = engine
+
+    @Executable
+    def start(self) -> str:
+        return self.engine.get().start()
+
+'''
+        when:
+        def context = buildContext(pythonCode)
+        def carService = getBean(context, "python.Vehicle")
+        def definition = getBeanDefinition(context, "python.Vehicle")
+        def providerArgument = definition.constructor.arguments[0]
+
+        then:
+        providerArgument.type.name == "jakarta.inject.Provider"
+        providerArgument.typeParameters[0].type.name == "python.Engine"
+        providerArgument.isProvider()
+        carService.start() == "Vrooom! 8"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test constructor injection with typed Dict container type"() {
         given: "Python code with constructor injection using Dict type"
         def pythonCode = '''
