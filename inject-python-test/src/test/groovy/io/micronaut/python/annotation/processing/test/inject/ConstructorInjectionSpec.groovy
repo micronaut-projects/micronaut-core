@@ -401,6 +401,56 @@ class ListConstructorService:
         context?.close()
     }
 
+    void "test constructor injection list excludes abstract beans"() {
+        given:
+        def context = buildContext('''
+from abc import ABC, abstractmethod
+from typing import List
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+class InterceptRule(ABC):
+    @abstractmethod
+    def name(self) -> str:
+        pass
+
+@Singleton
+class AbstractBean(InterceptRule, ABC):
+    @abstractmethod
+    def name(self) -> str:
+        pass
+
+@Singleton
+class ConcreteBean(InterceptRule):
+    @Executable
+    def name(self) -> str:
+        return "concrete"
+
+@Singleton
+class Test:
+    def __init__(self, rules: List[InterceptRule]):
+        self.rules = rules
+
+    @Executable
+    def rule_count(self) -> int:
+        return len(self.rules)
+
+    @Executable
+    def rule_names(self) -> str:
+        return ",".join(sorted([rule.name() for rule in self.rules]))
+''')
+
+        when:
+        def bean = getBean(context, "python.Test")
+
+        then:
+        bean.rule_count() == 1
+        bean.rule_names() == "concrete"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test constructor injection with named qualifiers"() {
         given: "Python code with named qualifier injection"
         def pythonCode = '''
