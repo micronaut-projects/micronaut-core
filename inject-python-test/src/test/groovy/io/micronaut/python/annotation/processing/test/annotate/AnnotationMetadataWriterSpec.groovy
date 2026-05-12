@@ -514,4 +514,56 @@ class Test:
         metadata.doubleValue(PrimitiveTypesAnnotation, "doubleArray").asDouble == 1.1d
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0005")
+    void "test annotation default values are available from annotation value"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from jakarta.inject import Singleton
+
+def Topic(value: str, qos: int = 1):
+    def decorator(func):
+        return func
+    return decorator
+
+@Singleton
+@Topic("test")
+class Test:
+    pass
+''')
+
+        when:
+        def annotationValue = definition.getAnnotationValuesByName("python.Topic")[0]
+
+        then:
+        annotationValue.getRequiredValue("qos", Integer) == 1
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0006")
+    void "test annotation default values are written for constructor arguments"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from typing import Annotated
+from jakarta.inject import Singleton
+
+def ParamAnn(value: str = "default"):
+    def decorator(func):
+        return func
+    return decorator
+
+@Singleton
+class Foo:
+    pass
+
+@Singleton
+class Test:
+    def __init__(self, foo: Annotated[Foo, ParamAnn]):
+        self.foo = foo
+''')
+
+        expect:
+        definition.constructor.arguments[0].annotationMetadata
+            .getAnnotationType("python.ParamAnn")
+            .isPresent()
+    }
+
 }
