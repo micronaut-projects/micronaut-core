@@ -90,6 +90,9 @@ If Python already has equivalent coverage, the source feature is cataloged as co
 | Java/Groovy/Kotlin executable method tests for `@Executable` and executable metadata | `ExecutableMethodSpec` |
 | Java/Groovy/Kotlin factory bean method tests for factory method scope and lifecycle behavior | `inject/factory/beanmethod/FactoryBeanMethodSpec` |
 | Java/Groovy/Kotlin constructor, method, field, provider, collection, and qualifier injection tests | `inject/ConstructorInjectionSpec` including both `BeanProvider` and `jakarta.inject.Provider`, `inject/MethodInjectionSpec`, and `inject/FieldInjectionSpec` |
+| `inject-java/src/test/groovy/io/micronaut/inject/qualifiers/named/NamedQualifierSpec.groovy` / named qualifier injection | `inject/ConstructorInjectionSpec.test constructor injection with named qualifiers`, `inject/MethodInjectionSpec.test method injection with named qualifiers`, and `inject/FieldInjectionSpec.test field injection with named qualifiers` |
+| `inject-java/src/test/groovy/io/micronaut/inject/qualifiers/annotation/AnnotationQualifierSpec.groovy` / annotation qualifier injection | `inject/ConstructorInjectionSpec.test constructor injection with annotation qualifiers` |
+| `inject-java/src/test/groovy/io/micronaut/inject/qualifiers/repeatable/RepeatableQualifierSpec.groovy` / repeatable qualifier injection and declared qualifier lookup | `inject/RepeatableQualifierSpec` |
 | Java/Groovy/Kotlin lifecycle tests for post-construct/pre-destroy behavior | `inject/PythonLifecycleSpec` |
 | Java/Groovy/Kotlin bean introspection tests for dataclass properties, constructor instantiation, nested object equality, generated proxy property exclusion, and serde stereotypes | `BeanIntrospectionSpec` |
 | Java/Groovy/Kotlin AOP/interceptor metadata tests that assert around/introduction bindings | `AroundAdviceSpec`, `IntroductionAdviceSpec`, `IntroductionGenericInterfaceSpec`, and `MapperIntroductionSpec` |
