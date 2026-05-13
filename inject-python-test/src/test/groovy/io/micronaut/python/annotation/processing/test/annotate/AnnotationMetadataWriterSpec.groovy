@@ -1,5 +1,6 @@
 package io.micronaut.python.annotation.processing.test.annotate
 
+import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
@@ -127,6 +128,53 @@ class Test:
         properties[3].get("name", String).get() == "prop1"
         properties[4].get("name", String).get() == "prop3"
         properties[4].getValue(String).get() == "value3"
+    }
+
+    void "test method annotation metadata overrides class property metadata"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import Executable, Property
+from jakarta.inject import Singleton
+
+@Property(name="myprop", value="xyz")
+@Singleton
+class Test:
+
+    @Property(name="myprop", value="abc")
+    @Executable
+    def someMethod(self):
+        pass
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod").annotationMetadata
+
+        then:
+        metadata.stringValue(Property).get() == "abc"
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0018")
+    void "test method annotation metadata merges configuration reader metadata"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import ConfigurationProperties, Executable
+
+@ConfigurationProperties(value="xyz", includes=["abc"], excludes=["lol"])
+class Test:
+
+    @ConfigurationProperties(value="qwe", excludes=["foo"])
+    @Executable
+    def someMethod(self):
+        pass
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod").annotationMetadata
+
+        then:
+        metadata.stringValue(ConfigurationReader, "prefix").get() == "qwe"
+        metadata.stringValue(ConfigurationReader, "includes").get() == "abc"
+        metadata.stringValue(ConfigurationReader, "excludes").get() == "foo"
     }
 
     void "test repeatable annotations are combined, lookup by name"() {
