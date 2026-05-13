@@ -445,6 +445,38 @@ class TaskFactory:
         ContextHolder.resetContext()
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0044")
+    void "test invalid exposed factory method type fails compilation"() {
+        given:
+        ApplicationContext context = null
+
+        when:
+        context = buildContext('''\
+from micronaut.context.annotation import Bean, Factory, Prototype
+
+class ExposedType:
+    pass
+
+class Product:
+    pass
+
+@Factory
+class ProductFactory:
+    @Prototype
+    @Bean(typed=[ExposedType])
+    def product(self) -> Product:
+        return Product()
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Bean defines an exposed type [python.ExposedType] that is not implemented by the bean type")
+
+        cleanup:
+        context?.close()
+        ContextHolder.resetContext()
+    }
+
     @Unroll
     void "test factory method can produce multiple #scopeName beans from list return"() {
         given:
