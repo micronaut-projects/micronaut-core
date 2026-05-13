@@ -17,7 +17,10 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
+import io.micronaut.context.annotation.Requires
+import io.micronaut.context.condition.OperatingSystem
 import io.micronaut.context.exceptions.NoSuchBeanException
+import spock.lang.PendingFeature
 
 class RequiresSpec extends AbstractPythonTypeElementSpec {
 
@@ -82,6 +85,42 @@ class MyBean:
 
         then:
         !definition.isEnabled(context)
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test requires property not equals"() {
+        given:
+        def definition = buildBeanDefinition("python", "MyBean", '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Requires
+
+@Requires(property="feature.mode", notEquals="disabled")
+@Singleton
+class MyBean:
+    pass
+''')
+
+        when:
+        def context = startContext(["feature.mode": "active"])
+
+        then:
+        definition.isEnabled(context)
+
+        when:
+        context.close()
+        context = startContext(["feature.mode": "disabled"])
+
+        then:
+        !definition.isEnabled(context)
+
+        when:
+        context.close()
+        context = startContext()
+
+        then:
+        definition.isEnabled(context)
 
         cleanup:
         context?.close()
@@ -226,6 +265,47 @@ class MyBean:
         context?.close()
     }
 
+    void "test meta requires condition"() {
+        given:
+        def definition = buildBeanDefinition("python", "MyBean", '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Requires
+
+@Requires(property="feature.meta", value="enabled")
+@Requires(beans=str)
+def MetaRequires(cls):
+    return cls
+
+@MetaRequires
+@Singleton
+class MyBean:
+    pass
+''')
+
+        when:
+        def context = startContext(["feature.meta": "enabled"])
+
+        then:
+        !definition.isEnabled(context)
+
+        when:
+        context.registerSingleton(String, "present")
+
+        then:
+        definition.isEnabled(context)
+
+        when:
+        context.close()
+        context = startContext(["feature.meta": "disabled"])
+        context.registerSingleton(String, "present")
+
+        then:
+        !definition.isEnabled(context)
+
+        cleanup:
+        context?.close()
+    }
+
     void "test requires environment"() {
         given:
         def definition = buildBeanDefinition("python", "MyBean", '''
@@ -318,6 +398,81 @@ class MissingAbsentClassBean:
         requiresClassDefinition.isEnabled(BeanContext.build())
         !missingPresentClassDefinition.isEnabled(BeanContext.build())
         missingAbsentClassDefinition.isEnabled(BeanContext.build())
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0051")
+    void "test requires java sdk"() {
+        given:
+        def supportedDefinition = buildBeanDefinition("python", "SupportedBean", '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Requires
+
+@Requires(sdk=Requires.Sdk.JAVA, version="8")
+@Singleton
+class SupportedBean:
+    pass
+''')
+        def unsupportedDefinition = buildBeanDefinition("python", "UnsupportedBean", '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Requires
+
+@Requires(sdk=Requires.Sdk.JAVA, version="800")
+@Singleton
+class UnsupportedBean:
+    pass
+''')
+        def context = startContext()
+
+        expect:
+        supportedDefinition.isEnabled(context)
+        !unsupportedDefinition.isEnabled(context)
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0052")
+    void "test requires operating system"() {
+        given:
+        def osDefinition = buildBeanDefinition("python", "OsBean", '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Requires
+
+@Requires(os=[Requires.Family.WINDOWS, Requires.Family.MAC_OS])
+@Singleton
+class OsBean:
+    pass
+''')
+        def notOsDefinition = buildBeanDefinition("python", "NotOsBean", '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Requires
+
+@Requires(notOs=[Requires.Family.WINDOWS, Requires.Family.MAC_OS])
+@Singleton
+class NotOsBean:
+    pass
+''')
+
+        when:
+        OperatingSystem.instance = new OperatingSystem(Requires.Family.LINUX)
+        def context = startContext()
+
+        then:
+        !osDefinition.isEnabled(context)
+        notOsDefinition.isEnabled(context)
+
+        when:
+        context.close()
+        OperatingSystem.instance = new OperatingSystem(Requires.Family.WINDOWS)
+        context = startContext()
+
+        then:
+        osDefinition.isEnabled(context)
+        !notOsDefinition.isEnabled(context)
+
+        cleanup:
+        OperatingSystem.instance = null
+        context?.close()
     }
 
     private static ApplicationContext startContext(Map properties = [:], String... environments) {
