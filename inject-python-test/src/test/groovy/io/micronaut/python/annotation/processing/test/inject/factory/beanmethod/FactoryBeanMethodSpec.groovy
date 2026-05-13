@@ -32,6 +32,8 @@ import jakarta.inject.Singleton
 import spock.lang.PendingFeature
 import spock.lang.Unroll
 
+import java.util.function.Function
+
 class FactoryBeanMethodSpec extends AbstractPythonTypeElementSpec {
     void "test factory bean with preDestroy"() {
         given:
@@ -181,6 +183,42 @@ class TestFactory:
         bar1BeanDefinition.getBeanDescription(TypeInformation.TypeFormat.SHORTENED) == '@i.m.c.a.Prototype p.Bar1 p.TestFactory.bar()'
         bar1 != null
         bar1BeanDefinition.getScope().get() == Prototype.class
+
+        cleanup:
+        context.close()
+    }
+
+    void "test executable annotation on factory method returning function"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory, Bean, Executable
+from java.util.function import Function
+
+class EchoFunction(Function[str, str]):
+    def apply(self, value: str) -> str:
+        return value
+
+@Factory
+class FunctionFactory:
+
+    @Bean
+    @Executable
+    def my_func(self) -> Function[str, str]:
+        return EchoFunction()
+''')
+
+        when:
+        def definition = context.getBeanDefinition(Function)
+        def bean = context.getBean(Function)
+
+        then:
+        definition.findMethod("apply", String).isPresent()
+        definition.getTypeArguments(Function).size() == 2
+        definition.getTypeArguments(Function)[0].name == "T"
+        definition.getTypeArguments(Function)[1].name == "R"
+        definition.getTypeArguments(Function)[0].type == String
+        definition.getTypeArguments(Function)[1].type == String
+        bean.apply("ok") == "ok"
 
         cleanup:
         context.close()
