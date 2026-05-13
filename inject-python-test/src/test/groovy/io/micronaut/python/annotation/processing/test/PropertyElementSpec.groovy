@@ -103,6 +103,25 @@ class MyDto:
         }
     }
 
+    void "test protocol bean properties"() {
+        expect:
+        buildClassElement('''
+from typing import Protocol
+
+class HealthResult(Protocol):
+    name: str
+    status: object
+    details: object
+''', "HealthResult") { ClassElement element ->
+            def properties = element.beanProperties
+
+            assert properties
+            assert properties*.name as Set == ["name", "status", "details"] as Set
+            assert properties.find { it.name == "name" }.type.name == String.name
+            return element
+        }
+    }
+
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0034")
     void "test inherited properties keep declaring and owning types"() {
         expect:
