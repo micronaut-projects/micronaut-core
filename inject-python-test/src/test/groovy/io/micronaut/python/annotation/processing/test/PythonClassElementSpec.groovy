@@ -30,6 +30,7 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
 import io.micronaut.python.compiler.RepeatableAnnotation
 import spock.lang.PendingFeature
@@ -772,6 +773,34 @@ class PrimitiveService:
             assert method.parameters*.type*.name == ["int", "boolean", "double"]
             assert method.parameters*.type*.canonicalName == ["int", "boolean", "double"]
             assert method.parameters.every { it.type.primitive }
+            return element
+        }
+    }
+
+    def "test primitive method types compare with primitive elements"() {
+        given:
+        def pythonCode = '''
+class PrimitiveComparison:
+    def enabled(self, count: int) -> bool:
+        return count > 0
+'''
+
+        expect:
+        buildClassElement(pythonCode, "PrimitiveComparison") { ClassElement element ->
+            def method = element.findMethod("enabled").get()
+            def parameterType = method.parameters[0].type
+            def returnType = method.returnType
+
+            assert element != PrimitiveElement.BOOLEAN
+            assert element != PrimitiveElement.VOID
+            assert element != PrimitiveElement.BOOLEAN.withArrayDimensions(4)
+            assert PrimitiveElement.VOID != element
+            assert PrimitiveElement.INT != element
+            assert PrimitiveElement.INT.withArrayDimensions(2) != element
+            assert parameterType == PrimitiveElement.INT
+            assert PrimitiveElement.INT == parameterType
+            assert returnType == PrimitiveElement.BOOLEAN
+            assert PrimitiveElement.BOOLEAN == returnType
             return element
         }
     }
