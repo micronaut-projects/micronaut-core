@@ -16,6 +16,7 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.Blocking
 import io.micronaut.python.aop.TestAround
 import spock.lang.PendingFeature
 import spock.lang.Specification
@@ -324,6 +325,66 @@ class Test:
         then:
         result == "second"
         secondInterceptor.invoked
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0057")
+    void "test overridden around-advised method inherits base method metadata"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from micronaut.context.annotation import Executable, Value
+from micronaut.core.annotation import Blocking
+from jakarta.inject import Singleton
+import java
+
+@Around
+def Mutating(cls):
+    return cls
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return context.proceed()
+
+class MyInterface:
+    @Blocking
+    @Executable
+    def some_method(self) -> str:
+        pass
+
+@Mutating
+@Singleton
+class MyBean(MyInterface):
+    def __init__(self, value: Annotated[str, Value("${foo.bar}")]):
+        self.value = value
+
+    def some_method(self) -> str:
+        return self.value
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, ["foo.bar": "test"])
+        def definition = getBeanDefinition(context, "python.MyBean")
+        def executableMethod = definition.executableMethods.find { it.methodName == "some_method" }
+        def requiredMethod = definition.getRequiredMethod("some_method")
+        def bean = getBean(context, "python.MyBean")
+
+        then:
+        definition != null
+        !definition.isAbstract()
+        definition.injectedFields.size() == 0
+        executableMethod != null
+        executableMethod.hasAnnotation(Blocking)
+        !executableMethod.hasDeclaredAnnotation(Blocking)
+        requiredMethod.hasAnnotation(Blocking)
+        bean.some_method() == "test"
 
         cleanup:
         context?.close()
