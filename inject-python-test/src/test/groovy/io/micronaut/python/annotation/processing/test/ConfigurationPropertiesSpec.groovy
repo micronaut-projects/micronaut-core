@@ -291,6 +291,35 @@ class DatabaseConfig:
         context?.close()
     }
 
+    void "test configuration property names with numbers"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import ConfigurationProperties
+
+@ConfigurationProperties("aws")
+class AwsConfig:
+    disable_ec2_metadata: str
+    disable_ec_metadata: str
+    disable_ec2instance_metadata: str
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "aws.disable-ec2-metadata": "disabled",
+                "aws.disable-ec-metadata": "enabled",
+                "aws.disable-ec2instance-metadata": "instance-disabled"
+        ])
+        def configBean = getBean(context, "python.AwsConfig")
+
+        then:
+        configBean.disable_ec2_metadata == "disabled"
+        configBean.disable_ec_metadata == "enabled"
+        configBean.disable_ec2instance_metadata == "instance-disabled"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test @ConfigurationProperties on Python class with @property decorator"() {
         given:
         def pythonCode = '''
