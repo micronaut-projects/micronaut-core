@@ -1,6 +1,9 @@
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.aop.InterceptorBinding
+import io.micronaut.aop.InterceptorKind
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Mapper
 
 class MapperIntroductionSpec extends AbstractPythonTypeElementSpec {
 
@@ -41,9 +44,15 @@ class ContactMappers(ABC):
         when:
         Class<?> mapperClass = ctx.classLoader.loadClass('python.ContactMappers')
         def mapper = ctx.getBean(mapperClass)
+        def definition = ctx.getBeanDefinition(mapperClass)
+        def binding = definition.annotationMetadata.getAnnotation(InterceptorBinding)
 
         then:
         mapper != null
+        definition.annotationMetadata.hasAnnotation(Mapper)
+        binding != null
+        binding.classValue().get() == Mapper
+        binding.enumValue("kind", InterceptorKind).get() == InterceptorKind.INTRODUCTION
 
         cleanup:
         ctx?.close()
