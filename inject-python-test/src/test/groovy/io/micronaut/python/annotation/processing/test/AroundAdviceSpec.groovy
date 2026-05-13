@@ -17,6 +17,7 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.python.aop.TestAround
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
 /**
@@ -261,5 +262,198 @@ class TestClass:
         context?.close()
     }
 
+    void "test method level interceptor matching"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Around
+from jakarta.inject import Singleton
+import java
+
+@Around
+def First(func):
+    return func
+
+@Around
+def Second(func):
+    return func
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(First)
+class FirstInterceptor(MethodInterceptor):
+    invoked: bool = False
+
+    def intercept(self, context : MethodInvocationContext):
+        self.invoked = True
+        return context.proceed()
+
+@InterceptorBean(Second)
+class SecondInterceptor(MethodInterceptor):
+    invoked: bool = False
+
+    def intercept(self, context : MethodInvocationContext):
+        self.invoked = True
+        return context.proceed()
+
+@Singleton
+class Test:
+    @First
+    def first(self) -> str:
+        return "first"
+
+    @Second
+    def second(self) -> str:
+        return "second"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def testBean = getBean(context, "python.Test")
+        def firstInterceptor = getBean(context, "python.FirstInterceptor")
+        def secondInterceptor = getBean(context, "python.SecondInterceptor")
+        def result = testBean.first()
+
+        then:
+        result == "first"
+        firstInterceptor.invoked
+        !secondInterceptor.invoked
+
+        when:
+        result = testBean.second()
+
+        then:
+        result == "second"
+        secondInterceptor.invoked
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0054")
+    void "test multiple around annotations on a single method"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Around
+from jakarta.inject import Singleton
+import java
+
+@Around
+def First(func):
+    return func
+
+@Around
+def Second(func):
+    return func
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(First)
+class FirstInterceptor(MethodInterceptor):
+    invoked: bool = False
+
+    def intercept(self, context : MethodInvocationContext):
+        self.invoked = True
+        return context.proceed()
+
+@InterceptorBean(Second)
+class SecondInterceptor(MethodInterceptor):
+    invoked: bool = False
+
+    def intercept(self, context : MethodInvocationContext):
+        self.invoked = True
+        return context.proceed()
+
+@Singleton
+class Test:
+    @First
+    @Second
+    def run(self) -> str:
+        return "done"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def testBean = getBean(context, "python.Test")
+        def firstInterceptor = getBean(context, "python.FirstInterceptor")
+        def secondInterceptor = getBean(context, "python.SecondInterceptor")
+
+        then:
+        testBean.run() == "done"
+        firstInterceptor.invoked
+        secondInterceptor.invoked
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0055")
+    void "test interceptor with multiple around bindings requires all method bindings"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Around
+from jakarta.inject import Singleton
+import java
+
+@Around
+def First(func):
+    return func
+
+@Around
+def Second(func):
+    return func
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean([First, Second])
+class BothInterceptor(MethodInterceptor):
+    count: int = 0
+
+    def intercept(self, context : MethodInvocationContext):
+        self.count += 1
+        return context.proceed()
+
+@Singleton
+class Test:
+    @First
+    def first(self) -> str:
+        return "first"
+
+    @Second
+    def second(self) -> str:
+        return "second"
+
+    @First
+    @Second
+    def both(self) -> str:
+        return "both"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def testBean = getBean(context, "python.Test")
+        def interceptor = getBean(context, "python.BothInterceptor")
+        def result = testBean.first()
+
+        then:
+        result == "first"
+        interceptor.count == 0
+
+        when:
+        result = testBean.second()
+
+        then:
+        result == "second"
+        interceptor.count == 0
+
+        when:
+        result = testBean.both()
+
+        then:
+        result == "both"
+        interceptor.count == 1
+
+        cleanup:
+        context?.close()
+    }
 
 }
