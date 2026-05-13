@@ -396,6 +396,70 @@ class EntityProperties:
         context?.close()
     }
 
+    void "test configuration inject constructor with beans and other configs"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import ConfigurationInject, ConfigurationProperties, Executable
+
+@ConfigurationProperties("xyz")
+class OtherConfig:
+    name: str
+
+@Singleton
+class OtherSingleton:
+    pass
+
+@ConfigurationProperties("foo.bar")
+class ConfigWithConstructor:
+    @ConfigurationInject
+    def __init__(
+        self,
+        host: str,
+        server_port: int,
+        other_config: OtherConfig,
+        other_singleton: OtherSingleton
+    ):
+        self.host = host
+        self.server_port = server_port
+        self.other_config = other_config
+        self.other_singleton = other_singleton
+
+    @Executable
+    def get_host(self) -> str:
+        return self.host
+
+    @Executable
+    def get_server_port(self) -> int:
+        return self.server_port
+
+    @Executable
+    def get_other_config(self) -> OtherConfig:
+        return self.other_config
+
+    @Executable
+    def get_other_singleton(self) -> OtherSingleton:
+        return self.other_singleton
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "foo.bar.host": "test",
+                "foo.bar.server-port": "123",
+                "xyz.name": "other"
+        ])
+        def configBean = getBean(context, "python.ConfigWithConstructor")
+
+        then:
+        configBean.get_host() == "test"
+        configBean.get_server_port() == 123
+        configBean.get_other_config().name == "other"
+        configBean.get_other_singleton() != null
+
+        cleanup:
+        context?.close()
+    }
+
     void "test @ConfigurationProperties on Python class with @property decorator"() {
         given:
         def pythonCode = '''
