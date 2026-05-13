@@ -15,14 +15,18 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.aop.Around
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
+import io.micronaut.inject.ProxyBeanDefinition
+import io.micronaut.validation.Validated
 import jakarta.validation.Constraint
 import jakarta.validation.Valid
 import jakarta.validation.constraints.*
 import org.intellij.lang.annotations.Language
+import spock.lang.PendingFeature
 
 /**
  * Tests for Jakarta validation annotation processing in Python code.
@@ -31,6 +35,44 @@ import org.intellij.lang.annotations.Language
  * @since 4.8.0
  */
 class ValidationAnnotationSpec extends AbstractPythonTypeElementSpec {
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0048")
+    def "test constraints on singleton methods make them validated"() {
+        given:
+        @Language("python") def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from typing import Annotated
+from jakarta.validation import Valid
+from jakarta.validation.constraints import NotBlank
+
+@Singleton
+class ProductService:
+    @Executable
+    def set_name(self, name: Annotated[str, NotBlank]):
+        pass
+
+    @Executable
+    def set_nested(self, nested: Annotated[str, Valid]):
+        pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.ProductService")
+        def setName = definition.getExecutableMethods().find { it.methodName == "set_name" }
+        def setNested = definition.getExecutableMethods().find { it.methodName == "set_nested" }
+
+        then:
+        definition instanceof ProxyBeanDefinition
+        setName != null
+        setName.hasStereotype(Validated)
+        setNested != null
+        setNested.getAnnotationTypesByStereotype(Around).contains(Validated)
+
+        cleanup:
+        context?.close()
+    }
 
     def "test dataclass attributes with Jakarta validation annotations"() {
         given: "Python dataclass with validation annotations on attributes"
