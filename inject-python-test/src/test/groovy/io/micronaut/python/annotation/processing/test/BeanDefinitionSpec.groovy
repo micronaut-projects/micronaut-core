@@ -438,6 +438,28 @@ class MyFunction(Function[str, str]):
         definition.getTypeArguments(Function)[1].type == String
     }
 
+    void "test recursive generic type arguments from definition"() {
+        given:
+        def definition = buildBeanDefinition("python", "RecursiveService", '''
+from typing import Generic, TypeVar
+from jakarta.inject import Singleton
+
+T = TypeVar("T", bound="RecursiveGeneric")
+
+class RecursiveGeneric(Generic[T]):
+    pass
+
+@Singleton
+class RecursiveService(RecursiveGeneric["RecursiveService"]):
+    pass
+''')
+
+        expect:
+        definition != null
+        definition.getTypeArguments("python.RecursiveGeneric").size() == 1
+        definition.getTypeArguments("python.RecursiveGeneric")[0].type.name == "python.RecursiveService"
+    }
+
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0041")
     void "test generic bean type from factory method"() {
         given:
