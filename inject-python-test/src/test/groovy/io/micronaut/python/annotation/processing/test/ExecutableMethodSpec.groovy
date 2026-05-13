@@ -55,6 +55,35 @@ class ExecutableService:
         context?.close()
     }
 
+    def "test executable method exposes return and argument types"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+@Executable
+class Calculator:
+    def round_value(self, num: float) -> int:
+        return round(num)
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def beanDefinition = getBeanDefinition(context, "python.Calculator")
+        def bean = getBean(context, "python.Calculator")
+        def executableMethod = beanDefinition.executableMethods.find { it.methodName == "round_value" }
+
+        then:
+        executableMethod != null
+        executableMethod.arguments[0].type == Double.TYPE
+        executableMethod.returnType.type == Integer.TYPE
+        bean.round_value(1.6d) == 2
+
+        cleanup:
+        context?.close()
+    }
+
     def "test class-level @Executable produces executable methods"() {
         given:
         def pythonCode = '''
