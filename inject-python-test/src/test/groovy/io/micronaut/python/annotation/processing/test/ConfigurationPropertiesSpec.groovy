@@ -366,6 +366,36 @@ class ExcludedConfig:
         context?.close()
     }
 
+    void "test configuration properties post construct sees bound values"() {
+        given:
+        def pythonCode = '''
+from jakarta.annotation import PostConstruct
+from micronaut.context.annotation import ConfigurationProperties
+
+@ConfigurationProperties("app.entity")
+class EntityProperties:
+    prop: str
+    initialized_prop: str = None
+
+    @PostConstruct
+    def init(self):
+        self.initialized_prop = self.prop
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "app.entity.prop": "configured"
+        ])
+        def configBean = getBean(context, "python.EntityProperties")
+
+        then:
+        configBean.prop == "configured"
+        configBean.initialized_prop == "configured"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test @ConfigurationProperties on Python class with @property decorator"() {
         given:
         def pythonCode = '''
