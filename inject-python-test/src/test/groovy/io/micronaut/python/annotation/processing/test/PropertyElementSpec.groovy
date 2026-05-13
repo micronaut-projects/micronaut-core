@@ -113,6 +113,33 @@ class MyDto:
         }
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0049")
+    void "test property type argument annotations remain after bean properties are resolved"() {
+        expect:
+        buildClassElement('''
+from typing import Annotated
+from jakarta.validation import Valid
+from micronaut.core.annotation import Introspected
+
+@Introspected
+class Ingredient:
+    name: str
+
+class Salad:
+    ingredients: list[Annotated[Ingredient, Valid]]
+''', "Salad") { ClassElement element ->
+            def properties = element.beanProperties.collectEntries { [it.name, it] }
+            def ingredients = properties["ingredients"]
+
+            assert ingredients != null
+            assert ingredients.field.isEmpty()
+            def ingredientType = ingredients.type.firstTypeArgument.get()
+            assert ingredientType.name == "python.Ingredient"
+            assert ingredientType.annotationMetadata.hasStereotype("jakarta.validation.Valid")
+            return element
+        }
+    }
+
     void "test protocol bean properties"() {
         expect:
         buildClassElement('''
