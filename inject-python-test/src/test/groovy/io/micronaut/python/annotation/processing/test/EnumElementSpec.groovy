@@ -54,4 +54,24 @@ class Status(enum.Enum):
             return element
         }
     }
+
+    void "test enum method return and parameter types"() {
+        expect:
+        buildClassElement('''
+from micronaut.http import HttpMethod
+
+class Route:
+    def handle(self, argument: HttpMethod) -> HttpMethod:
+        return argument
+''', "Route") { ClassElement element ->
+            def method = element.findMethod("handle").get()
+
+            assert method.returnType instanceof EnumElement
+            assert method.returnType.values().contains("GET")
+            assert method.parameters.size() == 1
+            assert method.parameters[0].type instanceof EnumElement
+            assert method.parameters[0].type.values().contains("POST")
+            return element
+        }
+    }
 }
