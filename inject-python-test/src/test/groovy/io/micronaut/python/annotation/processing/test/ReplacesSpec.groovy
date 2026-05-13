@@ -101,4 +101,94 @@ class ReplacementPrimaryEngine(Engine):
         cleanup:
         context?.close()
     }
+
+    void "test factory can replace another factory"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Factory, Replaces
+
+class Engine:
+    def name(self) -> str:
+        return "base"
+
+class V6Engine(Engine):
+    def name(self) -> str:
+        return "v6"
+
+class V8Engine(Engine):
+    def name(self) -> str:
+        return "v8"
+
+@Factory
+class EngineFactory:
+    @Singleton
+    def engine(self) -> Engine:
+        return V6Engine()
+
+@Factory
+@Replaces(factory=EngineFactory)
+class ReplacementEngineFactory:
+    @Singleton
+    def engine(self) -> Engine:
+        return V8Engine()
+''')
+
+        when:
+        def engineType = context.classLoader.loadClass("python.Engine")
+        def engines = context.getBeansOfType(engineType)
+        def engine = engines.first().asPolyglotValue()
+
+        then:
+        engines.size() == 1
+        engine.invokeMember("name").asString() == "v8"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test factory method can replace another factory method"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Factory, Replaces
+
+class Engine:
+    def name(self) -> str:
+        return "base"
+
+class V6Engine(Engine):
+    def name(self) -> str:
+        return "v6"
+
+class V8Engine(Engine):
+    def name(self) -> str:
+        return "v8"
+
+@Factory
+class EngineFactory:
+    @Singleton
+    def engine(self) -> Engine:
+        return V6Engine()
+
+@Factory
+class ReplacementEngineFactory:
+    @Singleton
+    @Replaces(value=Engine, factory=EngineFactory)
+    def engine(self) -> Engine:
+        return V8Engine()
+''')
+
+        when:
+        def engineType = context.classLoader.loadClass("python.Engine")
+        def engines = context.getBeansOfType(engineType)
+        def engine = engines.first().asPolyglotValue()
+
+        then:
+        engines.size() == 1
+        engine.invokeMember("name").asString() == "v8"
+
+        cleanup:
+        context?.close()
+    }
 }
