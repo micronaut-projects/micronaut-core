@@ -590,6 +590,45 @@ class MyClass:
         }
     }
 
+    def "test annotations from python types propagate to method type elements"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class Product:
+    name: str
+
+class ProductService:
+    def save(self, product: Product) -> Product:
+        return product
+
+    def list_products(self, products: list[Product]) -> list[Product]:
+        return products
+'''
+
+        expect:
+        buildClassElement(pythonCode, "ProductService") { ClassElement element ->
+            def save = element.findMethod("save").get()
+            assert save.returnType.hasAnnotation("io.micronaut.core.annotation.Introspected")
+            assert save.genericReturnType.hasAnnotation("io.micronaut.core.annotation.Introspected")
+            assert save.parameters[0].type.hasAnnotation("io.micronaut.core.annotation.Introspected")
+            assert save.parameters[0].genericType.hasAnnotation("io.micronaut.core.annotation.Introspected")
+
+            def listProducts = element.findMethod("list_products").get()
+            def returnTypeArgument = listProducts.genericReturnType.firstTypeArgument.get()
+            assert returnTypeArgument.name == "python.Product"
+            assert returnTypeArgument.hasAnnotation("io.micronaut.core.annotation.Introspected")
+
+            def parameterTypeArgument = listProducts.parameters[0].genericType.firstTypeArgument.get()
+            assert parameterTypeArgument.name == "python.Product"
+            assert parameterTypeArgument.hasAnnotation("io.micronaut.core.annotation.Introspected")
+            return element
+        }
+    }
+
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0024")
     def "test nullability on generic return type arguments"() {
         given:
