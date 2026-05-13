@@ -79,6 +79,7 @@ import reactor.core.publisher.Mono
 import spock.lang.Execution
 import spock.lang.Ignore
 import spock.lang.Specification
+import spock.lang.Timeout
 import spock.lang.Unroll
 
 import java.nio.charset.StandardCharsets
@@ -286,6 +287,45 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    @Timeout(30)
+    def 'h2c prior knowledge fails against http1 peer'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.plaintext-mode': 'h2c_prior_knowledge',
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupH2c()
+        patch(client, conn)
+
+        when:
+        def future = Mono.from(client.exchange('http://example.com/foo', String)).toFuture()
+        conn.advance()
+
+        then:
+        def preface = conn.serverChannel.readInbound()
+        preface instanceof io.netty.handler.codec.http.HttpRequest
+        preface.method().name() == 'PRI'
+        preface.uri() == '*'
+        conn.serverChannel.readInbound() instanceof LastHttpContent
+
+        when:
+        conn.clientChannel.close()
+        conn.advance()
+        future.get()
+
+        then:
+        def e = thrown ExecutionException
+        e.cause != null
+
+        assertPoolConnections(client, 0)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     def 'http1 streaming get'() {
         def ctx = ApplicationContext.run(['spec.name': ConnectionManagerSpec.simpleName])
         def client = ctx.getBean(DefaultHttpClient)
@@ -484,6 +524,7 @@ class ConnectionManagerSpec extends Specification {
         client.close()
         ctx.close()
     }
+
 
     def 'http2 customization'(boolean secure) {
         given:

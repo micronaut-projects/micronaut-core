@@ -23,9 +23,6 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
-import io.micronaut.runtime.ApplicationConfiguration;
-import jakarta.inject.Inject;
-
 import java.net.URI;
 import java.time.Duration;
 import java.util.Collections;
@@ -83,77 +80,11 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      *
      * @param serviceId The service id
      * @param connectionPoolConfiguration The connection pool configuration
-     * @param sslConfiguration The SSL configuration
-     * @param applicationConfiguration The application configuration
-     */
-    public ServiceHttpClientConfiguration(
-            @Parameter String serviceId,
-            @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
-            @Nullable ServiceSslClientConfiguration sslConfiguration,
-            ApplicationConfiguration applicationConfiguration) {
-        super(applicationConfiguration);
-        this.serviceId = serviceId;
-        if (sslConfiguration != null) {
-            setSslConfiguration(sslConfiguration);
-        }
-        if (connectionPoolConfiguration != null) {
-            this.connectionPoolConfiguration = connectionPoolConfiguration;
-        } else {
-            this.connectionPoolConfiguration = new ServiceConnectionPoolConfiguration();
-        }
-        this.webSocketCompressionConfiguration = new ServiceWebSocketCompressionConfiguration();
-        this.http2Configuration = new ServiceHttp2ClientConfiguration();
-    }
-
-    /**
-     * Creates a new client configuration for the given service ID.
-     *
-     * @param serviceId The service id
-     * @param connectionPoolConfiguration The connection pool configuration
-     * @param sslConfiguration The SSL configuration
-     * @param defaultHttpClientConfiguration The default HTTP client configuration
-     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration , ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
-     */
-    @Deprecated(since = "4.3.0")
-    public ServiceHttpClientConfiguration(
-            @Parameter String serviceId,
-            @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
-            @Nullable ServiceSslClientConfiguration sslConfiguration,
-            HttpClientConfiguration defaultHttpClientConfiguration) {
-        this(serviceId, connectionPoolConfiguration, new ServiceWebSocketCompressionConfiguration(), sslConfiguration, defaultHttpClientConfiguration);
-    }
-
-    /**
-     * Creates a new client configuration for the given service ID.
-     *
-     * @param serviceId The service id
-     * @param connectionPoolConfiguration The connection pool configuration
-     * @param webSocketCompressionConfiguration The WebSocket compression configuration
-     * @param sslConfiguration The SSL configuration
-     * @param defaultHttpClientConfiguration The default HTTP client configuration
-     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration , ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
-     */
-    @Deprecated(since = "4.6.0")
-    public ServiceHttpClientConfiguration(
-        @Parameter String serviceId,
-        @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
-        @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
-        @Nullable ServiceSslClientConfiguration sslConfiguration,
-        HttpClientConfiguration defaultHttpClientConfiguration) {
-        this(serviceId, connectionPoolConfiguration, webSocketCompressionConfiguration, new ServiceHttp2ClientConfiguration(), sslConfiguration, defaultHttpClientConfiguration);
-    }
-
-    /**
-     * Creates a new client configuration for the given service ID.
-     *
-     * @param serviceId The service id
-     * @param connectionPoolConfiguration The connection pool configuration
      * @param webSocketCompressionConfiguration The WebSocket compression configuration
      * @param http2Configuration The HTTP/2 configuration
      * @param sslConfiguration The SSL configuration
      * @param defaultHttpClientConfiguration The default HTTP client configuration
      */
-    @Inject
     public ServiceHttpClientConfiguration(
             @Parameter String serviceId,
             @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,

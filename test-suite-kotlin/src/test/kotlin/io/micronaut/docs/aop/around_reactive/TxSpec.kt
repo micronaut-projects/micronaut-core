@@ -15,8 +15,8 @@
  */
 package io.micronaut.docs.aop.around_reactive
 
-import io.kotest.common.runBlocking
 import io.micronaut.context.ApplicationContext
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 

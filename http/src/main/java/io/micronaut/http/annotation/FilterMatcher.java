@@ -17,7 +17,11 @@ package io.micronaut.http.annotation;
 
 import io.micronaut.http.HttpMethod;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * Stereotype annotation that helps to link together instance of the filter and http client that filter should be applied to.

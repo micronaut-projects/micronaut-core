@@ -67,3 +67,7 @@ tasks.withType<Test>().configureEach {
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 //compileTestGroovy.groovyOptions.fork = true
+
+micronautBuild {
+    binaryCompatibility.enabledAfter("5.0.0")
+}

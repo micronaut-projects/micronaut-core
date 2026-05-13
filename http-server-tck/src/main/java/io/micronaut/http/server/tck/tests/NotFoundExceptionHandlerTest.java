@@ -16,7 +16,12 @@
 package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.exceptions.ErrorResponseProcessorExceptionHandler;
 import io.micronaut.http.server.exceptions.NotFoundException;

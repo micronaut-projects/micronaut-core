@@ -30,7 +30,9 @@ import java.net.URI;
 import java.util.Optional;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
