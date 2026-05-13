@@ -29,6 +29,7 @@ import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
@@ -366,6 +367,60 @@ class MyBase(Generic[T]):
             def placeholder = placeholders[0]
             assert placeholder.getVariableName() == "T"
 
+            return element
+        }
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0043")
+    def "test generic return type argument keeps class placeholder model"() {
+        given:
+        def pythonCode = '''
+from typing import Generic, TypeVar
+
+T = TypeVar('T')
+
+class Box(Generic[T]):
+    pass
+
+class MyGeneric(Generic[T]):
+    def items(self) -> list[T]:
+        return []
+
+    def box(self) -> Box[T]:
+        return Box()
+'''
+
+        expect:
+        buildClassElement(pythonCode, "MyGeneric") { ClassElement element ->
+            def items = element.findMethod("items").get()
+            def itemsGenericArgument = items.genericReturnType.typeArguments["E"]
+            def itemsArgument = items.returnType.typeArguments["E"]
+
+            assert itemsGenericArgument instanceof GenericPlaceholderElement
+            assert itemsGenericArgument.genericPlaceholder
+            assert !itemsGenericArgument.rawType
+            assert !itemsGenericArgument.wildcard
+            assert (itemsGenericArgument as GenericPlaceholderElement).variableName == "T"
+            assert (itemsGenericArgument as GenericPlaceholderElement).declaringElement.get() == element
+
+            assert itemsArgument instanceof GenericPlaceholderElement
+            assert itemsArgument.genericPlaceholder
+            assert !itemsArgument.rawType
+            assert !itemsArgument.wildcard
+            assert (itemsArgument as GenericPlaceholderElement).variableName == "T"
+            assert (itemsArgument as GenericPlaceholderElement).declaringElement.get() == element
+
+            def box = element.findMethod("box").get()
+            def boxGenericArgument = box.genericReturnType.typeArguments["T"]
+            def boxArgument = box.returnType.typeArguments["T"]
+
+            assert boxGenericArgument instanceof GenericPlaceholderElement
+            assert (boxGenericArgument as GenericPlaceholderElement).variableName == "T"
+            assert (boxGenericArgument as GenericPlaceholderElement).declaringElement.get() == element
+
+            assert boxArgument instanceof GenericPlaceholderElement
+            assert (boxArgument as GenericPlaceholderElement).variableName == "T"
+            assert (boxArgument as GenericPlaceholderElement).declaringElement.get() == element
             return element
         }
     }
