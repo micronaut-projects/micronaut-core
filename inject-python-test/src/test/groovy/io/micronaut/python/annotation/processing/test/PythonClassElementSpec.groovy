@@ -27,6 +27,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
@@ -808,6 +809,35 @@ class QueryService(Parent):
             assert declared*.name as Set == ["declared_method", "declared_abstract"] as Set
             assert abstractMethods*.name as Set == ["declared_abstract", "inherited_abstract"] as Set
             assert concrete*.name as Set == ["declared_method", "parent_method"] as Set
+            return element
+        }
+    }
+
+    def "test constructor element query returns declared and inherited constructors"() {
+        given:
+        def pythonCode = '''
+class Parent:
+    def __init__(self, name: str):
+        self.name = name
+
+class ConstructorService(Parent):
+    def __init__(self, name: str, count: int):
+        super().__init__(name)
+        self.count = count
+'''
+
+        expect:
+        buildClassElement(pythonCode, "ConstructorService") { ClassElement element ->
+            def declaredConstructors = element.getEnclosedElements(ElementQuery.CONSTRUCTORS)
+            def allConstructors = element.getEnclosedElements(ElementQuery.of(ConstructorElement))
+
+            assert declaredConstructors.size() == 1
+            assert declaredConstructors.first().declaringType.name == "python.ConstructorService"
+            assert declaredConstructors.first().parameters*.name == ["name", "count"]
+            assert declaredConstructors.first().parameters*.type*.name == [String.name, "int"]
+
+            assert allConstructors.size() == 2
+            assert allConstructors*.declaringType*.name as Set == ["python.Parent", "python.ConstructorService"] as Set
             return element
         }
     }
