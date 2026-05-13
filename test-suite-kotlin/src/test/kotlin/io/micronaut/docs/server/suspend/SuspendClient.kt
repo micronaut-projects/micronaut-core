@@ -44,4 +44,7 @@ interface SuspendClient {
     @Get("/illegal", consumes = [MediaType.ALL])
     suspend fun errorCallResponse(): HttpResponse<String>
 
+    @Get("/keepRequestScopeAfterClientCall", consumes = [MediaType.TEXT_PLAIN])
+    suspend fun keepRequestScopeAfterClientCall(): String
+
 }

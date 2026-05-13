@@ -65,6 +65,7 @@ dependencies {
     testImplementation(libs.bcpkix)
 
     testImplementation(libs.managed.reactor)
+    testImplementation(libs.micrometer.context.propagation)
 
     testImplementation(libs.javax.persistence)
     testImplementation(libs.jakarta.persistence)

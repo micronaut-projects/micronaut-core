@@ -231,6 +231,14 @@ class SuspendControllerSpec : StringSpec() {
             response.status shouldBe HttpStatus.OK
         }
 
+        "test keeping request scope after suspend client call" {
+            val response = client.exchange(GET<Any>("/suspend/keepRequestScopeAfterClientCall"), String::class.java).awaitSingle()
+            val body = response.body.get()
+            val (beforeRequestId, _, afterRequestId, _) = body.split(',')
+            beforeRequestId shouldBe afterRequestId
+            response.status shouldBe HttpStatus.OK
+        }
+
         "test request context is available for completed upload coroutine factory" {
             val body = MultipartBody.builder()
                 .addPart("file", "file.json", io.micronaut.http.MediaType.APPLICATION_JSON_TYPE, "{\"title\":\"Foo\"}".toByteArray())

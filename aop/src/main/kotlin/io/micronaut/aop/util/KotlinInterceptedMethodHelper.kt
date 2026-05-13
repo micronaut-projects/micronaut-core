@@ -17,9 +17,9 @@ package io.micronaut.aop.util
 
 import io.micronaut.core.annotation.Experimental
 import io.micronaut.core.annotation.Internal
+import io.micronaut.core.propagation.PropagatedContext
 import java.util.concurrent.CompletionException
 import java.util.concurrent.CompletionStage
-import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 /**
@@ -34,18 +34,28 @@ internal object KotlinInterceptedMethodHelper {
     @JvmStatic
     suspend fun handleResult(result: CompletionStage<*>, isUnitValueType: Boolean): Any? =
         suspendCoroutine { continuation ->
+            val propagatedContext = PropagatedContext.find().orElse(null)
             result.whenComplete { value: Any?, throwable: Throwable? ->
-                if (throwable == null) {
-                    val res = Result.success(value ?: if (isUnitValueType) Unit else null)
-                    continuation.resumeWith(res)
+                val resumedResult = toCoroutineResult(value, throwable, isUnitValueType)
+                if (propagatedContext == null) {
+                    continuation.resumeWith(resumedResult)
                 } else {
-                    val exception = if (throwable is CompletionException) {
-                        throwable.cause ?: throwable
-                    } else {
-                        throwable
-                    }
-                    continuation.resumeWithException(exception)
+                    propagatedContext.propagate { continuation.resumeWith(resumedResult) }
                 }
             }
+        }
+
+    private fun toCoroutineResult(value: Any?, throwable: Throwable?, isUnitValueType: Boolean): Result<Any?> =
+        if (throwable == null) {
+            Result.success(value ?: if (isUnitValueType) Unit else null)
+        } else {
+            Result.failure(unwrapCompletionException(throwable))
+        }
+
+    private fun unwrapCompletionException(throwable: Throwable): Throwable =
+        if (throwable is CompletionException) {
+            throwable.cause ?: throwable
+        } else {
+            throwable
         }
 }
