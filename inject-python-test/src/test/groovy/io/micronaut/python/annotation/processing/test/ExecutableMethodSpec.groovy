@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
 
@@ -97,6 +98,33 @@ class Utility:
 
         then:
         definition == null
+    }
+
+    def "test executable method metadata includes bean scope"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class MetadataService:
+    @Executable
+    def some_method(self) -> None:
+        pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def beanDefinition = getBeanDefinition(context, "python.MetadataService")
+        def method = beanDefinition.findMethod("some_method").get()
+
+        then:
+        beanDefinition.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
+        method.annotationMetadata.hasAnnotation(AnnotationUtil.SINGLETON)
+        method.annotationMetadata.hasDeclaredAnnotation(Executable)
+
+        cleanup:
+        context?.close()
     }
 
     def "test class-level @Executable produces executable methods"() {
