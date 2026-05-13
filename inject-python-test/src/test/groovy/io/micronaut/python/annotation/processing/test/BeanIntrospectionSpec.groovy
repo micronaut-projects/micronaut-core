@@ -18,6 +18,7 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.python.compiler.Serdeable
 import spock.lang.PendingFeature
 
@@ -278,6 +279,44 @@ class TestPropertyClass:
         instance.full_name() == 'John Doe'
         // Note: Property access will depend on whether getters/setters are properly generated
         // This test verifies the basic structure is in place
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0053")
+    void "test generic placeholders for bean properties"() {
+        given:
+        def pythonCode = '''
+from micronaut.core.annotation import Introspected
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bound=str)
+
+@Introspected
+class Test(Generic[T]):
+    property: T
+    values: list[T]
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.Test")
+        def property = introspection.getRequiredProperty("property", String)
+        def propertyArgument = property.asArgument()
+        def values = introspection.getRequiredProperty("values", List)
+        def valueArgument = values.asArgument().getFirstTypeVariable().orElse(null)
+
+        then:
+        propertyArgument instanceof GenericPlaceholder
+        propertyArgument.variableName == "T"
+        propertyArgument.name == "property"
+        propertyArgument.type == String
+
+        valueArgument instanceof GenericPlaceholder
+        valueArgument.name == "E"
+        valueArgument.variableName == "T"
+        valueArgument.type == String
 
         cleanup:
         context?.close()
