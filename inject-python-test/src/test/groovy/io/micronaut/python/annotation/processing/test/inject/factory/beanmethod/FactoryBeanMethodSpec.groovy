@@ -457,6 +457,49 @@ class ProductFactory:
         context.close()
     }
 
+    void "test each bean factory can disable individual candidates"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import EachBean, EachProperty, Factory
+import java
+
+DisabledBeanException = java.type("io.micronaut.context.exceptions.DisabledBeanException")
+
+@EachProperty("engines")
+class EngineConfiguration:
+    cylinders: int
+    enabled: bool = True
+
+class Engine:
+    def __init__(self, cylinders: int):
+        self.cylinders = cylinders
+
+@Factory
+class EngineFactory:
+    @EachBean(EngineConfiguration.__qualname__)
+    def build_engine(self, config: EngineConfiguration) -> Engine:
+        if not config.enabled:
+            raise DisabledBeanException("Engine configuration disabled")
+        return Engine(config.cylinders)
+''', false, [
+                "engines.subaru.cylinders": "4",
+                "engines.ford.cylinders": "8",
+                "engines.ford.enabled": false,
+                "engines.lamborghini.cylinders": "12"
+        ])
+        def engineClass = context.classLoader.loadClass("python.Engine")
+
+        when:
+        def engines = context.getBeansOfType(engineClass)
+
+        then:
+        engines.size() == 2
+        engines.collect { it.asPolyglotValue().getMember("cylinders").asInt() }.sort() == [4, 12]
+
+        cleanup:
+        context.close()
+    }
+
     @PendingFeature(reason = "support static methods")
     void "test a factory bean with static method"() {
         given:
