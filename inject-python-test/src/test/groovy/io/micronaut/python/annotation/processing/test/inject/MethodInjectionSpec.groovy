@@ -1,5 +1,6 @@
 package io.micronaut.python.annotation.processing.test.inject
 
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 
 class MethodInjectionSpec extends AbstractPythonTypeElementSpec {
@@ -271,6 +272,65 @@ class NamedQualifierService:
         service.get_thing_two_name() == "two"
 
         cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
+
+    void "test method injection qualifier metadata"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from jakarta.inject import Singleton, Named, Inject, Qualifier
+
+@Qualifier
+def One(func):
+    return func
+
+class Thing:
+    def get_name(self) -> str:
+        return "Thing"
+
+@Singleton
+@One
+class ThingOne(Thing):
+    def get_name(self) -> str:
+        return "one"
+
+@Singleton
+@Named("two")
+class ThingTwo(Thing):
+    def get_name(self) -> str:
+        return "two"
+
+@Singleton
+class QualifiedMethodService:
+    def __init__(self):
+        self.thing_one = None
+        self.thing_two = None
+
+    @Inject
+    def set_thing_one(self, thing_one: Annotated[Thing, One]):
+        self.thing_one = thing_one
+
+    @Inject
+    def set_thing_two(self, thing_two: Annotated[Thing, Named("two")]):
+        self.thing_two = thing_two
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.QualifiedMethodService")
+        def injectedArguments = definition.injectedMethods.collect { it.arguments[0] }
+        def bean = getBean(context, "python.QualifiedMethodService")
+
+        then:
+        definition.injectedMethods.size() == 2
+        injectedArguments.every {
+            it.annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).isPresent()
+        }
+        bean.asPolyglotValue().getMember("thing_one").invokeMember("get_name").asString() == "one"
+        bean.asPolyglotValue().getMember("thing_two").invokeMember("get_name").asString() == "two"
+
+        cleanup:
         context?.close()
     }
 }
