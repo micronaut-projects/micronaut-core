@@ -204,6 +204,26 @@ class OrderedService:
         definition.intValue(Order).getAsInt() == 10
     }
 
+    @Unroll
+    void "test priority annotation maps to order preserving #priority"() {
+        given:
+        def definition = buildBeanDefinition("python", "PriorityService", """
+from jakarta.annotation import Priority
+from jakarta.inject import Singleton
+
+@Singleton
+@Priority(${priority})
+class PriorityService:
+    pass
+""")
+
+        expect:
+        definition.intValue(Order).getAsInt() == priority
+
+        where:
+        priority << [10, -3]
+    }
+
     void "test qualifier for named only"() {
         given:
         def definition = buildBeanDefinition("python", "NamedService", '''
