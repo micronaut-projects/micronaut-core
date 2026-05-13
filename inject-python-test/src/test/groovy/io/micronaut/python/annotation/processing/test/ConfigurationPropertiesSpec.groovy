@@ -18,6 +18,7 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.env.Environment
+import io.micronaut.inject.ValidatedBeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.PendingFeature
 
@@ -28,6 +29,23 @@ import spock.lang.PendingFeature
  * @since 4.8.0
  */
 class ConfigurationPropertiesSpec extends AbstractPythonTypeElementSpec {
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0050")
+    void "test configuration properties with constraints is validating bean definition"() {
+        given:
+        def definition = buildBeanDefinition("python", "ServiceConfig", '''
+from typing import Annotated
+from micronaut.context.annotation import ConfigurationProperties
+from jakarta.validation.constraints import NotBlank
+
+@ConfigurationProperties("service")
+class ServiceConfig:
+    name: Annotated[str, NotBlank]
+''')
+
+        expect:
+        definition instanceof ValidatedBeanDefinition
+    }
+
     @PendingFeature(reason = "Fails with 'Non writable or non-existent member key 'cylinders' which is likely a GraalPy bug")
     void "test each property on Python class tht implements Java interface"() {
         given:
