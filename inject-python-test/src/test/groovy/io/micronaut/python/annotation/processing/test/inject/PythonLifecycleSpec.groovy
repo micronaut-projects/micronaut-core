@@ -15,9 +15,69 @@
  */
 package io.micronaut.python.annotation.processing.test.inject
 
+import io.micronaut.inject.DisposableBeanDefinition
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 
 class PythonLifecycleSpec extends AbstractPythonTypeElementSpec {
+
+    void "test post construct method alone does not create bean definition"() {
+        when:
+        def definition = buildBeanDefinition("python", "LifecycleService", '''
+from jakarta.annotation import PostConstruct
+
+class LifecycleService:
+    @PostConstruct
+    def initialize(self):
+        pass
+''')
+
+        then:
+        definition == null
+    }
+
+    void "test inject constructor without lifecycle method creates bean definition"() {
+        when:
+        def definition = buildBeanDefinition("python", "LifecycleService", '''
+from jakarta.inject import Inject
+
+class LifecycleService:
+    @Inject
+    def __init__(self):
+        pass
+''')
+
+        then:
+        definition != null
+        definition.postConstructMethods.empty
+        definition.preDestroyMethods.empty
+    }
+
+    void "test post construct and pre destroy metadata on inject constructor bean"() {
+        when:
+        def definition = buildBeanDefinition("python", "LifecycleService", '''
+from jakarta.annotation import PostConstruct, PreDestroy
+from jakarta.inject import Inject
+
+class LifecycleService:
+    @Inject
+    def __init__(self):
+        pass
+
+    @PostConstruct
+    def initialize(self):
+        pass
+
+    @PreDestroy
+    def close(self):
+        pass
+''')
+
+        then:
+        definition != null
+        definition.postConstructMethods.size() == 1
+        definition.preDestroyMethods.size() == 1
+        definition instanceof DisposableBeanDefinition
+    }
 
     void "test @PostConstruct method is called during bean initialization"() {
         given: "Python code with a singleton bean that has a @PostConstruct method"
