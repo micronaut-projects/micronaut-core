@@ -1,11 +1,44 @@
 package io.micronaut.python.annotation.processing.test.event
 
+import io.micronaut.context.event.ApplicationEventListener
+import io.micronaut.context.event.ShutdownEvent
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import org.graalvm.polyglot.Value
 import spock.lang.PendingFeature
 import spock.util.concurrent.PollingConditions
 
 class PythonEventListenerSpec extends AbstractPythonTypeElementSpec {
+
+    void "test event listener with failing requirements is not present"() {
+        given:
+        def context = buildContext('''
+from dataclasses import dataclass
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Requires
+from micronaut.runtime.event.annotation import EventListener
+
+@dataclass
+class SampleEvent:
+    message : str = "Something happened"
+
+@Requires(property="not.present")
+@Singleton
+class DisabledSampleEventListener:
+    invocation_count : int = 0
+
+    @EventListener
+    def on_sample_event(self, event : SampleEvent):
+        self.invocation_count += 1
+''')
+        def listenerType = context.classLoader.loadClass("python.DisabledSampleEventListener")
+
+        expect:
+        !context.containsBean(listenerType)
+        context.getBeansOfType(ApplicationEventListener).isEmpty()
+
+        cleanup:
+        context?.close()
+    }
 
     @PendingFeature(reason = "GraalPy has a bug that doesn't allow constructors for types that implement a java interface")
     void "test python event listener via interface with java event"() {
@@ -95,6 +128,41 @@ class SampleEventListener2:
         then:
         value.getMember("invocation_count").asInt() == 1
         value2.getMember("invocation_count").asInt() == 1
+    }
+
+    void "test multiple event listener methods on same bean"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.event import ShutdownEvent, StartupEvent
+from micronaut.runtime.event.annotation import EventListener
+
+@Singleton
+class LifecycleEventListener:
+    invoked : bool = False
+    shutdown : bool = False
+
+    @EventListener
+    def receive_startup(self, event : StartupEvent):
+        self.invoked = True
+
+    @EventListener
+    def receive_shutdown(self, event : ShutdownEvent):
+        self.shutdown = True
+''')
+        Value value = getBean(context, "python.LifecycleEventListener").asPolyglotValue()
+
+        expect:
+        value.getMember("invoked").asBoolean()
+
+        when:
+        context.publishEvent(new ShutdownEvent(context))
+
+        then:
+        value.getMember("shutdown").asBoolean()
+
+        cleanup:
+        context?.close()
     }
 
     void "test python event listener via annotation with python event"() {
