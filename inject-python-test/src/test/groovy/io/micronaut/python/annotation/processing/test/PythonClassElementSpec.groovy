@@ -80,6 +80,18 @@ class Test:
         }
     }
 
+    def "test class element exposes generated Python package"() {
+        expect:
+        buildClassElement('''
+class Test:
+    pass
+''') { ClassElement element ->
+            assert element.package.name == "python"
+            assert element.package.simpleName == "python"
+            return element
+        }
+    }
+
     def "test build class element with methods"() {
         given:
         def pythonCode = '''
