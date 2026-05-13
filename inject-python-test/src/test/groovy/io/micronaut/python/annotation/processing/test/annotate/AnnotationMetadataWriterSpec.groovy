@@ -20,6 +20,8 @@ import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementS
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
 import spock.lang.PendingFeature
 
+import java.lang.annotation.Native
+
 class AnnotationMetadataWriterSpec extends AbstractPythonTypeElementSpec {
 
     void "test read enum constants"() {
@@ -91,6 +93,26 @@ class Test:
         metadata != null
         metadata.getValue(Requires, "property").isPresent()
         metadata.getValue(Requires, "property").get() == 'value'
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0019")
+    void "test source retention annotations are not retained"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from typing import Annotated
+from jakarta.inject import Inject, Singleton
+from java.lang.annotation import Native
+
+@Singleton
+class Test:
+    some_field: Annotated[str, Inject, Native] = None
+''')
+
+        when:
+        def injectedArgument = definition.injectedMethods.first().arguments[0]
+
+        then:
+        !injectedArgument.annotationMetadata.hasAnnotation(Native)
     }
 
     void "test repeatable annotations are combined"() {
