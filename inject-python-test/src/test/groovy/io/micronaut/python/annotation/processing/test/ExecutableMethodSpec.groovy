@@ -18,7 +18,11 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
+import jakarta.inject.Singleton
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Size
+import spock.lang.PendingFeature
 
 /**
  * Tests for Python @Executable annotation producing ExecutableMethod instances.
@@ -113,6 +117,56 @@ class BlobService:
 
         cleanup:
         context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0028")
+    def "test generic type arguments retain annotation metadata"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated, List
+
+from jakarta.inject import Inject, Singleton
+from jakarta.validation import Valid
+from jakarta.validation.constraints import Min
+from micronaut.context.annotation import Executable
+
+@Singleton
+class Foo:
+    pass
+
+@Singleton
+class GenericService:
+    injected_numbers: Annotated[List[Annotated[int, Min(10)]], Inject] = None
+
+    @Executable
+    def values(self, numbers: List[Annotated[int, Min(10)]], foos: List[Annotated[Foo, Valid]]) -> List[Annotated[int, Min(10)]]:
+        return numbers
+
+    @Inject
+    def set_method_numbers(self, numbers: List[Annotated[int, Min(10)]]):
+        self.method_numbers = numbers
+'''
+
+        when:
+        def beanDefinition = buildBeanDefinition("python", "GenericService", pythonCode)
+        def executableMethod = beanDefinition.executableMethods.find { it.methodName == "values" }
+        def numberArgumentMetadata = executableMethod.arguments[0].typeParameters[0].annotationMetadata
+        def fooArgumentMetadata = executableMethod.arguments[1].typeParameters[0].annotationMetadata
+        def returnArgumentMetadata = executableMethod.returnType.asArgument().typeParameters[0].annotationMetadata
+        def fieldInjectionMetadata = beanDefinition.injectedMethods.find { it.methodName == "setInjectedNumbers" }.arguments[0].typeParameters[0].annotationMetadata
+        def methodInjectionMetadata = beanDefinition.injectedMethods.find { it.methodName == "set_method_numbers" }.arguments[0].typeParameters[0].annotationMetadata
+
+        then:
+        numberArgumentMetadata.hasAnnotation(Min)
+        numberArgumentMetadata.intValue(Min).getAsInt() == 10
+        fooArgumentMetadata.hasAnnotation(Valid)
+        !fooArgumentMetadata.hasAnnotation(Singleton)
+        returnArgumentMetadata.hasAnnotation(Min)
+        returnArgumentMetadata.intValue(Min).getAsInt() == 10
+        fieldInjectionMetadata.hasAnnotation(Min)
+        fieldInjectionMetadata.intValue(Min).getAsInt() == 10
+        methodInjectionMetadata.hasAnnotation(Min)
+        methodInjectionMetadata.intValue(Min).getAsInt() == 10
     }
 
     def "test executable method alone does not create bean definition"() {
