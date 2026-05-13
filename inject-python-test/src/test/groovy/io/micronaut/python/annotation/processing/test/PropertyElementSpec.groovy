@@ -28,6 +28,10 @@ class Book:
     pages: int
 
     @property
+    def summary(self) -> str:
+        return self.title
+
+    @property
     def display_name(self) -> str:
         return self.title
 
@@ -49,6 +53,12 @@ class Book:
             assert properties["pages"].type.name == "int"
             assert properties["pages"].field.isEmpty()
             assert !properties["pages"].isReadOnly()
+
+            assert properties["summary"].type.name == String.name
+            assert properties["summary"].field.isEmpty()
+            assert properties["summary"].readMethod.isPresent()
+            assert properties["summary"].writeMethod.isEmpty()
+            assert properties["summary"].isReadOnly()
 
             assert properties["display_name"].type.name == String.name
             assert properties["display_name"].field.isEmpty()
