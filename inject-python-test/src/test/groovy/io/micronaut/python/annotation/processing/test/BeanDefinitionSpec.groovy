@@ -93,6 +93,36 @@ class GenericService(Generic[K, V]):
         reference.getGenericBeanType().getTypeString(true) == "GenericService<Object, Object>"
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0039")
+    void "test declared generic placeholders from reference with inheritance"() {
+        when:
+        def reference = buildBeanDefinitionReference("python", "DefaultKafkaConsumerConfiguration", '''
+from typing import Generic, TypeVar
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Requires
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+class KafkaDefaultConfiguration:
+    pass
+
+class AbstractKafkaConfiguration(Generic[K, V]):
+    pass
+
+class AbstractKafkaConsumerConfiguration(AbstractKafkaConfiguration[K, V]):
+    pass
+
+@Singleton
+@Requires(beans=KafkaDefaultConfiguration)
+class DefaultKafkaConsumerConfiguration(AbstractKafkaConsumerConfiguration[K, V]):
+    pass
+''')
+
+        then:
+        reference.getGenericBeanType().getTypeString(true) == "DefaultKafkaConsumerConfiguration<Object, Object>"
+    }
+
     void "test limit the exposed bean types"() {
         when:
         def definition = buildBeanDefinition("python", "RunnableService", '''
