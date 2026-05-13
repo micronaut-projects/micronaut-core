@@ -419,6 +419,42 @@ class MyFunction(Function[str, str]):
         definition.getTypeArguments(Function)[1].type == String
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0041")
+    void "test generic bean type from factory method"() {
+        given:
+        def context = buildContext('''\
+from typing import Generic, TypeVar
+from micronaut.context.annotation import Bean, Factory
+from jakarta.inject import Singleton
+
+T = TypeVar("T")
+
+class X(Generic[T]):
+    pass
+
+class Y(X):
+    pass
+
+@Factory
+class TestFactory:
+    @Bean
+    @Singleton
+    def method(self) -> X[Y]:
+        return Y()
+''')
+
+        when:
+        def xType = context.classLoader.loadClass("python.X")
+        def definitions = context.getBeanDefinitions(xType)
+
+        then:
+        definitions.size() == 1
+        definitions.iterator().next().getGenericBeanType().getTypeString(true) == "X<Y>"
+
+        cleanup:
+        context.close()
+    }
+
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0040")
     void "test resolved generic type arguments are not type variables"() {
         given:
