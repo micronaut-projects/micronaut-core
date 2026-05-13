@@ -306,6 +306,23 @@ class ScopedService:
         definition.getDeclaredQualifier() == null
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0047")
+    void "test singleton enum is rejected as bean"() {
+        when:
+        buildBeanDefinition("python", "TestEnum", '''
+from enum import Enum
+from jakarta.inject import Singleton
+
+@Singleton
+class TestEnum(Enum):
+    ONE = "one"
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Enum types cannot be defined as beans")
+    }
+
     void "test bean definition computed state"() {
         given:
         def definition = buildBeanDefinition("python", "PrimaryService", '''
