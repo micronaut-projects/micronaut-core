@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.python.compiler.Serdeable
+import spock.lang.PendingFeature
 
 /**
  * Tests for Python bean introspection.
@@ -201,6 +202,36 @@ class TestClass:
         instance != null
         introspection.getRequiredProperty("name", String).get(instance) == "Test"
         introspection.getRequiredProperty("value", int).get(instance) == 100
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0016")
+    void "test introspection includes inherited Python attributes"() {
+        given:
+        def pythonCode = '''
+from micronaut.core.annotation import Introspected
+
+class Parent:
+    parent_name: str
+
+@Introspected
+class Child(Parent):
+    name: str
+    count: int
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.Child")
+
+        then:
+        introspection != null
+        introspection.getPropertyNames() as Set == ["parent_name", "name", "count"] as Set
+        introspection.getProperty("parent_name").isPresent()
+        introspection.getProperty("name").isPresent()
+        introspection.getProperty("count").isPresent()
 
         cleanup:
         context?.close()
