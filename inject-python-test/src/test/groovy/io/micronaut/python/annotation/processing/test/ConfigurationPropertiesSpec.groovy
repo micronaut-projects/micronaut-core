@@ -336,4 +336,33 @@ class CacheConfig:
         context?.close()
     }
 
+    void "test configuration property map field uses raw key format annotation"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+import java
+
+from micronaut.context.annotation import ConfigurationProperties
+from micronaut.core.convert.format import MapFormat
+
+StringConvention = java.type("io.micronaut.core.naming.conventions.StringConvention")
+
+@ConfigurationProperties("conf")
+class AnnotatedField:
+    animals: Annotated[dict[str, str], MapFormat(keyFormat=StringConvention.RAW)] = {}
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "conf.animals.VERY_FAST": "rabbit"
+        ])
+        def configBean = getBean(context, "python.AnnotatedField")
+
+        then:
+        configBean.animals.containsKey("VERY_FAST")
+        configBean.animals.get("VERY_FAST") == "rabbit"
+
+        cleanup:
+        context?.close()
+    }
 }
