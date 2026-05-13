@@ -3,6 +3,11 @@ plugins {
     id "io.micronaut.build.internal.dependency-updates"
     id "io.micronaut.build.internal.version-catalog-updates"
     id "io.micronaut.build.internal.convention-quality"
+    alias(libs.plugins.managed.kotlin.jvm) apply false
+    alias(libs.plugins.managed.kotlin.allopen) apply false
+    alias(libs.plugins.managed.kotlin.kapt) apply false
+    alias(libs.plugins.managed.kotlin.noarg) apply false
+    alias(libs.plugins.managed.ksp) apply false
 }
 
 repositories {
