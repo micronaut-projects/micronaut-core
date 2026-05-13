@@ -222,6 +222,40 @@ class Engine:
         context?.close()
     }
 
+    void "test each bean with empty replaces does not replace itself"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import EachBean, EachProperty, Replaces
+
+@EachProperty(value="mydatasources", primary="default")
+class MyDataSource:
+    xyz: str
+
+@EachBean(MyDataSource.__qualname__)
+@Singleton
+@Replaces
+class MyService:
+    def __init__(self, data_source: MyDataSource):
+        self.data_source = data_source
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "mydatasources.default.xyz": "111",
+                "mydatasources.foo.xyz": "111",
+                "mydatasources.bar.xyz": "111"
+        ])
+        def serviceType = context.classLoader.loadClass("python.MyService")
+        def services = context.getBeansOfType(serviceType)
+
+        then:
+        services.size() == 3
+
+        cleanup:
+        context?.close()
+    }
+
     void "test @ConfigurationProperties on Python @dataclass"() {
         given:
         def pythonCode = '''
