@@ -635,6 +635,38 @@ class MyBean:
         context.close()
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0046")
+    void "test factory method named qualifier from constant"() {
+        given:
+        def context = buildContext('''\
+from jakarta.inject import Named, Singleton
+from micronaut.context.annotation import Factory, Bean
+
+class Product:
+    pass
+
+@Factory
+class ProductFactory:
+    NAME = "testing123"
+
+    @Bean
+    @Singleton
+    @Named(NAME)
+    def product(self) -> Product:
+        return Product()
+''')
+
+        when:
+        def productType = context.classLoader.loadClass("python.Product")
+        def definition = context.getBeanDefinition(productType, Qualifiers.byName("testing123"))
+
+        then:
+        definition.stringValue(AnnotationUtil.NAMED).get() == "testing123"
+
+        cleanup:
+        context.close()
+    }
+
     void "test factory method returning none fails bean creation"() {
         given:
         def context = buildContext('''\

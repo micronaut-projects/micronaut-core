@@ -218,6 +218,25 @@ class NamedService:
         definition.getDeclaredQualifier() == Qualifiers.byName("foo")
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0045")
+    void "test named qualifier from constant"() {
+        given:
+        def definition = buildBeanDefinition("python", "NamedConstantService", '''
+from jakarta.inject import Named, Singleton
+
+NAME = "testing123"
+
+@Named(NAME)
+@Singleton
+class NamedConstantService:
+    pass
+''')
+
+        expect:
+        definition.stringValue(AnnotationUtil.NAMED).get() == "testing123"
+        definition.getDeclaredQualifier() == Qualifiers.byName("testing123")
+    }
+
     void "test synthesize named annotation from bean definition"() {
         given:
         def definition = buildBeanDefinition("python", "NamedService", '''

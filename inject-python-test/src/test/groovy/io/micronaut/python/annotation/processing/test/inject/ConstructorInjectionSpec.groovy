@@ -1,6 +1,7 @@
 package io.micronaut.python.annotation.processing.test.inject
 
 import io.micronaut.context.BeanProvider
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.runtime.server.EmbeddedServer
@@ -612,6 +613,103 @@ class Vehicle:
 
         then:
         vehicle.invokeMember("start").asString() == "Starting V8"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test constructor injection with multiple qualifiers"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from jakarta.inject import Singleton, Qualifier
+from micronaut.context.annotation import Executable
+
+@Qualifier
+def Synchronous(func):
+    return func
+
+@Qualifier
+def Asynchronous(func):
+    return func
+
+@Qualifier
+def PayBy(value: str):
+    def decorator(func):
+        return func
+    return decorator
+
+class Processor:
+    @Executable
+    def name(self) -> str:
+        return "processor"
+
+@Singleton
+@PayBy("credit")
+@Synchronous
+class CreditCardProcessor(Processor):
+    @Executable
+    def name(self) -> str:
+        return "sync-credit"
+
+@Singleton
+@PayBy("credit")
+@Asynchronous
+class AsyncCreditCardProcessor(Processor):
+    @Executable
+    def name(self) -> str:
+        return "async-credit"
+
+@Singleton
+@PayBy("transfer")
+@Synchronous
+class BankTransferProcessor(Processor):
+    @Executable
+    def name(self) -> str:
+        return "sync-transfer"
+
+@Singleton
+@PayBy("transfer")
+@Asynchronous
+class AsyncBankTransferProcessor(Processor):
+    @Executable
+    def name(self) -> str:
+        return "async-transfer"
+
+@Singleton
+class PaymentService:
+    def __init__(
+        self,
+        async_credit: Annotated[Processor, PayBy("credit"), Asynchronous],
+        sync_credit: Annotated[Processor, PayBy("credit"), Synchronous],
+        async_transfer: Annotated[Processor, PayBy("transfer"), Asynchronous],
+        sync_transfer: Annotated[Processor, PayBy("transfer"), Synchronous]
+    ):
+        self.async_credit = async_credit
+        self.sync_credit = sync_credit
+        self.async_transfer = async_transfer
+        self.sync_transfer = sync_transfer
+
+    @Executable
+    def names(self) -> str:
+        return ",".join([
+            self.async_credit.name(),
+            self.sync_credit.name(),
+            self.async_transfer.name(),
+            self.sync_transfer.name()
+        ])
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.PaymentService")
+        def bean = getBean(context, "python.PaymentService")
+
+        then:
+        definition.constructor.arguments.every {
+            it.annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).isPresent()
+        }
+        bean.names() == "async-credit,sync-credit,async-transfer,sync-transfer"
 
         cleanup:
         context?.close()
