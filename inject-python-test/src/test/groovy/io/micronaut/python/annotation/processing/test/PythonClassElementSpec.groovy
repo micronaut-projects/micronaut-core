@@ -404,6 +404,41 @@ class MyDerived(MyBase[str]):
         }
     }
 
+    def "test generic type arguments expose concrete type members from base class"() {
+        given:
+        def pythonCode = '''
+from typing import Generic, TypeVar
+
+E = TypeVar('E')
+ID = TypeVar('ID')
+
+class Repo(Generic[E, ID]):
+    pass
+
+class MyBean:
+    name: str
+
+    def display_name(self) -> str:
+        return self.name
+
+class MyRepo(Repo[MyBean, int]):
+    pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "MyRepo") { ClassElement element ->
+            def repoTypeArguments = element.getTypeArguments("python.Repo")
+            def entityType = repoTypeArguments["E"]
+            def idType = repoTypeArguments["ID"]
+
+            assert entityType.simpleName == "MyBean"
+            assert entityType.getBeanProperties()*.name == ["name"]
+            assert entityType.getMethods()*.name.contains("display_name")
+            assert idType.name == "int"
+            return element
+        }
+    }
+
     def "test generic type arguments populated java interface in inheritance"() {
         given:
         def pythonCode = '''
