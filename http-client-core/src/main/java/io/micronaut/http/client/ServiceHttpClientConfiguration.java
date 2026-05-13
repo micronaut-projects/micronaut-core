@@ -110,44 +110,6 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      *
      * @param serviceId The service id
      * @param connectionPoolConfiguration The connection pool configuration
-     * @param sslConfiguration The SSL configuration
-     * @param defaultHttpClientConfiguration The default HTTP client configuration
-     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration , ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
-     */
-    @Deprecated(since = "4.3.0")
-    public ServiceHttpClientConfiguration(
-            @Parameter String serviceId,
-            @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
-            @Nullable ServiceSslClientConfiguration sslConfiguration,
-            HttpClientConfiguration defaultHttpClientConfiguration) {
-        this(serviceId, connectionPoolConfiguration, new ServiceWebSocketCompressionConfiguration(), sslConfiguration, defaultHttpClientConfiguration);
-    }
-
-    /**
-     * Creates a new client configuration for the given service ID.
-     *
-     * @param serviceId The service id
-     * @param connectionPoolConfiguration The connection pool configuration
-     * @param webSocketCompressionConfiguration The WebSocket compression configuration
-     * @param sslConfiguration The SSL configuration
-     * @param defaultHttpClientConfiguration The default HTTP client configuration
-     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration , ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
-     */
-    @Deprecated(since = "4.6.0")
-    public ServiceHttpClientConfiguration(
-        @Parameter String serviceId,
-        @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
-        @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
-        @Nullable ServiceSslClientConfiguration sslConfiguration,
-        HttpClientConfiguration defaultHttpClientConfiguration) {
-        this(serviceId, connectionPoolConfiguration, webSocketCompressionConfiguration, new ServiceHttp2ClientConfiguration(), sslConfiguration, defaultHttpClientConfiguration);
-    }
-
-    /**
-     * Creates a new client configuration for the given service ID.
-     *
-     * @param serviceId The service id
-     * @param connectionPoolConfiguration The connection pool configuration
      * @param webSocketCompressionConfiguration The WebSocket compression configuration
      * @param http2Configuration The HTTP/2 configuration
      * @param sslConfiguration The SSL configuration
