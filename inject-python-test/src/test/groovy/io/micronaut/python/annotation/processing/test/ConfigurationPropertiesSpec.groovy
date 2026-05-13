@@ -320,6 +320,52 @@ class AwsConfig:
         context?.close()
     }
 
+    void "test configuration property includes and excludes"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import ConfigurationProperties
+
+@ConfigurationProperties(value="include", includes=["public_field"])
+class IncludedConfig:
+    public_field: str = "default"
+    another_public_field: str = "default"
+
+@ConfigurationProperties(value="exclude", excludes=["another_public_field"])
+class ExcludedConfig:
+    public_field: str = "default"
+    another_public_field: str = "default"
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "include.public-field": "configured",
+                "include.another-public-field": "ignored",
+                "exclude.public-field": "configured",
+                "exclude.another-public-field": "ignored"
+        ])
+        def includedConfig = getBean(context, "python.IncludedConfig")
+        def excludedConfig = getBean(context, "python.ExcludedConfig")
+
+        then:
+        includedConfig.public_field == "configured"
+        excludedConfig.public_field == "configured"
+
+        when:
+        includedConfig.another_public_field
+
+        then:
+        thrown(MissingPropertyException)
+
+        when:
+        excludedConfig.another_public_field
+
+        then:
+        thrown(MissingPropertyException)
+
+        cleanup:
+        context?.close()
+    }
+
     void "test @ConfigurationProperties on Python class with @property decorator"() {
         given:
         def pythonCode = '''
