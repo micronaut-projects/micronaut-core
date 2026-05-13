@@ -74,6 +74,25 @@ class ProductService:
         context?.close()
     }
 
+    def "test class with only validation annotations is not a bean"() {
+        when:
+        def beanDefinition = buildBeanDefinition("python", "DefaultContract", '''
+from typing import Annotated
+from jakarta.validation.constraints import NotNull
+
+class Contract:
+    def parse_long(self, sequence: Annotated[str, NotNull]) -> int:
+        return 0
+
+class DefaultContract(Contract):
+    def parse_long(self, sequence: Annotated[str, NotNull]) -> int:
+        return 0
+''')
+
+        then:
+        beanDefinition == null
+    }
+
     def "test dataclass attributes with Jakarta validation annotations"() {
         given: "Python dataclass with validation annotations on attributes"
         @Language("python") def pythonCode = '''
