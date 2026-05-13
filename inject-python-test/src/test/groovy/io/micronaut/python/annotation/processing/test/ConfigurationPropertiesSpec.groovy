@@ -178,6 +178,50 @@ class Engine:
         fordBean.enabled() == true
     }
 
+    void "test each bean injects configuration name parameter"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from micronaut.context.annotation import EachProperty, EachBean, Executable, Parameter
+
+@EachProperty("engines")
+class EngineConfiguration:
+    cylinders : int
+
+@EachBean(EngineConfiguration.__qualname__)
+class Engine:
+    def __init__(self, config: EngineConfiguration, name: Annotated[str, Parameter]):
+        self.config = config
+        self.name = name
+
+    @Executable
+    def engine_name(self) -> str:
+        return self.name
+
+    @Executable
+    def cylinders(self) -> int:
+        return self.config.cylinders
+'''
+
+        when:
+        def properties = [
+                "engines.ferrari.cylinders": "8",
+                "engines.ford.cylinders": "6"
+        ]
+        def context = buildContext(pythonCode, false, properties)
+        def ferrariBean = getBean(context, "python.Engine", Qualifiers.byName("ferrari"))
+        def fordBean = getBean(context, "python.Engine", Qualifiers.byName("ford"))
+
+        then:
+        ferrariBean.engine_name() == "ferrari"
+        ferrariBean.cylinders() == 8
+        fordBean.engine_name() == "ford"
+        fordBean.cylinders() == 6
+
+        cleanup:
+        context?.close()
+    }
+
     void "test @ConfigurationProperties on Python @dataclass"() {
         given:
         def pythonCode = '''
