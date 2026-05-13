@@ -21,8 +21,13 @@ import io.micronaut.core.annotation.Order
 import io.micronaut.core.type.TypeInformation
 import io.micronaut.inject.qualifiers.Qualifiers
 import jakarta.inject.Named
+import jakarta.validation.constraints.NotEmpty
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.Size
 import spock.lang.PendingFeature
 import spock.lang.Unroll
+
+import java.util.function.Function
 
 class BeanDefinitionSpec extends AbstractPythonTypeElementSpec {
 
@@ -341,5 +346,57 @@ class DeepGenericService:
         param2.getTypeParameters().length == 1
         def param3 = param2.getTypeParameters()[0]
         param3.getType() == String.class
+    }
+
+    void "test type arguments for java function interface"() {
+        given:
+        def definition = buildBeanDefinition("python", "MyFunction", '''
+from java.util.function import Function
+from jakarta.inject import Singleton
+
+@Singleton
+class MyFunction(Function[str, str]):
+    def apply(self, value: str) -> str:
+        return value
+''')
+
+        expect:
+        definition != null
+        definition.getTypeArguments(Function).size() == 2
+        definition.getTypeArguments(Function)[0].name == "T"
+        definition.getTypeArguments(Function)[1].name == "R"
+        definition.getTypeArguments(Function)[0].type == String
+        definition.getTypeArguments(Function)[1].type == String
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0017")
+    void "test annotation metadata present on deep type parameters of definition"() {
+        given:
+        def definition = buildBeanDefinition("python", "DeepValidatedService", '''
+from typing import Annotated
+from jakarta.inject import Singleton
+from jakarta.validation.constraints import NotEmpty, NotNull, Size
+
+@Singleton
+class DeepValidatedService:
+    def __init__(
+        self,
+        deep_list: list[Annotated[list[Annotated[list[Annotated[str, NotNull]], NotEmpty]], Size(min=1)]]
+    ):
+        self.deep_list = deep_list
+''')
+
+        when:
+        def parameter = definition.constructor.arguments[0]
+        def firstTypeParameter = parameter.typeParameters[0]
+        def secondTypeParameter = firstTypeParameter.typeParameters[0]
+        def thirdTypeParameter = secondTypeParameter.typeParameters[0]
+
+        then:
+        parameter.annotationMetadata.annotationNames.contains("io.micronaut.validation.annotation.ValidatedElement")
+        firstTypeParameter.annotationMetadata.hasAnnotation(Size)
+        firstTypeParameter.annotationMetadata.intValue(Size, "min").getAsInt() == 1
+        secondTypeParameter.annotationMetadata.hasAnnotation(NotEmpty)
+        thirdTypeParameter.annotationMetadata.hasAnnotation(NotNull)
     }
 }
