@@ -298,4 +298,40 @@ class HelloController:
         context?.close()
     }
 
+    void "test inherited controller methods"() {
+        given:
+        def context = buildContext('''
+from micronaut.http.annotation import Controller, Get
+
+class BaseController:
+    @Get("/base/{name}")
+    def base(self, name: str) -> str:
+        return f"Base {name}"
+
+class ParentController(BaseController):
+    @Get("/parent/{name}")
+    def parent(self, name: str) -> str:
+        return f"Parent {name}"
+
+@Controller("/inherited")
+class InheritedController(ParentController):
+    @Get("/child/{name}")
+    def child(self, name: str) -> str:
+        return f"Child {name}"
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+
+        expect:
+        client.toBlocking().retrieve("/inherited/base/John") == "Base John"
+        client.toBlocking().retrieve("/inherited/parent/John") == "Parent John"
+        client.toBlocking().retrieve("/inherited/child/John") == "Child John"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
 }
