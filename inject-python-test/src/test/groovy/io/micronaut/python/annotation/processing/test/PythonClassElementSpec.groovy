@@ -587,6 +587,54 @@ class MyClass:
         }
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0024")
+    def "test nullability on generic return type arguments"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from java.util.concurrent import CompletionStage
+from micronaut.core.annotation import NonNull, Nullable
+
+class TypeTestService:
+    def not_nullable_method(self) -> CompletionStage[Annotated[str, NonNull]]:
+        pass
+
+    def nullable_method(self) -> CompletionStage[Annotated[str, Nullable]]:
+        pass
+
+    def pep604_nullable_method(self) -> CompletionStage[str | None]:
+        pass
+
+    def method(self) -> CompletionStage[str]:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "TypeTestService") { ClassElement element ->
+            def notNullableMethod = element.findMethod("not_nullable_method").get()
+            def nullableMethod = element.findMethod("nullable_method").get()
+            def pep604NullableMethod = element.findMethod("pep604_nullable_method").get()
+            def method = element.findMethod("method").get()
+
+            def notNullableType = notNullableMethod.genericReturnType.getFirstTypeArgument().get()
+            assert notNullableType.isNonNull()
+            assert !notNullableType.isNullable()
+
+            def nullableType = nullableMethod.genericReturnType.getFirstTypeArgument().get()
+            assert !nullableType.isNonNull()
+            assert nullableType.isNullable()
+
+            def pep604NullableType = pep604NullableMethod.genericReturnType.getFirstTypeArgument().get()
+            assert !pep604NullableType.isNonNull()
+            assert pep604NullableType.isNullable()
+
+            def type = method.genericReturnType.getFirstTypeArgument().get()
+            assert !type.isNonNull()
+            assert !type.isNullable()
+            return element
+        }
+    }
+
     @PendingFeature(reason = """
 Function _parse_function_type_params in micronaut_processor.py cannot find type_params
 
