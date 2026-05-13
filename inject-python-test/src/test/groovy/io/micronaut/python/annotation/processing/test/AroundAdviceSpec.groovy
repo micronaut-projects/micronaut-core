@@ -329,6 +329,52 @@ class Test:
         context?.close()
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0056")
+    void "test stereotype method level interceptor matching"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Around
+from jakarta.inject import Singleton
+import java
+
+@Around
+def First(func):
+    return func
+
+@First
+def FirstAlias(func):
+    return func
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(First)
+class FirstInterceptor(MethodInterceptor):
+    invoked: bool = False
+
+    def intercept(self, context : MethodInvocationContext):
+        self.invoked = True
+        return context.proceed()
+
+@Singleton
+class Test:
+    @FirstAlias
+    def run(self) -> str:
+        return "done"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def testBean = getBean(context, "python.Test")
+        def interceptor = getBean(context, "python.FirstInterceptor")
+
+        then:
+        testBean.run() == "done"
+        interceptor.invoked
+
+        cleanup:
+        context?.close()
+    }
+
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0054")
     void "test multiple around annotations on a single method"() {
         given:
