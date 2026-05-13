@@ -782,6 +782,50 @@ class TypeTestService:
         }
     }
 
+    def "test collection return types are assignable to iterable"() {
+        expect:
+        buildClassElement('''
+from typing import List
+
+class TypeTestService:
+    def method1(self) -> list[str]:
+        return []
+
+    def method2(self) -> List[str]:
+        return []
+''') { ClassElement element ->
+            def method1ReturnType = element.findMethod("method1").get().returnType
+            def method2ReturnType = element.findMethod("method2").get().returnType
+
+            assert method1ReturnType.isAssignable(Iterable)
+            assert method2ReturnType.isAssignable(Iterable)
+            assert method1ReturnType.isAssignable(List)
+            assert method2ReturnType.isAssignable(List)
+            return element
+        }
+    }
+
+    def "test nullable collection return type is assignable from non nullable collection return type"() {
+        expect:
+        buildClassElement('''
+class CartItem:
+    pass
+
+class Cart:
+    def cart_items(self) -> list[CartItem] | None:
+        return None
+
+    def cart_items_not_nullable(self) -> list[CartItem]:
+        return []
+''', "Cart") { ClassElement element ->
+            def nullableReturnType = element.findMethod("cart_items").get().returnType
+            def nonNullableReturnType = element.findMethod("cart_items_not_nullable").get().returnType
+
+            assert nullableReturnType.isAssignable(nonNullableReturnType)
+            return element
+        }
+    }
+
     def "test method parameter bytes type resolves to byte array"() {
         given:
         def pythonCode = '''
