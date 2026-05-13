@@ -769,10 +769,18 @@ class PrimitiveService:
             assert method.returnType.name == "int"
             assert method.returnType.canonicalName == "int"
             assert method.returnType.primitive
+            assert method.returnType.nonNull
+            assert !method.returnType.nullable
+            assert method.genericReturnType.nonNull
+            assert !method.genericReturnType.nullable
 
             assert method.parameters*.type*.name == ["int", "boolean", "double"]
             assert method.parameters*.type*.canonicalName == ["int", "boolean", "double"]
             assert method.parameters.every { it.type.primitive }
+            assert method.parameters.every { it.type.nonNull }
+            assert method.parameters.every { !it.type.nullable }
+            assert method.parameters.every { it.genericType.nonNull }
+            assert method.parameters.every { !it.genericType.nullable }
             return element
         }
     }
