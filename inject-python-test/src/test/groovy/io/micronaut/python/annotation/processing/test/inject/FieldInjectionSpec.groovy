@@ -1,5 +1,6 @@
 package io.micronaut.python.annotation.processing.test.inject
 
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
@@ -345,6 +346,70 @@ class NamedQualifierService:
         service.get_thing_two_name() == "two"
 
         cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
+
+    void "test field injection with annotation qualifiers"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from jakarta.inject import Singleton, Qualifier, Inject
+from micronaut.context.annotation import Executable
+
+@Qualifier
+def One(func):
+    return func
+
+@Qualifier
+def Two(func):
+    return func
+
+class Thing:
+    def get_name(self) -> str:
+        return "Thing"
+
+@Singleton
+@One
+class ThingOne(Thing):
+    @Executable
+    def get_name(self) -> str:
+        return "one"
+
+@Singleton
+@Two
+class ThingTwo(Thing):
+    @Executable
+    def get_name(self) -> str:
+        return "two"
+
+@Singleton
+class FieldQualifierService:
+    one: Annotated[Thing, Inject, One] = None
+    two: Annotated[Thing, Inject, Two] = None
+
+    @Executable
+    def get_one_name(self) -> str:
+        return self.one.get_name()
+
+    @Executable
+    def get_two_name(self) -> str:
+        return self.two.get_name()
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.FieldQualifierService")
+        def service = getBean(context, "python.FieldQualifierService")
+        def oneArgument = definition.injectedMethods.find { it.arguments[0].name == "one" }.arguments[0]
+        def twoArgument = definition.injectedMethods.find { it.arguments[0].name == "two" }.arguments[0]
+
+        then:
+        oneArgument.annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == "python.One"
+        twoArgument.annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == "python.Two"
+        service.get_one_name() == "one"
+        service.get_two_name() == "two"
+
+        cleanup:
         context?.close()
     }
 }
