@@ -371,6 +371,42 @@ class MyBase(Generic[T]):
         }
     }
 
+    def "test nested collection return type keeps concrete generic model"() {
+        expect:
+        buildClassElement('''
+class NestedCollections:
+    def values(self) -> list[list[list[str]]]:
+        return []
+''') { ClassElement element ->
+            def method = element.findMethod("values").get()
+
+            def genericType = method.genericReturnType
+            def genericTypeLevel1 = genericType.typeArguments["E"]
+            assert !genericTypeLevel1.genericPlaceholder
+            assert !genericTypeLevel1.wildcard
+            def genericTypeLevel2 = genericTypeLevel1.typeArguments["E"]
+            assert !genericTypeLevel2.genericPlaceholder
+            assert !genericTypeLevel2.wildcard
+            def genericTypeLevel3 = genericTypeLevel2.typeArguments["E"]
+            assert genericTypeLevel3.name == String.name
+            assert !genericTypeLevel3.genericPlaceholder
+            assert !genericTypeLevel3.wildcard
+
+            def type = method.returnType
+            def typeLevel1 = type.typeArguments["E"]
+            assert !typeLevel1.genericPlaceholder
+            assert !typeLevel1.wildcard
+            def typeLevel2 = typeLevel1.typeArguments["E"]
+            assert !typeLevel2.genericPlaceholder
+            assert !typeLevel2.wildcard
+            def typeLevel3 = typeLevel2.typeArguments["E"]
+            assert typeLevel3.name == String.name
+            assert !typeLevel3.genericPlaceholder
+            assert !typeLevel3.wildcard
+            return element
+        }
+    }
+
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0043")
     def "test generic return type argument keeps class placeholder model"() {
         given:
