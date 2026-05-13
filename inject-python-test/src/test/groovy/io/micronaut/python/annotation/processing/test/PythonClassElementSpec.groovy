@@ -775,6 +775,43 @@ class PrimitiveService:
         }
     }
 
+    def "test method element query filters declared abstract and concrete methods"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+
+class Parent(ABC):
+    def parent_method(self) -> bool:
+        return True
+
+    @abstractmethod
+    def inherited_abstract(self) -> bool:
+        pass
+
+class QueryService(Parent):
+    def declared_method(self) -> bool:
+        return True
+
+    @abstractmethod
+    def declared_abstract(self) -> bool:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "QueryService") { ClassElement element ->
+            def allMethods = element.getEnclosedElements(ElementQuery.ALL_METHODS)
+            def declared = element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+            def abstractMethods = element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAbstract())
+            def concrete = element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyConcrete())
+
+            assert allMethods*.name as Set == ["declared_method", "declared_abstract", "parent_method", "inherited_abstract"] as Set
+            assert declared*.name as Set == ["declared_method", "declared_abstract"] as Set
+            assert abstractMethods*.name as Set == ["declared_abstract", "inherited_abstract"] as Set
+            assert concrete*.name as Set == ["declared_method", "parent_method"] as Set
+            return element
+        }
+    }
+
     def "test override method inherits annotations from python base method"() {
         given:
         def pythonCode = '''
