@@ -90,6 +90,59 @@ class Calculator:
         context?.close()
     }
 
+    def "test executable method can be found as execution handle"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class BookController:
+    @Executable
+    def show(self, id: int) -> str:
+        return f"{id} - The Stand"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        Class<?> controllerType = context.classLoader.loadClass("python.BookController")
+        def executionHandle = context.findExecutionHandle(controllerType, "show", Integer.TYPE)
+        def executableMethod = context.findBeanDefinition(controllerType).get().findMethod("show", Integer.TYPE).get()
+
+        then:
+        executionHandle.isPresent()
+        executableMethod.returnType.type == String
+        executionHandle.get().invoke(1) == "1 - The Stand"
+
+        cleanup:
+        context?.close()
+    }
+
+    def "test class-level executable without explicit scope creates executable bean"() {
+        when:
+        BeanDefinition definition = buildBeanDefinition("python", "ExecutableService", '''
+from typing import Annotated
+from jakarta.inject import Named
+from micronaut.context.annotation import Executable
+
+@Executable
+class ExecutableService:
+    def method_one(self, one: Annotated[str, Named("foo")]) -> str:
+        return "good"
+
+    def method_two(self, one: str, two: str) -> str:
+        return "good"
+
+    def method_zero(self) -> str:
+        return "good"
+''')
+
+        then:
+        definition != null
+        definition.executableMethods*.methodName == ["method_one", "method_two", "method_zero"]
+        definition.executableMethods[0].arguments[0].annotationMetadata.stringValue(AnnotationUtil.NAMED).get() == "foo"
+    }
+
     def "test executable bytes argument retains validation metadata"() {
         given:
         def pythonCode = '''
