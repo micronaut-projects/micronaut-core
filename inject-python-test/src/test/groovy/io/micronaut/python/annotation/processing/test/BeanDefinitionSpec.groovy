@@ -16,9 +16,11 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.core.annotation.AnnotationUtil
+import io.micronaut.core.annotation.AnnotationValueProvider
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.type.TypeInformation
 import io.micronaut.inject.qualifiers.Qualifiers
+import jakarta.inject.Named
 import spock.lang.PendingFeature
 import spock.lang.Unroll
 
@@ -180,6 +182,28 @@ class NamedService:
         definition.getDeclaredQualifier() == Qualifiers.byName("foo")
     }
 
+    void "test synthesize named annotation from bean definition"() {
+        given:
+        def definition = buildBeanDefinition("python", "NamedService", '''
+from jakarta.inject import Named, Singleton
+
+@Named("test")
+@Singleton
+class NamedService:
+    pass
+''')
+
+        when:
+        def annotation = definition.synthesize(Named, AnnotationUtil.NAMED)
+
+        then:
+        annotation.toString() == "@jakarta.inject.Named(value=test)"
+        annotation.value() == "test"
+        definition.synthesizeDeclared(Named, AnnotationUtil.NAMED).value() == "test"
+        annotation instanceof AnnotationValueProvider
+        annotation.annotationValue()
+    }
+
     void "test implicit named qualifier on type"() {
         given:
         def definition = buildBeanDefinition("python", "FooBar", '''
@@ -225,6 +249,26 @@ class ScopedService:
 
         expect:
         definition.getDeclaredQualifier() == null
+    }
+
+    void "test bean definition computed state"() {
+        given:
+        def definition = buildBeanDefinition("python", "PrimaryService", '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Primary
+
+@Singleton
+@Primary
+class PrimaryService:
+    pass
+''')
+
+        expect:
+        definition != null
+        definition.isSingleton()
+        !definition.isIterable()
+        definition.isPrimary()
+        definition.getScopeName().get() == AnnotationUtil.SINGLETON
     }
 
     void "test qualifier annotation"() {

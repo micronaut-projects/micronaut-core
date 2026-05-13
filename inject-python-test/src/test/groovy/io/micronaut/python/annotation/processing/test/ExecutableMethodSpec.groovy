@@ -18,6 +18,7 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
+import jakarta.validation.constraints.Size
 
 /**
  * Tests for Python @Executable annotation producing ExecutableMethod instances.
@@ -80,6 +81,35 @@ class Calculator:
         executableMethod.arguments[0].type == Double.TYPE
         executableMethod.returnType.type == Integer.TYPE
         bean.round_value(1.6d) == 2
+
+        cleanup:
+        context?.close()
+    }
+
+    def "test executable bytes argument retains validation metadata"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from jakarta.validation.constraints import Size
+from micronaut.context.annotation import Executable
+from typing import Annotated
+
+@Singleton
+class BlobService:
+    @Executable
+    def save(self, data: Annotated[bytes, Size(max=1024)]) -> None:
+        pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def beanDefinition = getBeanDefinition(context, "python.BlobService")
+        def executableMethod = beanDefinition.findMethod("save", byte[].class).get()
+
+        then:
+        executableMethod.arguments[0].type == byte[].class
+        executableMethod.arguments[0].annotationMetadata.hasDeclaredAnnotation(Size)
+        executableMethod.arguments[0].annotationMetadata.intValue(Size, "max").getAsInt() == 1024
 
         cleanup:
         context?.close()
