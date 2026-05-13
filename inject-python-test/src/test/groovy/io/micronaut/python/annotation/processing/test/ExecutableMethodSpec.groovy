@@ -84,6 +84,21 @@ class Calculator:
         context?.close()
     }
 
+    def "test executable method alone does not create bean definition"() {
+        when:
+        BeanDefinition definition = buildBeanDefinition("python", "Utility", '''
+from micronaut.context.annotation import Executable
+
+class Utility:
+    @Executable
+    def round_value(self, num: float) -> int:
+        return round(num)
+''')
+
+        then:
+        definition == null
+    }
+
     def "test class-level @Executable produces executable methods"() {
         given:
         def pythonCode = '''
