@@ -16,6 +16,9 @@
 package io.micronaut.python.annotation.processing.test.inject.factory.beanmethod
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.EachBean
+import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.context.exceptions.NonUniqueBeanException
@@ -252,6 +255,76 @@ class BootstrapFactory:
         then:
         definition.isContextScope()
         bean.asPolyglotValue().getMember("created").asBoolean()
+
+        cleanup:
+        context.close()
+    }
+
+    void "test each bean factory method definition metadata"() {
+        given:
+        def context = buildContext('''\
+from jakarta.inject import Singleton
+from micronaut.context.annotation import EachBean, Factory, Bean
+
+@Singleton
+class ProductConfiguration:
+    pass
+
+class Product:
+    def shutdown(self):
+        pass
+
+@Factory
+class ProductFactory:
+    @EachBean(ProductConfiguration.__qualname__)
+    @Bean(preDestroy="shutdown")
+    def product(self, configuration: ProductConfiguration) -> Product:
+        return Product()
+''')
+
+        when:
+        def productType = context.classLoader.loadClass("python.Product")
+        BeanDefinition<?> definition = context.getBeanDefinitions(productType)
+            .find { it.declaringType.isPresent() && it.declaringType.get().simpleName.contains("ProductFactory") }
+
+        then:
+        definition != null
+        definition.hasStereotype(Factory)
+        !definition.hasDeclaredAnnotation(Factory)
+        !definition.hasDeclaredAnnotation(AnnotationUtil.SINGLETON)
+        definition.hasDeclaredAnnotation(Bean)
+        definition.hasDeclaredAnnotation(EachBean)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test factory method definition inherits returned type metadata"() {
+        given:
+        def context = buildContext('''\
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Factory, Bean
+
+@Singleton
+class Product:
+    pass
+
+@Factory
+class ProductFactory:
+    @Bean
+    def product(self) -> Product:
+        return Product()
+''')
+
+        when:
+        def productType = context.classLoader.loadClass("python.Product")
+        BeanDefinition<?> definition = context.getBeanDefinitions(productType)
+            .find { it.declaringType.isPresent() && it.declaringType.get().simpleName.contains("ProductFactory") }
+
+        then:
+        definition != null
+        definition.hasAnnotation(AnnotationUtil.SINGLETON)
+        definition.hasDeclaredAnnotation(Bean)
 
         cleanup:
         context.close()
