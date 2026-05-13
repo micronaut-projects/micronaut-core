@@ -20,6 +20,99 @@ import spock.lang.PendingFeature
 
 class NullableElementSpec extends AbstractPythonTypeElementSpec {
 
+    void "test nullable and non null annotations on method parameters"() {
+        expect:
+        buildClassElement('''
+from typing import Annotated
+from micronaut.core.annotation import NonNull, Nullable
+
+class NullableMethods:
+    def annotated_nullable(self, name: Annotated[str, Nullable]) -> Annotated[str, Nullable]:
+        pass
+
+    def pep604_nullable(self, name: str | None) -> str | None:
+        pass
+
+    def annotated_non_null(self, name: Annotated[str, NonNull]) -> Annotated[str, NonNull]:
+        pass
+
+    def plain(self, name: str) -> str:
+        pass
+''') { ClassElement element ->
+            def annotatedNullable = element.findMethod("annotated_nullable").get()
+            assert annotatedNullable.parameters[0].isNullable()
+            assert !annotatedNullable.parameters[0].isNonNull()
+
+            def pep604Nullable = element.findMethod("pep604_nullable").get()
+            assert pep604Nullable.parameters[0].isNullable()
+            assert !pep604Nullable.parameters[0].isNonNull()
+
+            def annotatedNonNull = element.findMethod("annotated_non_null").get()
+            assert !annotatedNonNull.parameters[0].isNullable()
+            assert annotatedNonNull.parameters[0].isNonNull()
+
+            def plain = element.findMethod("plain").get()
+            assert !plain.parameters[0].isNullable()
+            assert !plain.parameters[0].isNonNull()
+            return element
+        }
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0037")
+    void "test nullable and non null annotations on method return types"() {
+        expect:
+        buildClassElement('''
+from typing import Annotated
+from micronaut.core.annotation import NonNull, Nullable
+
+class NullableMethods:
+    def annotated_nullable(self, name: str) -> Annotated[str, Nullable]:
+        pass
+
+    def pep604_nullable(self, name: str) -> str | None:
+        pass
+
+    def annotated_non_null(self, name: str) -> Annotated[str, NonNull]:
+        pass
+
+    def plain(self, name: str) -> str:
+        pass
+''') { ClassElement element ->
+            def annotatedNullable = element.findMethod("annotated_nullable").get()
+            assert annotatedNullable.isNullable()
+            assert !annotatedNullable.isNonNull()
+            assert annotatedNullable.returnType.isNullable()
+            assert !annotatedNullable.returnType.isNonNull()
+            assert annotatedNullable.genericReturnType.isNullable()
+            assert !annotatedNullable.genericReturnType.isNonNull()
+
+            def pep604Nullable = element.findMethod("pep604_nullable").get()
+            assert pep604Nullable.isNullable()
+            assert !pep604Nullable.isNonNull()
+            assert pep604Nullable.returnType.isNullable()
+            assert !pep604Nullable.returnType.isNonNull()
+            assert pep604Nullable.genericReturnType.isNullable()
+            assert !pep604Nullable.genericReturnType.isNonNull()
+
+            def annotatedNonNull = element.findMethod("annotated_non_null").get()
+            assert !annotatedNonNull.isNullable()
+            assert annotatedNonNull.isNonNull()
+            assert !annotatedNonNull.returnType.isNullable()
+            assert annotatedNonNull.returnType.isNonNull()
+            assert !annotatedNonNull.genericReturnType.isNullable()
+            assert annotatedNonNull.genericReturnType.isNonNull()
+
+            def plain = element.findMethod("plain").get()
+            assert !plain.isNullable()
+            assert !plain.isNonNull()
+            assert !plain.returnType.isNullable()
+            assert !plain.returnType.isNonNull()
+            assert !plain.genericReturnType.isNullable()
+            assert !plain.genericReturnType.isNonNull()
+            return element
+        }
+    }
+
     void "test nullable and non null annotations on property elements"() {
         expect:
         buildClassElement('''
