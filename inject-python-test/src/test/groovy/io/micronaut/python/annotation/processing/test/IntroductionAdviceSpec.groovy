@@ -22,7 +22,10 @@ def Stub(value : str = ""):
 @InterceptorBean(Stub.__qualname__)
 @Singleton
 class StubIntroduction(MethodInterceptor):
+    invoked: int = 0
+
     def intercept(self, context : MethodInvocationContext):
+        self.invoked += 1
         return context.getValue("python.Stub", context.getReturnType().getType()).orElse(None)
 
 
@@ -55,12 +58,14 @@ class TestCaller:
         def context = buildContext(pythonCode)
         def testBean = getBean(context, "python.TestCaller")
         def stub = getBean(context, "python.StubExample").asPolyglotValue()
+        def interceptor = getBean(context, "python.StubIntroduction")
 
         then:
         stub.invokeMember("get_number").asInt() == 10
         testBean.asPolyglotValue().invokeMember("get_number").asInt() == 10
         testBean.get_number() == 10
         testBean.get_date() == null
+        interceptor.invoked == 4
     }
 
     void "test introduction advice runs around interceptors first"() {
