@@ -18,6 +18,7 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValueProvider
 import io.micronaut.core.annotation.Order
+import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.TypeInformation
 import io.micronaut.inject.qualifiers.Qualifiers
 import jakarta.inject.Named
@@ -416,6 +417,43 @@ class MyFunction(Function[str, str]):
         definition.getTypeArguments(Function)[1].name == "R"
         definition.getTypeArguments(Function)[0].type == String
         definition.getTypeArguments(Function)[1].type == String
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0040")
+    void "test resolved generic type arguments are not type variables"() {
+        given:
+        def definition = buildBeanDefinition("python", "TestSerde", '''
+from typing import Generic, TypeVar
+from jakarta.inject import Singleton
+
+T = TypeVar("T")
+
+class Serializer(Generic[T]):
+    pass
+
+class Deserializer(Generic[T]):
+    pass
+
+class Serde(Serializer[T], Deserializer[T], Generic[T]):
+    pass
+
+@Singleton
+class TestSerde(Serde[object]):
+    pass
+''')
+
+        when:
+        def serdeTypeParam = definition.getTypeArguments("python.Serde")[0]
+        def serializerTypeParam = definition.getTypeArguments("python.Serializer")[0]
+        def deserializerTypeParam = definition.getTypeArguments("python.Deserializer")[0]
+
+        then:
+        !serdeTypeParam.isTypeVariable()
+        !(serdeTypeParam instanceof GenericPlaceholder)
+        !serializerTypeParam.isTypeVariable()
+        !(serializerTypeParam instanceof GenericPlaceholder)
+        !deserializerTypeParam.isTypeVariable()
+        !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0017")
