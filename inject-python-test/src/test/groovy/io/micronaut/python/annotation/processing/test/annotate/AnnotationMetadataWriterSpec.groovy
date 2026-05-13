@@ -389,6 +389,55 @@ class Test:
         !method.arguments[1].isNullable()
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0023")
+    void "test nullable non null and PEP 604 on method return and parameters"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.core.annotation import NonNull, Nullable
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+from typing import Annotated
+
+@Singleton
+class Test:
+
+    @Executable
+    def nullableMethod(self, test: Annotated[str, Nullable]) -> Annotated[str, Nullable]:
+        return test
+
+    @Executable
+    def pep604NullableMethod(self, test: str | None) -> str | None:
+        return test
+
+    @Executable
+    def notNullableMethod(self, test: Annotated[str, NonNull]) -> Annotated[str, NonNull]:
+        return test
+''')
+
+        when:
+        def nullableMethod = definition.executableMethods.find { it.methodName == "nullableMethod" }
+        def pep604NullableMethod = definition.executableMethods.find { it.methodName == "pep604NullableMethod" }
+        def notNullableMethod = definition.executableMethods.find { it.methodName == "notNullableMethod" }
+
+        then:
+        nullableMethod.returnType.asArgument().isNullable()
+        !nullableMethod.returnType.asArgument().isNonNull()
+        nullableMethod.arguments[0].isNullable()
+        !nullableMethod.arguments[0].isNonNull()
+
+        and:
+        pep604NullableMethod.returnType.asArgument().isNullable()
+        !pep604NullableMethod.returnType.asArgument().isNonNull()
+        pep604NullableMethod.arguments[0].isNullable()
+        !pep604NullableMethod.arguments[0].isNonNull()
+
+        and:
+        !notNullableMethod.returnType.asArgument().isNullable()
+        notNullableMethod.returnType.asArgument().isNonNull()
+        !notNullableMethod.arguments[0].isNullable()
+        notNullableMethod.arguments[0].isNonNull()
+    }
+
     void "test Python annotation decorator is generated as Java annotation type"() {
         given:
         def context = buildContext('''
