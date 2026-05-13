@@ -72,6 +72,7 @@ class Test:
     pass
 ''') { ClassElement element ->
             assert element.name == "python.Test"
+            assert element.canonicalName == "python.Test"
             assert element.simpleName == "Test"
             return element
         }
@@ -747,6 +748,29 @@ class TypeTestService:
             assert parameter.genericType.name == "byte"
             assert parameter.genericType.array
             assert parameter.genericType.arrayDimensions == 1
+            return element
+        }
+    }
+
+    def "test primitive method return and parameter types"() {
+        given:
+        def pythonCode = '''
+class PrimitiveService:
+    def calculate(self, count: int, enabled: bool, ratio: float) -> int:
+        return count
+'''
+
+        expect:
+        buildClassElement(pythonCode, "PrimitiveService") { ClassElement element ->
+            def method = element.findMethod("calculate").get()
+
+            assert method.returnType.name == "int"
+            assert method.returnType.canonicalName == "int"
+            assert method.returnType.primitive
+
+            assert method.parameters*.type*.name == ["int", "boolean", "double"]
+            assert method.parameters*.type*.canonicalName == ["int", "boolean", "double"]
+            assert method.parameters.every { it.type.primitive }
             return element
         }
     }
