@@ -1015,6 +1015,32 @@ class PetClient(PetOperations):
         }
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0042")
+    def "test override method inherits parameter annotations from python base method"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from jakarta.validation.constraints import NotBlank
+
+class Repository:
+    def save(self, name: Annotated[str, NotBlank]) -> str:
+        return name
+
+class DefaultRepository(Repository):
+    def save(self, name: str) -> str:
+        return name
+'''
+
+        expect:
+        buildClassElement(pythonCode, "DefaultRepository") { ClassElement element ->
+            def method = element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+                .find { it.name == "save" }
+
+            assert method.parameters[0].hasAnnotation("jakarta.validation.constraints.NotBlank")
+            return element
+        }
+    }
+
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0035")
     def "test overridden method reports python base method"() {
         given:
