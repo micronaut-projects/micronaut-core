@@ -401,6 +401,50 @@ class MyFactory:
         ContextHolder.resetContext()
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0038")
+    void "test exposed factory method type with around advice"() {
+        given:
+        def context = buildContext('''\
+from micronaut.aop import Around
+from micronaut.context.annotation import Bean, Factory, Prototype
+
+import java
+
+Runnable = java.type("java.lang.Runnable")
+
+@Around
+def Logged(func):
+    return func
+
+class Task(Runnable):
+    def __init__(self):
+        self.ran = False
+
+    def run(self):
+        self.ran = True
+
+@Factory
+class TaskFactory:
+    @Prototype
+    @Bean(typed=[Runnable])
+    @Logged
+    def task(self) -> Task:
+        return Task()
+''')
+
+        when:
+        def definition = context.getBeanDefinition(Runnable)
+        def task = context.getBean(Runnable)
+
+        then:
+        definition.exposedTypes == [Runnable] as Set
+        task != null
+
+        cleanup:
+        context?.close()
+        ContextHolder.resetContext()
+    }
+
     @Unroll
     void "test factory method can produce multiple #scopeName beans from list return"() {
         given:
