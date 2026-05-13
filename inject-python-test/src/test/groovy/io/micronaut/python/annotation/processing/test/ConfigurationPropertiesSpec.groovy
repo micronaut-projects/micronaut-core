@@ -16,6 +16,7 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Property
 import io.micronaut.context.env.Environment
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.PendingFeature
@@ -489,6 +490,101 @@ class ConfigWithConstructor:
         configBean.get_server_port() == 123
         configBean.get_other_config().name == "other"
         configBean.get_other_singleton() != null
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test configuration inject constructor argument metadata"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import ConfigurationInject, ConfigurationProperties, Executable
+
+@ConfigurationProperties("foo.bar")
+class ConfigWithConstructor:
+    @ConfigurationInject
+    def __init__(self, host: str, server_port: int):
+        self.host = host
+        self.server_port = server_port
+
+    @Executable
+    def get_host(self) -> str:
+        return self.host
+
+    @Executable
+    def get_server_port(self) -> int:
+        return self.server_port
+'''
+
+        when:
+        def definition = buildBeanDefinition("python", "ConfigWithConstructor", pythonCode)
+        def arguments = definition.constructor.arguments
+
+        then:
+        arguments.length == 2
+        arguments[0].synthesize(Property).name() == "foo.bar.host"
+        arguments[1].synthesize(Property).name() == "foo.bar.server-port"
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "foo.bar.host": "test",
+                "foo.bar.server-port": "123"
+        ])
+        def configBean = getBean(context, "python.ConfigWithConstructor")
+
+        then:
+        configBean.get_host() == "test"
+        configBean.get_server_port() == 123
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test each property configuration inject constructor argument metadata"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import ConfigurationInject, EachProperty, Executable
+
+@EachProperty("engines")
+class EngineConfiguration:
+    @ConfigurationInject
+    def __init__(self, cylinders: int, manufacturer: str):
+        self.cylinders = cylinders
+        self.manufacturer = manufacturer
+
+    @Executable
+    def get_cylinders(self) -> int:
+        return self.cylinders
+
+    @Executable
+    def get_manufacturer(self) -> str:
+        return self.manufacturer
+'''
+
+        when:
+        def definition = buildBeanDefinition("python", "EngineConfiguration", pythonCode)
+        def arguments = definition.constructor.arguments
+
+        then:
+        arguments.length == 2
+        arguments[0].synthesize(Property).name() == "engines.*.cylinders"
+        arguments[1].synthesize(Property).name() == "engines.*.manufacturer"
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "engines.ferrari.cylinders": "8",
+                "engines.ferrari.manufacturer": "Ferrari",
+                "engines.ford.cylinders": "6",
+                "engines.ford.manufacturer": "Ford"
+        ])
+        def ferrariBean = getBean(context, "python.EngineConfiguration", Qualifiers.byName("ferrari"))
+        def fordBean = getBean(context, "python.EngineConfiguration", Qualifiers.byName("ford"))
+
+        then:
+        ferrariBean.get_cylinders() == 8
+        ferrariBean.get_manufacturer() == "Ferrari"
+        fordBean.get_cylinders() == 6
+        fordBean.get_manufacturer() == "Ford"
 
         cleanup:
         context?.close()
