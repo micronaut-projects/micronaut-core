@@ -229,6 +229,7 @@ If Python already has equivalent coverage, the source feature is cataloged as co
 | `inject-java/src/test/groovy/io/micronaut/inject/lifecycle/PreDestroyCompileSpec.groovy` / pre-destroy bean definition metadata | `inject/PythonLifecycleSpec.test post construct and pre destroy metadata on inject constructor bean` |
 | Java/Groovy/Kotlin lifecycle tests for post-construct/pre-destroy behavior | `inject/PythonLifecycleSpec` |
 | Java/Groovy/Kotlin bean introspection tests for dataclass properties, constructor instantiation, nested object equality, generated proxy property exclusion, and serde stereotypes | `BeanIntrospectionSpec` |
+| `inject-java/src/test/groovy/io/micronaut/aop/compile/ValidatedNonBeanSpec.groovy` / class with only validation annotations is not a bean | `ValidationAnnotationSpec.test class with only validation annotations is not a bean` |
 | Java/Groovy/Kotlin AOP/interceptor metadata tests that assert around/introduction bindings | `AroundAdviceSpec`, `IntroductionAdviceSpec`, `IntroductionGenericInterfaceSpec`, and `MapperIntroductionSpec` |
 | `inject-java/src/test/groovy/io/micronaut/inject/beans/visitor/MapperVisitorSpec.groovy` / mapper visitor introduction binding metadata | `MapperIntroductionSpec.test method level mapper creates bean for abstract Python class` |
 | Visitor resource-writing tests such as `visitMetaInfFile` behavior | `VisitMetaInfSpec` |
