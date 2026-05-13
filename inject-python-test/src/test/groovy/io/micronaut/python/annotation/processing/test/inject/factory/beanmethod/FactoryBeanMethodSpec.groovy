@@ -32,6 +32,7 @@ import jakarta.inject.Singleton
 import spock.lang.PendingFeature
 import spock.lang.Unroll
 
+import java.time.DayOfWeek
 import java.util.function.Function
 
 class FactoryBeanMethodSpec extends AbstractPythonTypeElementSpec {
@@ -219,6 +220,96 @@ class FunctionFactory:
         definition.getTypeArguments(Function)[0].type == String
         definition.getTypeArguments(Function)[1].type == String
         bean.apply("ok") == "ok"
+
+        cleanup:
+        context.close()
+    }
+
+    void "test factory method context scope"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory, Bean, Context
+
+class BootstrapBean:
+    created: bool = False
+
+    def __init__(self):
+        self.created = True
+
+@Factory
+class BootstrapFactory:
+
+    @Bean
+    @Context
+    def bootstrap(self) -> BootstrapBean:
+        return BootstrapBean()
+''')
+
+        when:
+        def definition = context.getBeanDefinition(context.classLoader.loadClass("python.BootstrapBean"))
+        def bean = context.getBean(context.classLoader.loadClass("python.BootstrapBean"))
+
+        then:
+        definition.isContextScope()
+        bean.asPolyglotValue().getMember("created").asBoolean()
+
+        cleanup:
+        context.close()
+    }
+
+    void "test factory method can return enum"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory
+from jakarta.inject import Singleton
+from java.time import DayOfWeek
+
+@Factory
+class DateFactory:
+
+    @Singleton
+    def start_day(self) -> DayOfWeek:
+        return DayOfWeek.MONDAY
+''')
+
+        expect:
+        context.containsBean(DayOfWeek)
+        context.getBean(DayOfWeek) == DayOfWeek.MONDAY
+
+        cleanup:
+        context.close()
+    }
+
+    void "test inherited factory method is produced by child factory"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory, Bean
+from jakarta.inject import Singleton
+
+class Product:
+    def __init__(self, name: str):
+        self.name = name
+
+class BaseProductFactory:
+
+    @Bean
+    @Singleton
+    def product(self) -> Product:
+        return Product("inherited")
+
+@Factory
+class ProductFactory(BaseProductFactory):
+    pass
+''')
+        def productType = context.classLoader.loadClass("python.Product")
+
+        when:
+        def definition = context.getBeanDefinition(productType)
+        def product = context.getBean(productType)
+
+        then:
+        definition.getDeclaringType().get().simpleName.contains("ProductFactory")
+        product.asPolyglotValue().getMember("name").asString() == "inherited"
 
         cleanup:
         context.close()
@@ -538,7 +629,7 @@ class EngineFactory:
         context.close()
     }
 
-    @PendingFeature(reason = "support static methods")
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0020")
     void "test a factory bean with static method"() {
         given:
         def context = buildContext('''\
