@@ -17,6 +17,7 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Blocking
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.python.aop.TestAround
 import spock.lang.PendingFeature
 import spock.lang.Specification
@@ -385,6 +386,138 @@ class MyBean(MyInterface):
         !executableMethod.hasDeclaredAnnotation(Blocking)
         requiredMethod.hasAnnotation(Blocking)
         bean.some_method() == "test"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test abstract aop annotated base types are not bean definitions"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from jakarta.inject import Singleton
+import java
+
+@Around
+def SomeAnnot(target):
+    return target
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(SomeAnnot)
+@Singleton
+class SomeInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return context.proceed()
+
+class ContractService(ABC):
+    @SomeAnnot
+    @abstractmethod
+    def interface_service_method(self) -> str:
+        pass
+
+class BaseService(ABC):
+    @SomeAnnot
+    def base_service_method(self) -> str:
+        return "base"
+
+@SomeAnnot
+class BaseAnnotatedService(ABC):
+    @abstractmethod
+    def missing(self) -> str:
+        pass
+
+@Singleton
+class Service(BaseService, ContractService):
+    @SomeAnnot
+    def service_method(self) -> str:
+        return "service"
+
+    def interface_service_method(self) -> str:
+        return "interface"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def service = getBean(context, "python.Service")
+
+        then:
+        service.service_method() == "service"
+
+        when:
+        context.classLoader.loadClass('python.$ContractService' + BeanDefinitionWriter.CLASS_SUFFIX)
+
+        then:
+        thrown(ClassNotFoundException)
+
+        when:
+        context.classLoader.loadClass('python.$BaseService' + BeanDefinitionWriter.CLASS_SUFFIX)
+
+        then:
+        thrown(ClassNotFoundException)
+
+        when:
+        context.classLoader.loadClass('python.$BaseService' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX)
+
+        then:
+        thrown(ClassNotFoundException)
+
+        when:
+        context.classLoader.loadClass('python.$BaseAnnotatedService' + BeanDefinitionWriter.CLASS_SUFFIX)
+
+        then:
+        thrown(ClassNotFoundException)
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0058")
+    void "test concrete aop bean is resolvable by abstract base type"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from jakarta.inject import Singleton
+import java
+
+@Around
+def SomeAnnot(target):
+    return target
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(SomeAnnot)
+@Singleton
+class SomeInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return context.proceed()
+
+class ContractService(ABC):
+    @SomeAnnot
+    @abstractmethod
+    def interface_service_method(self) -> str:
+        pass
+
+class BaseService(ABC):
+    @SomeAnnot
+    def base_service_method(self) -> str:
+        return "base"
+
+@Singleton
+class Service(BaseService, ContractService):
+    def interface_service_method(self) -> str:
+        return "interface"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def contractType = context.classLoader.loadClass("python.ContractService")
+        def service = getBean(context, "python.Service")
+
+        then:
+        context.getBean(contractType).is(service)
 
         cleanup:
         context?.close()
