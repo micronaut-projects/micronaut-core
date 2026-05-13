@@ -59,6 +59,79 @@ class Book:
         }
     }
 
+    void "test property type annotations remain after bean properties are resolved"() {
+        expect:
+        buildClassElement('''
+from micronaut.core.annotation import Introspected
+
+@Introspected
+class Parameters:
+    stamp_width: int
+    stamp_height: int
+    page_number: int
+
+class MyDto:
+    parameters: Parameters
+
+    @property
+    def settings(self) -> Parameters:
+        return self.parameters
+
+    @settings.setter
+    def settings(self, value: Parameters):
+        self.parameters = value
+''', "MyDto") { ClassElement element ->
+            def properties = element.beanProperties.collectEntries { [it.name, it] }
+            def parameters = properties["parameters"]
+            def settings = properties["settings"]
+            def expectedAnnotations = ["io.micronaut.core.annotation.Introspected"]
+
+            assert parameters != null
+            assert parameters.field.isEmpty()
+            assert parameters.type.annotationNames.sort() == expectedAnnotations
+            assert parameters.genericType.annotationNames.sort() == expectedAnnotations
+            assert parameters.readType.get().annotationNames.sort() == expectedAnnotations
+            assert parameters.writeType.get().annotationNames.sort() == expectedAnnotations
+
+            assert settings != null
+            assert settings.field.isEmpty()
+            assert settings.type.annotationNames.sort() == expectedAnnotations
+            assert settings.genericType.annotationNames.sort() == expectedAnnotations
+            assert settings.readType.get().annotationNames.sort() == expectedAnnotations
+            assert settings.writeType.get().annotationNames.sort() == expectedAnnotations
+            return element
+        }
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0034")
+    void "test inherited properties keep declaring and owning types"() {
+        expect:
+        buildClassElement('''
+class EntityDto:
+    id: str
+    tenant_id: int
+    version: int
+
+class PersonDto(EntityDto):
+    name: str
+    parent_name: str
+''', "PersonDto") { ClassElement element ->
+            def properties = element.beanProperties.findAll {
+                it.name in ["id", "tenant_id", "version", "name", "parent_name"]
+            }
+            def propertyNames = properties*.name as Set
+            def declaredByChild = properties.findAll { it.declaringType.name == "python.PersonDto" }*.name as Set
+            def declaredByParent = properties.findAll { it.declaringType.name == "python.EntityDto" }*.name as Set
+            def ownedByChild = properties.findAll { it.owningType.name == "python.PersonDto" }*.name as Set
+
+            assert propertyNames == ["id", "tenant_id", "version", "name", "parent_name"] as Set
+            assert declaredByChild == ["name", "parent_name"] as Set
+            assert declaredByParent == ["id", "tenant_id", "version"] as Set
+            assert ownedByChild == propertyNames
+            return element
+        }
+    }
+
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0032")
     void "test bean properties with generics"() {
         expect:
