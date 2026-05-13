@@ -17,6 +17,7 @@ package io.micronaut.python.annotation.processing.test.inject.factory.beanmethod
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Prototype
+import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.context.python.ContextHolder
 import io.micronaut.core.annotation.AnnotationUtil
@@ -424,6 +425,33 @@ class MyBean:
         then:
         bean.total_value() == 10
         bean.total_field_value() == 10
+
+        cleanup:
+        context.close()
+    }
+
+    void "test factory method returning none fails bean creation"() {
+        given:
+        def context = buildContext('''\
+from typing import Annotated
+from micronaut.context.annotation import Factory, Parameter, Prototype
+
+class Product:
+    pass
+
+@Factory
+class ProductFactory:
+    @Prototype
+    def product(self, name: Annotated[str, Parameter]) -> Product:
+        return None
+''')
+        def productClass = context.classLoader.loadClass("python.Product")
+
+        when:
+        context.createBean(productClass, "test")
+
+        then:
+        thrown(BeanContextException)
 
         cleanup:
         context.close()
