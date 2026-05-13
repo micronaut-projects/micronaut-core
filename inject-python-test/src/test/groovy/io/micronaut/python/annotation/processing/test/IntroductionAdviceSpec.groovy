@@ -1,5 +1,9 @@
 package io.micronaut.python.annotation.processing.test
 
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
+import org.graalvm.polyglot.Value
+
 class IntroductionAdviceSpec extends AbstractPythonTypeElementSpec {
     void "test introduction advice with the decorator defined in Python and invoked from another type"() {
         given:
@@ -116,6 +120,111 @@ class StubExample(ABC):
         then:
         def e = thrown(RuntimeException)
         e.message.contains("around interceptor executed")
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test introduction advice retains validation metadata on abstract methods"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Introduction
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+from jakarta.validation.constraints import Min, NotBlank
+from abc import ABC, abstractmethod
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Introduction
+def Stub(cls):
+    return cls
+
+@InterceptorBean(Stub)
+@Singleton
+class StubIntroduction(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return None
+
+@Stub
+class ValidationIntroducedService(ABC):
+    @abstractmethod
+    @Executable
+    def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> None:
+        pass
+
+    @abstractmethod
+    @Executable
+    def save_two(self, name: Annotated[str, Min(1)]) -> None:
+        pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = context.getBeanDefinition(context.classLoader.loadClass("python.ValidationIntroducedService"))
+        def save = definition.executableMethods.find { it.methodName == "save" }
+        def saveTwo = definition.executableMethods.find { it.methodName == "save_two" }
+
+        then:
+        save != null
+        save.returnType.type == void.class
+        save.arguments[0].annotationMetadata.hasAnnotation(NotBlank)
+        save.arguments[1].annotationMetadata.hasAnnotation(Min)
+        save.arguments[1].annotationMetadata.getValue(Min, Integer).get() == 1
+        saveTwo != null
+        saveTwo.returnType.type == void.class
+        saveTwo.arguments[0].annotationMetadata.hasAnnotation(Min)
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test introduction advice on abstract class preserves concrete methods"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Introduction
+from jakarta.inject import Singleton
+from abc import ABC, abstractmethod
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Introduction
+def Stub(value: str = ""):
+    def class_decorator(cls):
+        return cls
+    return class_decorator
+
+@InterceptorBean(Stub.__qualname__)
+@Singleton
+class StubIntroduction(MethodInterceptor):
+    invoked: int = 0
+
+    def intercept(self, context: MethodInvocationContext):
+        self.invoked += 1
+        return context.getValue("python.Stub", context.getReturnType().getType()).orElse(None)
+
+@Stub()
+class AbstractBean(ABC):
+    @abstractmethod
+    def is_abstract(self) -> str:
+        pass
+
+    def non_abstract(self) -> str:
+        return "good"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        Value bean = getBean(context, "python.AbstractBean").asPolyglotValue()
+        def interceptor = getBean(context, "python.StubIntroduction")
+
+        then:
+        bean.invokeMember("is_abstract").isNull()
+        bean.invokeMember("non_abstract").asString() == "good"
+        interceptor.invoked == 1
 
         cleanup:
         context?.close()
