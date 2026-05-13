@@ -323,6 +323,25 @@ class QualifiedService:
             .getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == "python.Cylinders"
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0036")
+    @Unroll
+    void "test #annotation protocol is not registered as a bean definition"() {
+        expect:
+        buildBeanDefinition("python", "MyProtocol", """
+from typing import Protocol
+${importStatement}
+
+@${annotation}
+class MyProtocol(Protocol):
+    pass
+""") == null
+
+        where:
+        importStatement                                    | annotation
+        "from jakarta.inject import Singleton"             | "Singleton"
+        "from micronaut.http.annotation import Controller" | "Controller"
+    }
+
     void "test deep type parameters are created in definition"() {
         given:
         def definition = buildBeanDefinition("python", "DeepGenericService", '''
