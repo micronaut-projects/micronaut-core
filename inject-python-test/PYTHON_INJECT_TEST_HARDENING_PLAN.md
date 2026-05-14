@@ -117,13 +117,14 @@ As of May 14, 2026:
 
 * Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
   from the included checkout; do not rely on a local bundle override.
-* The latest pending ID is `PY-INJECT-0089`; use `PY-INJECT-0090` for the next
+* The latest pending ID is `PY-INJECT-0091`; use `PY-INJECT-0092` for the next
   pending case.
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
-  `io.micronaut.python.annotation.processing.test.annotate.*`.
+  `io.micronaut.python.annotation.processing.test.ConfigurationPropertiesSpec`
+  with 23 tests executed and 5 skipped.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -235,6 +236,13 @@ The latest completed source slices are:
 * `AnnotateReplacesSpec.groovy`: visitor-added `@Factory`, `@Bean`, and
   `@Replaces` metadata for replacement factory methods is pending as
   `PY-INJECT-0085`.
+* `InterfaceConfigurationPropertiesSpec.groovy`, `InterfaceNestingSpec.groovy`,
+  `EachPropertyNestingSpec.groovy`, and `RecordNestingSpec.groovy`: nested
+  Python configuration class runtime binding is pending as `PY-INJECT-0090`,
+  and nested `@EachProperty` list binding is pending as `PY-INJECT-0091`;
+  interface proxies, Java record accessors, and Java/Groovy visibility variants
+  are cataloged as unsupported, while scalar binding and nested prefix metadata
+  are covered by `ConfigurationPropertiesSpec`.
 * `InheritedConfigurationReaderPrefixSpec.groovy`: supported
   `ConfigurationReader.PREFIX` alias paths with and without `basePrefix` are
   covered by `ConfigurationPropertiesSpec`; the source specs' documented
