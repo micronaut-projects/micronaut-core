@@ -8,6 +8,7 @@ io.micronaut.python.annotation.processing.test.visitor.AllElementsVisitor
 io.micronaut.python.annotation.processing.test.BeanElementBuilderSpec$AssociatedBeanVisitor
 io.micronaut.python.annotation.processing.test.TypeElementQuerySpec$TypeElementQueryVisitor
 io.micronaut.python.annotation.processing.test.IntroducedBeanVisitorSpec$IntroducedMethodVisitor
+io.micronaut.python.annotation.processing.test.IntroducedBeanVisitorSpec$GenericIntroductionVisitor
 io.micronaut.python.annotation.processing.test.CustomVisitorSpec$ControllerGetVisitor
 io.micronaut.python.annotation.processing.test.CustomVisitorSpec$ControllerAllElementsVisitor
 io.micronaut.python.annotation.processing.test.CustomVisitorSpec$GetMethodVisitor
