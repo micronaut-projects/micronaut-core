@@ -122,8 +122,8 @@ As of May 14, 2026:
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
-* The most recent focused verification passed for `AroundConstructSpec` with 5
-  passing tests and 1 skipped pending test.
+* The most recent focused verification passed for `NamedAopAdviceSpec` with 1
+  passing test.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -181,6 +181,8 @@ The latest completed source slices are:
   `AroundConstructSpec`. Combined `@Around` plus `@AroundConstruct` behavior is
   pending as `PY-INJECT-0070`; the local Java annotation transformer fixture is
   cataloged as unsupported.
+* `NamedAopAdviceSpec.groovy`: named refreshable `@EachProperty` factory beans
+  and qualified AOP proxy lookup are covered by `NamedAopAdviceSpec`.
 
 The next source area has not been selected yet.
 
