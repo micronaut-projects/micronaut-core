@@ -118,25 +118,25 @@ As of May 14, 2026:
   from the included checkout; do not rely on a local bundle override.
 * The latest committed pending ID is `PY-INJECT-0060`; use
   `PY-INJECT-0061` for the next pending case.
-* The most recent full verification passed with 399 tests and 65 skipped.
+* The most recent full verification passed with 400 tests and 65 skipped.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
 
-The executable factory method slice is complete:
+The latest completed source slices are:
 
-* `test executing a default interface method` is likely intentionally
-  unsupported because it exercises Java/Kotlin default interface method
-  semantics.
-* `test executable factory with multiple interface inheritance` is covered by
-  `FactoryBeanMethodSpec.test executable factory method with inherited client
-  interface methods`.
+* `ExecutableFactoryMethodSpec.groovy`: default interface method behavior is
+  cataloged as unsupported, while multiple-interface factory executable
+  behavior is covered by `FactoryBeanMethodSpec.test executable factory method
+  with inherited client interface methods`.
+* `AdviceDefinedOnFactorySpec.groovy`: class-level factory advice behavior is
+  covered by `FactoryBeanMethodSpec.test class level around advice on factory
+  applies to factory methods only`.
 
-The next source area under investigation is `AdviceDefinedOnFactorySpec.groovy`.
+The next source area under investigation is `InterfaceIntroductionAdviceSpec.groovy`.
 
-Good next source areas to mine after the advice-defined-on-factory slice:
+Good next source areas to mine after the interface-introduction slice:
 
-* `InterfaceIntroductionAdviceSpec.groovy`
 * `IntroductionGenericTypesSpec.groovy`
 * `FactoryMappedAdviceSpec.groovy`
 

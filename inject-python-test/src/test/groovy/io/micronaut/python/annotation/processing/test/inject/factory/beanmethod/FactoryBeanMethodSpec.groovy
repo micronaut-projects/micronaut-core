@@ -511,6 +511,77 @@ class MyFactory:
         ContextHolder.resetContext()
     }
 
+    void "test class level around advice on factory applies to factory methods only"() {
+        given:
+        def context = buildContext('''\
+from typing import Annotated
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from micronaut.context.annotation import Factory, Bean, Prototype, Parameter, Executable
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Around
+def Mutating(target):
+    return target
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    count: int = 0
+
+    def intercept(self, context: MethodInvocationContext):
+        self.count += 1
+        for param in context.getParameters().values():
+            if param.getName() == "name":
+                param.setValue("changed")
+        return context.proceed()
+
+class Product:
+    def __init__(self, name: str):
+        self.name = name
+
+    @Executable
+    def describe(self, name: str) -> str:
+        return name
+
+@Factory
+@Mutating
+class ProductFactory:
+
+    @Bean
+    @Prototype
+    @Executable
+    def product(self, name: Annotated[str, Parameter]) -> Product:
+        return Product(name)
+''')
+
+        when:
+        def productClass = context.classLoader.loadClass("python.Product")
+        BeanDefinition<?> factoryDefinition = getBeanDefinition(context, "python.ProductFactory")
+        BeanDefinition<?> productDefinition = context.getBeanDefinition(productClass)
+        def product = context.createBean(productClass, "original").asPolyglotValue()
+        def interceptor = getBean(context, "python.MutatingInterceptor").asPolyglotValue()
+
+        then:
+        factoryDefinition.executableMethods*.methodName == ["product"]
+        productDefinition.executableMethods*.methodName.contains("describe")
+        product.getMember("name").asString() == "changed"
+        interceptor.getMember("count").asInt() == 1
+
+        when:
+        def described = product.invokeMember("describe", "original")
+
+        then:
+        described.asString() == "original"
+        interceptor.getMember("count").asInt() == 1
+
+        cleanup:
+        context?.close()
+        ContextHolder.resetContext()
+    }
+
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0038")
     void "test exposed factory method type with around advice"() {
         given:
