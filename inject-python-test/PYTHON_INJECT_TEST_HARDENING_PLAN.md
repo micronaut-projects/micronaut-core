@@ -123,7 +123,7 @@ As of May 14, 2026:
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
-  `CustomVisitorSpec`.
+  `AnnotateMethodParameterSpec`.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -209,6 +209,10 @@ The latest completed source slices are:
   are covered by `CustomVisitorSpec`; Java/Groovy field visitor counts and
   field visibility portions are cataloged as unsupported. Python `@Generated`
   class visitor exclusion is pending as `PY-INJECT-0076`.
+* `ElementAnnotateSpec.groovy`: type visitor mutation of executable method
+  parameter metadata is covered by `AnnotateMethodParameterSpec`; broader
+  class, method, return type, property, and metadata writer mutation behavior is
+  covered by the existing Python annotate specs.
 
 The next source area has not been selected yet.
 
