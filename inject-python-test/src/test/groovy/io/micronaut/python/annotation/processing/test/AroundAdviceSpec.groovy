@@ -394,6 +394,50 @@ class MethodLevelBean:
         context?.close()
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0075")
+    void "test class level around advice applies to property setters"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Around
+def Mutating(target):
+    return target
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        for param in context.getParameters().values():
+            if param.getName() == "name" and param.getValue() == "test":
+                param.setValue("changed")
+        return context.proceed()
+
+@Mutating
+@Singleton
+class MyPropertyBean:
+    name: str = None
+
+    def test(self, name: str) -> None:
+        pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def bean = getBean(context, "python.MyPropertyBean")
+        bean.name = "test"
+
+        then:
+        bean.name == "changed"
+
+        cleanup:
+        context?.close()
+    }
+
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0057")
     void "test overridden around-advised method inherits base method metadata"() {
         given:
