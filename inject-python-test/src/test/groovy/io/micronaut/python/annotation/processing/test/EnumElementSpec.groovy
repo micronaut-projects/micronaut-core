@@ -74,4 +74,23 @@ class Route:
             return element
         }
     }
+
+    void "test enum method parameter collection type argument"() {
+        expect:
+        buildClassElement('''
+from micronaut.http import HttpMethod
+
+class Route:
+    def handle(self, methods: list[HttpMethod]) -> None:
+        pass
+''', "Route") { ClassElement element ->
+            def method = element.findMethod("handle").get()
+            def argumentType = method.parameters[0].genericType.firstTypeArgument.get()
+
+            assert argumentType instanceof EnumElement
+            assert argumentType.isEnum()
+            assert argumentType.values().contains("GET")
+            return element
+        }
+    }
 }
