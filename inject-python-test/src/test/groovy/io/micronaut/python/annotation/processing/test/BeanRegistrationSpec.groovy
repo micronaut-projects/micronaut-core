@@ -1,7 +1,5 @@
 package io.micronaut.python.annotation.processing.test
 
-import spock.lang.PendingFeature
-
 class BeanRegistrationSpec extends AbstractPythonTypeElementSpec {
 
     void "test inject bean registrations through constructor and method"() {
@@ -23,7 +21,6 @@ class BeanRegistrationSpec extends AbstractPythonTypeElementSpec {
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0012")
     void "test inject bean registrations through field"() {
         given:
         def context = buildContext(beanRegistrationCode(true))
