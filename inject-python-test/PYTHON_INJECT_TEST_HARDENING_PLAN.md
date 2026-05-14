@@ -112,24 +112,33 @@ git status --short --branch
 
 ## Current Continuation State
 
-As of May 13, 2026:
+As of May 14, 2026:
 
 * Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
   from the included checkout; do not rely on a local bundle override.
-* The latest committed pending ID is `PY-INJECT-0058`; use
-  `PY-INJECT-0059` for the next pending case.
-* The active uncommitted slice extends `PythonLifecycleSpec` with
-  class-level and method-level around-advised lifecycle coverage and updates
-  `DISABLED_TESTS.md` with the covered source mapping.
-* The focused lifecycle spec has passed. Before committing that slice, finish
-  full `:micronaut-inject-python-test:test`, run the hygiene checks, inspect
-  the diff, then commit it as a small verified change.
+* The latest committed pending ID is `PY-INJECT-0060`; use
+  `PY-INJECT-0061` for the next pending case.
+* The branch is clean after the latest committed slice:
+  `17568d756b Add Python introduction around coverage`.
+* The most recent full verification passed with 398 tests and 65 skipped.
+* Recent committed slices added or cataloged lifecycle hooks, lifecycle
+  interceptor bindings, and introduction-around coverage.
 
-Good next source areas to mine after the lifecycle slice:
+The next source area under investigation is `ExecutableFactoryMethodSpec.groovy`.
+Current working notes:
 
-* `PostConstructInterceptorCompileSpec.groovy`
-* `IntroductionWithAroundSpec.groovy`
-* `ExecutableFactoryMethodSpec.groovy`
+* `test executing a default interface method` is likely intentionally
+  unsupported because it exercises Java/Kotlin default interface method
+  semantics.
+* `test executable factory with multiple interface inheritance` may be covered
+  by existing factory executable and introduction-generic tests, or it may need
+  a focused addition in `FactoryBeanMethodSpec`.
+* If adding a test, prefer
+  `inject-python-test/src/test/groovy/io/micronaut/python/annotation/processing/test/inject/factory/beanmethod/FactoryBeanMethodSpec.groovy`
+  unless ownership is clearer elsewhere.
+
+Good next source areas to mine after the executable factory method slice:
+
 * `AdviceDefinedOnFactorySpec.groovy`
 * `InterfaceIntroductionAdviceSpec.groovy`
 * `IntroductionGenericTypesSpec.groovy`
