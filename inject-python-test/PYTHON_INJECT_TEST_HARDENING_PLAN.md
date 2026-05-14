@@ -117,13 +117,14 @@ As of May 14, 2026:
 
 * Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
   from the included checkout; do not rely on a local bundle override.
-* The latest pending ID is `PY-INJECT-0066`; use `PY-INJECT-0067` for the next
+* The latest pending ID is `PY-INJECT-0067`; use `PY-INJECT-0068` for the next
   pending case.
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
-  `IntroductionGenericInterfaceSpec` with 9 tests and 4 skipped.
+  `FactoryBeanMethodSpec.test mapped configuration factory advice caches
+  factory method result` with 1 test and 1 skipped.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -144,8 +145,10 @@ The latest completed source slices are:
 * `IntroductionGenericTypesSpec.groovy`: generic introduced method signature
   gaps are pending as `PY-INJECT-0064` through `PY-INJECT-0066`, with JVM array
   portions cataloged as unsupported.
+* `FactoryMappedAdviceSpec.groovy`: Java annotation-mapped factory advice is
+  pending as `PY-INJECT-0067`.
 
-The next source area under investigation is `FactoryMappedAdviceSpec.groovy`.
+The next source area has not been selected yet.
 
 After that, continue with the next uncataloged direct subclass from the
 inventory in `DISABLED_TESTS.md`.
