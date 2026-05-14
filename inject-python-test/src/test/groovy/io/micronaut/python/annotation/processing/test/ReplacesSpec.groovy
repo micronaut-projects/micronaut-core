@@ -15,6 +15,17 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.context.annotation.Bean
+import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Replaces
+import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.inject.visitor.VisitorContext
+import spock.lang.PendingFeature
+
 class ReplacesSpec extends AbstractPythonTypeElementSpec {
 
     void "test bean can replace another bean"() {
@@ -190,5 +201,108 @@ class ReplacementEngineFactory:
 
         cleanup:
         context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0085")
+    void "test replaces can be applied to factory methods from a visitor"() {
+        given:
+        VisitorProducesVisitor.ENABLED = true
+        VisitorSpecializesVisitor.ENABLED = true
+        def context = buildContext('''
+from jakarta.inject import Singleton
+
+def TestProduces(target):
+    return target
+
+def TestSpecializes(target):
+    return target
+
+@Singleton
+class Catalog:
+    def __init__(self, payment_processor: PaymentProcessor):
+        self.payment_processor = payment_processor
+
+class Shop:
+    @TestProduces
+    def get_payment_processor(self) -> PaymentProcessor:
+        return CreditCardProcessor()
+
+@TestSpecializes
+class MockShop(Shop):
+    @TestSpecializes
+    @TestProduces
+    def get_payment_processor(self) -> PaymentProcessor:
+        return MockPaymentProcessor()
+
+class PaymentProcessor:
+    pass
+
+class CreditCardProcessor(PaymentProcessor):
+    pass
+
+class MockPaymentProcessor(PaymentProcessor):
+    pass
+''')
+        def catalog = getBean(context, "python.Catalog").asPolyglotValue()
+
+        expect:
+        catalog.getMember("payment_processor").toString().contains("MockPaymentProcessor")
+
+        cleanup:
+        VisitorProducesVisitor.reset()
+        VisitorSpecializesVisitor.reset()
+        context?.close()
+    }
+
+    static class VisitorSpecializesVisitor implements TypeElementVisitor<Object, Object> {
+        static boolean ENABLED = false
+
+        static void reset() {
+            ENABLED = false
+        }
+
+        @Override
+        void visitMethod(MethodElement element, VisitorContext context) {
+            if (ENABLED && element.hasAnnotation("python.TestSpecializes")) {
+                element.annotate(Replaces) { builder ->
+                    builder.member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(element.genericReturnType.name))
+                    builder.member("factory", new AnnotationClassValue<>(element.declaringType.superType.get().name))
+                }
+            }
+        }
+
+        @Override
+        VisitorKind getVisitorKind() {
+            return VisitorKind.ISOLATING
+        }
+    }
+
+    static class VisitorProducesVisitor implements TypeElementVisitor<Object, Object> {
+        static boolean ENABLED = false
+        ClassElement currentClass
+
+        static void reset() {
+            ENABLED = false
+        }
+
+        @Override
+        void visitClass(ClassElement element, VisitorContext context) {
+            currentClass = element
+        }
+
+        @Override
+        void visitMethod(MethodElement element, VisitorContext context) {
+            if (ENABLED && element.hasAnnotation("python.TestProduces")) {
+                if (!currentClass.hasAnnotation(Factory)) {
+                    currentClass.annotate(Factory)
+                }
+                element.annotate(Bean)
+            }
+        }
+
+        @Override
+        VisitorKind getVisitorKind() {
+            return VisitorKind.ISOLATING
+        }
     }
 }
