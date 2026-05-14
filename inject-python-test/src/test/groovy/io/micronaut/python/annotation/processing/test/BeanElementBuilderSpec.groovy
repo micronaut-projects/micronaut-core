@@ -15,9 +15,12 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
+import io.micronaut.python.annotation.processing.test.beanbuilder.ApplyAopToMe
 import spock.lang.PendingFeature
 
 class BeanElementBuilderSpec extends AbstractPythonTypeElementSpec {
@@ -40,6 +43,106 @@ class BeanElementBuilderTrigger:
         context?.close()
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0083")
+    void "test AOP applied to method on type registered via builder"() {
+        given:
+        ApplyAopToMethodVisitor.ENABLED = true
+        def context = buildContext('''
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+ApplyAopToMe = java.type("io.micronaut.python.annotation.processing.test.beanbuilder.ApplyAopToMe")
+
+@Around
+def Mutating(value: str):
+    def decorator(target):
+        return target
+    return decorator
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        member = context.stringValue(Mutating).orElse(None)
+        argument = context.getParameters().get(member)
+        if argument is not None:
+            argument.setValue("changed")
+        return context.proceed()
+
+@Singleton
+class Test:
+    def __init__(self, apply_aop_to_me: ApplyAopToMe):
+        self.apply_aop_to_me = apply_aop_to_me
+
+    def hello(self, name: str) -> str:
+        return self.apply_aop_to_me.hello(name)
+
+    def plain(self, name: str) -> str:
+        return self.apply_aop_to_me.plain(name)
+''')
+        def test = getBean(context, "python.Test")
+
+        expect:
+        test.hello("john") == "Hello changed"
+        test.plain("john") == "Hello john"
+
+        cleanup:
+        ApplyAopToMethodVisitor.ENABLED = false
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0084")
+    void "test AOP applied to type registered via builder"() {
+        given:
+        ApplyAopToTypeVisitor.ENABLED = true
+        def context = buildContext('''
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+ApplyAopToMe = java.type("io.micronaut.python.annotation.processing.test.beanbuilder.ApplyAopToMe")
+
+@Around
+def Mutating(value: str):
+    def decorator(target):
+        return target
+    return decorator
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        member = context.stringValue(Mutating).orElse(None)
+        argument = context.getParameters().get(member)
+        if argument is not None:
+            argument.setValue("changed")
+        return context.proceed()
+
+@Singleton
+class Test:
+    def __init__(self, apply_aop_to_me: ApplyAopToMe):
+        self.apply_aop_to_me = apply_aop_to_me
+
+    def hello(self, name: str) -> str:
+        return self.apply_aop_to_me.hello(name)
+
+    def plain(self, name: str) -> str:
+        return self.apply_aop_to_me.plain(name)
+''')
+        def test = getBean(context, "python.Test")
+
+        expect:
+        test.hello("john") == "Hello changed"
+        test.plain("john") == "Hello changed"
+
+        cleanup:
+        ApplyAopToTypeVisitor.ENABLED = false
+        context?.close()
+    }
+
     static class AssociatedBean {
     }
 
@@ -50,6 +153,56 @@ class BeanElementBuilderTrigger:
                 context.getClassElement(AssociatedBean)
                     .ifPresent { associatedBean ->
                         element.addAssociatedBean(associatedBean)
+                    }
+            }
+        }
+
+        @Override
+        VisitorKind getVisitorKind() {
+            return VisitorKind.ISOLATING
+        }
+    }
+
+    static class ApplyAopToMethodVisitor implements TypeElementVisitor<Object, Object> {
+        static boolean ENABLED = false
+
+        @Override
+        void visitClass(ClassElement element, VisitorContext context) {
+            if (ENABLED && element.name == "python.Test") {
+                def annotationValue = AnnotationValue.builder("python.Mutating")
+                    .value("name")
+                    .build()
+                context.getClassElement(ApplyAopToMe)
+                    .ifPresent { applyAopToMe ->
+                        element.addAssociatedBean(applyAopToMe)
+                            .inject()
+                            .withMethods(ElementQuery.ALL_METHODS.named { it == "hello" }) { method ->
+                                method.intercept(annotationValue)
+                            }
+                    }
+            }
+        }
+
+        @Override
+        VisitorKind getVisitorKind() {
+            return VisitorKind.ISOLATING
+        }
+    }
+
+    static class ApplyAopToTypeVisitor implements TypeElementVisitor<Object, Object> {
+        static boolean ENABLED = false
+
+        @Override
+        void visitClass(ClassElement element, VisitorContext context) {
+            if (ENABLED && element.name == "python.Test") {
+                def annotationValue = AnnotationValue.builder("python.Mutating")
+                    .value("name")
+                    .build()
+                context.getClassElement(ApplyAopToMe)
+                    .ifPresent { applyAopToMe ->
+                        element.addAssociatedBean(applyAopToMe)
+                            .intercept(annotationValue)
+                            .inject()
                     }
             }
         }
