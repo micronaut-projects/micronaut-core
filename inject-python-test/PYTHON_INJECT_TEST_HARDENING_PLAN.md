@@ -169,6 +169,13 @@ The latest completed source slices are:
 * `InterceptedAdapterSpec.groovy`: around advice on event-listener adapter
   methods is pending as `PY-INJECT-0069` because the Python adapter path invokes
   the around interceptor twice for one event.
+* `SessionProxySpec.groovy`: Hibernate `Session`/`SessionFactory` JVM proxy
+  method emission is cataloged as unsupported Java library proxy behavior.
+* `IntroductionInnerInterfaceSpec.groovy`: Java nested interface introduction
+  cases are cataloged as unsupported source-model behavior.
+* `MyAbstractRepoSpec.groovy`: concrete methods on introduced abstract
+  repository-style beans are covered; Java default interface methods remain
+  unsupported.
 
 The next source area has not been selected yet.
 
