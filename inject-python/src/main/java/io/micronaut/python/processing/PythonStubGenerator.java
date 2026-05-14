@@ -1626,30 +1626,30 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     if (returnType.isAssignable(List.class)) {
                         ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
                         ExpressionDef genericType = toClassExpression(componentType);
-                        yield RUNTIME_UTIL
+                        yield uncheckedCast(RUNTIME_UTIL
                             .invokeStatic("convertList", ClassTypeDef.of(List.class),
-                                invokedValue, genericType);
+                                invokedValue, genericType), returnType);
                     } else if (returnType.isAssignable(Map.class)) {
                         Map<String, ClassElement> typeArguments = returnType.getTypeArguments();
                         ExpressionDef keyType = toClassExpression(typeArguments.get("K"));
                         ExpressionDef valueType = toClassExpression(typeArguments.get("V"));
-                        yield RUNTIME_UTIL
+                        yield uncheckedCast(RUNTIME_UTIL
                             .invokeStatic("convertMap", ClassTypeDef.of(Map.class),
-                                invokedValue, keyType, valueType);
+                                invokedValue, keyType, valueType), returnType);
                     } else if (returnType.isAssignable(Set.class)) {
                         ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
                         ExpressionDef genericType = toClassExpression(componentType);
 
-                        yield RUNTIME_UTIL
+                        yield uncheckedCast(RUNTIME_UTIL
                             .invokeStatic("convertSet", ClassTypeDef.of(Set.class),
-                                invokedValue, genericType);
+                                invokedValue, genericType), returnType);
                     } else if (returnType.isAssignable(java.util.Optional.class)) {
                         ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
                         ExpressionDef genericType = toClassExpression(componentType);
 
-                        yield RUNTIME_UTIL
+                        yield uncheckedCast(RUNTIME_UTIL
                             .invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class),
-                                invokedValue, genericType);
+                                invokedValue, genericType), returnType);
                     } else {
                         if (isGeneratedWrapperType(allClasses, returnType)) {
                             yield javaClassType(returnType)
@@ -1686,6 +1686,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             genericType = javaClassType(componentType).getStaticField("class", TypeDef.CLASS);
         }
         return genericType;
+    }
+
+    private static ExpressionDef uncheckedCast(ExpressionDef expression, ClassElement targetType) {
+        return expression.cast(TypeDef.OBJECT).cast(TypeDef.of(targetType));
     }
 
     private void addCreatorFactoryMethod(MethodElement creatorMethod, ClassDef.ClassDefBuilder builder, ClassElement element) {
@@ -1807,20 +1811,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     if (type.isAssignable(List.class)) {
                         ClassElement componentType = type.getFirstTypeArgument().orElse(null);
                         ExpressionDef genericType = toClassExpression(componentType);
-                        return RUNTIME_UTIL.invokeStatic("convertList", ClassTypeDef.of(List.class), member, genericType);
+                        return uncheckedCast(RUNTIME_UTIL.invokeStatic("convertList", ClassTypeDef.of(List.class), member, genericType), type);
                     } else if (type.isAssignable(Map.class)) {
                         Map<String, ClassElement> typeArguments = type.getTypeArguments();
                         ExpressionDef keyType = toClassExpression(typeArguments.get("K"));
                         ExpressionDef valueType = toClassExpression(typeArguments.get("V"));
-                        return RUNTIME_UTIL.invokeStatic("convertMap", ClassTypeDef.of(Map.class), member, keyType, valueType);
+                        return uncheckedCast(RUNTIME_UTIL.invokeStatic("convertMap", ClassTypeDef.of(Map.class), member, keyType, valueType), type);
                     } else if (type.isAssignable(Set.class)) {
                         ClassElement componentType = type.getFirstTypeArgument().orElse(null);
                         ExpressionDef genericType = toClassExpression(componentType);
-                        return RUNTIME_UTIL.invokeStatic("convertSet", ClassTypeDef.of(Set.class), member, genericType);
+                        return uncheckedCast(RUNTIME_UTIL.invokeStatic("convertSet", ClassTypeDef.of(Set.class), member, genericType), type);
                     } else if (type.isAssignable(java.util.Optional.class)) {
                         ClassElement componentType = type.getFirstTypeArgument().orElse(null);
                         ExpressionDef genericType = toClassExpression(componentType);
-                        return RUNTIME_UTIL.invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class), member, genericType);
+                        return uncheckedCast(RUNTIME_UTIL.invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class), member, genericType), type);
                     } else if (isGeneratedWrapperType(allClasses, type)) {
                         return javaClassType(type).invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, member);
                     } else {
