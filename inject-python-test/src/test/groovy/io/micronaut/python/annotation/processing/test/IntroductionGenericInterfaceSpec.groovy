@@ -1,5 +1,8 @@
 package io.micronaut.python.annotation.processing.test
 
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Min
+import io.micronaut.python.annotation.processing.test.repository.MinimalCrudRepository
 import io.micronaut.python.compiler.PyronautCompiler
 import org.graalvm.polyglot.Value
 import spock.lang.PendingFeature
@@ -66,10 +69,12 @@ class MyPersonRepository(MinimalCrudRepository[MyPerson, int], new_style=True):
 
         when:
         def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.MyPersonRepository")
         Value bean = getBean(context, "python.MyPersonRepository").asPolyglotValue()
 
 
         then:
+        !definition.getTypeArguments(MinimalCrudRepository).isEmpty()
         bean != null
 
         when:
@@ -78,6 +83,59 @@ class MyPersonRepository(MinimalCrudRepository[MyPerson, int], new_style=True):
         then:
         def e = thrown(RuntimeException)
         e.message.contains("repo introduction interceptor executed")
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0063")
+    void "test introduction generic type argument annotations propagate to methods"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from typing import Annotated
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Introduction
+from jakarta.inject import Singleton
+from jakarta.validation import Valid
+from jakarta.validation.constraints import Min
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+DataCrudRepository = java.type("io.micronaut.python.annotation.processing.test.repository.DataCrudRepository")
+
+@dataclass
+class MyPerson:
+    id: int
+    name: str
+
+@Introduction
+def RepoIntro(cls):
+    return cls
+
+@InterceptorBean(RepoIntro)
+@Singleton
+class RepoIntroInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return None
+
+@RepoIntro
+class MyPersonRepository(DataCrudRepository[Annotated[MyPerson, Valid], Annotated[int, Min(5)]], new_style=True):
+    pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.MyPersonRepository")
+        def save = definition.executableMethods.find { it.methodName == "save" }
+        def findById = definition.executableMethods.find { it.methodName == "findById" }
+
+        then:
+        save != null
+        findById != null
+        save.arguments[0].annotationMetadata.hasAnnotation(Valid)
+        findById.arguments[0].annotationMetadata.hasAnnotation(Min)
+        findById.arguments[0].annotationMetadata.getValue(Min, Integer).get() == 5
+        findById.returnType.annotationMetadata.hasAnnotation(Valid)
 
         cleanup:
         context?.close()

@@ -1,5 +1,6 @@
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.core.annotation.Blocking
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import org.graalvm.polyglot.Value
@@ -71,6 +72,129 @@ class TestCaller:
         testBean.get_number() == 10
         testBean.get_date() == null
         interceptor.invoked == 4
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0062")
+    void "test type level around advice on introduced abstract methods mutates arguments"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext, Introduction
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Introduction
+def Stub(cls):
+    return cls
+
+@Around
+def Mutating(cls):
+    return cls
+
+@InterceptorBean(Stub)
+@Singleton
+class StubIntroduction(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        for param in context.getParameters().values():
+            return param.getValue()
+        return None
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        for param in context.getParameters().values():
+            if param.getName() == "name":
+                param.setValue("changed")
+        return context.proceed()
+
+@Stub
+@Mutating
+@Singleton
+class InterfaceIntroductionClass(ABC):
+    @abstractmethod
+    def test(self, name: str) -> str:
+        pass
+
+    @abstractmethod
+    def test_with_age(self, name: str, age: int) -> str:
+        pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def bean = getBean(context, "python.InterfaceIntroductionClass")
+        def value = bean.asPolyglotValue()
+
+        then:
+        value.invokeMember("test", "test").asString() == "changed"
+        value.invokeMember("test_with_age", "test", 10).asString() == "changed"
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0061")
+    void "test type level around advice on introduced inherited generic abstract method"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from typing import Generic, TypeVar
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext, Introduction
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+T = TypeVar("T")
+
+@Introduction
+def Stub(cls):
+    return cls
+
+@Around
+def Mutating(cls):
+    return cls
+
+@InterceptorBean(Stub)
+@Singleton
+class StubIntroduction(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        for param in context.getParameters().values():
+            return param.getValue()
+        return None
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        for param in context.getParameters().values():
+            if param.getName() == "name":
+                param.setValue("changed")
+        return context.proceed()
+
+class SuperInterface(Generic[T], ABC):
+    @abstractmethod
+    def test_generics_from_type(self, name: T, age: int) -> T:
+        pass
+
+@Stub
+@Mutating
+@Singleton
+class InterfaceIntroductionClass(SuperInterface[str], ABC):
+    pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def bean = getBean(context, "python.InterfaceIntroductionClass").asPolyglotValue()
+
+        then:
+        bean.invokeMember("test_generics_from_type", "test", 10).asString() == "changed"
+
+        cleanup:
+        context?.close()
     }
 
     void "test introduction advice runs around interceptors first"() {
@@ -192,6 +316,7 @@ class AbstractBean(ABC):
 from typing import Annotated
 from micronaut.aop import InterceptorBean, MethodInvocationContext, Introduction
 from micronaut.context.annotation import Executable
+from micronaut.core.annotation import Blocking
 from jakarta.inject import Singleton
 from jakarta.validation.constraints import Min, NotBlank
 from abc import ABC, abstractmethod
@@ -217,6 +342,7 @@ class ValidationIntroducedService(ABC):
         pass
 
     @abstractmethod
+    @Blocking
     @Executable
     def save_two(self, name: Annotated[str, Min(1)]) -> None:
         pass
@@ -237,6 +363,8 @@ class ValidationIntroducedService(ABC):
         saveTwo != null
         saveTwo.returnType.type == void.class
         saveTwo.arguments[0].annotationMetadata.hasAnnotation(Min)
+        saveTwo.hasAnnotation(Blocking)
+        saveTwo.annotationMetadata.declaredAnnotationNames.contains(Blocking.name)
 
         cleanup:
         context?.close()
