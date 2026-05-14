@@ -207,4 +207,182 @@ class MyBean:
         cleanup:
         context?.close()
     }
+
+    void "test around construct declared on init method"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import AroundConstruct, ConstructorInvocationContext, InterceptorBean
+from micronaut.context.env import Environment
+from jakarta.inject import Singleton
+import java
+
+ConstructorInterceptor = java.type("io.micronaut.aop.ConstructorInterceptor")
+
+@AroundConstruct
+def Constructed(target):
+    return target
+
+@InterceptorBean(Constructed)
+@Singleton
+class TestConstructInterceptor(ConstructorInterceptor):
+    invoked: bool = False
+    parameter_count: int = 0
+
+    def intercept(self, context: ConstructorInvocationContext):
+        self.invoked = True
+        self.parameter_count = len(context.getParameterValues())
+        return context.proceed()
+
+@Singleton
+class MyBean:
+    @Constructed
+    def __init__(self, environment: Environment):
+        self.environment = environment
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def interceptor = getBean(context, "python.TestConstructInterceptor")
+
+        then:
+        !interceptor.invoked
+
+        when:
+        def bean = getBean(context, "python.MyBean")
+
+        then:
+        bean != null
+        interceptor.invoked
+        interceptor.parameter_count == 1
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test around construct on type and init method invokes both constructor interceptors"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import AroundConstruct, ConstructorInvocationContext, InterceptorBean
+from micronaut.context.env import Environment
+from jakarta.inject import Singleton
+import java
+
+ConstructorInterceptor = java.type("io.micronaut.aop.ConstructorInterceptor")
+
+@AroundConstruct
+def TypeConstructed(target):
+    return target
+
+@AroundConstruct
+def InitConstructed(target):
+    return target
+
+@InterceptorBean(TypeConstructed)
+@Singleton
+class TypeConstructInterceptor(ConstructorInterceptor):
+    invoked: bool = False
+    parameter_count: int = 0
+
+    def intercept(self, context: ConstructorInvocationContext):
+        self.invoked = True
+        self.parameter_count = len(context.getParameterValues())
+        return context.proceed()
+
+@InterceptorBean(InitConstructed)
+@Singleton
+class InitConstructInterceptor(ConstructorInterceptor):
+    invoked: bool = False
+    parameter_count: int = 0
+
+    def intercept(self, context: ConstructorInvocationContext):
+        self.invoked = True
+        self.parameter_count = len(context.getParameterValues())
+        return context.proceed()
+
+@TypeConstructed
+@Singleton
+class MyBean:
+    @InitConstructed
+    def __init__(self, environment: Environment):
+        self.environment = environment
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def typeInterceptor = getBean(context, "python.TypeConstructInterceptor")
+        def initInterceptor = getBean(context, "python.InitConstructInterceptor")
+
+        then:
+        !typeInterceptor.invoked
+        !initInterceptor.invoked
+
+        when:
+        def bean = getBean(context, "python.MyBean")
+
+        then:
+        bean != null
+        typeInterceptor.invoked
+        typeInterceptor.parameter_count == 1
+        initInterceptor.invoked
+        initInterceptor.parameter_count == 1
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test around construct on factory method invokes constructor interceptor"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import AroundConstruct, ConstructorInvocationContext, InterceptorBean
+from micronaut.context.annotation import Bean, Factory
+from micronaut.context.env import Environment
+from jakarta.inject import Singleton
+import java
+
+ConstructorInterceptor = java.type("io.micronaut.aop.ConstructorInterceptor")
+
+@AroundConstruct
+def Constructed(target):
+    return target
+
+@InterceptorBean(Constructed)
+@Singleton
+class TestConstructInterceptor(ConstructorInterceptor):
+    invoked: bool = False
+    parameter_count: int = 0
+
+    def intercept(self, context: ConstructorInvocationContext):
+        self.invoked = True
+        self.parameter_count = len(context.getParameterValues())
+        return context.proceed()
+
+class MyOtherBean:
+    pass
+
+@Factory
+class MyFactory:
+    @Constructed
+    @Bean
+    def my_other_bean(self, environment: Environment) -> MyOtherBean:
+        return MyOtherBean()
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def interceptor = getBean(context, "python.TestConstructInterceptor")
+
+        then:
+        !interceptor.invoked
+
+        when:
+        def bean = getBean(context, "python.MyOtherBean")
+
+        then:
+        bean != null
+        interceptor.invoked
+        interceptor.parameter_count == 1
+
+        cleanup:
+        context?.close()
+    }
 }

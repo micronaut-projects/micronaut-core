@@ -122,7 +122,7 @@ As of May 14, 2026:
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
-* The most recent focused verification passed for `AroundConstructSpec` with 2
+* The most recent focused verification passed for `AroundConstructSpec` with 5
   passing tests and 1 skipped pending test.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
@@ -175,10 +175,12 @@ The latest completed source slices are:
 * `MyAbstractRepoSpec.groovy`: concrete methods on introduced abstract
   repository-style beans are covered; Java default interface methods remain
   unsupported.
-* `AroundConstructCompileSpec.groovy`: constructor interceptor invocation and
-  around-construct-only method behavior are covered by `AroundConstructSpec`.
-  Combined `@Around` plus `@AroundConstruct` behavior is pending as
-  `PY-INJECT-0070`.
+* `AroundConstructCompileSpec.groovy`: constructor interceptor invocation,
+  around-construct-only method behavior, constructor-only binding, type plus
+  constructor binding, and factory-method construction binding are covered by
+  `AroundConstructSpec`. Combined `@Around` plus `@AroundConstruct` behavior is
+  pending as `PY-INJECT-0070`; the local Java annotation transformer fixture is
+  cataloged as unsupported.
 
 The next source area has not been selected yet.
 
