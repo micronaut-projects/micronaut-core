@@ -16,6 +16,7 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.env.Environment
 import io.micronaut.inject.ValidatedBeanDefinition
@@ -636,6 +637,52 @@ class EngineConfiguration:
 
         cleanup:
         context?.close()
+    }
+
+    void "test each property nested configuration reader prefix"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import ConfigurationProperties, EachProperty
+
+@EachProperty("foo.bar")
+class MyConfig:
+    host: str
+
+    @ConfigurationProperties("baz")
+    class ChildConfig:
+        stuff: str
+'''
+
+        when:
+        def definition = buildBeanDefinition("python", "MyConfig\$ChildConfig", pythonCode)
+
+        then:
+        definition.synthesize(ConfigurationReader).prefix() == "foo.bar.*.baz"
+    }
+
+    void "test each property nested configuration property metadata"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import ConfigurationProperties, EachProperty
+
+@EachProperty("foo.bar")
+class MyConfig:
+    host: str
+
+    @ConfigurationProperties("baz")
+    class ChildConfig:
+        stuff: str
+'''
+
+        when:
+        def definition = buildBeanDefinition("python", "MyConfig\$ChildConfig", pythonCode)
+        def propertyInjection = definition.injectedMethods.find { method ->
+            method.arguments.length == 1 && method.arguments[0].annotationMetadata.hasAnnotation(Property)
+        }
+
+        then:
+        propertyInjection != null
+        propertyInjection.arguments[0].annotationMetadata.synthesize(Property).name() == "foo.bar.*.baz.stuff"
     }
 
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0015")

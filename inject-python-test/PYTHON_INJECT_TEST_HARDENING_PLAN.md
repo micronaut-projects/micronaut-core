@@ -122,7 +122,7 @@ As of May 14, 2026:
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
-* The most recent focused verification passed for `FactoryWithScopedProxySpec`.
+* The most recent focused verification passed for `ConfigurationPropertiesSpec`.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -257,6 +257,10 @@ The latest completed source slices are:
   generic scoped-proxy factory lookup is pending as `PY-INJECT-0088`; JVM
   constructor-mode diagnostics and `MockBean` fixture compilation are cataloged
   as unsupported.
+* `EachPropertyParseSpec.groovy`: nested `@ConfigurationProperties` under
+  `@EachProperty` computes the expected wildcard `ConfigurationReader` prefix
+  and exposes wildcard property injection metadata on the generated injection
+  method.
 
 The next source area has not been selected yet.
 
