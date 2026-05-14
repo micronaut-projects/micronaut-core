@@ -1,12 +1,140 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.core.annotation.Blocking
+import io.micronaut.context.event.ApplicationEventListener
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import org.graalvm.polyglot.Value
 import spock.lang.PendingFeature
 
 class IntroductionAdviceSpec extends AbstractPythonTypeElementSpec {
+    void "test introduction advice implements additional Java interface"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from typing import Protocol
+from micronaut.aop import InterceptorBean, Introduction, MethodInvocationContext
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Introduction(interfaces="java.lang.Runnable")
+def RunnableAdvice(cls):
+    return cls
+
+@InterceptorBean(RunnableAdvice)
+@Singleton
+class RunnableAdviceInterceptor(MethodInterceptor):
+    runs: int = 0
+
+    def intercept(self, context: MethodInvocationContext):
+        if context.getMethodName() == "run":
+            self.runs += 1
+            return None
+        if context.getMethodName() == "get_bar":
+            return "introduced"
+        return context.proceed()
+
+@RunnableAdvice
+@Singleton
+class ConcreteRunnableBean:
+    @Executable
+    def get_foo(self) -> str:
+        return "good"
+
+@RunnableAdvice
+@Singleton
+class AbstractRunnableBean(ABC):
+    @Executable
+    def get_foo(self) -> str:
+        return "good"
+
+    @abstractmethod
+    def get_bar(self) -> str:
+        pass
+
+@RunnableAdvice
+class RunnableProtocol(Protocol):
+    def get_bar(self) -> str:
+        ...
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def concreteDefinition = getBeanDefinition(context, "python.ConcreteRunnableBean")
+        def abstractDefinition = getBeanDefinition(context, "python.AbstractRunnableBean")
+        def protocolDefinition = getBeanDefinition(context, "python.RunnableProtocol")
+        Value concrete = getBean(context, "python.ConcreteRunnableBean").asPolyglotValue()
+        Value abstractBean = getBean(context, "python.AbstractRunnableBean").asPolyglotValue()
+        Value protocol = getBean(context, "python.RunnableProtocol").asPolyglotValue()
+        def interceptor = getBean(context, "python.RunnableAdviceInterceptor")
+
+        then:
+        Runnable.isAssignableFrom(concreteDefinition.beanType)
+        Runnable.isAssignableFrom(abstractDefinition.beanType)
+        Runnable.isAssignableFrom(protocolDefinition.beanType)
+        concreteDefinition.executableMethods*.methodName.containsAll(["get_foo", "run"])
+        abstractDefinition.executableMethods*.methodName.containsAll(["get_foo", "get_bar", "run"])
+        protocolDefinition.executableMethods*.methodName.containsAll(["get_bar", "run"])
+
+        concrete.invokeMember("get_foo").asString() == "good"
+        abstractBean.invokeMember("get_foo").asString() == "good"
+        abstractBean.invokeMember("get_bar").asString() == "introduced"
+        protocol.invokeMember("get_bar").asString() == "introduced"
+        concrete.invokeMember("run").isNull()
+        abstractBean.invokeMember("run").isNull()
+        protocol.invokeMember("run").isNull()
+        interceptor.runs == 3
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0068")
+    void "test introduction advice implements additional generic event listener interface"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import InterceptorBean, Introduction, MethodInvocationContext
+from micronaut.context.event import ApplicationEventListener
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Introduction(interfaces=ApplicationEventListener)
+def ListenerAdvice(cls):
+    return cls
+
+@InterceptorBean(ListenerAdvice)
+@Singleton
+class ListenerAdviceInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        if context.getMethodName() == "onApplicationEvent":
+            return None
+        return context.proceed()
+
+@ListenerAdvice
+@Singleton
+class ConcreteListenerBean:
+    pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.ConcreteListenerBean")
+        Value bean = getBean(context, "python.ConcreteListenerBean").asPolyglotValue()
+
+        then:
+        ApplicationEventListener.isAssignableFrom(definition.beanType)
+        definition.executableMethods*.methodName.contains("onApplicationEvent")
+        bean.invokeMember("onApplicationEvent", new Object()).isNull()
+
+        cleanup:
+        context?.close()
+    }
+
     void "test introduction advice with the decorator defined in Python and invoked from another type"() {
         given:
         def pythonCode = '''
