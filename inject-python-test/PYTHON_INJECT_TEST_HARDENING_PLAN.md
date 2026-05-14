@@ -123,7 +123,7 @@ As of May 14, 2026:
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
-  `ReplacesSpec`.
+  `ConfigurationPropertiesSpec.test configuration reader prefix aliases from Java stereotypes`.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -235,6 +235,11 @@ The latest completed source slices are:
 * `AnnotateReplacesSpec.groovy`: visitor-added `@Factory`, `@Bean`, and
   `@Replaces` metadata for replacement factory methods is pending as
   `PY-INJECT-0085`.
+* `InheritedConfigurationReaderPrefixSpec.groovy`: supported
+  `ConfigurationReader.PREFIX` alias paths with and without `basePrefix` are
+  covered by `ConfigurationPropertiesSpec`; the source specs' documented
+  unsupported alias-to-`ConfigurationReader.value` cases are cataloged as
+  unsupported.
 
 The next source area has not been selected yet.
 
