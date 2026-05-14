@@ -7,3 +7,4 @@ io.micronaut.python.annotation.processing.test.annotate.RemoveAnnotationSpec$Rem
 io.micronaut.python.annotation.processing.test.visitor.AllElementsVisitor
 io.micronaut.python.annotation.processing.test.BeanElementBuilderSpec$AssociatedBeanVisitor
 io.micronaut.python.annotation.processing.test.TypeElementQuerySpec$TypeElementQueryVisitor
+io.micronaut.python.annotation.processing.test.IntroducedBeanVisitorSpec$IntroducedMethodVisitor
