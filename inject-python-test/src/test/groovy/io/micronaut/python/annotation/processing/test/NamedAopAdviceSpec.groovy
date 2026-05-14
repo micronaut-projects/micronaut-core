@@ -2,6 +2,7 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.aop.Intercepted
 import io.micronaut.inject.qualifiers.Qualifiers
+import spock.lang.PendingFeature
 
 class NamedAopAdviceSpec extends AbstractPythonTypeElementSpec {
 
@@ -41,6 +42,71 @@ class NamedFactory:
         context.getBean(namedBeanClass, Qualifiers.byName("two")).do_stuff() == "two"
         context.getBeansOfType(namedBeanClass).size() == 3
         context.getBeansOfType(namedBeanClass).every { it instanceof Intercepted }
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0092")
+    void "test each bean interceptor receives target qualifier"() {
+        given:
+        def context = buildContext('''\
+from typing import Annotated
+from jakarta.inject import Named, Singleton
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from micronaut.context.annotation import EachBean, EachProperty, Executable, Prototype
+
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+Qualifier = java.type("io.micronaut.context.Qualifier")
+
+@Around
+def Transactional(target):
+    return target
+
+@EachProperty(value="mydatasources", primary="default")
+class MyDataSource:
+    pass
+
+@EachBean(MyDataSource.__qualname__)
+@Transactional
+class MyTransactionalConnection:
+    @Executable
+    def catalog(self) -> str:
+        return "unintercepted"
+
+@Prototype
+@InterceptorBean(Transactional)
+class MyInterceptor(MethodInterceptor):
+    def __init__(self, qualifier: Qualifier):
+        self.qualifier = qualifier
+
+    def intercept(self, context: MethodInvocationContext):
+        return str(self.qualifier)
+
+@Singleton
+class MyBean:
+    def __init__(
+        self,
+        default_connection: Annotated[MyTransactionalConnection, Named("default")],
+        foo_connection: Annotated[MyTransactionalConnection, Named("foo")],
+        bar_connection: Annotated[MyTransactionalConnection, Named("bar")]
+    ):
+        self.default_connection = default_connection
+        self.foo_connection = foo_connection
+        self.bar_connection = bar_connection
+''', false, [
+            "mydatasources.default.xyz": "111",
+            "mydatasources.foo.xyz": "111",
+            "mydatasources.bar.xyz": "111"
+        ])
+        def service = getBean(context, "python.MyBean")
+
+        expect:
+        service.default_connection.catalog() == "@Named('default')"
+        service.foo_connection.catalog() == "@Named('foo')"
+        service.bar_connection.catalog() == "@Named('bar')"
 
         cleanup:
         context?.close()

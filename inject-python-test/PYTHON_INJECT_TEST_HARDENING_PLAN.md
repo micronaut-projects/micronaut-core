@@ -117,14 +117,14 @@ As of May 14, 2026:
 
 * Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
   from the included checkout; do not rely on a local bundle override.
-* The latest pending ID is `PY-INJECT-0091`; use `PY-INJECT-0092` for the next
+* The latest pending ID is `PY-INJECT-0092`; use `PY-INJECT-0093` for the next
   pending case.
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
-  `io.micronaut.python.annotation.processing.test.ConfigurationPropertiesSpec`
-  with 23 tests executed and 5 skipped.
+  `io.micronaut.python.annotation.processing.test.NamedAopAdviceSpec` with 2
+  tests executed and 1 skipped.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -243,6 +243,10 @@ The latest completed source slices are:
   interface proxies, Java record accessors, and Java/Groovy visibility variants
   are cataloged as unsupported, while scalar binding and nested prefix metadata
   are covered by `ConfigurationPropertiesSpec`.
+* `EachBeanInterceptorSpec.groovy`: named `@EachBean` AOP target lookup is
+  covered by `NamedAopAdviceSpec`; interceptor constructor injection of the
+  current target `Qualifier` is pending as `PY-INJECT-0092`, while the full
+  `java.sql.Connection` proxy surface is cataloged as unsupported.
 * `InheritedConfigurationReaderPrefixSpec.groovy`: supported
   `ConfigurationReader.PREFIX` alias paths with and without `basePrefix` are
   covered by `ConfigurationPropertiesSpec`; the source specs' documented
