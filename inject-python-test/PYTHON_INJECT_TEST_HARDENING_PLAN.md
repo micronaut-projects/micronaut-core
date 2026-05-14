@@ -117,13 +117,13 @@ As of May 14, 2026:
 
 * Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
   from the included checkout; do not rely on a local bundle override.
-* The latest pending ID is `PY-INJECT-0079`; use `PY-INJECT-0080` for the next
+* The latest pending ID is `PY-INJECT-0080`; use `PY-INJECT-0081` for the next
   pending case.
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
-  `AnnotationMetadataSpec`.
+  `ClassImportSpec`.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -218,6 +218,11 @@ The latest completed source slices are:
   `PY-INJECT-0078`.
 * `AnnotationMetadataSpec.groovy`: visitor-mutated method metadata based on
   method annotation default values is pending as `PY-INJECT-0079`.
+* `ImportTypeElementSpec.groovy`: `@ClassImport` generated introspection
+  metadata for imported Java classes and interfaces is pending as
+  `PY-INJECT-0080`; exact visitor counts for imported Java fields, methods,
+  constructors, and enum constants are cataloged as unsupported source-model
+  behavior.
 
 The next source area has not been selected yet.
 
