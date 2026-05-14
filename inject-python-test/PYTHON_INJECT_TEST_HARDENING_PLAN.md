@@ -123,8 +123,8 @@ As of May 14, 2026:
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
-  `IntroductionAdviceSpec.test introduction advice retains injection points on
-  abstract class` with 1 test.
+  `PythonEventListenerSpec.test event listener method adapter exposes metadata
+  and event type` with 1 test.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -163,6 +163,9 @@ The latest completed source slices are:
 * `InjectFieldAbstractIntroductionSpec.groovy`: injected members and executable
   methods on an introduced abstract class are covered, using Python property
   setter injection methods for attribute-backed injection points.
+* `MethodAdapterSpec.groovy`: event-listener adapter presence, requirements,
+  inherited class metadata, event type arguments, multiple lifecycle methods,
+  and async listener behavior are covered through `PythonEventListenerSpec`.
 
 The next source area has not been selected yet.
 
