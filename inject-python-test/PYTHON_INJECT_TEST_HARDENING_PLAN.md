@@ -122,7 +122,7 @@ As of May 14, 2026:
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
-* The most recent focused verification passed for `BeanElementSpec`.
+* The most recent focused verification passed for `ConfigurationBuilderSpec`.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -270,6 +270,11 @@ The latest completed source slices are:
 * `BeanElementVisitorSpec.groovy`: `BeanElementVisitor` inspection of simple
   bean and factory bean metadata, bean veto, and associated bean registration
   are covered by `BeanElementSpec`.
+* `ConfigurationPropertiesBuilderSpec.groovy`: portable configuration builder
+  binding through factory methods, `includes`, explicit `value`/
+  `configurationPrefix`, and inherited Java builder methods are covered by
+  `ConfigurationBuilderSpec`; source-specific Java/Groovy fixture shapes are
+  cataloged as unsupported.
 
 The next source area has not been selected yet.
 
