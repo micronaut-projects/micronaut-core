@@ -247,6 +247,14 @@ The latest completed source slices are:
   covered by `NamedAopAdviceSpec`; interceptor constructor injection of the
   current target `Qualifier` is pending as `PY-INJECT-0092`, while the full
   `java.sql.Connection` proxy surface is cataloged as unsupported.
+* Remaining source-model and infrastructure specs with explicit filenames in
+  the catalog include Groovy expression/AST fixtures, Java annotation
+  mapper/transformer fixtures, Java reconstruction and visitor-context
+  fixtures, Kotlin reconstruction/visitor-order fixtures, Java record/no-package
+  cases, package-level `@Requires`, external Java `@Import`, and constructor-copy
+  sealed-class regressions. These are catalog-only decisions because the
+  language-neutral behavior is already covered by Python specs or tracked by
+  existing pending IDs.
 * `InheritedConfigurationReaderPrefixSpec.groovy`: supported
   `ConfigurationReader.PREFIX` alias paths with and without `basePrefix` are
   covered by `ConfigurationPropertiesSpec`; the source specs' documented
