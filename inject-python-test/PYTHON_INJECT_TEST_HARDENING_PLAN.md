@@ -117,13 +117,13 @@ As of May 14, 2026:
 
 * Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
   from the included checkout; do not rely on a local bundle override.
-* The latest pending ID is `PY-INJECT-0069`; use `PY-INJECT-0070` for the next
+* The latest pending ID is `PY-INJECT-0070`; use `PY-INJECT-0071` for the next
   pending case.
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
-* The most recent focused verification passed for `AroundConstructSpec` with 1
-  passing test.
+* The most recent focused verification passed for `AroundConstructSpec` with 2
+  passing tests and 1 skipped pending test.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -175,8 +175,10 @@ The latest completed source slices are:
 * `MyAbstractRepoSpec.groovy`: concrete methods on introduced abstract
   repository-style beans are covered; Java default interface methods remain
   unsupported.
-* `AroundConstructCompileSpec.groovy`: constructor interceptor invocation for a
-  bean with constructor injection is covered by `AroundConstructSpec`.
+* `AroundConstructCompileSpec.groovy`: constructor interceptor invocation and
+  around-construct-only method behavior are covered by `AroundConstructSpec`.
+  Combined `@Around` plus `@AroundConstruct` behavior is pending as
+  `PY-INJECT-0070`.
 
 The next source area has not been selected yet.
 
