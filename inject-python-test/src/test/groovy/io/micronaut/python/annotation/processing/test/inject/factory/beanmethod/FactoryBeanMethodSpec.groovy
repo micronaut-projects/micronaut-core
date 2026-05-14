@@ -29,9 +29,11 @@ import io.micronaut.core.type.TypeInformation
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
+import io.micronaut.python.annotation.processing.test.client.ExecutableClient
 import io.micronaut.python.compiler.InMemoryBeanDefinitionsProvider
 import io.micronaut.python.compiler.PyronautCompiler
 import jakarta.inject.Singleton
+import reactor.core.publisher.Flux
 import spock.lang.PendingFeature
 import spock.lang.Unroll
 
@@ -223,6 +225,41 @@ class FunctionFactory:
         definition.getTypeArguments(Function)[0].type == String
         definition.getTypeArguments(Function)[1].type == String
         bean.apply("ok") == "ok"
+
+        cleanup:
+        context.close()
+    }
+
+    void "test executable factory method with inherited client interface methods"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory, Bean, Executable
+import java
+
+ExecutableClient = java.type("io.micronaut.python.annotation.processing.test.client.ExecutableClient")
+
+@Factory
+class ClientFactory:
+
+    @Bean
+    @Executable
+    def my_client(self) -> ExecutableClient:
+        return None
+''')
+
+        when:
+        BeanDefinition<?> definition = context.getBeanDefinition(ExecutableClient)
+        def retrieveMethod = definition.getRequiredMethod("retrieve")
+        def blockingMethod = definition.getRequiredMethod("blocking")
+        def streamMethod = definition.getRequiredMethod("stream")
+
+        then:
+        retrieveMethod.returnType.type == Flux
+        retrieveMethod.returnType.typeParameters.length == 1
+        retrieveMethod.returnType.typeParameters[0].type == Object
+        streamMethod.returnType.type == Flux
+        streamMethod.returnType.typeParameters[0].type == byte[].class
+        blockingMethod.returnType.type == byte[].class
 
         cleanup:
         context.close()
