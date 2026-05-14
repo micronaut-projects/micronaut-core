@@ -4,7 +4,10 @@
 
 Raise Python inject test coverage to the same behavioral level as the Java,
 Groovy, and Kotlin inject test suites where the behavior is language-neutral.
-Keep this pass focused on tests, cataloging, and Gradle build reliability.
+The first pass created and cataloged the tests. The next pass iterates through
+`inject-python-test/DISABLED_TESTS.md`, implements Python-specific fixes, and
+turns pending tests into passing coverage without regressing existing Python
+test suites.
 
 ## Scope
 
@@ -30,16 +33,23 @@ Source roots:
 * `inject-kotlin/src/test/groovy`
 * `inject-kotlin-test/src/main/groovy`
 
-Python changes should stay under `inject-python-test` unless separately
-approved.
+Fix implementation should stay under Python-specific modules unless separately
+reviewed:
+
+* `inject-python`
+* `context-python`
+* `inject-python-test`
 
 The authoritative inventory commands and direct-subclass counts live in
 `inject-python-test/DISABLED_TESTS.md`.
 
 ## Ground Rules
 
-* Do not change production Python implementation in this pass.
-* Add Python tests without asking for approval for each test.
+* Prefer production fixes in `inject-python` or `context-python`.
+* Do not change core Micronaut modules such as `inject`, `inject-java`, or
+  other non-Python modules without asking for review first.
+* Do not ask for review for test-only changes under `inject-python-test`; update
+  those tests and catalog entries as needed.
 * Use normal spec names that match the existing Python project style.
 * Prefer adding coverage to an existing Python spec when ownership is clear.
 * Attribute-backed Python classes expose `PropertyElement`, not `FieldElement`.
@@ -48,6 +58,10 @@ The authoritative inventory commands and direct-subclass counts live in
   implemented or cannot currently be represented by the Python compiler model.
 * Use pending reasons in this format:
   `Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-XXXX`
+* Once a fix for a pending test passes, commit it before moving to the next
+  unrelated fix.
+* Each fix must avoid regressions in `inject-python`, `context-python`, and
+  `test-suite-python`.
 
 ## Migration Rules
 
@@ -325,6 +339,48 @@ The latest completed source slices are:
 
 No uncataloged direct subclasses remain for this pass.
 
+## Fix Iteration Plan
+
+Treat `inject-python-test/DISABLED_TESTS.md` as the backlog for the fix phase.
+Work one root cause at a time. If one implementation change resolves multiple
+pending IDs, handle those IDs in one commit; otherwise keep each fix isolated.
+
+For every resolved ID:
+
+* Remove `@PendingFeature` from the Python test.
+* Move the row from `Pending Python Tests` to a `Resolved Python Fixes` table in
+  `DISABLED_TESTS.md`.
+* Record the focused verification command and commit hash in the resolved row
+  after committing.
+* Keep any new or adjusted tests under `inject-python-test` and update them
+  without a review checkpoint.
+
+Priority order:
+
+1. Fix generated Java compilation blockers first:
+   `PY-INJECT-0021`, `PY-INJECT-0032`, `PY-INJECT-0041`, `PY-INJECT-0088`,
+   `PY-INJECT-0012`, `PY-INJECT-0064`, `PY-INJECT-0065`, `PY-INJECT-0066`,
+   and `PY-INJECT-0068`.
+2. Fix compiler diagnostic and wrapper-generation failures:
+   `PY-INJECT-0002`, `PY-INJECT-0047`, `PY-INJECT-0044`, and
+   `PY-INJECT-0015`.
+3. Fix Python source visitor and associated-bean gaps:
+   `PY-INJECT-0025`, `PY-INJECT-0026`, `PY-INJECT-0027`, `PY-INJECT-0029`,
+   `PY-INJECT-0083`, `PY-INJECT-0084`, then related visitor/resource gaps such
+   as `PY-INJECT-0080`, `PY-INJECT-0081`, `PY-INJECT-0086`, and
+   `PY-INJECT-0087`.
+4. Continue with remaining runtime and model gaps in catalog order, grouping
+   only when the shared implementation root cause is clear.
+
+Likely first root-cause area:
+
+* Investigate `PythonStubGenerator` conversion of parameterized Python wrapper
+  types. The catalog shows several invalid generated Java cases where sourcegen
+  emits parameterized class references such as `Cache<String, Integer>` or
+  `Response<Integer>` for static `fromPolyglotValue(...)` calls. The fix should
+  erase the generated wrapper receiver/class-literal where Java syntax requires
+  a raw class while preserving generic metadata on Micronaut model elements.
+
 ## Gradle And GraalPy
 
 The build should resolve `25.1.0-SNAPSHOT` GraalPy artifacts from the included
@@ -342,7 +398,15 @@ Focused test:
 ./gradlew :micronaut-inject-python-test:test --tests <fully.qualified.SpecName>
 ```
 
-Full verification:
+Regression tests for production fixes:
+
+```bash
+./gradlew :micronaut-inject-python:test
+./gradlew :micronaut-context-python:test
+./gradlew :test-suite-python:test
+```
+
+Full final sweep:
 
 ```bash
 ./gradlew :micronaut-inject-python-test:test
@@ -350,9 +414,22 @@ Full verification:
 
 ## Acceptance Criteria
 
+For each fix commit:
+
+* The affected pending test no longer needs `@PendingFeature`.
+* The focused `:micronaut-inject-python-test:test --tests ...` command passes.
+* Relevant Python module regression tests pass:
+  `:micronaut-inject-python:test` for `inject-python` changes,
+  `:micronaut-context-python:test` for `context-python` changes, and
+  `:test-suite-python:test` for production-code fixes.
+* `DISABLED_TESTS.md` is updated so the resolved ID is no longer listed as
+  pending and has a resolved entry with the passing command and commit hash.
+* No non-Python module changes are included unless they were reviewed first.
+* The worktree is staged and committed before starting the next unrelated fix.
+
+For a batch/final sweep:
+
 * Full `:micronaut-inject-python-test:test` passes.
-* All pending Python tests are listed in `DISABLED_TESTS.md`.
-* All intentionally unsupported source tests are cataloged with reasons.
-* Already covered source behavior points to concrete Python coverage.
-* No production Python implementation changes are included unless separately
-  approved.
+* `:test-suite-python:test` passes.
+* No pending Python test is missing from `DISABLED_TESTS.md`.
+* No old parity naming is introduced.
