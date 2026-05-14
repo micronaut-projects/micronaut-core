@@ -15,7 +15,9 @@
  */
 package io.micronaut.python.annotation.processing.test.inject.factory.beanmethod
 
+import io.micronaut.aop.Interceptor
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.EachBean
 import io.micronaut.context.annotation.Factory
@@ -30,6 +32,8 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.python.annotation.processing.test.client.ExecutableClient
+import io.micronaut.python.annotation.processing.test.factory.mapped.TestSingletonAdvice
+import io.micronaut.python.annotation.processing.test.factory.mapped.TestSingletonInterceptor
 import io.micronaut.python.compiler.InMemoryBeanDefinitionsProvider
 import io.micronaut.python.compiler.PyronautCompiler
 import jakarta.inject.Singleton
@@ -576,6 +580,51 @@ class ProductFactory:
         then:
         described.asString() == "original"
         interceptor.getMember("count").asInt() == 1
+
+        cleanup:
+        context?.close()
+        ContextHolder.resetContext()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0067")
+    void "test mapped configuration factory advice caches factory method result"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Bean
+import java
+
+TestConfiguration = java.type("io.micronaut.python.annotation.processing.test.factory.mapped.TestConfiguration")
+
+class MyBean:
+    def __init__(self, name: str):
+        self.name = name
+
+@TestConfiguration()
+class MyConfiguration:
+
+    @Bean
+    def my_bean(self) -> MyBean:
+        return MyBean("default")
+''')
+
+        context.registerBeanDefinition(
+                RuntimeBeanDefinition.builder(new TestSingletonInterceptor())
+                    .singleton(true)
+                    .exposedTypes(Interceptor.class, TestSingletonInterceptor.class)
+                    .build()
+        )
+
+        when:
+        def beanType = context.classLoader.loadClass("python.MyBean")
+        def configType = context.classLoader.loadClass("python.MyConfiguration")
+        BeanDefinition<?> configDefinition = context.getBeanDefinition(configType)
+        def configBean = context.getBean(configType)
+
+        then:
+        configDefinition.hasAnnotation(Factory)
+        configDefinition.hasAnnotation(TestSingletonAdvice)
+        context.getBean(beanType).is(context.getBean(beanType))
+        configBean."my_bean"().is(configBean."my_bean"())
 
         cleanup:
         context?.close()
