@@ -685,6 +685,108 @@ class MyConfig:
         propertyInjection.arguments[0].annotationMetadata.synthesize(Property).name() == "foo.bar.*.baz.stuff"
     }
 
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0090")
+    void "test nested configuration properties bind nested classes"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import ConfigurationProperties
+
+@ConfigurationProperties("test")
+class OuterConfig:
+    @ConfigurationProperties("inner")
+    class InnerConfig:
+        @ConfigurationProperties("nested")
+        class ThirdLevel:
+            num: int
+
+        foo: str
+        third_level: ThirdLevel
+
+    name: str
+    age: int
+    inner: InnerConfig
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "test.name": "test1",
+                "test.age": "10",
+                "test.inner.foo": "test2",
+                "test.inner.nested.num": "20"
+        ])
+        def configBean = getBean(context, "python.OuterConfig")
+
+        then:
+        configBean.name == "test1"
+        configBean.age == 10
+        configBean.inner.foo == "test2"
+        configBean.inner.third_level.num == 20
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0091")
+    void "test each property nested configuration properties bind nested each property list"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from micronaut.context.annotation import ConfigurationInject, ConfigurationProperties, EachProperty, Parameter
+
+@EachProperty(value="test", primary="one")
+class OuterConfig:
+    @ConfigurationProperties("inner")
+    class InnerConfig:
+        @EachProperty("inners")
+        class InnerEachConfig:
+            @ConfigurationInject
+            def __init__(self, name: Annotated[str, Parameter]):
+                self.name = name
+
+            count: int
+
+        foo: str
+        inners: list[InnerEachConfig]
+
+    @ConfigurationInject
+    def __init__(self, name: Annotated[str, Parameter]):
+        self.name = name
+
+    age: int
+    inner: InnerConfig
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "test.one.age": "10",
+                "test.one.inner.foo": "test2",
+                "test.one.inner.inners.a.count": "20",
+                "test.two.age": "30",
+                "test.two.inner.foo": "test3",
+                "test.two.inner.inners.1st.count": "30",
+                "test.two.inner.inners.2nd.count": "40"
+        ])
+        def configBean = getBean(context, "python.OuterConfig")
+        def configBean2 = getBean(context, "python.OuterConfig", Qualifiers.byName("two"))
+
+        then:
+        configBean.name == "one"
+        configBean.age == 10
+        configBean.inner.foo == "test2"
+        configBean.inner.inners.size() == 1
+        configBean.inner.inners[0].name == "a"
+        configBean.inner.inners[0].count == 20
+        configBean2.name == "two"
+        configBean2.age == 30
+        configBean2.inner.foo == "test3"
+        configBean2.inner.inners.size() == 2
+        configBean2.inner.inners.find { it.name == "1st" }.count == 30
+        configBean2.inner.inners.find { it.name == "2nd" }.count == 40
+
+        cleanup:
+        context?.close()
+    }
+
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0015")
     void "test configuration inject method with beans and other configs"() {
         given:
