@@ -2,12 +2,96 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.context.event.ApplicationEventListener
+import io.micronaut.context.annotation.Value as ValueAnn
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import org.graalvm.polyglot.Value
 import spock.lang.PendingFeature
 
 class IntroductionAdviceSpec extends AbstractPythonTypeElementSpec {
+    void "test introduction advice retains injection points on abstract class"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from typing import Annotated
+from micronaut.aop import InterceptorBean, Introduction, MethodInvocationContext
+from micronaut.context.annotation import Executable, Value
+from jakarta.inject import Inject, Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Introduction
+def Stub(cls):
+    return cls
+
+@InterceptorBean(Stub)
+@Singleton
+class StubIntroduction(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        if context.getMethodName() == "is_abstract":
+            return "introduced"
+        return context.proceed()
+
+@Singleton
+class SomeOther:
+    pass
+
+@Stub
+@Singleton
+class AbstractBean(ABC):
+    foo: Annotated[str, Value("${foo.bar}")] = None
+    some_other: Annotated[SomeOther, Inject] = None
+    method_other: SomeOther = None
+    method_value: str = None
+
+    @Inject
+    def set_foo(self, foo: SomeOther):
+        self.method_other = foo
+
+    @Inject
+    def set_value(self, value: Annotated[str, Value("${foo.bar}")]):
+        self.method_value = value
+
+    @abstractmethod
+    def is_abstract(self) -> str:
+        pass
+
+    @Executable
+    def non_abstract(self) -> str:
+        return "good"
+
+    @Executable
+    def has_injections(self) -> bool:
+        return (
+            self.foo == "something"
+            and self.some_other is not None
+            and self.method_other is not None
+            and self.method_value == "something"
+        )
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, ["foo.bar": "something"])
+        def definition = getBeanDefinition(context, "python.AbstractBean")
+        Value bean = getBean(context, "python.AbstractBean").asPolyglotValue()
+        def nonAbstractMethod = definition.findMethod("non_abstract").get()
+
+        then:
+        !definition.isAbstract()
+        definition.injectedFields.size() == 0
+        definition.injectedMethods*.methodName.containsAll(["setFoo", "setSome_other", "set_foo", "set_value"])
+        definition.injectedMethods.find { it.methodName == "setFoo" }.arguments[0].annotationMetadata.stringValue(ValueAnn).get() == '${foo.bar}'
+        definition.findMethod("non_abstract").isPresent()
+        !nonAbstractMethod.getClass().name.contains("ReflectionExecutableMethod")
+        bean.invokeMember("non_abstract").asString() == "good"
+        bean.invokeMember("is_abstract").asString() == "introduced"
+        bean.invokeMember("has_injections").asBoolean()
+
+        cleanup:
+        context?.close()
+    }
+
     void "test introduction advice implements additional Java interface"() {
         given:
         def pythonCode = '''

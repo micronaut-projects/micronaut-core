@@ -123,7 +123,8 @@ As of May 14, 2026:
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
-  `IntroductionAdviceSpec` with 9 tests and 4 skipped.
+  `IntroductionAdviceSpec.test introduction advice retains injection points on
+  abstract class` with 1 test.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -159,6 +160,9 @@ The latest completed source slices are:
   assertions are cataloged as unsupported compiler infrastructure behavior.
 * `GeneratedAnnotationSpec.groovy`: Java generated-class bytecode annotation
   counting is cataloged as unsupported compiler-output behavior.
+* `InjectFieldAbstractIntroductionSpec.groovy`: injected members and executable
+  methods on an introduced abstract class are covered, using Python property
+  setter injection methods for attribute-backed injection points.
 
 The next source area has not been selected yet.
 
