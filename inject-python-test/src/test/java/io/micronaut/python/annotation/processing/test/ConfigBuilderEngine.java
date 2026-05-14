@@ -17,13 +17,19 @@ package io.micronaut.python.annotation.processing.test;
 
 public final class ConfigBuilderEngine {
     private final String manufacturer;
+    private final String model;
 
-    private ConfigBuilderEngine(String manufacturer) {
+    private ConfigBuilderEngine(String manufacturer, String model) {
         this.manufacturer = manufacturer;
+        this.model = model;
     }
 
     public String getManufacturer() {
         return manufacturer;
+    }
+
+    public String getModel() {
+        return model;
     }
 
     public static Builder builder() {
@@ -32,14 +38,20 @@ public final class ConfigBuilderEngine {
 
     public static final class Builder {
         private String manufacturer;
+        private String model;
 
         public Builder withManufacturer(String manufacturer) {
             this.manufacturer = manufacturer;
             return this;
         }
 
+        public Builder withModel(String model) {
+            this.model = model;
+            return this;
+        }
+
         public ConfigBuilderEngine build() {
-            return new ConfigBuilderEngine(manufacturer);
+            return new ConfigBuilderEngine(manufacturer, model);
         }
     }
 }

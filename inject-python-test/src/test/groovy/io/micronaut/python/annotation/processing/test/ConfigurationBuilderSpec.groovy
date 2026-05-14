@@ -76,6 +76,67 @@ class EngineConfig:
         context?.close()
     }
 
+    void "test configuration builder with includes"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+import java
+from micronaut.context.annotation import ConfigurationBuilder, ConfigurationProperties
+
+Engine = java.type("io.micronaut.python.annotation.processing.test.ConfigBuilderEngine")
+EngineBuilder = java.type("io.micronaut.python.annotation.processing.test.ConfigBuilderEngine$Builder")
+
+@ConfigurationProperties("test.props")
+class TestProps:
+    builder: Annotated[EngineBuilder, ConfigurationBuilder(prefixes=["with"], includes=["manufacturer"])] = Engine.builder()
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "test.props.manufacturer": "Toyota",
+                "test.props.model": "Supra"
+        ])
+        def engine = getBean(context, "python.TestProps").builder.build()
+
+        then:
+        engine.manufacturer == "Toyota"
+        engine.model == null
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test configuration builder with configuration prefix"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+import java
+from micronaut.context.annotation import ConfigurationBuilder, ConfigurationProperties
+
+Engine = java.type("io.micronaut.python.annotation.processing.test.ConfigBuilderEngine")
+EngineBuilder = java.type("io.micronaut.python.annotation.processing.test.ConfigBuilderEngine$Builder")
+
+@ConfigurationProperties("test.props")
+class TestProps:
+    builder: Annotated[EngineBuilder, ConfigurationBuilder(prefixes=["with"], configurationPrefix="engine")] = Engine.builder()
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "test.props.engine.manufacturer": "Honda",
+                "test.props.engine.model": "NSX",
+                "test.props.manufacturer": "ignored"
+        ])
+        def engine = getBean(context, "python.TestProps").builder.build()
+
+        then:
+        engine.manufacturer == "Honda"
+        engine.model == "NSX"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test configuration builder uses inherited builder methods"() {
         given:
         def pythonCode = '''
