@@ -117,14 +117,14 @@ As of May 14, 2026:
 
 * Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
   from the included checkout; do not rely on a local bundle override.
-* The latest pending ID is `PY-INJECT-0068`; use `PY-INJECT-0069` for the next
+* The latest pending ID is `PY-INJECT-0069`; use `PY-INJECT-0070` for the next
   pending case.
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
-  `PythonEventListenerSpec.test event listener method adapter exposes metadata
-  and event type` with 1 test.
+  `PythonEventListenerSpec.test event listener method adapter invokes around
+  advice` with 1 skipped pending test.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -166,6 +166,9 @@ The latest completed source slices are:
 * `MethodAdapterSpec.groovy`: event-listener adapter presence, requirements,
   inherited class metadata, event type arguments, multiple lifecycle methods,
   and async listener behavior are covered through `PythonEventListenerSpec`.
+* `InterceptedAdapterSpec.groovy`: around advice on event-listener adapter
+  methods is pending as `PY-INJECT-0069` because the Python adapter path invokes
+  the around interceptor twice for one event.
 
 The next source area has not been selected yet.
 

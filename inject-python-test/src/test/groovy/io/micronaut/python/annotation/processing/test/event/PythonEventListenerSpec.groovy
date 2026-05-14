@@ -10,6 +10,62 @@ import spock.lang.PendingFeature
 import spock.util.concurrent.PollingConditions
 
 class PythonEventListenerSpec extends AbstractPythonTypeElementSpec {
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0069")
+    void "test event listener method adapter invokes around advice"() {
+        given:
+        def context = buildContext('''
+from dataclasses import dataclass
+from jakarta.inject import Singleton
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from micronaut.runtime.event.annotation import EventListener
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Around
+def Transactional(func):
+    return func
+
+@InterceptorBean(Transactional)
+@Singleton
+class TransactionalInterceptor(MethodInterceptor):
+    count: int = 0
+    method_name: str = ""
+
+    def intercept(self, context: MethodInvocationContext):
+        self.count += 1
+        self.method_name = context.getMethodName()
+        return context.proceed()
+
+@dataclass
+class TheEvent:
+    pass
+
+@Singleton
+class EventService:
+    count: int = 0
+
+    @Transactional
+    @EventListener
+    def test(self, event: TheEvent):
+        self.count += 1
+''')
+
+        when:
+        def event = context.classLoader.loadClass("python.TheEvent").newInstance()
+        context.publishEvent(event)
+        Value service = getBean(context, "python.EventService").asPolyglotValue()
+        def interceptor = getBean(context, "python.TransactionalInterceptor")
+
+        then:
+        service.getMember("count").asInt() == 1
+        interceptor.count == 1
+        interceptor.method_name == "test"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test event listener method adapter exposes metadata and event type"() {
         given:
         def context = buildContext('''
