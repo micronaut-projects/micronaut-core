@@ -166,7 +166,6 @@ class RunnableService(Runnable):
         reference.exposedTypes == [Runnable] as Set
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0002")
     void "test fail compilation on invalid exposed bean type"() {
         when:
         buildBeanDefinition("python", "NotRunnableService", '''
@@ -326,7 +325,6 @@ class ScopedService:
         definition.getDeclaredQualifier() == null
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0047")
     void "test singleton enum is rejected as bean"() {
         when:
         buildBeanDefinition("python", "TestEnum", '''

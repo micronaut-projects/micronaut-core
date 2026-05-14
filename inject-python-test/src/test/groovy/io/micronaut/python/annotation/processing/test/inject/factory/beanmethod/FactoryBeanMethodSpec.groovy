@@ -703,7 +703,6 @@ class TaskFactory:
         ContextHolder.resetContext()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0044")
     void "test invalid exposed factory method type fails compilation"() {
         given:
         ApplicationContext context = null

@@ -35,6 +35,7 @@ import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Creator;
@@ -98,6 +99,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final ClassTypeDef CONTEXT_HOLDER = ClassTypeDef.of("io.micronaut.context.python.ContextHolder");
     public static final String GENERATOR_NAME = "python";
     private static final String ANN_CONFIGURATION_BUILDER = "io.micronaut.context.annotation.ConfigurationBuilder";
+    private static final String ANN_ANNOTATION_EXPRESSION_CONTEXT = "io.micronaut.context.annotation.AnnotationExpressionContext";
     private static final Set<String> ANNOTATION_PACKAGES_TO_COPY = Set.of("org.junit.jupiter.api", "io.micronaut.test.extensions.junit5.annotation");
     public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
     public static final String ANN_JSON_PROPERTY = "com.fasterxml.jackson.annotation.JsonProperty";
@@ -150,12 +152,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .decorators()
                 .values()
                 .stream()
-                .filter(decoratorDef -> pythonVisitorContext.getClassElement(decoratorDef.annotationName()).isEmpty())
+                .filter(decoratorDef -> shouldGenerateAnnotationStub(decoratorDef, pythonVisitorContext))
                 .forEach(decoratorDef -> annotationDefs.putIfAbsent(
                     decoratorDef.annotationName(),
                     new AnnotationEntry(generateAnnotationStub(decoratorDef, pythonVisitorContext), null)
                 ));
         }
+    }
+
+    private static boolean shouldGenerateAnnotationStub(DecoratorDef decoratorDef, PythonVisitorContext context) {
+        var javaVisitorContext = context.getJavaVisitorContext();
+        return javaVisitorContext == null || javaVisitorContext.getClassElement(decoratorDef.annotationName()).isEmpty();
     }
 
     @Override
@@ -573,12 +580,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         })));
                     }
 
+                    boolean isAnnotationExpressionContextType = isAnnotationExpressionContextType(element, pythonVisitorContext);
                     List<MethodElement> methodsToBridge = element.getEnclosedElements(
                         ElementQuery.ALL_METHODS
                             .onlyAccessible()
                             .onlyInstance()
                             .onlyDeclared()
                             .annotated(ann -> isJunit5Test ||
+                                isAnnotationExpressionContextType ||
                                 ann.hasStereotype(Executable.class) ||
                                 ann.hasAnnotation("io.micronaut.context.annotation.Mapper") ||
                                 ann.hasAnnotation("io.micronaut.context.annotation.Mapper$Mapping") ||
@@ -771,6 +780,61 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return false;
     }
 
+    private static boolean isAnnotationExpressionContextType(ClassElement element, PythonVisitorContext context) {
+        Set<String> typeNames = new HashSet<>();
+        typeNames.add(element.getName());
+        typeNames.add(element.getCanonicalName());
+        typeNames.add(element.getSimpleName());
+        for (DecoratorDef decoratorDef : context.getProcessingEnvironment().environment().decorators().values()) {
+            if (referencesAnnotationExpressionContextType(decoratorDef, typeNames)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean referencesAnnotationExpressionContextType(DecoratorDef decoratorDef, Set<String> typeNames) {
+        if (ANN_ANNOTATION_EXPRESSION_CONTEXT.equals(decoratorDef.annotationName())) {
+            for (Object memberValue : decoratorDef.members().values()) {
+                if (matchesTypeName(memberValue, typeNames)) {
+                    return true;
+                }
+            }
+        }
+        for (DecoratorDef stereotype : decoratorDef.stereotypes()) {
+            if (referencesAnnotationExpressionContextType(stereotype, typeNames)) {
+                return true;
+            }
+        }
+        for (List<DecoratorDef> memberDecorators : decoratorDef.memberDecorators().values()) {
+            for (DecoratorDef memberDecorator : memberDecorators) {
+                if (referencesAnnotationExpressionContextType(memberDecorator, typeNames)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesTypeName(Object value, Set<String> typeNames) {
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return false;
+            }
+            if (polyglotValue.isHostObject()) {
+                return matchesTypeName(polyglotValue.asHostObject(), typeNames);
+            }
+            return polyglotValue.isString() && typeNames.contains(polyglotValue.asString());
+        }
+        if (value instanceof Class<?> classValue) {
+            return typeNames.contains(classValue.getName());
+        }
+        if (value instanceof ClassElement classElement) {
+            return typeNames.contains(classElement.getName()) || typeNames.contains(classElement.getCanonicalName());
+        }
+        return value != null && typeNames.contains(value.toString());
+    }
+
     private static boolean sameErasedType(ClassElement left, ClassElement right) {
         return left.getName().equals(right.getName());
     }
@@ -948,10 +1012,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         try {
             return AnnotationDef.of(annotationValue, visitorContext);
         } catch (RuntimeException e) {
-            AnnotationDef.AnnotationDefBuilder builder = AnnotationDef.builder(ClassTypeDef.of(decoratorDef.annotationName()));
-            members.forEach((memberName, value) -> builder.addMember(memberName.toString(), value));
-            return builder.build();
+            return buildAnnotationDef(decoratorDef.annotationName(), members);
         }
+    }
+
+    private static AnnotationDef buildAnnotationDef(String annotationName, Map<CharSequence, Object> members) {
+        AnnotationDef.AnnotationDefBuilder builder = AnnotationDef.builder(ClassTypeDef.of(annotationName));
+        members.forEach((memberName, value) -> builder.addMember(memberName.toString(), value));
+        return builder.build();
     }
 
     private static String normalizeAnnotationMemberName(Object memberName) {
@@ -993,7 +1061,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return enumConstantName(value, visitorContext);
         }
         if (Class.class.getName().equals(memberType.getName())) {
-            return annotationClassName(value, visitorContext);
+            return annotationClassLiteralValue(value, visitorContext);
         }
         if (value instanceof Value polyglotValue) {
             return GraalPyUtil.convertValueToJava(polyglotValue, memberType, visitorContext);
@@ -1009,6 +1077,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ClassElement componentType,
         PythonVisitorContext visitorContext
     ) {
+        if (Class.class.getName().equals(componentType.getName())) {
+            return convertAnnotationClassArrayMemberValue(value, visitorContext);
+        }
         if (value instanceof Collection<?> collection) {
             return collection.stream()
                 .map(element -> convertAnnotationMemberValue(element, componentType, visitorContext))
@@ -1030,6 +1101,51 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return converted;
         }
         return new Object[] { convertAnnotationMemberValue(value, componentType, visitorContext) };
+    }
+
+    private static Object[] convertAnnotationClassArrayMemberValue(
+        Object value,
+        PythonVisitorContext visitorContext
+    ) {
+        List<Object> converted = new ArrayList<>();
+        collectAnnotationClassValues(value, visitorContext, converted);
+        if (converted.stream().allMatch(Class.class::isInstance)) {
+            return converted.toArray(Class[]::new);
+        }
+        if (converted.stream().allMatch(String.class::isInstance)) {
+            return converted.toArray(String[]::new);
+        }
+        return converted.toArray();
+    }
+
+    private static void collectAnnotationClassValues(
+        Object value,
+        PythonVisitorContext visitorContext,
+        List<Object> converted
+    ) {
+        if (value instanceof Collection<?> collection) {
+            for (Object element : collection) {
+                collectAnnotationClassValues(element, visitorContext, converted);
+            }
+            return;
+        }
+        if (value instanceof Object[] array) {
+            for (Object element : array) {
+                collectAnnotationClassValues(element, visitorContext, converted);
+            }
+            return;
+        }
+        if (value instanceof Value polyglotValue && polyglotValue.hasArrayElements()) {
+            int size = Math.toIntExact(polyglotValue.getArraySize());
+            for (int i = 0; i < size; i++) {
+                collectAnnotationClassValues(polyglotValue.getArrayElement(i), visitorContext, converted);
+            }
+            return;
+        }
+        Object classValue = annotationClassLiteralValue(value, visitorContext);
+        if (classValue != null) {
+            converted.add(classValue);
+        }
     }
 
     private static boolean isEnumMember(ClassElement memberType) {
@@ -1055,12 +1171,44 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return lastDot > -1 ? stringValue.substring(lastDot + 1) : stringValue;
     }
 
-    private static String annotationClassName(Object value, PythonVisitorContext visitorContext) {
+    private static @Nullable Object annotationClassLiteralValue(Object value, PythonVisitorContext visitorContext) {
+        String className = annotationClassName(value, visitorContext);
+        if (className == null) {
+            return null;
+        }
+        try {
+            return switch (className) {
+                case "boolean" -> boolean.class;
+                case "byte" -> byte.class;
+                case "char" -> char.class;
+                case "double" -> double.class;
+                case "float" -> float.class;
+                case "int" -> int.class;
+                case "long" -> long.class;
+                case "short" -> short.class;
+                case "void" -> void.class;
+                default -> {
+                    Class<?> clazz = Class.forName(className, false, PythonStubGenerator.class.getClassLoader());
+                    yield clazz.getTypeParameters().length > 0 ? clazz : className;
+                }
+            };
+        } catch (ClassNotFoundException e) {
+            return className;
+        }
+    }
+
+    private static @Nullable String annotationClassName(Object value, PythonVisitorContext visitorContext) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof AnnotationClassValue<?> annotationClassValue) {
+            return rawClassName(annotationClassValue.getName(), visitorContext);
+        }
         if (value instanceof Class<?> classValue) {
             return classValue.getName();
         }
         if (value instanceof ClassElement classElement) {
-            return classElement.getName();
+            return rawClassName(classElement.getRawClassElement().getName(), visitorContext);
         }
         if (value instanceof Value polyglotValue) {
             if (polyglotValue.isHostObject()) {
@@ -1068,11 +1216,30 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 if (hostObject instanceof Class<?> classValue) {
                     return classValue.getName();
                 }
+                return annotationClassName(hostObject, visitorContext);
+            }
+            if (polyglotValue.isString()) {
+                return rawClassName(polyglotValue.asString(), visitorContext);
             }
             Object converted = GraalPyUtil.convertValueToJava(polyglotValue, visitorContext);
+            if (converted == polyglotValue) {
+                return rawClassName(polyglotValue.toString(), visitorContext);
+            }
             return annotationClassName(converted, visitorContext);
         }
-        return value.toString();
+        return rawClassName(value.toString(), visitorContext);
+    }
+
+    private static String rawClassName(String typeName, PythonVisitorContext visitorContext) {
+        String rawTypeName = rawTypeName(typeName);
+        return visitorContext.getClassElement(rawTypeName)
+            .map(classElement -> rawTypeName(classElement.getRawClassElement().getName()))
+            .orElse(rawTypeName);
+    }
+
+    private static String rawTypeName(String typeName) {
+        int genericStart = typeName.indexOf('<');
+        return genericStart > -1 ? typeName.substring(0, genericStart) : typeName;
     }
 
     private static @Nullable ClassElement resolveAnnotationMemberType(

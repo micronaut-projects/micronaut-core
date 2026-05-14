@@ -245,7 +245,6 @@ class ConcreteRunnableBean:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0068")
     void "test introduction advice implements additional generic event listener interface"() {
         given:
         def pythonCode = '''
