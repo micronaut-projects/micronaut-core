@@ -122,8 +122,7 @@ As of May 14, 2026:
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
-* The most recent focused verification passed for
-  `ConfigurationJsonSchemaSpec`.
+* The most recent focused verification passed for `ConfigurationBuilderSpec`.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -247,6 +246,12 @@ The latest completed source slices are:
   `ConfigurationJsonSchemaDefaultsSpec.groovy`, and
   `ConfigurationJsonSchemaValidationSpec.groovy`: configuration JSON schema
   resource generation is pending as `PY-INJECT-0087`.
+* `ConfigurationBuilderSpec.groovy` and `ConfigurationBuilderSpec2.groovy`:
+  portable configuration builder binding is covered for Python attributes with
+  write prefixes, multiple builder instances with distinct configuration
+  prefixes, and inherited Java builder methods; Java private-field/getter
+  diagnostics, Java interface builder fixtures, and enum `Set` fixture details
+  are cataloged as unsupported.
 
 The next source area has not been selected yet.
 
