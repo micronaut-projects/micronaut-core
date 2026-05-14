@@ -8,6 +8,12 @@ Keep this pass focused on tests, cataloging, and Gradle build reliability.
 
 ## Scope
 
+Worktree:
+
+* Path: `/Users/graemerocher/dev/micronaut/core.pyronaut.python-hardening`
+* Branch: `python-hardening-tests`
+* Base: `origin/python-support`
+
 Source inventory is limited to direct subclasses of:
 
 * `AbstractBeanDefinitionSpec`
@@ -26,6 +32,9 @@ Source roots:
 
 Python changes should stay under `inject-python-test` unless separately
 approved.
+
+The authoritative inventory commands and direct-subclass counts live in
+`inject-python-test/DISABLED_TESTS.md`.
 
 ## Ground Rules
 
@@ -100,6 +109,31 @@ git status --short --branch
 ```
 
 8. Stage and commit the verified slice before continuing.
+
+## Current Continuation State
+
+As of May 13, 2026:
+
+* Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
+  from the included checkout; do not rely on a local bundle override.
+* The latest committed pending ID is `PY-INJECT-0058`; use
+  `PY-INJECT-0059` for the next pending case.
+* The active uncommitted slice extends `PythonLifecycleSpec` with
+  class-level and method-level around-advised lifecycle coverage and updates
+  `DISABLED_TESTS.md` with the covered source mapping.
+* The focused lifecycle spec has passed. Before committing that slice, finish
+  full `:micronaut-inject-python-test:test`, run the hygiene checks, inspect
+  the diff, then commit it as a small verified change.
+
+Good next source areas to mine after the lifecycle slice:
+
+* `PostConstructInterceptorCompileSpec.groovy`
+* `IntroductionWithAroundSpec.groovy`
+* `ExecutableFactoryMethodSpec.groovy`
+* `AdviceDefinedOnFactorySpec.groovy`
+* `InterfaceIntroductionAdviceSpec.groovy`
+* `IntroductionGenericTypesSpec.groovy`
+* `FactoryMappedAdviceSpec.groovy`
 
 ## Gradle And GraalPy
 
