@@ -1,13 +1,48 @@
 package io.micronaut.python.annotation.processing.test.event
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.event.ShutdownEvent
+import io.micronaut.context.event.StartupEvent
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import org.graalvm.polyglot.Value
 import spock.lang.PendingFeature
 import spock.util.concurrent.PollingConditions
 
 class PythonEventListenerSpec extends AbstractPythonTypeElementSpec {
+    void "test event listener method adapter exposes metadata and event type"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Requires
+from micronaut.context.event import StartupEvent
+from micronaut.runtime.event.annotation import EventListener
+
+@Requires(property="feature.enabled", value="true")
+@Singleton
+class StartupListener:
+    invoked: bool = False
+
+    @EventListener
+    def on_startup(self, event: StartupEvent):
+        self.invoked = True
+''', false, ["feature.enabled": "true"])
+
+        when:
+        def listenerDefinitions = context.getBeanDefinitions(ApplicationEventListener)
+        def definition = listenerDefinitions.find {
+            it.annotationMetadata.stringValue(Requires, "property").orElse(null) == "feature.enabled"
+        }
+
+        then:
+        definition != null
+        definition.annotationMetadata.stringValue(Requires, "value").get() == "true"
+        !definition.getTypeArguments(ApplicationEventListener).isEmpty()
+        definition.getTypeArguments(ApplicationEventListener).get(0).type == StartupEvent
+
+        cleanup:
+        context?.close()
+    }
 
     void "test event listener with failing requirements is not present"() {
         given:
