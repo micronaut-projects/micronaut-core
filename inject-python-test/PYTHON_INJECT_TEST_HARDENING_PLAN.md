@@ -122,7 +122,8 @@ As of May 14, 2026:
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
-* The most recent focused verification passed for `ConfigurationPropertiesSpec`.
+* The most recent focused verification passed for `PythonLifecycleSpec` plus
+  the selected `FactoryBeanMethodSpec` pre-destroy features.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -261,6 +262,12 @@ The latest completed source slices are:
   `@EachProperty` computes the expected wildcard `ConfigurationReader` prefix
   and exposes wildcard property injection metadata on the generated injection
   method.
+* `BeanWithPostConstructSpec.groovy` and `BeanWithPreDestroySpec.groovy`:
+  lifecycle metadata, dependency injection before post-construct, post-construct
+  invocation, pre-destroy invocation, and factory `preDestroy` methods are
+  covered by `PythonLifecycleSpec` and `FactoryBeanMethodSpec`; Java
+  private/protected visibility and Groovy anonymous-class fixture shapes are
+  cataloged as unsupported.
 
 The next source area has not been selected yet.
 
