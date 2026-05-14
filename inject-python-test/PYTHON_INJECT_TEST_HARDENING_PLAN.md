@@ -122,8 +122,7 @@ As of May 14, 2026:
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
-* The most recent focused verification passed for `PythonLifecycleSpec` plus
-  the selected `FactoryBeanMethodSpec` pre-destroy features.
+* The most recent focused verification passed for `BeanElementSpec`.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -268,6 +267,9 @@ The latest completed source slices are:
   covered by `PythonLifecycleSpec` and `FactoryBeanMethodSpec`; Java
   private/protected visibility and Groovy anonymous-class fixture shapes are
   cataloged as unsupported.
+* `BeanElementVisitorSpec.groovy`: `BeanElementVisitor` inspection of simple
+  bean and factory bean metadata, bean veto, and associated bean registration
+  are covered by `BeanElementSpec`.
 
 The next source area has not been selected yet.
 
