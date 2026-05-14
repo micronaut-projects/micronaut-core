@@ -155,6 +155,10 @@ The latest completed source slices are:
   interface introduction is covered for concrete, abstract, and protocol-style
   Python beans; generic `ApplicationEventListener` interface introduction is
   pending as `PY-INJECT-0068`.
+* `OriginatingElementsSpec.groovy`: Java static originating-element registry
+  assertions are cataloged as unsupported compiler infrastructure behavior.
+* `GeneratedAnnotationSpec.groovy`: Java generated-class bytecode annotation
+  counting is cataloged as unsupported compiler-output behavior.
 
 The next source area has not been selected yet.
 
