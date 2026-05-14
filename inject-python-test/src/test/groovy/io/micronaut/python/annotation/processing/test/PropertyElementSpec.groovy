@@ -188,7 +188,6 @@ class PersonDto(EntityDto):
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0032")
     void "test bean properties with generics"() {
         expect:
         buildClassElement('''

@@ -497,7 +497,6 @@ class RecursiveService(RecursiveGeneric["RecursiveService"]):
         definition.getTypeArguments("python.RecursiveGeneric")[0].type.name == "python.RecursiveService"
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0041")
     void "test generic bean type from factory method"() {
         given:
         def context = buildContext('''\

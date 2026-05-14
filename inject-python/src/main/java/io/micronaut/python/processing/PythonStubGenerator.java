@@ -40,6 +40,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
@@ -213,19 +214,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     var builder = ClassDef.builder(typeName)
                         .addModifiers(Modifier.PUBLIC);
+                    for (GenericPlaceholderElement placeholder : classElement.getDeclaredGenericPlaceholders()) {
+                        builder.addTypeVariable(TypeDef.variable(placeholder.getVariableName()));
+                    }
                     builder.addAnnotation(Vetoed.class);
 
                     copyAnnotations(element, builder, ANNOTATION_PACKAGES_TO_COPY, context);
-                    builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
-
-                    // Check if this class extends another PythonClassElement
                     ClassElement superType = element.getSuperType().orElse(null);
                     boolean extendsPythonClass = superType instanceof AbstractPythonClassElement;
                     boolean extendsHostThrowable = superType != null
                         && !extendsPythonClass
                         && superType.isAssignable(Throwable.class.getName());
+                    if (!extendsPythonClass) {
+                        builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
+                    }
+
+                    // Check if this class extends another PythonClassElement
                     if (extendsPythonClass || extendsHostThrowable) {
-                        builder.superclass(ClassTypeDef.of(superType.getName()));
+                        builder.superclass(parameterizedClassTypeDef(superType));
                     }
 
                     boolean isIntrospectedBean = element.hasStereotype(Introspected.class);
@@ -435,6 +441,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 }
                                 if (pythonValueFinal != null) {
                                     return aThis.field(pythonValueFinal).returning();
+                                } else if (extendsPythonClass) {
+                                    return aThis.superRef().invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).returning();
                                 } else {
                                     return aThis.field("graalpyInternalValue", POLYGLOT_VALUE).returning();
                                 }
@@ -718,16 +726,28 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Map<String, ClassElement> typeArguments = anInterface.getTypeArguments();
         TypeDef interfaceTypeDef = TypeDef.of(anInterface);
         if (!typeArguments.isEmpty()) {
-            Map<String, TypeDef> resolved = new LinkedHashMap<>(typeArguments.size());
-            for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
-                resolved.put(entry.getKey(), parameterizedTypeDef(entry.getValue()));
+            List<TypeDef> resolvedTypeArguments = new ArrayList<>(typeArguments.size());
+            for (ClassElement typeArgument : typeArguments.values()) {
+                resolvedTypeArguments.add(sourceTypeArgument(typeArgument));
             }
-            interfaceTypeDef = ClassTypeDef.of(anInterface,
-                resolved,
-                false
-            );
+            interfaceTypeDef = TypeDef.parameterized(javaClassType(anInterface), resolvedTypeArguments);
         }
         return interfaceTypeDef;
+    }
+
+    private static TypeDef sourceTypeArgument(ClassElement typeArgument) {
+        if (typeArgument.isPrimitive()) {
+            return TypeDescriptors.toBoxedIfNecessary(TypeDef.of(typeArgument));
+        }
+        return parameterizedTypeDef(typeArgument);
+    }
+
+    private static ClassTypeDef parameterizedClassTypeDef(ClassElement classElement) {
+        TypeDef typeDef = parameterizedTypeDef(classElement);
+        if (typeDef instanceof ClassTypeDef classTypeDef) {
+            return classTypeDef;
+        }
+        return javaClassType(classElement);
     }
 
     private boolean isConfigurationBuilderType(ClassElement element) {
@@ -1632,7 +1652,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 invokedValue, genericType);
                     } else {
                         if (isGeneratedWrapperType(allClasses, returnType)) {
-                            yield ClassTypeDef.of(returnType)
+                            yield javaClassType(returnType)
                                 .invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, invokedValue);
                         } else {
                             yield RUNTIME_UTIL
@@ -1802,7 +1822,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ExpressionDef genericType = toClassExpression(componentType);
                         return RUNTIME_UTIL.invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class), member, genericType);
                     } else if (isGeneratedWrapperType(allClasses, type)) {
-                        return ClassTypeDef.of(type).invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, member);
+                        return javaClassType(type).invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, member);
                     } else {
                         return RUNTIME_UTIL.invokeStatic("convertValue", ClassTypeDef.OBJECT, member, javaClassType(type).getStaticField("class", TypeDef.CLASS)).cast(erasedType(type));
                     }
