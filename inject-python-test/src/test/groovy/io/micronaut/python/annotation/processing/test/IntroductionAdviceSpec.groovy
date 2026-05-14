@@ -177,6 +177,74 @@ class RunnableProtocol(Protocol):
         context?.close()
     }
 
+    void "test combined introduction and around advice on concrete class"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import Around, InterceptorBean, Introduction, MethodInvocationContext
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Around
+@Introduction(interfaces="java.lang.Runnable")
+def RunnableAround(cls):
+    return cls
+
+@InterceptorBean(RunnableAround)
+@Singleton
+class RunnableAroundInterceptor(MethodInterceptor):
+    runs: int = 0
+    around_calls: int = 0
+
+    def intercept(self, context: MethodInvocationContext):
+        if context.getMethodName() == "run":
+            self.runs += 1
+            return None
+        if context.getMethodName() == "get_id":
+            self.around_calls += 1
+            return 1
+        self.around_calls += 1
+        return context.proceed()
+
+@RunnableAround
+@Singleton
+class ConcreteRunnableBean:
+    @Executable
+    def get_id(self) -> int:
+        return 99
+
+    @Executable
+    def get_name(self) -> str:
+        return None
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.ConcreteRunnableBean")
+        def bean = getBean(context, "python.ConcreteRunnableBean").asPolyglotValue()
+        def interceptor = getBean(context, "python.RunnableAroundInterceptor")
+
+        then:
+        Runnable.isAssignableFrom(definition.beanType)
+        definition.executableMethods*.methodName.containsAll(["get_id", "get_name", "run"])
+
+        when:
+        interceptor.runs = 0
+        interceptor.around_calls = 0
+
+        then:
+        bean.invokeMember("get_id").asInt() == 1
+        bean.invokeMember("get_name").isNull()
+        bean.invokeMember("run").isNull()
+        interceptor.runs == 1
+        interceptor.around_calls >= 2
+
+        cleanup:
+        context?.close()
+    }
+
     @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0068")
     void "test introduction advice implements additional generic event listener interface"() {
         given:

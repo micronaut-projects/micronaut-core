@@ -123,8 +123,8 @@ As of May 14, 2026:
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
-  `AroundAdviceSpec.test class level around advice applies to property setters`
-  with 1 skipped pending test.
+  `IntroductionAdviceSpec.test combined introduction and around advice on
+  concrete class`.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -196,6 +196,10 @@ The latest completed source slices are:
   introduction on a concrete class is pending as `PY-INJECT-0074`.
 * `PropertyAdviceSpec.groovy`: class-level around advice on attribute-backed
   property setters is pending as `PY-INJECT-0075`.
+* `IntroductionWithAroundOnConcreteClassSpec.groovy`: the portable combined
+  introduction-and-around concrete-class behavior is covered; Java fixture
+  matrices, exact executable method counts, JavaBean accessor names, and JVM
+  multidimensional array properties are cataloged as unsupported.
 
 The next source area has not been selected yet.
 
