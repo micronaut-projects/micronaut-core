@@ -419,6 +419,36 @@ class ExcludedConfig:
         context?.close()
     }
 
+    void "test configuration reader prefix aliases from Java stereotypes"() {
+        given:
+        def pythonCode = '''
+from micronaut.python.compiler import TestEndpoint2, TestEndpoint4
+
+@TestEndpoint2("simple")
+class SimpleEndpoint:
+    my_value: str | None = None
+
+@TestEndpoint4("simple")
+class BaseEndpoint:
+    my_value: str | None = None
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "simple.my-value": "simple-value",
+                "endpoints.simple.my-value": "base-value"
+        ])
+        def simpleEndpoint = getBean(context, "python.SimpleEndpoint")
+        def baseEndpoint = getBean(context, "python.BaseEndpoint")
+
+        then:
+        simpleEndpoint.my_value == "simple-value"
+        baseEndpoint.my_value == "base-value"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test configuration properties post construct sees bound values"() {
         given:
         def pythonCode = '''
