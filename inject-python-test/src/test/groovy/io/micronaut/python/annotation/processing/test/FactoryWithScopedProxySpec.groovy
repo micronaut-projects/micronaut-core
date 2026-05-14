@@ -15,8 +15,6 @@
  */
 package io.micronaut.python.annotation.processing.test
 
-import spock.lang.PendingFeature
-
 class FactoryWithScopedProxySpec extends AbstractPythonTypeElementSpec {
 
     void "test refreshable factory bean is lazily initialized"() {
@@ -63,7 +61,6 @@ class TestFactory:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0088")
     void "test refreshable factory beans resolve by generic type argument"() {
         given:
         ScopedProxyInitCounter.reset()
