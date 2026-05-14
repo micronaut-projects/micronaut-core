@@ -122,9 +122,8 @@ As of May 14, 2026:
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
-* The most recent focused verification passed for
-  `PythonEventListenerSpec.test event listener method adapter invokes around
-  advice` with 1 skipped pending test.
+* The most recent focused verification passed for `AroundConstructSpec` with 1
+  passing test.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -176,6 +175,8 @@ The latest completed source slices are:
 * `MyAbstractRepoSpec.groovy`: concrete methods on introduced abstract
   repository-style beans are covered; Java default interface methods remain
   unsupported.
+* `AroundConstructCompileSpec.groovy`: constructor interceptor invocation for a
+  bean with constructor injection is covered by `AroundConstructSpec`.
 
 The next source area has not been selected yet.
 
