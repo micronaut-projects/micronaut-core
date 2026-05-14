@@ -117,14 +117,13 @@ As of May 14, 2026:
 
 * Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
   from the included checkout; do not rely on a local bundle override.
-* The latest pending ID is `PY-INJECT-0067`; use `PY-INJECT-0068` for the next
+* The latest pending ID is `PY-INJECT-0068`; use `PY-INJECT-0069` for the next
   pending case.
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
-  `AroundAdviceSpec.test constructor value metadata is retained for around
-  advised beans` with 1 test.
+  `IntroductionAdviceSpec` with 9 tests and 4 skipped.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -152,6 +151,10 @@ The latest completed source slices are:
   portions are cataloged as unsupported.
 * `FinalModifierSpec.groovy`: final class and final method AOP diagnostics are
   cataloged as unsupported.
+* `IntroductionAdviceWithNewInterfaceSpec.groovy`: non-generic additional
+  interface introduction is covered for concrete, abstract, and protocol-style
+  Python beans; generic `ApplicationEventListener` interface introduction is
+  pending as `PY-INJECT-0068`.
 
 The next source area has not been selected yet.
 
