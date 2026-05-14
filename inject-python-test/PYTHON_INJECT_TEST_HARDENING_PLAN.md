@@ -119,7 +119,7 @@ As of May 14, 2026:
   from the included checkout; do not rely on a local bundle override.
 * The latest pending ID is `PY-INJECT-0092`; use `PY-INJECT-0093` for the next
   pending case.
-* The most recent full verification passed with 400 tests and 65 skipped.
+* The most recent full verification passed with 459 tests and 97 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
