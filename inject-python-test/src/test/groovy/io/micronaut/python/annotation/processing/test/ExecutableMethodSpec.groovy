@@ -459,4 +459,40 @@ class StatusController(GenericController[str, int]):
         definition.executableMethods.any { it.methodName == "find" && it.argumentTypes == [Integer.TYPE] as Class[] }
         definition.executableMethods.size() == 3
     }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0071")
+    def "test factory inherits class-level executable methods from superclass"() {
+        given:
+        def pythonCode = '''
+from micronaut.context.annotation import Executable, Factory
+
+@Executable
+class SuperClass:
+    def my_bool(self) -> bool:
+        return False
+
+    def my_int(self) -> int:
+        return 12
+
+    def my_double(self) -> float:
+        return 15.5
+
+@Factory
+class SuperClassFactory(SuperClass):
+    pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def beanDefinition = getBeanDefinition(context, "python.SuperClassFactory")
+        def instance = getBean(context, "python.SuperClassFactory")
+
+        then:
+        beanDefinition.findMethod("my_bool").get().invoke(instance) == false
+        beanDefinition.findMethod("my_int").get().invoke(instance) == 12
+        beanDefinition.findMethod("my_double").get().invoke(instance) == 15.5d
+
+        cleanup:
+        context?.close()
+    }
 }
