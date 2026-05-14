@@ -16,6 +16,7 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Value
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.python.aop.TestAround
@@ -326,6 +327,68 @@ class Test:
         then:
         result == "second"
         secondInterceptor.invoked
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test constructor value metadata is retained for around advised beans"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from micronaut.context.annotation import Executable, Value
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Around
+def Mutating(target):
+    return target
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        for param in context.getParameters().values():
+            if isinstance(param.getValue(), str):
+                param.setValue("changed")
+        return context.proceed()
+
+@Mutating
+@Singleton
+class ClassLevelBean:
+    def __init__(self, value: Annotated[str, Value("${foo.bar}")]):
+        self.value = value
+
+    @Executable
+    def some_method(self, some_val: str) -> str:
+        return self.value + " " + some_val
+
+@Singleton
+class MethodLevelBean:
+    def __init__(self, value: Annotated[str, Value("${foo.bar}")]):
+        self.value = value
+
+    @Mutating
+    @Executable
+    def some_method(self, some_val: str) -> str:
+        return self.value + " " + some_val
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, ["foo.bar": "test"])
+        def classLevelDefinition = getBeanDefinition(context, "python.ClassLevelBean")
+        def methodLevelDefinition = getBeanDefinition(context, "python.MethodLevelBean")
+        def classLevelBean = getBean(context, "python.ClassLevelBean")
+        def methodLevelBean = getBean(context, "python.MethodLevelBean")
+
+        then:
+        classLevelDefinition.constructor.arguments[0].annotationMetadata.stringValue(Value).get() == '${foo.bar}'
+        methodLevelDefinition.constructor.arguments[0].annotationMetadata.stringValue(Value).get() == '${foo.bar}'
+        classLevelBean.some_method("foo") == "test changed"
+        methodLevelBean.some_method("foo") == "test changed"
 
         cleanup:
         context?.close()

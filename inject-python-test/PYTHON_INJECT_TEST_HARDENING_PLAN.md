@@ -123,8 +123,8 @@ As of May 14, 2026:
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
-  `FactoryBeanMethodSpec.test mapped configuration factory advice caches
-  factory method result` with 1 test and 1 skipped.
+  `AroundAdviceSpec.test constructor value metadata is retained for around
+  advised beans` with 1 test.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -147,6 +147,11 @@ The latest completed source slices are:
   portions cataloged as unsupported.
 * `FactoryMappedAdviceSpec.groovy`: Java annotation-mapped factory advice is
   pending as `PY-INJECT-0067`.
+* `AnnotatedConstructorArgumentSpec.groovy`: constructor `@Value` metadata and
+  class-level/method-level AOP invocation are covered; package-private method
+  portions are cataloged as unsupported.
+* `FinalModifierSpec.groovy`: final class and final method AOP diagnostics are
+  cataloged as unsupported.
 
 The next source area has not been selected yet.
 
