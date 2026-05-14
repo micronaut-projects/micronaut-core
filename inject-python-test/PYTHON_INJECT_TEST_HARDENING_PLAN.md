@@ -111,20 +111,26 @@ git status --short --branch
 8. Defer the full Python inject test task until the final sweep after all
    selected tests have been migrated and cataloged.
 
-## Current Continuation State
+## Completion State
 
 As of May 14, 2026:
 
 * Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
   from the included checkout; do not rely on a local bundle override.
-* The latest pending ID is `PY-INJECT-0092`; use `PY-INJECT-0093` for the next
-  pending case.
+* The latest pending ID is `PY-INJECT-0096`; use `PY-INJECT-0097` for the next
+  follow-up pending case.
+* The direct-subclass inventory audit has no remaining uncataloged direct
+  subclasses.
+* All `@PendingFeature` tests under `inject-python-test` are cataloged with
+  stable `PY-INJECT-XXXX` IDs, including pre-existing Python compiler and
+  runtime gaps that were outside the direct source inventory.
 * The most recent full verification passed with 459 tests and 97 skipped.
-* Per-slice verification now uses focused tests only; run the full Python inject
-  test task as a final sweep once the migration/catalog pass is complete.
+* Per-slice verification used focused tests only; the full Python inject test
+  task has now been run as the final sweep for this migration/catalog pass.
 * The most recent focused verification passed for
-  `io.micronaut.python.annotation.processing.test.NamedAopAdviceSpec` with 2
-  tests executed and 1 skipped.
+  `ConfigurationPropertiesSpec`, `PythonClassElementSpec`,
+  `PythonEventListenerSpec`, and `PyronautCompilerSpec` with 112 tests executed
+  and 13 skipped.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -310,11 +316,14 @@ The latest completed source slices are:
   existing Python `annotate/*Spec` suite; field/array/type-argument variants are
   cataloged as source-model-specific because Python exposes attribute-backed
   properties rather than `FieldElement`s.
+* The final catalog pass also assigned stable IDs to existing Python pending
+  tests that were not source-inventory migrations: Java-event listener
+  interface construction (`PY-INJECT-0093`), `@EachProperty` classes
+  implementing a Java interface (`PY-INJECT-0094`), method-level Python type
+  variables (`PY-INJECT-0095`), and `PyronautCompiler.classpath(...)`
+  (`PY-INJECT-0096`).
 
-The next source area has not been selected yet.
-
-After that, continue with the next uncataloged direct subclass from the
-inventory in `DISABLED_TESTS.md`.
+No uncataloged direct subclasses remain for this pass.
 
 ## Gradle And GraalPy
 

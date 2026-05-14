@@ -47,7 +47,7 @@ class ServiceConfig:
         definition instanceof ValidatedBeanDefinition
     }
 
-    @PendingFeature(reason = "Fails with 'Non writable or non-existent member key 'cylinders' which is likely a GraalPy bug")
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0094")
     void "test each property on Python class tht implements Java interface"() {
         given:
         def pythonCode = '''
