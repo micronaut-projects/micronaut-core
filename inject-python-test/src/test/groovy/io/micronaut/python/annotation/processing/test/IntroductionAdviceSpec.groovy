@@ -3,6 +3,7 @@ package io.micronaut.python.annotation.processing.test
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import org.graalvm.polyglot.Value
+import spock.lang.PendingFeature
 
 class IntroductionAdviceSpec extends AbstractPythonTypeElementSpec {
     void "test introduction advice with the decorator defined in Python and invoked from another type"() {
@@ -120,6 +121,66 @@ class StubExample(ABC):
         then:
         def e = thrown(RuntimeException)
         e.message.contains("around interceptor executed")
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0060")
+    void "test around advice is applied to concrete methods on introduction bean"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext, Introduction
+from jakarta.inject import Singleton
+from abc import ABC, abstractmethod
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Introduction
+def Stub(cls):
+    return cls
+
+@Around
+def Mutating(func):
+    return func
+
+@InterceptorBean(Stub)
+@Singleton
+class StubIntroduction(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return context.getValue("python.Stub", context.getReturnType().getType()).orElse(None)
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        for param in context.getParameters().values():
+            if param.getName() == "name":
+                param.setValue("changed")
+        return context.proceed()
+
+@Stub
+class AbstractBean(ABC):
+    @abstractmethod
+    def save(self, name: str, age: int) -> None:
+        pass
+
+    @abstractmethod
+    def save_two(self, name: str) -> None:
+        pass
+
+    @Mutating
+    def my_concrete(self, name: str) -> str:
+        return name
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        Value bean = getBean(context, "python.AbstractBean").asPolyglotValue()
+
+        then:
+        bean.invokeMember("my_concrete", "test").asString() == "changed"
 
         cleanup:
         context?.close()
