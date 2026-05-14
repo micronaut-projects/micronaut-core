@@ -30,6 +30,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.core.type.TypeInformation
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
+import io.micronaut.inject.test.ClassWithReferencingExternalClass
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.python.annotation.processing.test.client.ExecutableClient
 import io.micronaut.python.annotation.processing.test.factory.mapped.TestSingletonAdvice
@@ -131,6 +132,33 @@ class TestFactory:
 
         cleanup:
         context.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0089")
+    void "test producing a bean with unresolved method parameter types does not break preDestroy search"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory, Bean
+import java
+
+ClassWithReferencingExternalClass = java.type("io.micronaut.inject.test.ClassWithReferencingExternalClass")
+UnresolvedClassFactory = java.type("io.micronaut.python.annotation.processing.test.factory.UnresolvedClassFactory")
+
+@Factory
+class MyFactory:
+    @Bean(preDestroy="method2")
+    def my_bean(self) -> ClassWithReferencingExternalClass:
+        return UnresolvedClassFactory.create()
+''')
+
+        when:
+        context.getBean(ClassWithReferencingExternalClass)
+
+        then:
+        noExceptionThrown()
+
+        cleanup:
+        context?.close()
     }
 
     void "test a factory bean with attribute"() {

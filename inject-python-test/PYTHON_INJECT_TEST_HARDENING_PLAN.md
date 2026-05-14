@@ -117,12 +117,13 @@ As of May 14, 2026:
 
 * Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
   from the included checkout; do not rely on a local bundle override.
-* The latest pending ID is `PY-INJECT-0088`; use `PY-INJECT-0089` for the next
+* The latest pending ID is `PY-INJECT-0089`; use `PY-INJECT-0090` for the next
   pending case.
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
-* The most recent focused verification passed for `ConfigurationBuilderSpec`.
+* The most recent focused verification passed for the selected
+  `FactoryBeanMethodSpec` unresolved-parameter `preDestroy` feature.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -275,6 +276,10 @@ The latest completed source slices are:
   `configurationPrefix`, and inherited Java builder methods are covered by
   `ConfigurationBuilderSpec`; source-specific Java/Groovy fixture shapes are
   cataloged as unsupported.
+* `FactoryOfBeanWithUnresolvedClassSpec.groovy`: factory bean `preDestroy`
+  method search with unresolved method parameter types is pending as
+  `PY-INJECT-0089` because GraalPy host-object conversion reflects the missing
+  parameter type while converting the returned Java object.
 
 The next source area has not been selected yet.
 
