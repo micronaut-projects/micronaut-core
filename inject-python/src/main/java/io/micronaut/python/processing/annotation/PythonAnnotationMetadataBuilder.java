@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.annotation;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -34,6 +35,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -284,8 +286,105 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             if (lastDot > -1) {
                 annotationValue = stringValue.substring(lastDot + 1);
             }
+        } else if (isClassArrayMember(memberType)) {
+            annotationValue = annotationClassValues(annotationValue);
+        } else if (isClassMember(memberType)) {
+            annotationValue = annotationClassValue(annotationValue);
         }
         return resolveEvaluatedExpressionReferences(originatingElement, annotationName, memberName, annotationValue);
+    }
+
+    private boolean isClassMember(@Nullable ClassElement memberType) {
+        return memberType != null && !memberType.isArray() && Class.class.getName().equals(memberType.getName());
+    }
+
+    private boolean isClassArrayMember(@Nullable ClassElement memberType) {
+        return memberType != null && memberType.isArray() && isClassMember(memberType.fromArray());
+    }
+
+    private @Nullable AnnotationClassValue<?> annotationClassValue(@Nullable Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof AnnotationClassValue<?> annotationClassValue) {
+            return annotationClassValue;
+        }
+        if (value instanceof Class<?> classValue) {
+            return new AnnotationClassValue<>(classValue);
+        }
+        if (value instanceof ClassElement classElement) {
+            return new AnnotationClassValue<>(classElement.getRawClassElement().getName());
+        }
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return null;
+            }
+            if (polyglotValue.isHostObject()) {
+                return annotationClassValue(polyglotValue.asHostObject());
+            }
+            if (polyglotValue.isString()) {
+                return annotationClassValue(polyglotValue.asString());
+            }
+            return annotationClassValue(GraalPyUtil.convertValueToJava(polyglotValue, visitorContext));
+        }
+        String typeName = rawTypeName(value.toString());
+        ClassElement classElement = GraalPyUtil.resolvePythonTypeToJava(typeName, visitorContext, Map.of());
+        if (!Object.class.getName().equals(classElement.getName()) || Object.class.getName().equals(typeName)) {
+            return new AnnotationClassValue<>(classElement.getName());
+        }
+        return new AnnotationClassValue<>(typeName);
+    }
+
+    private static String rawTypeName(String typeName) {
+        int genericStart = typeName.indexOf('<');
+        return genericStart > -1 ? typeName.substring(0, genericStart) : typeName;
+    }
+
+    private AnnotationClassValue<?>[] annotationClassValues(@Nullable Object value) {
+        List<AnnotationClassValue<?>> values = new ArrayList<>();
+        collectAnnotationClassValues(value, values);
+        return values.toArray(AnnotationClassValue[]::new);
+    }
+
+    private void collectAnnotationClassValues(@Nullable Object value, List<AnnotationClassValue<?>> values) {
+        if (value == null) {
+            return;
+        }
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return;
+            }
+            if (polyglotValue.hasArrayElements()) {
+                int size = Math.toIntExact(polyglotValue.getArraySize());
+                for (int i = 0; i < size; i++) {
+                    collectAnnotationClassValues(polyglotValue.getArrayElement(i), values);
+                }
+                return;
+            }
+            addAnnotationClassValue(polyglotValue, values);
+            return;
+        }
+        if (value.getClass().isArray()) {
+            int size = Array.getLength(value);
+            for (int i = 0; i < size; i++) {
+                collectAnnotationClassValues(Array.get(value, i), values);
+            }
+            return;
+        }
+        if (value instanceof Iterable<?> iterable) {
+            for (Object element : iterable) {
+                collectAnnotationClassValues(element, values);
+            }
+            return;
+        }
+        addAnnotationClassValue(value, values);
+    }
+
+    private void addAnnotationClassValue(@Nullable Object value, List<AnnotationClassValue<?>> values) {
+        AnnotationClassValue<?> classValue = annotationClassValue(value);
+        if (classValue != null) {
+            values.add(classValue);
+        }
     }
 
     private Object resolveEvaluatedExpressionReferences(

@@ -290,7 +290,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
 
     private void collectIntroductionInterfaceNames(AnnotationValue<Introduction> introduction, Set<String> interfaceNames) {
         for (AnnotationClassValue<?> interfaceValue : introduction.annotationClassValues("interfaces")) {
-            interfaceNames.add(interfaceValue.getName());
+            interfaceNames.add(rawTypeName(interfaceValue.getName()));
         }
     }
 
@@ -299,16 +299,16 @@ public final class PythonClassElement extends AbstractPythonClassElement {
             return;
         }
         if (value instanceof AnnotationClassValue<?> annotationClassValue) {
-            interfaceNames.add(annotationClassValue.getName());
+            interfaceNames.add(rawTypeName(annotationClassValue.getName()));
         } else if (value instanceof AnnotationClassValue<?>[] annotationClassValues) {
             for (AnnotationClassValue<?> annotationClassValue : annotationClassValues) {
-                interfaceNames.add(annotationClassValue.getName());
+                interfaceNames.add(rawTypeName(annotationClassValue.getName()));
             }
         } else if (value instanceof String interfaceName) {
-            interfaceNames.add(interfaceName);
+            interfaceNames.add(rawTypeName(interfaceName));
         } else if (value instanceof String[] names) {
             for (String name : names) {
-                interfaceNames.add(name);
+                interfaceNames.add(rawTypeName(name));
             }
         } else if (value instanceof Value polyglotValue) {
             collectIntroductionInterfaceNames(polyglotValue, interfaceNames);
@@ -331,8 +331,20 @@ public final class PythonClassElement extends AbstractPythonClassElement {
                 collectIntroductionInterfaceNames(hostObject, interfaceNames);
             }
         } else if (value.isString()) {
-            interfaceNames.add(value.asString());
+            interfaceNames.add(rawTypeName(value.asString()));
+        } else {
+            Object converted = GraalPyUtil.convertValueToJava(value, environment.visitorContext());
+            if (converted != value) {
+                collectIntroductionInterfaceNames(converted, interfaceNames);
+            } else {
+                interfaceNames.add(rawTypeName(value.toString()));
+            }
         }
+    }
+
+    private static String rawTypeName(String typeName) {
+        int genericStart = typeName.indexOf('<');
+        return genericStart > -1 ? typeName.substring(0, genericStart) : typeName;
     }
 
     @Override

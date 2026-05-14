@@ -521,6 +521,50 @@ def CustomAnnotation(
         context?.close()
     }
 
+    void "test Python annotation expression context methods are bridged"() {
+        given:
+        def context = buildContext('''
+from typing import Annotated
+
+from jakarta.inject import Singleton
+from micronaut.context.annotation import AnnotationExpressionContext
+
+@Singleton
+class AnnotationContext:
+    def firstValue(self) -> str:
+        return "first value"
+
+@Singleton
+class AnnotationMemberContext:
+    def secondValue(self) -> str:
+        return "second value"
+
+@AnnotationExpressionContext(AnnotationContext)
+def CustomAnnotation(
+    value: Annotated[str, AnnotationExpressionContext(AnnotationMemberContext)] = "",
+):
+    def decorator(bean):
+        return bean
+    return decorator
+
+@Singleton
+@CustomAnnotation(value="#{firstValue() + secondValue()}")
+class Example:
+    pass
+''')
+
+        when:
+        BeanDefinition definition = getBeanDefinition(context, "python.Example")
+        def value = definition.annotationMetadata.getValue("python.CustomAnnotation", "value", Object).get()
+
+        then:
+        value == "first valuesecond value"
+        definition.annotationMetadata.hasEvaluatedExpressions()
+
+        cleanup:
+        context?.close()
+    }
+
     void "test Python annotation decorator same annotation aliases are resolved"() {
         given:
         def context = buildContext('''
