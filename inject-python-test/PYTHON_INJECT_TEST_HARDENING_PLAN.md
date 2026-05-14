@@ -122,8 +122,8 @@ As of May 14, 2026:
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
-* The most recent focused verification passed for the selected
-  `FactoryBeanMethodSpec` multi-bean list-return factory feature.
+* The most recent focused verification passed for
+  `io.micronaut.python.annotation.processing.test.annotate.*`.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -283,6 +283,13 @@ The latest completed source slices are:
 * `FactoryFieldArraySpec.groovy`: portable multi-bean factory behavior is
   covered by `FactoryBeanMethodSpec` list-return tests; Java array-valued
   factory field and array lookup details are cataloged as unsupported.
+* Source annotation mutation specs named `AnnotateClassSpec.groovy`,
+  `AnnotateMethodSpec.groovy`, `AnnotateMethodReturnSpec.groovy`,
+  `AnnotateMethodParameterSpec.groovy`, and `AnnotatePropertySpec.groovy`:
+  portable visitor annotation mutation and cache behavior are covered by the
+  existing Python `annotate/*Spec` suite; field/array/type-argument variants are
+  cataloged as source-model-specific because Python exposes attribute-backed
+  properties rather than `FieldElement`s.
 
 The next source area has not been selected yet.
 
