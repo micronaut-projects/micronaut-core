@@ -131,7 +131,7 @@ class DisabledSampleEventListener:
         context?.close()
     }
 
-    @PendingFeature(reason = "GraalPy has a bug that doesn't allow constructors for types that implement a java interface")
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0093")
     void "test python event listener via interface with java event"() {
         given:
         def context = buildContext('''

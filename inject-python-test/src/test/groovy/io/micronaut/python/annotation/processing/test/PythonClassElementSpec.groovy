@@ -815,11 +815,7 @@ class TypeTestService:
         }
     }
 
-    @PendingFeature(reason = """
-Function _parse_function_type_params in micronaut_processor.py cannot find type_params
-
-FunctionDef https://docs.python.org/3/library/ast.html#ast.FunctionDef defines type_params but only since 3.12 so maybe a Python version issue.
-""")
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0095")
     def "test method-level type variables"() {
         given:
         def pythonCode = '''

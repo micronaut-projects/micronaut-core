@@ -158,7 +158,7 @@ class OutOfStockException(RuntimeException):
         RuntimeException.isAssignableFrom(generatedException)
     }
 
-    @PendingFeature(reason = "need to improve inheritance")
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0096")
     def "test classpath support"() {
         given:
         def compiler = PyronautCompiler.builder()
