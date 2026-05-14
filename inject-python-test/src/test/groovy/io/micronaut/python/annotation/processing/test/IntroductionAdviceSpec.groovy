@@ -3,6 +3,7 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.annotation.Value as ValueAnn
+import io.micronaut.python.compiler.RepeatableAnnotation
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import org.graalvm.polyglot.Value
@@ -577,6 +578,59 @@ class ValidationIntroducedService(ABC):
         saveTwo.arguments[0].annotationMetadata.hasAnnotation(Min)
         saveTwo.hasAnnotation(Blocking)
         saveTwo.annotationMetadata.declaredAnnotationNames.contains(Blocking.name)
+
+        cleanup:
+        context?.close()
+    }
+
+    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0073")
+    void "test introduction advice retains repeatable annotations on inherited abstract methods"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Introduction
+from micronaut.context.annotation import Executable
+from micronaut.python.compiler import RepeatableAnnotation
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Introduction
+def RepoDef(cls):
+    return cls
+
+@InterceptorBean(RepoDef)
+@Singleton
+class RepoIntroducer(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return None
+
+class CrudRepo(ABC):
+    @abstractmethod
+    @Executable
+    @RepeatableAnnotation("base")
+    def save_and_flush(self, value: str) -> str:
+        pass
+
+@RepoDef
+@Singleton
+@Executable
+class CustomCrudRepo(CrudRepo):
+    pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.CustomCrudRepo")
+        def method = definition.findMethod("save_and_flush", String).orElse(null)
+
+        then:
+        definition.annotationMetadata.isRepeatableAnnotation(RepeatableAnnotation)
+        method != null
+        method.annotationMetadata.isRepeatableAnnotation(RepeatableAnnotation)
+        method.annotationMetadata.hasAnnotation(RepeatableAnnotation)
+        method.annotationMetadata.getAnnotationValuesByType(RepeatableAnnotation)*.stringValue().collect { it.get() } == ["base"]
 
         cleanup:
         context?.close()
