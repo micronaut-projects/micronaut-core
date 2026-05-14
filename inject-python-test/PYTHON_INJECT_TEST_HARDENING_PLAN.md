@@ -117,13 +117,13 @@ As of May 14, 2026:
 
 * Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
   from the included checkout; do not rely on a local bundle override.
-* The latest pending ID is `PY-INJECT-0085`; use `PY-INJECT-0086` for the next
+* The latest pending ID is `PY-INJECT-0087`; use `PY-INJECT-0088` for the next
   pending case.
 * The most recent full verification passed with 400 tests and 65 skipped.
 * Per-slice verification now uses focused tests only; run the full Python inject
   test task as a final sweep once the migration/catalog pass is complete.
 * The most recent focused verification passed for
-  `ConfigurationPropertiesSpec.test configuration reader prefix aliases from Java stereotypes`.
+  `ConfigurationJsonSchemaSpec`.
 * Recent committed slices added or cataloged lifecycle hooks, lifecycle
   interceptor bindings, introduction-around coverage, and executable factory
   method inheritance coverage.
@@ -240,6 +240,13 @@ The latest completed source slices are:
   covered by `ConfigurationPropertiesSpec`; the source specs' documented
   unsupported alias-to-`ConfigurationReader.value` cases are cataloged as
   unsupported.
+* `ConfigurationMetadataSpec.groovy`: Spring configuration metadata resource
+  generation for Python `@ConfigurationProperties` classes is pending as
+  `PY-INJECT-0086`.
+* `ConfigurationJsonSchemaSpec.groovy`,
+  `ConfigurationJsonSchemaDefaultsSpec.groovy`, and
+  `ConfigurationJsonSchemaValidationSpec.groovy`: configuration JSON schema
+  resource generation is pending as `PY-INJECT-0087`.
 
 The next source area has not been selected yet.
 
