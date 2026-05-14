@@ -12,3 +12,4 @@ io.micronaut.python.annotation.processing.test.CustomVisitorSpec$ControllerGetVi
 io.micronaut.python.annotation.processing.test.CustomVisitorSpec$ControllerAllElementsVisitor
 io.micronaut.python.annotation.processing.test.CustomVisitorSpec$GetMethodVisitor
 io.micronaut.python.annotation.processing.test.CustomVisitorSpec$InjectElementVisitor
+io.micronaut.python.annotation.processing.test.annotate.StereotypeVisitorSpec$StereotypeAddingVisitor
