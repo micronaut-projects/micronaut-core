@@ -199,10 +199,19 @@ public record PythonProcessingEnvironment(
         return cached;
     }
 
+    /**
+     * Returns the script element cache without initializing it.
+     *
+     * @return The cached script elements, or {@code null} if scripts have not been initialized yet.
+     */
+    public Map<String, ClassElement> scriptsIfInitialized() {
+        return scriptsCache.get();
+    }
+
     private static Map<String, ClassElement> toMapOfScriptElement(java.util.Map<String, io.micronaut.python.processing.visitor.ScriptDef> scripts, PythonProcessingEnvironment environment) {
         return scripts.entrySet().stream()
             .collect(Collectors.toMap(
-                Map.Entry::getKey,
+                entry -> entry.getValue().qualifiedName(),
                 entry -> new io.micronaut.python.processing.visitor.PythonScriptElement(entry.getValue(), environment)
             ));
     }

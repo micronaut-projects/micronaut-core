@@ -216,6 +216,16 @@ public class PythonVisitorContext implements VisitorContext {
             if (pythonClass != null) {
                 return Optional.of(pythonClass);
             }
+            Map<String, ClassElement> scripts = processingEnvironment.scriptsIfInitialized();
+            if (scripts != null) {
+                io.micronaut.inject.ast.ClassElement pythonScript = scripts.get(name);
+                if (pythonScript == null && name.startsWith(defaultPackage)) {
+                    pythonScript = scripts.get(name.substring(defaultPackage.length()));
+                }
+                if (pythonScript != null) {
+                    return Optional.of(pythonScript);
+                }
+            }
         }
         // Fallback to Java visitor context
         if (javaVisitorContext != null) {
@@ -232,6 +242,15 @@ public class PythonVisitorContext implements VisitorContext {
             var classElement = entry.getValue();
             if (classElement.getPackageName().equals(aPackage)) {
                 pythonClasses.add(classElement);
+            }
+        }
+        Map<String, ClassElement> scripts = processingEnvironment.scriptsIfInitialized();
+        if (scripts != null) {
+            for (var entry : scripts.entrySet()) {
+                var classElement = entry.getValue();
+                if (classElement.getPackageName().equals(aPackage)) {
+                    pythonClasses.add(classElement);
+                }
             }
         }
         // Add Java classes if visitor context is available

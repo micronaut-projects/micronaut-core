@@ -768,6 +768,43 @@ class GenreRepository(CrudRepository[Genre, int]):
         tempTargetDir.deleteDir()
     }
 
+    def "test file-backed classless route with execute on resolves script proxy type"() {
+        given:
+        def tempSrcDir = File.createTempDir("pyronaut-test-script-route-src", "")
+        def tempTargetDir = File.createTempDir("pyronaut-test-script-route-target", "")
+
+        def appDir = new File(tempSrcDir, "example/micronaut")
+        appDir.mkdirs()
+
+        new File(appDir, "genre_controller.py").text = '''
+from micronaut.http.annotation import Get
+from micronaut.scheduling import TaskExecutors
+from micronaut.scheduling.annotation import ExecuteOn
+
+@ExecuteOn(TaskExecutors.BLOCKING)
+@Get(value="/genres/{id}", produces="text/plain")
+def show(id: int) -> str:
+    return str(id)
+'''
+
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(tempSrcDir.absolutePath)
+            .javaSrc("inject-python-test/src/test/java")
+            .targetDir(tempTargetDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
+
+        then:
+        classLoader.loadClass('example.micronaut.Genre_controller') != null
+
+        cleanup:
+        tempSrcDir.deleteDir()
+        tempTargetDir.deleteDir()
+    }
+
     def "test relative import of Python decorator"() {
         given:
         def tempSrcDir = File.createTempDir("pyronaut-test-multi-package-src", "")

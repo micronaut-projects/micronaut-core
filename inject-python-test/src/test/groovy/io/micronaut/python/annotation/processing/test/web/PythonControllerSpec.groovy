@@ -84,6 +84,32 @@ class HelloController:
         context?.close()
     }
 
+    void "test classless python controller route with execute on"() {
+        given:
+        def context = buildContext('''
+from micronaut.http.annotation import Get
+from micronaut.scheduling import TaskExecutors
+from micronaut.scheduling.annotation import ExecuteOn
+
+@ExecuteOn(TaskExecutors.BLOCKING)
+@Get(value="/classless/{name}", produces="text/plain")
+def say_hello(name : str) -> str:
+    return f"Hello {name}"
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+
+        expect:
+        client.toBlocking().retrieve("/classless/John") == "Hello John"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
     void "test python controller map response"() {
         given:
         def context = buildContext('''
