@@ -23,11 +23,10 @@ import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.visitor.TypeElementQuery
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
-import spock.lang.PendingFeature
 
 class TypeElementQuerySpec extends AbstractPythonTypeElementSpec {
 
-    void "test default query visits class and methods"() {
+    void "test default query visits class methods and constructors"() {
         when:
         TypeElementQueryVisitor.ENABLED = true
         def definition = buildBeanDefinition("python", "QueryTarget", queryTargetSource())
@@ -36,7 +35,8 @@ class TypeElementQuerySpec extends AbstractPythonTypeElementSpec {
         definition
         visitedPythonClassNames().contains("python.QueryTarget")
         visitedPythonQueryTargetMethodNames().containsAll(queryTargetSourceMethodNames())
-        visitedPythonConstructors().isEmpty()
+        visitedPythonConstructors().size() == 1
+        visitedPythonConstructors().first().parameters*.name == ["name"]
         visitedPythonFields().isEmpty()
         visitedPythonEnumConstants().isEmpty()
 
@@ -80,7 +80,6 @@ class TypeElementQuerySpec extends AbstractPythonTypeElementSpec {
         TypeElementQueryVisitor.cleanup()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0033")
     void "test constructor query visits python constructor"() {
         when:
         TypeElementQueryVisitor.ENABLED = true
