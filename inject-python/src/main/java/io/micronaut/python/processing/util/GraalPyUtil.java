@@ -286,8 +286,14 @@ public final class GraalPyUtil {
         }
 
         String name = typeRef.name();
-        ClassElement rawType = resolvePythonTypeToJava(name, visitorContext, boundGenerics);
         List<TypeRef> typeArguments = typeRef.typeArguments();
+        if (typeArguments.isEmpty()) {
+            ClassElement boundGeneric = boundGenerics.get(name);
+            if (boundGeneric != null) {
+                return boundGeneric;
+            }
+        }
+        ClassElement rawType = resolvePythonTypeToJava(name, visitorContext, boundGenerics);
         if (!typeArguments.isEmpty()) {
             ClassElement collectionType = resolveCollectionTypeArguments(rawType, typeArguments, visitorContext, boundGenerics);
             if (collectionType != null) {

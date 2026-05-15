@@ -17,6 +17,7 @@ package io.micronaut.python.processing.visitor;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -276,15 +277,12 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     private ClassElement resolveGenericReturnType(FunctionDef functionDef) {
         if (resolvedGenericReturnType == null) {
 
-            Map<String, Map<String, ClassElement>> allGenerics = getOwningType().getAllTypeArguments();
-            ClassDef declaringClass = functionDef.declaringClass();
-            Map<String, ClassElement> boundGenerics = declaringClass != null ? allGenerics.getOrDefault(declaringClass.qualifiedName(), Map.of()) : Map.of();
             ReturnDef returnDef = functionDef.returnType();
             if (returnDef != null && returnDef.typeAnnotation() != null) {
                 ClassElement baseType = GraalPyUtil.resolvePythonTypeToJava(
                     returnDef.typeAnnotation(),
                     environment.visitorContext(),
-                    boundGenerics
+                    getBoundGenericTypes()
                 );
 
                 // If there are decorators, create a ClassElement with annotation metadata
@@ -418,9 +416,26 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
         List<GenericPlaceholderElement> placeholders = new ArrayList<>(typeVars.size());
         for (TypeVar typeVar : typeVars) {
-            placeholders.add(new PythonGenericPlaceholderElement(typeVar, environment, Collections.emptyList(), (PythonClassElement) getDeclaringType()));
+            placeholders.add(new PythonGenericPlaceholderElement(typeVar, environment, Collections.emptyList(), this));
         }
         return placeholders;
+    }
+
+    Map<String, ClassElement> getBoundGenericTypes() {
+        Map<String, Map<String, ClassElement>> allGenerics = getOwningType().getAllTypeArguments();
+        ClassDef declaringClass = getNativeType().declaringClass();
+        Map<String, ClassElement> declaringGenerics = declaringClass != null
+            ? allGenerics.getOrDefault(declaringClass.qualifiedName(), Map.of())
+            : Map.of();
+        List<? extends GenericPlaceholderElement> methodTypeVariables = getDeclaredTypeVariables();
+        if (declaringGenerics.isEmpty() && methodTypeVariables.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, ClassElement> boundGenerics = new LinkedHashMap<>(declaringGenerics);
+        for (GenericPlaceholderElement methodTypeVariable : methodTypeVariables) {
+            boundGenerics.put(methodTypeVariable.getVariableName(), methodTypeVariable);
+        }
+        return boundGenerics;
     }
 
     @Override
