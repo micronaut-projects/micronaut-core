@@ -27,6 +27,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.FieldInjectionPoint;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
@@ -59,6 +60,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private static final String SCOPED_PROXY_FACTORY = "__micronaut_create_scoped_proxy";
     private static final String SCOPED_PROXY_OVERRIDE_METHOD = "_micronaut_put_override";
+    private static final String SCOPED_PROXY_REGISTER_MEMBER_METHOD = "_micronaut_register_member";
 
     @Override
     public <T> T createProxy(RuntimeProxyDefinition<T> proxyDefinition) {
@@ -118,6 +120,9 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
         Value pythonClass = ContextHolder.findClass(type.getPackageName(), type.getSimpleName());
         Value proxyValue = createScopedProxyValue(pythonClass, () -> asValue(proxyDefinition.targetBean()));
+        for (String memberName : proxyMemberNames(proxyDefinition)) {
+            proxyValue.getMember(SCOPED_PROXY_REGISTER_MEMBER_METHOD).execute(memberName);
+        }
 
         Map<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> interceptedMethodsByName = new LinkedHashMap<>();
         for (RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod : proxyDefinition.interceptedMethods()) {
@@ -148,6 +153,26 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             throw new IllegalStateException("Python proxy target cannot be null");
         }
         return proxy;
+    }
+
+    private Set<String> proxyMemberNames(RuntimeProxyDefinition<?> proxyDefinition) {
+        Set<String> memberNames = new LinkedHashSet<>();
+        for (Argument<?> argument : proxyDefinition.constructorArguments()) {
+            addProxyMemberName(memberNames, argument.getName());
+        }
+        for (Argument<?> argument : proxyDefinition.proxyBeanDefinition().getConstructor().getArguments()) {
+            addProxyMemberName(memberNames, argument.getName());
+        }
+        for (FieldInjectionPoint<?, ?> fieldInjectionPoint : proxyDefinition.proxyBeanDefinition().getInjectedFields()) {
+            addProxyMemberName(memberNames, fieldInjectionPoint.getName());
+        }
+        return memberNames;
+    }
+
+    private void addProxyMemberName(Set<String> memberNames, String memberName) {
+        if (memberName != null && !memberName.isBlank() && !memberName.startsWith("_")) {
+            memberNames.add(memberName);
+        }
     }
 
     private Class<?> resolvePythonBeanType(RuntimeProxyDefinition<?> proxyDefinition) {
@@ -235,13 +260,28 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                             object.__setattr__(self, "_micronaut_overrides", {})
 
                         def _micronaut_target(self):
-                            return object.__getattribute__(self, "_micronaut_target_supplier")()
+                            target = object.__getattribute__(self, "_micronaut_target_supplier")()
+                            object.__getattribute__(self, "_micronaut_sync_target_attributes")(target)
+                            return target
 
                         def _micronaut_put_override(self, name, value):
                             object.__getattribute__(self, "_micronaut_overrides")[name] = value
 
+                        def _micronaut_register_member(self, name):
+                            if isinstance(name, str) and not name.startswith("_"):
+                                object.__setattr__(self, name, None)
+
+                        def _micronaut_sync_target_attributes(self, target):
+                            try:
+                                attributes = getattr(target, "__dict__", {})
+                                names = attributes.keys()
+                            except Exception:
+                                return
+                            for name in names:
+                                object.__getattribute__(self, "_micronaut_register_member")(name)
+
                         def __getattribute__(self, name):
-                            if name in ("_micronaut_target_supplier", "_micronaut_overrides", "_micronaut_target", "_micronaut_put_override"):
+                            if name in ("_micronaut_target_supplier", "_micronaut_overrides", "_micronaut_target", "_micronaut_put_override", "_micronaut_register_member", "_micronaut_sync_target_attributes"):
                                 return object.__getattribute__(self, name)
                             overrides = object.__getattribute__(self, "_micronaut_overrides")
                             if name in overrides:
@@ -252,6 +292,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                         def __setattr__(self, name, value):
                             target = object.__getattribute__(self, "_micronaut_target")()
                             setattr(target, name, value)
+                            object.__getattribute__(self, "_micronaut_register_member")(name)
 
                         def __repr__(self):
                             target = object.__getattribute__(self, "_micronaut_target")()

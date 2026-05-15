@@ -712,6 +712,62 @@ class UserController:
         tempSrcDir.deleteDir()
     }
 
+    def "test relative submodule import resolves generic repository entity"() {
+        given:
+        def tempSrcDir = File.createTempDir("pyronaut-test-data-repository-src", "")
+        def tempTargetDir = File.createTempDir("pyronaut-test-data-repository-target", "")
+
+        def appDir = new File(tempSrcDir, "example/micronaut")
+        def domainDir = new File(appDir, "domain")
+        domainDir.mkdirs()
+
+        new File(domainDir, "genre.py").text = '''
+from dataclasses import dataclass
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity
+from typing import Annotated
+
+@dataclass
+@MappedEntity
+class Genre:
+    id: Annotated[int | None, Id, GeneratedValue]
+    name: str
+'''
+
+        new File(appDir, "genre_repository.py").text = '''
+from jakarta.data.repository import Save
+from micronaut.data.jdbc.annotation import JdbcRepository
+from micronaut.data.repository import CrudRepository
+from typing import List
+
+from .domain.genre import Genre
+
+@JdbcRepository(dialect = "H2")
+class GenreRepository(CrudRepository[Genre, int]):
+
+    @Save
+    def saveGenre(self, genre: Genre) -> None: ...
+
+    def findAll(self) -> List[Genre]: ...
+'''
+
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(tempSrcDir.absolutePath)
+            .javaSrc("inject-python-test/src/test/java")
+            .targetDir(tempTargetDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
+
+        then:
+        classLoader.loadClass('example.micronaut.GenreRepository') != null
+
+        cleanup:
+        tempSrcDir.deleteDir()
+        tempTargetDir.deleteDir()
+    }
+
     def "test relative import of Python decorator"() {
         given:
         def tempSrcDir = File.createTempDir("pyronaut-test-multi-package-src", "")

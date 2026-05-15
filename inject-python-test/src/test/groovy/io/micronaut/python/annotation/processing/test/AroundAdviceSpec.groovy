@@ -253,7 +253,9 @@ class TestClass:
         // Verify the bean is created and intercepted
         def testBean = getBean(context, "python.TestClass")
         testBean.greet("World") == "intercepted: Hello, World!"
+        testBean.$unbox().hasMember("fooBar")
         testBean.$unbox().getMember("fooBar") != null
+        testBean.$unbox().getMember("fooBar").invokeMember("hello").asString() == "World"
 
         cleanup:
         context?.close()

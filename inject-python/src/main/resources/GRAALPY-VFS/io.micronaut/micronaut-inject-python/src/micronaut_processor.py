@@ -142,6 +142,26 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
         return None
 
+    def _resolve_relative_import(self, level, module_name, imported_name):
+        """
+        Resolve relative imports from source-root modules.
+        """
+        parts = self.package_name.split('.') if self.package_name else []
+        if level == 1:
+            base_pkg = self.package_name
+        else:
+            up = level - 1
+            base_pkg = '.'.join(parts[:max(0, len(parts) - up)])
+
+        if module_name:
+            absolute_module = f"{base_pkg}.{module_name}" if base_pkg else module_name
+            local_import = self._resolve_top_level_import(absolute_module, imported_name)
+            if local_import is not None:
+                return local_import
+            return f"{absolute_module}.{imported_name}"
+
+        return f"{base_pkg}.{imported_name}" if base_pkg else imported_name
+
     def visit(self, node: ast.AST) -> ast.AST:
         match node:
             case ast.ClassDef():
@@ -258,15 +278,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         base_pkg = node.module
 
                         if is_relative:
-                            parts = self.package_name.split('.') if self.package_name else []
-
-                            if level == 1:
-                                base_pkg = self.package_name
-                            else:
-                                up = level - 1
-                                base_pkg = '.'.join(parts[:max(0, len(parts) - up)])
-
-                            full_name = f"{base_pkg}.{alias.name}"
+                            full_name = self._resolve_relative_import(level, node.module, alias.name)
                         else:
                             local_import = self._resolve_top_level_import(node.module, alias.name)
                             if local_import is not None:
