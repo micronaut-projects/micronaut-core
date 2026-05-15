@@ -787,7 +787,6 @@ class OuterConfig:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0015")
     void "test configuration inject method with beans and other configs"() {
         given:
         def pythonCode = '''
