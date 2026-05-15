@@ -9,6 +9,17 @@ from micronaut.test.extensions.junit5.annotation import MicronautTest
 from org.junit.jupiter.api import Test
 
 
+def _exception_messages(exception):
+    current = exception
+    for _ in range(16):
+        if current is None:
+            break
+        message = current.getMessage()
+        if message:
+            yield message
+        current = current.getCause()
+
+
 @Requires(property="spec.name", value="PythonConfigurationValidationSpec")
 @Context
 @ConfigurationProperties("framework")
@@ -33,6 +44,9 @@ class PythonConfigurationValidationSpec:
                 "test",
             )
         except BeanInstantiationException as e:
-            assert 'language - must match "groovy|java|kotlin|python"' in str(e)
+            assert any(
+                'language - must match "groovy|java|kotlin|python"' in message
+                for message in _exception_messages(e)
+            )
         else:
             assert False

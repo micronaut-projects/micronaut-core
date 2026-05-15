@@ -39,7 +39,7 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param cause             The throwable
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, Throwable cause) {
-        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, messageForCause(cause), false), cause);
+        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, !(cause instanceof BeanInstantiationException) ? cause.getMessage() : null, false), cause);
     }
 
     /**
@@ -48,7 +48,7 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param cause             The throwable
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, Argument argument, Throwable cause) {
-        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, argument, messageForCause(cause), false), cause);
+        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, argument, !(cause instanceof BeanInstantiationException) ? cause.getMessage() : null, false), cause);
     }
 
     /**
@@ -93,7 +93,7 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param cause               The throwable
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, BeanDefinition declaringBean, String fieldName, Throwable cause) {
-        super(resolutionContext, MessageUtils.buildMessageForField(resolutionContext, declaringBean, fieldName, messageForCause(cause), false), cause);
+        super(resolutionContext, MessageUtils.buildMessageForField(resolutionContext, declaringBean, fieldName, null, false), cause);
     }
 
     /**
@@ -143,7 +143,7 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param cause                The throwable
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, MethodInjectionPoint methodInjectionPoint, Argument argument, Throwable cause) {
-        super(resolutionContext, MessageUtils.buildMessageForMethod(resolutionContext, methodInjectionPoint.getDeclaringBean(), methodInjectionPoint.getName(), argument, messageForCause(cause), false), cause);
+        super(resolutionContext, MessageUtils.buildMessageForMethod(resolutionContext, methodInjectionPoint.getDeclaringBean(), methodInjectionPoint.getName(), argument, null, false), cause);
     }
 
     /**
@@ -154,7 +154,7 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param cause                The throwable
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, BeanDefinition declaringType, String methodName, Argument argument, Throwable cause) {
-        super(resolutionContext, MessageUtils.buildMessageForMethod(resolutionContext, declaringType, methodName, argument, messageForCause(cause), false), cause);
+        super(resolutionContext, MessageUtils.buildMessageForMethod(resolutionContext, declaringType, methodName, argument, null, false), cause);
     }
 
     /**
@@ -300,12 +300,4 @@ public class DependencyInjectionException extends BeanCreationException {
         }
     }
 
-    @Nullable
-    private static String messageForCause(Throwable cause) {
-        Throwable nested = cause.getCause();
-        if (cause instanceof BeanInstantiationException && nested != null && nested.getMessage() != null) {
-            return nested.getMessage();
-        }
-        return cause.getMessage();
-    }
 }
