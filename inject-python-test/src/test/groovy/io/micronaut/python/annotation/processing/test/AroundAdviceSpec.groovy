@@ -17,6 +17,7 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Value
+import io.micronaut.context.python.GraalPyRuntimeUtil
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.python.aop.TestAround
@@ -257,9 +258,9 @@ class TestClass:
         // Verify the bean is created and intercepted
         def testBean = getBean(context, "python.TestClass")
         testBean.greet("World") == "intercepted: Hello, World!"
-        testBean.$unbox().hasMember("fooBar")
-        testBean.$unbox().getMember("fooBar") != null
-        testBean.$unbox().getMember("fooBar").invokeMember("hello").asString() == "World"
+        def fooBar = GraalPyRuntimeUtil.getRawClassMember(testBean.$unbox(), "fooBar")
+        fooBar != null
+        fooBar.invokeMember("hello").asString() == "World"
 
         cleanup:
         context?.close()

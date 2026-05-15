@@ -240,9 +240,6 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
 
         List<MethodElement> inheritedMethods = new ArrayList<>();
         for (ClassElement anInterface : getInterfaces()) {
-            if (anInterface instanceof AbstractPythonClassElement) {
-                continue;
-            }
             if (elementType == MethodElement.class) {
                 inheritedMethods.addAll(anInterface.getEnclosedElements((ElementQuery<MethodElement>) query));
             } else {

@@ -427,6 +427,10 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         Map<String, ClassElement> declaringGenerics = declaringClass != null
             ? allGenerics.getOrDefault(declaringClass.qualifiedName(), Map.of())
             : Map.of();
+        if (declaringGenerics.isEmpty()) {
+            boolean declaredOnOwningType = getDeclaringType().getName().equals(getOwningType().getName());
+            declaringGenerics = declaredGenericBindings(declaredOnOwningType);
+        }
         List<? extends GenericPlaceholderElement> methodTypeVariables = getDeclaredTypeVariables();
         if (declaringGenerics.isEmpty() && methodTypeVariables.isEmpty()) {
             return Map.of();
@@ -436,6 +440,29 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             boundGenerics.put(methodTypeVariable.getVariableName(), methodTypeVariable);
         }
         return boundGenerics;
+    }
+
+    private Map<String, ClassElement> declaredGenericBindings(boolean preservePlaceholders) {
+        List<? extends GenericPlaceholderElement> placeholders = getDeclaringType().getDeclaredGenericPlaceholders();
+        if (placeholders.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, ClassElement> bindings = new LinkedHashMap<>(placeholders.size());
+        for (GenericPlaceholderElement placeholder : placeholders) {
+            bindings.put(
+                placeholder.getVariableName(),
+                preservePlaceholders ? placeholder : firstBound(placeholder)
+            );
+        }
+        return bindings;
+    }
+
+    private static ClassElement firstBound(GenericPlaceholderElement placeholder) {
+        List<? extends ClassElement> bounds = placeholder.getBounds();
+        if (bounds.isEmpty()) {
+            return ClassElement.of(Object.class);
+        }
+        return bounds.getFirst();
     }
 
     @Override

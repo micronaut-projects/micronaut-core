@@ -88,7 +88,6 @@ class MyPersonRepository(MinimalCrudRepository[MyPerson, int], new_style=True):
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0066")
     void "test introduction generic return and argument types from Java interface"() {
         given:
         def pythonCode = '''
@@ -130,7 +129,7 @@ class MyPersonRepository(MinimalCrudRepository[MyPerson, int], new_style=True):
         then:
         save.returnType.type.name == "python.MyPerson"
         save.arguments[0].type.name == "python.MyPerson"
-        findById.arguments[0].type == Integer.TYPE
+        findById.arguments[0].type == Integer
         findById.returnType.type == Optional
         findById.returnType.typeVariables["T"].type.name == "python.MyPerson"
         findAll.returnType.type == Iterable
@@ -140,7 +139,6 @@ class MyPersonRepository(MinimalCrudRepository[MyPerson, int], new_style=True):
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0064")
     void "test introduction generic return and argument types from base class"() {
         given:
         def pythonCode = '''
@@ -225,7 +223,6 @@ class MyBean(MyInterface[SubPerson], ABC):
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0065")
     void "test introduction bounded generic return types without concrete type argument"() {
         given:
         def pythonCode = '''

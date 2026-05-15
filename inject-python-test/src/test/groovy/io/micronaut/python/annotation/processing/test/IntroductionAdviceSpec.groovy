@@ -650,7 +650,6 @@ class ValidationIntroducedService(ABC):
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0073")
     void "test introduction advice retains repeatable annotations on inherited abstract methods"() {
         given:
         def pythonCode = '''
