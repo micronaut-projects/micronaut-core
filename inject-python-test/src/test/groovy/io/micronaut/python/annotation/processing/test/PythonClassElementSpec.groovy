@@ -815,7 +815,6 @@ class TypeTestService:
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0095")
     def "test method-level type variables"() {
         given:
         def pythonCode = '''

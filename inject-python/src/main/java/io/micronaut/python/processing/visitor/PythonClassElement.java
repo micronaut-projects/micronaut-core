@@ -375,10 +375,14 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         List<TypeRef> typeArguments = base.typeArguments();
         if (!typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty() && typeArguments.size() == declaredGenericPlaceholders.size()) {
             Map<String, ClassElement> resolvedTypeArguments = new HashMap<>(declaredGenericPlaceholders.size());
+            Map<String, ClassElement> boundGenerics = new HashMap<>();
+            for (GenericPlaceholderElement placeholder : getDeclaredGenericPlaceholders()) {
+                boundGenerics.put(placeholder.getVariableName(), placeholder);
+            }
             for (int i = 0; i < declaredGenericPlaceholders.size(); i++) {
                 GenericPlaceholderElement placeHolder = declaredGenericPlaceholders.get(i);
                 TypeRef typeRef = typeArguments.get(i);
-                ClassElement resolvedType = GraalPyUtil.resolvePythonTypeToJava(typeRef, environment.visitorContext(), Map.of());
+                ClassElement resolvedType = GraalPyUtil.resolvePythonTypeToJava(typeRef, environment.visitorContext(), boundGenerics);
                 String variableName = placeHolder.getVariableName();
                 resolvedTypeArguments.put(variableName, resolvedType);
             }

@@ -71,13 +71,10 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
 
     @Override
     public ClassElement getGenericType() {
-        Map<String, Map<String, ClassElement>> allGenerics = methodElement.getOwningType().getAllTypeArguments();
-        ClassDef classDef = methodElement.getNativeType().declaringClass();
-        Map<String, ClassElement> boundGenerics = classDef != null ? allGenerics.getOrDefault(classDef.qualifiedName(), Map.of()) : Map.of();
         ClassElement classElement = GraalPyUtil.resolvePythonTypeToJava(
             getNativeType().typeAnnotation(),
             environment.visitorContext(),
-            boundGenerics
+            methodElement.getBoundGenericTypes()
         );
         if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
             return pythonClassElement.withTypeAnnotationsKey(argumentDef);

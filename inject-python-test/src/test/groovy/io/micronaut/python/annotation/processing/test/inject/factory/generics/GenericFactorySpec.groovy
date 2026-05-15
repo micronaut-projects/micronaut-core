@@ -16,11 +16,9 @@
 package io.micronaut.python.annotation.processing.test.inject.factory.generics
 
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
-import spock.lang.PendingFeature
 
 class GenericFactorySpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0021")
     void "test generic factory with type variables"() {
         given:
         def context = buildContext('''\

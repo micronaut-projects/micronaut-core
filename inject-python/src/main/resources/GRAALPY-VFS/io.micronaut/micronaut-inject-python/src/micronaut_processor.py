@@ -108,6 +108,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.in_function = False  # Track if we're inside a function definition
         self.java_type_assignments = {}  # Track java.type() assignments: variable_name -> full_qualified_name
         self.java_keyword_method_aliases = {}  # Track keyword-safe aliases on Java type references
+        self.type_vars = {}  # Track TypeVar assignments: variable_name -> TypeVar
         self.imported_types = {}  # Track imported types: simple_name -> full_qualified_name
         self.local_classes = set()  # Track class names defined in this file
         self.local_constant_values = {}  # Track local class constants visible to annotation expressions
@@ -251,6 +252,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             case ast.Assign():
                 # Track java.type() assignments first
                 self._track_java_type_assignments(node)
+                self._track_type_var_assignment(node)
                 self._track_local_constant_assignment(node)
                 # Handle class attribute assignments (only at class body level, not inside methods)
                 if self.current_class is not None and not self.in_function:
@@ -1251,10 +1253,37 @@ class MicronautAstVisitor(ast.NodeVisitor):
         This is a fallback for Python versions that don't support type_params.
         """
         type_params = []
-        TypeVar = java.type("io.micronaut.python.processing.visitor.TypeVar")
 
         # Look for type parameters in the function signature by examining type annotations
-        # For syntax like def func[S](param: S), we need to parse S from the annotations
+        # For Python versions before PEP 695 support, module-level TypeVar
+        # assignments are referenced from parameter and return annotations.
+        seen = set()
+        class_type_param_names = set()
+        if self.current_class is not None:
+            for type_param in self.current_class.typeParams():
+                class_type_param_names.add(type_param.name())
+
+        def collect(annotation):
+            if annotation is None:
+                return
+            for child in ast.walk(annotation):
+                if isinstance(child, ast.Name):
+                    type_var = self.type_vars.get(child.id)
+                    if type_var is not None and child.id not in seen and child.id not in class_type_param_names:
+                        seen.add(child.id)
+                        type_params.append(type_var)
+
+        for arg in getattr(func_node.args, "posonlyargs", []):
+            collect(arg.annotation)
+        for arg in func_node.args.args:
+            collect(arg.annotation)
+        for arg in func_node.args.kwonlyargs:
+            collect(arg.annotation)
+        if func_node.args.vararg is not None:
+            collect(func_node.args.vararg.annotation)
+        if func_node.args.kwarg is not None:
+            collect(func_node.args.kwarg.annotation)
+        collect(func_node.returns)
 
         # Check if the function name contains type parameters (e.g., def func[S](...))
         func_name = func_node.name
@@ -1268,8 +1297,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     param_names = [name.strip() for name in bracket_content.split(',')]
                     for param_name in param_names:
                         # Create TypeVar objects for each parameter name
-                        type_var = TypeVar(param_name, None, [])
-                        type_params.append(type_var)
+                        if param_name and param_name not in seen:
+                            seen.add(param_name)
+                            type_params.append(self.type_vars.get(param_name) or java.type("io.micronaut.python.processing.visitor.TypeVar")(param_name, None, []))
             except:
                 pass
 
@@ -1427,6 +1457,18 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         elif hasattr(arg_node, 's') and isinstance(arg_node.s, str):
                             self.java_type_assignments[var_name] = arg_node.s
                             self._track_java_keyword_method_aliases(var_name, arg_node.s, explicit_java_type=True)
+
+    def _track_type_var_assignment(self, node):
+        """
+        Track module-level TypeVar assignments so pre-PEP 695 function generic
+        annotations such as `def build() -> Cache[K, V]` expose method type
+        variables to Micronaut.
+        """
+        if self.current_class is not None or len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
+            return
+        type_var = self._parse_type_var_call(node.value)
+        if type_var is not None:
+            self.type_vars[node.targets[0].id] = type_var
 
     def _track_java_keyword_method_aliases(self, var_name, full_qualified_name, explicit_java_type=False):
         if explicit_java_type:

@@ -35,6 +35,7 @@ public final class PythonGenericPlaceholderElement extends AbstractPythonClassEl
 
     private final TypeVar typeVar;
     private final List<PythonClassElement> bounds;
+    private Element declaringElement;
 
     public PythonGenericPlaceholderElement(TypeVar typeVar,
                                            PythonProcessingEnvironment environment,
@@ -45,23 +46,21 @@ public final class PythonGenericPlaceholderElement extends AbstractPythonClassEl
     public PythonGenericPlaceholderElement(TypeVar typeVar,
                                            PythonProcessingEnvironment environment,
                                            List<PythonClassElement> bounds,
-                                           PythonClassElement declaringElement) {
+                                           Element declaringElement) {
         super(new ClassDef(typeVar.name()), environment);
         this.typeVar = typeVar;
         this.bounds = bounds != null ? bounds : Collections.emptyList();
         this.declaringElement = declaringElement;
     }
 
-    private PythonClassElement declaringElement;
-
     @Override
     protected ClassElement createWithArrayDimensions(int arrayDimensions) {
-        return new PythonGenericPlaceholderElement(typeVar, environment, bounds);
+        return new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement);
     }
 
     @Override
     protected AbstractPythonElement copyThis() {
-        return new PythonGenericPlaceholderElement(typeVar, environment, bounds);
+        return new PythonGenericPlaceholderElement(typeVar, environment, bounds, declaringElement);
     }
 
     @Override
@@ -77,6 +76,9 @@ public final class PythonGenericPlaceholderElement extends AbstractPythonClassEl
     @NonNull
     @Override
     public List<? extends ClassElement> getBounds() {
+        if (bounds.isEmpty()) {
+            return List.of(ClassElement.of(Object.class));
+        }
         return bounds;
     }
 

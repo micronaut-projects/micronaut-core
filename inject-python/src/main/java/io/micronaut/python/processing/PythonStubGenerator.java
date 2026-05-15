@@ -72,6 +72,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
 import io.micronaut.python.processing.visitor.PythonClassElement;
+import io.micronaut.python.processing.visitor.PythonMethodElement;
 import io.micronaut.python.processing.visitor.PythonScriptElement;
 import io.micronaut.sourcegen.generator.SourceGenerator;
 import io.micronaut.sourcegen.generator.SourceGenerators;
@@ -860,7 +861,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(methodElement.getName())
                 .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
-                .returns(TypeDef.of(methodElement.getGenericReturnType()));
+                .returns(methodReturnType(methodElement, false));
+            addMethodTypeVariables(methodElement, methodBuilder);
             for (@NonNull ParameterElement parameter : methodElement.getParameters()) {
                 methodBuilder.addParameter(ParameterDef
                     .builder(parameter.getName(), erasedType(parameter.getGenericType()))
@@ -1402,6 +1404,26 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return erasedType(parameter.getType());
     }
 
+    static TypeDef methodReturnType(MethodElement methodElement, boolean isJunit5Test) {
+        if (isJunit5Test) {
+            return TypeDef.Primitive.VOID;
+        }
+        ClassElement genericReturnType = methodElement.getGenericReturnType();
+        if (!genericReturnType.getTypeArguments().isEmpty()) {
+            return parameterizedTypeDef(genericReturnType);
+        }
+        return TypeDef.of(genericReturnType);
+    }
+
+    private static void addMethodTypeVariables(MethodElement methodElement, MethodDef.MethodDefBuilder methodBuilder) {
+        if (!(methodElement instanceof PythonMethodElement)) {
+            return;
+        }
+        for (GenericPlaceholderElement placeholder : methodElement.getDeclaredTypeVariables()) {
+            methodBuilder.addTypeVariable(TypeDef.variable(placeholder.getVariableName()));
+        }
+    }
+
     private static String javaTypeName(ClassElement t) {
         if (t instanceof AbstractPythonClassElement) {
             return t.getName();
@@ -1518,7 +1540,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
-            .returns(isJunit5Test ? TypeDef.Primitive.VOID : TypeDef.of(methodElement.getGenericReturnType()));
+            .returns(methodReturnType(methodElement, isJunit5Test));
+        addMethodTypeVariables(methodElement, methodBuilder);
 
         copyAnnotations(methodElement, methodBuilder, ANNOTATION_PACKAGES_TO_COPY, visitorContext);
         @NonNull ParameterElement[] parameters = methodElement.getParameters();
