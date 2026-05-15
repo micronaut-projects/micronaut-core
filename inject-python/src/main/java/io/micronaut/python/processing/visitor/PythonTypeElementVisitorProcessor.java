@@ -25,7 +25,11 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.EnumConstantElement;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.TypeElementQuery;
@@ -103,7 +107,6 @@ public class PythonTypeElementVisitorProcessor {
         Map<String, ClassElement> classes = environment.classes();
         Map<String, ClassElement> scripts = environment.scripts();
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
-            TypeElementVisitor<?, ?> visitor = loadedVisitor.getVisitor();
             for (ClassElement element : classes.values()) {
                 if (loadedVisitor.matchesClass(element)) {
                     if (isAopProxy(element)) {
@@ -112,8 +115,7 @@ public class PythonTypeElementVisitorProcessor {
                                 .member("proxyTarget", true)
                         );
                     }
-                    visitor.visitClass(element, pythonVisitorContext);
-                    visitMethods(loadedVisitor, element, pythonVisitorContext);
+                    visitClass(loadedVisitor, element, pythonVisitorContext);
                 }
             }
             // Also process script elements
@@ -125,8 +127,7 @@ public class PythonTypeElementVisitorProcessor {
                                 .member("proxyTarget", true)
                         );
                     }
-                    visitor.visitClass(scriptElement, pythonVisitorContext);
-                    visitMethods(loadedVisitor, scriptElement, pythonVisitorContext);
+                    visitClass(loadedVisitor, scriptElement, pythonVisitorContext);
                 }
             }
         }
@@ -136,16 +137,68 @@ public class PythonTypeElementVisitorProcessor {
         }
     }
 
-    private void visitMethods(LoadedVisitor loadedVisitor, ClassElement element, PythonVisitorContext pythonVisitorContext) {
+    private void visitClass(LoadedVisitor loadedVisitor, ClassElement element, PythonVisitorContext pythonVisitorContext) {
         TypeElementVisitor<?, ?> visitor = loadedVisitor.getVisitor();
         TypeElementQuery query = visitor.query();
-        if (!query.includesMethods()) {
-            return;
-        }
-        for (MethodElement method : element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())) {
-            if (loadedVisitor.matchesElement(method.getAnnotationMetadata())) {
-                visitor.visitMethod(method, pythonVisitorContext);
+        visitor.visitClass(element, pythonVisitorContext);
+
+        if (query.includesConstructors()) {
+            for (ConstructorElement constructorElement : element.getEnclosedElements(ElementQuery.CONSTRUCTORS)) {
+                visitConstructor(loadedVisitor, constructorElement, pythonVisitorContext);
             }
+        }
+
+        boolean includesFields = query.includesFields() || query.includesEnumConstants();
+        boolean includesMethods = query.includesMethods();
+        List<? extends MemberElement> elements;
+        if (includesMethods && includesFields) {
+            elements = element.getEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS);
+        } else if (includesMethods) {
+            elements = element.getEnclosedElements(ElementQuery.ALL_METHODS);
+        } else if (includesFields) {
+            elements = element.getEnclosedElements(ElementQuery.ALL_FIELDS);
+        } else {
+            elements = List.of();
+        }
+
+        for (MemberElement memberElement : elements) {
+            if (memberElement instanceof EnumConstantElement enumConstantElement) {
+                if (query.includesEnumConstants()) {
+                    visitEnumConstant(loadedVisitor, enumConstantElement, pythonVisitorContext);
+                }
+            } else if (memberElement instanceof FieldElement fieldElement) {
+                if (query.includesFields()) {
+                    visitField(loadedVisitor, fieldElement, pythonVisitorContext);
+                }
+            } else if (memberElement instanceof MethodElement methodElement) {
+                if (includesMethods) {
+                    visitMethod(loadedVisitor, methodElement, pythonVisitorContext);
+                }
+            }
+        }
+    }
+
+    private void visitConstructor(LoadedVisitor visitor, ConstructorElement constructorElement, PythonVisitorContext pythonVisitorContext) {
+        if (visitor.matchesElement(constructorElement.getAnnotationMetadata())) {
+            visitor.getVisitor().visitConstructor(constructorElement, pythonVisitorContext);
+        }
+    }
+
+    private void visitMethod(LoadedVisitor visitor, MethodElement methodElement, PythonVisitorContext pythonVisitorContext) {
+        if (visitor.matchesElement(methodElement.getAnnotationMetadata())) {
+            visitor.getVisitor().visitMethod(methodElement, pythonVisitorContext);
+        }
+    }
+
+    private void visitEnumConstant(LoadedVisitor visitor, EnumConstantElement enumConstantElement, PythonVisitorContext pythonVisitorContext) {
+        if (visitor.matchesElement(enumConstantElement.getAnnotationMetadata())) {
+            visitor.getVisitor().visitEnumConstant(enumConstantElement, pythonVisitorContext);
+        }
+    }
+
+    private void visitField(LoadedVisitor visitor, FieldElement fieldElement, PythonVisitorContext pythonVisitorContext) {
+        if (visitor.matchesElement(fieldElement.getAnnotationMetadata())) {
+            visitor.getVisitor().visitField(fieldElement, pythonVisitorContext);
         }
     }
 
