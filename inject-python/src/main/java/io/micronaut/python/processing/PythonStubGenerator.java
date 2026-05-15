@@ -101,6 +101,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String GENERATOR_NAME = "python";
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
     private static final String ANN_CONFIGURATION_BUILDER = "io.micronaut.context.annotation.ConfigurationBuilder";
+    private static final String ANN_CONFIGURATION_INJECT = "io.micronaut.context.annotation.ConfigurationInject";
     private static final String ANN_ANNOTATION_EXPRESSION_CONTEXT = "io.micronaut.context.annotation.AnnotationExpressionContext";
     private static final Set<String> ANNOTATION_PACKAGES_TO_COPY = Set.of("org.junit.jupiter.api", "io.micronaut.test.extensions.junit5.annotation");
     public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
@@ -639,7 +640,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             .onlyInstance()
                             .filter(method -> !methodsToBridge.contains(method))
                             .annotated(ann ->
-                                ann.hasStereotype(AnnotationUtil.INJECT)
+                                ann.hasStereotype(AnnotationUtil.INJECT) ||
+                                    ann.hasAnnotation(ANN_CONFIGURATION_INJECT)
                             ));
 
                     for (MethodElement injectionMethod : injectionMethods) {
