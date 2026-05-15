@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.StringTokenizer;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -98,7 +99,8 @@ final class PyronautJavaCompiler {
                              JavaFileManager fileManager,
                              DiagnosticCollector<JavaFileObject> diagnosticCollector) {
         List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
-        List<String> options = buildCompilerOptions(classpath, bootclasspath, annotationProcessorPath, compilerOptions);
+        List<File> compileClasspath = effectiveClasspath(classpath);
+        List<String> options = buildCompilerOptions(compileClasspath, bootclasspath, annotationProcessorPath, compilerOptions);
         ClassLoader classLoader = createAnnotationProcessorClassLoader(processorClasspath);
         System.setProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
         System.setProperty(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
@@ -187,6 +189,29 @@ final class PyronautJavaCompiler {
             options.addAll(compilerOptions);
         }
         return options;
+    }
+
+    private static List<File> effectiveClasspath(List<File> classpath) {
+        if (classpath == null || classpath.isEmpty()) {
+            return classpath;
+        }
+        return mergeClasspath(defaultClasspath(), classpath);
+    }
+
+    private static List<File> defaultClasspath() {
+        String javaClassPath = System.getProperty("java.class.path");
+        if (javaClassPath == null || javaClassPath.isBlank()) {
+            return List.of();
+        }
+        List<File> files = new ArrayList<>();
+        StringTokenizer tokenizer = new StringTokenizer(javaClassPath, File.pathSeparator);
+        while (tokenizer.hasMoreTokens()) {
+            String entry = tokenizer.nextToken();
+            if (!entry.isBlank()) {
+                files.add(new File(entry));
+            }
+        }
+        return files;
     }
 
     private static List<File> mergeClasspath(List<File> first, List<File> second) {

@@ -21,6 +21,9 @@ import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -109,7 +112,25 @@ public final class PyronautCompiler {
         }
         JavaFileObject[] sources = createJavaSources();
         Iterable<JavaFileObject> compiledClasses = compiler.compileInMemory(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
-        return new JavaFileObjectClassLoader(compiledClasses, parentClassLoader);
+        return new JavaFileObjectClassLoader(compiledClasses, createRuntimeClassLoader());
+    }
+
+    private ClassLoader createRuntimeClassLoader() {
+        if (classpath == null || classpath.isEmpty()) {
+            return parentClassLoader;
+        }
+        URL[] urls = classpath.stream()
+            .map(PyronautCompiler::toUrl)
+            .toArray(URL[]::new);
+        return new URLClassLoader(urls, parentClassLoader);
+    }
+
+    private static URL toUrl(File file) {
+        try {
+            return file.toURI().toURL();
+        } catch (MalformedURLException e) {
+            throw new IllegalArgumentException("Invalid classpath entry: " + file, e);
+        }
     }
 
     /**

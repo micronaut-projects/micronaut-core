@@ -18,7 +18,6 @@ package io.micronaut.python.compiler
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.GraalPyContextFactory
 import io.micronaut.python.processing.PythonAnnotationProcessor
-import spock.lang.PendingFeature
 import spock.lang.Specification
 
 class PyronautCompilerSpec extends Specification {
@@ -158,19 +157,53 @@ class OutOfStockException(RuntimeException):
         RuntimeException.isAssignableFrom(generatedException)
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0096")
     def "test classpath support"() {
         given:
+        def tempDir = File.createTempDir("pyronaut-test-classpath", "")
+        def sourceDir = new File(tempDir, "src/example")
+        def classesDir = new File(tempDir, "classes")
+        sourceDir.mkdirs()
+        classesDir.mkdirs()
+        def externalSource = new File(sourceDir, "ExternalBase.java")
+        externalSource.text = '''
+package example;
+
+public class ExternalBase {
+    public String marker() {
+        return "base";
+    }
+}
+'''
+        def javac = javax.tools.ToolProvider.systemJavaCompiler
+        assert javac != null
+        assert javac.run(null, null, null, "-d", classesDir.absolutePath, externalSource.absolutePath) == 0
+
         def compiler = PyronautCompiler.builder()
-            .pythonCode("class Test: pass")
-            .classpath([new File("/tmp/fake.jar")])
+            .pythonCode('''
+import java
+from micronaut.context.annotation import Executable
+
+ExternalBase = java.type("example.ExternalBase")
+
+class Test:
+    @Executable
+    def make(self) -> ExternalBase:
+        return ExternalBase()
+''')
+            .classpath([classesDir])
             .build()
 
         when:
         def classLoader = compiler.buildClassLoader()
+        def generated = classLoader.loadClass("python.Test")
 
         then:
         classLoader != null
+        generated.getDeclaredMethod("make").returnType.name == "example.ExternalBase"
+        classLoader.loadClass("example.ExternalBase").name == "example.ExternalBase"
+
+        cleanup:
+        tempDir.deleteDir()
     }
 
     def "test annotation transformation and META-INF file generation"() {
