@@ -46,29 +46,35 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static io.micronaut.aop.Adapter.InternalAttributes.ADAPTED_BEAN;
+import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
 @Internal
 @Singleton
 @NullMarked
 public final class PythonProxyCreator implements RuntimeProxyCreator {
 
+    private static final String SCOPED_PROXY_FACTORY = "__micronaut_create_scoped_proxy";
+    private static final String SCOPED_PROXY_OVERRIDE_METHOD = "_micronaut_put_override";
+
     @Override
     public <T> T createProxy(RuntimeProxyDefinition<T> proxyDefinition) {
-        @Nullable T targetBean;
-        Value value;
         if (proxyDefinition.introduction()) {
-            Class<?> pythonBeanType = resolvePythonBeanType(proxyDefinition);
-            value = ContextHolder.findClass(pythonBeanType.getPackageName(), pythonBeanType.getSimpleName());
-            targetBean = null;
-        } else {
-            targetBean = proxyDefinition.targetBean();
-            value = ((ValueCoercible) targetBean).$unbox();
+            return createIntroductionProxy(proxyDefinition);
         }
+        if (proxyDefinition.proxyTarget()) {
+            return createProxyTargetProxy(proxyDefinition);
+        }
+        throw new IllegalStateException("Python runtime proxies require proxyTarget=true");
+    }
+
+    private <T> T createIntroductionProxy(RuntimeProxyDefinition<T> proxyDefinition) {
+        Class<?> pythonBeanType = resolvePythonBeanType(proxyDefinition);
+        Value value = ContextHolder.findClass(pythonBeanType.getPackageName(), pythonBeanType.getSimpleName());
         AtomicReference<Object> targetBeanRef = new AtomicReference<>();
-        boolean isIntroduction = proxyDefinition.introduction();
         Map<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> interceptedMethodsByName = new LinkedHashMap<>();
         for (RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod : proxyDefinition.interceptedMethods()) {
             interceptedMethodsByName.computeIfAbsent(
@@ -80,40 +86,68 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         for (Map.Entry<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> entry : interceptedMethodsByName.entrySet()) {
             String methodName = entry.getKey();
             List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods = entry.getValue();
-            Value originalFunction = isIntroduction ? GraalPyRuntimeUtil.getRawClassMember(value, methodName) : value.getMember(methodName);
+            Value originalFunction = GraalPyRuntimeUtil.getRawClassMember(value, methodName);
             ProxyExecutable proxiedFunction = createProxiedFunction(
-                isIntroduction,
+                true,
+                true,
                 value,
-                targetBean,
+                null,
+                null,
                 targetBeanRef,
                 methodName,
                 interceptedMethods,
                 originalFunction
             );
-            if (isIntroduction) {
-                introductionFunctions.put(methodName, proxiedFunction);
-            } else {
-                value.putMember(methodName, proxiedFunction);
-            }
+            introductionFunctions.put(methodName, proxiedFunction);
         }
-        if (isIntroduction) {
-            fillAllAbstractMethods(value);
-            Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
-            Value targetValue = value.newInstance();
-            T target = box(type, targetValue);
-            if (target == null) {
-                throw new IllegalStateException("Introduction proxy target cannot be null");
-            }
-            targetBeanRef.set(target);
-            for (Map.Entry<String, ProxyExecutable> entry : introductionFunctions.entrySet()) {
-                targetValue.putMember(entry.getKey(), entry.getValue());
-            }
-            return target;
+        fillAllAbstractMethods(value);
+        Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
+        Value targetValue = value.newInstance();
+        T target = box(type, targetValue);
+        if (target == null) {
+            throw new IllegalStateException("Introduction proxy target cannot be null");
         }
-        if (targetBean == null) {
-            throw new IllegalStateException("Target bean is null for non-introduction proxy");
+        targetBeanRef.set(target);
+        for (Map.Entry<String, ProxyExecutable> entry : introductionFunctions.entrySet()) {
+            targetValue.putMember(entry.getKey(), entry.getValue());
         }
-        return targetBean;
+        return target;
+    }
+
+    private <T> T createProxyTargetProxy(RuntimeProxyDefinition<T> proxyDefinition) {
+        Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
+        Value pythonClass = ContextHolder.findClass(type.getPackageName(), type.getSimpleName());
+        Value proxyValue = createScopedProxyValue(pythonClass, () -> asValue(proxyDefinition.targetBean()));
+
+        Map<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> interceptedMethodsByName = new LinkedHashMap<>();
+        for (RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod : proxyDefinition.interceptedMethods()) {
+            interceptedMethodsByName.computeIfAbsent(
+                interceptedMethod.executableMethod().getMethodName(),
+                ignored -> new ArrayList<>()
+            ).add(interceptedMethod);
+        }
+        for (Map.Entry<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> entry : interceptedMethodsByName.entrySet()) {
+            String methodName = entry.getKey();
+            List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods = entry.getValue();
+            Value originalFunction = GraalPyRuntimeUtil.getRawClassMember(pythonClass, methodName);
+            ProxyExecutable proxiedFunction = createProxiedFunction(
+                false,
+                true,
+                pythonClass,
+                proxyDefinition::targetBean,
+                null,
+                null,
+                methodName,
+                interceptedMethods,
+                originalFunction
+            );
+            proxyValue.getMember(SCOPED_PROXY_OVERRIDE_METHOD).execute(methodName, proxiedFunction);
+        }
+        T proxy = box(type, proxyValue);
+        if (proxy == null) {
+            throw new IllegalStateException("Python proxy target cannot be null");
+        }
+        return proxy;
     }
 
     private Class<?> resolvePythonBeanType(RuntimeProxyDefinition<?> proxyDefinition) {
@@ -128,9 +162,11 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private <T> ProxyExecutable createProxiedFunction(
         boolean isIntroduction,
+        boolean bindOriginalFunction,
         Value owner,
+        @Nullable Supplier<T> targetBeanSupplier,
         @Nullable T targetBean,
-        AtomicReference<Object> targetBeanRef,
+        @Nullable AtomicReference<Object> targetBeanRef,
         String methodName,
         List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods,
         @Nullable Value originalFunction
@@ -141,7 +177,16 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             Interceptor<T, ?>[] interceptors = interceptedMethod.interceptors();
             Object[] javaArgs = fromPolyglotArray(args, executableMethod.getArguments());
             @SuppressWarnings("unchecked")
-            T tb = targetBean != null ? targetBean : (T) targetBeanRef.get();
+            T tb;
+            if (targetBeanSupplier != null) {
+                tb = targetBeanSupplier.get();
+            } else if (targetBean != null) {
+                tb = targetBean;
+            } else if (targetBeanRef != null) {
+                tb = (T) targetBeanRef.get();
+            } else {
+                tb = null;
+            }
             if (tb == null) {
                 throw new IllegalStateException("Target bean has not been initialized yet");
             }
@@ -154,7 +199,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 }
                 finalInterceptors = Arrays.copyOf(interceptors, interceptors.length + 1, Interceptor[].class);
                 finalInterceptors[finalInterceptors.length - 1] = invocationContext -> {
-                    Value executable = isIntroduction
+                    Value executable = bindOriginalFunction
                         ? GraalPyRuntimeUtil.bindPythonDescriptor(originalFunction, tb, owner)
                         : originalFunction;
                     Value result = executable.execute(
@@ -169,6 +214,62 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             Object result = new MethodInterceptorChain(finalInterceptors, tb, executableMethod, javaArgs).proceed();
             return unbox(result);
         };
+    }
+
+    private Value createScopedProxyValue(Value pythonClass, Supplier<Value> targetSupplier) {
+        Value factory = scopedProxyFactory(pythonClass.getContext());
+        return factory.execute(pythonClass, (ProxyExecutable) args -> targetSupplier.get());
+    }
+
+    private Value scopedProxyFactory(Context context) {
+        Value bindings = context.getBindings(PYTHON);
+        Value factory = bindings.getMember(SCOPED_PROXY_FACTORY);
+        if (factory == null || GraalPyRuntimeUtil.isNone(factory)) {
+            context.eval(
+                PYTHON,
+                """
+                def __micronaut_create_scoped_proxy(cls, target_supplier):
+                    class _MicronautScopedProxy(cls):
+                        def __init__(self, supplier):
+                            object.__setattr__(self, "_micronaut_target_supplier", supplier)
+                            object.__setattr__(self, "_micronaut_overrides", {})
+
+                        def _micronaut_target(self):
+                            return object.__getattribute__(self, "_micronaut_target_supplier")()
+
+                        def _micronaut_put_override(self, name, value):
+                            object.__getattribute__(self, "_micronaut_overrides")[name] = value
+
+                        def __getattribute__(self, name):
+                            if name in ("_micronaut_target_supplier", "_micronaut_overrides", "_micronaut_target", "_micronaut_put_override"):
+                                return object.__getattribute__(self, name)
+                            overrides = object.__getattribute__(self, "_micronaut_overrides")
+                            if name in overrides:
+                                return overrides[name]
+                            target = object.__getattribute__(self, "_micronaut_target")()
+                            return getattr(target, name)
+
+                        def __setattr__(self, name, value):
+                            target = object.__getattribute__(self, "_micronaut_target")()
+                            setattr(target, name, value)
+
+                        def __repr__(self):
+                            target = object.__getattribute__(self, "_micronaut_target")()
+                            return repr(target)
+
+                    return _MicronautScopedProxy(target_supplier)
+                """
+            );
+            factory = bindings.getMember(SCOPED_PROXY_FACTORY);
+        }
+        return factory;
+    }
+
+    private Value asValue(Object bean) {
+        if (bean instanceof ValueCoercible valueCoercible) {
+            return valueCoercible.asPolyglotValue();
+        }
+        throw new IllegalStateException("Python proxy target must implement ValueCoercible: " + bean);
     }
 
     private <T> RuntimeProxyDefinition.InterceptedMethod<T> findInterceptedMethod(
