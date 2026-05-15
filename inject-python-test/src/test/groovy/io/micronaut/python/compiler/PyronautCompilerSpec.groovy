@@ -118,6 +118,29 @@ class TestClass:
         targetDir.deleteDir()
     }
 
+    def "test compile to disk fails for invalid python source"() {
+        given:
+        def sourceDir = File.createTempDir("pyronaut-test-invalid-source", "")
+        def targetDir = File.createTempDir("pyronaut-test-invalid-target", "")
+        new File(sourceDir, "Broken.py").text = "class Broken("
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(sourceDir.absolutePath)
+            .targetDir(targetDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Broken.py")
+        e.message.contains("SyntaxError")
+
+        cleanup:
+        sourceDir.deleteDir()
+        targetDir.deleteDir()
+    }
+
     def "test Python exception subclass generates Throwable subtype"() {
         given:
         def pythonCode = '''
