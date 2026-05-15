@@ -1200,7 +1200,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             if isinstance(arg, ast.Name):
                                 # Simple TypeVar reference like T
                                 name = arg.id
-                                type_var = TypeVar(name, None, [])
+                                type_var = self.type_vars.get(name) or TypeVar(name, None, [])
                                 type_params.append(type_var)
                             elif isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and arg.func.id == 'TypeVar':
                                 # TypeVar call like TypeVar('T', bound=SomeType)

@@ -445,7 +445,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                     Value next = iterator.getIteratorNextElement();
                     if (next != null && next.isString()) {
                         String methodName = next.asString();
-                        Value existingMember = pythonClass.getMember(methodName);
+                        Value existingMember = GraalPyRuntimeUtil.getRawClassMember(pythonClass, methodName);
                         if (existingMember == null || !existingMember.canExecute()) {
                             pythonClass.putMember(methodName, (ProxyExecutable) args -> null);
                         }

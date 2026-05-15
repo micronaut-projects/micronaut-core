@@ -248,6 +248,16 @@ public final class GraalPyRuntimeUtil {
     }
 
     /**
+     * Return a value as {@link Object} so generated code can perform unchecked generic casts.
+     *
+     * @param value The value
+     * @return The value as an object
+     */
+    public static @Nullable Object asObject(@Nullable Object value) {
+        return value;
+    }
+
+    /**
      * Convert a GraalPy Value representing a list to a Java List.
      * Recursively converts nested collections.
      *

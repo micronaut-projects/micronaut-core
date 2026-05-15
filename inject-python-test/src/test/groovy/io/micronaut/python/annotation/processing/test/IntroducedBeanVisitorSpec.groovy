@@ -10,7 +10,6 @@ import spock.lang.PendingFeature
 
 class IntroducedBeanVisitorSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0072")
     void "test visitor annotations are retained on introduced methods"() {
         given:
         IntroducedMethodVisitor.ENABLED = true

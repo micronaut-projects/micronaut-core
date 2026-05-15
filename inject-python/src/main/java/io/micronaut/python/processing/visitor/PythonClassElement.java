@@ -388,7 +388,22 @@ public final class PythonClassElement extends AbstractPythonClassElement {
             }
             return baseElement.withTypeArguments(resolvedTypeArguments);
         }
+        if (typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty()) {
+            Map<String, ClassElement> resolvedTypeArguments = new HashMap<>(declaredGenericPlaceholders.size());
+            for (GenericPlaceholderElement placeholder : declaredGenericPlaceholders) {
+                resolvedTypeArguments.put(placeholder.getVariableName(), firstBound(placeholder));
+            }
+            return baseElement.withTypeArguments(resolvedTypeArguments);
+        }
         return baseElement;
+    }
+
+    private static ClassElement firstBound(GenericPlaceholderElement placeholder) {
+        List<? extends ClassElement> bounds = placeholder.getBounds();
+        if (bounds.isEmpty()) {
+            return ClassElement.of(Object.class);
+        }
+        return bounds.getFirst();
     }
 
     private Optional<ClassElement> toJavaType(TypeRef typeRef) {
@@ -421,12 +436,32 @@ public final class PythonClassElement extends AbstractPythonClassElement {
     @Override
     public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
         return getNativeType().typeParams().stream()
-            .map(typeVar -> {
-                // For now, we'll create empty bounds. Bounds handling can be added later
-                List<PythonClassElement> bounds = List.of();
-                return new PythonGenericPlaceholderElement(typeVar, environment, bounds, this);
-            })
+            .map(typeVar -> new PythonGenericPlaceholderElement(typeVar, environment, resolveTypeVarBounds(typeVar), this))
             .toList();
+    }
+
+    private List<ClassElement> resolveTypeVarBounds(TypeVar typeVar) {
+        List<ClassElement> bounds = new ArrayList<>();
+        addTypeVarBound(bounds, typeVar.bound());
+        for (Object constraint : typeVar.constraints()) {
+            addTypeVarBound(bounds, constraint);
+        }
+        return bounds;
+    }
+
+    private void addTypeVarBound(List<ClassElement> bounds, Object bound) {
+        if (bound == null) {
+            return;
+        }
+        ClassElement boundElement;
+        if (bound instanceof TypeRef typeRef) {
+            boundElement = GraalPyUtil.resolvePythonTypeToJava(typeRef, environment.visitorContext(), Map.of());
+        } else {
+            boundElement = GraalPyUtil.resolvePythonTypeToJava(new TypeRef(bound.toString()), environment.visitorContext(), Map.of());
+        }
+        if (!Object.class.getName().equals(boundElement.getName())) {
+            bounds.add(boundElement);
+        }
     }
 
 }

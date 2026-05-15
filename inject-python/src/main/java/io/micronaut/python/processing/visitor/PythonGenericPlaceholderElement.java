@@ -34,18 +34,18 @@ import java.util.Optional;
 public final class PythonGenericPlaceholderElement extends AbstractPythonClassElement implements GenericPlaceholderElement {
 
     private final TypeVar typeVar;
-    private final List<PythonClassElement> bounds;
+    private final List<ClassElement> bounds;
     private Element declaringElement;
 
     public PythonGenericPlaceholderElement(TypeVar typeVar,
                                            PythonProcessingEnvironment environment,
-                                           List<PythonClassElement> bounds) {
+                                           List<ClassElement> bounds) {
         this(typeVar, environment, bounds, null);
     }
 
     public PythonGenericPlaceholderElement(TypeVar typeVar,
                                            PythonProcessingEnvironment environment,
-                                           List<PythonClassElement> bounds,
+                                           List<ClassElement> bounds,
                                            Element declaringElement) {
         super(new ClassDef(typeVar.name()), environment);
         this.typeVar = typeVar;
