@@ -24,9 +24,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
+import io.micronaut.aop.InterceptorKind;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import org.jetbrains.annotations.NotNull;
@@ -34,6 +39,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.inject.ast.ArrayableClassElement;
@@ -227,14 +233,39 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     @Override
     public <T extends Element> List<T> getEnclosedElements(ElementQuery<T> query) {
         List<T> elements = enclosedElementsQuery.getEnclosedElements(this, query);
+        elements = decorateDeclaredAbstractMethods(elements, query);
         return appendJavaInterfaceMethods(elements, query);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T extends Element> List<T> decorateDeclaredAbstractMethods(List<T> elements, ElementQuery<T> query) {
+        ElementQuery.Result<T> result = query.result();
+        Class<T> elementType = result.getElementType();
+        if (elements.isEmpty() || (elementType != MethodElement.class && elementType != MemberElement.class) || !hasDeclaredTypeAroundBinding()) {
+            return elements;
+        }
+        List<T> decorated = null;
+        for (int i = 0; i < elements.size(); i++) {
+            T element = elements.get(i);
+            if (element instanceof MethodElement methodElement && methodElement.isAbstract() && methodElement.getDeclaringType().equals(this)) {
+                if (decorated == null) {
+                    decorated = new ArrayList<>(elements);
+                }
+                decorated.set(i, (T) decorateMethodWithTypeInterceptorMetadata(methodElement));
+            }
+        }
+        return decorated == null ? elements : decorated;
+    }
+
+    private boolean hasDeclaredTypeAroundBinding() {
+        return !getAnnotationMetadata().getDeclaredAnnotationNamesByStereotype(Around.class.getName()).isEmpty();
     }
 
     @SuppressWarnings("unchecked")
     private <T extends Element> List<T> appendJavaInterfaceMethods(List<T> elements, ElementQuery<T> query) {
         ElementQuery.Result<T> result = query.result();
         Class<T> elementType = result.getElementType();
-        if (result.isOnlyDeclared() || elementType != MethodElement.class && elementType != MemberElement.class) {
+        if (result.isOnlyDeclared() || (elementType != MethodElement.class && elementType != MemberElement.class)) {
             return elements;
         }
 
@@ -264,12 +295,50 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     }
 
     private MethodElement decorateInheritedInterfaceMethod(MethodElement inheritedMethod) {
+        if (hasDeclaredTypeAroundBinding()) {
+            return decorateMethodWithTypeInterceptorMetadata(inheritedMethod);
+        }
         if (hasStereotype(InterceptorBinding.class)) {
             return inheritedMethod.withAnnotationMetadata(
                 new AnnotationMetadataHierarchy(true, getAnnotationMetadata(), inheritedMethod.getAnnotationMetadata())
             );
         }
         return inheritedMethod;
+    }
+
+    private MethodElement decorateMethodWithTypeInterceptorMetadata(MethodElement method) {
+        return method.withAnnotationMetadata(
+            new AnnotationMetadataHierarchy(true, typeInterceptorMetadata(), MutableAnnotationMetadata.of(method.getMethodAnnotationMetadata()))
+        );
+    }
+
+    private AnnotationMetadata typeInterceptorMetadata() {
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        MutableAnnotationMetadata explicitBindings = null;
+        Set<String> existingAroundBindings = annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class)
+            .stream()
+            .filter(binding -> binding.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND)
+            .flatMap(binding -> binding.stringValue().stream())
+            .collect(Collectors.toSet());
+        for (String annotationName : annotationMetadata.getAnnotationNamesByStereotype(Around.class.getName())) {
+            if (existingAroundBindings.contains(annotationName)) {
+                continue;
+            }
+            if (explicitBindings == null) {
+                explicitBindings = new MutableAnnotationMetadata();
+            }
+            explicitBindings.addDeclaredRepeatable(
+                AnnotationUtil.ANN_INTERCEPTOR_BINDINGS,
+                AnnotationValue.builder(InterceptorBinding.class)
+                    .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName))
+                    .member("kind", InterceptorKind.AROUND)
+                    .build()
+            );
+        }
+        if (explicitBindings == null) {
+            return annotationMetadata;
+        }
+        return new AnnotationMetadataHierarchy(true, annotationMetadata, explicitBindings);
     }
 
     private static boolean isInterfaceMethodAlreadyRepresented(List<? extends Element> elements, MethodElement inheritedMethod) {
