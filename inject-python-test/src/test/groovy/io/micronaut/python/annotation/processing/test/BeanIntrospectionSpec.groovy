@@ -284,7 +284,6 @@ class TestPropertyClass:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0053")
     void "test generic placeholders for bean properties"() {
         given:
         def pythonCode = '''
