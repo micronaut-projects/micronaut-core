@@ -283,7 +283,8 @@ def micronaut_annotation(name, repeated=None):
         Track direct java.type() aliases so Java interface bases can be stripped
         from runtime Python classes before GraalPy creates host adapters.
         """
-        self._track_java_type_assignment(node)
+        if self._track_java_type_assignment(node):
+            return None
         return self.generic_visit(node)
 
     def visit_Attribute(self, node: ast.Attribute):
@@ -429,15 +430,22 @@ def micronaut_annotation(name, repeated=None):
 
     def _track_java_type_assignment(self, node: ast.Assign):
         if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
-            return
+            return False
         class_name = self._java_type_name(node.value)
         if not class_name:
-            return
+            return False
         variable_name = node.targets[0].id
         self._track_java_keyword_method_aliases(variable_name)
         class_element = self.callback_get_class_element(class_name)
         if class_element:
+            if self._is_annotation_class(class_element):
+                decorator_code = self._generate_decorator_from_class_element(class_element, variable_name)
+                if decorator_code:
+                    self.transformed_code.append(decorator_code)
+                    return True
+                return variable_name in self.generated_decorators
             self._track_java_class(variable_name, class_element)
+        return False
 
     def _track_java_class(self, variable_name: str, class_element):
         try:

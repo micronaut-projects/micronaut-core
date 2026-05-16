@@ -284,11 +284,29 @@ public final class PythonClassElement extends AbstractPythonClassElement {
             javaVisitorContext.getClassElement(decorator.annotationName())
                 .map(annotationElement -> annotationElement.getAnnotation(Introduction.class))
                 .ifPresent(introduction -> collectIntroductionInterfaceNames(introduction, interfaceNames));
+            javaVisitorContext.getClassElement(decorator.annotationName()).filter(annotationElement -> decorator.members().isEmpty()).ifPresent(annotationElement ->
+                environment.annotationMetadataBuilder()
+                    .mapAnnotation(decorator)
+                    .forEach(annotationValue -> collectIntroductionInterfaceNames(javaVisitorContext, annotationValue, interfaceNames))
+            );
             collectIntroductionInterfaceNames(javaVisitorContext, decorator.stereotypes(), interfaceNames);
         }
     }
 
-    private void collectIntroductionInterfaceNames(AnnotationValue<Introduction> introduction, Set<String> interfaceNames) {
+    private void collectIntroductionInterfaceNames(JavaVisitorContext javaVisitorContext, AnnotationValue<?> annotationValue, Set<String> interfaceNames) {
+        if (Introduction.class.getName().equals(annotationValue.getAnnotationName())) {
+            collectIntroductionInterfaceNames(annotationValue, interfaceNames);
+        }
+        javaVisitorContext.getClassElement(annotationValue.getAnnotationName())
+            .map(annotationElement -> annotationElement.getAnnotation(Introduction.class))
+            .ifPresent(introduction -> collectIntroductionInterfaceNames(introduction, interfaceNames));
+        List<AnnotationValue<?>> stereotypes = annotationValue.getStereotypes();
+        if (stereotypes != null) {
+            stereotypes.forEach(stereotype -> collectIntroductionInterfaceNames(javaVisitorContext, stereotype, interfaceNames));
+        }
+    }
+
+    private void collectIntroductionInterfaceNames(AnnotationValue<?> introduction, Set<String> interfaceNames) {
         for (AnnotationClassValue<?> interfaceValue : introduction.annotationClassValues("interfaces")) {
             interfaceNames.add(rawTypeName(interfaceValue.getName()));
         }

@@ -1,15 +1,14 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.aop.Interceptor
+import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.event.StartupEvent
 import io.micronaut.python.annotation.processing.test.introduction.mapped.ListenerAdviceInterceptor
-import spock.lang.PendingFeature
 
 class MappedIntroductionSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0074")
     void "test mapped introduction of event listener interface on concrete class"() {
         given:
         def context = buildContext('''\
@@ -23,12 +22,6 @@ ListenerAdviceMarker = java.type("io.micronaut.python.annotation.processing.test
 class MyBeanWithMappedIntroduction:
     pass
 ''')
-        context.registerBeanDefinition(
-                RuntimeBeanDefinition.builder(new ListenerAdviceInterceptor())
-                    .singleton(true)
-                    .exposedTypes(ListenerAdviceInterceptor.class, Interceptor.class)
-                    .build()
-        )
 
         when:
         def beanType = context.classLoader.loadClass("python.MyBeanWithMappedIntroduction")
@@ -47,5 +40,15 @@ class MyBeanWithMappedIntroduction:
 
         cleanup:
         context?.close()
+    }
+
+    @Override
+    protected void configureContext(ApplicationContextBuilder contextBuilder) {
+        contextBuilder.beanDefinitions(
+            RuntimeBeanDefinition.builder(new ListenerAdviceInterceptor())
+                .singleton(true)
+                .exposedTypes(ListenerAdviceInterceptor.class, Interceptor.class)
+                .build()
+        )
     }
 }
