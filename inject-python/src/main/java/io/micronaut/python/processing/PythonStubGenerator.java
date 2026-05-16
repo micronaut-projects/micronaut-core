@@ -1948,6 +1948,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (returnType.isVoid()) {
             // For void methods, just invoke the Python method without returning
             return invokedValue;
+        } else if (returnType.isArray()) {
+            return convertRuntimeValue(returnType, invokedValue);
         } else if (returnType.isPrimitive()) {
             return convertPrimitive(returnType, invokedValue);
         } else {
@@ -2007,10 +2009,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             yield javaClassType(returnType)
                                 .invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, invokedValue);
                         } else {
-                            yield RUNTIME_UTIL
-                                .invokeStatic("convertValue", ClassTypeDef.OBJECT,
-                                    invokedValue, javaClassType(returnType).getStaticField("class", TypeDef.CLASS))
-                                .cast(erasedType(returnType));
+                            yield convertRuntimeValue(returnType, invokedValue);
                         }
                     }
                 }
@@ -2035,15 +2034,26 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (componentType == null) {
             genericType = CLASS_OBJECT;
         } else if (componentType instanceof GenericPlaceholderElement placeholder) {
-            genericType = javaClassType(firstBound(placeholder)).getStaticField("class", TypeDef.CLASS);
+            genericType = classLiteral(firstBound(placeholder));
         } else {
-            genericType = javaClassType(componentType).getStaticField("class", TypeDef.CLASS);
+            genericType = classLiteral(componentType);
         }
         return genericType;
     }
 
     private static ExpressionDef uncheckedCast(ExpressionDef expression, ClassElement targetType) {
         return RUNTIME_UTIL.invokeStatic("asObject", TypeDef.OBJECT, expression).cast(TypeDef.of(targetType));
+    }
+
+    private static ExpressionDef convertRuntimeValue(ClassElement targetType, ExpressionDef value) {
+        return RUNTIME_UTIL
+            .invokeStatic("convertValue", ClassTypeDef.OBJECT,
+                value, classLiteral(targetType))
+            .cast(erasedType(targetType));
+    }
+
+    private static ExpressionDef classLiteral(ClassElement targetType) {
+        return ExpressionDef.constant(erasedType(targetType));
     }
 
     private void addCreatorFactoryMethod(MethodElement creatorMethod, ClassDef.ClassDefBuilder builder, ClassElement element) {
@@ -2128,7 +2138,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private ExpressionDef convertValueForType(ClassElement type, ExpressionDef member) {
-        if (type.isPrimitive()) {
+        if (type.isArray()) {
+            return convertRuntimeValue(type, member);
+        } else if (type.isPrimitive()) {
             return switch (type.getName()) {
                 case "int" -> member.invoke("asInt", TypeDef.Primitive.INT);
                 case "boolean" -> member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
@@ -2182,7 +2194,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     } else if (isGeneratedWrapperType(allClasses, type)) {
                         return javaClassType(type).invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, member);
                     } else {
-                        return RUNTIME_UTIL.invokeStatic("convertValue", ClassTypeDef.OBJECT, member, javaClassType(type).getStaticField("class", TypeDef.CLASS)).cast(erasedType(type));
+                        return convertRuntimeValue(type, member);
                     }
             }
         }
