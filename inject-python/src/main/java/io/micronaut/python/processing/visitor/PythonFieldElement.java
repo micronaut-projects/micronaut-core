@@ -15,18 +15,20 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
-import io.micronaut.inject.visitor.VisitorContext;
-import org.graalvm.polyglot.Value;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
+import org.graalvm.polyglot.Value;
 
 /**
  * A field element returning data from a Python {@link AttributeDef}.
@@ -105,12 +107,8 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
 
     private ClassElement resolveType(AttributeDef attributeDef) {
         if (attributeDef.typeName() != null) {
-            Map<String, Map<String, ClassElement>> allGenerics = getOwningType().getAllTypeArguments();
-            ClassDef declaringClass = attributeDef.declaringClass();
-            Map<String, ClassElement> boundGenerics = declaringClass != null ? allGenerics.getOrDefault(declaringClass.qualifiedName(), Map.of()) : Map.of();
-
             // Use the parsed type name (e.g., "io.micronaut.runtime.server.EmbeddedServer")
-            return GraalPyUtil.resolvePythonTypeToJava(attributeDef.typeName(), environment.visitorContext(), boundGenerics);
+            return GraalPyUtil.resolvePythonTypeToJava(attributeDef.typeName(), environment.visitorContext(), getBoundGenericTypes(attributeDef));
         }
         if (attributeDef.annotation() != null) {
             // Fallback to resolving the full annotation string
@@ -122,6 +120,42 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
             return inferTypeFromValue(attributeDef.value(), environment.visitorContext());
         }
         return environment.visitorContext().getClassElement(Object.class).orElse(null);
+    }
+
+    private Map<String, ClassElement> getBoundGenericTypes(AttributeDef attributeDef) {
+        Map<String, Map<String, ClassElement>> allGenerics = getOwningType().getAllTypeArguments();
+        ClassDef declaringClass = attributeDef.declaringClass();
+        Map<String, ClassElement> declaringGenerics = declaringClass != null
+            ? allGenerics.getOrDefault(declaringClass.qualifiedName(), Map.of())
+            : Map.of();
+        if (declaringGenerics.isEmpty()) {
+            boolean declaredOnOwningType = getDeclaringType().getName().equals(getOwningType().getName());
+            declaringGenerics = declaredGenericBindings(declaredOnOwningType);
+        }
+        return declaringGenerics;
+    }
+
+    private Map<String, ClassElement> declaredGenericBindings(boolean preservePlaceholders) {
+        List<? extends GenericPlaceholderElement> placeholders = getDeclaringType().getDeclaredGenericPlaceholders();
+        if (placeholders.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, ClassElement> bindings = new LinkedHashMap<>(placeholders.size());
+        for (GenericPlaceholderElement placeholder : placeholders) {
+            bindings.put(
+                placeholder.getVariableName(),
+                preservePlaceholders ? placeholder : firstBound(placeholder)
+            );
+        }
+        return bindings;
+    }
+
+    private static ClassElement firstBound(GenericPlaceholderElement placeholder) {
+        List<? extends ClassElement> bounds = placeholder.getBounds();
+        if (bounds.isEmpty()) {
+            return ClassElement.of(Object.class);
+        }
+        return bounds.getFirst();
     }
 
     private ClassElement inferTypeFromValue(Value value, PythonVisitorContext visitorContext) {
