@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.AnnotationMapper;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -60,6 +61,44 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     public PythonAnnotationMetadataBuilder(Map<String, DecoratorDef> decorators, PythonVisitorContext visitorContext) {
         this.decorators = decorators;
         this.visitorContext = visitorContext;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public List<AnnotationValue<?>> mapAnnotation(DecoratorDef decorator) {
+        String annotationName = toBinaryClassName(decorator.annotationName());
+        List<AnnotationMapper<Annotation>> mappers = (List) getAnnotationMappers(annotationName);
+        if (mappers == null || mappers.isEmpty()) {
+            return List.of();
+        }
+        AnnotationValue<Annotation> annotationValue = (AnnotationValue) toAnnotationValue(decorator);
+        List<AnnotationValue<?>> mappedAnnotations = new ArrayList<>();
+        for (AnnotationMapper<Annotation> mapper : mappers) {
+            List<AnnotationValue<?>> mapped = mapper.map(annotationValue, visitorContext);
+            if (mapped != null) {
+                mappedAnnotations.addAll(mapped);
+            }
+        }
+        return mappedAnnotations;
+    }
+
+    private AnnotationValue<?> toAnnotationValue(DecoratorDef decorator) {
+        String annotationName = toBinaryClassName(decorator.annotationName());
+        Map<? extends ElementDef, ?> elementValues = readAnnotationRawValues(decorator);
+        Map<CharSequence, Object> annotationValues = new LinkedHashMap<>();
+        for (Map.Entry<? extends ElementDef, ?> entry : elementValues.entrySet()) {
+            ElementDef member = entry.getKey();
+            if (member != null) {
+                readAnnotationRawValues(
+                    getTypeForAnnotation(decorator),
+                    annotationName,
+                    member,
+                    getAnnotationMemberName(member),
+                    entry.getValue(),
+                    annotationValues
+                );
+            }
+        }
+        return new AnnotationValue<>(annotationName, annotationValues);
     }
 
     @Override
