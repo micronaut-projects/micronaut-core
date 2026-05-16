@@ -34,6 +34,7 @@ import org.graalvm.polyglot.Value;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Repeatable;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -619,7 +620,11 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected String getRepeatableName(DecoratorDef annotationMirror) {
         if (annotationMirror != null) {
-            return toBinaryClassName(annotationMirror.repeatedName());
+            String repeatedName = annotationMirror.repeatedName();
+            if (repeatedName != null) {
+                return toBinaryClassName(repeatedName);
+            }
+            return getJavaRepeatableContainerName(getJavaAnnotationType(annotationMirror));
         } else {
             return null;
         }
@@ -630,11 +635,24 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (visitorContext != null) {
             PythonProcessingEnvironment env = visitorContext.getProcessingEnvironment();
             DecoratorDef decoratorDef = findDecoratorDef(env.environment().decorators(), annotationType.name());
-            if (decoratorDef != null) {
+            if (decoratorDef != null && decoratorDef.repeatedName() != null) {
                 return toBinaryClassName(decoratorDef.repeatedName());
             }
         }
-        return null;
+        return getJavaRepeatableContainerName(getJavaAnnotationType(annotationType.name()));
+    }
+
+    private @Nullable String getJavaRepeatableContainerName(@Nullable ClassElement annotationType) {
+        if (annotationType == null) {
+            return null;
+        }
+        AnnotationValue<Repeatable> repeatable = annotationType.getAnnotation(Repeatable.class);
+        if (repeatable == null) {
+            return null;
+        }
+        return repeatable.annotationClassValue(AnnotationMetadata.VALUE_MEMBER)
+            .map(AnnotationClassValue::getName)
+            .orElse(null);
     }
 
     @Override

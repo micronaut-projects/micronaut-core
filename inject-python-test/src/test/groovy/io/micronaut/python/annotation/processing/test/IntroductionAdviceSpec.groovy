@@ -354,7 +354,6 @@ class TestCaller:
         interceptor.invoked == 4
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0062")
     void "test type level around advice on introduced abstract methods mutates arguments"() {
         given:
         def pythonCode = '''
@@ -416,7 +415,6 @@ class InterfaceIntroductionClass(ABC):
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0061")
     void "test type level around advice on introduced inherited generic abstract method"() {
         given:
         def pythonCode = '''
