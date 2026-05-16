@@ -222,7 +222,7 @@ final class PythonPooledStubGenerator {
             args.add(ExpressionDef.constant(pythonFunctionName));
             args.addAll(parameterExpressions);
             var invoked = CONTEXT_HOLDER.invokeStatic("invokePooled", POLYGLOT_VALUE, args);
-            return handleReturnType(allClasses, methodElement.getReturnType(), invoked).returning();
+            return bridgeReturnValue(allClasses, methodElement, invoked);
         })));
 
     }
@@ -255,9 +255,18 @@ final class PythonPooledStubGenerator {
             args.add(ExpressionDef.constant(pythonFunctionName));
             args.addAll(parameterExpressions);
             var invoked = CONTEXT_HOLDER.invokeStatic("invokePooledScript", POLYGLOT_VALUE, args);
-            return handleReturnType(allClasses, methodElement.getReturnType(), invoked).returning();
+            return bridgeReturnValue(allClasses, methodElement, invoked);
         })));
 
+    }
+
+    private static StatementDef bridgeReturnValue(Map<String, ClassElement> allClasses,
+                                                  MethodElement methodElement,
+                                                  ExpressionDef.InvokeStaticMethod invoked) {
+        if (methodElement.getReturnType().isVoid()) {
+            return invoked;
+        }
+        return handleReturnType(allClasses, methodElement.getReturnType(), invoked).returning();
     }
 
     private static void addGetterScriptPooled(PropertyElement beanProperty,

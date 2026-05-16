@@ -777,7 +777,7 @@ class GenreRepository(CrudRepository[Genre, int]):
         appDir.mkdirs()
 
         new File(appDir, "genre_controller.py").text = '''
-from micronaut.http.annotation import Get
+from micronaut.http.annotation import Delete, Get
 from micronaut.scheduling import TaskExecutors
 from micronaut.scheduling.annotation import ExecuteOn
 
@@ -785,6 +785,10 @@ from micronaut.scheduling.annotation import ExecuteOn
 @Get(value="/genres/{id}", produces="text/plain")
 def show(id: int) -> str:
     return str(id)
+
+@Delete("/genres/{id}")
+def delete(id: int) -> None:
+    pass
 '''
 
         def compiler = PyronautCompiler.builder()
