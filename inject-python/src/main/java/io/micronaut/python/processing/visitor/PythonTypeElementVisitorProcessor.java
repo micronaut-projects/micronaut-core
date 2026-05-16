@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.runtime.RuntimeProxy;
 import io.micronaut.context.annotation.Requires;
@@ -33,8 +34,10 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.TypeElementQuery;
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -134,6 +137,24 @@ public class PythonTypeElementVisitorProcessor {
 
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             loadedVisitor.getVisitor().finish(pythonVisitorContext);
+        }
+        writeAssociatedBeanDefinitions(pythonVisitorContext);
+    }
+
+    private void writeAssociatedBeanDefinitions(PythonVisitorContext pythonVisitorContext) {
+        JavaVisitorContext javaVisitorContext = pythonVisitorContext.getJavaVisitorContext();
+        if (javaVisitorContext == null) {
+            return;
+        }
+        List<AbstractBeanDefinitionBuilder> beanElementBuilders = javaVisitorContext.getBeanElementBuilders();
+        if (beanElementBuilders.isEmpty()) {
+            return;
+        }
+        try {
+            AbstractBeanDefinitionBuilder.writeBeanDefinitionBuilders(pythonVisitorContext, beanElementBuilders);
+        } catch (IOException e) {
+            String message = e.getMessage();
+            pythonVisitorContext.fail("Unexpected error: " + (message != null ? message : e.getClass().getSimpleName()), null);
         }
     }
 

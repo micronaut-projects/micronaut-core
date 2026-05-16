@@ -25,7 +25,6 @@ import spock.lang.PendingFeature
 
 class BeanElementBuilderSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0029")
     void "test associated bean can be defined from type element visitor"() {
         given:
         def context = buildContext('''

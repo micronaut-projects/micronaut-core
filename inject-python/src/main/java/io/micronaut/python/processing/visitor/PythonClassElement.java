@@ -37,6 +37,7 @@ import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
@@ -96,6 +97,15 @@ public final class PythonClassElement extends AbstractPythonClassElement {
 
     public boolean isPythonSource() {
         return environment.classes().containsKey(getName());
+    }
+
+    @Override
+    public BeanElementBuilder addAssociatedBean(ClassElement type) {
+        JavaVisitorContext javaVisitorContext = environment.javaVisitorContext();
+        if (javaVisitorContext != null) {
+            return javaVisitorContext.addAssociatedBean(this, type);
+        }
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding associated beans without a Java visitor context");
     }
 
     @Override

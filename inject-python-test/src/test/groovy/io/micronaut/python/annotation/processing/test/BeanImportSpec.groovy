@@ -17,11 +17,9 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.python.annotation.processing.test.beanimport.ImportedPackageBean
 import io.micronaut.python.annotation.processing.test.beanimport.UpstreamByteConstructorBean
-import spock.lang.PendingFeature
 
 class BeanImportSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0025")
     void "test bean import with byte array constructor"() {
         given:
         def context = buildContext('''
@@ -51,7 +49,6 @@ class BytesFactory:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0026")
     void "test bean import for classes"() {
         given:
         def context = buildContext('''
@@ -73,7 +70,6 @@ class Application:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0027")
     void "test bean import for package"() {
         given:
         def context = buildContext('''
