@@ -18,8 +18,11 @@ package io.micronaut.python.processing.visitor;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.runtime.RuntimeProxy;
+import io.micronaut.context.annotation.Mixin;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.visitor.VisitorUtils;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -28,11 +31,13 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
@@ -108,6 +113,7 @@ public class PythonTypeElementVisitorProcessor {
             loadedVisitor.getVisitor().start(pythonVisitorContext);
         }
 
+        applyMixins(environment, pythonVisitorContext);
         List<ClassElement> allClasses = collectClassElements(environment, pythonVisitorContext);
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             for (ClassElement element : allClasses) {
@@ -124,16 +130,86 @@ public class PythonTypeElementVisitorProcessor {
         writeAssociatedBeanDefinitions(pythonVisitorContext);
     }
 
-    private List<ClassElement> collectClassElements(PythonProcessingEnvironment environment, PythonVisitorContext pythonVisitorContext) {
+    private void applyMixins(PythonProcessingEnvironment environment, PythonVisitorContext pythonVisitorContext) {
+        for (ClassElement mixin : collectPythonClassElements(environment)) {
+            AnnotationValue<Mixin> mixinAnnotation = mixin.getAnnotation(Mixin.class);
+            if (mixinAnnotation == null) {
+                continue;
+            }
+            String target = mixinAnnotation.stringValue("target")
+                .orElse(mixinAnnotation.stringValue().orElse(null));
+            if (target == null || Object.class.getName().equals(target)) {
+                continue;
+            }
+            ClassElement mixinTarget = pythonVisitorContext.getClassElement(target).orElse(null);
+            if (mixinTarget == null) {
+                pythonVisitorContext.warn("Cannot access class: " + target, mixin);
+                continue;
+            }
+            VisitorUtils.applyMixin(mixinAnnotation, mixin, mixinTarget, pythonVisitorContext);
+            copyPythonPropertyMixinAnnotations(mixinAnnotation, mixin, mixinTarget);
+        }
+    }
+
+    private List<ClassElement> collectPythonClassElements(PythonProcessingEnvironment environment) {
         Map<String, ClassElement> classes = environment.classes();
         Map<String, ClassElement> scripts = environment.scripts();
         List<ClassElement> allClasses = new ArrayList<>(classes.size() + scripts.size());
         allClasses.addAll(classes.values());
         allClasses.addAll(scripts.values());
+        return allClasses;
+    }
+
+    private List<ClassElement> collectClassElements(PythonProcessingEnvironment environment, PythonVisitorContext pythonVisitorContext) {
+        List<ClassElement> allClasses = collectPythonClassElements(environment);
         for (ClassElement classElement : new ArrayList<>(allClasses)) {
             allClasses.addAll(VisitorUtils.collectImportedElements(classElement, pythonVisitorContext));
         }
         return allClasses;
+    }
+
+    private void copyPythonPropertyMixinAnnotations(AnnotationValue<Mixin> mixinAnnotation, ClassElement mixin, ClassElement mixinTarget) {
+        Map<String, PropertyElement> targetProperties = mixinTarget.getBeanProperties()
+            .stream()
+            .collect(Collectors.toMap(PropertyElement::getName, property -> property, (left, right) -> left));
+        for (PropertyElement mixinProperty : mixin.getBeanProperties()) {
+            PropertyElement targetProperty = targetProperties.get(mixinProperty.getName());
+            if (targetProperty != null && mixinProperty.getType().equals(targetProperty.getType())) {
+                copyAnnotations(mixinProperty, targetProperty, mixinAnnotation);
+            }
+        }
+    }
+
+    private void copyAnnotations(AnnotationMetadata source, Element target, AnnotationValue<Mixin> mixinAnnotation) {
+        for (String annotationName : source.getAnnotationNames()) {
+            if (shouldCopyMixinAnnotation(annotationName, mixinAnnotation)) {
+                AnnotationValue<?> annotation = source.getAnnotation(annotationName);
+                if (annotation != null) {
+                    target.annotate(annotation);
+                }
+            }
+        }
+    }
+
+    private boolean shouldCopyMixinAnnotation(String annotationName, AnnotationValue<Mixin> mixinAnnotation) {
+        if (Mixin.Filter.class.getName().equals(annotationName) || Mixin.class.getName().equals(annotationName)) {
+            return false;
+        }
+        String[] includedAnnotations = mixinAnnotation.stringValues("includeAnnotations");
+        if (includedAnnotations.length > 0) {
+            for (String includedAnnotation : includedAnnotations) {
+                if (annotationName.startsWith(includedAnnotation)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        for (String excludedAnnotation : mixinAnnotation.stringValues("excludeAnnotations")) {
+            if (annotationName.startsWith(excludedAnnotation)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void annotatePythonAopProxy(ClassElement element) {
