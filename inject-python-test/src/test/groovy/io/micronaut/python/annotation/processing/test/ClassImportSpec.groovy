@@ -16,11 +16,9 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.core.beans.BeanIntrospectionReference
-import spock.lang.PendingFeature
 
 class ClassImportSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0080")
     void "test class import annotates Java classes with introspected"() {
         given:
         def context = buildContext('''

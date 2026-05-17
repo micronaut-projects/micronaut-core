@@ -19,6 +19,7 @@ import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.runtime.RuntimeProxy;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -107,30 +108,12 @@ public class PythonTypeElementVisitorProcessor {
             loadedVisitor.getVisitor().start(pythonVisitorContext);
         }
 
-        Map<String, ClassElement> classes = environment.classes();
-        Map<String, ClassElement> scripts = environment.scripts();
+        List<ClassElement> allClasses = collectClassElements(environment, pythonVisitorContext);
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
-            for (ClassElement element : classes.values()) {
+            for (ClassElement element : allClasses) {
                 if (loadedVisitor.matchesClass(element)) {
-                    if (isAopProxy(element)) {
-                        element.annotate(RuntimeProxy.class, builder ->
-                            builder.value("io.micronaut.context.python.aop.PythonProxyCreator")
-                                .member("proxyTarget", true)
-                        );
-                    }
+                    annotatePythonAopProxy(element);
                     visitClass(loadedVisitor, element, pythonVisitorContext);
-                }
-            }
-            // Also process script elements
-            for (ClassElement scriptElement : scripts.values()) {
-                if (loadedVisitor.matchesClass(scriptElement)) {
-                    if (isAopProxy(scriptElement)) {
-                        scriptElement.annotate(RuntimeProxy.class, builder ->
-                            builder.value("io.micronaut.context.python.aop.PythonProxyCreator")
-                                .member("proxyTarget", true)
-                        );
-                    }
-                    visitClass(loadedVisitor, scriptElement, pythonVisitorContext);
                 }
             }
         }
@@ -139,6 +122,28 @@ public class PythonTypeElementVisitorProcessor {
             loadedVisitor.getVisitor().finish(pythonVisitorContext);
         }
         writeAssociatedBeanDefinitions(pythonVisitorContext);
+    }
+
+    private List<ClassElement> collectClassElements(PythonProcessingEnvironment environment, PythonVisitorContext pythonVisitorContext) {
+        Map<String, ClassElement> classes = environment.classes();
+        Map<String, ClassElement> scripts = environment.scripts();
+        List<ClassElement> allClasses = new ArrayList<>(classes.size() + scripts.size());
+        allClasses.addAll(classes.values());
+        allClasses.addAll(scripts.values());
+        for (ClassElement classElement : new ArrayList<>(allClasses)) {
+            allClasses.addAll(VisitorUtils.collectImportedElements(classElement, pythonVisitorContext));
+        }
+        return allClasses;
+    }
+
+    private void annotatePythonAopProxy(ClassElement element) {
+        if (!(element instanceof AbstractPythonClassElement) || !isAopProxy(element)) {
+            return;
+        }
+        element.annotate(RuntimeProxy.class, builder ->
+            builder.value("io.micronaut.context.python.aop.PythonProxyCreator")
+                .member("proxyTarget", true)
+        );
     }
 
     private void writeAssociatedBeanDefinitions(PythonVisitorContext pythonVisitorContext) {
