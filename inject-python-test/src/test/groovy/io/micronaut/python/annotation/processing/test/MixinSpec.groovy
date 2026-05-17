@@ -17,11 +17,9 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.beans.BeanIntrospection
-import spock.lang.PendingFeature
 
 class MixinSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0081")
     void "test mixin adds introspection and annotation metadata to target class"() {
         when:
         BeanIntrospection introspection = buildBeanIntrospection("python.MyBean", '''
