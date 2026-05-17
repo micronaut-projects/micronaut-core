@@ -1449,14 +1449,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     static TypeDef methodReturnType(MethodElement methodElement, boolean isJunit5Test) {
-        return methodReturnType(methodElement, isJunit5Test, null);
+        return methodReturnType(methodElement.getGenericReturnType(), isJunit5Test);
     }
 
     static TypeDef methodReturnType(MethodElement methodElement, boolean isJunit5Test, @Nullable ClassElement returnTypeOverride) {
+        return methodReturnType(returnTypeOverride == null ? methodElement.getGenericReturnType() : returnTypeOverride, isJunit5Test);
+    }
+
+    static TypeDef methodReturnType(ClassElement genericReturnType, boolean isJunit5Test) {
         if (isJunit5Test) {
             return TypeDef.Primitive.VOID;
         }
-        ClassElement genericReturnType = returnTypeOverride == null ? methodElement.getGenericReturnType() : returnTypeOverride;
         if (!genericReturnType.getTypeArguments().isEmpty()) {
             return parameterizedTypeDef(genericReturnType);
         }
@@ -1615,9 +1618,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         }
 
+        ClassElement effectiveReturnType = effectiveBridgeReturnType(methodElement, returnTypeOverride);
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
-            .returns(methodReturnType(methodElement, isJunit5Test, returnTypeOverride));
+            .returns(methodReturnType(effectiveReturnType, isJunit5Test));
         addMethodTypeVariables(methodElement, methodBuilder);
 
         copyAnnotations(methodElement, methodBuilder, ANNOTATION_PACKAGES_TO_COPY, visitorContext);
@@ -1639,8 +1643,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     coerceParameterToPolyglotValue(parameter, parameterExpressions, methodParameter, targetContext);
                 }
 
-                // Get the return type to determine appropriate conversion method
-                var returnType = returnTypeOverride == null ? methodElement.getGenericReturnType() : returnTypeOverride;
                 var invokedValue = RUNTIME_UTIL.invokeStatic(
                     "invokePythonMethod",
                     POLYGLOT_VALUE,
@@ -1652,13 +1654,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 if (isJunit5Test) {
                     return invokedValue;
                 } else {
-                    if (returnType.isVoid()) {
+                    if (effectiveReturnType.isVoid()) {
                         return invokedValue;
                     } else {
-                        return returnConvertedValue(allClasses, returnType, invokedValue);
+                        return returnConvertedValue(allClasses, effectiveReturnType, invokedValue);
                     }
                 }
             })));
+    }
+
+    private static ClassElement effectiveBridgeReturnType(MethodElement methodElement, @Nullable ClassElement returnTypeOverride) {
+        ClassElement returnType = returnTypeOverride == null ? methodElement.getGenericReturnType() : returnTypeOverride;
+        if (returnType instanceof GenericPlaceholderElement placeholder) {
+            return firstBound(placeholder);
+        }
+        return returnType;
     }
 
     private static String bridgeMethodKey(MethodElement methodElement) {
