@@ -24,6 +24,7 @@ dependencies {
     compileOnlyApi(projects.micronautHttp)
     compileOnly(libs.jetbrains.annotations)
     testImplementation(projects.micronautAop)
+    testImplementation(projects.micronautHttp)
 }
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()

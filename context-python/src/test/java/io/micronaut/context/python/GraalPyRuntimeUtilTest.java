@@ -20,12 +20,15 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import io.micronaut.http.HttpResponse;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.proxy.ProxyObject;
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -238,6 +241,38 @@ class GraalPyRuntimeUtilTest {
     }
 
     @Test
+    void testConvertHttpResponseUnwrapsValueCoercibleProxyBody() {
+        TestBody body = new TestBody("DevOps");
+        ProxyObject proxyBody = new ProxyObject() {
+            @Override
+            public Object getMember(String key) {
+                if (ValueCoercible.HOST_OBJECT_MEMBER.equals(key)) {
+                    return new ValueCoercible.HostObjectReference(body);
+                }
+                return null;
+            }
+
+            @Override
+            public Object getMemberKeys() {
+                return new String[] {ValueCoercible.HOST_OBJECT_MEMBER};
+            }
+
+            @Override
+            public boolean hasMember(String key) {
+                return ValueCoercible.HOST_OBJECT_MEMBER.equals(key);
+            }
+
+            @Override
+            public void putMember(String key, Value value) {
+            }
+        };
+
+        HttpResponse<TestBody> response = GraalPyRuntimeUtil.convertHttpResponse(HttpResponse.created(proxyBody), TestBody.class);
+
+        assertSame(body, response.body());
+    }
+
+    @Test
     void testConvertSetWithIntegers() {
         // Create a Python set with integers
         Value pythonSet = context.eval("python", "{1, 2, 3, 4, 5}");
@@ -333,5 +368,12 @@ class GraalPyRuntimeUtilTest {
         assertNotNull(result);
         assertEquals(3, result.size());
         assertEquals(List.of(1, 2, 3), result);
+    }
+
+    private record TestBody(String name) implements ValueCoercible {
+        @Override
+        public Value asPolyglotValue() {
+            throw new UnsupportedOperationException("This test should unwrap the host object without converting through Python");
+        }
     }
 }

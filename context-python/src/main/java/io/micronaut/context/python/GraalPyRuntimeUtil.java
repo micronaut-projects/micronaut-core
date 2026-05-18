@@ -28,6 +28,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.proxy.ProxyObject;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -492,6 +493,19 @@ public final class GraalPyRuntimeUtil {
         if (response == null) {
             return null;
         }
+        return convertHttpResponse(response, bodyType);
+    }
+
+    /**
+     * Convert a response body to the declared Java body type.
+     *
+     * @param response The source response
+     * @param bodyType The declared response body type
+     * @param <T> The response body type
+     * @return The converted response
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> HttpResponse<T> convertHttpResponse(HttpResponse<?> response, Class<T> bodyType) {
         Optional<?> body = response.getBody();
         if (body.isEmpty()) {
             return (HttpResponse<T>) response;
@@ -500,11 +514,34 @@ public final class GraalPyRuntimeUtil {
         if (rawBody == null || bodyType.isInstance(rawBody)) {
             return (HttpResponse<T>) response;
         }
-        if (rawBody instanceof Value bodyValue && response instanceof MutableHttpResponse<?> mutableResponse) {
-            T convertedBody = convertValue(bodyValue, bodyType);
+        if (response instanceof MutableHttpResponse<?> mutableResponse) {
+            T convertedBody = convertResponseBody(rawBody, bodyType);
+            if (convertedBody == null) {
+                return (HttpResponse<T>) response;
+            }
             return ((MutableHttpResponse<T>) mutableResponse).body(convertedBody);
         }
         return (HttpResponse<T>) response;
+    }
+
+    private static <T> @Nullable T convertResponseBody(Object rawBody, Class<T> bodyType) {
+        if (bodyType.isInstance(rawBody)) {
+            return bodyType.cast(rawBody);
+        }
+        if (rawBody instanceof Value bodyValue) {
+            return convertValue(bodyValue, bodyType);
+        }
+        if (rawBody instanceof ProxyObject proxyObject && proxyObject.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+            Object hostReference = proxyObject.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
+            if (hostReference instanceof ValueCoercible.HostObjectReference reference) {
+                ValueCoercible host = reference.value();
+                if (bodyType.isInstance(host)) {
+                    return bodyType.cast(host);
+                }
+                return convertValue(host.asPolyglotValue(), bodyType);
+            }
+        }
+        return null;
     }
 
     private static <T> @Nullable T convertMappedWrapper(Value value, Class<T> targetType) {
