@@ -617,7 +617,10 @@ def micronaut_annotation(name, repeated=None):
         # Collect meta-annotations to include as decorators
         decorator_lines = [f'@micronaut_annotation("{annotation_name}"{repeatable_info})']
 
-        # Get all annotations on this annotation class (meta-annotations)
+        # Get all annotations on this annotation class (meta-annotations).
+        # Some Java annotations reference optional/provided meta-annotation types.
+        # Only generate Python imports/decorator calls for types the processor can resolve.
+        meta_annotations = []
         annotation_names = annotation_metadata.getAnnotationNames()
         for meta_annotation_name in annotation_names:
             # Skip retention and other built-in annotations that aren't user-facing
@@ -626,37 +629,37 @@ def micronaut_annotation(name, repeated=None):
                 if '$' in meta_annotation_name:
                     continue
 
-                # Generate decorator for the meta-annotation if not already generated
                 meta_class_element = self.callback_get_class_element(meta_annotation_name)
-                if meta_class_element and self._is_annotation_class(meta_class_element):
-                    meta_decorator_name = meta_class_element.getSimpleName()
-                    if meta_decorator_name not in self.generated_decorators:
-                        meta_decorator_code = self._generate_decorator_from_class_element(meta_class_element, meta_decorator_name)
-                        if meta_decorator_code:
-                            self.transformed_code.append(meta_decorator_code)
-                    # Add the meta-annotation as a decorator
-                    decorator_lines.append(f'@{meta_decorator_name}()')
+                if not meta_class_element or not self._is_annotation_class(meta_class_element):
+                    continue
+
+                meta_annotations.append((meta_annotation_name, meta_class_element))
+
+        for meta_annotation_name, meta_class_element in meta_annotations:
+            # Generate decorator for the meta-annotation if not already generated
+            meta_decorator_name = meta_class_element.getSimpleName()
+            if meta_decorator_name not in self.generated_decorators:
+                meta_decorator_code = self._generate_decorator_from_class_element(meta_class_element, meta_decorator_name)
+                if meta_decorator_code:
+                    self.transformed_code.append(meta_decorator_code)
+            # Add the meta-annotation as a decorator
+            decorator_lines.append(f'@{meta_decorator_name}()')
 
         # Collect imports for meta-annotations
         import_lines = []
         current_package = '.'.join(annotation_name.split('.')[:-1])  # Package of current annotation
 
-        for meta_annotation_name in annotation_metadata.getAnnotationNames():
-            if not meta_annotation_name.startswith('java.lang.annotation.'):
-                # Skip nested annotations (annotations with $ in their names)
-                if '$' in meta_annotation_name:
-                    continue
+        for meta_annotation_name, _ in meta_annotations:
+            meta_package = '.'.join(meta_annotation_name.split('.')[:-1])
+            meta_simple_name = meta_annotation_name.split('.')[-1]
 
-                meta_package = '.'.join(meta_annotation_name.split('.')[:-1])
-                meta_simple_name = meta_annotation_name.split('.')[-1]
+            # Transform io. prefixed packages to avoid conflict with Python's builtin io module
+            import_package = self._to_python_import_module(meta_package)
+            if import_package.startswith('io.'):
+                import_package = import_package[3:]  # Remove 'io.' prefix
 
-                # Transform io. prefixed packages to avoid conflict with Python's builtin io module
-                import_package = self._to_python_import_module(meta_package)
-                if import_package.startswith('io.'):
-                    import_package = import_package[3:]  # Remove 'io.' prefix
-
-                # Use absolute import path of the function
-                import_lines.append(f"from {import_package} import {meta_simple_name}")
+            # Use absolute import path of the function
+            import_lines.append(f"from {import_package} import {meta_simple_name}")
 
         # Remove duplicates
         import_lines = list(set(import_lines))

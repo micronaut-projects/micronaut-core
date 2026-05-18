@@ -309,6 +309,43 @@ class MyRepeatableService:
         tempDir.deleteDir()
     }
 
+    def "test transactional annotation transformation skips unavailable meta annotations"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from jakarta.transaction import Transactional
+
+@Singleton
+class MyTransactionalService:
+
+    @Transactional
+    def save(self):
+        pass
+'''
+        def tempDir = File.createTempDir("pyronaut-test-transactional", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def metaInfDir = new File(tempDir, "META-INF")
+        def transactionalFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/jakarta/transaction/Transactional.py")
+        transactionalFile.exists()
+
+        def transformedContent = transactionalFile.text
+        transformedContent.contains("@micronaut_annotation(\"jakarta.transaction.Transactional\")")
+        transformedContent.contains("def Transactional(")
+        !transformedContent.contains("jakarta.interceptor")
+        !transformedContent.contains("InterceptorBinding")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
     def "test Python keyword-safe Micronaut imports are normalized"() {
         given:
         def pythonCode = '''
