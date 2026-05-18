@@ -22,6 +22,7 @@ import java.util.Set;
 
 import io.micronaut.http.HttpResponse;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyObject;
 import org.junit.jupiter.api.AfterEach;
@@ -270,6 +271,39 @@ class GraalPyRuntimeUtilTest {
         HttpResponse<TestBody> response = GraalPyRuntimeUtil.convertHttpResponse(HttpResponse.created(proxyBody), TestBody.class);
 
         assertSame(body, response.body());
+    }
+
+    @Test
+    void testConvertHttpResponseConvertsForeignObjectBody() {
+        HostAccess hostAccess = HostAccess.newBuilder(HostAccess.ALL)
+            .targetTypeMapping(
+                Value.class,
+                TestBody.class,
+                value -> value != null && value.hasMember("name"),
+                value -> new TestBody(value.getMember("name").asString())
+            )
+            .build();
+        try (Context context = Context.newBuilder(GraalPyRuntimeUtil.PYTHON)
+            .allowHostAccess(hostAccess)
+            .allowHostClassLookup(className -> true)
+            .build()) {
+            Value responseValue = context.eval(GraalPyRuntimeUtil.PYTHON, """
+                import java
+
+                HttpResponse = java.type("io.micronaut.http.HttpResponse")
+
+                class Body:
+                    def __init__(self, name):
+                        self.name = name
+
+                HttpResponse.created(Body("DevOps"))
+                """);
+            HttpResponse<?> rawResponse = responseValue.as(HttpResponse.class);
+
+            HttpResponse<TestBody> response = GraalPyRuntimeUtil.convertHttpResponse(rawResponse, TestBody.class);
+
+            assertEquals(new TestBody("DevOps"), response.body());
+        }
     }
 
     @Test

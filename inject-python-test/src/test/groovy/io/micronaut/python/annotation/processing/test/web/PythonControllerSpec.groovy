@@ -188,6 +188,53 @@ def save(genre : Annotated[Genre, Body]) -> HttpResponse[Genre]:
         context?.close()
     }
 
+    void "test classless python controller generic JSON entity response from Java value"() {
+        given:
+        def context = buildContext('''
+import java
+from typing import Annotated
+from micronaut.http.annotation import Body, Post
+from micronaut.core.annotation import Introspected
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity
+from micronaut.http import HttpResponse
+from dataclasses import dataclass
+
+JavaStore = java.type("io.micronaut.python.annotation.processing.test.web.PythonControllerSpec$JavaStore")
+
+@Introspected
+@dataclass
+@MappedEntity
+class Genre:
+    id: Annotated[int | None, Id, GeneratedValue] = None
+    name: str | None = None
+
+@Post("/classless/generic/java-entity")
+def save(genre : Annotated[Genre, Body]) -> HttpResponse[Genre]:
+    saved = JavaStore.save(genre)
+    response = HttpResponse.created(saved)
+    response.header("Foo", "Bar")
+    return response
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+        def controllerClass = context.classLoader.loadClass("python.Script")
+        def genreClass = context.classLoader.loadClass("python.Genre")
+        def saveMethod = controllerClass.getDeclaredMethod("save", genreClass)
+
+        def response = client.toBlocking().exchange(HttpRequest.POST("/classless/generic/java-entity", [name: "DevOps"]), String)
+        expect:
+        saveMethod.genericReturnType.typeName == "io.micronaut.http.HttpResponse<python.Genre>"
+        response.header("Foo") == "Bar"
+        response.body() == "{\"name\":\"DevOps\"}"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
     void "test python controller map response"() {
         given:
         def context = buildContext('''
@@ -374,6 +421,15 @@ class HelloController:
         cleanup:
         client.close()
         context?.close()
+    }
+
+    static final class JavaStore {
+        static Object save(Object value) {
+            if (!value.getClass().getName().equals('python.Genre')) {
+                throw new IllegalArgumentException("Expected generated python.Genre wrapper but got " + value.getClass().getName())
+            }
+            return value
+        }
     }
 
 }

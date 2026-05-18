@@ -472,6 +472,12 @@ public final class GraalPyRuntimeUtil {
         }
         if (value.isHostObject()) {
             Object hostObject = value.asHostObject();
+            if (hostObject instanceof ProxyObject proxyObject) {
+                T converted = convertValueCoercibleProxy(proxyObject, targetType);
+                if (converted != null) {
+                    return converted;
+                }
+            }
             if (targetType.isInstance(hostObject)) {
                 return targetType.cast(hostObject);
             }
@@ -511,7 +517,7 @@ public final class GraalPyRuntimeUtil {
             return (HttpResponse<T>) response;
         }
         Object rawBody = body.get();
-        if (rawBody == null || bodyType.isInstance(rawBody)) {
+        if (rawBody == null) {
             return (HttpResponse<T>) response;
         }
         if (response instanceof MutableHttpResponse<?> mutableResponse) {
@@ -528,30 +534,73 @@ public final class GraalPyRuntimeUtil {
         if (bodyType.isInstance(rawBody)) {
             return bodyType.cast(rawBody);
         }
+        if (rawBody instanceof ProxyObject proxyObject && proxyObject.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+            T converted = convertValueCoercibleProxy(proxyObject, bodyType);
+            if (converted != null) {
+                return converted;
+            }
+        }
         if (rawBody instanceof Value bodyValue) {
             return convertValue(bodyValue, bodyType);
         }
-        if (rawBody instanceof ProxyObject proxyObject && proxyObject.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
-            Object hostReference = proxyObject.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
-            if (hostReference instanceof ValueCoercible.HostObjectReference reference) {
-                ValueCoercible host = reference.value();
-                if (bodyType.isInstance(host)) {
-                    return bodyType.cast(host);
-                }
-                return convertValue(host.asPolyglotValue(), bodyType);
-            }
+        try {
+            return convertValue(Value.asValue(rawBody), bodyType);
+        } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
+            return null;
         }
-        return null;
     }
 
     private static <T> @Nullable T convertMappedWrapper(Value value, Class<T> targetType) {
         try {
+            ValueCoercible host = valueCoercibleHost(value);
+            if (host != null && targetType.isInstance(host)) {
+                return targetType.cast(host);
+            }
+            if (value.isHostObject()) {
+                Object hostObject = value.asHostObject();
+                if (hostObject instanceof ProxyObject proxyObject) {
+                    T converted = convertValueCoercibleProxy(proxyObject, targetType);
+                    if (converted != null) {
+                        return converted;
+                    }
+                }
+            }
             Object mappedObject = value.as(Object.class);
             if (mappedObject instanceof ValueCoercible && targetType.isInstance(mappedObject)) {
                 return targetType.cast(mappedObject);
             }
         } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
             return null;
+        }
+        return null;
+    }
+
+    private static <T> @Nullable T convertValueCoercibleProxy(ProxyObject proxyObject, Class<T> targetType) {
+        if (!proxyObject.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+            return null;
+        }
+        Object hostReference = proxyObject.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
+        if (hostReference instanceof ValueCoercible.HostObjectReference reference) {
+            ValueCoercible host = reference.value();
+            if (targetType.isInstance(host)) {
+                return targetType.cast(host);
+            }
+            return convertValue(host.asPolyglotValue(), targetType);
+        }
+        return null;
+    }
+
+    private static @Nullable ValueCoercible valueCoercibleHost(Value value) {
+        if (value == null || value.isNull() || !value.hasMembers() || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+            return null;
+        }
+        Value hostReferenceValue = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
+        if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
+            return null;
+        }
+        Object hostReference = hostReferenceValue.asHostObject();
+        if (hostReference instanceof ValueCoercible.HostObjectReference reference) {
+            return reference.value();
         }
         return null;
     }
