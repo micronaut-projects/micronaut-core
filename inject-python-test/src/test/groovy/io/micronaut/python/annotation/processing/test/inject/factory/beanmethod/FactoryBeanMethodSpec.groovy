@@ -613,7 +613,6 @@ class ProductFactory:
         ContextHolder.resetContext()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0067")
     void "test mapped configuration factory advice caches factory method result"() {
         given:
         def context = buildContext('''\
@@ -646,12 +645,16 @@ class MyConfiguration:
         def configType = context.classLoader.loadClass("python.MyConfiguration")
         BeanDefinition<?> configDefinition = context.getBeanDefinition(configType)
         def configBean = context.getBean(configType)
+        def beanOne = context.getBean(beanType)
+        def beanTwo = context.getBean(beanType)
+        def directOne = configBean."my_bean"()
+        def directTwo = configBean."my_bean"()
 
         then:
         configDefinition.hasAnnotation(Factory)
         configDefinition.hasAnnotation(TestSingletonAdvice)
-        context.getBean(beanType).is(context.getBean(beanType))
-        configBean."my_bean"().is(configBean."my_bean"())
+        beanOne.is(beanTwo)
+        directOne.is(directTwo)
 
         cleanup:
         context?.close()

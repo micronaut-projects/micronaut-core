@@ -270,6 +270,36 @@ public final class GraalPyRuntimeUtil {
     }
 
     /**
+     * Unwraps a generated Python wrapper that crossed a polyglot boundary as a host or proxy object.
+     *
+     * @param value The source polyglot value
+     * @param targetType The expected Java wrapper type
+     * @return The existing host wrapper, or {@code null} when the value is not one
+     */
+    public static @Nullable Object unwrapHostObject(@Nullable Value value, Class<?> targetType) {
+        if (value == null || isNone(value)) {
+            return null;
+        }
+        if (value.isHostObject()) {
+            Object hostObject = value.asHostObject();
+            return targetType.isInstance(hostObject) ? hostObject : null;
+        }
+        if (!value.hasMembers() || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+            return null;
+        }
+        Value hostReferenceValue = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
+        if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
+            return null;
+        }
+        Object hostReference = hostReferenceValue.asHostObject();
+        if (hostReference instanceof ValueCoercible.HostObjectReference reference) {
+            ValueCoercible hostObject = reference.value();
+            return targetType.isInstance(hostObject) ? hostObject : null;
+        }
+        return null;
+    }
+
+    /**
      * Convert a GraalPy Value representing a list to a Java List.
      * Recursively converts nested collections.
      *

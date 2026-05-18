@@ -476,15 +476,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                             .addParameter(POLYGLOT_VALUE)
                             .returns(thisType)
-                            .build(((aThis, methodParameters) -> {
-                                var val = methodParameters.get(0);
-                                return RUNTIME_UTIL.invokeStatic("isNone", TypeDef.Primitive.BOOLEAN, val)
-                                    .isTrue()
-                                    .doIfElse(
-                                        ExpressionDef.nullValue().returning(),
-                                        thisType.instantiate(methodParameters).returning()
-                                    );
-                            }))
+                            .build((aThis, methodParameters) -> fromPolyglotValueBody(thisType, methodParameters.get(0)))
                         );
                     }
 
@@ -2252,6 +2244,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static StatementDef returnConvertedValue(Map<String, ClassElement> allClasses, ClassElement returnType, ExpressionDef invokedValue) {
         return invokedValue.newLocal("pythonResult", result ->
             handleReturnType(allClasses, returnType, result).returning()
+        );
+    }
+
+    private static StatementDef fromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value) {
+        return StatementDef.multi(
+            RUNTIME_UTIL.invokeStatic("isNone", TypeDef.Primitive.BOOLEAN, value)
+                .isTrue()
+                .doIf(ExpressionDef.nullValue().returning()),
+            RUNTIME_UTIL.invokeStatic(
+                    "unwrapHostObject",
+                    TypeDef.OBJECT,
+                    value,
+                    thisType.getStaticField("class", TypeDef.CLASS)
+                )
+                .newLocal("hostObject", hostObject ->
+                    hostObject.isNonNull().doIf(hostObject.cast(thisType).returning())
+                ),
+            thisType.instantiate(value).returning()
         );
     }
 

@@ -36,9 +36,12 @@ class Person:
   public static Person fromPolyglotValue(Value arg1) {
     if (GraalPyRuntimeUtil.isNone(arg1)) {
       return null;
-    } else {
-      return new python.Person(arg1);
     }
+    Object hostObject = GraalPyRuntimeUtil.unwrapHostObject(arg1, Person.class);
+    if (hostObject != null) {
+      return (Person) hostObject;
+    }
+    return new python.Person(arg1);
   }
 
   public void setName(String arg1) {
