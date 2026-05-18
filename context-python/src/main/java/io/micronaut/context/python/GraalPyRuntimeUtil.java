@@ -24,6 +24,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpResponse;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
@@ -474,6 +476,35 @@ public final class GraalPyRuntimeUtil {
             }
         }
         return value.as(targetType);
+    }
+
+    /**
+     * Convert a GraalPy-created {@link HttpResponse} and its response body to the declared Java body type.
+     *
+     * @param value The source polyglot response
+     * @param bodyType The declared response body type
+     * @param <T> The response body type
+     * @return The converted response
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> @Nullable HttpResponse<T> convertHttpResponse(Value value, Class<T> bodyType) {
+        HttpResponse<?> response = convertValue(value, HttpResponse.class);
+        if (response == null) {
+            return null;
+        }
+        Optional<?> body = response.getBody();
+        if (body.isEmpty()) {
+            return (HttpResponse<T>) response;
+        }
+        Object rawBody = body.get();
+        if (rawBody == null || bodyType.isInstance(rawBody)) {
+            return (HttpResponse<T>) response;
+        }
+        if (rawBody instanceof Value bodyValue && response instanceof MutableHttpResponse<?> mutableResponse) {
+            T convertedBody = convertValue(bodyValue, bodyType);
+            return ((MutableHttpResponse<T>) mutableResponse).body(convertedBody);
+        }
+        return (HttpResponse<T>) response;
     }
 
     private static <T> @Nullable T convertMappedWrapper(Value value, Class<T> targetType) {

@@ -202,10 +202,10 @@ final class PythonPooledStubGenerator {
         String pythonFunctionName = methodElement.getName();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
-            .returns(TypeDef.of(methodElement.getReturnType()));
+            .returns(TypeDef.of(methodElement.getGenericReturnType()));
 
         for (ParameterElement parameter : methodElement.getParameters()) {
-            var parameterType = erasedType(parameter.getType());
+            var parameterType = erasedType(parameter.getGenericType());
             methodBuilder.addParameter(ParameterDef.builder(parameter.getName(), parameterType).build());
         }
 
@@ -235,10 +235,10 @@ final class PythonPooledStubGenerator {
         String pythonFunctionName = methodElement.getName();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
-            .returns(TypeDef.of(methodElement.getReturnType()));
+            .returns(TypeDef.of(methodElement.getGenericReturnType()));
 
         for (ParameterElement parameter : methodElement.getParameters()) {
-            var parameterType = erasedType(parameter.getType());
+            var parameterType = erasedType(parameter.getGenericType());
             methodBuilder.addParameter(ParameterDef.builder(parameter.getName(), parameterType).build());
         }
 
@@ -266,7 +266,7 @@ final class PythonPooledStubGenerator {
         if (methodElement.getReturnType().isVoid()) {
             return invoked;
         }
-        return handleReturnType(allClasses, methodElement.getReturnType(), invoked).returning();
+        return handleReturnType(allClasses, methodElement.getGenericReturnType(), invoked).returning();
     }
 
     private static void addGetterScriptPooled(PropertyElement beanProperty,
