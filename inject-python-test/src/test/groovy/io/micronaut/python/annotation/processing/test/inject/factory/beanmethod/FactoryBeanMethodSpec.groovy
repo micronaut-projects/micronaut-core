@@ -134,7 +134,6 @@ class TestFactory:
         context.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0089")
     void "test producing a bean with unresolved method parameter types does not break preDestroy search"() {
         given:
         def context = buildContext('''\

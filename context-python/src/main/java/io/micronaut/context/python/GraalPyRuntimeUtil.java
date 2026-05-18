@@ -53,6 +53,9 @@ public final class GraalPyRuntimeUtil {
         if (value == null || value.isNull()) {
             return true;
         }
+        if (value.isHostObject()) {
+            return false;
+        }
         try {
             Value metaObject = value.getMetaObject();
             if (metaObject != null && metaObject.isMetaObject() && "NoneType".equals(metaObject.getMetaSimpleName())) {
@@ -512,10 +515,6 @@ public final class GraalPyRuntimeUtil {
             return null;
         }
 
-        T mappedWrapper = convertMappedWrapper(value, targetType);
-        if (mappedWrapper != null) {
-            return mappedWrapper;
-        }
         if (value.isHostObject()) {
             Object hostObject = value.asHostObject();
             if (hostObject instanceof ProxyObject proxyObject) {
@@ -527,6 +526,10 @@ public final class GraalPyRuntimeUtil {
             if (targetType.isInstance(hostObject)) {
                 return targetType.cast(hostObject);
             }
+        }
+        T mappedWrapper = convertMappedWrapper(value, targetType);
+        if (mappedWrapper != null) {
+            return mappedWrapper;
         }
         return value.as(targetType);
     }
