@@ -631,7 +631,6 @@ class Service(BaseService, ContractService):
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0056")
     void "test stereotype method level interceptor matching"() {
         given:
         def pythonCode = '''
@@ -677,7 +676,6 @@ class Test:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0054")
     void "test multiple around annotations on a single method"() {
         given:
         def pythonCode = '''
@@ -734,7 +732,6 @@ class Test:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0055")
     void "test interceptor with multiple around bindings requires all method bindings"() {
         given:
         def pythonCode = '''

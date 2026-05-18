@@ -2054,11 +2054,17 @@ def is_micronaut_decorator(funcdef, visitor=None):
             decorator_name = extract_decorator_name(dec)
             if decorator_name:
                 existing_decorator = visitor.known_decorators.get(decorator_name)
-                if existing_decorator:
-                    annotation_name = existing_decorator.annotationName()
-                    if is_annotation_stereotype_for_python_decorator(annotation_name):
-                        return True
+                if existing_decorator and has_python_annotation_stereotype(existing_decorator):
+                    return True
 
+    return False
+
+def has_python_annotation_stereotype(decorator):
+    if is_annotation_stereotype_for_python_decorator(decorator.annotationName()):
+        return True
+    for stereotype in decorator.stereotypes():
+        if has_python_annotation_stereotype(stereotype):
+            return True
     return False
 
 def is_annotation_stereotype_for_python_decorator(annotation_name):

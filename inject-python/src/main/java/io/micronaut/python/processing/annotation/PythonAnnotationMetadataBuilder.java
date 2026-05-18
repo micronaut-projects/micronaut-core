@@ -15,6 +15,9 @@
  */
 package io.micronaut.python.processing.annotation;
 
+import io.micronaut.aop.Around;
+import io.micronaut.aop.InterceptorBinding;
+import io.micronaut.aop.InterceptorKind;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -41,9 +44,11 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Builder for creating annotation metadata from Python decorators and elements.
@@ -230,6 +235,67 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (hasSyntheticNullable(element) && !annotationMetadata.hasDeclaredStereotype(AnnotationUtil.NON_NULL)) {
             annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, Map.of());
         }
+        addAroundInterceptorBindings(annotationMetadata, element);
+    }
+
+    private void addAroundInterceptorBindings(MutableAnnotationMetadata annotationMetadata, ElementDef element) {
+        Set<String> bindingAnnotationNames = new LinkedHashSet<>();
+        for (DecoratorDef decorator : element.decorators()) {
+            collectAroundBindingAnnotationNames(decorator, bindingAnnotationNames);
+        }
+        if (bindingAnnotationNames.isEmpty()) {
+            return;
+        }
+        Set<String> existingBindings = new LinkedHashSet<>();
+        for (AnnotationValue<InterceptorBinding> binding : annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class)) {
+            if (binding.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND) {
+                binding.stringValue().ifPresent(existingBindings::add);
+            }
+        }
+        for (String bindingAnnotationName : bindingAnnotationNames) {
+            if (existingBindings.add(bindingAnnotationName)) {
+                annotationMetadata.addDeclaredRepeatable(
+                    AnnotationUtil.ANN_INTERCEPTOR_BINDINGS,
+                    AnnotationValue.builder(InterceptorBinding.class)
+                        .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(bindingAnnotationName))
+                        .member("kind", InterceptorKind.AROUND)
+                        .build()
+                );
+            }
+        }
+    }
+
+    private void collectAroundBindingAnnotationNames(DecoratorDef decorator, Set<String> bindingAnnotationNames) {
+        DecoratorDef resolvedDecorator = resolveDecoratorDefinition(decorator);
+        if (hasDirectAroundStereotype(resolvedDecorator)) {
+            bindingAnnotationNames.add(toBinaryClassName(decorator.annotationName()));
+        }
+        for (DecoratorDef stereotype : resolvedDecorator.stereotypes()) {
+            collectAroundBindingAnnotationNames(stereotype, bindingAnnotationNames);
+        }
+    }
+
+    private DecoratorDef resolveDecoratorDefinition(DecoratorDef decorator) {
+        String annotationName = toBinaryClassName(decorator.annotationName());
+        DecoratorDef resolved = decorators.get(annotationName);
+        if (resolved != null) {
+            return resolved;
+        }
+        for (DecoratorDef candidate : decorators.values()) {
+            if (annotationName.equals(toBinaryClassName(candidate.annotationName()))) {
+                return candidate;
+            }
+        }
+        return decorator;
+    }
+
+    private boolean hasDirectAroundStereotype(DecoratorDef decorator) {
+        for (DecoratorDef stereotype : decorator.stereotypes()) {
+            if (Around.class.getName().equals(toBinaryClassName(stereotype.annotationName()))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean hasSyntheticNullable(ElementDef element) {
