@@ -389,7 +389,6 @@ class Test:
         !method.arguments[1].isNullable()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0023")
     void "test nullable non null and PEP 604 on method return and parameters"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''

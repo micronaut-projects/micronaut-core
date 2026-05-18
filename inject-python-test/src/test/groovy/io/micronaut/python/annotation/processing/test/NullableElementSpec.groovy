@@ -58,7 +58,6 @@ class NullableMethods:
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0037")
     void "test nullable and non null annotations on method return types"() {
         expect:
         buildClassElement('''
