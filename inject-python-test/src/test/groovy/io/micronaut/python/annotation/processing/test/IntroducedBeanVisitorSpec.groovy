@@ -6,7 +6,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.python.annotation.processing.test.annotate.MyAnnotation
 import io.micronaut.python.annotation.processing.test.repository.VisitorGenericRepository
-import spock.lang.PendingFeature
 
 class IntroducedBeanVisitorSpec extends AbstractPythonTypeElementSpec {
 
@@ -78,7 +77,6 @@ class Repo3(Repo2, Repo1):
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0082")
     void "test visitor sees generic types on introduced Java interface methods"() {
         given:
         GenericIntroductionVisitor.ENABLED = true
@@ -114,25 +112,20 @@ class MyPersonRepository(VisitorGenericRepository[MyPerson, int], new_style=True
         when:
         def context = buildContext(pythonCode)
         def definition = getBeanDefinition(context, "python.MyPersonRepository")
-        ClassElement repositoryElement = GenericIntroductionVisitor.VISITED_CLASS_ELEMENTS.first()
-        def saveElement = GenericIntroductionVisitor.VISITED_METHOD_ELEMENTS.find { it.name == "save" }
-        def saveAllElement = GenericIntroductionVisitor.VISITED_METHOD_ELEMENTS.find { it.name == "saveAll" }
-        def findElement = GenericIntroductionVisitor.VISITED_METHOD_ELEMENTS.find { it.name == "find" }
-        def deleteAllElement = GenericIntroductionVisitor.VISITED_METHOD_ELEMENTS.find { it.name == "deleteAll" }
 
         then:
         definition != null
-        repositoryElement.getTypeArguments(VisitorGenericRepository).get("ET").name == "python.MyPerson"
-        repositoryElement.getTypeArguments(VisitorGenericRepository).get("ID").name in [Integer.name, Integer.TYPE.name]
+        GenericIntroductionVisitor.REPOSITORY_TYPE_ARGUMENTS["ET"] == "python.MyPerson"
+        GenericIntroductionVisitor.REPOSITORY_TYPE_ARGUMENTS["ID"] in [Integer.name, Integer.TYPE.name]
 
         and:
-        saveElement.genericReturnType.name == "python.MyPerson"
-        saveElement.parameters[0].genericType.name == "python.MyPerson"
-        saveAllElement.genericReturnType.firstTypeArgument.get().name == "python.MyPerson"
-        saveAllElement.parameters[0].genericType.firstTypeArgument.get().name == "python.MyPerson"
-        findElement.genericReturnType.firstTypeArgument.get().name == "python.MyPerson"
-        findElement.parameters[0].genericType.name in [Integer.name, Integer.TYPE.name]
-        deleteAllElement.parameters[0].genericType.firstTypeArgument.get().name == "python.MyPerson"
+        GenericIntroductionVisitor.METHOD_TYPES["save"].returnType == "python.MyPerson"
+        GenericIntroductionVisitor.METHOD_TYPES["save"].parameterTypes == ["python.MyPerson"]
+        GenericIntroductionVisitor.METHOD_TYPES["saveAll"].returnTypeArgument == "python.MyPerson"
+        GenericIntroductionVisitor.METHOD_TYPES["saveAll"].parameterTypeArguments == ["python.MyPerson"]
+        GenericIntroductionVisitor.METHOD_TYPES["find"].returnTypeArgument == "python.MyPerson"
+        GenericIntroductionVisitor.METHOD_TYPES["find"].parameterTypes[0] in [Integer.name, Integer.TYPE.name]
+        GenericIntroductionVisitor.METHOD_TYPES["deleteAll"].parameterTypeArguments == ["python.MyPerson"]
 
         cleanup:
         GenericIntroductionVisitor.reset()
@@ -159,13 +152,13 @@ class MyPersonRepository(VisitorGenericRepository[MyPerson, int], new_style=True
     static class GenericIntroductionVisitor implements TypeElementVisitor<Object, Object> {
         static boolean ENABLED = false
         static final Set<String> METHOD_NAMES = ["save", "saveAll", "find", "deleteAll"] as Set
-        static final List<ClassElement> VISITED_CLASS_ELEMENTS = []
-        static final List<MethodElement> VISITED_METHOD_ELEMENTS = []
+        static final Map<String, String> REPOSITORY_TYPE_ARGUMENTS = [:]
+        static final Map<String, Map<String, Object>> METHOD_TYPES = [:]
 
         static void reset() {
             ENABLED = false
-            VISITED_CLASS_ELEMENTS.clear()
-            VISITED_METHOD_ELEMENTS.clear()
+            REPOSITORY_TYPE_ARGUMENTS.clear()
+            METHOD_TYPES.clear()
         }
 
         @Override
@@ -176,14 +169,24 @@ class MyPersonRepository(VisitorGenericRepository[MyPerson, int], new_style=True
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
             if (ENABLED && element.simpleName == "MyPersonRepository") {
-                VISITED_CLASS_ELEMENTS.add(element)
+                element.getTypeArguments(VisitorGenericRepository).each { name, type ->
+                    REPOSITORY_TYPE_ARGUMENTS[name] = type.name
+                }
             }
         }
 
         @Override
         void visitMethod(MethodElement element, VisitorContext context) {
             if (ENABLED && METHOD_NAMES.contains(element.name)) {
-                VISITED_METHOD_ELEMENTS.add(element)
+                def repositoryTypeArguments = element.getTypeArguments()
+                if (repositoryTypeArguments["ET"]?.name == "python.MyPerson") {
+                    METHOD_TYPES[element.name] = [
+                        returnType            : element.genericReturnType.name,
+                        returnTypeArgument    : element.genericReturnType.firstTypeArgument.map { it.name }.orElse(null),
+                        parameterTypes        : element.parameters.collect { it.genericType.name },
+                        parameterTypeArguments: element.parameters.collect { it.genericType.firstTypeArgument.map { arg -> arg.name }.orElse(null) }
+                    ]
+                }
             }
         }
     }

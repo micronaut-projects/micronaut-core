@@ -35,6 +35,8 @@ public record TypeRef(
         Objects.requireNonNull(name, "Type name cannot be null");
         if (typeArguments == null) {
             typeArguments = List.of();
+        } else {
+            typeArguments = List.copyOf(typeArguments);
         }
     }
 

@@ -58,28 +58,42 @@ public record ClassDef(
         Objects.requireNonNull(name, "Decorator name cannot be null");
         if (bases == null) {
             bases = List.of();
+        } else {
+            bases = List.copyOf(bases);
         }
         if (decorators == null) {
             decorators = List.of();
+        } else {
+            decorators = List.copyOf(decorators);
         }
         if (typeParams == null) {
             typeParams = List.of();
+        } else {
+            typeParams = List.copyOf(typeParams);
         }
 
         if (functions == null) {
             functions = List.of();
+        } else {
+            functions = List.copyOf(functions);
         }
 
         if (attributes == null) {
             attributes = List.of();
+        } else {
+            attributes = List.copyOf(attributes);
         }
 
         if (properties == null) {
             properties = List.of();
+        } else {
+            properties = List.copyOf(properties);
         }
 
         if (values == null) {
             values = List.of();
+        } else {
+            values = List.copyOf(values);
         }
     }
 

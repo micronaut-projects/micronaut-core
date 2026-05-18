@@ -18,6 +18,7 @@ package io.micronaut.python.processing.visitor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -26,9 +27,18 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.TypeParameterElement;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
+import javax.lang.model.type.WildcardType;
+
 import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
+import io.micronaut.annotation.processing.visitor.JavaMethodElement;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -48,8 +58,11 @@ import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
@@ -272,11 +285,13 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         List<MethodElement> inheritedMethods = new ArrayList<>();
         for (ClassElement anInterface : getInterfaces()) {
             if (elementType == MethodElement.class) {
-                inheritedMethods.addAll(anInterface.getEnclosedElements((ElementQuery<MethodElement>) query));
+                for (MethodElement methodElement : anInterface.getEnclosedElements((ElementQuery<MethodElement>) query)) {
+                    inheritedMethods.add(resolveInheritedInterfaceMethod(anInterface, methodElement));
+                }
             } else {
                 for (MemberElement memberElement : anInterface.getEnclosedElements((ElementQuery<MemberElement>) query)) {
                     if (memberElement instanceof MethodElement methodElement) {
-                        inheritedMethods.add(methodElement);
+                        inheritedMethods.add(resolveInheritedInterfaceMethod(anInterface, methodElement));
                     }
                 }
             }
@@ -292,6 +307,119 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             }
         }
         return allElements;
+    }
+
+    private MethodElement resolveInheritedInterfaceMethod(ClassElement anInterface, MethodElement inheritedMethod) {
+        if (!(inheritedMethod instanceof JavaMethodElement javaMethodElement) || anInterface.getTypeArguments().isEmpty()) {
+            return inheritedMethod;
+        }
+        List<? extends VariableElement> nativeParameters = javaMethodElement.getNativeType().element().getParameters();
+        ParameterElement[] parameters = inheritedMethod.getParameters();
+        if (nativeParameters.size() != parameters.length) {
+            return inheritedMethod;
+        }
+        Map<String, ClassElement> typeArguments = new LinkedHashMap<>(anInterface.getTypeArguments());
+        for (TypeParameterElement typeParameter : javaMethodElement.getNativeType().element().getTypeParameters()) {
+            resolveTypeParameter(typeParameter, typeArguments)
+                .ifPresent(type -> typeArguments.put(typeParameter.getSimpleName().toString(), type));
+        }
+        ParameterElement[] resolvedParameters = null;
+        for (int i = 0; i < parameters.length; i++) {
+            Optional<ClassElement> resolvedType = resolveTypeMirror(nativeParameters.get(i).asType(), typeArguments);
+            if (resolvedType.isPresent() && !sameGenericType(resolvedType.get(), parameters[i].getGenericType())) {
+                if (resolvedParameters == null) {
+                    resolvedParameters = Arrays.copyOf(parameters, parameters.length);
+                }
+                resolvedParameters[i] = ParameterElement.of(resolvedType.get(), parameters[i].getName())
+                    .withAnnotationMetadata(parameters[i].getAnnotationMetadata());
+            }
+        }
+        return resolvedParameters == null ? inheritedMethod : inheritedMethod.withParameters(resolvedParameters);
+    }
+
+    private Optional<ClassElement> resolveTypeParameter(TypeParameterElement typeParameter, Map<String, ClassElement> typeArguments) {
+        for (TypeMirror bound : typeParameter.getBounds()) {
+            Optional<ClassElement> resolvedBound = resolveTypeMirror(bound, typeArguments);
+            if (resolvedBound.isPresent() && !Object.class.getName().equals(resolvedBound.get().getName())) {
+                return resolvedBound;
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<ClassElement> resolveTypeMirror(TypeMirror typeMirror, Map<String, ClassElement> typeArguments) {
+        return switch (typeMirror.getKind()) {
+            case TYPEVAR -> {
+                TypeVariable typeVariable = (TypeVariable) typeMirror;
+                yield Optional.ofNullable(typeArguments.get(typeVariable.asElement().getSimpleName().toString()));
+            }
+            case WILDCARD -> {
+                WildcardType wildcardType = (WildcardType) typeMirror;
+                TypeMirror extendsBound = wildcardType.getExtendsBound();
+                TypeMirror superBound = wildcardType.getSuperBound();
+                if (extendsBound != null) {
+                    yield resolveTypeMirror(extendsBound, typeArguments);
+                }
+                if (superBound != null) {
+                    yield resolveTypeMirror(superBound, typeArguments);
+                }
+                yield Optional.empty();
+            }
+            case DECLARED -> resolveDeclaredType((DeclaredType) typeMirror, typeArguments);
+            case INT -> Optional.of(PrimitiveElement.INT);
+            case LONG -> Optional.of(PrimitiveElement.LONG);
+            case BOOLEAN -> Optional.of(PrimitiveElement.BOOLEAN);
+            case DOUBLE -> Optional.of(PrimitiveElement.DOUBLE);
+            case FLOAT -> Optional.of(PrimitiveElement.FLOAT);
+            case SHORT -> Optional.of(PrimitiveElement.SHORT);
+            case BYTE -> Optional.of(PrimitiveElement.BYTE);
+            case CHAR -> Optional.of(PrimitiveElement.CHAR);
+            case VOID -> Optional.of(PrimitiveElement.VOID);
+            default -> Optional.empty();
+        };
+    }
+
+    private Optional<ClassElement> resolveDeclaredType(DeclaredType declaredType, Map<String, ClassElement> typeArguments) {
+        if (!(declaredType.asElement() instanceof TypeElement typeElement)) {
+            return Optional.empty();
+        }
+        String typeName = typeElement.getQualifiedName().toString();
+        ClassElement rawType = environment.visitorContext()
+            .getClassElement(typeName)
+            .orElse(ClassElement.of(typeName));
+        List<? extends TypeMirror> declaredTypeArguments = declaredType.getTypeArguments();
+        if (declaredTypeArguments.isEmpty()) {
+            return Optional.of(rawType);
+        }
+        List<? extends GenericPlaceholderElement> placeholders = rawType.getDeclaredGenericPlaceholders();
+        if (placeholders.isEmpty() || placeholders.size() != declaredTypeArguments.size()) {
+            return Optional.of(rawType);
+        }
+        Map<String, ClassElement> resolvedTypeArguments = new LinkedHashMap<>(placeholders.size());
+        for (int i = 0; i < declaredTypeArguments.size(); i++) {
+            ClassElement resolvedType = resolveTypeMirror(declaredTypeArguments.get(i), typeArguments)
+                .orElse(ClassElement.of(Object.class));
+            resolvedTypeArguments.put(placeholders.get(i).getVariableName(), resolvedType);
+        }
+        return Optional.of(rawType.withTypeArguments(resolvedTypeArguments));
+    }
+
+    private static boolean sameGenericType(ClassElement left, ClassElement right) {
+        if (!left.getName().equals(right.getName())) {
+            return false;
+        }
+        Map<String, ClassElement> leftTypeArguments = left.getTypeArguments();
+        Map<String, ClassElement> rightTypeArguments = right.getTypeArguments();
+        if (leftTypeArguments.size() != rightTypeArguments.size()) {
+            return false;
+        }
+        for (Map.Entry<String, ClassElement> entry : leftTypeArguments.entrySet()) {
+            ClassElement rightTypeArgument = rightTypeArguments.get(entry.getKey());
+            if (rightTypeArgument == null || !sameGenericType(entry.getValue(), rightTypeArgument)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private MethodElement decorateInheritedInterfaceMethod(MethodElement inheritedMethod) {
