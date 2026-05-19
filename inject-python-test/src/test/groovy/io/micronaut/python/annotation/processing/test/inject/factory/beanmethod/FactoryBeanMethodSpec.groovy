@@ -50,7 +50,6 @@ class FactoryBeanMethodSpec extends AbstractPythonTypeElementSpec {
         given:
         def context = buildContext('''\
 from micronaut.context.annotation import Factory, Bean, Prototype
-from jakarta.inject import Singleton
 
 class Bar1:
     stopped : bool = False
@@ -995,7 +994,6 @@ class EngineFactory:
         context.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0020")
     void "test a factory bean with static method"() {
         given:
         def context = buildContext('''\
@@ -1008,7 +1006,8 @@ class Bar1:
 @Factory
 class TestFactory:
 
-    @Singleton
+    @Bean
+    @Prototype
     @staticmethod
     def bar() -> Bar1:
         return Bar1()
@@ -1021,7 +1020,7 @@ class TestFactory:
         def bar1 = getBean(context, 'python.Bar1')
 
         then:
-        bar1BeanDefinition.getBeanDescription(TypeInformation.TypeFormat.SHORTENED) == '@i.m.c.a.Prototype python.Bar1 python.TestFactory.bar()'
+        bar1BeanDefinition.getBeanDescription(TypeInformation.TypeFormat.SHORTENED) == '@i.m.c.a.Prototype p.Bar1 p.TestFactory.bar()'
         bar1 != null
         bar1BeanDefinition.getScope().get() == Prototype.class
 

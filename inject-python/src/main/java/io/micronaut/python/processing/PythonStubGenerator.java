@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import javax.lang.model.element.Modifier;
 
@@ -584,25 +585,32 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     }
 
                     boolean isAnnotationExpressionContextType = isAnnotationExpressionContextType(element, pythonVisitorContext);
-                    List<MethodElement> methodsToBridge = element.getEnclosedElements(
+                    Predicate<AnnotationMetadata> bridgeMethodFilter = ann -> isJunit5Test ||
+                        isAnnotationExpressionContextType ||
+                        ann.hasStereotype(Executable.class) ||
+                        ann.hasAnnotation("io.micronaut.context.annotation.Mapper") ||
+                        ann.hasAnnotation("io.micronaut.context.annotation.Mapper$Mapping") ||
+                        ann.hasAnnotation(ANN_CONFIGURATION_BUILDER) ||
+                        ann.hasAnnotation(AnnotationUtil.PRE_DESTROY) ||
+                        ann.hasAnnotation(AnnotationUtil.POST_CONSTRUCT) ||
+                        ann.hasStereotype(Around.class) ||
+                        ann.hasStereotype(InterceptorBinding.class) ||
+                        element.hasStereotype(Around.class) ||
+                        ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
+                        ann.hasDeclaredStereotype(Bean.class) ||
+                        isConfigurationBuilderType;
+                    List<MethodElement> methodsToBridge = new ArrayList<>(element.getEnclosedElements(
                         ElementQuery.ALL_METHODS
                             .onlyAccessible()
                             .onlyInstance()
                             .onlyDeclared()
-                            .annotated(ann -> isJunit5Test ||
-                                isAnnotationExpressionContextType ||
-                                ann.hasStereotype(Executable.class) ||
-                                ann.hasAnnotation("io.micronaut.context.annotation.Mapper") ||
-                                ann.hasAnnotation("io.micronaut.context.annotation.Mapper$Mapping") ||
-                                ann.hasAnnotation(ANN_CONFIGURATION_BUILDER) ||
-                                ann.hasAnnotation(AnnotationUtil.PRE_DESTROY) ||
-                                ann.hasAnnotation(AnnotationUtil.POST_CONSTRUCT) ||
-                                ann.hasStereotype(Around.class) ||
-                                ann.hasStereotype(InterceptorBinding.class) ||
-                                element.hasStereotype(Around.class) ||
-                                ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
-                                ann.hasDeclaredStereotype(Bean.class) ||
-                                isConfigurationBuilderType));
+                            .annotated(bridgeMethodFilter)));
+                    methodsToBridge.addAll(element.getEnclosedElements(
+                        ElementQuery.ALL_METHODS
+                            .onlyAccessible()
+                            .onlyStatic()
+                            .onlyDeclared()
+                            .annotated(bridgeMethodFilter)));
 
                     boolean hasIntroductionAdviceMethod = false;
                     for (MethodElement methodElement : methodsToBridge) {
@@ -1786,8 +1794,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         ClassElement effectiveReturnType = effectiveBridgeReturnType(methodElement, returnTypeOverride);
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
-            .addModifiers(Modifier.PUBLIC)
             .returns(methodReturnType(effectiveReturnType, isJunit5Test));
+        if (methodElement.isStatic()) {
+            methodBuilder.addModifiers(Modifier.PUBLIC, Modifier.STATIC);
+        } else {
+            methodBuilder.addModifiers(Modifier.PUBLIC);
+        }
         addMethodTypeVariables(methodElement, methodBuilder);
 
         copyAnnotations(methodElement, methodBuilder, ANNOTATION_PACKAGES_TO_COPY, visitorContext);
@@ -1800,28 +1812,42 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         builder.addMethod(methodBuilder
             .build(((aThis, methodParameters) -> {
-                var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
-                var targetContext = targetValue.invoke("getContext", POLYGLOT_CONTEXT);
                 List<ExpressionDef> parameterExpressions = new ArrayList<>();
-                for (int i = 0; i < parameters.length; i++) {
-                    @NonNull ParameterElement parameter = parameters[i];
-                    VariableDef.MethodParameter methodParameter = methodParameters.get(i);
-                    coerceParameterToPolyglotValue(parameter, parameterExpressions, methodParameter, targetContext);
+                ExpressionDef invokedValue;
+                if (methodElement.isStatic()) {
+                    List<ExpressionDef> arguments = new ArrayList<>();
+                    ClassElement declaringType = methodElement.getDeclaringType();
+                    arguments.add(ExpressionDef.constant(declaringType.getPackageName()));
+                    arguments.add(ExpressionDef.constant(pythonSimpleName(declaringType)));
+                    arguments.add(ExpressionDef.constant(pythonFunctionName));
+                    arguments.addAll(methodParameters);
+                    invokedValue = CONTEXT_HOLDER.invokeStatic(
+                        "invokeStaticMethod",
+                        POLYGLOT_VALUE,
+                        arguments
+                    );
+                } else {
+                    var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
+                    var targetContext = targetValue.invoke("getContext", POLYGLOT_CONTEXT);
+                    for (int i = 0; i < parameters.length; i++) {
+                        @NonNull ParameterElement parameter = parameters[i];
+                        VariableDef.MethodParameter methodParameter = methodParameters.get(i);
+                        coerceParameterToPolyglotValue(parameter, parameterExpressions, methodParameter, targetContext);
+                    }
+                    invokedValue = RUNTIME_UTIL.invokeStatic(
+                        "invokePythonMethod",
+                        POLYGLOT_VALUE,
+                        targetValue,
+                        ExpressionDef.constant(pythonFunctionName),
+                        TypeDef.OBJECT.array().instantiate(parameterExpressions)
+                    );
                 }
 
-                var invokedValue = RUNTIME_UTIL.invokeStatic(
-                    "invokePythonMethod",
-                    POLYGLOT_VALUE,
-                    targetValue,
-                    ExpressionDef.constant(pythonFunctionName),
-                    TypeDef.OBJECT.array().instantiate(parameterExpressions)
-                );
-
                 if (isJunit5Test) {
-                    return invokedValue;
+                    return (StatementDef) invokedValue;
                 } else {
                     if (effectiveReturnType.isVoid()) {
-                        return invokedValue;
+                        return (StatementDef) invokedValue;
                     } else {
                         return returnConvertedValue(allClasses, effectiveReturnType, invokedValue);
                     }
