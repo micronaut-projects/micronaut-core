@@ -72,19 +72,22 @@ boolean mavenVersionDirReady(File versionDir, String artifactId) {
     if (!versionDir.isDirectory()) {
         return false
     }
-    if (new File(versionDir, "maven-metadata.xml").isFile() || new File(versionDir, "maven-metadata-local.xml").isFile()) {
-        return true
-    }
     if (new File(versionDir, "${artifactId}-${versionDir.name}.pom").isFile()) {
         return true
     }
     versionDir.listFiles()?.any { candidate ->
-        candidate.isFile() && (candidate.extension == "pom" || candidate.extension == "jar")
+        candidate.isFile() &&
+            candidate.name.startsWith("${artifactId}-") &&
+            (candidate.name.endsWith(".pom") || candidate.name.endsWith(".jar"))
     } == true
 }
 
 boolean graalPyBundleReady(File repoDir, String graalpyVersion) {
-    mavenVersionDirReady(new File(repoDir, "org/graalvm/python/python/$graalpyVersion"), "python")
+    mavenVersionDirReady(new File(repoDir, "org/graalvm/polyglot/polyglot/$graalpyVersion"), "polyglot") &&
+        mavenVersionDirReady(new File(repoDir, "org/graalvm/polyglot/python/$graalpyVersion"), "python") &&
+        mavenVersionDirReady(new File(repoDir, "org/graalvm/python/python/$graalpyVersion"), "python") &&
+        mavenVersionDirReady(new File(repoDir, "org/graalvm/python/python-launcher/$graalpyVersion"), "python-launcher") &&
+        mavenVersionDirReady(new File(repoDir, "org/graalvm/python/python-bouncycastle-support/$graalpyVersion"), "python-bouncycastle-support")
 }
 
 boolean graalPyExtensionsReady(File repoDir, String graalpyVersion) {
@@ -107,6 +110,50 @@ boolean isValidZip(File file) {
     } catch (Exception ignored) {
         false
     }
+}
+
+File writeGraalPyMavenSettings(File repoDir) {
+    def settingsFile = new File(repoDir, "micronaut-graalpy-maven-settings.xml")
+    def repoUrl = repoDir.toURI().toASCIIString()
+    settingsFile.text = """\
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
+  <profiles>
+    <profile>
+      <id>micronaut-graalpy-bundle</id>
+      <repositories>
+        <repository>
+          <id>micronaut-graalpy-bundle</id>
+          <url>${repoUrl}</url>
+          <releases>
+            <enabled>true</enabled>
+          </releases>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+        </repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>micronaut-graalpy-bundle</id>
+          <url>${repoUrl}</url>
+          <releases>
+            <enabled>true</enabled>
+          </releases>
+          <snapshots>
+            <enabled>true</enabled>
+          </snapshots>
+        </pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+  <activeProfiles>
+    <activeProfile>micronaut-graalpy-bundle</activeProfile>
+  </activeProfiles>
+</settings>
+"""
+    settingsFile
 }
 
 String resolveGraalPyBundleUrl(String graalpyVersion) {
@@ -204,22 +251,22 @@ File ensureGraalPyBundleRepo(File checkoutDir, String graalpyVersion) {
         return repoDir
     }
 
-    repoDir.mkdirs()
-    def bundleUrl = resolveGraalPyBundleUrl(graalpyVersion)
-    def zipFile = file("checkouts/maven-bundles/graalpy/${checkoutSha}.zip")
-    zipFile.parentFile.mkdirs()
-    def leftoverZip = new File(checkoutDir, "maven-resource-bundle.zip")
-    if (isValidZip(leftoverZip) && !zipFile.exists()) {
-        java.nio.file.Files.move(leftoverZip.toPath(), zipFile.toPath())
-    }
-    if (!isValidZip(zipFile)) {
-        zipFile.delete()
-        runCommand(settingsDir, "curl", "-L", "-o", zipFile.absolutePath, bundleUrl)
-    }
     if (!graalPyBundleReady(repoDir, graalpyVersion)) {
+        repoDir.mkdirs()
+        def bundleUrl = resolveGraalPyBundleUrl(graalpyVersion)
+        def zipFile = file("checkouts/maven-bundles/graalpy/${checkoutSha}.zip")
+        zipFile.parentFile.mkdirs()
+        def leftoverZip = new File(checkoutDir, "maven-resource-bundle.zip")
+        if (isValidZip(leftoverZip) && !zipFile.exists()) {
+            java.nio.file.Files.move(leftoverZip.toPath(), zipFile.toPath())
+        }
+        if (!isValidZip(zipFile)) {
+            zipFile.delete()
+            runCommand(settingsDir, "curl", "-L", "-o", zipFile.absolutePath, bundleUrl)
+        }
         runCommand(settingsDir, "unzip", "-q", "-o", zipFile.absolutePath, "-d", repoDir.absolutePath)
+        zipFile.delete()
     }
-    zipFile.delete()
 
     if (!graalPyBundleReady(repoDir, graalpyVersion)) {
         throw new org.gradle.api.GradleException(
@@ -228,9 +275,12 @@ File ensureGraalPyBundleRepo(File checkoutDir, String graalpyVersion) {
     }
 
     if (!graalPyExtensionsReady(repoDir, graalpyVersion)) {
+        def mavenSettingsFile = writeGraalPyMavenSettings(repoDir)
         runCommand(
             checkoutDir,
             "./mvnw",
+            "-s",
+            mavenSettingsFile.absolutePath,
             "-pl",
             "org.graalvm.python.embedding,org.graalvm.python.embedding.tools",
             "-am",

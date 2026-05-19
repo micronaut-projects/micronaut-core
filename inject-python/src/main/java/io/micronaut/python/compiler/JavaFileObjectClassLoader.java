@@ -39,6 +39,11 @@ final class JavaFileObjectClassLoader extends ClassLoader {
     private final Collection<JavaFileObject> files = new ArrayList<>();
 
     public JavaFileObjectClassLoader(Iterable<? extends JavaFileObject> files) {
+        this(files, JavaFileObjectClassLoader.class.getClassLoader());
+    }
+
+    public JavaFileObjectClassLoader(Iterable<? extends JavaFileObject> files, ClassLoader parent) {
+        super(parent);
         for (JavaFileObject file : files) {
             this.files.add(file);
         }

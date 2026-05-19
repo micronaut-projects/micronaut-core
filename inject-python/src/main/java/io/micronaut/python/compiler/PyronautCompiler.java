@@ -55,6 +55,7 @@ public final class PyronautCompiler {
     private final List<File> annotationProcessorPath;
     private final List<File> classpath;
     private final List<File> bootclasspath;
+    private final ClassLoader parentClassLoader;
     private final Consumer<ClassElement> classElementCallback;
     private final List<String> compilerOptions;
 
@@ -68,6 +69,7 @@ public final class PyronautCompiler {
         this.annotationProcessorPath = builder.annotationProcessorPath != null ? List.copyOf(builder.annotationProcessorPath) : null;
         this.bootclasspath = builder.bootclasspath != null ? List.copyOf(builder.bootclasspath) : null;
         this.classpath = builder.classpath != null ? List.copyOf(builder.classpath) : null;
+        this.parentClassLoader = builder.parentClassLoader != null ? builder.parentClassLoader : PyronautCompiler.class.getClassLoader();
         this.classElementCallback = builder.classElementCallback;
         this.compilerOptions = builder.compilerOptions != null ? List.copyOf(builder.compilerOptions) : null;
         validateConfiguration();
@@ -107,7 +109,7 @@ public final class PyronautCompiler {
         }
         JavaFileObject[] sources = createJavaSources();
         Iterable<JavaFileObject> compiledClasses = compiler.compileInMemory(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
-        return new JavaFileObjectClassLoader(compiledClasses);
+        return new JavaFileObjectClassLoader(compiledClasses, parentClassLoader);
     }
 
     /**
@@ -256,6 +258,7 @@ public final class PyronautCompiler {
         private List<File> annotationProcessorPath;
         private List<File> bootclasspath;
         private List<File> classpath;
+        private ClassLoader parentClassLoader;
         private List<String> compilerOptions;
         private Consumer<ClassElement> classElementCallback;
 
@@ -360,6 +363,19 @@ public final class PyronautCompiler {
          */
         public Builder bootclasspath(List<File> bootclasspath) {
             this.bootclasspath = bootclasspath;
+            return this;
+        }
+
+        /**
+         * Set the parent classloader for in-memory compilation results.
+         * This lets generated application classes resolve user runtime dependencies
+         * without requiring generated classes to be written to disk first.
+         *
+         * @param parentClassLoader The parent classloader
+         * @return This builder
+         */
+        public Builder parentClassLoader(ClassLoader parentClassLoader) {
+            this.parentClassLoader = parentClassLoader;
             return this;
         }
 

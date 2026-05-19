@@ -68,6 +68,23 @@ class TestClass:
         tempDir.deleteDir()
     }
 
+    def "test buildClassLoader uses explicit parent classloader"() {
+        given:
+        def parent = new ClassLoader(getClass().classLoader) {
+        }
+        def compiler = PyronautCompiler.builder()
+            .pythonCode("class TestClass: pass")
+            .parentClassLoader(parent)
+            .build()
+
+        when:
+        def classLoader = compiler.buildClassLoader()
+
+        then:
+        classLoader.parent.is(parent)
+        classLoader.loadClass("pyronaut_application.PyronautMain") != null
+    }
+
     def "test validation requires python source"() {
         when:
         PyronautCompiler.builder().build()
