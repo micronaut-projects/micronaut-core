@@ -29,6 +29,7 @@ import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
@@ -120,7 +121,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
             }
         }
         for (AttributeDef attributeDef : getNativeType().attributes()) {
-            if (hasPropertyInjectionPoint(new PropertyDef(attributeDef.name()).withField(attributeDef))) {
+            if (hasPropertyInjectionPoint(attributeDef)) {
                 return true;
             }
         }
@@ -128,16 +129,18 @@ public final class PythonClassElement extends AbstractPythonClassElement {
     }
 
     private boolean hasPropertyInjectionPoint(PropertyDef propertyDef) {
-        PythonPropertyElement property = new PythonPropertyElement(
-            propertyDef,
-            environment,
-            this,
-            this,
-            environment.metadataFactory()
-        );
-        return property.hasStereotype(AnnotationUtil.INJECT)
-            || property.hasStereotype(Property.class)
-            || property.hasStereotype(io.micronaut.context.annotation.Value.class);
+        return hasPropertyInjectionPoint((ElementDef) propertyDef);
+    }
+
+    private boolean hasPropertyInjectionPoint(AttributeDef attributeDef) {
+        return hasPropertyInjectionPoint((ElementDef) attributeDef);
+    }
+
+    private boolean hasPropertyInjectionPoint(ElementDef element) {
+        AnnotationMetadata annotationMetadata = environment.annotationMetadataBuilder().buildDeclared(element);
+        return annotationMetadata.hasStereotype(AnnotationUtil.INJECT)
+            || annotationMetadata.hasStereotype(Property.class)
+            || annotationMetadata.hasStereotype(io.micronaut.context.annotation.Value.class);
     }
 
     @Override
