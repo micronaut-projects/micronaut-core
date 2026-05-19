@@ -27,7 +27,9 @@ import java.util.Set;
 import io.micronaut.aop.Introduction;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Bean;
@@ -54,12 +56,14 @@ public final class PythonClassElement extends AbstractPythonClassElement {
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment) {
         super(classDef, environment);
         excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);
+        markPropertyInjectionBeanCandidate();
         moveIntroductionInterfacesToImplementedInterfaces();
     }
 
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment, int arrayDimensions) {
         super(classDef, environment, arrayDimensions);
         excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);
+        markPropertyInjectionBeanCandidate();
         moveIntroductionInterfacesToImplementedInterfaces();
     }
 
@@ -67,6 +71,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         super(classDef, environment, arrayDimensions);
         this.resolvedTypeArguments = resolvedTypeArguments;
         excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);
+        markPropertyInjectionBeanCandidate();
         moveIntroductionInterfacesToImplementedInterfaces();
     }
 
@@ -97,6 +102,18 @@ public final class PythonClassElement extends AbstractPythonClassElement {
 
     public boolean isPythonSource() {
         return environment.classes().containsKey(getName());
+    }
+
+    private void markPropertyInjectionBeanCandidate() {
+        if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(getAnnotationMetadata())) {
+            return;
+        }
+        if (getBeanProperties().stream().anyMatch(property ->
+            property.hasStereotype(AnnotationUtil.INJECT)
+                || property.hasStereotype(Property.class)
+                || property.hasStereotype(io.micronaut.context.annotation.Value.class))) {
+            annotate(Bean.class);
+        }
     }
 
     @Override
