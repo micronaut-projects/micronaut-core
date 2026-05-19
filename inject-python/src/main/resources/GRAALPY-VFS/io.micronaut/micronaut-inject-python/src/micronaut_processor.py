@@ -2097,6 +2097,7 @@ def is_annotation_stereotype_for_python_decorator(annotation_name):
     return annotation_name in {
         'io.micronaut.context.annotation.AnnotationExpressionContext',
         'io.micronaut.context.annotation.Bean',
+        'io.micronaut.context.annotation.DefaultScope',
         'io.micronaut.context.annotation.Prototype',
         'io.micronaut.context.annotation.Requires',
         'io.micronaut.core.bind.annotation.Bindable',
