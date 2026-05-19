@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.visitor;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.runtime.RuntimeProxy;
 import io.micronaut.context.annotation.Mixin;
@@ -215,6 +216,9 @@ public class PythonTypeElementVisitorProcessor {
     private void annotatePythonAopProxy(ClassElement element) {
         if (!(element instanceof AbstractPythonClassElement) || !isAopProxy(element)) {
             return;
+        }
+        if (element.hasStereotype(Around.class)) {
+            element.annotate(Around.class, builder -> builder.member("proxyTarget", true));
         }
         element.annotate(RuntimeProxy.class, builder ->
             builder.value("io.micronaut.context.python.aop.PythonProxyCreator")
