@@ -262,6 +262,48 @@ class Message:
         ctx?.close()
     }
 
+    void "Serdeable Python dataclasses serialize list properties"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from micronaut.python.compiler import Serdeable
+
+
+@Serdeable
+@dataclass
+class Period:
+    temperature: int = 0
+
+
+@Serdeable
+@dataclass
+class ForecastProperties:
+    periods: list[Period] | None = None
+
+
+@Serdeable
+@dataclass
+class Forecast:
+    properties: ForecastProperties | None = None
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Context polyglot = ctx.getBean(Context)
+        Class<?> forecastClass = ctx.classLoader.loadClass('python.Forecast')
+        def forecast = polyglot.eval("python", "Forecast(ForecastProperties([Period(68)]))").as(forecastClass)
+        String json = ctx.getBean(JsonMapper).writeValueAsString(forecast)
+
+        then:
+        json == '{"properties":{"periods":[{"temperature":68}]}}'
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "runtime conversion returns generated wrapper for Python value assignable to Java interface"() {
         given:
         String py = '''

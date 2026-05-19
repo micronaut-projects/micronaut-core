@@ -1759,7 +1759,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static boolean isGeneratedWrapperType(Map<String, ClassElement> allClasses, ClassElement type) {
-        return allClasses.containsKey(type.getName()) && !type.isInterface();
+        return !type.isInterface() && (
+            allClasses.containsKey(type.getName()) ||
+                type.isAssignable("io.micronaut.context.python.ValueCoercible")
+        );
     }
 
     private ExpressionDef convertValueForType(ClassElement type, ExpressionDef member) {
