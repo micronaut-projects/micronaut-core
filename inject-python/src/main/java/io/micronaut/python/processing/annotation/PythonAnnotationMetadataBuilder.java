@@ -19,6 +19,7 @@ import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
@@ -234,6 +235,14 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     protected void postProcess(MutableAnnotationMetadata annotationMetadata, ElementDef element) {
         if (hasSyntheticNullable(element) && !annotationMetadata.hasDeclaredStereotype(AnnotationUtil.NON_NULL)) {
             annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, Map.of());
+        }
+        if ((element instanceof AttributeDef || element instanceof PropertyDef)
+            && !annotationMetadata.hasDeclaredStereotype(AnnotationUtil.INJECT)
+            && (annotationMetadata.hasDeclaredAnnotation(Property.class)
+                || annotationMetadata.hasDeclaredStereotype(Property.class)
+                || annotationMetadata.hasDeclaredAnnotation(io.micronaut.context.annotation.Value.class)
+                || annotationMetadata.hasDeclaredStereotype(io.micronaut.context.annotation.Value.class))) {
+            annotationMetadata.addDeclaredAnnotation(AnnotationUtil.INJECT, Map.of());
         }
         addAroundInterceptorBindings(annotationMetadata, element);
     }

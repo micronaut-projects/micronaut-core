@@ -61,7 +61,6 @@ class Test:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0010")
     void "test inject property through field without explicit inject"() {
         given:
         def context = buildContext(propertyInjectionCode(), false, propertyValues())
