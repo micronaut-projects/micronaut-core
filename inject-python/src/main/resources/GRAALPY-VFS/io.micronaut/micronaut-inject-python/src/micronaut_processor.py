@@ -588,6 +588,10 @@ class MicronautAstVisitor(ast.NodeVisitor):
             return
 
         for target in targets:
+            if isinstance(target, ast.Name):
+                if self.current_class is None:
+                    self.local_constant_values[target.id] = value
+                continue
             if not isinstance(target, ast.Attribute):
                 continue
             names = []
@@ -1668,6 +1672,7 @@ def decorator_to_function(visitor, node):
 
             if decorator_declaration is not None:
                 members = extract_call_arguments_with_defaults(decorator_declaration, node, visitor)
+                members = resolve_annotation_member_constants(decorator_declaration.annotationName(), members, visitor)
                 return DecoratorDef(
                     decorator_name,
                     decorator_declaration.annotationName(),
@@ -1678,6 +1683,7 @@ def decorator_to_function(visitor, node):
             else:
                 # Direct annotation or Java annotation used as a decorator
                 members = extract_call_arguments_with_defaults(None, node, visitor)
+                members = resolve_annotation_member_constants(resolved_decorator_fqn, members, visitor)
                 # Resolve names in member values
                 resolved_members = {}
                 for key, value in members.items():
@@ -1707,6 +1713,24 @@ def decorator_to_function(visitor, node):
                 return DecoratorDef(decorator_name, resolved_decorator_fqn, None, resolved_members, [])
         case _:
             return None
+
+def resolve_annotation_member_constants(annotation_name, members, visitor=None):
+    if visitor is None or annotation_name != "jakarta.inject.Named":
+        return members
+    value = members.get("value")
+    if not isinstance(value, str):
+        return members
+    constant_value = None
+    if value in visitor.local_constant_values:
+        constant_value = visitor.local_constant_values[value]
+    elif visitor.current_class is not None:
+        class_name = visitor.current_class.name().replace("$", ".")
+        constant_value = visitor.local_constant_values.get(f"{class_name}.{value}")
+    if constant_value is None:
+        return members
+    resolved = dict(members)
+    resolved["value"] = constant_value
+    return resolved
 
 
 def convert_ast_value(node, visitor=None):

@@ -237,7 +237,6 @@ class NamedService:
         definition.getDeclaredQualifier() == Qualifiers.byName("foo")
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0045")
     void "test named qualifier from constant"() {
         given:
         def definition = buildBeanDefinition("python", "NamedConstantService", '''

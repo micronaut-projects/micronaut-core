@@ -894,7 +894,6 @@ class MyBean:
         context.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0046")
     void "test factory method named qualifier from constant"() {
         given:
         def context = buildContext('''\
