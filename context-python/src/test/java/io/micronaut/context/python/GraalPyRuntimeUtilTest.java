@@ -162,6 +162,16 @@ class GraalPyRuntimeUtilTest {
     }
 
     @Test
+    void testCoerceListNull() {
+        assertNull(GraalPyRuntimeUtil.coerceList(null));
+    }
+
+    @Test
+    void testCoerceMapNull() {
+        assertNull(GraalPyRuntimeUtil.coerceMap(null));
+    }
+
+    @Test
     void testConvertListPythonNone() {
         // Test conversion with Python None value
         Value none = context.eval("python", "lambda: None").execute();

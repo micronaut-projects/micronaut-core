@@ -78,7 +78,10 @@ public final class GraalPyRuntimeUtil {
      * @param <V> The value type of the map
      * @return The resulting map
      */
-    public static <V> Map<String, Object> coerceMap(Map<String, V> map) {
+    public static <V> @Nullable Map<String, Object> coerceMap(@Nullable Map<String, V> map) {
+        if (map == null) {
+            return null;
+        }
         return
             map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, (entry) -> {
                 Object v = entry.getValue();
@@ -96,7 +99,10 @@ public final class GraalPyRuntimeUtil {
      * @return The resulting list
      *
      */
-    public static <E> List<Object> coerceList(List<E> list) {
+    public static <E> @Nullable List<Object> coerceList(@Nullable List<E> list) {
+        if (list == null) {
+            return null;
+        }
         return
             list.stream().map(v -> {
                 if (v instanceof ValueCoercible valueCoercible && !(v instanceof PooledValueCoercible)) {
