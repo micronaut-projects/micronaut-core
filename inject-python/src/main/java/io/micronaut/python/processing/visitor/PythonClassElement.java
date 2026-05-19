@@ -108,12 +108,36 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(getAnnotationMetadata())) {
             return;
         }
-        if (getBeanProperties().stream().anyMatch(property ->
-            property.hasStereotype(AnnotationUtil.INJECT)
-                || property.hasStereotype(Property.class)
-                || property.hasStereotype(io.micronaut.context.annotation.Value.class))) {
+        if (hasPropertyInjectionPoint()) {
             annotate(Bean.class);
         }
+    }
+
+    private boolean hasPropertyInjectionPoint() {
+        for (PropertyDef propertyDef : getNativeType().properties()) {
+            if (hasPropertyInjectionPoint(propertyDef)) {
+                return true;
+            }
+        }
+        for (AttributeDef attributeDef : getNativeType().attributes()) {
+            if (hasPropertyInjectionPoint(new PropertyDef(attributeDef.name()).withField(attributeDef))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasPropertyInjectionPoint(PropertyDef propertyDef) {
+        PythonPropertyElement property = new PythonPropertyElement(
+            propertyDef,
+            environment,
+            this,
+            this,
+            environment.metadataFactory()
+        );
+        return property.hasStereotype(AnnotationUtil.INJECT)
+            || property.hasStereotype(Property.class)
+            || property.hasStereotype(io.micronaut.context.annotation.Value.class);
     }
 
     @Override
