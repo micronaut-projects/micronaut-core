@@ -676,7 +676,6 @@ class Test:
         metadata.doubleValue(PrimitiveTypesAnnotation, "doubleArray").asDouble == 1.1d
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0005")
     void "test annotation default values are available from annotation value"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
@@ -694,13 +693,12 @@ class Test:
 ''')
 
         when:
-        def annotationValue = definition.getAnnotationValuesByName("python.Topic")[0]
+        def annotationValue = definition.getAnnotation("python.Topic")
 
         then:
         annotationValue.getRequiredValue("qos", Integer) == 1
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0006")
     void "test annotation default values are written for constructor arguments"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''

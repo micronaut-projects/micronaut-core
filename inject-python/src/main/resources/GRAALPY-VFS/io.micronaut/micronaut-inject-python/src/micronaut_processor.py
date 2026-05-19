@@ -183,7 +183,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             return node
 
                     # Only check for micronaut decorators on top-level functions (not nested)
-                    if self.current_class is None and not was_in_function and is_micronaut_decorator(node, self):
+                    if self.current_class is None and not was_in_function and (
+                        is_micronaut_decorator(node, self) or is_python_decorator_function(node)
+                    ):
                         arg_dict = extract_arg_defaults(node)
                         member_decorators = extract_arg_decorators(self, node)
                         member_types = extract_arg_types(self, node)
@@ -2081,6 +2083,33 @@ def is_micronaut_decorator(funcdef, visitor=None):
                 if existing_decorator and has_python_annotation_stereotype(existing_decorator):
                     return True
 
+    return False
+
+def is_python_decorator_function(funcdef):
+    """
+    Returns true for top-level Python functions that have the normal decorator
+    shape, either `def ann(target): return target` or a decorator factory that
+    returns a nested decorator function.
+    """
+    if funcdef.name == "micronaut_annotation":
+        return False
+
+    nested_function_names = {
+        stmt.name
+        for stmt in funcdef.body
+        if isinstance(stmt, ast.FunctionDef)
+    }
+    argument_names = {arg.arg for arg in funcdef.args.args}
+
+    for stmt in ast.walk(funcdef):
+        if not isinstance(stmt, ast.Return):
+            continue
+        value = stmt.value
+        if isinstance(value, ast.Name):
+            if value.id in nested_function_names:
+                return True
+            if value.id in argument_names:
+                return True
     return False
 
 def has_python_annotation_stereotype(decorator):
