@@ -226,6 +226,42 @@ class Message:
         ctx?.close()
     }
 
+    void "bare Micronaut annotation decorators preserve decorated Python dataclasses at runtime"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from micronaut.python.compiler import Serdeable
+
+
+@Serdeable
+@dataclass
+class Detail:
+    name: str
+
+
+@Serdeable
+@dataclass
+class Message:
+    detail: Detail | None = None
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Context polyglot = ctx.getBean(Context)
+        Class<?> messageClass = ctx.classLoader.loadClass('python.Message')
+        def message = polyglot.eval("python", "Message(Detail('Hello'))").as(messageClass)
+        String json = ctx.getBean(JsonMapper).writeValueAsString(message)
+
+        then:
+        json == '{"detail":{"name":"Hello"}}'
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "runtime conversion returns generated wrapper for Python value assignable to Java interface"() {
         given:
         String py = '''

@@ -184,8 +184,8 @@ def micronaut_annotation(name, repeated=None):
     """
     Decorator to mark functions as Micronaut annotations.
     """
-    def decorator(func):
-        return func
+    def decorator(target):
+        return target
     return decorator
 '''
                 try:
@@ -682,8 +682,13 @@ def {decorator_name}({param_signature}):
     """
     Micronaut annotation decorator for {annotation_name}.
     """
-    def decorator(func):
-        return func
+    if len(args) == 1 and callable(args[0]) and not kwargs:
+        target = args[0]
+        if not any(value is target for value in globals().values()):
+            return target
+
+    def decorator(target):
+        return target
 
     return decorator
 {nested_members_code}
@@ -728,8 +733,8 @@ def micronaut_annotation(name, repeated=None):
     """
     Decorator to mark functions as Micronaut annotations.
     """
-    def decorator(func):
-        return func
+    def decorator(target):
+        return target
     return decorator
 
 @micronaut_annotation("{custom_annotation_name}"{repeatable_info})
@@ -737,8 +742,13 @@ def {decorator_name}({param_signature}):
     """
     Micronaut annotation decorator for {custom_annotation_name}.
     """
-    def decorator(func):
-        return func
+    if len(args) == 1 and callable(args[0]) and not kwargs:
+        target = args[0]
+        if not any(value is target for value in globals().values()):
+            return target
+
+    def decorator(target):
+        return target
 
     return decorator
 {nested_members_code}
@@ -871,8 +881,13 @@ def {simple_name}(*args, **kwargs):
     """
     Micronaut annotation decorator for {nested_name}.
     """
-    def decorator(func):
-        return func
+    if len(args) == 1 and callable(args[0]) and not kwargs:
+        target = args[0]
+        if not any(value is target for value in globals().values()):
+            return target
+
+    def decorator(target):
+        return target
 
     return decorator
 
