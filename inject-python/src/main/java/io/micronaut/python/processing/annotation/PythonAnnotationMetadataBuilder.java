@@ -392,6 +392,8 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             if (lastDot > -1) {
                 annotationValue = stringValue.substring(lastDot + 1);
             }
+        } else if (isEnumArrayMember(memberType)) {
+            annotationValue = enumValues(annotationValue);
         } else if (isClassArrayMember(memberType)) {
             annotationValue = annotationClassValues(annotationValue);
         } else if (isClassMember(memberType)) {
@@ -556,6 +558,75 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     private static boolean isEnumMember(@Nullable ClassElement memberType) {
         return memberType != null && (memberType.isEnum() || memberType.isAssignable(Enum.class));
+    }
+
+    private static boolean isEnumArrayMember(@Nullable ClassElement memberType) {
+        return memberType != null && memberType.isArray() && isEnumMember(memberType.fromArray());
+    }
+
+    private String[] enumValues(@Nullable Object value) {
+        List<String> values = new ArrayList<>();
+        collectEnumValues(value, values);
+        return values.toArray(String[]::new);
+    }
+
+    private void collectEnumValues(@Nullable Object value, List<String> values) {
+        if (value == null) {
+            return;
+        }
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return;
+            }
+            if (polyglotValue.hasArrayElements()) {
+                int size = Math.toIntExact(polyglotValue.getArraySize());
+                for (int i = 0; i < size; i++) {
+                    collectEnumValues(polyglotValue.getArrayElement(i), values);
+                }
+                return;
+            }
+            addEnumValue(polyglotValue, values);
+            return;
+        }
+        if (value.getClass().isArray()) {
+            int size = Array.getLength(value);
+            for (int i = 0; i < size; i++) {
+                collectEnumValues(Array.get(value, i), values);
+            }
+            return;
+        }
+        if (value instanceof Iterable<?> iterable) {
+            for (Object element : iterable) {
+                collectEnumValues(element, values);
+            }
+            return;
+        }
+        addEnumValue(value, values);
+    }
+
+    private void addEnumValue(Object value, List<String> values) {
+        String enumValue = enumValue(value);
+        if (enumValue != null) {
+            values.add(enumValue);
+        }
+    }
+
+    private @Nullable String enumValue(Object value) {
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return null;
+            }
+            if (polyglotValue.isHostObject()) {
+                return enumValue(polyglotValue.asHostObject());
+            }
+            if (polyglotValue.isString()) {
+                return enumValue(polyglotValue.asString());
+            }
+            return enumValue(GraalPyUtil.convertValueToJava(polyglotValue, visitorContext));
+        }
+        String stringValue = value instanceof Enum<?> enumValue ? enumValue.name() : value.toString();
+        int lastDot = stringValue.lastIndexOf('.');
+        return lastDot > -1 ? stringValue.substring(lastDot + 1) : stringValue;
     }
 
     @Override
