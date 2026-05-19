@@ -806,6 +806,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return javaClassType(classElement);
     }
 
+    static TypeDef propertyType(PropertyElement beanProperty) {
+        ClassElement genericType = beanProperty.getGenericType();
+        if (!genericType.getTypeArguments().isEmpty() && !(genericType instanceof AbstractPythonClassElement)) {
+            return parameterizedTypeDef(genericType);
+        }
+        return TypeDef.of(beanProperty.getType());
+    }
+
     private boolean isConfigurationBuilderType(ClassElement element) {
         for (ClassElement classElement : allClasses.values()) {
             for (PropertyElement propertyElement : classElement.getBeanProperties()) {
