@@ -556,6 +556,44 @@ class MyMergeStrategy(Mapper.MergeStrategy):
         tempDir.deleteDir()
     }
 
+    def "test nested meta annotations are generated before parent annotation decorator"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.python.compiler import Serdeable
+
+@Serdeable
+@dataclass
+class Message:
+    text: str
+'''
+        def tempDir = File.createTempDir("pyronaut-test-nested-meta-annotation", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .javaSrc("inject-python-test/src/test/java")
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def serdeableFile = new File(tempDir, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler/Serdeable.py")
+        serdeableFile.exists()
+        def transformedContent = serdeableFile.text
+        transformedContent.indexOf("def Serializable(") < transformedContent.indexOf("@Serializable()")
+        transformedContent.indexOf("def Deserializable(") < transformedContent.indexOf("@Deserializable()")
+        transformedContent.indexOf("@Serializable()") < transformedContent.indexOf("def Serdeable(")
+        transformedContent.indexOf("@Deserializable()") < transformedContent.indexOf("def Serdeable(")
+        transformedContent.contains("@micronaut_annotation(\"io.micronaut.python.compiler.Serdeable\$Serializable\")")
+        transformedContent.contains("@micronaut_annotation(\"io.micronaut.python.compiler.Serdeable\$Deserializable\")")
+        transformedContent.contains("Serdeable.Serializable = Serializable")
+        transformedContent.contains("Serdeable.Deserializable = Deserializable")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
     def "test generated introspected Python stubs expose public fields for host attribute access"() {
         given:
         def pythonCode = '''

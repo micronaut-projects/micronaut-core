@@ -239,7 +239,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     if (isIntrospectedBean) {
                         for (PropertyElement beanProperty : beanProperties) {
                             FieldDef field = FieldDef.builder(beanProperty.getName())
-                                .ofType(TypeDef.of(beanProperty.getType()))
+                                .ofType(propertyType(beanProperty))
                                 .addModifiers(Modifier.PUBLIC)
                                 .build();
                             builder.addField(field);
@@ -323,7 +323,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 }
                                                 ExpressionDef.InvokeInstanceMethod has = val.invoke("hasMember", TypeDef.Primitive.BOOLEAN, ExpressionDef.constant(beanProperty.getName()));
                                                 ExpressionDef.InvokeInstanceMethod member = val.invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(beanProperty.getName()));
-                                                ExpressionDef valueExpr = convertValueForType(beanProperty.getType(), member);
+                                                ExpressionDef valueExpr = convertValueForType(beanProperty.getGenericType(), member);
                                                 assigns.add(has.isTrue().doIfElse(
                                                     aThis.field(field).assign(valueExpr),
                                                     StatementDef.multi()
@@ -729,6 +729,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             );
         }
         return interfaceTypeDef;
+    }
+
+    static TypeDef propertyType(PropertyElement beanProperty) {
+        ClassElement genericType = beanProperty.getGenericType();
+        if (!genericType.getTypeArguments().isEmpty() && !(genericType instanceof AbstractPythonClassElement)) {
+            return parameterizedTypeDef(genericType);
+        }
+        return TypeDef.of(beanProperty.getType());
     }
 
     private boolean isConfigurationBuilderType(ClassElement element) {
@@ -1390,7 +1398,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private void addGetterPojo(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef field) {
-        TypeDef propertyType = TypeDef.of(beanProperty.getType());
+        TypeDef propertyType = propertyType(beanProperty);
         Optional<MethodElement> rm = beanProperty.getReadMethod();
         boolean isSynthetic = rm.map(MethodElement::isSynthetic).orElse(true);
         String getterName = isSynthetic ? beanGetterName(beanProperty.getName(), beanProperty.getType()) :
@@ -1415,13 +1423,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
 
-        propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
+        propertySetter.addParameter(propertyType(beanProperty));
 
         builder.addMethod(propertySetter.build(((aThis, methodParameters) -> aThis.field(field).assign(methodParameters.getFirst()))));
     }
 
     private void addGetterDynamic(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder) {
-        TypeDef propertyType = TypeDef.of(beanProperty.getType());
+        TypeDef propertyType = propertyType(beanProperty);
         String getterName = beanGetterName(beanProperty.getName(), beanProperty.getType());
         MethodDef.MethodDefBuilder getterBuilder = MethodDef
             .builder(getterName)
@@ -1434,12 +1442,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 POLYGLOT_VALUE,
                 ExpressionDef.constant(beanProperty.getName())
             );
-            return returnConvertedValue(allClasses, beanProperty.getType(), invokedValue);
+            return returnConvertedValue(allClasses, beanProperty.getGenericType(), invokedValue);
         })));
     }
 
     private void addNamedGetterDynamic(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder) {
-        TypeDef propertyType = TypeDef.of(beanProperty.getType());
+        TypeDef propertyType = propertyType(beanProperty);
         String getterName = beanProperty.getReadMethod().map(MethodElement::getName).orElse(beanProperty.getName());
         MethodDef.MethodDefBuilder getterBuilder = MethodDef
             .builder(getterName)
@@ -1452,7 +1460,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 POLYGLOT_VALUE,
                 ExpressionDef.constant(beanProperty.getName())
             );
-            return returnConvertedValue(allClasses, beanProperty.getType(), invokedValue);
+            return returnConvertedValue(allClasses, beanProperty.getGenericType(), invokedValue);
         })));
     }
 
@@ -1464,7 +1472,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
 
-        propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
+        propertySetter.addParameter(propertyType(beanProperty));
 
         builder.addMethod(propertySetter.build(((aThis, methodParameters) -> {
             var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
@@ -1493,7 +1501,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
 
-        propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
+        propertySetter.addParameter(propertyType(beanProperty));
 
         builder.addMethod(propertySetter.build(((aThis, methodParameters) -> {
             var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
@@ -1516,7 +1524,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     // Script-specific accessors still use polyglot value
     private void addGetterScript(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue) {
-        TypeDef propertyType = TypeDef.of(beanProperty.getType());
+        TypeDef propertyType = propertyType(beanProperty);
         String getterName = beanProperty.getReadMethod().map(MethodElement::getName).orElse(beanProperty.getName());
         MethodDef.MethodDefBuilder getterBuilder = MethodDef
             .builder(getterName)
@@ -1529,7 +1537,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 POLYGLOT_VALUE,
                 ExpressionDef.constant(beanProperty.getName())
             );
-            return returnConvertedValue(allClasses, beanProperty.getType(), invokedValue);
+            return returnConvertedValue(allClasses, beanProperty.getGenericType(), invokedValue);
         })));
     }
 
@@ -1543,7 +1551,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
 
-        propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
+        propertySetter.addParameter(propertyType(beanProperty));
 
         builder.addMethod(propertySetter.build(((aThis, methodParameters) -> {
             var targetValue = aThis.field(pythonValue);

@@ -362,6 +362,62 @@ class HelloController:
         context?.close()
     }
 
+    void "test python controller serializes nested serdeable list properties"() {
+        given:
+        def context = buildContext('''
+from dataclasses import dataclass
+from jakarta.inject import Singleton
+from micronaut.http.annotation import Controller, Get
+from micronaut.python.compiler import Serdeable
+
+
+@Serdeable
+@dataclass
+class Period:
+    temperature: int = 0
+
+
+@Serdeable
+@dataclass
+class ForecastProperties:
+    periods: list[Period] | None = None
+
+
+@Serdeable
+@dataclass
+class Forecast:
+    properties: ForecastProperties | None = None
+
+
+@Singleton
+class ForecastService:
+    def forecast(self) -> Forecast:
+        return Forecast(ForecastProperties(periods=[Period(68)]))
+
+
+@Controller("/forecast")
+class ForecastController:
+    def __init__(self, forecastService: ForecastService):
+        self.forecastService = forecastService
+
+    @Get("/")
+    def forecast(self) -> Forecast:
+        return self.forecastService.forecast()
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+
+        expect:
+        client.toBlocking().retrieve("/forecast") == '{"properties":{"periods":[{"temperature":68}]}}'
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
     void "test python controller generic JSON exchange"() {
         given:
         def context = buildContext('''

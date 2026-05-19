@@ -294,7 +294,7 @@ class Forecast:
         when:
         Context polyglot = ctx.getBean(Context)
         Class<?> forecastClass = ctx.classLoader.loadClass('python.Forecast')
-        def forecast = polyglot.eval("python", "Forecast(ForecastProperties([Period(68)]))").as(forecastClass)
+        def forecast = polyglot.eval("python", "Forecast(ForecastProperties(periods=[Period(68)]))").as(forecastClass)
         String json = ctx.getBean(JsonMapper).writeValueAsString(forecast)
 
         then:
