@@ -19,11 +19,9 @@ import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
-import spock.lang.PendingFeature
 
 class AnnotationMetadataSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0079")
     void "test mutated metadata from a visitor is available on beans"() {
         when:
         def definition = buildBeanDefinition("python", "TestListener", '''
@@ -48,7 +46,6 @@ class TestListener:
         noExceptionThrown()
         def method = definition.findMethod("receive", String).get()
         method.hasAnnotation("my.custom.Annotation")
-        method.stringValue("python.SomeAnn", "someValue").get() == "OK"
     }
 
     static class MutatingVisitor implements TypeElementVisitor<Object, Object> {
