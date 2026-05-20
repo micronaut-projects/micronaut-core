@@ -1172,6 +1172,13 @@ class MicronautAstVisitor(ast.NodeVisitor):
         type_params = []
         TypeVar = java.type("io.micronaut.python.processing.visitor.TypeVar")
 
+        def add_type_var(name):
+            if any(existing.name() == name for existing in type_params):
+                return
+            type_var = self.type_vars.get(name)
+            if type_var is not None:
+                type_params.append(type_var)
+
         # Check if the node has type_params (Python 3.12+)
         if hasattr(node, 'type_params') and node.type_params:
             for type_param in node.type_params:
@@ -1207,12 +1214,17 @@ class MicronautAstVisitor(ast.NodeVisitor):
                                 # Simple TypeVar reference like T
                                 name = arg.id
                                 type_var = self.type_vars.get(name) or TypeVar(name, None, [])
-                                type_params.append(type_var)
+                                if not any(existing.name() == name for existing in type_params):
+                                    type_params.append(type_var)
                             elif isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and arg.func.id == 'TypeVar':
                                 # TypeVar call like TypeVar('T', bound=SomeType)
                                 type_var = self._parse_type_var_call(arg)
-                                if type_var:
+                                if type_var and not any(existing.name() == type_var.name() for existing in type_params):
                                     type_params.append(type_var)
+                    else:
+                        for arg in self._extract_subscript_args(base):
+                            if isinstance(arg, ast.Name):
+                                add_type_var(arg.id)
 
         return type_params
 

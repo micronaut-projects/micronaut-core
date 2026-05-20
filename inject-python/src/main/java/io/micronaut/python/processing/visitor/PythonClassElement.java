@@ -18,6 +18,7 @@ package io.micronaut.python.processing.visitor;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -506,10 +507,17 @@ public final class PythonClassElement extends AbstractPythonClassElement {
     @Override
     public Map<String, ClassElement> getTypeArguments() {
         if (resolvedTypeArguments == null) {
-            return super.getTypeArguments();
-        } else {
-            return resolvedTypeArguments;
+            List<? extends GenericPlaceholderElement> placeholders = getDeclaredGenericPlaceholders();
+            if (placeholders.isEmpty()) {
+                return super.getTypeArguments();
+            }
+            Map<String, ClassElement> typeArguments = new LinkedHashMap<>(placeholders.size());
+            for (GenericPlaceholderElement placeholder : placeholders) {
+                typeArguments.put(placeholder.getVariableName(), firstBound(placeholder));
+            }
+            return typeArguments;
         }
+        return resolvedTypeArguments;
     }
 
     @Override

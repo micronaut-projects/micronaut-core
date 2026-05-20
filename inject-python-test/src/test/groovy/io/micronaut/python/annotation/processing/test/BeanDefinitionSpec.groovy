@@ -56,7 +56,6 @@ class TypeStringService:
         TypeInformation.TypeFormat.ANSI_SHORTENED | "\u001B[0;36mp.TypeStringService\u001B[0m"
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0001")
     void "test declared generic placeholders from definition"() {
         when:
         def definition = buildBeanDefinition("python", "GenericService", '''
@@ -75,7 +74,6 @@ class GenericService(Generic[K, V]):
         definition.getGenericBeanType().getTypeString(true) == "GenericService<Object, Object>"
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0003")
     void "test declared generic placeholders from reference"() {
         when:
         def reference = buildBeanDefinitionReference("python", "GenericService", '''
@@ -94,7 +92,6 @@ class GenericService(Generic[K, V]):
         reference.getGenericBeanType().getTypeString(true) == "GenericService<Object, Object>"
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0039")
     void "test declared generic placeholders from reference with inheritance"() {
         when:
         def reference = buildBeanDefinitionReference("python", "DefaultKafkaConsumerConfiguration", '''
