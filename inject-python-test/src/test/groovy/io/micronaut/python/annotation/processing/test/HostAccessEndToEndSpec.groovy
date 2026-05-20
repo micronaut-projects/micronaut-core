@@ -92,6 +92,45 @@ class ApiKeyTokenReader(HeaderTokenReaderLike):
         ctx?.close()
     }
 
+    void "Python bean extending Java abstract class with constructor calls host super constructor"() {
+        given:
+        String py = '''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test import ConstructorBackedHandler, HandlerDependency
+
+
+@Singleton
+class PythonHandlerDependency(HandlerDependency):
+    def name(self) -> str:
+        return "dependency"
+
+
+@Singleton
+class PythonConstructorBackedHandler(ConstructorBackedHandler):
+    def __init__(self, dependency: HandlerDependency):
+        super().__init__(dependency)
+
+    def handle(self) -> str:
+        return self.dependencyName()
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Class<?> generatedClass = ctx.classLoader.loadClass('python.PythonConstructorBackedHandler')
+        def handler = ctx.getBean(ConstructorBackedHandler)
+
+        then:
+        ConstructorBackedHandler.isAssignableFrom(generatedClass)
+        handler.dependencyName() == "dependency"
+        handler.handle() == "dependency"
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "HostAccess converts nested properties dataclass list fields"() {
         given:
         String py = '''

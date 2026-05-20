@@ -314,7 +314,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         throw new IllegalStateException("Expected graalpyInternalValue field to be initialized");
                     }
 
-                    if (!isJunit5Test) {
+                    if (!isJunit5Test && !extendsHostClass) {
                         if (isIntrospectedBean) {
                             builder.addMethod(
                                 MethodDef.constructor()
@@ -462,7 +462,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // implement static factory
                     ClassTypeDef thisType = ClassTypeDef.of(typeName);
 
-                    if (!isJunit5Test) {
+                    if (!isJunit5Test && !extendsHostClass) {
                         builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
                             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                             .addParameter(POLYGLOT_VALUE)
@@ -543,6 +543,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     );
                                     if (extendsPythonClass) {
                                         return aThis.superRef().invokeConstructor(pythonInstance);
+                                    } else if (extendsHostClass) {
+                                        List<ExpressionDef> superArguments = new ArrayList<>(methodParameters);
+                                        return StatementDef.multi(
+                                            aThis.superRef().invokeConstructor(superArguments),
+                                            aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance)
+                                        );
                                     } else {
                                         return aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance);
                                     }
