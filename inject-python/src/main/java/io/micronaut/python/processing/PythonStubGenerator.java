@@ -95,6 +95,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
     public static final ClassTypeDef RUNTIME_UTIL = ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil");
     public static final ClassTypeDef CONTEXT_HOLDER = ClassTypeDef.of("io.micronaut.context.python.ContextHolder");
+    public static final ClassTypeDef POLYGLOT_VALUE_CONVERTER = ClassTypeDef.of("io.micronaut.context.python.PolyglotValueConverter");
     public static final String GENERATOR_NAME = "python";
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
     private static final String ANN_CONFIGURATION_BUILDER = "io.micronaut.context.annotation.ConfigurationBuilder";
@@ -1818,6 +1819,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 default:
                     if (type.isAssignable(List.class)) {
                         ClassElement componentType = type.getFirstTypeArgument().orElse(null);
+                        if (componentType != null && isGeneratedWrapperType(allClasses, componentType)) {
+                            return RUNTIME_UTIL.invokeStatic(
+                                "convertList",
+                                List.of(POLYGLOT_VALUE, POLYGLOT_VALUE_CONVERTER),
+                                ClassTypeDef.of(List.class),
+                                member,
+                                generatedWrapperConverter(componentType)
+                            );
+                        }
                         ExpressionDef genericType = toClassExpression(componentType);
                         return RUNTIME_UTIL.invokeStatic("convertList", ClassTypeDef.of(List.class), member, genericType);
                     } else if (type.isAssignable(Map.class)) {
@@ -1840,6 +1850,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     }
             }
         }
+    }
+
+    private ExpressionDef generatedWrapperConverter(ClassElement componentType) {
+        MethodDef convertMethod = MethodDef.builder("convert")
+            .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+            .addParameter(ParameterDef.of("element", POLYGLOT_VALUE))
+            .returns(TypeDef.OBJECT)
+            .build();
+        MethodDef implementation = MethodDef.override(convertMethod)
+            .build((aThis, methodParameters) -> ClassTypeDef.of(componentType)
+                .invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, methodParameters.get(0))
+                .returning());
+        return new ExpressionDef.Lambda(POLYGLOT_VALUE_CONVERTER, convertMethod, implementation);
     }
 
     @Override

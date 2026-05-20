@@ -1,6 +1,8 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.python.ContextHolder
+import io.micronaut.context.python.GraalPyContextFactory
 import io.micronaut.context.python.GraalPyRuntimeUtil
 import io.micronaut.context.python.ValueCoercible
 import io.micronaut.core.io.Writable
@@ -109,6 +111,64 @@ class Forecast:
 
         cleanup:
         ctx?.close()
+    }
+
+    void "generated wrapper conversion does not require HostAccess target mappings for nested list fields"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+
+@dataclass
+@Introspected
+class Period:
+    temperature: int
+    summary: str
+
+
+@dataclass
+@Introspected
+class ForecastProperties:
+    periods: list[Period] | None = None
+
+
+@dataclass
+@Introspected
+class Forecast:
+    properties: ForecastProperties | None = None
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+        ClassLoader classLoader = ctx.classLoader
+        ctx.close()
+        ContextHolder.setReuseContext(false)
+        ContextHolder.resetContext()
+
+        when:
+        Context polyglot = GraalPyContextFactory.bootstrapReusableContext(classLoader, Map.of(), "pyronaut_application.py")
+        def value = polyglot.eval("python", "Forecast(ForecastProperties([Period(68, 'Clear')]))")
+        Class<?> forecastClass = classLoader.loadClass('python.Forecast')
+        Class<?> forecastPropertiesClass = classLoader.loadClass('python.ForecastProperties')
+        Class<?> periodClass = classLoader.loadClass('python.Period')
+        def converted = forecastClass.getMethod('fromPolyglotValue', org.graalvm.polyglot.Value).invoke(null, value)
+        def convertedProperties = forecastClass.getField('properties').get(converted)
+        def convertedPeriods = forecastPropertiesClass.getField('periods').get(convertedProperties)
+
+        then:
+        converted != null
+        convertedProperties != null
+        convertedPeriods != null
+        convertedPeriods.size() == 1
+        periodClass.isInstance(convertedPeriods[0])
+        periodClass.getField('temperature').get(convertedPeriods[0]) == 68
+        periodClass.getField('summary').get(convertedPeriods[0]) == 'Clear'
+
+        cleanup:
+        ContextHolder.setReuseContext(false)
+        ContextHolder.resetContext()
     }
 
     void "HostAccess exposes non-introspected dataclass properties on generated stub"() {

@@ -300,6 +300,36 @@ public final class GraalPyRuntimeUtil {
     }
 
     /**
+     * Convert a GraalPy Value representing a list using a generated element converter.
+     *
+     * @param graalValue the GraalPy Value (should be a list-like object)
+     * @param converter the converter to apply to each element
+     * @param <T> the expected list element type
+     * @return a Java List with converted elements
+     */
+    public static <T> @Nullable List<T> convertList(Value graalValue, PolyglotValueConverter<T> converter) {
+        if (isNone(graalValue)) {
+            return null;
+        }
+        try {
+            long size = getSize(graalValue);
+            if (size == 0) {
+                return List.of();
+            }
+            List<T> result = new ArrayList<>(Long.valueOf(size).intValue());
+            for (long i = 0; i < size; i++) {
+                Value elementValue = getElementAt(graalValue, i);
+                if (elementValue != null) {
+                    result.add(converter.convert(elementValue));
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /**
      * Convert a GraalPy Value representing a dict to a Java Map.
      * Recursively converts nested collections.
      *
