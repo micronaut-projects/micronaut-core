@@ -25,17 +25,16 @@ import java.util.Set;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
-import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.python.processing.visitor.AttributeDef;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.python.processing.visitor.DecoratorDef;
@@ -349,25 +348,24 @@ public final class GraalPyUtil {
         if (annotationTypes.isEmpty()) {
             return baseType;
         }
-        MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        List<DecoratorDef> decorators = new ArrayList<>(annotationTypes.size());
         for (TypeRef annotationType : annotationTypes) {
             String annotationName = annotationType.name();
             if (annotationName == null || annotationName.isBlank()) {
                 continue;
             }
-            annotationMetadata.addDeclaredAnnotation(annotationName, Map.of());
-            annotationMetadata.addDeclaredStereotype(List.of(annotationName), annotationName, Map.of());
-            if (AnnotationUtil.NON_NULL.equals(annotationName)) {
-                annotationMetadata.addDeclaredStereotype(List.of(annotationName), AnnotationUtil.NON_NULL, Map.of());
-            }
-            if (AnnotationUtil.NULLABLE.equals(annotationName)) {
-                annotationMetadata.addDeclaredStereotype(List.of(annotationName), AnnotationUtil.NULLABLE, Map.of());
-            }
+            decorators.add(new DecoratorDef(annotationName, annotationName));
         }
+        if (decorators.isEmpty()) {
+            return baseType;
+        }
+        AnnotationMetadata annotationMetadata = visitorContext
+            .getAnnotationMetadataBuilder()
+            .buildDeclared(new AttributeDef("$typeUse", null, null, null, decorators, null, false, null));
         if (annotationMetadata.isEmpty()) {
             return baseType;
         }
-        ElementAnnotationMetadata metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
+        var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
         return new TypeAnnotatedClassElement(baseType, metadata);
     }
 
@@ -526,7 +524,15 @@ public final class GraalPyUtil {
             return null;
         }
         ClassElement resolvedType = resolvePythonTypeToJava(nonNoneTypes.get(0), visitorContext, boundGenerics);
-        return boxPrimitiveTypeIfNeeded(resolvedType, visitorContext);
+        ClassElement boxedType = boxPrimitiveTypeIfNeeded(resolvedType, visitorContext);
+        AnnotationMetadata annotationMetadata = visitorContext
+            .getAnnotationMetadataBuilder()
+            .buildDeclared(new AttributeDef("$typeUse", typeAnnotation, new TypeRef(typeAnnotation), null, List.of(), null, false, null));
+        if (annotationMetadata.isEmpty()) {
+            return boxedType;
+        }
+        var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
+        return new TypeAnnotatedClassElement(boxedType, metadata);
     }
 
     private static List<String> parseUnionTypes(String typeAnnotation) {

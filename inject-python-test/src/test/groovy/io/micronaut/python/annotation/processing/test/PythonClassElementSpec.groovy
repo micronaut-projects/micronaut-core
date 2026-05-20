@@ -766,7 +766,6 @@ class ProductService:
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0024")
     def "test nullability on generic return type arguments"() {
         given:
         def pythonCode = '''

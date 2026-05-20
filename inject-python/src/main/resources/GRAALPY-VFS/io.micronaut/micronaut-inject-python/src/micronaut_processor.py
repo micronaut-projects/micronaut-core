@@ -955,12 +955,15 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 local_name = self._resolve_local_type_name(type_name)
                 if local_name:
                     return local_name
+                # Locally generated decorator/java.type assignments shadow imports at runtime.
+                assigned_name = self.java_type_assignments.get(type_name)
+                if assigned_name:
+                    return assigned_name
                 # Check if this is an imported type
                 imported_name = self.imported_types.get(type_name)
                 if imported_name:
                     return imported_name
-                # Check if this is a Java type that was imported
-                return self.java_type_assignments.get(type_name, type_name)
+                return type_name
         elif isinstance(type_node, ast.Str):
             # Handle older Python versions with ast.Str
             type_name = type_node.s
@@ -968,23 +971,26 @@ class MicronautAstVisitor(ast.NodeVisitor):
             local_name = self._resolve_local_type_name(type_name)
             if local_name:
                 return local_name
+            # Locally generated decorator/java.type assignments shadow imports at runtime.
+            assigned_name = self.java_type_assignments.get(type_name)
+            if assigned_name:
+                return assigned_name
             # Check if this is an imported type
             imported_name = self.imported_types.get(type_name)
             if imported_name:
                 return imported_name
-            # Check if this is a Java type that was imported
-            return self.java_type_assignments.get(type_name, type_name)
+            return type_name
         elif isinstance(type_node, ast.Name):
-            # Check if this is an imported type first
-            imported_name = self.imported_types.get(type_node.id)
-            if imported_name:
-                return imported_name
             # Check if this is a local class
             local_name = self._resolve_local_type_name(type_node.id)
             if local_name:
                 return local_name
-            # Then check if this is a Java type that was imported
-            return self.java_type_assignments.get(type_node.id, type_node.id)
+            # Locally generated decorator/java.type assignments shadow imports at runtime.
+            assigned_name = self.java_type_assignments.get(type_node.id)
+            if assigned_name:
+                return assigned_name
+            # Then check if this is an imported type
+            return self.imported_types.get(type_node.id, type_node.id)
         elif isinstance(type_node, ast.Attribute):
             # Handle qualified names like typing.List
             names = []
