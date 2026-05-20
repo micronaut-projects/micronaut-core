@@ -16,6 +16,7 @@
 package io.micronaut.context.python;
 
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
@@ -448,15 +449,82 @@ public final class ContextHolder {
     private static Value importPackageMember(Context ctx, String packageName, String importName) {
         Value module = importModule(ctx, packageName);
         Value member = module.getMember(importName);
-        if (member != null) {
+        if (member != null && isPythonClass(ctx, member)) {
             return member;
         }
-        Value submodule = importModule(ctx, packageName + "." + importName);
-        member = submodule.getMember(importName);
-        if (member != null) {
+        member = importPackageSubmoduleMember(ctx, packageName, importName);
+        if (member != null && isPythonClass(ctx, member)) {
+            return member;
+        }
+        member = findClassInPackageModules(ctx, packageName, importName);
+        if (member != null && isPythonClass(ctx, member)) {
             return member;
         }
         throw new InstantiationException("Cannot find Python member: " + packageName + "." + importName);
+    }
+
+    private static @Nullable Value importPackageSubmoduleMember(Context ctx, String packageName, String importName) {
+        try {
+            Value submodule = importModule(ctx, packageName + "." + importName);
+            Value member = submodule.getMember(importName);
+            if (member != null) {
+                return member;
+            }
+        } catch (Exception ignored) {
+            // Fall back to the Python source module name below.
+        }
+        String pythonModuleName = NameUtils.underscoreSeparate(importName, true);
+        if (!pythonModuleName.equals(importName)) {
+            try {
+                Value submodule = importModule(ctx, packageName + "." + pythonModuleName);
+                return submodule.getMember(importName);
+            } catch (Exception ignored) {
+                // Fall back to package module scanning below.
+            }
+        }
+        return null;
+    }
+
+    private static @Nullable Value findClassInPackageModules(Context ctx, String packageName, String importName) {
+        Value bindings = ctx.getBindings(PYTHON);
+        Value findClass = bindings.getMember("__micronaut_find_class_in_package_modules");
+        if (findClass == null) {
+            ctx.eval(PYTHON, """
+                import importlib
+                import inspect
+                import pkgutil
+
+                def __micronaut_find_class_in_package_modules(package_name, class_name):
+                    package = importlib.import_module(package_name)
+                    package_path = getattr(package, "__path__", None)
+                    if package_path is None:
+                        return None
+                    for module_info in pkgutil.iter_modules(package_path):
+                        try:
+                            module = importlib.import_module(package_name + "." + module_info.name)
+                        except Exception:
+                            continue
+                        member = getattr(module, class_name, None)
+                        if inspect.isclass(member):
+                            return member
+                    return None
+                """);
+            findClass = bindings.getMember("__micronaut_find_class_in_package_modules");
+        }
+        return findClass.execute(packageName, importName);
+    }
+
+    private static boolean isPythonClass(Context ctx, @Nullable Value value) {
+        if (value == null || GraalPyRuntimeUtil.isNone(value)) {
+            return false;
+        }
+        Value bindings = ctx.getBindings(PYTHON);
+        Value isClass = bindings.getMember("__micronaut_inspect_isclass");
+        if (isClass == null) {
+            ctx.eval(PYTHON, "import inspect\n__micronaut_inspect_isclass = inspect.isclass");
+            isClass = bindings.getMember("__micronaut_inspect_isclass");
+        }
+        return isClass.execute(value).asBoolean();
     }
 
     private static Value importModule(Context ctx, String moduleName) {

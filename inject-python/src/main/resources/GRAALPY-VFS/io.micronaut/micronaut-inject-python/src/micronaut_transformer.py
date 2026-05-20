@@ -659,8 +659,9 @@ def micronaut_annotation(name, repeated=None):
             if import_package.startswith('io.'):
                 import_package = import_package[3:]  # Remove 'io.' prefix
 
-            # Use absolute import path of the function
-            import_lines.append(f"from {import_package} import {meta_simple_name}")
+            # Import from the concrete annotation module so duplicate VFS package
+            # roots cannot resolve the package member as a module object.
+            import_lines.append(f"from {import_package}.{meta_simple_name} import {meta_simple_name}")
 
         # Remove duplicates
         import_lines = list(set(import_lines))
