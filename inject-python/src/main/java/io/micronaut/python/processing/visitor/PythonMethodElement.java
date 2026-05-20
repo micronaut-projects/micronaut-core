@@ -368,7 +368,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             ClassElement baseType = GraalPyUtil.resolvePythonTypeToJava(
                 returnDef.typeAnnotation(),
                 environment.visitorContext(),
-                Map.of()
+                getBoundGenericTypes()
             );
 
             baseType = withDeclaredReturnAnnotationMetadata(returnDef, baseType);
@@ -819,8 +819,13 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         Map<String, ClassElement> declaringGenerics = declaringClass != null
             ? allGenerics.getOrDefault(declaringClass.qualifiedName(), Map.of())
             : Map.of();
+        boolean declaredOnOwningType = getDeclaringType().getName().equals(getOwningType().getName());
+        if (declaredOnOwningType
+            && getOwningType() instanceof PythonClassElement pythonClassElement
+            && !pythonClassElement.hasExplicitTypeArguments()) {
+            declaringGenerics = declaredGenericBindings(true);
+        }
         if (declaringGenerics.isEmpty()) {
-            boolean declaredOnOwningType = getDeclaringType().getName().equals(getOwningType().getName());
             declaringGenerics = declaredGenericBindings(declaredOnOwningType);
         }
         List<? extends GenericPlaceholderElement> methodTypeVariables = getDeclaredTypeVariables();

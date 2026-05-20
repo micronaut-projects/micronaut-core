@@ -407,7 +407,6 @@ class NestedCollections:
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0043")
     def "test generic return type argument keeps class placeholder model"() {
         given:
         def pythonCode = '''

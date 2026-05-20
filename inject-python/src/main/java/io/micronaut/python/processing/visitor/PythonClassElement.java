@@ -537,6 +537,10 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         return new PythonClassElement(getNativeType(), environment, arrayDimensions, typeArguments);
     }
 
+    boolean hasExplicitTypeArguments() {
+        return resolvedTypeArguments != null;
+    }
+
     @NonNull
     @Override
     public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
