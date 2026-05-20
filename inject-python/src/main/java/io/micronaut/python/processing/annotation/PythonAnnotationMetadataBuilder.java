@@ -996,7 +996,10 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected RetentionPolicy getRetentionPolicy(ElementDef annotation) {
-        // no concept of retention in Python decorators
+        JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
+        if (javaVisitorContext != null) {
+            return javaVisitorContext.getAnnotationMetadataBuilder().getRetentionPolicy(annotation.name());
+        }
         return RetentionPolicy.RUNTIME;
     }
 

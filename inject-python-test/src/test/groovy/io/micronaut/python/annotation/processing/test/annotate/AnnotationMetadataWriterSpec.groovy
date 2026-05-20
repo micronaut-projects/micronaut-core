@@ -95,7 +95,6 @@ class Test:
         metadata.getValue(Requires, "property").get() == 'value'
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0019")
     void "test source retention annotations are not retained"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
