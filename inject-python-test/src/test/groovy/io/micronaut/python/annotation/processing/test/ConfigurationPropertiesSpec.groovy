@@ -30,7 +30,6 @@ import spock.lang.PendingFeature
  * @since 4.8.0
  */
 class ConfigurationPropertiesSpec extends AbstractPythonTypeElementSpec {
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0050")
     void "test configuration properties with constraints is validating bean definition"() {
         given:
         def definition = buildBeanDefinition("python", "ServiceConfig", '''

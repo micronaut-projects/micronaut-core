@@ -30,6 +30,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.annotation.PropertyElementAnnotationMetadata;
+import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import org.jetbrains.annotations.Nullable;
 
@@ -47,6 +48,9 @@ import org.jetbrains.annotations.Nullable;
  * @since 5.0.0
  */
 public final class PythonPropertyElement extends AbstractPythonElement implements PropertyElement, ElementProvider {
+    private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
+    private static final String ANN_VALID = "jakarta.validation.Valid";
+
     private final PythonProcessingEnvironment environment;
     private final ClassElement declaringType;
     private final ClassElement owningType;
@@ -110,6 +114,9 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
             metadataFactory
         ) : (isWritable() ? createSyntheticSetter() : null);
         this.annotationMetadata = new PropertyElementAnnotationMetadata(this, readMethod, writeMethod, field, null, null, false);
+        if (requiresValidation()) {
+            annotate(RequiresValidation.class);
+        }
     }
 
     @Override
@@ -139,6 +146,14 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return this.annotationMetadata;
+    }
+
+    private boolean requiresValidation() {
+        AnnotationMetadata metadata = getAnnotationMetadata();
+        return metadata.hasStereotype(ANN_CONSTRAINT)
+            || metadata.hasAnnotation(ANN_VALID)
+            || getType().getAnnotationMetadata().hasStereotype(ANN_CONSTRAINT)
+            || getType().getAnnotationMetadata().hasAnnotation(ANN_VALID);
     }
 
     @Override
