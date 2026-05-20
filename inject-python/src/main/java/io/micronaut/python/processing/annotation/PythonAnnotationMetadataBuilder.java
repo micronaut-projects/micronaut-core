@@ -19,6 +19,7 @@ import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -784,9 +785,38 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected <K extends Annotation> Optional<AnnotationValue<K>> getAnnotationValues(ElementDef originatingElement, ElementDef member, Class<K> annotationType) {
         if (member instanceof AnnotationMemberDef memberDef) {
-            return memberDef.getAnnotationMetadata().findAnnotation(annotationType);
+            Optional<AnnotationValue<K>> annotation = memberDef.getAnnotationMetadata().findAnnotation(annotationType);
+            if (annotation.isEmpty()) {
+                annotation = findMemberDecorator(memberDef, annotationType);
+            }
+            return annotation.map(value -> normalizeAliasForAnnotationValue(value, annotationType));
         }
         return Optional.empty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private <K extends Annotation> Optional<AnnotationValue<K>> findMemberDecorator(AnnotationMemberDef memberDef, Class<K> annotationType) {
+        String annotationName = annotationType.getName();
+        for (DecoratorDef decorator : memberDef.decorators()) {
+            if (toBinaryClassName(decorator.annotationName()).equals(annotationName)) {
+                return Optional.of((AnnotationValue<K>) toAnnotationValue(decorator));
+            }
+        }
+        return Optional.empty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private <K extends Annotation> AnnotationValue<K> normalizeAliasForAnnotationValue(AnnotationValue<K> annotationValue, Class<K> annotationType) {
+        if (annotationType == AliasFor.class && annotationValue.stringValue("annotationName").isEmpty()) {
+            Optional<AnnotationClassValue<?>> annotationClassValue = annotationValue.annotationClassValue("annotation");
+            if (annotationClassValue.isPresent()) {
+                return (AnnotationValue<K>) annotationValue
+                    .mutate()
+                    .member("annotationName", annotationClassValue.get().getName())
+                    .build();
+            }
+        }
+        return annotationValue;
     }
 
     @Override
