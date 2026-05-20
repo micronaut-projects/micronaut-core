@@ -172,7 +172,6 @@ class BlobService:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0028")
     def "test generic type arguments retain annotation metadata"() {
         given:
         def pythonCode = '''
@@ -206,7 +205,7 @@ class GenericService:
         def numberArgumentMetadata = executableMethod.arguments[0].typeParameters[0].annotationMetadata
         def fooArgumentMetadata = executableMethod.arguments[1].typeParameters[0].annotationMetadata
         def returnArgumentMetadata = executableMethod.returnType.asArgument().typeParameters[0].annotationMetadata
-        def fieldInjectionMetadata = beanDefinition.injectedMethods.find { it.methodName == "setInjectedNumbers" }.arguments[0].typeParameters[0].annotationMetadata
+        def fieldInjectionMetadata = beanDefinition.injectedMethods.find { it.methodName == "setInjected_numbers" }.arguments[0].typeParameters[0].annotationMetadata
         def methodInjectionMetadata = beanDefinition.injectedMethods.find { it.methodName == "set_method_numbers" }.arguments[0].typeParameters[0].annotationMetadata
 
         then:

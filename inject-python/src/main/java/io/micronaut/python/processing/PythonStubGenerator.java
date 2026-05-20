@@ -655,7 +655,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         }
 
                         for (@NonNull ParameterElement parameter : injectionMethod.getParameters()) {
-                            var parameterType = TypeDef.of(parameter.getType());
+                            var parameterType = sourceSignatureType(parameter.getGenericType());
                             ParameterDef parameterDef = ParameterDef
                                 .builder(parameter.getName(), parameterType).build();
                             injectionMethodBuilder.addParameter(parameterDef);
@@ -756,7 +756,25 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             interfaceTypeDef = TypeDef.parameterized(javaClassType(anInterface), resolvedTypeArguments);
         }
-        return interfaceTypeDef;
+        return withTypeAnnotations(interfaceTypeDef, anInterface);
+    }
+
+    private static TypeDef withTypeAnnotations(TypeDef typeDef, ClassElement classElement) {
+        AnnotationMetadata annotationMetadata = classElement.getTypeAnnotationMetadata();
+        if (annotationMetadata.isEmpty()) {
+            return typeDef;
+        }
+        List<AnnotationDef> annotationDefs = new ArrayList<>();
+        for (String annotationName : annotationMetadata.getDeclaredAnnotationNames()) {
+            AnnotationValue<?> annotationValue = annotationMetadata.getDeclaredAnnotation(annotationName);
+            if (annotationValue != null) {
+                annotationDefs.add(buildAnnotationDef(annotationValue.getAnnotationName(), (Map) annotationValue.getValues()));
+            }
+        }
+        if (annotationDefs.isEmpty()) {
+            return typeDef;
+        }
+        return typeDef.annotated(annotationDefs);
     }
 
     static TypeDef propertyType(PropertyElement beanProperty) {
@@ -1798,7 +1816,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         @NonNull ParameterElement[] parameters = methodElement.getParameters();
         for (@NonNull ParameterElement parameter : parameters) {
             ParameterDef parameterDef = ParameterDef
-                .builder(parameter.getName(), erasedType(parameter.getGenericType())).build();
+                .builder(parameter.getName(), sourceSignatureType(parameter.getGenericType())).build();
             methodBuilder.addParameter(parameterDef);
         }
 

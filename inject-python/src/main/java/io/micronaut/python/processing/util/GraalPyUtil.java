@@ -32,6 +32,7 @@ import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.visitor.AttributeDef;
@@ -304,6 +305,7 @@ public final class GraalPyUtil {
 
         String name = typeRef.name();
         List<TypeRef> typeArguments = typeRef.typeArguments();
+        List<DecoratorDef> typeUseDecorators = typeRef.typeUseDecorators();
         if (isAnnotatedType(name) && !typeArguments.isEmpty()) {
             ClassElement baseType = resolvePythonTypeToJava(typeArguments.getFirst(), visitorContext, boundGenerics);
             return withTypeUseAnnotations(baseType, typeArguments.subList(1, typeArguments.size()), visitorContext);
@@ -311,14 +313,14 @@ public final class GraalPyUtil {
         if (typeArguments.isEmpty()) {
             ClassElement boundGeneric = boundGenerics.get(name);
             if (boundGeneric != null) {
-                return boundGeneric;
+                return withTypeUseDecorators(boundGeneric, typeUseDecorators, visitorContext);
             }
         }
         ClassElement rawType = resolvePythonTypeToJava(name, visitorContext, boundGenerics);
         if (!typeArguments.isEmpty()) {
             ClassElement collectionType = resolveCollectionTypeArguments(rawType, typeArguments, visitorContext, boundGenerics);
             if (collectionType != null) {
-                return collectionType;
+                return withTypeUseDecorators(collectionType, typeUseDecorators, visitorContext);
             }
         }
         List<? extends GenericPlaceholderElement> declaredGenericPlaceholders = rawType.getDeclaredGenericPlaceholders();
@@ -331,9 +333,9 @@ public final class GraalPyUtil {
                 String variableName = placeHolder.getVariableName();
                 resolvedTypeArguments.put(variableName, resolvedType);
             }
-            return rawType.withTypeArguments(resolvedTypeArguments);
+            return withTypeUseDecorators(rawType.withTypeArguments(resolvedTypeArguments), typeUseDecorators, visitorContext);
         }
-        return rawType;
+        return withTypeUseDecorators(rawType, typeUseDecorators, visitorContext);
     }
 
     private static boolean isAnnotatedType(String name) {
@@ -356,6 +358,14 @@ public final class GraalPyUtil {
             }
             decorators.add(new DecoratorDef(annotationName, annotationName));
         }
+        return withTypeUseDecorators(baseType, decorators, visitorContext);
+    }
+
+    private static ClassElement withTypeUseDecorators(
+        ClassElement baseType,
+        List<DecoratorDef> decorators,
+        PythonVisitorContext visitorContext
+    ) {
         if (decorators.isEmpty()) {
             return baseType;
         }
@@ -414,7 +424,16 @@ public final class GraalPyUtil {
         ClassElement resolvedType = resolvePythonTypeToJava(typeParameterDef, visitorContext, boundGenerics);
         if (resolvedType.isPrimitive()) {
             ClassTypeDef boxedType = TypeDescriptors.toBoxedIfNecessary(io.micronaut.sourcegen.model.TypeDef.of(resolvedType));
-            return ClassElement.of(boxedType.getName());
+            ClassElement boxedClassElement = visitorContext.getClassElement(boxedType.getName()).orElseGet(() -> ClassElement.of(boxedType.getName()));
+            AnnotationMetadata annotationMetadata = resolvedType.getTypeAnnotationMetadata();
+            if (annotationMetadata.isEmpty()) {
+                return boxedClassElement;
+            }
+            if (annotationMetadata instanceof ElementAnnotationMetadata elementAnnotationMetadata) {
+                return new TypeAnnotatedClassElement(boxedClassElement, elementAnnotationMetadata);
+            }
+            var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
+            return new TypeAnnotatedClassElement(boxedClassElement, metadata);
         }
         return resolvedType;
     }

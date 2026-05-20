@@ -955,15 +955,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 local_name = self._resolve_local_type_name(type_name)
                 if local_name:
                     return local_name
-                # Locally generated decorator/java.type assignments shadow imports at runtime.
-                assigned_name = self.java_type_assignments.get(type_name)
-                if assigned_name:
-                    return assigned_name
-                # Check if this is an imported type
-                imported_name = self.imported_types.get(type_name)
-                if imported_name:
-                    return imported_name
-                return type_name
+                return self._resolve_bound_type_name(type_name)
         elif isinstance(type_node, ast.Str):
             # Handle older Python versions with ast.Str
             type_name = type_node.s
@@ -971,26 +963,13 @@ class MicronautAstVisitor(ast.NodeVisitor):
             local_name = self._resolve_local_type_name(type_name)
             if local_name:
                 return local_name
-            # Locally generated decorator/java.type assignments shadow imports at runtime.
-            assigned_name = self.java_type_assignments.get(type_name)
-            if assigned_name:
-                return assigned_name
-            # Check if this is an imported type
-            imported_name = self.imported_types.get(type_name)
-            if imported_name:
-                return imported_name
-            return type_name
+            return self._resolve_bound_type_name(type_name)
         elif isinstance(type_node, ast.Name):
             # Check if this is a local class
             local_name = self._resolve_local_type_name(type_node.id)
             if local_name:
                 return local_name
-            # Locally generated decorator/java.type assignments shadow imports at runtime.
-            assigned_name = self.java_type_assignments.get(type_node.id)
-            if assigned_name:
-                return assigned_name
-            # Then check if this is an imported type
-            return self.imported_types.get(type_node.id, type_node.id)
+            return self._resolve_bound_type_name(type_node.id)
         elif isinstance(type_node, ast.Attribute):
             # Handle qualified names like typing.List
             names = []
@@ -1020,6 +999,17 @@ class MicronautAstVisitor(ast.NodeVisitor):
             return ast.unparse(type_node)
         else:
             return ast.dump(type_node)
+
+    def _resolve_bound_type_name(self, type_name):
+        imported_name = self.imported_types.get(type_name)
+        if imported_name and imported_name.startswith("typing."):
+            return imported_name
+        assigned_name = self.java_type_assignments.get(type_name)
+        if assigned_name:
+            return assigned_name
+        if imported_name:
+            return imported_name
+        return type_name
 
     def _extract_union_type(self, type_node):
         """
@@ -1431,6 +1421,11 @@ class MicronautAstVisitor(ast.NodeVisitor):
         elif isinstance(type_node, ast.Subscript):
             # Generic type like 'MyBase[str]' or 'dict[str, int]'
             base_name = self._extract_type_name(type_node.value)
+            if base_name in ('Annotated', 'typing.Annotated'):
+                parsed_type, parsed_decorators = self._parse_annotated_type(type_node)
+                if parsed_type:
+                    return TypeRef(parsed_type.name(), parsed_type.typeArguments(), parsed_decorators)
+                return TypeRef("object")
             type_args = self._extract_subscript_args(type_node)
             # Recursively parse each type argument
             type_arg_defs = [self._parse_type(arg) for arg in type_args]
