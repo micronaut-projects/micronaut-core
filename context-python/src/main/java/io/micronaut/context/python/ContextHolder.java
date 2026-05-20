@@ -24,6 +24,7 @@ import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
@@ -38,6 +39,7 @@ public final class ContextHolder {
 
     private static final AtomicBoolean REUSE_CONTEXT = new AtomicBoolean();
     private static volatile @Nullable Context context;
+    private static volatile @Nullable ClassLoader contextClassLoader;
     private static volatile @Nullable PythonPool pythonPool;
 
     private ContextHolder() {
@@ -283,12 +285,14 @@ public final class ContextHolder {
     }
 
     private static Value instantiate(@Nullable String packageName, String simpleName, Object[] args, Value pythonClass) {
-        if (pythonClass.canInstantiate()) {
-            return pythonClass.newInstance(GraalPyRuntimeUtil.coerceArgumentsToContext(pythonClass.getContext(), args));
-        } else {
-            String qualifiedName = packageName == null || PYTHON.equals(packageName) ? simpleName :  packageName + "." + simpleName;
-            throw new InstantiationException("Cannot instantiate class: " + qualifiedName + ". Ensure the class is a valid Python class and is non-abstract.");
-        }
+        return withContextClassLoader(() -> {
+            if (pythonClass.canInstantiate()) {
+                return pythonClass.newInstance(GraalPyRuntimeUtil.coerceArgumentsToContext(pythonClass.getContext(), args));
+            } else {
+                String qualifiedName = packageName == null || PYTHON.equals(packageName) ? simpleName :  packageName + "." + simpleName;
+                throw new InstantiationException("Cannot instantiate class: " + qualifiedName + ". Ensure the class is a valid Python class and is non-abstract.");
+            }
+        });
     }
 
     /**
@@ -456,13 +460,15 @@ public final class ContextHolder {
     }
 
     private static Value importModule(Context ctx, String moduleName) {
-        Value bindings = ctx.getBindings(PYTHON);
-        Value importModule = bindings.getMember("__micronaut_import_module");
-        if (importModule == null) {
-            ctx.eval(PYTHON, "import importlib\n__micronaut_import_module = importlib.import_module");
-            importModule = bindings.getMember("__micronaut_import_module");
-        }
-        return importModule.execute(moduleName);
+        return withContextClassLoader(() -> {
+            Value bindings = ctx.getBindings(PYTHON);
+            Value importModule = bindings.getMember("__micronaut_import_module");
+            if (importModule == null) {
+                ctx.eval(PYTHON, "import importlib\n__micronaut_import_module = importlib.import_module");
+                importModule = bindings.getMember("__micronaut_import_module");
+            }
+            return importModule.execute(moduleName);
+        });
     }
 
     /**
@@ -473,6 +479,19 @@ public final class ContextHolder {
      */
     public static void setContext(Context context) {
         ContextHolder.context = context;
+        ContextHolder.contextClassLoader = Thread.currentThread().getContextClassLoader();
+    }
+
+    /**
+     * Set the GraalPy context and the application class loader that should be active when
+     * generated bridge classes enter Python from arbitrary runtime threads.
+     *
+     * @param context The GraalPy context to set
+     * @param classLoader The application class loader used to build the context
+     */
+    public static void setContext(Context context, @Nullable ClassLoader classLoader) {
+        ContextHolder.context = context;
+        ContextHolder.contextClassLoader = classLoader;
     }
 
     /**
@@ -506,6 +525,25 @@ public final class ContextHolder {
             return;
         }
         context = null;
+        contextClassLoader = null;
+    }
+
+    private static <T> T withContextClassLoader(Supplier<T> action) {
+        ClassLoader classLoader = contextClassLoader;
+        if (classLoader == null) {
+            return action.get();
+        }
+        Thread thread = Thread.currentThread();
+        ClassLoader previous = thread.getContextClassLoader();
+        if (previous == classLoader) {
+            return action.get();
+        }
+        thread.setContextClassLoader(classLoader);
+        try {
+            return action.get();
+        } finally {
+            thread.setContextClassLoader(previous);
+        }
     }
 
     /**

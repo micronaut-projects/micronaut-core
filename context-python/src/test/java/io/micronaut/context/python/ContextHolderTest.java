@@ -26,6 +26,7 @@ import java.nio.file.Path;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class ContextHolderTest {
 
@@ -54,6 +55,34 @@ final class ContextHolderTest {
 
             assertEquals("class", sample.getMember("value").asString());
             assertEquals("script", script.getMember("value").asString());
+        }
+    }
+
+    @Test
+    void usesContextClassLoaderWhenInstantiatingPythonFromRuntimeThreads() {
+        ClassLoader hostClassLoader = ContextHolderTest.class.getClassLoader();
+        ClassLoader previousClassLoader = Thread.currentThread().getContextClassLoader();
+        try (Context context = Context.newBuilder(PYTHON)
+            .allowAllAccess(true)
+            .hostClassLoader(hostClassLoader)
+            .allowHostClassLookup(name -> true)
+            .build()) {
+            context.eval(PYTHON, """
+                class NeedsHost:
+                    def __init__(self):
+                        import java
+                        self.loaded = java.type("io.micronaut.context.python.ContextHolder") is not None
+                """);
+            ContextHolder.setContext(context, hostClassLoader);
+
+            Thread.currentThread().setContextClassLoader(new ClassLoader(null) {
+            });
+            Value value = ContextHolder.newInstance("NeedsHost");
+
+            assertTrue(value.getMember("loaded").asBoolean());
+        } finally {
+            Thread.currentThread().setContextClassLoader(previousClassLoader);
+            ContextHolder.resetContext();
         }
     }
 }
