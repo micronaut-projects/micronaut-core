@@ -267,7 +267,8 @@ public final class PythonClassElement extends AbstractPythonClassElement {
 
     @Override
     public boolean isInterface() {
-        if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(getAnnotationMetadata())
+        boolean hasInterfaceBase = hasInterfaceBase();
+        if ((!hasInterfaceBase && BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(getAnnotationMetadata()))
             || hasStereotype(InterceptorBinding.class)
             || hasStereotype(Introspected.class)
             || getPrimaryConstructor().isPresent()
@@ -277,7 +278,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         }
         List<MethodElement> declaredMethods = getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared());
         if (declaredMethods.isEmpty()) {
-            return hasInterfaceBase();
+            return hasInterfaceBase;
         }
         return !declaredMethods.isEmpty()
             && declaredMethods.stream().allMatch(MethodElement::isAbstract)
@@ -286,6 +287,9 @@ public final class PythonClassElement extends AbstractPythonClassElement {
 
     private boolean hasInterfaceBase() {
         for (TypeRef basis : getNativeType().bases()) {
+            if (isProtocolType(basis.name())) {
+                return true;
+            }
             ClassElement baseElement = findPythonClass(basis);
             if (baseElement != null) {
                 if (baseElement.isInterface()) {
@@ -299,6 +303,12 @@ public final class PythonClassElement extends AbstractPythonClassElement {
             }
         }
         return false;
+    }
+
+    private static boolean isProtocolType(String typeName) {
+        return typeName.equals("typing.Protocol")
+            || typeName.equals("typing_extensions.Protocol")
+            || typeName.equals("Protocol");
     }
 
     private static boolean isIntroductionFactoryMethod(MethodElement method) {

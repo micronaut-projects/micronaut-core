@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
@@ -30,6 +31,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.annotation.PropertyElementAnnotationMetadata;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A property element representing a Python property (either a @property decorated method or a regular attribute).
@@ -44,7 +46,7 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
  * @author Micronaut Team
  * @since 5.0.0
  */
-public final class PythonPropertyElement extends AbstractPythonElement implements PropertyElement {
+public final class PythonPropertyElement extends AbstractPythonElement implements PropertyElement, ElementProvider {
     private final PythonProcessingEnvironment environment;
     private final ClassElement declaringType;
     private final ClassElement owningType;
@@ -182,6 +184,11 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
     @Override
     public ClassElement getOwningType() {
         return owningType;
+    }
+
+    @Override
+    public @Nullable javax.lang.model.element.Element element() {
+        return environment.originatingElement();
     }
 
     @Override

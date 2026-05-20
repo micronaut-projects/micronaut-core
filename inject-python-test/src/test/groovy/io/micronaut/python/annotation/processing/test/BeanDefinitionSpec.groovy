@@ -407,7 +407,6 @@ class QualifiedService:
             .getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == "python.Cylinders"
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0036")
     @Unroll
     void "test #annotation protocol is not registered as a bean definition"() {
         expect:
