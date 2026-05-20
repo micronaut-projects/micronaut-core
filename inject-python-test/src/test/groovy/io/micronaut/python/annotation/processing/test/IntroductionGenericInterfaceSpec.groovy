@@ -290,7 +290,6 @@ class MyBean(MyInterface, ABC):
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0063")
     void "test introduction generic type argument annotations propagate to methods"() {
         given:
         def pythonCode = '''
