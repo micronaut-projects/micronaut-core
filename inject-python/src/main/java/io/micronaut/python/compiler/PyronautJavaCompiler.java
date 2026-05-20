@@ -41,6 +41,7 @@ import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -124,13 +125,21 @@ final class PyronautJavaCompiler {
             boolean success = task.call();
             if (!success) {
                 throw new RuntimeException(
-                    "Compilation failed: " + diagnosticCollector.getDiagnostics());
+                    "Compilation failed: " + diagnosticsToString(diagnosticCollector));
             }
         } finally {
             Thread.currentThread().setContextClassLoader(previous);
             System.clearProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER);
             System.clearProperty(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER);
             shutdownProcessors(processors);
+        }
+    }
+
+    private static String diagnosticsToString(DiagnosticCollector<JavaFileObject> diagnosticCollector) {
+        try {
+            return new ArrayList<>(diagnosticCollector.getDiagnostics()).toString();
+        } catch (ConcurrentModificationException e) {
+            return "diagnostics unavailable due to concurrent modification";
         }
     }
 
