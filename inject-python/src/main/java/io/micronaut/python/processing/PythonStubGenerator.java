@@ -292,6 +292,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         for (MethodElement method : abstractHostMethods) {
                             addBridgeMethod(method, builder, context, false, false, addedMethodNames);
                         }
+                        List<MethodElement> hostMethods = superType.getEnclosedElements(
+                            ElementQuery.ALL_METHODS
+                                .onlyAccessible()
+                                .onlyInstance()
+                                .filter(method -> !method.isAbstract() && !method.isFinal() && !method.isStatic()));
+                        List<MethodElement> declaredMethods = element.getEnclosedElements(
+                            ElementQuery.ALL_METHODS
+                                .onlyAccessible()
+                                .onlyInstance()
+                                .onlyDeclared());
+                        for (MethodElement hostMethod : hostMethods) {
+                            if (declaredMethods.stream().anyMatch(declaredMethod -> overridesHostMethod(declaredMethod, hostMethod))) {
+                                addBridgeMethod(hostMethod, builder, context, false, false, addedMethodNames);
+                            }
+                        }
                     }
 
                     if (isDeclaredBean) {
@@ -751,6 +766,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             );
         }
         return interfaceTypeDef;
+    }
+
+    private static boolean overridesHostMethod(MethodElement declaredMethod, MethodElement hostMethod) {
+        return declaredMethod.getName().equals(hostMethod.getName())
+            && declaredMethod.getParameters().length == hostMethod.getParameters().length;
     }
 
     static TypeDef propertyType(PropertyElement beanProperty) {
