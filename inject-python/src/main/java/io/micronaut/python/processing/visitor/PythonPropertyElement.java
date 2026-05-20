@@ -327,10 +327,12 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
 
         // Then try field documentation
         if (propertyDef.hasField()) {
-            Optional<String> fieldDoc = getField().flatMap(field ->
-                field.getDocumentation(parseContent));
-            if (fieldDoc.isPresent()) {
-                return fieldDoc;
+            String fieldDoc = propertyDef.field().documentation();
+            if (fieldDoc != null) {
+                if (parseContent) {
+                    return Optional.of(io.micronaut.python.processing.util.GraalPyUtil.parsePythonDocstring(fieldDoc));
+                }
+                return Optional.of(fieldDoc);
             }
         }
 
