@@ -25,9 +25,12 @@ import java.util.Set;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -36,6 +39,7 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.python.processing.visitor.DecoratorDef;
+import io.micronaut.python.processing.visitor.TypeAnnotatedClassElement;
 import io.micronaut.python.processing.visitor.TypeRef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import org.graalvm.polyglot.Value;
@@ -301,6 +305,10 @@ public final class GraalPyUtil {
 
         String name = typeRef.name();
         List<TypeRef> typeArguments = typeRef.typeArguments();
+        if (isAnnotatedType(name) && !typeArguments.isEmpty()) {
+            ClassElement baseType = resolvePythonTypeToJava(typeArguments.getFirst(), visitorContext, boundGenerics);
+            return withTypeUseAnnotations(baseType, typeArguments.subList(1, typeArguments.size()), visitorContext);
+        }
         if (typeArguments.isEmpty()) {
             ClassElement boundGeneric = boundGenerics.get(name);
             if (boundGeneric != null) {
@@ -327,6 +335,40 @@ public final class GraalPyUtil {
             return rawType.withTypeArguments(resolvedTypeArguments);
         }
         return rawType;
+    }
+
+    private static boolean isAnnotatedType(String name) {
+        return "Annotated".equals(name) || "typing.Annotated".equals(name);
+    }
+
+    private static ClassElement withTypeUseAnnotations(
+        ClassElement baseType,
+        List<TypeRef> annotationTypes,
+        PythonVisitorContext visitorContext
+    ) {
+        if (annotationTypes.isEmpty()) {
+            return baseType;
+        }
+        MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        for (TypeRef annotationType : annotationTypes) {
+            String annotationName = annotationType.name();
+            if (annotationName == null || annotationName.isBlank()) {
+                continue;
+            }
+            annotationMetadata.addDeclaredAnnotation(annotationName, Map.of());
+            annotationMetadata.addDeclaredStereotype(List.of(annotationName), annotationName, Map.of());
+            if (AnnotationUtil.NON_NULL.equals(annotationName)) {
+                annotationMetadata.addDeclaredStereotype(List.of(annotationName), AnnotationUtil.NON_NULL, Map.of());
+            }
+            if (AnnotationUtil.NULLABLE.equals(annotationName)) {
+                annotationMetadata.addDeclaredStereotype(List.of(annotationName), AnnotationUtil.NULLABLE, Map.of());
+            }
+        }
+        if (annotationMetadata.isEmpty()) {
+            return baseType;
+        }
+        ElementAnnotationMetadata metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
+        return new TypeAnnotatedClassElement(baseType, metadata);
     }
 
     private static @Nullable ClassElement resolveCollectionTypeArguments(

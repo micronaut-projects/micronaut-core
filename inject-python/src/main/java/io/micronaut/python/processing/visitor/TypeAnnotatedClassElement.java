@@ -18,6 +18,7 @@ package io.micronaut.python.processing.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -43,7 +44,8 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-record TypeAnnotatedClassElement(
+@Internal
+public record TypeAnnotatedClassElement(
     ClassElement delegate,
     ElementAnnotationMetadata typeAnnotationMetadata
 ) implements ClassElement {
