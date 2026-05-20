@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -32,6 +33,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
 import org.graalvm.polyglot.Value;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A field element returning data from a Python {@link AttributeDef}.
@@ -39,7 +41,7 @@ import org.graalvm.polyglot.Value;
  * @author Micronaut Team
  * @since 5.0.0
  */
-public final class PythonFieldElement extends AbstractPythonElement implements FieldElement {
+public final class PythonFieldElement extends AbstractPythonElement implements FieldElement, ElementProvider {
     private final PythonProcessingEnvironment environment;
     private final ClassElement declaringType;
     private final ClassElement owningType;
@@ -106,6 +108,11 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
     @Override
     public ClassElement getOwningType() {
         return owningType;
+    }
+
+    @Override
+    public @Nullable javax.lang.model.element.Element element() {
+        return environment.originatingElement();
     }
 
     private ClassElement resolveType(AttributeDef attributeDef) {

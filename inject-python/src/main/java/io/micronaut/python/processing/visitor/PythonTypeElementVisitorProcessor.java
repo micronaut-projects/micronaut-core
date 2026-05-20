@@ -79,10 +79,7 @@ public class PythonTypeElementVisitorProcessor {
         this.loadedVisitors = new ArrayList<>(typeElementVisitors.size());
 
         for (TypeElementVisitor<?, ?> visitor : typeElementVisitors) {
-            TypeElementVisitor.VisitorKind visitorKind = visitor.getVisitorKind();
-            TypeElementVisitor.VisitorKind incrementalProcessorKind = getIncrementalProcessorKind();
-
-            if (incrementalProcessorKind == visitorKind) {
+            if (isSupportedVisitorKind(visitor.getVisitorKind())) {
                 try {
                     loadedVisitors.add(new LoadedVisitor(visitor));
                 } catch (TypeNotPresentException | NoClassDefFoundError e) {
@@ -320,8 +317,9 @@ public class PythonTypeElementVisitorProcessor {
         return false;
     }
 
-    private TypeElementVisitor.VisitorKind getIncrementalProcessorKind() {
-        return TypeElementVisitor.VisitorKind.ISOLATING;
+    private boolean isSupportedVisitorKind(TypeElementVisitor.VisitorKind visitorKind) {
+        return visitorKind == TypeElementVisitor.VisitorKind.ISOLATING
+            || visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING;
     }
 
     /**

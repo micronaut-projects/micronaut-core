@@ -16,12 +16,10 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.python.compiler.PyronautCompiler
-import spock.lang.PendingFeature
 import tools.jackson.databind.ObjectMapper
 
 class ConfigurationJsonSchemaSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0087")
     void "test simple configuration properties schema"() {
         given:
         def pythonCode = '''
@@ -48,8 +46,8 @@ class MyProps:
         schema.'$id' == "urn:micronaut:config:python.MyProps"
         schema.title == "python.MyProps"
         schema.'x-micronaut'.prefix == "foo.bar"
-        schema.properties.host.type == "string"
-        schema.properties.port.type == "integer"
+        schema.get("properties").host.type == "string"
+        schema.get("properties").port.type == "integer"
 
         cleanup:
         tempDir?.deleteDir()
