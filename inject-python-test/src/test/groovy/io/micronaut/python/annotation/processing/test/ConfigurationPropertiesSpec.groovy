@@ -47,7 +47,6 @@ class ServiceConfig:
         definition instanceof ValidatedBeanDefinition
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0094")
     void "test each property on Python class tht implements Java interface"() {
         given:
         def pythonCode = '''
@@ -72,10 +71,10 @@ class EngineConfiguration(Toggleable):
 
         then:
         ferrariBean != null
-        ferrariBean.cylinders() == 8
-        ferrariBean.enabled() == false
-        fordBean.cylinders() == 6
-        fordBean.enabled() == true
+        ferrariBean.getCylinders() == 8
+        ferrariBean.isEnabled() == false
+        fordBean.getCylinders() == 6
+        fordBean.isEnabled() == true
     }
 
     void "test each property on Python class"() {
