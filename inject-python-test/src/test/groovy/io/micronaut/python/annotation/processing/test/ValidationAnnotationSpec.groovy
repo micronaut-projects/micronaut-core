@@ -26,7 +26,6 @@ import jakarta.validation.Constraint
 import jakarta.validation.Valid
 import jakarta.validation.constraints.*
 import org.intellij.lang.annotations.Language
-import spock.lang.PendingFeature
 
 /**
  * Tests for Jakarta validation annotation processing in Python code.
@@ -36,7 +35,6 @@ import spock.lang.PendingFeature
  */
 class ValidationAnnotationSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0048")
     def "test constraints on singleton methods make them validated"() {
         given:
         @Language("python") def pythonCode = '''

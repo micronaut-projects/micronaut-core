@@ -52,6 +52,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
 import org.jetbrains.annotations.NotNull;
@@ -73,6 +74,9 @@ import javax.lang.model.element.Element;
  * @since 5.0.0
  */
 public non-sealed class PythonMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider {
+    private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
+    private static final String ANN_VALID = "jakarta.validation.Valid";
+
     private final PythonProcessingEnvironment environment;
     private final ClassElement declaringType;
     private final ClassElement owningType;
@@ -110,6 +114,9 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         // Create parameter elements
         this.parameters = createParameters(functionDef);
         this.helper = new MethodElementAnnotationsHelper(this, metadataFactory);
+        if (requiresValidation()) {
+            annotate(RequiresValidation.class);
+        }
     }
 
     @Override
@@ -206,6 +213,24 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             }
         }
         return Optional.empty();
+    }
+
+    private boolean requiresValidation() {
+        if (hasValidationAnnotation(getAnnotationMetadata()) || hasValidationAnnotation(getReturnType().getAnnotationMetadata())) {
+            return true;
+        }
+        for (ParameterElement parameter : parameters) {
+            if (hasValidationAnnotation(parameter.getAnnotationMetadata())
+                || hasValidationAnnotation(parameter.getType().getAnnotationMetadata())
+                || hasValidationAnnotation(parameter.getGenericType().getAnnotationMetadata())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasValidationAnnotation(AnnotationMetadata metadata) {
+        return metadata.hasStereotype(ANN_CONSTRAINT) || metadata.hasAnnotation(ANN_VALID);
     }
 
     @Override
