@@ -572,8 +572,8 @@ public final class GraalPyRuntimeUtil {
      * @param <T> The response body type
      * @return The converted response
      */
-    @SuppressWarnings("unchecked")
-    public static <T> @Nullable HttpResponse<T> convertHttpResponse(Value value, Class<T> bodyType) {
+    @SuppressWarnings({"unchecked", "NullAway"})
+    public static <T> HttpResponse<T> convertHttpResponse(Value value, Class<T> bodyType) {
         HttpResponse<?> response = convertValue(value, HttpResponse.class);
         if (response == null) {
             return null;
