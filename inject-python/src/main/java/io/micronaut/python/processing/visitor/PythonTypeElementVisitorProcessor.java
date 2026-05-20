@@ -24,6 +24,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -115,6 +116,9 @@ public class PythonTypeElementVisitorProcessor {
         List<ClassElement> allClasses = collectClassElements(environment, pythonVisitorContext);
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             for (ClassElement element : allClasses) {
+                if (element.hasAnnotation(Generated.class)) {
+                    continue;
+                }
                 if (loadedVisitor.matchesClass(element)) {
                     annotatePythonAopProxy(element);
                     visitClass(loadedVisitor, element, pythonVisitorContext);
