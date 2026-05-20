@@ -525,7 +525,6 @@ class TestFactory:
         context.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0040")
     void "test resolved generic type arguments are not type variables"() {
         given:
         def definition = buildBeanDefinition("python", "TestSerde", '''

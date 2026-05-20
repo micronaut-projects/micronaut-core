@@ -461,10 +461,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         List<TypeRef> typeArguments = base.typeArguments();
         if (!typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty() && typeArguments.size() == declaredGenericPlaceholders.size()) {
             Map<String, ClassElement> resolvedTypeArguments = new HashMap<>(declaredGenericPlaceholders.size());
-            Map<String, ClassElement> boundGenerics = new HashMap<>();
-            for (GenericPlaceholderElement placeholder : getDeclaredGenericPlaceholders()) {
-                boundGenerics.put(placeholder.getVariableName(), placeholder);
-            }
+            Map<String, ClassElement> boundGenerics = new HashMap<>(getTypeArguments());
             for (int i = 0; i < declaredGenericPlaceholders.size(); i++) {
                 GenericPlaceholderElement placeHolder = declaredGenericPlaceholders.get(i);
                 TypeRef typeRef = typeArguments.get(i);
@@ -518,6 +515,21 @@ public final class PythonClassElement extends AbstractPythonClassElement {
             return typeArguments;
         }
         return resolvedTypeArguments;
+    }
+
+    @Override
+    public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
+        Map<String, Map<String, ClassElement>> result = new LinkedHashMap<>();
+        for (TypeRef base : getNativeType().bases()) {
+            ClassElement baseElement = findPythonClass(base);
+            if (baseElement != null) {
+                result.putAll(resolveTypeArguments(baseElement, base).getAllTypeArguments());
+            } else {
+                toJavaType(base).ifPresent(javaType -> result.putAll(javaType.getAllTypeArguments()));
+            }
+        }
+        result.put(getName(), getTypeArguments());
+        return result;
     }
 
     @Override
