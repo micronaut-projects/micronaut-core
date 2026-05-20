@@ -109,6 +109,9 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(getAnnotationMetadata())) {
             return;
         }
+        if (isAbstract()) {
+            return;
+        }
         if (hasPropertyInjectionPoint()) {
             annotate(Bean.class);
         }

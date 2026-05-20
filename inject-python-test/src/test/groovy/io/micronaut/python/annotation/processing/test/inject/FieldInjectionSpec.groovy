@@ -5,7 +5,6 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.PendingFeature
 
 class FieldInjectionSpec extends AbstractPythonTypeElementSpec {
     void "test field injection generic metadata"() {
@@ -258,7 +257,6 @@ class ListConsumerService:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0014")
     void "test inherited field injection from abstract base class"() {
         given:
         def pythonCode = '''
