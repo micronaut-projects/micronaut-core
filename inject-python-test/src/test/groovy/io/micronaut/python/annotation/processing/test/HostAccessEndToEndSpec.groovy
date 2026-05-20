@@ -59,6 +59,39 @@ class Book:
         ctx?.close()
     }
 
+    void "Python bean extending Java abstract class remains assignable to inherited interface"() {
+        given:
+        String py = '''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test import HeaderTokenReaderLike
+
+
+@Singleton
+class ApiKeyTokenReader(HeaderTokenReaderLike):
+    def getPrefix(self) -> str | None:
+        return None
+
+    def getHeaderName(self) -> str:
+        return "X-API-KEY"
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Class<?> generatedClass = ctx.classLoader.loadClass('python.ApiKeyTokenReader')
+        def reader = ctx.getBean(TokenReaderLike)
+
+        then:
+        HeaderTokenReaderLike.isAssignableFrom(generatedClass)
+        TokenReaderLike.isAssignableFrom(generatedClass)
+        reader.findToken("XXX") == "XXX"
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "HostAccess converts nested properties dataclass list fields"() {
         given:
         String py = '''

@@ -223,10 +223,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // Check if this class extends another PythonClassElement
                     ClassElement superType = element.getSuperType().orElse(null);
                     boolean extendsPythonClass = superType instanceof AbstractPythonClassElement;
-                    boolean extendsHostThrowable = superType != null
+                    boolean extendsHostClass = superType != null
                         && !extendsPythonClass
-                        && superType.isAssignable(Throwable.class.getName());
-                    if (extendsPythonClass || extendsHostThrowable) {
+                        && !Object.class.getName().equals(superType.getName())
+                        && !superType.isInterface();
+                    if (extendsPythonClass || extendsHostClass) {
                         builder.superclass(ClassTypeDef.of(superType.getName()));
                     }
 
@@ -280,6 +281,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             }
                             addBridgeMethod(method, builder, context, false, false, addedMethodNames);
                             methodSet.add(method);
+                        }
+                    }
+                    if (extendsHostClass) {
+                        List<MethodElement> abstractHostMethods = superType.getEnclosedElements(
+                            ElementQuery.ALL_METHODS
+                                .onlyAccessible()
+                                .onlyInstance()
+                                .filter(MethodElement::isAbstract));
+                        for (MethodElement method : abstractHostMethods) {
+                            addBridgeMethod(method, builder, context, false, false, addedMethodNames);
                         }
                     }
 
