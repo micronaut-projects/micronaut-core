@@ -561,7 +561,6 @@ class TestSerde(Serde[object]):
         !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0017")
     void "test annotation metadata present on deep type parameters of definition"() {
         given:
         def definition = buildBeanDefinition("python", "DeepValidatedService", '''

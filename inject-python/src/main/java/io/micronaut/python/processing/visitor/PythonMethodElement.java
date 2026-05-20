@@ -216,13 +216,12 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     }
 
     private boolean requiresValidation() {
-        if (hasValidationAnnotation(getAnnotationMetadata()) || hasValidationAnnotation(getReturnType().getAnnotationMetadata())) {
+        if (hasValidationAnnotation(getAnnotationMetadata()) || hasValidationAnnotation(getGenericReturnType())) {
             return true;
         }
         for (ParameterElement parameter : parameters) {
             if (hasValidationAnnotation(parameter.getAnnotationMetadata())
-                || hasValidationAnnotation(parameter.getType().getAnnotationMetadata())
-                || hasValidationAnnotation(parameter.getGenericType().getAnnotationMetadata())) {
+                || hasValidationAnnotation(parameter.getGenericType())) {
                 return true;
             }
         }
@@ -231,6 +230,18 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     private static boolean hasValidationAnnotation(AnnotationMetadata metadata) {
         return metadata.hasStereotype(ANN_CONSTRAINT) || metadata.hasAnnotation(ANN_VALID);
+    }
+
+    private static boolean hasValidationAnnotation(ClassElement classElement) {
+        if (hasValidationAnnotation(classElement.getAnnotationMetadata())) {
+            return true;
+        }
+        for (ClassElement typeArgument : classElement.getTypeArguments().values()) {
+            if (hasValidationAnnotation(typeArgument)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

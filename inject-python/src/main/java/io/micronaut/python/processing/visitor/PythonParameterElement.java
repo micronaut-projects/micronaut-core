@@ -37,6 +37,10 @@ import io.micronaut.python.processing.util.GraalPyUtil;
  * @since 5.0.0
  */
 public final class PythonParameterElement extends AbstractPythonElement implements ParameterElement {
+    private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
+    private static final String ANN_VALID = "jakarta.validation.Valid";
+    private static final String ANN_VALIDATED_ELEMENT = "io.micronaut.validation.annotation.ValidatedElement";
+
     private final PythonProcessingEnvironment environment;
     private final ClassElement type;
     private final PythonMethodElement methodElement;
@@ -57,6 +61,9 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
         // Resolve parameter type
         this.type = resolveType(argumentDef);
         this.argumentDef = argumentDef;
+        if (hasValidationAnnotation(type)) {
+            annotate(ANN_VALIDATED_ELEMENT);
+        }
     }
 
     @Override
@@ -119,5 +126,18 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
     @Override
     public ParameterElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return (ParameterElement) super.withAnnotationMetadata(annotationMetadata);
+    }
+
+    private static boolean hasValidationAnnotation(ClassElement classElement) {
+        AnnotationMetadata annotationMetadata = classElement.getAnnotationMetadata();
+        if (annotationMetadata.hasStereotype(ANN_CONSTRAINT) || annotationMetadata.hasAnnotation(ANN_VALID)) {
+            return true;
+        }
+        for (ClassElement typeArgument : classElement.getTypeArguments().values()) {
+            if (hasValidationAnnotation(typeArgument)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
