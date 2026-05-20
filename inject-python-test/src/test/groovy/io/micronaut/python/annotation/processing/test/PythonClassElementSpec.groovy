@@ -34,6 +34,7 @@ import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
 import io.micronaut.python.compiler.RepeatableAnnotation
+import jakarta.validation.constraints.NotBlank
 import spock.lang.PendingFeature
 import spock.lang.Unroll
 
@@ -1134,7 +1135,6 @@ class PetClient(PetOperations):
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0042")
     def "test override method inherits parameter annotations from python base method"() {
         given:
         def pythonCode = '''
@@ -1155,12 +1155,11 @@ class DefaultRepository(Repository):
             def method = element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
                 .find { it.name == "save" }
 
-            assert method.parameters[0].hasAnnotation("jakarta.validation.constraints.NotBlank")
+            assert method.parameters[0].hasAnnotation(NotBlank)
             return element
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0035")
     def "test overridden method reports python base method"() {
         given:
         def pythonCode = '''
@@ -1184,7 +1183,7 @@ class DefaultRepository(Repository):
 
             assert overridden.size() == 1
             assert overridden.first().declaringType.name == "python.Repository"
-            assert overridden.first().parameters[0].hasAnnotation("jakarta.validation.constraints.NotBlank")
+            assert overridden.first().parameters[0].hasAnnotation(NotBlank)
             return element
         }
     }

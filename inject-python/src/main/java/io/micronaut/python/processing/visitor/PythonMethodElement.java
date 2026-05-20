@@ -87,6 +87,8 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     private ClassElement resolvedGenericReturnType;
     private ElementAnnotationMetadata resolvedMergedMethodAnnotationMetadata;
     private AnnotationMetadata resolvedInheritedMethodAnnotationMetadata;
+    private Collection<MethodElement> resolvedOverriddenMethods;
+    private ParameterElement[] resolvedParameters;
 
     /**
      * Constructs a new {@code PythonMethodElement} from the given {@code FunctionDef}.
@@ -303,7 +305,10 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public ParameterElement[] getParameters() {
-        return parameters.clone();
+        if (resolvedParameters == null) {
+            resolvedParameters = resolveParameters();
+        }
+        return resolvedParameters.clone();
     }
 
     @Override
@@ -346,8 +351,75 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     }
 
     @Override
+    public Collection<MethodElement> getOverriddenMethods() {
+        if (resolvedOverriddenMethods == null) {
+            resolvedOverriddenMethods = resolveOverriddenMethods();
+        }
+        return resolvedOverriddenMethods;
+    }
+
+    @Override
     public ClassElement getGenericReturnType() {
         return resolveGenericReturnType(getNativeType());
+    }
+
+    private ParameterElement[] resolveParameters() {
+        ParameterElement[] resolved = parameters;
+        for (MethodElement overriddenMethod : getOverriddenMethods()) {
+            ParameterElement[] overriddenParameters = overriddenMethod.getParameters();
+            if (overriddenParameters.length != resolved.length) {
+                continue;
+            }
+            ParameterElement[] merged = null;
+            for (int i = 0; i < resolved.length; i++) {
+                AnnotationMetadata inheritedMetadata = overriddenParameters[i].getAnnotationMetadata();
+                if (inheritedMetadata.isEmpty()) {
+                    continue;
+                }
+                if (merged == null) {
+                    merged = resolved.clone();
+                }
+                merged[i] = resolved[i].withAnnotationMetadata(
+                    new AnnotationMetadataHierarchy(true, inheritedMetadata, resolved[i].getAnnotationMetadata())
+                );
+            }
+            if (merged != null) {
+                resolved = merged;
+            }
+        }
+        return resolved;
+    }
+
+    private Collection<MethodElement> resolveOverriddenMethods() {
+        List<MethodElement> candidates = new ArrayList<>();
+        declaringType.getSuperType()
+            .ifPresent(superType -> candidates.addAll(superType.getEnclosedElements(ElementQuery.ALL_METHODS)));
+        for (ClassElement anInterface : declaringType.getInterfaces()) {
+            candidates.addAll(anInterface.getEnclosedElements(ElementQuery.ALL_METHODS));
+        }
+        if (candidates.isEmpty()) {
+            return List.of();
+        }
+        List<MethodElement> overriddenMethods = new ArrayList<>();
+        for (MethodElement candidate : candidates) {
+            if (candidate != this && isSubSignature(candidate, parameters)) {
+                overriddenMethods.add(candidate);
+            }
+        }
+        return overriddenMethods.isEmpty() ? List.of() : List.copyOf(overriddenMethods);
+    }
+
+    private boolean isSubSignature(MethodElement overridden, ParameterElement[] currentParameters) {
+        if (!getName().equals(overridden.getName()) || overridden.getParameters().length != currentParameters.length) {
+            return false;
+        }
+        ParameterElement[] overriddenParameters = overridden.getParameters();
+        for (int i = 0; i < overriddenParameters.length; i++) {
+            if (!currentParameters[i].getGenericType().isAssignable(overriddenParameters[i].getGenericType())) {
+                return false;
+            }
+        }
+        return getReturnType().getGenericType().isAssignable(overridden.getReturnType().getGenericType());
     }
 
     private ClassElement resolveGenericReturnType(FunctionDef functionDef) {

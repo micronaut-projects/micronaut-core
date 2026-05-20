@@ -18,6 +18,7 @@ package io.micronaut.python.processing.annotation;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
@@ -96,11 +97,23 @@ public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnot
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForMethod(MethodElement methodElement) {
         if (methodElement instanceof PythonMethodElement pythonMethodElement) {
             return metadataBuilder.lookupOrBuildForMethod(
-                getNativeElement(methodElement.getOwningType()),
+                getNativeElement(methodElement.getDeclaringType()),
                 methodMetadataKey(pythonMethodElement.getNativeType())
             );
         }
         return super.lookupForMethod(methodElement);
+    }
+
+    @Override
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForParameter(ParameterElement parameterElement) {
+        if (parameterElement.getMethodElement() instanceof PythonMethodElement pythonMethodElement) {
+            return metadataBuilder.lookupOrBuildForParameter(
+                getNativeElement(pythonMethodElement.getDeclaringType()),
+                getNativeElement(pythonMethodElement),
+                getNativeElement(parameterElement)
+            );
+        }
+        return super.lookupForParameter(parameterElement);
     }
 
     private static FunctionDef methodMetadataKey(FunctionDef functionDef) {
