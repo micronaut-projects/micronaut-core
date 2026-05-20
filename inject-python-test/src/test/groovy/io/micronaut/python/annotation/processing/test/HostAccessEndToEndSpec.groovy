@@ -57,6 +57,60 @@ class Book:
         ctx?.close()
     }
 
+    void "HostAccess converts nested properties dataclass list fields"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+
+@dataclass
+@Introspected
+class Period:
+    temperature: int
+    summary: str
+
+
+@dataclass
+@Introspected
+class ForecastProperties:
+    periods: list[Period] | None = None
+
+
+@dataclass
+@Introspected
+class Forecast:
+    properties: ForecastProperties | None = None
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Context polyglot = ctx.getBean(Context)
+        def value = polyglot.eval("python", "Forecast(ForecastProperties([Period(68, 'Clear')]))")
+        Class<?> forecastClass = ctx.classLoader.loadClass('python.Forecast')
+        Class<?> forecastPropertiesClass = ctx.classLoader.loadClass('python.ForecastProperties')
+        Class<?> periodClass = ctx.classLoader.loadClass('python.Period')
+        def converted = value.as(forecastClass)
+        def convertedProperties = forecastClass.getField('properties').get(converted)
+        def convertedPeriods = forecastPropertiesClass.getField('periods').get(convertedProperties)
+
+        then:
+        converted != null
+        convertedProperties != null
+        forecastPropertiesClass.isInstance(convertedProperties)
+        convertedPeriods != null
+        convertedPeriods.size() == 1
+        periodClass.isInstance(convertedPeriods[0])
+        periodClass.getField('temperature').get(convertedPeriods[0]) == 68
+        periodClass.getField('summary').get(convertedPeriods[0]) == 'Clear'
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "HostAccess exposes non-introspected dataclass properties on generated stub"() {
         given:
         String py = '''

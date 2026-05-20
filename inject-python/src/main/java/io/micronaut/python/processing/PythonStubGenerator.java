@@ -324,10 +324,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 ExpressionDef.InvokeInstanceMethod has = val.invoke("hasMember", TypeDef.Primitive.BOOLEAN, ExpressionDef.constant(beanProperty.getName()));
                                                 ExpressionDef.InvokeInstanceMethod member = val.invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(beanProperty.getName()));
                                                 ExpressionDef valueExpr = convertValueForType(beanProperty.getGenericType(), member);
-                                                assigns.add(has.isTrue().doIfElse(
-                                                    aThis.field(field).assign(valueExpr),
-                                                    StatementDef.multi()
-                                                ));
+                                                if (isCollectionLike(beanProperty.getGenericType())) {
+                                                    assigns.add(aThis.field(field).assign(valueExpr));
+                                                } else {
+                                                    assigns.add(has.isTrue().doIfElse(
+                                                        aThis.field(field).assign(valueExpr),
+                                                        StatementDef.multi()
+                                                    ));
+                                                }
                                             }
                                             return StatementDef.multi(assigns);
                                         })
@@ -1771,6 +1775,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             allClasses.containsKey(type.getName()) ||
                 type.isAssignable("io.micronaut.context.python.ValueCoercible")
         );
+    }
+
+    private static boolean isCollectionLike(ClassElement type) {
+        return type.isAssignable(List.class) || type.isAssignable(Map.class) || type.isAssignable(Set.class);
     }
 
     private ExpressionDef convertValueForType(ClassElement type, ExpressionDef member) {
