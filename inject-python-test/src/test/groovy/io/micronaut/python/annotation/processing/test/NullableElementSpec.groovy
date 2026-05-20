@@ -16,7 +16,6 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.inject.ast.ClassElement
-import spock.lang.PendingFeature
 
 class NullableElementSpec extends AbstractPythonTypeElementSpec {
 
@@ -135,7 +134,6 @@ class NullableProperties:
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0030")
     void "test nullable and non null annotations propagate to property types"() {
         expect:
         buildClassElement('''
