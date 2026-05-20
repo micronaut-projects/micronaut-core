@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.python.compiler.Serdeable
-import spock.lang.PendingFeature
 
 /**
  * Tests for Python bean introspection.
@@ -208,7 +207,6 @@ class TestClass:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0016")
     void "test introspection includes inherited Python attributes"() {
         given:
         def pythonCode = '''

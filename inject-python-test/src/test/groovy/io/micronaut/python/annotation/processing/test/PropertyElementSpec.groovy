@@ -159,7 +159,6 @@ class HealthResult(Protocol):
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0034")
     void "test inherited properties keep declaring and owning types"() {
         expect:
         buildClassElement('''

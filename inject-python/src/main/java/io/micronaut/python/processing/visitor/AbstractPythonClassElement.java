@@ -531,7 +531,16 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         List<PropertyElement> allProperties = new java.util.ArrayList<>(decoratorProperties);
 
         // Then, create properties from regular attributes that aren't already represented as properties
-        List<AttributeDef> fields = getNativeType().attributes();
+        addAttributeBackedProperties(this, this, allProperties);
+
+        // Apply propertyElementQuery filtering
+        return filterProperties(allProperties, propertyElementQuery);
+    }
+
+    private void addAttributeBackedProperties(AbstractPythonClassElement declaringType,
+                                              ClassElement owningType,
+                                              List<PropertyElement> allProperties) {
+        List<AttributeDef> fields = declaringType.getNativeType().attributes();
         for (AttributeDef field : fields) {
             // Check if this field is already represented as a property
             boolean alreadyExists = allProperties.stream()
@@ -545,16 +554,19 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                 PythonPropertyElement propertyElement = new PythonPropertyElement(
                     propertyDef,
                     environment,
-                    this,
-                    this,
+                    declaringType,
+                    owningType,
                     environment.metadataFactory()
                 );
                 allProperties.add(propertyElement);
             }
         }
 
-        // Apply propertyElementQuery filtering
-        return filterProperties(allProperties, propertyElementQuery);
+        declaringType.getSuperType().ifPresent(superType -> {
+            if (superType instanceof AbstractPythonClassElement pythonSuperType) {
+                addAttributeBackedProperties(pythonSuperType, owningType, allProperties);
+            }
+        });
     }
 
     static List<PropertyElement> filterProperties(List<PropertyElement> properties, PropertyElementQuery query) {
