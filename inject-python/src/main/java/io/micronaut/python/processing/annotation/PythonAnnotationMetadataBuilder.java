@@ -175,10 +175,90 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (decoratorList.isEmpty()) {
             DecoratorDef decoratorDef = this.decorators.get(element.name());
             if (decoratorDef != null) {
-                return decoratorDef.stereotypes();
+                return expandAliasedDecorators(decoratorDef.stereotypes());
             }
         }
-        return decoratorList;
+        return expandAliasedDecorators(decoratorList);
+    }
+
+    private List<DecoratorDef> expandAliasedDecorators(List<DecoratorDef> decoratorList) {
+        if (decoratorList.isEmpty()) {
+            return decoratorList;
+        }
+        List<DecoratorDef> expanded = null;
+        for (DecoratorDef decorator : decoratorList) {
+            List<DecoratorDef> aliasedDecorators = buildAliasedDecorators(decorator);
+            if (!aliasedDecorators.isEmpty() && expanded == null) {
+                expanded = new ArrayList<>(decoratorList);
+            }
+            if (expanded != null) {
+                expanded.addAll(aliasedDecorators);
+            }
+        }
+        return expanded == null ? decoratorList : expanded;
+    }
+
+    private List<DecoratorDef> buildAliasedDecorators(DecoratorDef decorator) {
+        Map<?, ?> members = decorator.members();
+        if (members.isEmpty()) {
+            return List.of();
+        }
+        String annotationName = toBinaryClassName(decorator.annotationName());
+        ClassElement javaAnnotationType = getJavaAnnotationType(decorator);
+        Map<String, Map<String, Object>> aliasValues = new LinkedHashMap<>();
+        Set<String> expandedTargets = new LinkedHashSet<>();
+        for (Map.Entry<?, ?> entry : members.entrySet()) {
+            String memberName = normalizeAnnotationMemberName(entry.getKey());
+            AnnotationMemberDef memberDef = resolveMemberDef(annotationName, javaAnnotationType, memberName);
+            List<AnnotationValue<AliasFor>> crossAnnotationAliases = getCrossAnnotationAliases(memberDef).stream()
+                .filter(alias -> alias.stringValue("annotation")
+                    .or(() -> alias.stringValue("annotationName"))
+                    .filter(targetAnnotation -> !targetAnnotation.equals(annotationName))
+                    .isPresent())
+                .toList();
+            boolean multiTargetMember = crossAnnotationAliases.size() > 1;
+            for (AnnotationValue<AliasFor> alias : crossAnnotationAliases) {
+                Optional<String> targetAnnotation = alias.stringValue("annotation")
+                    .or(() -> alias.stringValue("annotationName"));
+                Optional<String> targetMember = alias.stringValue("member");
+                if (targetAnnotation.isEmpty() || targetMember.isEmpty()) {
+                    continue;
+                }
+                String targetAnnotationName = targetAnnotation.get();
+                String targetMemberName = targetMember.get();
+                if (targetAnnotationName.equals(annotationName) || targetMemberName.isBlank()) {
+                    continue;
+                }
+                if (multiTargetMember) {
+                    expandedTargets.add(targetAnnotationName);
+                }
+                aliasValues
+                    .computeIfAbsent(targetAnnotationName, ignored -> new LinkedHashMap<>())
+                    .putIfAbsent(targetMemberName, entry.getValue());
+            }
+        }
+        if (expandedTargets.isEmpty()) {
+            return List.of();
+        }
+        List<DecoratorDef> aliasedDecorators = new ArrayList<>(expandedTargets.size());
+        for (String targetAnnotation : expandedTargets) {
+            Map<String, Object> targetValues = aliasValues.get(targetAnnotation);
+            if (targetValues == null || targetValues.isEmpty()) {
+                continue;
+            }
+            // Keep cross-annotation aliases in metadata, not on generated stubs. This mirrors
+            // Java's APT view for Python decorators. Only members with multiple annotation
+            // targets activate synthesis, then other explicit aliases for that same target
+            // are folded in so partial stereotypes do not drop values such as prefix.
+            aliasedDecorators.add(new DecoratorDef(
+                targetAnnotation,
+                targetAnnotation,
+                null,
+                (Map) targetValues,
+                List.of()
+            ));
+        }
+        return aliasedDecorators;
     }
 
     @Override
