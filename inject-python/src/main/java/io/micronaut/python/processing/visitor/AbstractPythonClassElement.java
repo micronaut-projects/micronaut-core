@@ -286,12 +286,12 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         for (ClassElement anInterface : getInterfaces()) {
             if (elementType == MethodElement.class) {
                 for (MethodElement methodElement : anInterface.getEnclosedElements((ElementQuery<MethodElement>) query)) {
-                    inheritedMethods.add(resolveInheritedInterfaceMethod(anInterface, methodElement));
+                    inheritedMethods.add(ownInheritedInterfaceMethod(resolveInheritedInterfaceMethod(anInterface, methodElement)));
                 }
             } else {
                 for (MemberElement memberElement : anInterface.getEnclosedElements((ElementQuery<MemberElement>) query)) {
                     if (memberElement instanceof MethodElement methodElement) {
-                        inheritedMethods.add(resolveInheritedInterfaceMethod(anInterface, methodElement));
+                        inheritedMethods.add(ownInheritedInterfaceMethod(resolveInheritedInterfaceMethod(anInterface, methodElement)));
                     }
                 }
             }
@@ -302,8 +302,13 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
 
         List<T> allElements = new ArrayList<>(elements);
         for (MethodElement inheritedMethod : inheritedMethods) {
-            if (!isInterfaceMethodAlreadyRepresented(allElements, inheritedMethod)) {
+            int representedMethodIndex = representedInterfaceMethodIndex(allElements, inheritedMethod);
+            if (representedMethodIndex == -1) {
                 allElements.add((T) decorateInheritedInterfaceMethod(inheritedMethod));
+            } else if (allElements.get(representedMethodIndex) instanceof MethodElement representedMethod
+                && !representedMethod.getDeclaringType().equals(this)
+                && representedMethod.isAbstract()) {
+                allElements.set(representedMethodIndex, (T) decorateInheritedInterfaceMethod(representedMethod));
             }
         }
         return allElements;
@@ -335,6 +340,15 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             }
         }
         return resolvedParameters == null ? inheritedMethod : inheritedMethod.withParameters(resolvedParameters);
+    }
+
+    private MethodElement ownInheritedInterfaceMethod(MethodElement inheritedMethod) {
+        if (inheritedMethod instanceof PythonMethodElement) {
+            // Match Java, Groovy, and Kotlin: inherited methods are viewed through the concrete owning type
+            // so type-level metadata participates in normal method metadata resolution.
+            return inheritedMethod.withNewOwningType(this);
+        }
+        return inheritedMethod;
     }
 
     private Optional<ClassElement> resolveTypeParameter(TypeParameterElement typeParameter, Map<String, ClassElement> typeArguments) {
@@ -426,12 +440,19 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         if (hasDeclaredTypeAroundBinding()) {
             return decorateMethodWithTypeInterceptorMetadata(inheritedMethod);
         }
-        if (hasStereotype(InterceptorBinding.class)) {
-            return inheritedMethod.withAnnotationMetadata(
-                new AnnotationMetadataHierarchy(true, getAnnotationMetadata(), inheritedMethod.getAnnotationMetadata())
-            );
+        if (!this.equals(inheritedMethod.getOwningType())) {
+            // JavaMethodElement cannot be re-owned by a Python class because its implementation requires a
+            // JavaClassElement owner. Apply the Python owning type metadata here instead, which is the
+            // metadata hierarchy that MethodElementAnnotationMetadata would build after withNewOwningType.
+            return decorateMethodWithOwningTypeMetadata(inheritedMethod);
         }
         return inheritedMethod;
+    }
+
+    private MethodElement decorateMethodWithOwningTypeMetadata(MethodElement method) {
+        return method.withAnnotationMetadata(
+            new AnnotationMetadataHierarchy(getAnnotationMetadata(), method.getMethodAnnotationMetadata())
+        );
     }
 
     private MethodElement decorateMethodWithTypeInterceptorMetadata(MethodElement method) {
@@ -469,15 +490,18 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         return new AnnotationMetadataHierarchy(true, annotationMetadata, explicitBindings);
     }
 
-    private static boolean isInterfaceMethodAlreadyRepresented(List<? extends Element> elements, MethodElement inheritedMethod) {
-        for (Element element : elements) {
+    private static int representedInterfaceMethodIndex(List<? extends Element> elements, MethodElement inheritedMethod) {
+        for (int i = 0; i < elements.size(); i++) {
+            Element element = elements.get(i);
             if (element instanceof MethodElement methodElement &&
                 methodElement.getName().equals(inheritedMethod.getName()) &&
-                (methodElement.overrides(inheritedMethod) || methodElement.isSubSignature(inheritedMethod))) {
-                return true;
+                (methodElement.overrides(inheritedMethod) ||
+                    methodElement.isSubSignature(inheritedMethod) ||
+                    methodElement.getParameters().length == inheritedMethod.getParameters().length)) {
+                return i;
             }
         }
-        return false;
+        return -1;
     }
 
     @Override

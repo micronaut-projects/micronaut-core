@@ -159,14 +159,21 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
     }
 
     private Map<String, ClassElement> getBoundGenericTypes(AttributeDef attributeDef) {
-        Map<String, Map<String, ClassElement>> allGenerics = getOwningType().getAllTypeArguments();
         ClassDef declaringClass = attributeDef.declaringClass();
+        boolean declaredOnOwningType = declaringClass != null
+            ? declaringClass.qualifiedName().equals(getOwningType().getName())
+            : getDeclaringType().getName().equals(getOwningType().getName());
+        if (declaredOnOwningType
+            && getOwningType() instanceof PythonClassElement pythonClassElement
+            && !pythonClassElement.hasExplicitTypeArguments()) {
+            return declaredGenericBindings(true);
+        }
+        Map<String, Map<String, ClassElement>> allGenerics = getOwningType().getAllTypeArguments();
         Map<String, ClassElement> declaringGenerics = declaringClass != null
             ? allGenerics.getOrDefault(declaringClass.qualifiedName(), Map.of())
             : Map.of();
         if (declaringGenerics.isEmpty()) {
-            boolean declaredOnOwningType = getDeclaringType().getName().equals(getOwningType().getName());
-            declaringGenerics = declaredGenericBindings(declaredOnOwningType);
+            declaringGenerics = declaredGenericBindings(false);
         }
         return declaringGenerics;
     }

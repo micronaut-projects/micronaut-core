@@ -439,7 +439,6 @@ class MyPropertyBean:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0057")
     void "test overridden around-advised method inherits base method metadata"() {
         given:
         def pythonCode = '''

@@ -73,16 +73,22 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
 
     @Override
     public ClassElement getType() {
+        if (methodElement.requiresResolvedParameterType()) {
+            ClassElement classElement = resolveType(argumentDef, methodElement.getBoundGenericTypes());
+            if (!classElement.getTypeArguments().isEmpty()) {
+                classElement = classElement.getRawClassElement();
+            }
+            if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
+                return pythonClassElement.withTypeAnnotationsKey(argumentDef);
+            }
+            return classElement;
+        }
         return type;
     }
 
     @Override
     public ClassElement getGenericType() {
-        ClassElement classElement = GraalPyUtil.resolvePythonTypeToJava(
-            getNativeType().typeAnnotation(),
-            environment.visitorContext(),
-            methodElement.getBoundGenericTypes()
-        );
+        ClassElement classElement = resolveType(argumentDef, methodElement.getBoundGenericTypes());
         if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
             return pythonClassElement.withTypeAnnotationsKey(argumentDef);
         }
@@ -90,13 +96,17 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
     }
 
     private ClassElement resolveType(ArgumentDef argumentDef) {
+        ClassElement classElement = resolveType(argumentDef, Map.of());
+        if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
+            return pythonClassElement.withTypeAnnotationsKey(argumentDef);
+        }
+        return classElement;
+    }
+
+    private ClassElement resolveType(ArgumentDef argumentDef, Map<String, ClassElement> boundTypes) {
         if (argumentDef.typeAnnotation() != null) {
             // Use the same type resolution logic as fields
-            ClassElement classElement = GraalPyUtil.resolvePythonTypeToJava(argumentDef.typeAnnotation(), environment.visitorContext(), Map.of());
-            if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
-                return pythonClassElement.withTypeAnnotationsKey(argumentDef);
-            }
-            return classElement;
+            return GraalPyUtil.resolvePythonTypeToJava(argumentDef.typeAnnotation(), environment.visitorContext(), boundTypes);
         }
 
         // Fall back to Object when no type annotation

@@ -28,12 +28,14 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -149,7 +151,15 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public @NonNull MethodElement withNewOwningType(@NonNull ClassElement owningType) {
-        return MethodElement.super.withNewOwningType(owningType);
+        PythonMethodElement methodElement = new PythonMethodElement(
+            getNativeType(),
+            environment,
+            declaringType,
+            owningType,
+            elementAnnotationMetadataFactory
+        );
+        copyValues(methodElement);
+        return methodElement;
     }
 
     @Override
@@ -183,6 +193,31 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         return helper.getAnnotationMetadata(presetAnnotationMetadata);
     }
 
+    @Override
+    public AnnotationMetadata getTargetAnnotationMetadata() {
+        AnnotationMetadata targetAnnotationMetadata = getMethodAnnotationMetadata().getTargetAnnotationMetadata();
+        AnnotationMetadata overriddenMethodAnnotationMetadata = getOverriddenMethodAnnotationMetadata();
+        if (!overriddenMethodAnnotationMetadata.isEmpty()) {
+            targetAnnotationMetadata = new AnnotationMetadataHierarchy(
+                toNonDeclaredAnnotationMetadata(overriddenMethodAnnotationMetadata),
+                targetAnnotationMetadata
+            );
+        }
+        if (!owningType.getAnnotationMetadata().isEmpty()) {
+            targetAnnotationMetadata = new AnnotationMetadataHierarchy(owningType, targetAnnotationMetadata);
+        }
+        return targetAnnotationMetadata;
+    }
+
+    private AnnotationMetadata toNonDeclaredAnnotationMetadata(AnnotationMetadata source) {
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
+        for (String annotationName : source.getAnnotationNames()) {
+            source.findAnnotation(annotationName)
+                .ifPresent(annotationValue -> metadata.addAnnotation(annotationValue.getAnnotationName(), annotationValue.getValues()));
+        }
+        return metadata;
+    }
+
     private ElementAnnotationMetadata getDeclaredMethodAnnotationMetadata() {
         return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
     }
@@ -194,6 +229,20 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                 .orElse(AnnotationMetadata.EMPTY_METADATA);
         }
         return resolvedInheritedMethodAnnotationMetadata;
+    }
+
+    private AnnotationMetadata getOverriddenMethodAnnotationMetadata() {
+        AnnotationMetadata inheritedMetadata = AnnotationMetadata.EMPTY_METADATA;
+        for (MethodElement overriddenMethod : getOverriddenMethods()) {
+            AnnotationMetadata methodMetadata = overriddenMethod.getMethodAnnotationMetadata();
+            if (methodMetadata.isEmpty()) {
+                continue;
+            }
+            inheritedMetadata = inheritedMetadata.isEmpty()
+                ? methodMetadata
+                : new AnnotationMetadataHierarchy(methodMetadata, inheritedMetadata);
+        }
+        return inheritedMetadata;
     }
 
     private Optional<MethodElement> findInheritedMethod() {
@@ -350,6 +399,13 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         return owningType;
     }
 
+    boolean requiresResolvedParameterType() {
+        // Keep ordinary getType() erased like Java/Groovy, but inherited generic AOP methods need
+        // resolved parameter signatures so proxy override detection does not drop the introduced method.
+        return !declaringType.equals(owningType)
+            && owningType.hasStereotype(InterceptorBinding.class);
+    }
+
     @Override
     public Collection<MethodElement> getOverriddenMethods() {
         if (resolvedOverriddenMethods == null) {
@@ -451,7 +507,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             ClassElement baseType = GraalPyUtil.resolvePythonTypeToJava(
                 returnDef.typeAnnotation(),
                 environment.visitorContext(),
-                getBoundGenericTypes()
+                getRawBoundGenericTypes()
             );
 
             baseType = withDeclaredReturnAnnotationMetadata(returnDef, baseType);
@@ -879,7 +935,15 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public MethodElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return (MethodElement) super.withAnnotationMetadata(annotationMetadata);
+        PythonMethodElement methodElement = new PythonMethodElement(
+            getNativeType(),
+            environment,
+            declaringType,
+            owningType,
+            getElementAnnotationMetadataFactory()
+        );
+        methodElement.presetAnnotationMetadata = annotationMetadata;
+        return methodElement;
     }
 
     @Override
@@ -911,6 +975,23 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         if (declaringGenerics.isEmpty()) {
             declaringGenerics = declaredGenericBindings(declaredOnOwningType);
         }
+        List<? extends GenericPlaceholderElement> methodTypeVariables = getDeclaredTypeVariables();
+        if (declaringGenerics.isEmpty() && methodTypeVariables.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, ClassElement> boundGenerics = new LinkedHashMap<>(declaringGenerics);
+        for (GenericPlaceholderElement methodTypeVariable : methodTypeVariables) {
+            boundGenerics.put(methodTypeVariable.getVariableName(), methodTypeVariable);
+        }
+        return boundGenerics;
+    }
+
+    private Map<String, ClassElement> getRawBoundGenericTypes() {
+        boolean declaredOnOwningType = getDeclaringType().getName().equals(getOwningType().getName());
+        boolean preservePlaceholders = declaredOnOwningType
+            && getOwningType() instanceof PythonClassElement pythonClassElement
+            && !pythonClassElement.hasExplicitTypeArguments();
+        Map<String, ClassElement> declaringGenerics = declaredGenericBindings(preservePlaceholders);
         List<? extends GenericPlaceholderElement> methodTypeVariables = getDeclaredTypeVariables();
         if (declaringGenerics.isEmpty() && methodTypeVariables.isEmpty()) {
             return Map.of();
