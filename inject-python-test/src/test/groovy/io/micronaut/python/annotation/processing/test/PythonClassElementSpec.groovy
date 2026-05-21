@@ -26,6 +26,7 @@ import io.micronaut.core.expressions.EvaluatedExpressionReference
 import io.micronaut.data.annotation.Relation
 import io.micronaut.data.model.Association
 import io.micronaut.data.processor.model.SourcePersistentEntity
+import io.micronaut.data.processor.model.criteria.impl.SourcePersistentEntityCriteriaBuilderImpl
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.qualifiers.Qualifiers
@@ -909,15 +910,19 @@ class TypeTestService:
 from dataclasses import dataclass
 from typing import Annotated
 from micronaut.core.annotation import Nullable
-from micronaut.data.annotation import Relation
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity, Relation
 
 @dataclass
-class Room:
-    name: str
-
-@dataclass
+@MappedEntity
 class Message:
     room: Annotated["Room | None", Nullable, Relation(value="MANY_TO_ONE")] = None
+    id: Annotated[int | None, Id, GeneratedValue] = None
+
+@dataclass
+@MappedEntity
+class Room:
+    name: str
+    id: Annotated[int | None, Id, GeneratedValue] = None
 '''
 
         expect:
@@ -928,6 +933,11 @@ class Message:
             assert room.type.isNullable()
             assert room.hasAnnotation("io.micronaut.data.annotation.Relation")
             assert room.enumValue(Relation, "value", Relation.Kind).get() == Relation.Kind.MANY_TO_ONE
+            def entity = new SourcePersistentEntity(element, ce -> new SourcePersistentEntity(ce, c -> null))
+            def association = entity.persistentProperties.find { it.name == "room" } as Association
+            assert association != null
+            assert association.associatedEntity.name == "python.Room"
+            assert association.associatedEntity.hasIdentity()
             return element
         }
     }
@@ -938,14 +948,16 @@ class Message:
 from dataclasses import dataclass, field
 from typing import Annotated
 from micronaut.core.annotation import Nullable
-from micronaut.data.annotation import GeneratedValue, Id, Relation
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity, Relation
 
 @dataclass
+@MappedEntity
 class Message:
     content: str
     id: Annotated[int | None, Id, GeneratedValue] = None
 
 @dataclass
+@MappedEntity
 class Room:
     messages: Annotated[
         list[Message] | None,
@@ -970,6 +982,13 @@ class Room:
             assert association != null
             assert association.associatedEntity.name == "python.Message"
             assert association.associatedEntity.hasIdentity()
+            Function<ClassElement, SourcePersistentEntity> resolver = ce -> new SourcePersistentEntity(ce, c -> null)
+            def criteriaBuilder = new SourcePersistentEntityCriteriaBuilderImpl(resolver)
+            def query = criteriaBuilder.createQuery()
+            def root = query.from(entity)
+            def join = root.join("messages")
+            assert join.persistentEntity.name == "python.Message"
+            assert join.persistentEntity.hasIdentity()
             return element
         }
     }

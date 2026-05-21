@@ -258,15 +258,15 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     private List<DecoratorDef> buildAliasedDecorators(DecoratorDef decorator) {
-        Map<String, Value> members = decorator.members();
+        Map<?, ?> members = decorator.members();
         if (members.isEmpty()) {
             return List.of();
         }
         String annotationName = toBinaryClassName(decorator.annotationName());
         ClassElement javaAnnotationType = getJavaAnnotationType(decorator);
-        Map<String, Map<String, Value>> aliasValues = new LinkedHashMap<>();
+        Map<String, Map<String, Object>> aliasValues = new LinkedHashMap<>();
         Set<String> expandedTargets = new LinkedHashSet<>();
-        for (Map.Entry<String, Value> entry : members.entrySet()) {
+        for (Map.Entry<?, ?> entry : members.entrySet()) {
             String memberName = normalizeAnnotationMemberName(entry.getKey());
             AnnotationMemberDef memberDef = resolveMemberDef(annotationName, javaAnnotationType, memberName);
             List<AnnotationValue<AliasFor>> crossAnnotationAliases = getCrossAnnotationAliases(memberDef).stream()
@@ -301,7 +301,7 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         }
         List<DecoratorDef> aliasedDecorators = new ArrayList<>(expandedTargets.size());
         for (String targetAnnotation : expandedTargets) {
-            Map<String, Value> targetValues = aliasValues.get(targetAnnotation);
+            Map<String, Object> targetValues = aliasValues.get(targetAnnotation);
             if (targetValues == null || targetValues.isEmpty()) {
                 continue;
             }
@@ -313,7 +313,7 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                 targetAnnotation,
                 targetAnnotation,
                 null,
-                targetValues,
+                (Map) targetValues,
                 List.of()
             ));
         }

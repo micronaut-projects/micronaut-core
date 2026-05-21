@@ -332,6 +332,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
             case ast.Module():
                 # Process the module and create script element if we have script-level constructs
                 self.current_class = None
+                self.local_classes.update(
+                    stmt.name for stmt in node.body if isinstance(stmt, ast.ClassDef)
+                )
                 result = super().visit(node)
 
                 # Create script element if we have collected script attributes or functions
@@ -942,6 +945,19 @@ class MicronautAstVisitor(ast.NodeVisitor):
             return f"{self.package_name}.{type_name}" if self.package_name else type_name
         return None
 
+    def _parse_forward_reference_type(self, type_name):
+        if not isinstance(type_name, str) or not type_name.strip():
+            return None
+        try:
+            parsed = ast.parse(type_name, mode='eval').body
+        except (SyntaxError, ValueError):
+            return None
+        if isinstance(parsed, ast.Constant) and parsed.value == type_name:
+            return None
+        if isinstance(parsed, ast.Str) and parsed.s == type_name:
+            return None
+        return parsed
+
     def _extract_type_name(self, type_node):
         """
         Extract a type name from an AST type node.
@@ -951,6 +967,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # Handle string literals like 'Engine' or "Engine"
             if isinstance(type_node.value, str):
                 type_name = type_node.value
+                parsed_type = self._parse_forward_reference_type(type_name)
+                if parsed_type is not None:
+                    return self._extract_type_name(parsed_type)
                 # Check if this is a local class and qualify it
                 local_name = self._resolve_local_type_name(type_name)
                 if local_name:
@@ -959,6 +978,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
         elif isinstance(type_node, ast.Str):
             # Handle older Python versions with ast.Str
             type_name = type_node.s
+            parsed_type = self._parse_forward_reference_type(type_name)
+            if parsed_type is not None:
+                return self._extract_type_name(parsed_type)
             # Check if this is a local class and qualify it
             local_name = self._resolve_local_type_name(type_name)
             if local_name:
@@ -1412,6 +1434,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
         elif isinstance(type_node, ast.Constant):
             # Handle string literals (forward references) like "Engine"
             if isinstance(type_node.value, str):
+                parsed_type = self._parse_forward_reference_type(type_node.value)
+                if parsed_type is not None:
+                    return self._parse_type(parsed_type)
                 name = self._extract_type_name(type_node)
                 return TypeRef(name)
             else:

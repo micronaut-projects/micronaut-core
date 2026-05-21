@@ -1,5 +1,26 @@
 Micronaut framework supports Python through compile-time processing of Python sources.
 
+== Type Ordering and Forward References
+
+Python evaluates type annotations while the module is loaded unless annotations are quoted. This matters for Micronaut's compile-time processing because the type metadata has to be available before visitors such as Micronaut Data, Serde, validation, and dependency injection process the class.
+
+If two Python classes refer to each other, or a class refers to another class that is declared later in the same file, quote the forward reference and include the full Python type expression in the string:
+
+[source,python]
+----
+from dataclasses import dataclass, field
+
+@dataclass
+class Message:
+    room: "Room | None" = None
+
+@dataclass
+class Room:
+    messages: list[Message] | None = field(default_factory=list)
+----
+
+Use this quoted form instead of relying on declaration order or `from __future__ import annotations`. It keeps the Python code idiomatic while still allowing Micronaut to resolve the referenced type, nullability, and generic collection element metadata during annotation processing.
+
 == Python Keywords in Java APIs
 
 Some Java APIs use method or annotation member names that are reserved keywords in Python. Python code should use the same name with a trailing underscore. The Python compiler support rewrites these aliases during processing, so Micronaut metadata and runtime calls still target the original Java name.

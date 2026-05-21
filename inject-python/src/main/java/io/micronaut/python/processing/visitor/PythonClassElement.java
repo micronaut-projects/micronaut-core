@@ -562,12 +562,12 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         if (bound == null) {
             return;
         }
-        ClassElement boundElement;
-        if (bound instanceof TypeRef typeRef) {
-            boundElement = GraalPyUtil.resolvePythonTypeToJava(typeRef, environment.visitorContext(), Map.of());
-        } else {
-            boundElement = GraalPyUtil.resolvePythonTypeToJava(new TypeRef(bound.toString()), environment.visitorContext(), Map.of());
+        TypeRef typeRef = bound instanceof TypeRef tr ? tr : new TypeRef(bound.toString());
+        ClassElement pythonClass = findPythonClass(typeRef);
+        if (pythonClass != null && pythonClass.getName().equals(getName())) {
+            return;
         }
+        ClassElement boundElement = GraalPyUtil.resolvePythonTypeToJava(typeRef, environment.visitorContext(), Map.of());
         if (!Object.class.getName().equals(boundElement.getName())) {
             bounds.add(boundElement);
         }
