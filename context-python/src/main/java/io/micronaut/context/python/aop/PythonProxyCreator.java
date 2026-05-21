@@ -200,6 +200,12 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = findInterceptedMethod(methodName, interceptedMethods, args);
             ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
             Interceptor<T, ?>[] interceptors = interceptedMethod.interceptors();
+            if (isIntroduction && executableMethod.hasStereotype(Adapter.class) && interceptors.length > 1) {
+                // Core adapter introduction resolution returns method-level around interceptors plus
+                // the adapter introduction. Python target methods are proxied separately, so keeping
+                // those around interceptors here would apply the same Python method advice twice.
+                interceptors = Arrays.copyOfRange(interceptors, interceptors.length - 1, interceptors.length);
+            }
             Object[] javaArgs = fromPolyglotArray(args, executableMethod.getArguments());
             @SuppressWarnings("unchecked")
             T tb;
