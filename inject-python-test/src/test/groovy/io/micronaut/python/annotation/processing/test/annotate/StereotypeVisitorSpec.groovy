@@ -25,11 +25,9 @@ import io.micronaut.python.annotation.processing.test.annotate.stereotype.Visito
 import io.micronaut.python.annotation.processing.test.annotate.stereotype.VisitorScope
 import jakarta.inject.Qualifier
 import jakarta.inject.Scope
-import spock.lang.PendingFeature
 
 class StereotypeVisitorSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0077")
     void "test visitor added scope stereotype creates bean"() {
         when:
         def definition = buildBeanDefinition("python", "StereotypeTest", """
@@ -47,7 +45,6 @@ class StereotypeTest:
         definition.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).get() == VisitorScope.name
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0078")
     void "test visitor added qualifier stereotype resolves constructor injection"() {
         given:
         def definition = buildBeanDefinition("python", "TestBean", """

@@ -36,8 +36,10 @@ import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PrimitiveElement
+import io.micronaut.python.compiler.PyronautCompiler
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
 import io.micronaut.python.compiler.RepeatableAnnotation
+import jakarta.validation.constraints.NotBlank
 import spock.lang.PendingFeature
 import spock.lang.Unroll
 
@@ -411,7 +413,6 @@ class NestedCollections:
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0043")
     def "test generic return type argument keeps class placeholder model"() {
         given:
         def pythonCode = '''
@@ -702,6 +703,91 @@ class MyDataSource(DataSource):
         }
     }
 
+    def "test Java interface bridge methods use interface generic signatures"() {
+        given:
+        def pythonCode = '''
+import java
+
+from javax.sql import DataSource
+from jakarta.inject import Singleton
+from micronaut.context.event import BeanCreatedEvent, BeanCreatedEventListener
+from micronaut.core.bind import ArgumentBinder
+from micronaut.core.convert import ArgumentConversionContext, ConversionContext, TypeConverter
+from micronaut.core.type import Argument
+from micronaut.data.repository import CrudRepository
+from micronaut.http import HttpRequest, HttpResponse
+from micronaut.http.bind.binders import TypedRequestArgumentBinder
+from micronaut.http.filter import HttpServerFilter, ServerFilterChain
+from micronaut.http.server.netty import NettyServerCustomizer
+from micronaut.runtime.http.scope import RequestAware
+from java.lang import RuntimeException
+from java.time import LocalDate
+from java.util import Map, Optional
+
+ExceptionHandler = java.type("io.micronaut.http.server.exceptions.ExceptionHandler")
+Publisher = java.type("org.reactivestreams.Publisher")
+
+class MyDataSource(DataSource):
+    pass
+
+class RequestIdentifier(RequestAware):
+    def setRequest(self, request: HttpRequest):
+        pass
+
+class OutOfStockException(RuntimeException):
+    pass
+
+@Singleton
+class OutOfStockExceptionHandler(ExceptionHandler[OutOfStockException, HttpResponse]):
+    def handle(self, request: HttpRequest, e: OutOfStockException) -> HttpResponse:
+        return HttpResponse.badRequest()
+
+@Singleton
+class RegistryCustomizer(BeanCreatedEventListener[NettyServerCustomizer.Registry]):
+    def onCreated(self, event: BeanCreatedEvent[NettyServerCustomizer.Registry]) -> NettyServerCustomizer.Registry:
+        return event.getBean()
+
+@Singleton
+class MapToLocalDateConverter(TypeConverter[Map, LocalDate]):
+    def convert(self, source: Map, target_type: type[LocalDate], context: ConversionContext) -> Optional:
+        return Optional.empty()
+
+@Singleton
+class ShoppingCartRequestArgumentBinder(TypedRequestArgumentBinder):
+    def bind(self, context: ArgumentConversionContext, source: HttpRequest):
+        return ArgumentBinder.BindingResult.empty()
+
+    def argumentType(self):
+        return Argument.of(str)
+
+class ResponseFilter(HttpServerFilter):
+    def doFilter(self, request: HttpRequest, chain: ServerFilterChain) -> Publisher:
+        return chain.proceed(request)
+
+class Person:
+    pass
+
+class PersonRepository(CrudRepository[Person, int]):
+    pass
+'''
+
+        when:
+        def classLoader = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .build()
+            .buildClassLoader()
+
+        then:
+        classLoader.loadClass("python.MyDataSource") != null
+        classLoader.loadClass("python.RequestIdentifier") != null
+        classLoader.loadClass("python.OutOfStockExceptionHandler") != null
+        classLoader.loadClass("python.RegistryCustomizer") != null
+        classLoader.loadClass("python.MapToLocalDateConverter") != null
+        classLoader.loadClass("python.ShoppingCartRequestArgumentBinder") != null
+        classLoader.loadClass("python.ResponseFilter") != null
+        classLoader.loadClass("python.PersonRepository") != null
+    }
+
     def "test generic type arguments populated from function return types and arguments"() {
         given:
         def pythonCode = '''
@@ -771,7 +857,6 @@ class ProductService:
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0024")
     def "test nullability on generic return type arguments"() {
         given:
         def pythonCode = '''
@@ -1229,7 +1314,6 @@ class PetClient(PetOperations):
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0042")
     def "test override method inherits parameter annotations from python base method"() {
         given:
         def pythonCode = '''
@@ -1250,12 +1334,11 @@ class DefaultRepository(Repository):
             def method = element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
                 .find { it.name == "save" }
 
-            assert method.parameters[0].hasAnnotation("jakarta.validation.constraints.NotBlank")
+            assert method.parameters[0].hasAnnotation(NotBlank)
             return element
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0035")
     def "test overridden method reports python base method"() {
         given:
         def pythonCode = '''
@@ -1279,7 +1362,7 @@ class DefaultRepository(Repository):
 
             assert overridden.size() == 1
             assert overridden.first().declaringType.name == "python.Repository"
-            assert overridden.first().parameters[0].hasAnnotation("jakarta.validation.constraints.NotBlank")
+            assert overridden.first().parameters[0].hasAnnotation(NotBlank)
             return element
         }
     }

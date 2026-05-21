@@ -16,13 +16,11 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.core.annotation.AnnotationUtil
-import spock.lang.PendingFeature
 
 import java.util.function.Function
 
 class AliasForQualifierSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0022")
     void "test alias for named qualifier stereotypes"() {
         given:
         def context = buildContext('''\

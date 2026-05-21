@@ -18,7 +18,6 @@ import io.micronaut.http.annotation.Error
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
-import spock.lang.PendingFeature
 
 import java.lang.annotation.Native
 
@@ -95,7 +94,6 @@ class Test:
         metadata.getValue(Requires, "property").get() == 'value'
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0019")
     void "test source retention annotations are not retained"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
@@ -175,7 +173,53 @@ class Test:
         metadata.stringValue(Property).get() == "abc"
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0018")
+    void "test configuration properties metadata aliases to configuration reader"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import ConfigurationProperties
+
+@ConfigurationProperties(value="xyz", includes=["abc"], excludes=["lol"])
+class Test:
+    pass
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.annotationMetadata
+
+        then:
+        metadata.stringValue(ConfigurationReader, "prefix").get() == "xyz"
+        metadata.stringValue(ConfigurationReader, "includes").get() == "abc"
+        metadata.stringValue(ConfigurationReader, "excludes").get() == "lol"
+    }
+
+    void "test configuration properties stub does not copy configuration reader decorator"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import ConfigurationProperties
+
+@ConfigurationProperties(value="xyz", includes=["abc"], excludes=["lol"])
+class Test:
+    pass
+''')
+
+        when:
+        def resource = definition.class.classLoader.getResource(
+            'META-INF/GRAALPY-VFS/micronaut-application/src/micronaut/context/annotation/ConfigurationProperties.py'
+        )
+        def stub = resource?.text
+
+        then:
+        resource != null
+        stub.contains('@micronaut_annotation("io.micronaut.context.annotation.ConfigurationProperties")')
+        !stub.contains('@ConfigurationReader')
+        !stub.contains('@micronaut_annotation("io.micronaut.context.annotation.ConfigurationReader")')
+
+        and:
+        definition.annotationMetadata.stringValue(ConfigurationReader, "prefix").get() == "xyz"
+        definition.annotationMetadata.stringValue(ConfigurationReader, "includes").get() == "abc"
+        definition.annotationMetadata.stringValue(ConfigurationReader, "excludes").get() == "lol"
+    }
+
     void "test method annotation metadata merges configuration reader metadata"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
@@ -364,6 +408,32 @@ class Test:
         !method.arguments[1].isNullable()
     }
 
+    void "test generated nullable annotation stub skips missing meta annotations"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.core.annotation import Nullable
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+from typing import Annotated
+
+@Singleton
+class Test:
+
+    @Executable
+    def testMethod(self, name: Annotated[str, Nullable]) -> None:
+        pass
+''')
+
+        when:
+        def resource = definition.class.classLoader.getResource(
+            'META-INF/GRAALPY-VFS/micronaut-application/src/micronaut/core/annotation/Nullable.py'
+        )
+
+        then:
+        resource != null
+        !resource.text.contains('jakarta.annotation.Nullable')
+    }
+
     void "test PEP 604 nullable annotated parameter is captured in method parameter metadata"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
@@ -389,7 +459,6 @@ class Test:
         !method.arguments[1].isNullable()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0023")
     void "test nullable non null and PEP 604 on method return and parameters"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
@@ -677,7 +746,6 @@ class Test:
         metadata.doubleValue(PrimitiveTypesAnnotation, "doubleArray").asDouble == 1.1d
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0005")
     void "test annotation default values are available from annotation value"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
@@ -695,13 +763,12 @@ class Test:
 ''')
 
         when:
-        def annotationValue = definition.getAnnotationValuesByName("python.Topic")[0]
+        def annotationValue = definition.getAnnotation("python.Topic")
 
         then:
         annotationValue.getRequiredValue("qos", Integer) == 1
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0006")
     void "test annotation default values are written for constructor arguments"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''

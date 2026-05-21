@@ -2,7 +2,6 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.aop.Intercepted
 import io.micronaut.inject.qualifiers.Qualifiers
-import spock.lang.PendingFeature
 
 class NamedAopAdviceSpec extends AbstractPythonTypeElementSpec {
 
@@ -47,10 +46,9 @@ class NamedFactory:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0092")
     void "test each bean interceptor receives target qualifier"() {
         given:
-        def context = buildContext('''\
+        def pythonCode = '''\
 from typing import Annotated
 from jakarta.inject import Named, Singleton
 from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
@@ -96,17 +94,26 @@ class MyBean:
         self.default_connection = default_connection
         self.foo_connection = foo_connection
         self.bar_connection = bar_connection
-''', false, [
+'''
+
+        expect:
+        buildClassElement(pythonCode, "MyInterceptor") {
+            it.primaryConstructor.get().parameters[0].type.name
+        } == "io.micronaut.context.Qualifier"
+
+        when:
+        def context = buildContext(pythonCode, false, [
             "mydatasources.default.xyz": "111",
             "mydatasources.foo.xyz": "111",
             "mydatasources.bar.xyz": "111"
         ])
         def service = getBean(context, "python.MyBean")
+        def serviceValue = service.asPolyglotValue()
 
-        expect:
-        service.default_connection.catalog() == "@Named('default')"
-        service.foo_connection.catalog() == "@Named('foo')"
-        service.bar_connection.catalog() == "@Named('bar')"
+        then:
+        serviceValue.getMember("default_connection").invokeMember("catalog").asString() == "@Named('default')"
+        serviceValue.getMember("foo_connection").invokeMember("catalog").asString() == "@Named('foo')"
+        serviceValue.getMember("bar_connection").invokeMember("catalog").asString() == "@Named('bar')"
 
         cleanup:
         context?.close()

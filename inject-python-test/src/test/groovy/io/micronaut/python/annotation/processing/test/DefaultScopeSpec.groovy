@@ -15,17 +15,16 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.context.annotation.DefaultScope
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.AnnotationUtil
 import jakarta.inject.Singleton
-import spock.lang.PendingFeature
 
 class DefaultScopeSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0004")
     void "test default scope no override"() {
         given:
-        def definition = buildBeanDefinition("python", "MyBean", '''
+        def source = '''
 from jakarta.inject import Singleton
 from micronaut.context.annotation import DefaultScope
 
@@ -36,10 +35,12 @@ def SomeAnn(func):
 @SomeAnn
 class MyBean:
     pass
-''')
+'''
+        def definition = buildBeanDefinition("python", "MyBean", source)
 
         expect:
         definition != null
+        definition.hasStereotype(DefaultScope)
         definition.hasDeclaredStereotype(Singleton)
         definition.isSingleton()
     }

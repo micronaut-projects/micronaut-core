@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.annotation.processing.test.annotate
 
+import io.micronaut.context.annotation.DefaultImplementation
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Requirements
@@ -104,5 +105,26 @@ class Test(Parent):
         definition.declaredQualifier == null
         !definition.hasAnnotation(Requirements)
         definition.getDeclaredAnnotationValuesByType(Requires).size() == 0
+    }
+
+    void "test inherited default implementation metadata is not treated as declared"() {
+        given:
+        def definition = buildBeanDefinition("python", "TestImpl", '''
+from abc import ABC
+from micronaut.context.annotation import DefaultImplementation, Prototype
+
+@DefaultImplementation(name="python.TestImpl")
+class Test(ABC):
+    pass
+
+@Prototype
+class TestImpl(Test):
+    pass
+''')
+
+        expect:
+        definition.hasAnnotation(DefaultImplementation)
+        !definition.hasDeclaredAnnotation(DefaultImplementation)
+        definition.getDefaultImplementation().name == "python.TestImpl"
     }
 }

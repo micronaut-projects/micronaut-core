@@ -16,12 +16,10 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.python.compiler.PyronautCompiler
-import spock.lang.PendingFeature
 import tools.jackson.databind.ObjectMapper
 
 class ConfigurationMetadataSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0086")
     void "test simple configuration properties metadata"() {
         given:
         def pythonCode = '''
@@ -45,8 +43,8 @@ class MyProps:
 
         then:
         metadata.groups == [[name: "foo.bar", type: "python.MyProps"]]
-        metadata.properties.contains([name: "foo.bar.host", type: "java.lang.String", sourceType: "python.MyProps"])
-        metadata.properties.contains([name: "foo.bar.port", type: "int", sourceType: "python.MyProps"])
+        metadata.get("properties").contains([name: "foo.bar.host", type: "java.lang.String", sourceType: "python.MyProps"])
+        metadata.get("properties").contains([name: "foo.bar.port", type: "int", sourceType: "python.MyProps"])
 
         cleanup:
         tempDir?.deleteDir()

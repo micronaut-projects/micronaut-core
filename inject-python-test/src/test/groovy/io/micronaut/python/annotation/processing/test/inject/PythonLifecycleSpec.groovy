@@ -17,7 +17,6 @@ package io.micronaut.python.annotation.processing.test.inject
 
 import io.micronaut.inject.DisposableBeanDefinition
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
-import spock.lang.PendingFeature
 
 class PythonLifecycleSpec extends AbstractPythonTypeElementSpec {
 
@@ -615,18 +614,20 @@ class LifecycleService:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0059")
     void "test pre destroy interceptor binding on around advised bean"() {
         given:
         def pythonCode = '''
 from micronaut.aop import Around, InterceptorBinding, MethodInvocationContext
+from jakarta.annotation import PostConstruct
 from jakarta.inject import Singleton
 import java
 
 InterceptorKind = java.type("io.micronaut.aop.InterceptorKind")
 MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+System = java.type("java.lang.System")
 
 @Around
+@InterceptorBinding(kind=InterceptorKind.POST_CONSTRUCT)
 @InterceptorBinding(kind=InterceptorKind.PRE_DESTROY)
 def LifecycleBinding(target):
     return target
@@ -638,11 +639,16 @@ class PreDestroyInterceptor(MethodInterceptor):
 
     def intercept(self, context: MethodInvocationContext):
         self.count += 1
+        System.setProperty("python.lifecycle.preDestroyInterceptor.count", str(self.count))
         return context.proceed()
 
 @LifecycleBinding
 @Singleton
 class LifecycleService:
+    @PostConstruct
+    def init(self):
+        pass
+
     def call(self) -> str:
         return "ok"
 '''
@@ -651,12 +657,14 @@ class LifecycleService:
         def context = buildContext(pythonCode)
         def preDestroyInterceptor = getBean(context, "python.PreDestroyInterceptor")
         def service = getBean(context, "python.LifecycleService")
+        service.call()
         context.destroyBean(service)
 
         then:
-        preDestroyInterceptor.count == 1
+        System.getProperty("python.lifecycle.preDestroyInterceptor.count") == "1"
 
         cleanup:
+        System.clearProperty("python.lifecycle.preDestroyInterceptor.count")
         context?.close()
     }
 }

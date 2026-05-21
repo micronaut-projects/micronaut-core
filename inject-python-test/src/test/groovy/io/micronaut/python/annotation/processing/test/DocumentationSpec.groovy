@@ -18,7 +18,6 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.MethodElement
-import spock.lang.PendingFeature
 
 class DocumentationSpec extends AbstractPythonTypeElementSpec {
 
@@ -96,7 +95,6 @@ class Documented:
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0031")
     void "test attribute documentation is exposed on bean properties"() {
         expect:
         buildClassElement('''

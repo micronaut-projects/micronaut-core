@@ -5,11 +5,10 @@ import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
-import spock.lang.PendingFeature
 
 class BeanProviderSpec extends AbstractPythonTypeElementSpec {
 
-    boolean allowEmptyProviders = true
+    boolean allowEmptyProviders = false
 
     void "test bean definition reference uses bean type for jakarta provider implementation"() {
         given:
@@ -226,7 +225,6 @@ class Test:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0007")
     void "test jakarta provider triggers containsBean during injection"() {
         given:
         def context = buildContext('''

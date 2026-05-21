@@ -15,27 +15,46 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
+import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.ElementModifier;
+import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.ast.UnresolvedTypeKind;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
+import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
 import org.jetbrains.annotations.NotNull;
@@ -57,6 +76,9 @@ import javax.lang.model.element.Element;
  * @since 5.0.0
  */
 public non-sealed class PythonMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider {
+    private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
+    private static final String ANN_VALID = "jakarta.validation.Valid";
+
     private final PythonProcessingEnvironment environment;
     private final ClassElement declaringType;
     private final ClassElement owningType;
@@ -67,6 +89,8 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     private ClassElement resolvedGenericReturnType;
     private ElementAnnotationMetadata resolvedMergedMethodAnnotationMetadata;
     private AnnotationMetadata resolvedInheritedMethodAnnotationMetadata;
+    private Collection<MethodElement> resolvedOverriddenMethods;
+    private ParameterElement[] resolvedParameters;
 
     /**
      * Constructs a new {@code PythonMethodElement} from the given {@code FunctionDef}.
@@ -94,6 +118,9 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         // Create parameter elements
         this.parameters = createParameters(functionDef);
         this.helper = new MethodElementAnnotationsHelper(this, metadataFactory);
+        if (requiresValidation()) {
+            annotate(RequiresValidation.class);
+        }
     }
 
     @Override
@@ -124,7 +151,15 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public @NonNull MethodElement withNewOwningType(@NonNull ClassElement owningType) {
-        return MethodElement.super.withNewOwningType(owningType);
+        PythonMethodElement methodElement = new PythonMethodElement(
+            getNativeType(),
+            environment,
+            declaringType,
+            owningType,
+            elementAnnotationMetadataFactory
+        );
+        copyValues(methodElement);
+        return methodElement;
     }
 
     @Override
@@ -158,6 +193,58 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         return helper.getAnnotationMetadata(presetAnnotationMetadata);
     }
 
+    @Override
+    public boolean hasStereotype(@Nullable Class<? extends Annotation> annotation) {
+        return helper.getAnnotationMetadata(presetAnnotationMetadata).hasStereotype(annotation)
+            || (!declaringType.equals(owningType) && declaringType.hasStereotype(annotation));
+    }
+
+    @Override
+    public boolean hasStereotype(@Nullable String annotation) {
+        return helper.getAnnotationMetadata(presetAnnotationMetadata).hasStereotype(annotation)
+            || (!declaringType.equals(owningType) && declaringType.hasStereotype(annotation));
+    }
+
+    @Override
+    public AnnotationMetadata getTargetAnnotationMetadata() {
+        AnnotationMetadata targetAnnotationMetadata = getMethodAnnotationMetadata().getTargetAnnotationMetadata();
+        AnnotationMetadata overriddenMethodAnnotationMetadata = getOverriddenMethodAnnotationMetadata();
+        if (!overriddenMethodAnnotationMetadata.isEmpty()) {
+            // Match Java/Groovy/Kotlin semantics for overridden methods: annotations inherited from
+            // the overridden method must be visible to hasAnnotation, but not to hasDeclaredAnnotation.
+            // This keeps the source-level declaration boundary intact while still letting downstream
+            // method metadata consumers see inherited AOP and executable metadata.
+            targetAnnotationMetadata = new AnnotationMetadataHierarchy(
+                toNonDeclaredAnnotationMetadata(overriddenMethodAnnotationMetadata),
+                targetAnnotationMetadata
+            );
+        }
+        if (!declaringType.equals(owningType) && !declaringType.getAnnotationMetadata().isEmpty()) {
+            // Inherited methods must retain class-level metadata from the type that declared them.
+            // The bean definition writer first checks method.hasStereotype(Executable) before it
+            // checks method.getDeclaringType().hasStereotype(Executable), so class-level @Executable
+            // on a Python superclass has to be visible as inherited method metadata.
+            targetAnnotationMetadata = new AnnotationMetadataHierarchy(declaringType, targetAnnotationMetadata);
+        }
+        if (!owningType.getAnnotationMetadata().isEmpty()) {
+            // Keep inherited/owning type metadata in the annotation metadata model instead of copying
+            // annotations onto generated Java stubs. The stubs are only a Java shape for processing;
+            // copying annotations there would make declared/inherited metadata checks diverge from the
+            // other language implementations.
+            targetAnnotationMetadata = new AnnotationMetadataHierarchy(owningType, targetAnnotationMetadata);
+        }
+        return targetAnnotationMetadata;
+    }
+
+    private AnnotationMetadata toNonDeclaredAnnotationMetadata(AnnotationMetadata source) {
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
+        for (String annotationName : source.getAnnotationNames()) {
+            source.findAnnotation(annotationName)
+                .ifPresent(annotationValue -> metadata.addAnnotation(annotationValue.getAnnotationName(), annotationValue.getValues()));
+        }
+        return metadata;
+    }
+
     private ElementAnnotationMetadata getDeclaredMethodAnnotationMetadata() {
         return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
     }
@@ -169,6 +256,20 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                 .orElse(AnnotationMetadata.EMPTY_METADATA);
         }
         return resolvedInheritedMethodAnnotationMetadata;
+    }
+
+    private AnnotationMetadata getOverriddenMethodAnnotationMetadata() {
+        AnnotationMetadata inheritedMetadata = AnnotationMetadata.EMPTY_METADATA;
+        for (MethodElement overriddenMethod : getOverriddenMethods()) {
+            AnnotationMetadata methodMetadata = overriddenMethod.getMethodAnnotationMetadata();
+            if (methodMetadata.isEmpty()) {
+                continue;
+            }
+            inheritedMetadata = inheritedMetadata.isEmpty()
+                ? methodMetadata
+                : new AnnotationMetadataHierarchy(methodMetadata, inheritedMetadata);
+        }
+        return inheritedMetadata;
     }
 
     private Optional<MethodElement> findInheritedMethod() {
@@ -190,6 +291,35 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             }
         }
         return Optional.empty();
+    }
+
+    private boolean requiresValidation() {
+        if (hasValidationAnnotation(getAnnotationMetadata()) || hasValidationAnnotation(getGenericReturnType())) {
+            return true;
+        }
+        for (ParameterElement parameter : parameters) {
+            if (hasValidationAnnotation(parameter.getAnnotationMetadata())
+                || hasValidationAnnotation(parameter.getGenericType())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasValidationAnnotation(AnnotationMetadata metadata) {
+        return metadata.hasStereotype(ANN_CONSTRAINT) || metadata.hasAnnotation(ANN_VALID);
+    }
+
+    private static boolean hasValidationAnnotation(ClassElement classElement) {
+        if (hasValidationAnnotation(classElement.getAnnotationMetadata())) {
+            return true;
+        }
+        for (ClassElement typeArgument : classElement.getTypeArguments().values()) {
+            if (hasValidationAnnotation(typeArgument)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -226,8 +356,35 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     }
 
     @Override
+    public boolean isDeclaredNullable() {
+        return getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.NULLABLE)
+            || getReturnType().isDeclaredNullable();
+    }
+
+    @Override
+    public boolean isNullable() {
+        return getAnnotationMetadata().hasStereotype(AnnotationUtil.NULLABLE)
+            || getReturnType().isNullable();
+    }
+
+    @Override
+    public boolean isNonNull() {
+        return getAnnotationMetadata().hasStereotype(AnnotationUtil.NON_NULL)
+            || getReturnType().isNonNull();
+    }
+
+    @Override
+    public boolean isDeclaredNonNull() {
+        return getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.NON_NULL)
+            || getReturnType().isDeclaredNonNull();
+    }
+
+    @Override
     public ParameterElement[] getParameters() {
-        return parameters.clone();
+        if (resolvedParameters == null) {
+            resolvedParameters = resolveParameters();
+        }
+        return resolvedParameters.clone();
     }
 
     @Override
@@ -269,9 +426,86 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         return owningType;
     }
 
+    boolean requiresResolvedParameterType() {
+        // Keep ordinary getType() erased like Java/Groovy, but inherited generic AOP methods need
+        // resolved parameter signatures so proxy override detection does not drop the introduced method.
+        return !declaringType.equals(owningType)
+            && owningType.hasStereotype(InterceptorBinding.class);
+    }
+
+    @Override
+    public Collection<MethodElement> getOverriddenMethods() {
+        if (resolvedOverriddenMethods == null) {
+            resolvedOverriddenMethods = resolveOverriddenMethods();
+        }
+        return resolvedOverriddenMethods;
+    }
+
     @Override
     public ClassElement getGenericReturnType() {
         return resolveGenericReturnType(getNativeType());
+    }
+
+    private ParameterElement[] resolveParameters() {
+        ParameterElement[] resolved = parameters;
+        for (MethodElement overriddenMethod : getOverriddenMethods()) {
+            ParameterElement[] overriddenParameters = overriddenMethod.getParameters();
+            if (overriddenParameters.length != resolved.length) {
+                continue;
+            }
+            ParameterElement[] merged = null;
+            for (int i = 0; i < resolved.length; i++) {
+                AnnotationMetadata inheritedMetadata = overriddenParameters[i].getAnnotationMetadata();
+                if (inheritedMetadata.isEmpty()) {
+                    continue;
+                }
+                if (merged == null) {
+                    merged = resolved.clone();
+                }
+                merged[i] = resolved[i].withAnnotationMetadata(
+                    // Validation visitors mutate parameter metadata while inheriting constraints.
+                    // Keep the declared child metadata concrete here; a hierarchy as the declared
+                    // child cannot be mutated by AbstractAnnotationMetadataBuilder.
+                    new AnnotationMetadataHierarchy(true, inheritedMetadata, MutableAnnotationMetadata.of(resolved[i].getAnnotationMetadata()))
+                );
+            }
+            if (merged != null) {
+                resolved = merged;
+            }
+        }
+        return resolved;
+    }
+
+    private Collection<MethodElement> resolveOverriddenMethods() {
+        List<MethodElement> candidates = new ArrayList<>();
+        declaringType.getSuperType()
+            .ifPresent(superType -> candidates.addAll(superType.getEnclosedElements(ElementQuery.ALL_METHODS)));
+        for (ClassElement anInterface : declaringType.getInterfaces()) {
+            candidates.addAll(anInterface.getEnclosedElements(ElementQuery.ALL_METHODS));
+        }
+        if (candidates.isEmpty()) {
+            return List.of();
+        }
+        List<MethodElement> overriddenMethods = new ArrayList<>();
+        for (MethodElement candidate : candidates) {
+            if (candidate != this && isSubSignature(candidate, parameters)) {
+                overriddenMethods.add(candidate);
+            }
+        }
+        return overriddenMethods.isEmpty() ? List.of() : List.copyOf(overriddenMethods);
+    }
+
+    private boolean isSubSignature(MethodElement overridden, ParameterElement[] currentParameters) {
+        if (!getName().equals(overridden.getName()) || overridden.getParameters().length != currentParameters.length) {
+            return false;
+        }
+        ParameterElement[] overriddenParameters = overridden.getParameters();
+        for (int i = 0; i < overriddenParameters.length; i++) {
+            if (!currentParameters[i].getGenericType().isAssignable(overriddenParameters[i].getGenericType())) {
+                return false;
+            }
+        }
+        return getReturnType().getGenericType().isAssignable(overridden.getReturnType().getGenericType());
     }
 
     private ClassElement resolveGenericReturnType(FunctionDef functionDef) {
@@ -285,14 +519,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                     getBoundGenericTypes()
                 );
 
-                // If there are decorators, create a ClassElement with annotation metadata
-                if (!returnDef.decorators().isEmpty()) {
-                    io.micronaut.core.annotation.AnnotationMetadata annotationMetadata =
-                        environment.visitorContext().getAnnotationMetadataBuilder().buildDeclared(returnDef);
-                    resolvedGenericReturnType = withReturnAnnotationMetadata(baseType, annotationMetadata);
-                } else {
-                    resolvedGenericReturnType = baseType;
-                }
+                resolvedGenericReturnType = withDeclaredReturnAnnotationMetadata(returnDef, baseType);
             } else {
                 // Fall back to void/Object
                 resolvedGenericReturnType = PrimitiveElement.VOID;
@@ -310,15 +537,10 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             ClassElement baseType = GraalPyUtil.resolvePythonTypeToJava(
                 returnDef.typeAnnotation(),
                 environment.visitorContext(),
-                Map.of()
+                getRawBoundGenericTypes()
             );
 
-            // If there are decorators, create a ClassElement with annotation metadata
-            if (!returnDef.decorators().isEmpty()) {
-                io.micronaut.core.annotation.AnnotationMetadata annotationMetadata =
-                    environment.visitorContext().getAnnotationMetadataBuilder().buildDeclared(returnDef);
-                return withReturnAnnotationMetadata(baseType, annotationMetadata);
-            }
+            baseType = withDeclaredReturnAnnotationMetadata(returnDef, baseType);
             if (baseType instanceof AbstractPythonClassElement pythonClassElement) {
                 return pythonClassElement.withTypeAnnotationsKey(functionDef);
             }
@@ -329,15 +551,354 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         return PrimitiveElement.VOID;
     }
 
-    private static ClassElement withReturnAnnotationMetadata(ClassElement baseType, AnnotationMetadata annotationMetadata) {
-        try {
-            return baseType.withAnnotationMetadata(annotationMetadata);
-        } catch (UnsupportedOperationException e) {
-            Object nativeType = baseType.getNativeType();
-            if (nativeType instanceof Class<?> nativeClass) {
-                return ClassElement.of(nativeClass, annotationMetadata, baseType.getTypeArguments());
-            }
-            return ClassElement.of(baseType.getName(), baseType.isInterface(), annotationMetadata, baseType.getTypeArguments());
+    private ClassElement withDeclaredReturnAnnotationMetadata(ReturnDef returnDef, ClassElement baseType) {
+        AnnotationMetadata annotationMetadata = environment.visitorContext()
+            .getAnnotationMetadataBuilder()
+            .buildDeclared(returnDef);
+        if (annotationMetadata.isEmpty()) {
+            return baseType;
+        }
+        return withReturnAnnotationMetadata(baseType, annotationMetadata);
+    }
+
+    private ClassElement withReturnAnnotationMetadata(ClassElement baseType, AnnotationMetadata annotationMetadata) {
+        AnnotationMetadata typeAnnotationMetadata = baseType.getTypeAnnotationMetadata();
+        AnnotationMetadata returnAnnotationMetadata = typeAnnotationMetadata.isEmpty()
+            ? annotationMetadata
+            : new AnnotationMetadataHierarchy(true, typeAnnotationMetadata, annotationMetadata);
+        return new ReturnTypeAnnotatedClassElement(
+            baseType,
+            elementAnnotationMetadataFactory.buildMutable(returnAnnotationMetadata)
+        );
+    }
+
+    private record ReturnTypeAnnotatedClassElement(
+        ClassElement delegate,
+        ElementAnnotationMetadata typeAnnotationMetadata
+    ) implements ClassElement {
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return new AnnotationMetadataHierarchy(true, delegate.getAnnotationMetadata(), typeAnnotationMetadata);
+        }
+
+        @Override
+        public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
+            return typeAnnotationMetadata;
+        }
+
+        @Override
+        public <T extends Annotation> ClassElement annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+            typeAnnotationMetadata.annotate(annotationType, consumer);
+            return this;
+        }
+
+        @Override
+        public <T extends Annotation> ClassElement annotate(AnnotationValue<T> annotationValue) {
+            typeAnnotationMetadata.annotate(annotationValue);
+            return this;
+        }
+
+        @Override
+        public ClassElement removeAnnotation(String annotationType) {
+            typeAnnotationMetadata.removeAnnotation(annotationType);
+            return this;
+        }
+
+        @Override
+        public <T extends Annotation> ClassElement removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+            typeAnnotationMetadata.removeAnnotationIf(predicate);
+            return this;
+        }
+
+        @Override
+        public ClassElement removeStereotype(String annotationType) {
+            typeAnnotationMetadata.removeStereotype(annotationType);
+            return this;
+        }
+
+        @Override
+        public boolean isAssignable(String type) {
+            return delegate.isAssignable(type);
+        }
+
+        @Override
+        public boolean isAssignable(ClassElement type) {
+            return delegate.isAssignable(type);
+        }
+
+        @Override
+        public boolean isAssignable(Class<?> type) {
+            return delegate.isAssignable(type);
+        }
+
+        @Override
+        public boolean isTypeVariable() {
+            return delegate.isTypeVariable();
+        }
+
+        @Override
+        public boolean hasUnresolvedTypes(UnresolvedTypeKind... kind) {
+            return delegate.hasUnresolvedTypes(kind);
+        }
+
+        @Override
+        public boolean isGenericPlaceholder() {
+            return delegate.isGenericPlaceholder();
+        }
+
+        @Override
+        public boolean isWildcard() {
+            return delegate.isWildcard();
+        }
+
+        @Override
+        public boolean isRawType() {
+            return delegate.isRawType();
+        }
+
+        @Override
+        public boolean isOptional() {
+            return delegate.isOptional();
+        }
+
+        @Override
+        public Optional<ClassElement> getOptionalValueType() {
+            return delegate.getOptionalValueType();
+        }
+
+        @Override
+        public boolean isContainerType() {
+            return delegate.isContainerType();
+        }
+
+        @Override
+        public boolean isRecord() {
+            return delegate.isRecord();
+        }
+
+        @Override
+        public boolean isInner() {
+            return delegate.isInner();
+        }
+
+        @Override
+        public boolean isEnum() {
+            return delegate.isEnum();
+        }
+
+        @Override
+        public ClassElement toArray() {
+            return new ReturnTypeAnnotatedClassElement(delegate.toArray(), typeAnnotationMetadata);
+        }
+
+        @Override
+        public ClassElement fromArray() {
+            return new ReturnTypeAnnotatedClassElement(delegate.fromArray(), typeAnnotationMetadata);
+        }
+
+        @Override
+        public String getName() {
+            return delegate.getName();
+        }
+
+        @Override
+        public boolean isPackagePrivate() {
+            return delegate.isPackagePrivate();
+        }
+
+        @Override
+        public boolean isSynthetic() {
+            return delegate.isSynthetic();
+        }
+
+        @Override
+        public boolean isProtected() {
+            return delegate.isProtected();
+        }
+
+        @Override
+        public boolean isPublic() {
+            return delegate.isPublic();
+        }
+
+        @Override
+        public Set<ElementModifier> getModifiers() {
+            return delegate.getModifiers();
+        }
+
+        @Override
+        public boolean isAbstract() {
+            return delegate.isAbstract();
+        }
+
+        @Override
+        public boolean isStatic() {
+            return delegate.isStatic();
+        }
+
+        @Override
+        public Optional<String> getDocumentation(boolean parseContent) {
+            return delegate.getDocumentation(parseContent);
+        }
+
+        @Override
+        public boolean isPrivate() {
+            return delegate.isPrivate();
+        }
+
+        @Override
+        public boolean isFinal() {
+            return delegate.isFinal();
+        }
+
+        @Override
+        public String getDescription(boolean simple) {
+            return delegate.getDescription(simple);
+        }
+
+        @Override
+        public Object getNativeType() {
+            return delegate.getNativeType();
+        }
+
+        @Override
+        public boolean isPrimitive() {
+            return delegate.isPrimitive();
+        }
+
+        @Override
+        public boolean isVoid() {
+            return delegate.isVoid();
+        }
+
+        @Override
+        public boolean isArray() {
+            return delegate.isArray();
+        }
+
+        @Override
+        public int getArrayDimensions() {
+            return delegate.getArrayDimensions();
+        }
+
+        @Override
+        public boolean isInterface() {
+            return delegate.isInterface();
+        }
+
+        @Override
+        public Optional<ClassElement> getSuperType() {
+            return delegate.getSuperType();
+        }
+
+        @Override
+        public Collection<ClassElement> getInterfaces() {
+            return delegate.getInterfaces();
+        }
+
+        @Override
+        public PackageElement getPackage() {
+            return delegate.getPackage();
+        }
+
+        @Override
+        public List<PropertyElement> getBeanProperties() {
+            return delegate.getBeanProperties();
+        }
+
+        @Override
+        public List<PropertyElement> getSyntheticBeanProperties() {
+            return delegate.getSyntheticBeanProperties();
+        }
+
+        @Override
+        public List<PropertyElement> getBeanProperties(PropertyElementQuery propertyElementQuery) {
+            return delegate.getBeanProperties(propertyElementQuery);
+        }
+
+        @Override
+        public List<FieldElement> getFields() {
+            return delegate.getFields();
+        }
+
+        @Override
+        public List<MethodElement> getMethods() {
+            return delegate.getMethods();
+        }
+
+        @Override
+        public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(ElementQuery<T> query) {
+            return delegate.getEnclosedElements(query);
+        }
+
+        @Override
+        public Optional<ClassElement> getEnclosingType() {
+            return delegate.getEnclosingType();
+        }
+
+        @Override
+        public List<? extends ClassElement> getBoundGenericTypes() {
+            return delegate.getBoundGenericTypes();
+        }
+
+        @Override
+        public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
+            return delegate.getDeclaredGenericPlaceholders();
+        }
+
+        @Override
+        public Map<String, ClassElement> getTypeArguments(String type) {
+            return delegate.getTypeArguments(type);
+        }
+
+        @Override
+        public Map<String, ClassElement> getTypeArguments() {
+            return delegate.getTypeArguments();
+        }
+
+        @Override
+        public ClassElement getRawClassElement() {
+            return new ReturnTypeAnnotatedClassElement(delegate.getRawClassElement(), typeAnnotationMetadata);
+        }
+
+        @Override
+        public BeanElementBuilder addAssociatedBean(ClassElement type) {
+            return delegate.addAssociatedBean(type);
+        }
+
+        @Override
+        public List<ConstructorElement> getAccessibleConstructors() {
+            return delegate.getAccessibleConstructors();
+        }
+
+        @Override
+        public List<MethodElement> getAccessibleStaticCreators() {
+            return delegate.getAccessibleStaticCreators();
+        }
+
+        @Override
+        public ClassElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+            return new ReturnTypeAnnotatedClassElement(
+                delegate.withAnnotationMetadata(annotationMetadata),
+                typeAnnotationMetadata
+            );
+        }
+
+        @Override
+        public ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
+            return new ReturnTypeAnnotatedClassElement(
+                delegate.withTypeArguments(typeArguments),
+                typeAnnotationMetadata
+            );
+        }
+
+        @Override
+        public ClassElement withTypeArguments(Collection<ClassElement> typeArguments) {
+            return new ReturnTypeAnnotatedClassElement(
+                delegate.withTypeArguments(typeArguments),
+                typeAnnotationMetadata
+            );
         }
     }
 
@@ -404,7 +965,15 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public MethodElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return (MethodElement) super.withAnnotationMetadata(annotationMetadata);
+        PythonMethodElement methodElement = new PythonMethodElement(
+            getNativeType(),
+            environment,
+            declaringType,
+            owningType,
+            getElementAnnotationMetadataFactory()
+        );
+        methodElement.presetAnnotationMetadata = annotationMetadata;
+        return methodElement;
     }
 
     @Override
@@ -427,10 +996,32 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         Map<String, ClassElement> declaringGenerics = declaringClass != null
             ? allGenerics.getOrDefault(declaringClass.qualifiedName(), Map.of())
             : Map.of();
+        boolean declaredOnOwningType = getDeclaringType().getName().equals(getOwningType().getName());
+        if (declaredOnOwningType
+            && getOwningType() instanceof PythonClassElement pythonClassElement
+            && !pythonClassElement.hasExplicitTypeArguments()) {
+            declaringGenerics = declaredGenericBindings(true);
+        }
         if (declaringGenerics.isEmpty()) {
-            boolean declaredOnOwningType = getDeclaringType().getName().equals(getOwningType().getName());
             declaringGenerics = declaredGenericBindings(declaredOnOwningType);
         }
+        List<? extends GenericPlaceholderElement> methodTypeVariables = getDeclaredTypeVariables();
+        if (declaringGenerics.isEmpty() && methodTypeVariables.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, ClassElement> boundGenerics = new LinkedHashMap<>(declaringGenerics);
+        for (GenericPlaceholderElement methodTypeVariable : methodTypeVariables) {
+            boundGenerics.put(methodTypeVariable.getVariableName(), methodTypeVariable);
+        }
+        return boundGenerics;
+    }
+
+    private Map<String, ClassElement> getRawBoundGenericTypes() {
+        boolean declaredOnOwningType = getDeclaringType().getName().equals(getOwningType().getName());
+        boolean preservePlaceholders = declaredOnOwningType
+            && getOwningType() instanceof PythonClassElement pythonClassElement
+            && !pythonClassElement.hasExplicitTypeArguments();
+        Map<String, ClassElement> declaringGenerics = declaredGenericBindings(preservePlaceholders);
         List<? extends GenericPlaceholderElement> methodTypeVariables = getDeclaredTypeVariables();
         if (declaringGenerics.isEmpty() && methodTypeVariables.isEmpty()) {
             return Map.of();

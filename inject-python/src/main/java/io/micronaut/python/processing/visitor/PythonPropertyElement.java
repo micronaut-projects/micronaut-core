@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
@@ -29,7 +30,9 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.annotation.PropertyElementAnnotationMetadata;
+import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A property element representing a Python property (either a @property decorated method or a regular attribute).
@@ -44,7 +47,10 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
  * @author Micronaut Team
  * @since 5.0.0
  */
-public final class PythonPropertyElement extends AbstractPythonElement implements PropertyElement {
+public final class PythonPropertyElement extends AbstractPythonElement implements PropertyElement, ElementProvider {
+    private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
+    private static final String ANN_VALID = "jakarta.validation.Valid";
+
     private final PythonProcessingEnvironment environment;
     private final ClassElement declaringType;
     private final ClassElement owningType;
@@ -108,6 +114,9 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
             metadataFactory
         ) : (isWritable() ? createSyntheticSetter() : null);
         this.annotationMetadata = new PropertyElementAnnotationMetadata(this, readMethod, writeMethod, field, null, null, false);
+        if (requiresValidation()) {
+            annotate(RequiresValidation.class);
+        }
     }
 
     @Override
@@ -137,6 +146,14 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return this.annotationMetadata;
+    }
+
+    private boolean requiresValidation() {
+        AnnotationMetadata metadata = getAnnotationMetadata();
+        return metadata.hasStereotype(ANN_CONSTRAINT)
+            || metadata.hasAnnotation(ANN_VALID)
+            || getType().getAnnotationMetadata().hasStereotype(ANN_CONSTRAINT)
+            || getType().getAnnotationMetadata().hasAnnotation(ANN_VALID);
     }
 
     @Override
@@ -182,6 +199,11 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
     @Override
     public ClassElement getOwningType() {
         return owningType;
+    }
+
+    @Override
+    public @Nullable javax.lang.model.element.Element element() {
+        return environment.originatingElement();
     }
 
     @Override
@@ -327,10 +349,12 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
 
         // Then try field documentation
         if (propertyDef.hasField()) {
-            Optional<String> fieldDoc = getField().flatMap(field ->
-                field.getDocumentation(parseContent));
-            if (fieldDoc.isPresent()) {
-                return fieldDoc;
+            String fieldDoc = propertyDef.field().documentation();
+            if (fieldDoc != null) {
+                if (parseContent) {
+                    return Optional.of(io.micronaut.python.processing.util.GraalPyUtil.parsePythonDocstring(fieldDoc));
+                }
+                return Optional.of(fieldDoc);
             }
         }
 

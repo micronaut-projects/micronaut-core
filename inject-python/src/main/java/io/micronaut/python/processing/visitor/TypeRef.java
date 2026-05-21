@@ -24,22 +24,35 @@ import java.util.Objects;
  *
  * @param name The fully qualified name of the class.
  * @param typeArguments The type arguments if the type is generic (e.g., [TypeDef("str")] for MyBase[str], or [TypeDef("dict", [TypeDef("str"), TypeDef("int")])]).
+ * @param typeUseDecorators The decorators applied through typing.Annotated when this type is used.
  * @see ClassDef
  */
 public record TypeRef(
     String name,
-    List<TypeRef> typeArguments
+    List<TypeRef> typeArguments,
+    List<DecoratorDef> typeUseDecorators
 ) {
 
     public TypeRef {
         Objects.requireNonNull(name, "Type name cannot be null");
         if (typeArguments == null) {
             typeArguments = List.of();
+        } else {
+            typeArguments = List.copyOf(typeArguments);
+        }
+        if (typeUseDecorators == null) {
+            typeUseDecorators = List.of();
+        } else {
+            typeUseDecorators = List.copyOf(typeUseDecorators);
         }
     }
 
+    public TypeRef(String name, List<TypeRef> typeArguments) {
+        this(name, typeArguments, List.of());
+    }
+
     public TypeRef(String name) {
-        this(name, List.of());
+        this(name, List.of(), List.of());
     }
 
     @Override
@@ -48,12 +61,14 @@ public record TypeRef(
             return false;
         }
         TypeRef that = (TypeRef) o;
-        return Objects.equals(name, that.name) && Objects.equals(typeArguments, that.typeArguments);
+        return Objects.equals(name, that.name)
+            && Objects.equals(typeArguments, that.typeArguments)
+            && Objects.equals(typeUseDecorators, that.typeUseDecorators);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, typeArguments);
+        return Objects.hash(name, typeArguments, typeUseDecorators);
     }
 
     @Override

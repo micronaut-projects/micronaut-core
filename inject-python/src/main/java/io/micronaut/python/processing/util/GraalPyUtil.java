@@ -23,17 +23,23 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.python.processing.visitor.AttributeDef;
+import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.python.processing.visitor.DecoratorDef;
+import io.micronaut.python.processing.visitor.TypeAnnotatedClassElement;
 import io.micronaut.python.processing.visitor.TypeRef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import org.graalvm.polyglot.Value;
@@ -104,8 +110,7 @@ public final class GraalPyUtil {
                 if (value.canInvokeMember("__name__")) {
                     Value nameValue = value.invokeMember("__name__");
                     String className = nameValue.asString();
-                    // Map Python builtin types to Java types
-                    Class<?> classReference = toClassReference(className);
+                    Object classReference = toClassReference(className, visitorContext);
                     return Objects.requireNonNullElse(classReference, value);
                 }
             } catch (Exception e) {
@@ -160,24 +165,37 @@ public final class GraalPyUtil {
         return value;
     }
 
-    private static Class<?> toClassReference(String className) {
-        switch (className) {
-            case "str":
-                return String.class;
-            case "int":
-                return Integer.class;
-            case "float":
-                return Double.class;
-            case "bool":
-                return Boolean.class;
-            default:
-                // Try to find the class by name
-                try {
-                    return Class.forName(className);
-                } catch (ClassNotFoundException e) {
-                    return null;
-                }
+    private static @Nullable Object toClassReference(String className, VisitorContext visitorContext) {
+        Class<?> builtInType = builtInClassReference(className);
+        if (builtInType != null) {
+            return builtInType;
         }
+        if (visitorContext instanceof PythonVisitorContext pythonVisitorContext) {
+            String pythonClassName = resolvePythonClassName(className, pythonVisitorContext.getProcessingEnvironment());
+            if (pythonClassName != null) {
+                return new AnnotationClassValue<>(pythonClassName);
+            }
+            JavaVisitorContext javaVisitorContext = pythonVisitorContext.getJavaVisitorContext();
+            return javaVisitorContext == null ? null : javaVisitorContext.getClassElement(className).orElse(null);
+        }
+        return visitorContext.getClassElement(className).orElse(null);
+    }
+
+    private static @Nullable Class<?> builtInClassReference(String className) {
+        return switch (className) {
+            case "str" -> String.class;
+            case "int" -> Integer.class;
+            case "float" -> Double.class;
+            case "bool" -> Boolean.class;
+            case "boolean" -> boolean.class;
+            case "byte" -> byte.class;
+            case "char" -> char.class;
+            case "double" -> double.class;
+            case "long" -> long.class;
+            case "short" -> short.class;
+            case "void" -> void.class;
+            default -> null;
+        };
     }
 
     /**
@@ -287,17 +305,22 @@ public final class GraalPyUtil {
 
         String name = typeRef.name();
         List<TypeRef> typeArguments = typeRef.typeArguments();
+        List<DecoratorDef> typeUseDecorators = typeRef.typeUseDecorators();
+        if (isAnnotatedType(name) && !typeArguments.isEmpty()) {
+            ClassElement baseType = resolvePythonTypeToJava(typeArguments.getFirst(), visitorContext, boundGenerics);
+            return withTypeUseAnnotations(baseType, typeArguments.subList(1, typeArguments.size()), visitorContext);
+        }
         if (typeArguments.isEmpty()) {
             ClassElement boundGeneric = boundGenerics.get(name);
             if (boundGeneric != null) {
-                return boundGeneric;
+                return withTypeUseDecorators(boundGeneric, typeUseDecorators, visitorContext);
             }
         }
         ClassElement rawType = resolvePythonTypeToJava(name, visitorContext, boundGenerics);
         if (!typeArguments.isEmpty()) {
             ClassElement collectionType = resolveCollectionTypeArguments(rawType, typeArguments, visitorContext, boundGenerics);
             if (collectionType != null) {
-                return collectionType;
+                return withTypeUseDecorators(collectionType, typeUseDecorators, visitorContext);
             }
         }
         List<? extends GenericPlaceholderElement> declaredGenericPlaceholders = rawType.getDeclaredGenericPlaceholders();
@@ -310,9 +333,50 @@ public final class GraalPyUtil {
                 String variableName = placeHolder.getVariableName();
                 resolvedTypeArguments.put(variableName, resolvedType);
             }
-            return rawType.withTypeArguments(resolvedTypeArguments);
+            return withTypeUseDecorators(rawType.withTypeArguments(resolvedTypeArguments), typeUseDecorators, visitorContext);
         }
-        return rawType;
+        return withTypeUseDecorators(rawType, typeUseDecorators, visitorContext);
+    }
+
+    private static boolean isAnnotatedType(String name) {
+        return "Annotated".equals(name) || "typing.Annotated".equals(name);
+    }
+
+    private static ClassElement withTypeUseAnnotations(
+        ClassElement baseType,
+        List<TypeRef> annotationTypes,
+        PythonVisitorContext visitorContext
+    ) {
+        if (annotationTypes.isEmpty()) {
+            return baseType;
+        }
+        List<DecoratorDef> decorators = new ArrayList<>(annotationTypes.size());
+        for (TypeRef annotationType : annotationTypes) {
+            String annotationName = annotationType.name();
+            if (annotationName == null || annotationName.isBlank()) {
+                continue;
+            }
+            decorators.add(new DecoratorDef(annotationName, annotationName));
+        }
+        return withTypeUseDecorators(baseType, decorators, visitorContext);
+    }
+
+    private static ClassElement withTypeUseDecorators(
+        ClassElement baseType,
+        List<DecoratorDef> decorators,
+        PythonVisitorContext visitorContext
+    ) {
+        if (decorators.isEmpty()) {
+            return baseType;
+        }
+        AnnotationMetadata annotationMetadata = visitorContext
+            .getAnnotationMetadataBuilder()
+            .buildDeclared(new AttributeDef("$typeUse", null, null, null, decorators, null, false, null));
+        if (annotationMetadata.isEmpty()) {
+            return baseType;
+        }
+        var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
+        return new TypeAnnotatedClassElement(baseType, metadata);
     }
 
     private static @Nullable ClassElement resolveCollectionTypeArguments(
@@ -360,7 +424,16 @@ public final class GraalPyUtil {
         ClassElement resolvedType = resolvePythonTypeToJava(typeParameterDef, visitorContext, boundGenerics);
         if (resolvedType.isPrimitive()) {
             ClassTypeDef boxedType = TypeDescriptors.toBoxedIfNecessary(io.micronaut.sourcegen.model.TypeDef.of(resolvedType));
-            return ClassElement.of(boxedType.getName());
+            ClassElement boxedClassElement = visitorContext.getClassElement(boxedType.getName()).orElseGet(() -> ClassElement.of(boxedType.getName()));
+            AnnotationMetadata annotationMetadata = resolvedType.getTypeAnnotationMetadata();
+            if (annotationMetadata.isEmpty()) {
+                return boxedClassElement;
+            }
+            if (annotationMetadata instanceof ElementAnnotationMetadata elementAnnotationMetadata) {
+                return new TypeAnnotatedClassElement(boxedClassElement, elementAnnotationMetadata);
+            }
+            var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
+            return new TypeAnnotatedClassElement(boxedClassElement, metadata);
         }
         return resolvedType;
     }
@@ -470,7 +543,15 @@ public final class GraalPyUtil {
             return null;
         }
         ClassElement resolvedType = resolvePythonTypeToJava(nonNoneTypes.get(0), visitorContext, boundGenerics);
-        return boxPrimitiveTypeIfNeeded(resolvedType, visitorContext);
+        ClassElement boxedType = boxPrimitiveTypeIfNeeded(resolvedType, visitorContext);
+        AnnotationMetadata annotationMetadata = visitorContext
+            .getAnnotationMetadataBuilder()
+            .buildDeclared(new AttributeDef("$typeUse", typeAnnotation, new TypeRef(typeAnnotation), null, List.of(), null, false, null));
+        if (annotationMetadata.isEmpty()) {
+            return boxedType;
+        }
+        var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
+        return new TypeAnnotatedClassElement(boxedType, metadata);
     }
 
     private static List<String> parseUnionTypes(String typeAnnotation) {
@@ -966,20 +1047,18 @@ public final class GraalPyUtil {
 
     private static @Nullable AnnotationClassValue<?> toClassValue(Value value, PythonVisitorContext visitorContext) {
         String typeName = value.asString();
-        Class<?> classReference = toClassReference(typeName);
-        if (classReference == null && !typeName.contains(".")) {
-            PythonProcessingEnvironment environment = visitorContext.getProcessingEnvironment();
-            Map<String, ClassElement> classes = environment.classes();
-            String qualified = PythonClassElement.PYTHON_DEFAULT_PACKAGE + "." + typeName;
-            if (classes.containsKey(qualified)) {
-                return new AnnotationClassValue<>(qualified);
-            }
-        }
+        Class<?> classReference = builtInClassReference(typeName);
         if (classReference == null) {
-            ClassElement classElement = visitorContext.getClassElement(typeName).orElse(null);
+            PythonProcessingEnvironment environment = visitorContext.getProcessingEnvironment();
+            String pythonClassName = resolvePythonClassName(typeName, environment);
+            if (pythonClassName != null) {
+                return new AnnotationClassValue<>(pythonClassName);
+            }
+            JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
+            ClassElement classElement = javaVisitorContext == null ? null : javaVisitorContext.getClassElement(typeName).orElse(null);
             if (classElement != null) {
                 return new AnnotationClassValue<>(classElement.getCanonicalName());
-            } else if (isValidClassName(typeName)) {
+            } else if (isValidClassName(typeName) || isValidClassDescriptor(typeName)) {
                 return new AnnotationClassValue<>(typeName);
             } else {
                 return null;
@@ -987,6 +1066,30 @@ public final class GraalPyUtil {
         } else {
             return new AnnotationClassValue<>(classReference);
         }
+    }
+
+    private static @Nullable String resolvePythonClassName(String typeName, PythonProcessingEnvironment environment) {
+        Map<String, ClassDef> classes = environment.environment().classes();
+        ClassDef classDef = classes.get(typeName);
+        if (classDef != null) {
+            return classDef.qualifiedName();
+        }
+        String defaultPackage = PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
+        if (!typeName.contains(".")) {
+            classDef = classes.get(defaultPackage + typeName);
+            if (classDef != null) {
+                return classDef.qualifiedName();
+            }
+        }
+        for (ClassDef candidate : classes.values()) {
+            if (candidate.qualifiedName().equals(typeName)) {
+                return typeName;
+            }
+            if (!typeName.contains(".") && candidate.name().equals(typeName)) {
+                return candidate.qualifiedName();
+            }
+        }
+        return null;
     }
 
     public static boolean isValidClassName(String className) {
@@ -1001,6 +1104,29 @@ public final class GraalPyUtil {
             if (isJavaKeyword(part)) return false; // Optional: check for Java keywords
         }
         return true;
+    }
+
+    private static boolean isValidClassDescriptor(String className) {
+        if (className == null || className.isEmpty() || className.charAt(0) != '[') {
+            return false;
+        }
+        int componentStart = 0;
+        while (componentStart < className.length() && className.charAt(componentStart) == '[') {
+            componentStart++;
+        }
+        if (componentStart >= className.length()) {
+            return false;
+        }
+        char componentType = className.charAt(componentStart);
+        if ("BCDFIJSZ".indexOf(componentType) > -1) {
+            return componentStart == className.length() - 1;
+        }
+        if (componentType == 'L' && className.endsWith(";")) {
+            String componentName = className.substring(componentStart + 1, className.length() - 1)
+                .replace('/', '.');
+            return isValidClassName(componentName);
+        }
+        return false;
     }
 
     private static boolean isJavaKeyword(String s) {

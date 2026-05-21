@@ -43,7 +43,6 @@ class OptionalPropertySpec extends AbstractPythonTypeElementSpec {
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0008")
     void "test get bean with field optionals not present"() {
         given:
         def context = buildContext(fieldOptionalPropertiesCode())
@@ -60,7 +59,6 @@ class OptionalPropertySpec extends AbstractPythonTypeElementSpec {
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0009")
     void "test get bean with field optionals present"() {
         given:
         def context = buildContext(fieldOptionalPropertiesCode(), false, [

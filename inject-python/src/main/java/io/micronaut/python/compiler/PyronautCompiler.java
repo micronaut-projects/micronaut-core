@@ -116,14 +116,13 @@ public final class PyronautCompiler {
     }
 
     private ClassLoader createRuntimeClassLoader() {
-        ClassLoader parent = parentClassLoader;
         if (classpath == null || classpath.isEmpty()) {
-            return parent;
+            return parentClassLoader;
         }
         URL[] urls = classpath.stream()
             .map(PyronautCompiler::toUrl)
             .toArray(URL[]::new);
-        return new URLClassLoader(urls, parent);
+        return new URLClassLoader(urls, parentClassLoader);
     }
 
     private static URL toUrl(File file) {

@@ -20,15 +20,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
 import org.graalvm.polyglot.Value;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A field element returning data from a Python {@link AttributeDef}.
@@ -36,7 +41,7 @@ import org.graalvm.polyglot.Value;
  * @author Micronaut Team
  * @since 5.0.0
  */
-public final class PythonFieldElement extends AbstractPythonElement implements FieldElement {
+public final class PythonFieldElement extends AbstractPythonElement implements FieldElement, ElementProvider {
     private final PythonProcessingEnvironment environment;
     private final ClassElement declaringType;
     private final ClassElement owningType;
@@ -105,15 +110,26 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
         return owningType;
     }
 
+    @Override
+    public @Nullable javax.lang.model.element.Element element() {
+        return environment.originatingElement();
+    }
+
     private ClassElement resolveType(AttributeDef attributeDef) {
         if (attributeDef.typeName() != null) {
             // Use the parsed type name (e.g., "io.micronaut.runtime.server.EmbeddedServer")
-            return GraalPyUtil.resolvePythonTypeToJava(attributeDef.typeName(), environment.visitorContext(), getBoundGenericTypes(attributeDef));
+            return withDeclaredTypeAnnotationMetadata(
+                attributeDef,
+                GraalPyUtil.resolvePythonTypeToJava(attributeDef.typeName(), environment.visitorContext(), getBoundGenericTypes(attributeDef))
+            );
         }
         if (attributeDef.annotation() != null) {
             // Fallback to resolving the full annotation string
             String annotation = attributeDef.annotation();
-            return GraalPyUtil.resolvePythonTypeToJava(annotation, environment.visitorContext(), Map.of());
+            return withDeclaredTypeAnnotationMetadata(
+                attributeDef,
+                GraalPyUtil.resolvePythonTypeToJava(annotation, environment.visitorContext(), Map.of())
+            );
         }
         // Infer from value if no annotation
         if (attributeDef.value() != null) {
@@ -122,15 +138,42 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
         return environment.visitorContext().getClassElement(Object.class).orElse(null);
     }
 
+    private ClassElement withDeclaredTypeAnnotationMetadata(AttributeDef attributeDef, ClassElement baseType) {
+        AnnotationMetadata annotationMetadata = environment.annotationMetadataBuilder().buildDeclared(attributeDef);
+        MutableAnnotationMetadata typeAnnotationMetadata = null;
+        if (annotationMetadata.hasStereotype(AnnotationUtil.NULLABLE)) {
+            typeAnnotationMetadata = new MutableAnnotationMetadata();
+            typeAnnotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, Map.of());
+        }
+        if (annotationMetadata.hasStereotype(AnnotationUtil.NON_NULL)) {
+            if (typeAnnotationMetadata == null) {
+                typeAnnotationMetadata = new MutableAnnotationMetadata();
+            }
+            typeAnnotationMetadata.addDeclaredAnnotation(AnnotationUtil.NON_NULL, Map.of());
+        }
+        if (typeAnnotationMetadata == null) {
+            return baseType;
+        }
+        ElementAnnotationMetadata metadata = getElementAnnotationMetadataFactory().buildMutable(typeAnnotationMetadata);
+        return new TypeAnnotatedClassElement(baseType, metadata);
+    }
+
     private Map<String, ClassElement> getBoundGenericTypes(AttributeDef attributeDef) {
-        Map<String, Map<String, ClassElement>> allGenerics = getOwningType().getAllTypeArguments();
         ClassDef declaringClass = attributeDef.declaringClass();
+        boolean declaredOnOwningType = declaringClass != null
+            ? declaringClass.qualifiedName().equals(getOwningType().getName())
+            : getDeclaringType().getName().equals(getOwningType().getName());
+        if (declaredOnOwningType
+            && getOwningType() instanceof PythonClassElement pythonClassElement
+            && !pythonClassElement.hasExplicitTypeArguments()) {
+            return declaredGenericBindings(true);
+        }
+        Map<String, Map<String, ClassElement>> allGenerics = getOwningType().getAllTypeArguments();
         Map<String, ClassElement> declaringGenerics = declaringClass != null
             ? allGenerics.getOrDefault(declaringClass.qualifiedName(), Map.of())
             : Map.of();
         if (declaringGenerics.isEmpty()) {
-            boolean declaredOnOwningType = getDeclaringType().getName().equals(getOwningType().getName());
-            declaringGenerics = declaredGenericBindings(declaredOnOwningType);
+            declaringGenerics = declaredGenericBindings(false);
         }
         return declaringGenerics;
     }

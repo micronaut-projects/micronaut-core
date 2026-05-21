@@ -62,4 +62,27 @@ class MyFactory:
         cleanup:
         context?.close()
     }
+
+    void "test value expression resolver service is loaded from python context classloader"() {
+        given:
+        def context = buildContext('''
+from typing import Annotated
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Value
+
+@Singleton
+class A:
+    def __init__(self, value: Annotated[str, Value("${python.service.loaded}")]):
+        self.value = value
+''')
+
+        when:
+        def bean = getBean(context, "python.A")
+
+        then:
+        bean.asPolyglotValue().getMember("value").asString() == "loaded"
+
+        cleanup:
+        context?.close()
+    }
 }

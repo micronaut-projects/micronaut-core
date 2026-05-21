@@ -145,9 +145,21 @@ public record FunctionDef(
     }
 
     public FunctionDef withClassDef(ClassDef classDef) {
+        FunctionDef functionDef = new FunctionDef(
+            name,
+            arguments,
+            decorators,
+            returnType,
+            typeComment,
+            typeParams,
+            documentation,
+            isAbstract,
+            isStatic,
+            classDef
+        );
         return new FunctionDef(
             name,
-            arguments.withDeclaringFunction(this),
+            arguments.withDeclaringFunction(functionDef),
             decorators,
             returnType,
             typeComment,

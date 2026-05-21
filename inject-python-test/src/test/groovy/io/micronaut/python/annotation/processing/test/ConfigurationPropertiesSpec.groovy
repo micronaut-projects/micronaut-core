@@ -30,7 +30,6 @@ import spock.lang.PendingFeature
  * @since 4.8.0
  */
 class ConfigurationPropertiesSpec extends AbstractPythonTypeElementSpec {
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0050")
     void "test configuration properties with constraints is validating bean definition"() {
         given:
         def definition = buildBeanDefinition("python", "ServiceConfig", '''
@@ -47,7 +46,47 @@ class ServiceConfig:
         definition instanceof ValidatedBeanDefinition
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0094")
+    void "test validated configuration properties can be injected into another bean"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from jakarta.inject import Inject, Singleton
+from jakarta.validation.constraints import NotBlank
+from micronaut.context.annotation import ConfigurationProperties
+
+@ConfigurationProperties("service")
+class ServiceConfig:
+    name: Annotated[str, NotBlank]
+
+@Singleton
+class Service:
+    def __init__(self, config: ServiceConfig):
+        self.config = config
+
+    def get_name(self) -> str:
+        return self.config.name
+
+@Singleton
+class FieldInjectedService:
+    config: Annotated[ServiceConfig, Inject]
+
+    def get_name(self) -> str:
+        return self.config.name
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, ["service.name": "catalog"])
+        def service = getBean(context, "python.Service")
+        def fieldInjectedService = getBean(context, "python.FieldInjectedService")
+
+        then:
+        service.asPolyglotValue().invokeMember("get_name").asString() == "catalog"
+        fieldInjectedService.asPolyglotValue().invokeMember("get_name").asString() == "catalog"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test each property on Python class tht implements Java interface"() {
         given:
         def pythonCode = '''
@@ -72,10 +111,10 @@ class EngineConfiguration(Toggleable):
 
         then:
         ferrariBean != null
-        ferrariBean.cylinders() == 8
-        ferrariBean.enabled() == false
-        fordBean.cylinders() == 6
-        fordBean.enabled() == true
+        ferrariBean.getCylinders() == 8
+        ferrariBean.isEnabled() == false
+        fordBean.getCylinders() == 6
+        fordBean.isEnabled() == true
     }
 
     void "test each property on Python class"() {

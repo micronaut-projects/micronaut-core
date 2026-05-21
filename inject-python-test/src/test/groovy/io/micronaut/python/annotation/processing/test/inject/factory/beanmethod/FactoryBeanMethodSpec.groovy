@@ -50,7 +50,6 @@ class FactoryBeanMethodSpec extends AbstractPythonTypeElementSpec {
         given:
         def context = buildContext('''\
 from micronaut.context.annotation import Factory, Bean, Prototype
-from jakarta.inject import Singleton
 
 class Bar1:
     stopped : bool = False
@@ -134,7 +133,6 @@ class TestFactory:
         context.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0089")
     void "test producing a bean with unresolved method parameter types does not break preDestroy search"() {
         given:
         def context = buildContext('''\
@@ -614,7 +612,6 @@ class ProductFactory:
         ContextHolder.resetContext()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0067")
     void "test mapped configuration factory advice caches factory method result"() {
         given:
         def context = buildContext('''\
@@ -647,12 +644,16 @@ class MyConfiguration:
         def configType = context.classLoader.loadClass("python.MyConfiguration")
         BeanDefinition<?> configDefinition = context.getBeanDefinition(configType)
         def configBean = context.getBean(configType)
+        def beanOne = context.getBean(beanType)
+        def beanTwo = context.getBean(beanType)
+        def directOne = configBean."my_bean"()
+        def directTwo = configBean."my_bean"()
 
         then:
         configDefinition.hasAnnotation(Factory)
         configDefinition.hasAnnotation(TestSingletonAdvice)
-        context.getBean(beanType).is(context.getBean(beanType))
-        configBean."my_bean"().is(configBean."my_bean"())
+        beanOne.is(beanTwo)
+        directOne.is(directTwo)
 
         cleanup:
         context?.close()
@@ -892,7 +893,6 @@ class MyBean:
         context.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0046")
     void "test factory method named qualifier from constant"() {
         given:
         def context = buildContext('''\
@@ -994,7 +994,6 @@ class EngineFactory:
         context.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0020")
     void "test a factory bean with static method"() {
         given:
         def context = buildContext('''\
@@ -1007,7 +1006,8 @@ class Bar1:
 @Factory
 class TestFactory:
 
-    @Singleton
+    @Bean
+    @Prototype
     @staticmethod
     def bar() -> Bar1:
         return Bar1()
@@ -1020,7 +1020,7 @@ class TestFactory:
         def bar1 = getBean(context, 'python.Bar1')
 
         then:
-        bar1BeanDefinition.getBeanDescription(TypeInformation.TypeFormat.SHORTENED) == '@i.m.c.a.Prototype python.Bar1 python.TestFactory.bar()'
+        bar1BeanDefinition.getBeanDescription(TypeInformation.TypeFormat.SHORTENED) == '@i.m.c.a.Prototype p.Bar1 p.TestFactory.bar()'
         bar1 != null
         bar1BeanDefinition.getScope().get() == Prototype.class
 

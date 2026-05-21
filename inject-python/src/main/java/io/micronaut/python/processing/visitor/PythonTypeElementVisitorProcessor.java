@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.visitor;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.runtime.RuntimeProxy;
 import io.micronaut.context.annotation.Mixin;
@@ -23,6 +24,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -78,10 +80,7 @@ public class PythonTypeElementVisitorProcessor {
         this.loadedVisitors = new ArrayList<>(typeElementVisitors.size());
 
         for (TypeElementVisitor<?, ?> visitor : typeElementVisitors) {
-            TypeElementVisitor.VisitorKind visitorKind = visitor.getVisitorKind();
-            TypeElementVisitor.VisitorKind incrementalProcessorKind = getIncrementalProcessorKind();
-
-            if (incrementalProcessorKind == visitorKind) {
+            if (isSupportedVisitorKind(visitor.getVisitorKind())) {
                 try {
                     loadedVisitors.add(new LoadedVisitor(visitor));
                 } catch (TypeNotPresentException | NoClassDefFoundError e) {
@@ -117,6 +116,9 @@ public class PythonTypeElementVisitorProcessor {
         List<ClassElement> allClasses = collectClassElements(environment, pythonVisitorContext);
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             for (ClassElement element : allClasses) {
+                if (element.hasAnnotation(Generated.class)) {
+                    continue;
+                }
                 if (loadedVisitor.matchesClass(element)) {
                     annotatePythonAopProxy(element);
                     visitClass(loadedVisitor, element, pythonVisitorContext);
@@ -215,6 +217,9 @@ public class PythonTypeElementVisitorProcessor {
     private void annotatePythonAopProxy(ClassElement element) {
         if (!(element instanceof AbstractPythonClassElement) || !isAopProxy(element)) {
             return;
+        }
+        if (element.hasStereotype(Around.class)) {
+            element.annotate(Around.class, builder -> builder.member("proxyTarget", true));
         }
         element.annotate(RuntimeProxy.class, builder ->
             builder.value("io.micronaut.context.python.aop.PythonProxyCreator")
@@ -316,8 +321,9 @@ public class PythonTypeElementVisitorProcessor {
         return false;
     }
 
-    private TypeElementVisitor.VisitorKind getIncrementalProcessorKind() {
-        return TypeElementVisitor.VisitorKind.ISOLATING;
+    private boolean isSupportedVisitorKind(TypeElementVisitor.VisitorKind visitorKind) {
+        return visitorKind == TypeElementVisitor.VisitorKind.ISOLATING
+            || visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING;
     }
 
     /**

@@ -20,7 +20,6 @@ import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.condition.OperatingSystem
 import io.micronaut.context.exceptions.NoSuchBeanException
-import spock.lang.PendingFeature
 
 class RequiresSpec extends AbstractPythonTypeElementSpec {
 
@@ -400,14 +399,13 @@ class MissingAbsentClassBean:
         missingAbsentClassDefinition.isEnabled(BeanContext.build())
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0051")
     void "test requires java sdk"() {
         given:
         def supportedDefinition = buildBeanDefinition("python", "SupportedBean", '''
 from jakarta.inject import Singleton
 from micronaut.context.annotation import Requires
 
-@Requires(sdk=Requires.Sdk.JAVA, version="8")
+@Requires(sdk=Requires.Sdk.JAVA, version="17")
 @Singleton
 class SupportedBean:
     pass
@@ -431,7 +429,6 @@ class UnsupportedBean:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0052")
     void "test requires operating system"() {
         given:
         def osDefinition = buildBeanDefinition("python", "OsBean", '''

@@ -113,7 +113,6 @@ class MyDto:
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0049")
     void "test property type argument annotations remain after bean properties are resolved"() {
         expect:
         buildClassElement('''
@@ -159,7 +158,6 @@ class HealthResult(Protocol):
         }
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0034")
     void "test inherited properties keep declaring and owning types"() {
         expect:
         buildClassElement('''

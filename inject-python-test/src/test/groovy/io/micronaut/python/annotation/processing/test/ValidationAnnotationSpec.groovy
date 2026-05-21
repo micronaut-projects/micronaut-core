@@ -26,7 +26,6 @@ import jakarta.validation.Constraint
 import jakarta.validation.Valid
 import jakarta.validation.constraints.*
 import org.intellij.lang.annotations.Language
-import spock.lang.PendingFeature
 
 /**
  * Tests for Jakarta validation annotation processing in Python code.
@@ -36,7 +35,6 @@ import spock.lang.PendingFeature
  */
 class ValidationAnnotationSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0048")
     def "test constraints on singleton methods make them validated"() {
         given:
         @Language("python") def pythonCode = '''
@@ -69,6 +67,82 @@ class ProductService:
         setName.hasStereotype(Validated)
         setNested != null
         setNested.getAnnotationTypesByStereotype(Around).contains(Validated)
+
+        cleanup:
+        context?.close()
+    }
+
+    def "test inherited method validation metadata can be mutated by validation visitor"() {
+        given:
+        @Language("python") def pythonCode = '''
+from typing import Annotated
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.validation import Validated
+from jakarta.validation.constraints import Min, NotBlank
+
+@Validated
+class PetOperations:
+    @Executable
+    def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> str:
+        ...
+
+@Singleton
+@Validated
+class PetController(PetOperations):
+    @Executable
+    def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> str:
+        return name
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.PetController")
+        def save = definition.getExecutableMethods().find { it.methodName == "save" }
+
+        then:
+        definition instanceof ProxyBeanDefinition
+        save != null
+        save.hasStereotype(Validated)
+
+        cleanup:
+        context?.close()
+    }
+
+    def "test inherited route validation metadata can be mutated by validation visitor"() {
+        given:
+        @Language("python") def pythonCode = '''
+from typing import Annotated
+from micronaut.core.async_.annotation import SingleResult
+from micronaut.http.annotation import Controller, Post
+from micronaut.validation import Validated
+from jakarta.validation.constraints import Min, NotBlank
+
+@Validated
+class PetOperations:
+    @Post
+    @SingleResult
+    def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> str:
+        ...
+
+@Validated
+@Controller("/pets")
+class PetController(PetOperations):
+    @Post
+    @SingleResult
+    def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> str:
+        return name
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.PetController")
+        def save = definition.getExecutableMethods().find { it.methodName == "save" }
+
+        then:
+        definition instanceof ProxyBeanDefinition
+        save != null
+        save.hasStereotype(Validated)
 
         cleanup:
         context?.close()

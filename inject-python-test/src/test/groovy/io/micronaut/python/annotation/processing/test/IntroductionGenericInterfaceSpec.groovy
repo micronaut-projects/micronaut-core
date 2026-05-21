@@ -198,11 +198,11 @@ class MyBean(MyInterface[SubPerson], ABC):
         when:
         def context = buildContext(pythonCode)
         def definition = getBeanDefinition(context, "python.MyBean")
-        Value bean = getBean(context, "python.MyBean").asPolyglotValue()
         def getPerson = definition.executableMethods.find { it.methodName == "get_person" }
         def getPeople = definition.executableMethods.find { it.methodName == "get_people" }
         def save = definition.executableMethods.find { it.methodName == "save" }
         def saveAll = definition.executableMethods.find { it.methodName == "save_all" }
+        Value bean = getBean(context, "python.MyBean").asPolyglotValue()
 
         then:
         !definition.isAbstract()
@@ -290,7 +290,6 @@ class MyBean(MyInterface, ABC):
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0063")
     void "test introduction generic type argument annotations propagate to methods"() {
         given:
         def pythonCode = '''

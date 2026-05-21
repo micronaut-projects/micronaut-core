@@ -24,7 +24,6 @@ import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
-import spock.lang.PendingFeature
 
 class CustomVisitorSpec extends AbstractPythonTypeElementSpec {
 
@@ -114,7 +113,6 @@ class TestController:
         InjectElementVisitor.visited().containsAll(["python.TestController", "setter_method"])
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0076")
     void "test Generated class is not visited by custom visitors"() {
         when:
         buildBeanDefinition('python', 'TestGenerated', '''

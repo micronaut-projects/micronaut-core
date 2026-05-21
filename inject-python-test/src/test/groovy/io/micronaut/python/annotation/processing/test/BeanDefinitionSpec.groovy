@@ -56,7 +56,6 @@ class TypeStringService:
         TypeInformation.TypeFormat.ANSI_SHORTENED | "\u001B[0;36mp.TypeStringService\u001B[0m"
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0001")
     void "test declared generic placeholders from definition"() {
         when:
         def definition = buildBeanDefinition("python", "GenericService", '''
@@ -75,7 +74,6 @@ class GenericService(Generic[K, V]):
         definition.getGenericBeanType().getTypeString(true) == "GenericService<Object, Object>"
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0003")
     void "test declared generic placeholders from reference"() {
         when:
         def reference = buildBeanDefinitionReference("python", "GenericService", '''
@@ -94,7 +92,6 @@ class GenericService(Generic[K, V]):
         reference.getGenericBeanType().getTypeString(true) == "GenericService<Object, Object>"
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0039")
     void "test declared generic placeholders from reference with inheritance"() {
         when:
         def reference = buildBeanDefinitionReference("python", "DefaultKafkaConsumerConfiguration", '''
@@ -237,7 +234,6 @@ class NamedService:
         definition.getDeclaredQualifier() == Qualifiers.byName("foo")
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0045")
     void "test named qualifier from constant"() {
         given:
         def definition = buildBeanDefinition("python", "NamedConstantService", '''
@@ -408,7 +404,6 @@ class QualifiedService:
             .getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == "python.Cylinders"
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0036")
     @Unroll
     void "test #annotation protocol is not registered as a bean definition"() {
         expect:
@@ -530,7 +525,6 @@ class TestFactory:
         context.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0040")
     void "test resolved generic type arguments are not type variables"() {
         given:
         def definition = buildBeanDefinition("python", "TestSerde", '''
@@ -567,7 +561,6 @@ class TestSerde(Serde[object]):
         !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0017")
     void "test annotation metadata present on deep type parameters of definition"() {
         given:
         def definition = buildBeanDefinition("python", "DeepValidatedService", '''

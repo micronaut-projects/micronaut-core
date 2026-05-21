@@ -18,6 +18,7 @@ package io.micronaut.python.processing.visitor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -26,9 +27,18 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.TypeParameterElement;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
+import javax.lang.model.type.WildcardType;
+
 import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
+import io.micronaut.annotation.processing.visitor.JavaMethodElement;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -48,8 +58,11 @@ import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
@@ -272,11 +285,13 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         List<MethodElement> inheritedMethods = new ArrayList<>();
         for (ClassElement anInterface : getInterfaces()) {
             if (elementType == MethodElement.class) {
-                inheritedMethods.addAll(anInterface.getEnclosedElements((ElementQuery<MethodElement>) query));
+                for (MethodElement methodElement : anInterface.getEnclosedElements((ElementQuery<MethodElement>) query)) {
+                    inheritedMethods.add(ownInheritedInterfaceMethod(resolveInheritedInterfaceMethod(anInterface, methodElement)));
+                }
             } else {
                 for (MemberElement memberElement : anInterface.getEnclosedElements((ElementQuery<MemberElement>) query)) {
                     if (memberElement instanceof MethodElement methodElement) {
-                        inheritedMethods.add(methodElement);
+                        inheritedMethods.add(ownInheritedInterfaceMethod(resolveInheritedInterfaceMethod(anInterface, methodElement)));
                     }
                 }
             }
@@ -287,23 +302,157 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
 
         List<T> allElements = new ArrayList<>(elements);
         for (MethodElement inheritedMethod : inheritedMethods) {
-            if (!isInterfaceMethodAlreadyRepresented(allElements, inheritedMethod)) {
+            int representedMethodIndex = representedInterfaceMethodIndex(allElements, inheritedMethod);
+            if (representedMethodIndex == -1) {
                 allElements.add((T) decorateInheritedInterfaceMethod(inheritedMethod));
+            } else if (allElements.get(representedMethodIndex) instanceof MethodElement representedMethod
+                && !representedMethod.getDeclaringType().equals(this)
+                && representedMethod.isAbstract()) {
+                allElements.set(representedMethodIndex, (T) decorateInheritedInterfaceMethod(representedMethod));
             }
         }
         return allElements;
+    }
+
+    private MethodElement resolveInheritedInterfaceMethod(ClassElement anInterface, MethodElement inheritedMethod) {
+        if (!(inheritedMethod instanceof JavaMethodElement javaMethodElement) || anInterface.getTypeArguments().isEmpty()) {
+            return inheritedMethod;
+        }
+        List<? extends VariableElement> nativeParameters = javaMethodElement.getNativeType().element().getParameters();
+        ParameterElement[] parameters = inheritedMethod.getParameters();
+        if (nativeParameters.size() != parameters.length) {
+            return inheritedMethod;
+        }
+        Map<String, ClassElement> typeArguments = new LinkedHashMap<>(anInterface.getTypeArguments());
+        for (TypeParameterElement typeParameter : javaMethodElement.getNativeType().element().getTypeParameters()) {
+            resolveTypeParameter(typeParameter, typeArguments)
+                .ifPresent(type -> typeArguments.put(typeParameter.getSimpleName().toString(), type));
+        }
+        ParameterElement[] resolvedParameters = null;
+        for (int i = 0; i < parameters.length; i++) {
+            Optional<ClassElement> resolvedType = resolveTypeMirror(nativeParameters.get(i).asType(), typeArguments);
+            if (resolvedType.isPresent() && !sameGenericType(resolvedType.get(), parameters[i].getGenericType())) {
+                if (resolvedParameters == null) {
+                    resolvedParameters = Arrays.copyOf(parameters, parameters.length);
+                }
+                resolvedParameters[i] = ParameterElement.of(resolvedType.get(), parameters[i].getName())
+                    .withAnnotationMetadata(parameters[i].getAnnotationMetadata());
+            }
+        }
+        return resolvedParameters == null ? inheritedMethod : inheritedMethod.withParameters(resolvedParameters);
+    }
+
+    private MethodElement ownInheritedInterfaceMethod(MethodElement inheritedMethod) {
+        if (inheritedMethod instanceof PythonMethodElement) {
+            // Match Java, Groovy, and Kotlin: inherited methods are viewed through the concrete owning type
+            // so type-level metadata participates in normal method metadata resolution.
+            return inheritedMethod.withNewOwningType(this);
+        }
+        return inheritedMethod;
+    }
+
+    private Optional<ClassElement> resolveTypeParameter(TypeParameterElement typeParameter, Map<String, ClassElement> typeArguments) {
+        for (TypeMirror bound : typeParameter.getBounds()) {
+            Optional<ClassElement> resolvedBound = resolveTypeMirror(bound, typeArguments);
+            if (resolvedBound.isPresent() && !Object.class.getName().equals(resolvedBound.get().getName())) {
+                return resolvedBound;
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<ClassElement> resolveTypeMirror(TypeMirror typeMirror, Map<String, ClassElement> typeArguments) {
+        return switch (typeMirror.getKind()) {
+            case TYPEVAR -> {
+                TypeVariable typeVariable = (TypeVariable) typeMirror;
+                yield Optional.ofNullable(typeArguments.get(typeVariable.asElement().getSimpleName().toString()));
+            }
+            case WILDCARD -> {
+                WildcardType wildcardType = (WildcardType) typeMirror;
+                TypeMirror extendsBound = wildcardType.getExtendsBound();
+                TypeMirror superBound = wildcardType.getSuperBound();
+                if (extendsBound != null) {
+                    yield resolveTypeMirror(extendsBound, typeArguments);
+                }
+                if (superBound != null) {
+                    yield resolveTypeMirror(superBound, typeArguments);
+                }
+                yield Optional.empty();
+            }
+            case DECLARED -> resolveDeclaredType((DeclaredType) typeMirror, typeArguments);
+            case INT -> Optional.of(PrimitiveElement.INT);
+            case LONG -> Optional.of(PrimitiveElement.LONG);
+            case BOOLEAN -> Optional.of(PrimitiveElement.BOOLEAN);
+            case DOUBLE -> Optional.of(PrimitiveElement.DOUBLE);
+            case FLOAT -> Optional.of(PrimitiveElement.FLOAT);
+            case SHORT -> Optional.of(PrimitiveElement.SHORT);
+            case BYTE -> Optional.of(PrimitiveElement.BYTE);
+            case CHAR -> Optional.of(PrimitiveElement.CHAR);
+            case VOID -> Optional.of(PrimitiveElement.VOID);
+            default -> Optional.empty();
+        };
+    }
+
+    private Optional<ClassElement> resolveDeclaredType(DeclaredType declaredType, Map<String, ClassElement> typeArguments) {
+        if (!(declaredType.asElement() instanceof TypeElement typeElement)) {
+            return Optional.empty();
+        }
+        String typeName = typeElement.getQualifiedName().toString();
+        ClassElement rawType = environment.visitorContext()
+            .getClassElement(typeName)
+            .orElse(ClassElement.of(typeName));
+        List<? extends TypeMirror> declaredTypeArguments = declaredType.getTypeArguments();
+        if (declaredTypeArguments.isEmpty()) {
+            return Optional.of(rawType);
+        }
+        List<? extends GenericPlaceholderElement> placeholders = rawType.getDeclaredGenericPlaceholders();
+        if (placeholders.isEmpty() || placeholders.size() != declaredTypeArguments.size()) {
+            return Optional.of(rawType);
+        }
+        Map<String, ClassElement> resolvedTypeArguments = new LinkedHashMap<>(placeholders.size());
+        for (int i = 0; i < declaredTypeArguments.size(); i++) {
+            ClassElement resolvedType = resolveTypeMirror(declaredTypeArguments.get(i), typeArguments)
+                .orElse(ClassElement.of(Object.class));
+            resolvedTypeArguments.put(placeholders.get(i).getVariableName(), resolvedType);
+        }
+        return Optional.of(rawType.withTypeArguments(resolvedTypeArguments));
+    }
+
+    private static boolean sameGenericType(ClassElement left, ClassElement right) {
+        if (!left.getName().equals(right.getName())) {
+            return false;
+        }
+        Map<String, ClassElement> leftTypeArguments = left.getTypeArguments();
+        Map<String, ClassElement> rightTypeArguments = right.getTypeArguments();
+        if (leftTypeArguments.size() != rightTypeArguments.size()) {
+            return false;
+        }
+        for (Map.Entry<String, ClassElement> entry : leftTypeArguments.entrySet()) {
+            ClassElement rightTypeArgument = rightTypeArguments.get(entry.getKey());
+            if (rightTypeArgument == null || !sameGenericType(entry.getValue(), rightTypeArgument)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private MethodElement decorateInheritedInterfaceMethod(MethodElement inheritedMethod) {
         if (hasDeclaredTypeAroundBinding()) {
             return decorateMethodWithTypeInterceptorMetadata(inheritedMethod);
         }
-        if (hasStereotype(InterceptorBinding.class)) {
-            return inheritedMethod.withAnnotationMetadata(
-                new AnnotationMetadataHierarchy(true, getAnnotationMetadata(), inheritedMethod.getAnnotationMetadata())
-            );
+        if (!this.equals(inheritedMethod.getOwningType())) {
+            // JavaMethodElement cannot be re-owned by a Python class because its implementation requires a
+            // JavaClassElement owner. Apply the Python owning type metadata here instead, which is the
+            // metadata hierarchy that MethodElementAnnotationMetadata would build after withNewOwningType.
+            return decorateMethodWithOwningTypeMetadata(inheritedMethod);
         }
         return inheritedMethod;
+    }
+
+    private MethodElement decorateMethodWithOwningTypeMetadata(MethodElement method) {
+        return method.withAnnotationMetadata(
+            new AnnotationMetadataHierarchy(getAnnotationMetadata(), method.getMethodAnnotationMetadata())
+        );
     }
 
     private MethodElement decorateMethodWithTypeInterceptorMetadata(MethodElement method) {
@@ -341,15 +490,18 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         return new AnnotationMetadataHierarchy(true, annotationMetadata, explicitBindings);
     }
 
-    private static boolean isInterfaceMethodAlreadyRepresented(List<? extends Element> elements, MethodElement inheritedMethod) {
-        for (Element element : elements) {
+    private static int representedInterfaceMethodIndex(List<? extends Element> elements, MethodElement inheritedMethod) {
+        for (int i = 0; i < elements.size(); i++) {
+            Element element = elements.get(i);
             if (element instanceof MethodElement methodElement &&
                 methodElement.getName().equals(inheritedMethod.getName()) &&
-                (methodElement.overrides(inheritedMethod) || methodElement.isSubSignature(inheritedMethod))) {
-                return true;
+                (methodElement.overrides(inheritedMethod) ||
+                    methodElement.isSubSignature(inheritedMethod) ||
+                    methodElement.getParameters().length == inheritedMethod.getParameters().length)) {
+                return i;
             }
         }
-        return false;
+        return -1;
     }
 
     @Override
@@ -403,7 +555,16 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         List<PropertyElement> allProperties = new java.util.ArrayList<>(decoratorProperties);
 
         // Then, create properties from regular attributes that aren't already represented as properties
-        List<AttributeDef> fields = getNativeType().attributes();
+        addAttributeBackedProperties(this, this, allProperties);
+
+        // Apply propertyElementQuery filtering
+        return filterProperties(allProperties, propertyElementQuery);
+    }
+
+    private void addAttributeBackedProperties(AbstractPythonClassElement declaringType,
+                                              ClassElement owningType,
+                                              List<PropertyElement> allProperties) {
+        List<AttributeDef> fields = declaringType.getNativeType().attributes();
         for (AttributeDef field : fields) {
             // Check if this field is already represented as a property
             boolean alreadyExists = allProperties.stream()
@@ -417,16 +578,19 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                 PythonPropertyElement propertyElement = new PythonPropertyElement(
                     propertyDef,
                     environment,
-                    this,
-                    this,
+                    declaringType,
+                    owningType,
                     environment.metadataFactory()
                 );
                 allProperties.add(propertyElement);
             }
         }
 
-        // Apply propertyElementQuery filtering
-        return filterProperties(allProperties, propertyElementQuery);
+        declaringType.getSuperType().ifPresent(superType -> {
+            if (superType instanceof AbstractPythonClassElement pythonSuperType) {
+                addAttributeBackedProperties(pythonSuperType, owningType, allProperties);
+            }
+        });
     }
 
     static List<PropertyElement> filterProperties(List<PropertyElement> properties, PropertyElementQuery query) {
@@ -666,9 +830,12 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                     }
                 }
             } else {
-                if (currentDeclaringClass != null && currentDeclaringClass != getNativeClassType(AbstractPythonClassElement.this)) {
-                    // This is an inherited element - find the declaring class
-                    String declaringClassName = currentDeclaringClass.name();
+                if (currentDeclaringClass != null && !currentDeclaringClass.equals(getNativeClassType(AbstractPythonClassElement.this))) {
+                    // This is an inherited element. The Python environment is keyed by qualified
+                    // class name, and preserving the real declaring type is required for inherited
+                    // class-level metadata such as @Executable to be evaluated against the superclass
+                    // instead of the subclass currently being queried.
+                    String declaringClassName = qualifiedClassName(currentDeclaringClass);
                     ClassElement declaringElement = environment.classes().get(declaringClassName);
                     if (declaringElement instanceof PythonClassElement pythonDeclaringClass) {
                         declaringClassElement = pythonDeclaringClass;
