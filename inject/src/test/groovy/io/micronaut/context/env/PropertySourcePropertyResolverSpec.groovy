@@ -757,6 +757,38 @@ class PropertySourcePropertyResolverSpec extends Specification {
         closed.get()
     }
 
+    void "test expression resolver services are loaded from configured classloader"() {
+        given:
+        java.nio.file.Path servicesRoot = java.nio.file.Files.createTempDirectory("property-expression-services")
+        java.nio.file.Path serviceFile = servicesRoot.resolve("META-INF/services/io.micronaut.context.env.PropertyExpressionResolver")
+        java.nio.file.Files.createDirectories(serviceFile.parent)
+        java.nio.file.Files.writeString(serviceFile, TestExpressionResolver.name)
+        URLClassLoader classLoader = new URLClassLoader([servicesRoot.toUri().toURL()] as URL[], getClass().classLoader)
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(ConversionService.SHARED, true, classLoader)
+        resolver.addPropertySource(PropertySource.of("test", [foo: '${service.loaded}']))
+
+        expect:
+        resolver.getProperty("foo", String).get() == "loaded"
+
+        cleanup:
+        classLoader.close()
+        servicesRoot.toFile().deleteDir()
+    }
+
     interface PropertyExpressionResolverAutoCloseable extends PropertyExpressionResolver, AutoCloseable {
+    }
+
+    static class TestExpressionResolver implements PropertyExpressionResolver {
+        @Override
+        @NonNull
+        <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
+                                @NonNull ConversionService conversionService,
+                                @NonNull String expression,
+                                @NonNull Class<T> requiredType) {
+            if (expression == "service.loaded") {
+                return conversionService.convert("loaded", requiredType)
+            }
+            Optional.empty()
+        }
     }
 }
