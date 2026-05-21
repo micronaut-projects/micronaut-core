@@ -403,6 +403,8 @@ public final class GraalPyUtil {
 
         // Try to map Python primitive types to Java primitives
         return switch (typeAnnotation) {
+            case "object", "typing.Any", "Any" ->
+                visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class));
             case "int" -> PrimitiveElement.INT;
             case "float" -> PrimitiveElement.DOUBLE;
             case "bool" -> PrimitiveElement.BOOLEAN;

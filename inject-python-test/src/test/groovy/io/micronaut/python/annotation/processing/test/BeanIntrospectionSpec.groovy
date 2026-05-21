@@ -360,6 +360,33 @@ class SerdeableDataClass:
         context?.close()
     }
 
+    void "test @Serdeable on Python @dataclass with object property"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.python.compiler import Serdeable
+
+@Serdeable
+@dataclass
+class SerdeableDataClass:
+    name: str
+    data: object | None = None
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.SerdeableDataClass")
+
+        then:
+        introspection != null
+        introspection.hasStereotype(Serdeable.Serializable)
+        introspection.hasStereotype(Serdeable.Deserializable)
+        introspection.getRequiredProperty("data", Object).type == Object
+
+        cleanup:
+        context?.close()
+    }
+
     void "equals/hashCode/toString for @Introspected Python dataclass"() {
         given:
         def pythonCode = '''

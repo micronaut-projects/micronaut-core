@@ -89,7 +89,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             var context = buildContext(hostAccess, engine, classLoader);
 
             // Make context available to bridge classes
-            ContextHolder.setContext(context);
+            ContextHolder.setContext(context, classLoader);
 
             return context;
 
@@ -125,7 +125,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         }
         var context = buildContext(HostAccess.ALL, GraalPyEngineFactory.buildPythonEngine(), classLoader, options, applicationMain);
         ContextHolder.setReuseContext(true);
-        ContextHolder.setContext(context);
+        ContextHolder.setContext(context, classLoader);
         return context;
     }
 

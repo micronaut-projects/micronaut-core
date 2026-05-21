@@ -24,8 +24,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpResponse;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.proxy.ProxyObject;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -75,7 +78,10 @@ public final class GraalPyRuntimeUtil {
      * @param <V> The value type of the map
      * @return The resulting map
      */
-    public static <V> Map<String, Object> coerceMap(Map<String, V> map) {
+    public static <V> @Nullable Map<String, Object> coerceMap(@Nullable Map<String, V> map) {
+        if (map == null) {
+            return null;
+        }
         return
             map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, (entry) -> {
                 Object v = entry.getValue();
@@ -93,7 +99,10 @@ public final class GraalPyRuntimeUtil {
      * @return The resulting list
      *
      */
-    public static <E> List<Object> coerceList(List<E> list) {
+    public static <E> @Nullable List<Object> coerceList(@Nullable List<E> list) {
+        if (list == null) {
+            return null;
+        }
         return
             list.stream().map(v -> {
                 if (v instanceof ValueCoercible valueCoercible && !(v instanceof PooledValueCoercible)) {
@@ -301,6 +310,36 @@ public final class GraalPyRuntimeUtil {
     }
 
     /**
+     * Convert a GraalPy Value representing a list using a generated element converter.
+     *
+     * @param graalValue the GraalPy Value (should be a list-like object)
+     * @param converter the converter to apply to each element
+     * @param <T> the expected list element type
+     * @return a Java List with converted elements
+     */
+    public static <T> @Nullable List<T> convertList(Value graalValue, PolyglotValueConverter<T> converter) {
+        if (isNone(graalValue)) {
+            return null;
+        }
+        try {
+            long size = getSize(graalValue);
+            if (size == 0) {
+                return List.of();
+            }
+            List<T> result = new ArrayList<>(Long.valueOf(size).intValue());
+            for (long i = 0; i < size; i++) {
+                Value elementValue = getElementAt(graalValue, i);
+                if (elementValue != null) {
+                    result.add(converter.convert(elementValue));
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /**
      * Convert a GraalPy Value representing a dict to a Java Map.
      * Recursively converts nested collections.
      *
@@ -479,6 +518,12 @@ public final class GraalPyRuntimeUtil {
         }
         if (value.isHostObject()) {
             Object hostObject = value.asHostObject();
+            if (hostObject instanceof ProxyObject proxyObject) {
+                T converted = convertValueCoercibleProxy(proxyObject, targetType);
+                if (converted != null) {
+                    return converted;
+                }
+            }
             if (targetType.isInstance(hostObject)) {
                 return targetType.cast(hostObject);
             }
@@ -486,14 +531,122 @@ public final class GraalPyRuntimeUtil {
         return value.as(targetType);
     }
 
+    /**
+     * Convert a GraalPy-created {@link HttpResponse} and its response body to the declared Java body type.
+     *
+     * @param value The source polyglot response
+     * @param bodyType The declared response body type
+     * @param <T> The response body type
+     * @return The converted response
+     */
+    @SuppressWarnings({"unchecked", "NullAway"})
+    public static <T> HttpResponse<T> convertHttpResponse(Value value, Class<T> bodyType) {
+        HttpResponse<?> response = convertValue(value, HttpResponse.class);
+        if (response == null) {
+            return null;
+        }
+        return convertHttpResponse(response, bodyType);
+    }
+
+    /**
+     * Convert a response body to the declared Java body type.
+     *
+     * @param response The source response
+     * @param bodyType The declared response body type
+     * @param <T> The response body type
+     * @return The converted response
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> HttpResponse<T> convertHttpResponse(HttpResponse<?> response, Class<T> bodyType) {
+        Optional<?> body = response.getBody();
+        if (body.isEmpty()) {
+            return (HttpResponse<T>) response;
+        }
+        Object rawBody = body.get();
+        if (rawBody == null) {
+            return (HttpResponse<T>) response;
+        }
+        if (response instanceof MutableHttpResponse<?> mutableResponse) {
+            T convertedBody = convertResponseBody(rawBody, bodyType);
+            if (convertedBody == null) {
+                return (HttpResponse<T>) response;
+            }
+            return ((MutableHttpResponse<T>) mutableResponse).body(convertedBody);
+        }
+        return (HttpResponse<T>) response;
+    }
+
+    private static <T> @Nullable T convertResponseBody(Object rawBody, Class<T> bodyType) {
+        if (bodyType.isInstance(rawBody)) {
+            return bodyType.cast(rawBody);
+        }
+        if (rawBody instanceof ProxyObject proxyObject && proxyObject.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+            T converted = convertValueCoercibleProxy(proxyObject, bodyType);
+            if (converted != null) {
+                return converted;
+            }
+        }
+        if (rawBody instanceof Value bodyValue) {
+            return convertValue(bodyValue, bodyType);
+        }
+        try {
+            return convertValue(Value.asValue(rawBody), bodyType);
+        } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
+            return null;
+        }
+    }
+
     private static <T> @Nullable T convertMappedWrapper(Value value, Class<T> targetType) {
         try {
+            ValueCoercible host = valueCoercibleHost(value);
+            if (host != null && targetType.isInstance(host)) {
+                return targetType.cast(host);
+            }
+            if (value.isHostObject()) {
+                Object hostObject = value.asHostObject();
+                if (hostObject instanceof ProxyObject proxyObject) {
+                    T converted = convertValueCoercibleProxy(proxyObject, targetType);
+                    if (converted != null) {
+                        return converted;
+                    }
+                }
+            }
             Object mappedObject = value.as(Object.class);
             if (mappedObject instanceof ValueCoercible && targetType.isInstance(mappedObject)) {
                 return targetType.cast(mappedObject);
             }
         } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
             return null;
+        }
+        return null;
+    }
+
+    private static <T> @Nullable T convertValueCoercibleProxy(ProxyObject proxyObject, Class<T> targetType) {
+        if (!proxyObject.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+            return null;
+        }
+        Object hostReference = proxyObject.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
+        if (hostReference instanceof ValueCoercible.HostObjectReference reference) {
+            ValueCoercible host = reference.value();
+            if (targetType.isInstance(host)) {
+                return targetType.cast(host);
+            }
+            return convertValue(host.asPolyglotValue(), targetType);
+        }
+        return null;
+    }
+
+    private static @Nullable ValueCoercible valueCoercibleHost(Value value) {
+        if (value == null || value.isNull() || !value.hasMembers() || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+            return null;
+        }
+        Value hostReferenceValue = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
+        if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
+            return null;
+        }
+        Object hostReference = hostReferenceValue.asHostObject();
+        if (hostReference instanceof ValueCoercible.HostObjectReference reference) {
+            return reference.value();
         }
         return null;
     }

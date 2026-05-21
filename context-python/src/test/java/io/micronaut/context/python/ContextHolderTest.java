@@ -26,6 +26,7 @@ import java.nio.file.Path;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class ContextHolderTest {
 
@@ -54,6 +55,83 @@ final class ContextHolderTest {
 
             assertEquals("class", sample.getMember("value").asString());
             assertEquals("script", script.getMember("value").asString());
+        }
+    }
+
+    @Test
+    void importsClassFromPythonStyleModuleWhenPackageExportIsUnavailable() throws IOException {
+        Path packagePath = temporaryDirectory.resolve("example").resolve("micronaut");
+        Files.createDirectories(packagePath);
+        Files.writeString(temporaryDirectory.resolve("example").resolve("__init__.py"), "");
+        Files.writeString(packagePath.resolve("__init__.py"), """
+            import importlib
+            TestWeatherApi = importlib.import_module("example.micronaut.test_weather_api")
+            """);
+        Files.writeString(packagePath.resolve("test_weather_api.py"), """
+            class TestWeatherApi:
+                value = "fixture"
+            """);
+
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            context.getBindings(PYTHON).putMember("root", temporaryDirectory.toString());
+            context.eval(PYTHON, "import sys\nsys.path.insert(0, root)");
+
+            Value testWeatherApi = ContextHolder.findClass("example.micronaut", "TestWeatherApi", context);
+
+            assertTrue(testWeatherApi.canInstantiate());
+            assertEquals("fixture", testWeatherApi.getMember("value").asString());
+        }
+    }
+
+    @Test
+    void importsClassFromAnyPackageModuleWhenPackageExportIsUnavailable() throws IOException {
+        Path packagePath = temporaryDirectory.resolve("example").resolve("micronaut");
+        Files.createDirectories(packagePath);
+        Files.writeString(temporaryDirectory.resolve("example").resolve("__init__.py"), "");
+        Files.writeString(packagePath.resolve("__init__.py"), """
+            __all__ = []
+            """);
+        Files.writeString(packagePath.resolve("forecast_controller.py"), """
+            class ForecastService:
+                value = "forecast"
+            """);
+
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            context.getBindings(PYTHON).putMember("root", temporaryDirectory.toString());
+            context.eval(PYTHON, "import sys\nsys.path.insert(0, root)");
+
+            Value forecastService = ContextHolder.findClass("example.micronaut", "ForecastService", context);
+
+            assertTrue(forecastService.canInstantiate());
+            assertEquals("forecast", forecastService.getMember("value").asString());
+        }
+    }
+
+    @Test
+    void usesContextClassLoaderWhenInstantiatingPythonFromRuntimeThreads() {
+        ClassLoader hostClassLoader = ContextHolderTest.class.getClassLoader();
+        ClassLoader previousClassLoader = Thread.currentThread().getContextClassLoader();
+        try (Context context = Context.newBuilder(PYTHON)
+            .allowAllAccess(true)
+            .hostClassLoader(hostClassLoader)
+            .allowHostClassLookup(name -> true)
+            .build()) {
+            context.eval(PYTHON, """
+                class NeedsHost:
+                    def __init__(self):
+                        import java
+                        self.loaded = java.type("io.micronaut.context.python.ContextHolder") is not None
+                """);
+            ContextHolder.setContext(context, hostClassLoader);
+
+            Thread.currentThread().setContextClassLoader(new ClassLoader(null) {
+            });
+            Value value = ContextHolder.newInstance("NeedsHost");
+
+            assertTrue(value.getMember("loaded").asBoolean());
+        } finally {
+            Thread.currentThread().setContextClassLoader(previousClassLoader);
+            ContextHolder.resetContext();
         }
     }
 }

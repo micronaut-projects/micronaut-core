@@ -16,6 +16,7 @@
 package io.micronaut.context.python;
 
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
@@ -24,6 +25,7 @@ import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
@@ -38,6 +40,7 @@ public final class ContextHolder {
 
     private static final AtomicBoolean REUSE_CONTEXT = new AtomicBoolean();
     private static volatile @Nullable Context context;
+    private static volatile @Nullable ClassLoader contextClassLoader;
     private static volatile @Nullable PythonPool pythonPool;
 
     private ContextHolder() {
@@ -283,12 +286,14 @@ public final class ContextHolder {
     }
 
     private static Value instantiate(@Nullable String packageName, String simpleName, Object[] args, Value pythonClass) {
-        if (pythonClass.canInstantiate()) {
-            return pythonClass.newInstance(GraalPyRuntimeUtil.coerceArgumentsToContext(pythonClass.getContext(), args));
-        } else {
-            String qualifiedName = packageName == null || PYTHON.equals(packageName) ? simpleName :  packageName + "." + simpleName;
-            throw new InstantiationException("Cannot instantiate class: " + qualifiedName + ". Ensure the class is a valid Python class and is non-abstract.");
-        }
+        return withContextClassLoader(() -> {
+            if (pythonClass.canInstantiate()) {
+                return pythonClass.newInstance(GraalPyRuntimeUtil.coerceArgumentsToContext(pythonClass.getContext(), args));
+            } else {
+                String qualifiedName = packageName == null || PYTHON.equals(packageName) ? simpleName :  packageName + "." + simpleName;
+                throw new InstantiationException("Cannot instantiate class: " + qualifiedName + ". Ensure the class is a valid Python class and is non-abstract.");
+            }
+        });
     }
 
     /**
@@ -444,25 +449,94 @@ public final class ContextHolder {
     private static Value importPackageMember(Context ctx, String packageName, String importName) {
         Value module = importModule(ctx, packageName);
         Value member = module.getMember(importName);
-        if (member != null) {
+        if (member != null && isPythonClass(ctx, member)) {
             return member;
         }
-        Value submodule = importModule(ctx, packageName + "." + importName);
-        member = submodule.getMember(importName);
-        if (member != null) {
+        member = importPackageSubmoduleMember(ctx, packageName, importName);
+        if (member != null && isPythonClass(ctx, member)) {
+            return member;
+        }
+        member = findClassInPackageModules(ctx, packageName, importName);
+        if (member != null && isPythonClass(ctx, member)) {
             return member;
         }
         throw new InstantiationException("Cannot find Python member: " + packageName + "." + importName);
     }
 
-    private static Value importModule(Context ctx, String moduleName) {
-        Value bindings = ctx.getBindings(PYTHON);
-        Value importModule = bindings.getMember("__micronaut_import_module");
-        if (importModule == null) {
-            ctx.eval(PYTHON, "import importlib\n__micronaut_import_module = importlib.import_module");
-            importModule = bindings.getMember("__micronaut_import_module");
+    private static @Nullable Value importPackageSubmoduleMember(Context ctx, String packageName, String importName) {
+        try {
+            Value submodule = importModule(ctx, packageName + "." + importName);
+            Value member = submodule.getMember(importName);
+            if (member != null) {
+                return member;
+            }
+        } catch (Exception ignored) {
+            // Fall back to the Python source module name below.
         }
-        return importModule.execute(moduleName);
+        String pythonModuleName = NameUtils.underscoreSeparate(importName, true);
+        if (!pythonModuleName.equals(importName)) {
+            try {
+                Value submodule = importModule(ctx, packageName + "." + pythonModuleName);
+                return submodule.getMember(importName);
+            } catch (Exception ignored) {
+                // Fall back to package module scanning below.
+            }
+        }
+        return null;
+    }
+
+    private static @Nullable Value findClassInPackageModules(Context ctx, String packageName, String importName) {
+        Value bindings = ctx.getBindings(PYTHON);
+        Value findClass = bindings.getMember("__micronaut_find_class_in_package_modules");
+        if (findClass == null) {
+            ctx.eval(PYTHON, """
+                import importlib
+                import inspect
+                import pkgutil
+
+                def __micronaut_find_class_in_package_modules(package_name, class_name):
+                    package = importlib.import_module(package_name)
+                    package_path = getattr(package, "__path__", None)
+                    if package_path is None:
+                        return None
+                    for module_info in pkgutil.iter_modules(package_path):
+                        try:
+                            module = importlib.import_module(package_name + "." + module_info.name)
+                        except Exception:
+                            continue
+                        member = getattr(module, class_name, None)
+                        if inspect.isclass(member):
+                            return member
+                    return None
+                """);
+            findClass = bindings.getMember("__micronaut_find_class_in_package_modules");
+        }
+        return findClass.execute(packageName, importName);
+    }
+
+    private static boolean isPythonClass(Context ctx, @Nullable Value value) {
+        if (value == null || GraalPyRuntimeUtil.isNone(value)) {
+            return false;
+        }
+        Value bindings = ctx.getBindings(PYTHON);
+        Value isClass = bindings.getMember("__micronaut_inspect_isclass");
+        if (isClass == null) {
+            ctx.eval(PYTHON, "import inspect\n__micronaut_inspect_isclass = inspect.isclass");
+            isClass = bindings.getMember("__micronaut_inspect_isclass");
+        }
+        return isClass.execute(value).asBoolean();
+    }
+
+    private static Value importModule(Context ctx, String moduleName) {
+        return withContextClassLoader(() -> {
+            Value bindings = ctx.getBindings(PYTHON);
+            Value importModule = bindings.getMember("__micronaut_import_module");
+            if (importModule == null) {
+                ctx.eval(PYTHON, "import importlib\n__micronaut_import_module = importlib.import_module");
+                importModule = bindings.getMember("__micronaut_import_module");
+            }
+            return importModule.execute(moduleName);
+        });
     }
 
     /**
@@ -473,6 +547,28 @@ public final class ContextHolder {
      */
     public static void setContext(Context context) {
         ContextHolder.context = context;
+        ContextHolder.contextClassLoader = Thread.currentThread().getContextClassLoader();
+    }
+
+    /**
+     * Set the GraalPy context and the application class loader that should be active when
+     * generated bridge classes enter Python from arbitrary runtime threads.
+     *
+     * @param context The GraalPy context to set
+     * @param classLoader The application class loader used to build the context
+     */
+    public static void setContext(Context context, @Nullable ClassLoader classLoader) {
+        ContextHolder.context = context;
+        ContextHolder.contextClassLoader = classLoader;
+    }
+
+    /**
+     * Returns the application class loader associated with the current GraalPy context.
+     *
+     * @return The application class loader
+     */
+    public static @Nullable ClassLoader getContextClassLoader() {
+        return contextClassLoader;
     }
 
     /**
@@ -506,6 +602,25 @@ public final class ContextHolder {
             return;
         }
         context = null;
+        contextClassLoader = null;
+    }
+
+    private static <T> T withContextClassLoader(Supplier<T> action) {
+        ClassLoader classLoader = contextClassLoader;
+        if (classLoader == null) {
+            return action.get();
+        }
+        Thread thread = Thread.currentThread();
+        ClassLoader previous = thread.getContextClassLoader();
+        if (previous == classLoader) {
+            return action.get();
+        }
+        thread.setContextClassLoader(classLoader);
+        try {
+            return action.get();
+        } finally {
+            thread.setContextClassLoader(previous);
+        }
     }
 
     /**

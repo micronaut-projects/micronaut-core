@@ -1,6 +1,8 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.python.ContextHolder
+import io.micronaut.context.python.GraalPyContextFactory
 import io.micronaut.context.python.GraalPyRuntimeUtil
 import io.micronaut.context.python.ValueCoercible
 import io.micronaut.core.io.Writable
@@ -55,6 +57,190 @@ class Book:
 
         cleanup:
         ctx?.close()
+    }
+
+    void "Python bean extending Java abstract class remains assignable to inherited interface"() {
+        given:
+        String py = '''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test import HeaderTokenReaderLike
+
+
+@Singleton
+class ApiKeyTokenReader(HeaderTokenReaderLike):
+    def getPrefix(self) -> str | None:
+        return None
+
+    def getHeaderName(self) -> str:
+        return "X-API-KEY"
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Class<?> generatedClass = ctx.classLoader.loadClass('python.ApiKeyTokenReader')
+        def reader = ctx.getBean(TokenReaderLike)
+
+        then:
+        HeaderTokenReaderLike.isAssignableFrom(generatedClass)
+        TokenReaderLike.isAssignableFrom(generatedClass)
+        reader.findToken("XXX") == "XXX"
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python bean extending Java abstract class with constructor calls host super constructor"() {
+        given:
+        String py = '''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test import ConstructorBackedHandler, HandlerDependency
+
+
+@Singleton
+class PythonHandlerDependency(HandlerDependency):
+    def name(self) -> str:
+        return "dependency"
+
+
+@Singleton
+class PythonConstructorBackedHandler(ConstructorBackedHandler):
+    def __init__(self, dependency: HandlerDependency):
+        super().__init__(dependency)
+
+    def handle(self) -> str:
+        return self.dependencyName()
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Class<?> generatedClass = ctx.classLoader.loadClass('python.PythonConstructorBackedHandler')
+        def handler = ctx.getBean(ConstructorBackedHandler)
+
+        then:
+        ConstructorBackedHandler.isAssignableFrom(generatedClass)
+        handler.dependencyName() == "dependency"
+        handler.handle() == "dependency"
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "HostAccess converts nested properties dataclass list fields"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+
+@dataclass
+@Introspected
+class Period:
+    temperature: int
+    summary: str
+
+
+@dataclass
+@Introspected
+class ForecastProperties:
+    periods: list[Period] | None = None
+
+
+@dataclass
+@Introspected
+class Forecast:
+    properties: ForecastProperties | None = None
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Context polyglot = ctx.getBean(Context)
+        def value = polyglot.eval("python", "Forecast(ForecastProperties([Period(68, 'Clear')]))")
+        Class<?> forecastClass = ctx.classLoader.loadClass('python.Forecast')
+        Class<?> forecastPropertiesClass = ctx.classLoader.loadClass('python.ForecastProperties')
+        Class<?> periodClass = ctx.classLoader.loadClass('python.Period')
+        def converted = value.as(forecastClass)
+        def convertedProperties = forecastClass.getField('properties').get(converted)
+        def convertedPeriods = forecastPropertiesClass.getField('periods').get(convertedProperties)
+
+        then:
+        converted != null
+        convertedProperties != null
+        forecastPropertiesClass.isInstance(convertedProperties)
+        convertedPeriods != null
+        convertedPeriods.size() == 1
+        periodClass.isInstance(convertedPeriods[0])
+        periodClass.getField('temperature').get(convertedPeriods[0]) == 68
+        periodClass.getField('summary').get(convertedPeriods[0]) == 'Clear'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "generated wrapper conversion does not require HostAccess target mappings for nested list fields"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+
+@dataclass
+@Introspected
+class Period:
+    temperature: int
+    summary: str
+
+
+@dataclass
+@Introspected
+class ForecastProperties:
+    periods: list[Period] | None = None
+
+
+@dataclass
+@Introspected
+class Forecast:
+    properties: ForecastProperties | None = None
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+        ClassLoader classLoader = ctx.classLoader
+        ctx.close()
+        ContextHolder.setReuseContext(false)
+        ContextHolder.resetContext()
+
+        when:
+        Context polyglot = GraalPyContextFactory.bootstrapReusableContext(classLoader, Map.of(), "pyronaut_application.py")
+        def value = polyglot.eval("python", "Forecast(ForecastProperties([Period(68, 'Clear')]))")
+        Class<?> forecastClass = classLoader.loadClass('python.Forecast')
+        Class<?> forecastPropertiesClass = classLoader.loadClass('python.ForecastProperties')
+        Class<?> periodClass = classLoader.loadClass('python.Period')
+        def converted = forecastClass.getMethod('fromPolyglotValue', org.graalvm.polyglot.Value).invoke(null, value)
+        def convertedProperties = forecastClass.getField('properties').get(converted)
+        def convertedPeriods = forecastPropertiesClass.getField('periods').get(convertedProperties)
+
+        then:
+        converted != null
+        convertedProperties != null
+        convertedPeriods != null
+        convertedPeriods.size() == 1
+        periodClass.isInstance(convertedPeriods[0])
+        periodClass.getField('temperature').get(convertedPeriods[0]) == 68
+        periodClass.getField('summary').get(convertedPeriods[0]) == 'Clear'
+
+        cleanup:
+        ContextHolder.setReuseContext(false)
+        ContextHolder.resetContext()
     }
 
     void "HostAccess exposes non-introspected dataclass properties on generated stub"() {
@@ -221,6 +407,84 @@ class Message:
 
         then:
         json == '{"text":"Hello"}'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "bare Micronaut annotation decorators preserve decorated Python dataclasses at runtime"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from micronaut.python.compiler import Serdeable
+
+
+@Serdeable
+@dataclass
+class Detail:
+    name: str
+
+
+@Serdeable
+@dataclass
+class Message:
+    detail: Detail | None = None
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Context polyglot = ctx.getBean(Context)
+        Class<?> messageClass = ctx.classLoader.loadClass('python.Message')
+        def message = polyglot.eval("python", "Message(Detail('Hello'))").as(messageClass)
+        String json = ctx.getBean(JsonMapper).writeValueAsString(message)
+
+        then:
+        json == '{"detail":{"name":"Hello"}}'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Serdeable Python dataclasses serialize list properties"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from micronaut.python.compiler import Serdeable
+
+
+@Serdeable
+@dataclass
+class Period:
+    temperature: int = 0
+
+
+@Serdeable
+@dataclass
+class ForecastProperties:
+    periods: list[Period] | None = None
+
+
+@Serdeable
+@dataclass
+class Forecast:
+    properties: ForecastProperties | None = None
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Context polyglot = ctx.getBean(Context)
+        Class<?> forecastClass = ctx.classLoader.loadClass('python.Forecast')
+        def forecast = polyglot.eval("python", "Forecast(ForecastProperties(periods=[Period(68)]))").as(forecastClass)
+        String json = ctx.getBean(JsonMapper).writeValueAsString(forecast)
+
+        then:
+        json == '{"properties":{"periods":[{"temperature":68}]}}'
 
         cleanup:
         ctx?.close()

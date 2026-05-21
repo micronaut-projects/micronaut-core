@@ -67,6 +67,23 @@ class TestClass:
         tempDir.deleteDir()
     }
 
+    def "test buildClassLoader uses explicit parent classloader"() {
+        given:
+        def parent = new ClassLoader(getClass().classLoader) {
+        }
+        def compiler = PyronautCompiler.builder()
+            .pythonCode("class TestClass: pass")
+            .parentClassLoader(parent)
+            .build()
+
+        when:
+        def classLoader = compiler.buildClassLoader()
+
+        then:
+        classLoader.parent.is(parent)
+        classLoader.loadClass("pyronaut_application.PyronautMain") != null
+    }
+
     def "test validation requires python source"() {
         when:
         PyronautCompiler.builder().build()
@@ -365,6 +382,43 @@ class MyRepeatableService:
         tempDir.deleteDir()
     }
 
+    def "test transactional annotation transformation skips unavailable meta annotations"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from jakarta.transaction import Transactional
+
+@Singleton
+class MyTransactionalService:
+
+    @Transactional
+    def save(self):
+        pass
+'''
+        def tempDir = File.createTempDir("pyronaut-test-transactional", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def metaInfDir = new File(tempDir, "META-INF")
+        def transactionalFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/jakarta/transaction/Transactional.py")
+        transactionalFile.exists()
+
+        def transformedContent = transactionalFile.text
+        transformedContent.contains("@micronaut_annotation(\"jakarta.transaction.Transactional\")")
+        transformedContent.contains("def Transactional(")
+        !transformedContent.contains("jakarta.interceptor")
+        !transformedContent.contains("InterceptorBinding")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
     def "test Python keyword-safe Micronaut imports are normalized"() {
         given:
         def pythonCode = '''
@@ -553,6 +607,44 @@ class MyMergeStrategy(Mapper.MergeStrategy):
         mapperFile.text.contains("def Mapping(")
         mapperFile.text.contains("Mapper.Mapping = Mapping")
         mapperFile.text.contains("Mapper.MergeStrategy = MergeStrategy")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
+    def "test nested meta annotations are generated before parent annotation decorator"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.python.compiler import Serdeable
+
+@Serdeable
+@dataclass
+class Message:
+    text: str
+'''
+        def tempDir = File.createTempDir("pyronaut-test-nested-meta-annotation", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .javaSrc("inject-python-test/src/test/java")
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def serdeableFile = new File(tempDir, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler/Serdeable.py")
+        serdeableFile.exists()
+        def transformedContent = serdeableFile.text
+        transformedContent.indexOf("def Serializable(") < transformedContent.indexOf("@Serializable()")
+        transformedContent.indexOf("def Deserializable(") < transformedContent.indexOf("@Deserializable()")
+        transformedContent.indexOf("@Serializable()") < transformedContent.indexOf("def Serdeable(")
+        transformedContent.indexOf("@Deserializable()") < transformedContent.indexOf("def Serdeable(")
+        transformedContent.contains("@micronaut_annotation(\"io.micronaut.python.compiler.Serdeable\$Serializable\")")
+        transformedContent.contains("@micronaut_annotation(\"io.micronaut.python.compiler.Serdeable\$Deserializable\")")
+        transformedContent.contains("Serdeable.Serializable = Serializable")
+        transformedContent.contains("Serdeable.Deserializable = Deserializable")
 
         cleanup:
         tempDir.deleteDir()

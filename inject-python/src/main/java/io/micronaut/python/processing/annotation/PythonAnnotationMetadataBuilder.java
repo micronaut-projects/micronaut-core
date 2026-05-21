@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.annotation;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
@@ -41,9 +42,11 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Builder for creating annotation metadata from Python decorators and elements.
@@ -99,6 +102,18 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             }
         }
         return new AnnotationValue<>(annotationName, annotationValues);
+    }
+
+    private List<AnnotationValue<AliasFor>> getCrossAnnotationAliases(AnnotationMemberDef memberDef) {
+        List<AnnotationValue<AliasFor>> aliases = memberDef.getAnnotationMetadata().getAnnotationValuesByType(AliasFor.class);
+        if (!aliases.isEmpty()) {
+            return aliases.stream()
+                .map(alias -> normalizeAliasForAnnotationValue(alias, AliasFor.class))
+                .toList();
+        }
+        Optional<AnnotationValue<AliasFor>> alias = memberDef.getAnnotationMetadata().findAnnotation(AliasFor.class)
+            .map(value -> normalizeAliasForAnnotationValue(value, AliasFor.class));
+        return alias.map(List::of).orElseGet(List::of);
     }
 
     @Override
@@ -718,9 +733,25 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected <K extends Annotation> Optional<AnnotationValue<K>> getAnnotationValues(ElementDef originatingElement, ElementDef member, Class<K> annotationType) {
         if (member instanceof AnnotationMemberDef memberDef) {
-            return memberDef.getAnnotationMetadata().findAnnotation(annotationType);
+            return memberDef.getAnnotationMetadata()
+                .findAnnotation(annotationType)
+                .map(value -> normalizeAliasForAnnotationValue(value, annotationType));
         }
         return Optional.empty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private <K extends Annotation> AnnotationValue<K> normalizeAliasForAnnotationValue(AnnotationValue<K> annotationValue, Class<K> annotationType) {
+        if (annotationType == AliasFor.class && annotationValue.stringValue("annotationName").isEmpty()) {
+            Optional<AnnotationClassValue<?>> annotationClassValue = annotationValue.annotationClassValue("annotation");
+            if (annotationClassValue.isPresent()) {
+                return (AnnotationValue<K>) annotationValue
+                    .mutate()
+                    .member("annotationName", annotationClassValue.get().getName())
+                    .build();
+            }
+        }
+        return annotationValue;
     }
 
     @Override

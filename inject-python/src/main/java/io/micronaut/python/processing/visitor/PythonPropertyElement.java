@@ -266,7 +266,7 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
                 environment.metadataFactory()
             );
             ClassElement fieldType = fieldElement.getType();
-            if (fieldType != null && !"java.lang.Object".equals(fieldType.getName())) {
+            if (fieldType != null) {
                 return fieldType;
             }
         }
@@ -283,7 +283,7 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
         }
 
         // Fallback to Object
-        return ClassElement.of(Object.class);
+        return environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class));
     }
 
     private ClassElement resolvePythonTypeToJava(TypeRef pythonType) {

@@ -110,6 +110,131 @@ def say_hello(name : str) -> str:
         context?.close()
     }
 
+    void "test classless python controller generic JSON response"() {
+        given:
+        def context = buildContext('''
+from micronaut.http.annotation import Get
+from micronaut.core.annotation import Introspected
+from micronaut.http import HttpResponse
+from dataclasses import dataclass
+
+@Introspected
+@dataclass
+class Message:
+    message: str = "Who are you?"
+
+@Get("/classless/generic/{name}")
+def say_hello(name : str) -> HttpResponse[Message]:
+    response = HttpResponse.ok(Message(f"Hello {name}"))
+    response.header("Foo", "Bar")
+    return response
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+
+        def response = client.toBlocking().exchange("/classless/generic/John", String)
+        expect:
+        response.header("Foo") == "Bar"
+        response.body() == "{\"message\":\"Hello John\"}"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
+    void "test classless python controller generic JSON entity body response"() {
+        given:
+        def context = buildContext('''
+from typing import Annotated
+from micronaut.http.annotation import Body, Post
+from micronaut.core.annotation import Introspected
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity
+from micronaut.http import HttpResponse
+from dataclasses import dataclass
+
+@Introspected
+@dataclass
+@MappedEntity
+class Genre:
+    id: Annotated[int | None, Id, GeneratedValue] = None
+    name: str | None = None
+
+@Post("/classless/generic/entity")
+def save(genre : Annotated[Genre, Body]) -> HttpResponse[Genre]:
+    response = HttpResponse.created(genre)
+    response.header("Foo", "Bar")
+    return response
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+        def controllerClass = context.classLoader.loadClass("python.Script")
+        def genreClass = context.classLoader.loadClass("python.Genre")
+        def saveMethod = controllerClass.getDeclaredMethod("save", genreClass)
+
+        def response = client.toBlocking().exchange(HttpRequest.POST("/classless/generic/entity", [name: "DevOps"]), String)
+        expect:
+        saveMethod.genericReturnType.typeName == "io.micronaut.http.HttpResponse<python.Genre>"
+        response.header("Foo") == "Bar"
+        response.body() == "{\"name\":\"DevOps\"}"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
+    void "test classless python controller generic JSON entity response from Java value"() {
+        given:
+        def context = buildContext('''
+import java
+from typing import Annotated
+from micronaut.http.annotation import Body, Post
+from micronaut.core.annotation import Introspected
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity
+from micronaut.http import HttpResponse
+from dataclasses import dataclass
+
+JavaStore = java.type("io.micronaut.python.annotation.processing.test.web.PythonControllerSpec$JavaStore")
+
+@Introspected
+@dataclass
+@MappedEntity
+class Genre:
+    id: Annotated[int | None, Id, GeneratedValue] = None
+    name: str | None = None
+
+@Post("/classless/generic/java-entity")
+def save(genre : Annotated[Genre, Body]) -> HttpResponse[Genre]:
+    saved = JavaStore.save(genre)
+    response = HttpResponse.created(saved)
+    response.header("Foo", "Bar")
+    return response
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+        def controllerClass = context.classLoader.loadClass("python.Script")
+        def genreClass = context.classLoader.loadClass("python.Genre")
+        def saveMethod = controllerClass.getDeclaredMethod("save", genreClass)
+
+        def response = client.toBlocking().exchange(HttpRequest.POST("/classless/generic/java-entity", [name: "DevOps"]), String)
+        expect:
+        saveMethod.genericReturnType.typeName == "io.micronaut.http.HttpResponse<python.Genre>"
+        response.header("Foo") == "Bar"
+        response.body() == "{\"name\":\"DevOps\"}"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
     void "test python controller map response"() {
         given:
         def context = buildContext('''
@@ -237,6 +362,62 @@ class HelloController:
         context?.close()
     }
 
+    void "test python controller serializes nested serdeable list properties"() {
+        given:
+        def context = buildContext('''
+from dataclasses import dataclass
+from jakarta.inject import Singleton
+from micronaut.http.annotation import Controller, Get
+from micronaut.python.compiler import Serdeable
+
+
+@Serdeable
+@dataclass
+class Period:
+    temperature: int = 0
+
+
+@Serdeable
+@dataclass
+class ForecastProperties:
+    periods: list[Period] | None = None
+
+
+@Serdeable
+@dataclass
+class Forecast:
+    properties: ForecastProperties | None = None
+
+
+@Singleton
+class ForecastService:
+    def forecast(self) -> Forecast:
+        return Forecast(ForecastProperties(periods=[Period(68)]))
+
+
+@Controller("/forecast")
+class ForecastController:
+    def __init__(self, forecastService: ForecastService):
+        self.forecastService = forecastService
+
+    @Get("/")
+    def forecast(self) -> Forecast:
+        return self.forecastService.forecast()
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+
+        expect:
+        client.toBlocking().retrieve("/forecast") == '{"properties":{"periods":[{"temperature":68}]}}'
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
     void "test python controller generic JSON exchange"() {
         given:
         def context = buildContext('''
@@ -332,6 +513,15 @@ class InheritedController(ParentController):
         cleanup:
         client.close()
         context?.close()
+    }
+
+    static final class JavaStore {
+        static Object save(Object value) {
+            if (!value.getClass().getName().equals('python.Genre')) {
+                throw new IllegalArgumentException("Expected generated python.Genre wrapper but got " + value.getClass().getName())
+            }
+            return value
+        }
     }
 
 }

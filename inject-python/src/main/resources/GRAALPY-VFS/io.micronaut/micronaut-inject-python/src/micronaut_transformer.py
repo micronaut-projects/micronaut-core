@@ -184,8 +184,8 @@ def micronaut_annotation(name, repeated=None):
     """
     Decorator to mark functions as Micronaut annotations.
     """
-    def decorator(func):
-        return func
+    def decorator(target):
+        return target
     return decorator
 '''
                 try:
@@ -625,53 +625,57 @@ def micronaut_annotation(name, repeated=None):
         # Collect meta-annotations to include as decorators
         decorator_lines = [f'@micronaut_annotation("{annotation_name}"{repeatable_info})']
 
-        # Get all annotations on this annotation class (meta-annotations)
+        nested_members_prelude, nested_members_code = self._generate_nested_members_sections(class_element, decorator_name)
+
+        # Get all annotations on this annotation class (meta-annotations).
+        # Some Java annotations reference optional/provided meta-annotation types.
+        # Only generate Python imports/decorator calls for types the processor can resolve.
+        meta_annotations = []
         annotation_names = annotation_metadata.getAnnotationNames()
         for meta_annotation_name in annotation_names:
             # Skip retention and other built-in annotations that aren't user-facing
             if not meta_annotation_name.startswith('java.lang.annotation.'):
-                # Skip nested annotations (annotations with $ in their names)
-                if '$' in meta_annotation_name:
+                meta_class_element = self.callback_get_class_element(meta_annotation_name)
+                if not meta_class_element or not self._is_annotation_class(meta_class_element):
                     continue
 
-                # Generate decorator for the meta-annotation if not already generated
-                meta_class_element = self.callback_get_class_element(meta_annotation_name)
-                if meta_class_element and self._is_annotation_class(meta_class_element):
-                    meta_decorator_name = meta_class_element.getSimpleName()
-                    if meta_decorator_name not in self.generated_decorators:
-                        meta_decorator_code = self._generate_decorator_from_class_element(meta_class_element, meta_decorator_name)
-                        if meta_decorator_code:
-                            self.transformed_code.append(meta_decorator_code)
-                    # Add the meta-annotation as a decorator
-                    decorator_lines.append(f'@{meta_decorator_name}()')
+                meta_annotations.append((meta_annotation_name, meta_class_element))
+
+        for meta_annotation_name, meta_class_element in meta_annotations:
+            # Generate decorator for the meta-annotation if not already generated
+            meta_decorator_name = self._meta_decorator_name(meta_annotation_name, annotation_name, meta_class_element)
+            if meta_decorator_name not in self.generated_decorators:
+                meta_decorator_code = self._generate_decorator_from_class_element(meta_class_element, meta_decorator_name)
+                if meta_decorator_code:
+                    self.transformed_code.append(meta_decorator_code)
+            # Add the meta-annotation as a decorator
+            decorator_lines.append(f'@{meta_decorator_name}()')
 
         # Collect imports for meta-annotations
         import_lines = []
         current_package = '.'.join(annotation_name.split('.')[:-1])  # Package of current annotation
 
-        for meta_annotation_name in annotation_metadata.getAnnotationNames():
-            if not meta_annotation_name.startswith('java.lang.annotation.'):
-                # Skip nested annotations (annotations with $ in their names)
-                if '$' in meta_annotation_name:
-                    continue
+        for meta_annotation_name, _ in meta_annotations:
+            if '$' in meta_annotation_name:
+                continue
 
-                meta_package = '.'.join(meta_annotation_name.split('.')[:-1])
-                meta_simple_name = meta_annotation_name.split('.')[-1]
+            meta_package = '.'.join(meta_annotation_name.split('.')[:-1])
+            meta_simple_name = meta_annotation_name.split('.')[-1]
 
-                # Transform io. prefixed packages to avoid conflict with Python's builtin io module
-                import_package = self._to_python_import_module(meta_package)
-                if import_package.startswith('io.'):
-                    import_package = import_package[3:]  # Remove 'io.' prefix
+            # Transform io. prefixed packages to avoid conflict with Python's builtin io module
+            import_package = self._to_python_import_module(meta_package)
+            if import_package.startswith('io.'):
+                import_package = import_package[3:]  # Remove 'io.' prefix
 
-                # Use absolute import path of the function
-                import_lines.append(f"from {import_package} import {meta_simple_name}")
+            # Import from the concrete annotation module so duplicate VFS package
+            # roots cannot resolve the package member as a module object.
+            import_lines.append(f"from {import_package}.{meta_simple_name} import {meta_simple_name}")
 
         # Remove duplicates
         import_lines = list(set(import_lines))
 
         # Generate the decorator function with imports, meta-annotations and micronaut_annotation for VFS
         imports_section = '\n'.join(import_lines) + '\n\n' if import_lines else ''
-        nested_members_code = self._generate_nested_members_code(class_element, decorator_name)
 
         decorator_code = f'''
 {imports_section}def micronaut_annotation(name, repeated=None):
@@ -682,13 +686,19 @@ def micronaut_annotation(name, repeated=None):
         return func
     return decorator
 
+{nested_members_prelude}
 {chr(10).join(decorator_lines)}
 def {decorator_name}({param_signature}):
     """
     Micronaut annotation decorator for {annotation_name}.
     """
-    def decorator(func):
-        return func
+    if len(args) == 1 and callable(args[0]) and not kwargs:
+        target = args[0]
+        if not any(value is target for value in globals().values()):
+            return target
+
+    def decorator(target):
+        return target
 
     return decorator
 {nested_members_code}
@@ -727,23 +737,29 @@ def {decorator_name}({param_signature}):
         param_handling = param_info['handling']
 
         # Generate the decorator function with custom annotation name and micronaut_annotation
-        nested_members_code = self._generate_nested_members_code(class_element, decorator_name)
+        nested_members_prelude, nested_members_code = self._generate_nested_members_sections(class_element, decorator_name)
         decorator_code = f'''
 def micronaut_annotation(name, repeated=None):
     """
     Decorator to mark functions as Micronaut annotations.
     """
-    def decorator(func):
-        return func
+    def decorator(target):
+        return target
     return decorator
 
+{nested_members_prelude}
 @micronaut_annotation("{custom_annotation_name}"{repeatable_info})
 def {decorator_name}({param_signature}):
     """
     Micronaut annotation decorator for {custom_annotation_name}.
     """
-    def decorator(func):
-        return func
+    if len(args) == 1 and callable(args[0]) and not kwargs:
+        target = args[0]
+        if not any(value is target for value in globals().values()):
+            return target
+
+    def decorator(target):
+        return target
 
     return decorator
 {nested_members_code}
@@ -860,6 +876,15 @@ def {decorator_name}({param_signature}):
         """
         Generate Python attributes for Java nested types exposed through an annotation.
         """
+        prelude, body = self._generate_nested_members_sections(class_element, parent_name)
+        return prelude + body
+
+    def _generate_nested_members_sections(self, class_element, parent_name: str):
+        """
+        Generate Python definitions and post-definition assignments for Java nested types
+        exposed through an annotation.
+        """
+        prelude_lines = []
         lines = []
         needs_java = False
         for nested_element in self._get_nested_class_elements(class_element):
@@ -869,17 +894,24 @@ def {decorator_name}({param_signature}):
                 repeatable_name = self._get_repeatable_name(nested_element.getAnnotationMetadata(), nested_element)
                 repeatable_info = f', repeated="{repeatable_name}"' if repeatable_name else ''
                 self.generated_decorators.add(simple_name)
-                lines.append(f'''
+                prelude_lines.append(f'''
 
 @micronaut_annotation("{nested_name}"{repeatable_info})
 def {simple_name}(*args, **kwargs):
     """
     Micronaut annotation decorator for {nested_name}.
     """
-    def decorator(func):
-        return func
+    if len(args) == 1 and callable(args[0]) and not kwargs:
+        target = args[0]
+        if not any(value is target for value in globals().values()):
+            return target
+
+    def decorator(target):
+        return target
 
     return decorator
+''')
+                lines.append(f'''
 
 {parent_name}.{simple_name} = {simple_name}
 ''')
@@ -893,7 +925,14 @@ def {simple_name}(*args, **kwargs):
 
         if needs_java:
             lines.insert(0, "\nimport java\n")
-        return ''.join(lines)
+        return ''.join(prelude_lines), ''.join(lines)
+
+    def _meta_decorator_name(self, meta_annotation_name: str, annotation_name: str, meta_class_element) -> str:
+        if meta_annotation_name.startswith(annotation_name + '$'):
+            return meta_annotation_name.split('$')[-1]
+        if '$' in meta_annotation_name:
+            return meta_annotation_name.split('$')[-1]
+        return meta_class_element.getSimpleName()
 
     def _get_nested_class_elements(self, class_element):
         nested_elements = []

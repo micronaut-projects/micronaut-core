@@ -49,6 +49,7 @@ import static io.micronaut.python.processing.PythonStubGenerator.POLYGLOT_VALUE;
 import static io.micronaut.python.processing.PythonStubGenerator.coerceParameterToPolyglotValue;
 import static io.micronaut.python.processing.PythonStubGenerator.erasedType;
 import static io.micronaut.python.processing.PythonStubGenerator.handleReturnType;
+import static io.micronaut.python.processing.PythonStubGenerator.propertyType;
 
 final class PythonPooledStubGenerator {
     private static final ClassTypeDef POLYGLOT_CONTEXT = ClassTypeDef.of("org.graalvm.polyglot.Context");
@@ -202,10 +203,10 @@ final class PythonPooledStubGenerator {
         String pythonFunctionName = methodElement.getName();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
-            .returns(TypeDef.of(methodElement.getReturnType()));
+            .returns(TypeDef.of(methodElement.getGenericReturnType()));
 
         for (ParameterElement parameter : methodElement.getParameters()) {
-            var parameterType = erasedType(parameter.getType());
+            var parameterType = erasedType(parameter.getGenericType());
             methodBuilder.addParameter(ParameterDef.builder(parameter.getName(), parameterType).build());
         }
 
@@ -235,10 +236,10 @@ final class PythonPooledStubGenerator {
         String pythonFunctionName = methodElement.getName();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .addModifiers(Modifier.PUBLIC)
-            .returns(TypeDef.of(methodElement.getReturnType()));
+            .returns(TypeDef.of(methodElement.getGenericReturnType()));
 
         for (ParameterElement parameter : methodElement.getParameters()) {
-            var parameterType = erasedType(parameter.getType());
+            var parameterType = erasedType(parameter.getGenericType());
             methodBuilder.addParameter(ParameterDef.builder(parameter.getName(), parameterType).build());
         }
 
@@ -266,7 +267,7 @@ final class PythonPooledStubGenerator {
         if (methodElement.getReturnType().isVoid()) {
             return invoked;
         }
-        return handleReturnType(allClasses, methodElement.getReturnType(), invoked).returning();
+        return handleReturnType(allClasses, methodElement.getGenericReturnType(), invoked).returning();
     }
 
     private static void addGetterScriptPooled(PropertyElement beanProperty,
@@ -274,7 +275,7 @@ final class PythonPooledStubGenerator {
                                               String pkg,
                                               String script,
                                               Map<String, ClassElement> allClasses) {
-        TypeDef propertyType = TypeDef.of(beanProperty.getType());
+        TypeDef propertyType = propertyType(beanProperty);
         String getterName = beanProperty.getReadMethod().map(MethodElement::getName).orElse(beanProperty.getName());
         MethodDef.MethodDefBuilder getterBuilder = MethodDef
             .builder(getterName)
@@ -284,7 +285,7 @@ final class PythonPooledStubGenerator {
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> {
             var invoked = CONTEXT_HOLDER.invokeStatic("invokePooledScript", POLYGLOT_VALUE,
                 List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script), ExpressionDef.constant(beanProperty.getName())));
-            return handleReturnType(allClasses, beanProperty.getType(), invoked).returning();
+            return handleReturnType(allClasses, beanProperty.getGenericType(), invoked).returning();
         })));
     }
 
@@ -299,7 +300,7 @@ final class PythonPooledStubGenerator {
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
 
-        propertySetter.addParameter(TypeDef.of(beanProperty.getType()));
+        propertySetter.addParameter(propertyType(beanProperty));
 
         builder.addMethod(propertySetter.build(((aThis, methodParameters) -> {
             List<ExpressionDef> parameters = new ArrayList<>();

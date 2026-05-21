@@ -20,12 +20,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import io.micronaut.http.HttpResponse;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.proxy.ProxyObject;
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -158,6 +162,16 @@ class GraalPyRuntimeUtilTest {
     }
 
     @Test
+    void testCoerceListNull() {
+        assertNull(GraalPyRuntimeUtil.coerceList(null));
+    }
+
+    @Test
+    void testCoerceMapNull() {
+        assertNull(GraalPyRuntimeUtil.coerceMap(null));
+    }
+
+    @Test
     void testConvertListPythonNone() {
         // Test conversion with Python None value
         Value none = context.eval("python", "lambda: None").execute();
@@ -235,6 +249,71 @@ class GraalPyRuntimeUtilTest {
         Optional<String> result = GraalPyRuntimeUtil.convertOptional(context.eval("python", "optional"), String.class);
 
         assertEquals(Optional.of("value"), result);
+    }
+
+    @Test
+    void testConvertHttpResponseUnwrapsValueCoercibleProxyBody() {
+        TestBody body = new TestBody("DevOps");
+        ProxyObject proxyBody = new ProxyObject() {
+            @Override
+            public Object getMember(String key) {
+                if (ValueCoercible.HOST_OBJECT_MEMBER.equals(key)) {
+                    return new ValueCoercible.HostObjectReference(body);
+                }
+                return null;
+            }
+
+            @Override
+            public Object getMemberKeys() {
+                return new String[] {ValueCoercible.HOST_OBJECT_MEMBER};
+            }
+
+            @Override
+            public boolean hasMember(String key) {
+                return ValueCoercible.HOST_OBJECT_MEMBER.equals(key);
+            }
+
+            @Override
+            public void putMember(String key, Value value) {
+            }
+        };
+
+        HttpResponse<TestBody> response = GraalPyRuntimeUtil.convertHttpResponse(HttpResponse.created(proxyBody), TestBody.class);
+
+        assertSame(body, response.body());
+    }
+
+    @Test
+    void testConvertHttpResponseConvertsForeignObjectBody() {
+        HostAccess hostAccess = HostAccess.newBuilder(HostAccess.ALL)
+            .targetTypeMapping(
+                Value.class,
+                TestBody.class,
+                value -> value != null && value.hasMember("name"),
+                value -> new TestBody(value.getMember("name").asString())
+            )
+            .build();
+        try (Context context = Context.newBuilder(GraalPyRuntimeUtil.PYTHON)
+            .allowHostAccess(hostAccess)
+            .allowHostClassLookup(className -> true)
+            .build()) {
+            Value responseValue = context.eval(GraalPyRuntimeUtil.PYTHON, """
+                import java
+
+                HttpResponse = java.type("io.micronaut.http.HttpResponse")
+
+                class Body:
+                    def __init__(self, name):
+                        self.name = name
+
+                HttpResponse.created(Body("DevOps"))
+                """);
+            HttpResponse<?> rawResponse = responseValue.as(HttpResponse.class);
+
+            HttpResponse<TestBody> response = GraalPyRuntimeUtil.convertHttpResponse(rawResponse, TestBody.class);
+
+            assertEquals(new TestBody("DevOps"), response.body());
+        }
     }
 
     @Test
@@ -333,5 +412,12 @@ class GraalPyRuntimeUtilTest {
         assertNotNull(result);
         assertEquals(3, result.size());
         assertEquals(List.of(1, 2, 3), result);
+    }
+
+    private record TestBody(String name) implements ValueCoercible {
+        @Override
+        public Value asPolyglotValue() {
+            throw new UnsupportedOperationException("This test should unwrap the host object without converting through Python");
+        }
     }
 }
