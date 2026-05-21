@@ -134,8 +134,12 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected List<ElementDef> buildHierarchy(ElementDef element, boolean inheritTypeAnnotations, boolean declaredOnly) {
         if (element instanceof ClassDef classDef) {
-            // TODO: load base classes
-            return List.of(classDef);
+            if (declaredOnly) {
+                return List.of(classDef);
+            }
+            List<ElementDef> hierarchy = new ArrayList<>();
+            populateClassHierarchy(classDef, hierarchy, new LinkedHashSet<>());
+            return hierarchy;
         } else if (element instanceof FunctionDef functionDef) {
             List<ElementDef> hierarchy;
             if (inheritTypeAnnotations && functionDef.declaringClass() != null) {
@@ -168,6 +172,42 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             return List.of(returnDef);
         }
         return List.of();
+    }
+
+    private void populateClassHierarchy(ClassDef classDef, List<ElementDef> hierarchy, Set<String> visited) {
+        String className = toQualifiedPythonName(classDef);
+        if (!visited.add(className)) {
+            return;
+        }
+        hierarchy.add(classDef);
+        for (TypeRef base : classDef.bases()) {
+            resolvePythonBaseClass(classDef, base).ifPresent(baseClass -> populateClassHierarchy(baseClass, hierarchy, visited));
+        }
+    }
+
+    private Optional<ClassDef> resolvePythonBaseClass(ClassDef declaringClass, TypeRef base) {
+        // Use raw parsed Python classes here. Resolving ClassElement instances while class
+        // metadata is being built can recursively initialize the same metadata cache.
+        Map<String, ClassDef> classes = visitorContext.getProcessingEnvironment().environment().classes();
+        ClassDef baseClass = classes.get(base.name());
+        if (baseClass == null && base.name().indexOf('.') < 0) {
+            String packageName = declaringClass.packageName();
+            if (!packageName.isEmpty()) {
+                baseClass = classes.get(packageName + '.' + base.name());
+            }
+            if (baseClass == null) {
+                baseClass = classes.get(PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.' + base.name());
+            }
+        }
+        return Optional.ofNullable(baseClass);
+    }
+
+    private static String toQualifiedPythonName(ClassDef classDef) {
+        String packageName = classDef.packageName();
+        if (packageName == null || packageName.isEmpty()) {
+            packageName = PythonClassElement.PYTHON_DEFAULT_PACKAGE;
+        }
+        return packageName + '.' + classDef.name();
     }
 
     @Override

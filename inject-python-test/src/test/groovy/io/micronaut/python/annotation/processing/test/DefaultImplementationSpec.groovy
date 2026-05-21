@@ -15,11 +15,10 @@
  */
 package io.micronaut.python.annotation.processing.test
 
-import spock.lang.PendingFeature
+import io.micronaut.context.annotation.DefaultImplementation
 
 class DefaultImplementationSpec extends AbstractPythonTypeElementSpec {
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0013")
     void "test pick default implementation when multiple candidates"() {
         given:
         def context = buildContext('''\
@@ -45,8 +44,14 @@ class TestImpl2(Test):
         return "secondary"
 ''')
         def testClass = context.classLoader.loadClass("python.Test")
+        def implDefinition = getBeanDefinition(context, "python.TestImpl")
+        def impl2Definition = getBeanDefinition(context, "python.TestImpl2")
 
         expect:
+        implDefinition.getDefaultImplementation().name == "python.TestImpl"
+        impl2Definition.getDefaultImplementation().name == "python.TestImpl"
+        !implDefinition.hasDeclaredAnnotation(DefaultImplementation)
+        !impl2Definition.hasDeclaredAnnotation(DefaultImplementation)
         context.getBean(testClass).name() == "default"
 
         cleanup:
