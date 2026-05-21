@@ -363,6 +363,32 @@ class Test:
         !method.arguments[1].isNullable()
     }
 
+    void "test generated nullable annotation stub skips missing meta annotations"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.core.annotation import Nullable
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+from typing import Annotated
+
+@Singleton
+class Test:
+
+    @Executable
+    def testMethod(self, name: Annotated[str, Nullable]) -> None:
+        pass
+''')
+
+        when:
+        def resource = definition.class.classLoader.getResource(
+            'META-INF/GRAALPY-VFS/micronaut-application/src/micronaut/core/annotation/Nullable.py'
+        )
+
+        then:
+        resource != null
+        !resource.text.contains('jakarta.annotation.Nullable')
+    }
+
     void "test PEP 604 nullable annotated parameter is captured in method parameter metadata"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''

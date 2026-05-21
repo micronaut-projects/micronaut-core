@@ -1373,7 +1373,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .build());
 
         for (DecoratorDef stereotype : decoratorDef.stereotypes()) {
-            builder.addAnnotation(toAnnotationDef(stereotype, visitorContext));
+            if (shouldEmitAnnotationReference(stereotype, visitorContext)) {
+                builder.addAnnotation(toAnnotationDef(stereotype, visitorContext));
+            }
         }
 
         Set<String> memberNames = new LinkedHashSet<>();
@@ -1387,7 +1389,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             AnnotationObjectDef.AnnotationMemberDefBuilder memberBuilder =
                 AnnotationObjectDef.AnnotationMemberDef.builder(memberName, memberType);
             for (DecoratorDef memberDecorator : decoratorDef.memberDecorators().getOrDefault(memberName, List.of())) {
-                memberBuilder.addAnnotation(toAnnotationDef(memberDecorator, visitorContext));
+                if (shouldEmitAnnotationReference(memberDecorator, visitorContext)) {
+                    memberBuilder.addAnnotation(toAnnotationDef(memberDecorator, visitorContext));
+                }
             }
             ExpressionDef defaultValue = annotationDefaultValue(decoratorDef.members().get(memberName), memberType, visitorContext);
             if (defaultValue != null) {
@@ -1397,6 +1401,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
 
         return builder.build();
+    }
+
+    private static boolean shouldEmitAnnotationReference(DecoratorDef decoratorDef, PythonVisitorContext visitorContext) {
+        String annotationName = decoratorDef.annotationName();
+        var javaVisitorContext = visitorContext.getJavaVisitorContext();
+        if (javaVisitorContext != null && javaVisitorContext.getClassElement(annotationName).isPresent()) {
+            return true;
+        }
+        return visitorContext.getProcessingEnvironment().environment().decorators().containsKey(annotationName);
     }
 
     private static boolean isDecoratorTargetMember(String memberName, DecoratorDef decoratorDef) {
