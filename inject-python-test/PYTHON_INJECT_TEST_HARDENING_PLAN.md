@@ -138,7 +138,9 @@ As of May 14, 2026:
 * All `@PendingFeature` tests under `inject-python-test` are cataloged with
   stable `PY-INJECT-XXXX` IDs, including pre-existing Python compiler and
   runtime gaps that were outside the direct source inventory.
-* The most recent full verification passed with 459 tests and 97 skipped.
+* The most recent full verification passed with 491 tests and 10 skipped:
+  `./gradlew --no-daemon --no-build-cache --max-workers=1 :micronaut-inject-python-test:test`
+  on May 21, 2026.
 * Per-slice verification used focused tests only; the full Python inject test
   task has now been run as the final sweep for this migration/catalog pass.
 * The most recent focused verification passed for
@@ -380,6 +382,16 @@ Likely first root-cause area:
   `Response<Integer>` for static `fromPolyglotValue(...)` calls. The fix should
   erase the generated wrapper receiver/class-literal where Java syntax requires
   a raw class while preserving generic metadata on Micronaut model elements.
+
+Separate `test-suite-python` work item:
+
+* Investigate `micronaut.docs.server.exception.ExceptionHandlerSpec`.
+  `./gradlew --no-daemon --no-build-cache --max-workers=1 :test-suite-python:test --tests micronaut.docs.server.exception.ExceptionHandlerSpec`
+  currently fails on committed baseline `33c93fe3fb` and on the current branch
+  with `test_exception_is_handled` returning the unexpected error path instead
+  of the expected `BAD_REQUEST` response body `"No stock available"`. Treat this
+  as an independent Python exception-handler propagation bug, not a regression
+  from the event-adapter AOP fix.
 
 ## Gradle And GraalPy
 
