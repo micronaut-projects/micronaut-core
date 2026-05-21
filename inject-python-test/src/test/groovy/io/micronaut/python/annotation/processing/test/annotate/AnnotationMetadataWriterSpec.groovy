@@ -18,7 +18,6 @@ import io.micronaut.http.annotation.Error
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
-import spock.lang.PendingFeature
 
 import java.lang.annotation.Native
 
@@ -174,7 +173,25 @@ class Test:
         metadata.stringValue(Property).get() == "abc"
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0018")
+    void "test configuration properties metadata aliases to configuration reader"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import ConfigurationProperties
+
+@ConfigurationProperties(value="xyz", includes=["abc"], excludes=["lol"])
+class Test:
+    pass
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.annotationMetadata
+
+        then:
+        metadata.stringValue(ConfigurationReader, "prefix").get() == "xyz"
+        metadata.stringValue(ConfigurationReader, "includes").get() == "abc"
+        metadata.stringValue(ConfigurationReader, "excludes").get() == "lol"
+    }
+
     void "test method annotation metadata merges configuration reader metadata"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''

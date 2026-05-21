@@ -108,6 +108,18 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         return new AnnotationValue<>(annotationName, annotationValues);
     }
 
+    private List<AnnotationValue<AliasFor>> getCrossAnnotationAliases(AnnotationMemberDef memberDef) {
+        List<AnnotationValue<AliasFor>> aliases = memberDef.getAnnotationMetadata().getAnnotationValuesByType(AliasFor.class);
+        if (!aliases.isEmpty()) {
+            return aliases.stream()
+                .map(alias -> normalizeAliasForAnnotationValue(alias, AliasFor.class))
+                .toList();
+        }
+        Optional<AnnotationValue<AliasFor>> alias = memberDef.getAnnotationMetadata().findAnnotation(AliasFor.class)
+            .map(value -> normalizeAliasForAnnotationValue(value, AliasFor.class));
+        return alias.map(List::of).orElseGet(List::of);
+    }
+
     @Override
     public AnnotationMetadata buildDeclared(ElementDef element) {
         if (element instanceof AnnotationMetadataProvider provider) {
@@ -222,10 +234,90 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (decoratorList.isEmpty()) {
             DecoratorDef decoratorDef = this.decorators.get(element.name());
             if (decoratorDef != null) {
-                return decoratorDef.stereotypes();
+                return expandAliasedDecorators(decoratorDef.stereotypes());
             }
         }
-        return decoratorList;
+        return expandAliasedDecorators(decoratorList);
+    }
+
+    private List<DecoratorDef> expandAliasedDecorators(List<DecoratorDef> decoratorList) {
+        if (decoratorList.isEmpty()) {
+            return decoratorList;
+        }
+        List<DecoratorDef> expanded = null;
+        for (DecoratorDef decorator : decoratorList) {
+            List<DecoratorDef> aliasedDecorators = buildAliasedDecorators(decorator);
+            if (!aliasedDecorators.isEmpty() && expanded == null) {
+                expanded = new ArrayList<>(decoratorList);
+            }
+            if (expanded != null) {
+                expanded.addAll(aliasedDecorators);
+            }
+        }
+        return expanded == null ? decoratorList : expanded;
+    }
+
+    private List<DecoratorDef> buildAliasedDecorators(DecoratorDef decorator) {
+        Map<String, Value> members = decorator.members();
+        if (members.isEmpty()) {
+            return List.of();
+        }
+        String annotationName = toBinaryClassName(decorator.annotationName());
+        ClassElement javaAnnotationType = getJavaAnnotationType(decorator);
+        Map<String, Map<String, Value>> aliasValues = new LinkedHashMap<>();
+        Set<String> expandedTargets = new LinkedHashSet<>();
+        for (Map.Entry<String, Value> entry : members.entrySet()) {
+            String memberName = normalizeAnnotationMemberName(entry.getKey());
+            AnnotationMemberDef memberDef = resolveMemberDef(annotationName, javaAnnotationType, memberName);
+            List<AnnotationValue<AliasFor>> crossAnnotationAliases = getCrossAnnotationAliases(memberDef).stream()
+                .filter(alias -> alias.stringValue("annotation")
+                    .or(() -> alias.stringValue("annotationName"))
+                    .filter(targetAnnotation -> !targetAnnotation.equals(annotationName))
+                    .isPresent())
+                .toList();
+            boolean multiTargetMember = crossAnnotationAliases.size() > 1;
+            for (AnnotationValue<AliasFor> alias : crossAnnotationAliases) {
+                Optional<String> targetAnnotation = alias.stringValue("annotation")
+                    .or(() -> alias.stringValue("annotationName"));
+                Optional<String> targetMember = alias.stringValue("member");
+                if (targetAnnotation.isEmpty() || targetMember.isEmpty()) {
+                    continue;
+                }
+                String targetAnnotationName = targetAnnotation.get();
+                String targetMemberName = targetMember.get();
+                if (targetAnnotationName.equals(annotationName) || targetMemberName.isBlank()) {
+                    continue;
+                }
+                if (multiTargetMember) {
+                    expandedTargets.add(targetAnnotationName);
+                }
+                aliasValues
+                    .computeIfAbsent(targetAnnotationName, ignored -> new LinkedHashMap<>())
+                    .putIfAbsent(targetMemberName, entry.getValue());
+            }
+        }
+        if (expandedTargets.isEmpty()) {
+            return List.of();
+        }
+        List<DecoratorDef> aliasedDecorators = new ArrayList<>(expandedTargets.size());
+        for (String targetAnnotation : expandedTargets) {
+            Map<String, Value> targetValues = aliasValues.get(targetAnnotation);
+            if (targetValues == null || targetValues.isEmpty()) {
+                continue;
+            }
+            // Keep cross-annotation aliases in metadata, not on generated stubs. This mirrors
+            // Java's APT view for Python decorators. Only members with multiple annotation
+            // targets activate synthesis, then other explicit aliases for that same target
+            // are folded in so partial stereotypes do not drop values such as prefix.
+            aliasedDecorators.add(new DecoratorDef(
+                targetAnnotation,
+                targetAnnotation,
+                null,
+                targetValues,
+                List.of()
+            ));
+        }
+        return aliasedDecorators;
     }
 
     @Override
@@ -845,7 +937,6 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         return Optional.empty();
     }
 
-    @SuppressWarnings("unchecked")
     private <K extends Annotation> AnnotationValue<K> normalizeAliasForAnnotationValue(AnnotationValue<K> annotationValue, Class<K> annotationType) {
         if (annotationType == AliasFor.class && annotationValue.stringValue("annotationName").isEmpty()) {
             Optional<AnnotationClassValue<?>> annotationClassValue = annotationValue.annotationClassValue("annotation");
