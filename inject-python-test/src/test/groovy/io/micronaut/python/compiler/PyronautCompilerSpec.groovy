@@ -18,6 +18,7 @@ package io.micronaut.python.compiler
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.GraalPyContextFactory
 import io.micronaut.python.processing.PythonAnnotationProcessor
+import org.graalvm.polyglot.Value
 import spock.lang.Specification
 
 class PyronautCompilerSpec extends Specification {
@@ -178,6 +179,7 @@ class OutOfStockException(RuntimeException):
 
         then:
         RuntimeException.isAssignableFrom(generatedException)
+        generatedException.getConstructor(Value) != null
     }
 
     def "test classpath support"() {

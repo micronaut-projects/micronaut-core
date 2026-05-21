@@ -383,15 +383,16 @@ Likely first root-cause area:
   erase the generated wrapper receiver/class-literal where Java syntax requires
   a raw class while preserving generic metadata on Micronaut model elements.
 
-Separate `test-suite-python` work item:
+Resolved `test-suite-python` work item:
 
-* Investigate `micronaut.docs.server.exception.ExceptionHandlerSpec`.
+* `micronaut.docs.server.exception.ExceptionHandlerSpec` failed because Python
+  exceptions that extend Java `Throwable` generated only the normal Python
+  construction path, not the `Value` constructor needed by the runtime to remap
+  GraalPy host adapter exceptions back to the generated exception subtype.
+  `PythonStubGenerator` now emits that constructor for generated Python
+  `Throwable` wrappers, allowing typed Micronaut exception handlers to match.
   `./gradlew --no-daemon --no-build-cache --max-workers=1 :test-suite-python:test --tests micronaut.docs.server.exception.ExceptionHandlerSpec`
-  currently fails on committed baseline `33c93fe3fb` and on the current branch
-  with `test_exception_is_handled` returning the unexpected error path instead
-  of the expected `BAD_REQUEST` response body `"No stock available"`. Treat this
-  as an independent Python exception-handler propagation bug, not a regression
-  from the event-adapter AOP fix.
+  passes after the fix.
 
 ## Gradle And GraalPy
 

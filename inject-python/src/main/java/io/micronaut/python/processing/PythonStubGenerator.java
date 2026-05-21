@@ -433,6 +433,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     ));
                         }
                     }
+                    if (!isJunit5Test && extendsHostClass && superType.isAssignable(Throwable.class)) {
+                        // Python exceptions raised from GraalPy can surface as host adapter exceptions.
+                        // The runtime remaps those adapters back to the generated Throwable subtype
+                        // through this Value constructor so Micronaut exception handlers can match it.
+                        builder.addMethod(
+                            MethodDef.constructor()
+                                .addModifiers(Modifier.PUBLIC)
+                                .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+                                .build((aThis, methodParameters) ->
+                                    aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(methodParameters.get(0))
+                                )
+                        );
+                    }
 
                     // implement asPolyglotValue by reconstructing the Python object with current field values
                     if (isIntrospectedBean) {
