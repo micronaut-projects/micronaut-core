@@ -824,6 +824,60 @@ class GenreRepository(CrudRepository[Genre, int]):
         tempTargetDir.deleteDir()
     }
 
+    def "test data repository join on nullable collection relation compiles"() {
+        given:
+        def tempTargetDir = File.createTempDir("pyronaut-test-data-join-target", "")
+        def pythonCode = '''
+from dataclasses import dataclass, field
+from typing import Annotated, Optional
+
+from jakarta.validation.constraints import NotNull
+from micronaut.core.annotation import NonNull, Nullable
+from micronaut.data.annotation import GeneratedValue, Id, Join, MappedEntity, Relation
+from micronaut.data.jdbc.annotation import JdbcRepository
+from micronaut.data.repository import CrudRepository
+
+@dataclass
+@MappedEntity
+class Message:
+    content: str
+    room: Annotated["Room | None", Nullable, Relation(value="MANY_TO_ONE")] = None
+    id: Annotated[int | None, Id, GeneratedValue] = None
+
+@dataclass
+@MappedEntity
+class Room:
+    name: str
+    messages: Annotated[
+        list[Message] | None,
+        Nullable,
+        Relation(value="ONE_TO_MANY", mappedBy="room"),
+    ] = field(default_factory=list)
+    id: Annotated[int | None, Id, GeneratedValue] = None
+
+@JdbcRepository(dialect="H2")
+class RoomRepository(CrudRepository[Room, int]):
+    @Join(value="messages", type=Join.Type.LEFT_FETCH)
+    def getById(self, id: Annotated[int, NonNull, NotNull]) -> Optional[Room]: ...
+'''
+
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .javaSrc("inject-python-test/src/test/java")
+            .targetDir(tempTargetDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
+
+        then:
+        classLoader.loadClass('python.RoomRepository') != null
+
+        cleanup:
+        tempTargetDir.deleteDir()
+    }
+
     def "test file-backed classless route with execute on resolves script proxy type"() {
         given:
         def tempSrcDir = File.createTempDir("pyronaut-test-script-route-src", "")

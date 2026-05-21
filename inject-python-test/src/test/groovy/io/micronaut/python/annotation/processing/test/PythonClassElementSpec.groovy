@@ -23,6 +23,9 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Mapper
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.expressions.EvaluatedExpressionReference
+import io.micronaut.data.annotation.Relation
+import io.micronaut.data.model.Association
+import io.micronaut.data.processor.model.SourcePersistentEntity
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.qualifiers.Qualifiers
@@ -811,6 +814,77 @@ class TypeTestService:
             def type = method.genericReturnType.getFirstTypeArgument().get()
             assert !type.isNonNull()
             assert !type.isNullable()
+            return element
+        }
+    }
+
+    def "test quoted nullable forward reference property preserves target type"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from typing import Annotated
+from micronaut.core.annotation import Nullable
+from micronaut.data.annotation import Relation
+
+@dataclass
+class Room:
+    name: str
+
+@dataclass
+class Message:
+    room: Annotated["Room | None", Nullable, Relation(value="MANY_TO_ONE")] = None
+'''
+
+        expect:
+        buildClassElement(pythonCode, "Message") { ClassElement element ->
+            def room = element.beanProperties.find { it.name == "room" }
+            assert room != null
+            assert room.type.name == "python.Room"
+            assert room.type.isNullable()
+            assert room.hasAnnotation("io.micronaut.data.annotation.Relation")
+            assert room.enumValue(Relation, "value", Relation.Kind).get() == Relation.Kind.MANY_TO_ONE
+            return element
+        }
+    }
+
+    def "test nullable collection property preserves element type"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass, field
+from typing import Annotated
+from micronaut.core.annotation import Nullable
+from micronaut.data.annotation import GeneratedValue, Id, Relation
+
+@dataclass
+class Message:
+    content: str
+    id: Annotated[int | None, Id, GeneratedValue] = None
+
+@dataclass
+class Room:
+    messages: Annotated[
+        list[Message] | None,
+        Nullable,
+        Relation(value="ONE_TO_MANY", mappedBy="room"),
+    ] = field(default_factory=list)
+'''
+
+        expect:
+        buildClassElement(pythonCode, "Room") { ClassElement element ->
+            def messages = element.beanProperties.find { it.name == "messages" }
+            assert messages != null
+            assert messages.type.name == List.name
+            assert messages.type.isNullable()
+            assert messages.type.firstTypeArgument.get().name == "python.Message"
+            assert messages.genericType.firstTypeArgument.get().name == "python.Message"
+            assert messages.hasAnnotation("io.micronaut.data.annotation.Relation")
+            assert messages.enumValue(Relation, "value", Relation.Kind).get() == Relation.Kind.ONE_TO_MANY
+            assert messages.stringValue(Relation, "mappedBy").get() == "room"
+            def entity = new SourcePersistentEntity(element, ce -> new SourcePersistentEntity(ce, c -> null))
+            def association = entity.persistentProperties.find { it.name == "messages" } as Association
+            assert association != null
+            assert association.associatedEntity.name == "python.Message"
+            assert association.associatedEntity.hasIdentity()
             return element
         }
     }
