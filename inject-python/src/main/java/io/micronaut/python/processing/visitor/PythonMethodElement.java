@@ -194,16 +194,43 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     }
 
     @Override
+    public boolean hasStereotype(@Nullable Class<? extends Annotation> annotation) {
+        return helper.getAnnotationMetadata(presetAnnotationMetadata).hasStereotype(annotation)
+            || (!declaringType.equals(owningType) && declaringType.hasStereotype(annotation));
+    }
+
+    @Override
+    public boolean hasStereotype(@Nullable String annotation) {
+        return helper.getAnnotationMetadata(presetAnnotationMetadata).hasStereotype(annotation)
+            || (!declaringType.equals(owningType) && declaringType.hasStereotype(annotation));
+    }
+
+    @Override
     public AnnotationMetadata getTargetAnnotationMetadata() {
         AnnotationMetadata targetAnnotationMetadata = getMethodAnnotationMetadata().getTargetAnnotationMetadata();
         AnnotationMetadata overriddenMethodAnnotationMetadata = getOverriddenMethodAnnotationMetadata();
         if (!overriddenMethodAnnotationMetadata.isEmpty()) {
+            // Match Java/Groovy/Kotlin semantics for overridden methods: annotations inherited from
+            // the overridden method must be visible to hasAnnotation, but not to hasDeclaredAnnotation.
+            // This keeps the source-level declaration boundary intact while still letting downstream
+            // method metadata consumers see inherited AOP and executable metadata.
             targetAnnotationMetadata = new AnnotationMetadataHierarchy(
                 toNonDeclaredAnnotationMetadata(overriddenMethodAnnotationMetadata),
                 targetAnnotationMetadata
             );
         }
+        if (!declaringType.equals(owningType) && !declaringType.getAnnotationMetadata().isEmpty()) {
+            // Inherited methods must retain class-level metadata from the type that declared them.
+            // The bean definition writer first checks method.hasStereotype(Executable) before it
+            // checks method.getDeclaringType().hasStereotype(Executable), so class-level @Executable
+            // on a Python superclass has to be visible as inherited method metadata.
+            targetAnnotationMetadata = new AnnotationMetadataHierarchy(declaringType, targetAnnotationMetadata);
+        }
         if (!owningType.getAnnotationMetadata().isEmpty()) {
+            // Keep inherited/owning type metadata in the annotation metadata model instead of copying
+            // annotations onto generated Java stubs. The stubs are only a Java shape for processing;
+            // copying annotations there would make declared/inherited metadata checks diverge from the
+            // other language implementations.
             targetAnnotationMetadata = new AnnotationMetadataHierarchy(owningType, targetAnnotationMetadata);
         }
         return targetAnnotationMetadata;
@@ -436,7 +463,10 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                     merged = resolved.clone();
                 }
                 merged[i] = resolved[i].withAnnotationMetadata(
-                    new AnnotationMetadataHierarchy(true, inheritedMetadata, resolved[i].getAnnotationMetadata())
+                    // Validation visitors mutate parameter metadata while inheriting constraints.
+                    // Keep the declared child metadata concrete here; a hierarchy as the declared
+                    // child cannot be mutated by AbstractAnnotationMetadataBuilder.
+                    new AnnotationMetadataHierarchy(true, inheritedMetadata, MutableAnnotationMetadata.of(resolved[i].getAnnotationMetadata()))
                 );
             }
             if (merged != null) {

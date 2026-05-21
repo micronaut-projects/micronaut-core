@@ -830,9 +830,12 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                     }
                 }
             } else {
-                if (currentDeclaringClass != null && currentDeclaringClass != getNativeClassType(AbstractPythonClassElement.this)) {
-                    // This is an inherited element - find the declaring class
-                    String declaringClassName = currentDeclaringClass.name();
+                if (currentDeclaringClass != null && !currentDeclaringClass.equals(getNativeClassType(AbstractPythonClassElement.this))) {
+                    // This is an inherited element. The Python environment is keyed by qualified
+                    // class name, and preserving the real declaring type is required for inherited
+                    // class-level metadata such as @Executable to be evaluated against the superclass
+                    // instead of the subclass currently being queried.
+                    String declaringClassName = qualifiedClassName(currentDeclaringClass);
                     ClassElement declaringElement = environment.classes().get(declaringClassName);
                     if (declaringElement instanceof PythonClassElement pythonDeclaringClass) {
                         declaringClassElement = pythonDeclaringClass;

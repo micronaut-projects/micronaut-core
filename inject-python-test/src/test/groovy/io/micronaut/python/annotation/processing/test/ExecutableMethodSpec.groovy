@@ -459,7 +459,6 @@ class StatusController(GenericController[str, int]):
         definition.executableMethods.size() == 3
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0071")
     def "test factory inherits class-level executable methods from superclass"() {
         given:
         def pythonCode = '''
