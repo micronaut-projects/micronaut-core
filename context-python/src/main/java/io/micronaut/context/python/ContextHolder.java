@@ -563,6 +563,15 @@ public final class ContextHolder {
     }
 
     /**
+     * Returns the application class loader associated with the current GraalPy context.
+     *
+     * @return The application class loader
+     */
+    public static @Nullable ClassLoader getContextClassLoader() {
+        return contextClassLoader;
+    }
+
+    /**
      * Check if the context has been initialized.
      *
      * @return true if the context is available, false otherwise

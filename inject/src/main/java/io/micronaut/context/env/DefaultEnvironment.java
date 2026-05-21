@@ -131,7 +131,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         MutableConversionService conversionService = configuration.getConversionService().orElseGet(MutableConversionService::create);
         this.propertyPlaceholderResolver = new PropertySourcePropertyResolver(
             conversionService,
-            true
+            true,
+            configuration.getClassLoader()
         );
         this.applicationName = configuration.getApplicationName();
         if (applicationName.isBlank()) {

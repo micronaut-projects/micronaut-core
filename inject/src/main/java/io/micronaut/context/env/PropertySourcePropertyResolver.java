@@ -107,9 +107,20 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @param logEnabled        flag to enable or disable logger
      */
     public PropertySourcePropertyResolver(ConversionService conversionService, boolean logEnabled) {
+        this(conversionService, logEnabled, null);
+    }
+
+    /**
+     * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
+     *
+     * @param conversionService The {@link ConversionService}
+     * @param logEnabled        flag to enable or disable logger
+     * @param classLoader       The class loader to use for expression resolver service loading
+     */
+    public PropertySourcePropertyResolver(ConversionService conversionService, boolean logEnabled, @Nullable ClassLoader classLoader) {
         this.log = logEnabled ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
         this.conversionService = conversionService;
-        this.propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(this, conversionService);
+        this.propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(this, conversionService, classLoader);
     }
 
     /**
