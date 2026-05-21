@@ -8,6 +8,14 @@ PYTHON_KEYWORD_METHOD_ALIASES = {
     for name in keyword.kwlist
 }
 
+META_ANNOTATIONS_TO_SKIP_IN_SOURCE = {
+    # ConfigurationReader is compile-time metadata for the configuration binder.
+    # Python keeps these aliases in Micronaut annotation metadata; copying the
+    # meta-annotation onto the generated decorator source is unnecessary and can
+    # make the stub diverge from the Java APT model.
+    "io.micronaut.context.annotation.ConfigurationReader",
+}
+
 def normalize_python_keyword_alias(name: str) -> str:
     if name.endswith('_') and keyword.iskeyword(name[:-1]):
         return name[:-1]
@@ -634,7 +642,8 @@ def micronaut_annotation(name, repeated=None):
         annotation_names = annotation_metadata.getAnnotationNames()
         for meta_annotation_name in annotation_names:
             # Skip retention and other built-in annotations that aren't user-facing
-            if not meta_annotation_name.startswith('java.lang.annotation.'):
+            if (not meta_annotation_name.startswith('java.lang.annotation.')
+                    and meta_annotation_name not in META_ANNOTATIONS_TO_SKIP_IN_SOURCE):
                 meta_class_element = self.callback_get_class_element(meta_annotation_name)
                 if not meta_class_element or not self._is_annotation_class(meta_class_element):
                     continue

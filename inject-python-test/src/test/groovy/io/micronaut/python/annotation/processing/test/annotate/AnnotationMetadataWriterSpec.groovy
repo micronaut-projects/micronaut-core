@@ -192,6 +192,34 @@ class Test:
         metadata.stringValue(ConfigurationReader, "excludes").get() == "lol"
     }
 
+    void "test configuration properties stub does not copy configuration reader decorator"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import ConfigurationProperties
+
+@ConfigurationProperties(value="xyz", includes=["abc"], excludes=["lol"])
+class Test:
+    pass
+''')
+
+        when:
+        def resource = definition.class.classLoader.getResource(
+            'META-INF/GRAALPY-VFS/micronaut-application/src/micronaut/context/annotation/ConfigurationProperties.py'
+        )
+        def stub = resource?.text
+
+        then:
+        resource != null
+        stub.contains('@micronaut_annotation("io.micronaut.context.annotation.ConfigurationProperties")')
+        !stub.contains('@ConfigurationReader')
+        !stub.contains('@micronaut_annotation("io.micronaut.context.annotation.ConfigurationReader")')
+
+        and:
+        definition.annotationMetadata.stringValue(ConfigurationReader, "prefix").get() == "xyz"
+        definition.annotationMetadata.stringValue(ConfigurationReader, "includes").get() == "abc"
+        definition.annotationMetadata.stringValue(ConfigurationReader, "excludes").get() == "lol"
+    }
+
     void "test method annotation metadata merges configuration reader metadata"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
