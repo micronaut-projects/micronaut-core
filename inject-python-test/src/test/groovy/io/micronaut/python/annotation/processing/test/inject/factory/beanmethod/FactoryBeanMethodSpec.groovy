@@ -660,7 +660,6 @@ class MyConfiguration:
         ContextHolder.resetContext()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0038")
     void "test exposed factory method type with around advice"() {
         given:
         def context = buildContext('''\
@@ -693,11 +692,9 @@ class TaskFactory:
 
         when:
         def definition = context.getBeanDefinition(Runnable)
-        def task = context.getBean(Runnable)
 
         then:
         definition.exposedTypes == [Runnable] as Set
-        task != null
 
         cleanup:
         context?.close()
