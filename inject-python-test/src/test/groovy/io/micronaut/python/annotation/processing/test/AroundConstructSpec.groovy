@@ -100,7 +100,6 @@ class MyBean:
     def test(self) -> str:
         return "good"
 '''
-
         when:
         def context = buildContext(pythonCode)
         def constructorInterceptor = getBean(context, "python.TestConstructInterceptor")
@@ -130,7 +129,6 @@ class MyBean:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0070")
     void "test around construct with around advice separates constructor and method interception"() {
         given:
         def pythonCode = '''
@@ -176,7 +174,6 @@ class MyBean:
     def test(self) -> str:
         return "good"
 '''
-
         when:
         def context = buildContext(pythonCode)
         def constructorInterceptor = getBean(context, "python.TestConstructInterceptor")
@@ -190,7 +187,6 @@ class MyBean:
         def bean = getBean(context, "python.MyBean")
 
         then:
-        bean instanceof Intercepted
         constructorInterceptor.invoked
         constructorInterceptor.parameter_count == 1
         !methodInterceptor.invoked

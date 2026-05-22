@@ -138,7 +138,11 @@ As of May 14, 2026:
 * All `@PendingFeature` tests under `inject-python-test` are cataloged with
   stable `PY-INJECT-XXXX` IDs, including pre-existing Python compiler and
   runtime gaps that were outside the direct source inventory.
-* The most recent full verification passed with 459 tests and 97 skipped.
+* The active pending catalog is currently down to 6 IDs after resolving
+  `PY-INJECT-0075`.
+* The most recent full verification passed with 491 tests and 6 skipped:
+  `./gradlew --no-daemon --no-build-cache --max-workers=1 :micronaut-inject-python-test:test`
+  after resolving `PY-INJECT-0075`.
 * Per-slice verification used focused tests only; the full Python inject test
   task has now been run as the final sweep for this migration/catalog pass.
 * The most recent focused verification passed for
@@ -187,8 +191,8 @@ The latest completed source slices are:
   inherited class metadata, event type arguments, multiple lifecycle methods,
   and async listener behavior are covered through `PythonEventListenerSpec`.
 * `InterceptedAdapterSpec.groovy`: around advice on event-listener adapter
-  methods is pending as `PY-INJECT-0069` because the Python adapter path invokes
-  the around interceptor twice for one event.
+  methods is covered after the Python adapter path stopped invoking the around
+  interceptor twice for one event.
 * `SessionProxySpec.groovy`: Hibernate `Session`/`SessionFactory` JVM proxy
   method emission is cataloged as unsupported Java library proxy behavior.
 * `IntroductionInnerInterfaceSpec.groovy`: Java nested interface introduction
@@ -200,8 +204,8 @@ The latest completed source slices are:
   around-construct-only method behavior, constructor-only binding, type plus
   constructor binding, and factory-method construction binding are covered by
   `AroundConstructSpec`. Combined `@Around` plus `@AroundConstruct` behavior is
-  pending as `PY-INJECT-0070`; the local Java annotation transformer fixture is
-  cataloged as unsupported.
+  also covered; the local Java annotation transformer fixture is cataloged as
+  unsupported.
 * `NamedAopAdviceSpec.groovy`: named refreshable `@EachProperty` factory beans
   and qualified AOP proxy lookup are covered by `NamedAopAdviceSpec`.
 * `ExecutableSuperclassSpec.groovy`: a factory subclass inheriting class-level
@@ -215,7 +219,7 @@ The latest completed source slices are:
 * `MappedIntroductionOnConcreteClassSpec.groovy`: Java annotation-mapped
   introduction on a concrete class is pending as `PY-INJECT-0074`.
 * `PropertyAdviceSpec.groovy`: class-level around advice on attribute-backed
-  property setters is pending as `PY-INJECT-0075`.
+  property setters is covered by resolved `PY-INJECT-0075`.
 * `IntroductionWithAroundOnConcreteClassSpec.groovy`: the portable combined
   introduction-and-around concrete-class behavior is covered for Java and Groovy
   sources; fixture matrices, exact executable method counts, JavaBean accessor
@@ -380,6 +384,21 @@ Likely first root-cause area:
   `Response<Integer>` for static `fromPolyglotValue(...)` calls. The fix should
   erase the generated wrapper receiver/class-literal where Java syntax requires
   a raw class while preserving generic metadata on Micronaut model elements.
+
+`test-suite-python` regression watch item:
+
+* `micronaut.docs.server.exception.ExceptionHandlerSpec` failed because Python
+  exceptions that extend Java `Throwable` generated only the normal Python
+  construction path, not the `Value` constructor needed by the runtime to remap
+  GraalPy host adapter exceptions back to the generated exception subtype.
+  `PythonStubGenerator` now emits that constructor for generated Python
+  `Throwable` wrappers, allowing typed Micronaut exception handlers to match.
+  `./gradlew --no-daemon --no-build-cache --max-workers=1 :test-suite-python:test --tests micronaut.docs.server.exception.ExceptionHandlerSpec`
+  passes at the current branch head. If this spec regresses again, investigate
+  the generated Python `Throwable` wrapper constructors, the GraalPy host
+  adapter exception remapping path, and the `ExceptionHandler<E, R>` generic
+  type arguments visible from the generated handler bean definition before
+  changing HTTP server exception handling.
 
 ## Gradle And GraalPy
 

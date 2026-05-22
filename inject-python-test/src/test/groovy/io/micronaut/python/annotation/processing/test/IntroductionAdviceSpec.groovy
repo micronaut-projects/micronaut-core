@@ -528,7 +528,6 @@ class StubExample(ABC):
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0060")
     void "test around advice is applied to concrete methods on introduction bean"() {
         given:
         def pythonCode = '''

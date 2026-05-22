@@ -10,7 +10,6 @@ import spock.lang.PendingFeature
 import spock.util.concurrent.PollingConditions
 
 class PythonEventListenerSpec extends AbstractPythonTypeElementSpec {
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0069")
     void "test event listener method adapter invokes around advice"() {
         given:
         def context = buildContext('''
