@@ -134,15 +134,15 @@ Current audit as of May 22, 2026:
 * The direct-subclass inventory audit has no remaining uncataloged direct
   subclasses.
 * `inject-python-test/DISABLED_TESTS.md` is the authoritative backlog and is
-  down to one pending ID: `PY-INJECT-0093`.
+  down to zero pending IDs.
 * All `@PendingFeature` tests under `inject-python-test` are cataloged with
-  stable `PY-INJECT-XXXX` IDs. The only current `@PendingFeature` is
-  `PY-INJECT-0093` in `PythonEventListenerSpec`.
+  stable `PY-INJECT-XXXX` IDs. There are currently no active
+  `@PendingFeature` tests under `inject-python-test`.
 * The latest assigned ID remains `PY-INJECT-0096`; use `PY-INJECT-0097` for
   the next follow-up pending case.
 * The latest full Python inject verification passed:
   `./gradlew --no-daemon --no-build-cache --max-workers=1 :micronaut-inject-python-test:test`
-  executed 491 tests with 1 skipped.
+  executed 491 tests.
 * The latest Python inject module verification passed:
   `./gradlew --no-daemon --no-build-cache --max-workers=1 :micronaut-inject-python:test`
   executed 34 tests.
@@ -152,6 +152,9 @@ Current audit as of May 22, 2026:
 * The latest committed implementation slice is
   `24df730272 Fix Python nested configuration binding`, resolving
   `PY-INJECT-0090` and `PY-INJECT-0091`.
+* The latest focused test-only slice resolves `PY-INJECT-0093` by correcting
+  `PythonEventListenerSpec.test python event listener via interface with java event`;
+  the focused `:micronaut-inject-python-test:test --tests ...` command passes.
 
 Historical snapshot as of May 14, 2026:
 
@@ -366,8 +369,8 @@ The latest completed source slices are:
   implementing a Java interface (`PY-INJECT-0094`), method-level Python type
   variables (`PY-INJECT-0095`), and `PyronautCompiler.classpath(...)`
   (`PY-INJECT-0096`). The current catalog has since resolved
-  `PY-INJECT-0094`, `PY-INJECT-0095`, and `PY-INJECT-0096`; only
-  `PY-INJECT-0093` remains pending.
+  `PY-INJECT-0093`, `PY-INJECT-0094`, `PY-INJECT-0095`, and
+  `PY-INJECT-0096`; no pending IDs remain.
 
 No uncataloged direct subclasses remain for this pass.
 
@@ -479,4 +482,4 @@ For a batch/final sweep:
 * Full `:micronaut-inject-python-test:test` passes.
 * `:test-suite-python:test` passes.
 * No pending Python test is missing from `DISABLED_TESTS.md`.
-* No old parity naming is introduced.
+* No old migration-only naming is introduced.
