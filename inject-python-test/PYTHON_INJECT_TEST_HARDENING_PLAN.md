@@ -138,7 +138,9 @@ As of May 14, 2026:
 * All `@PendingFeature` tests under `inject-python-test` are cataloged with
   stable `PY-INJECT-XXXX` IDs, including pre-existing Python compiler and
   runtime gaps that were outside the direct source inventory.
-* The most recent full verification passed with 491 tests and 10 skipped:
+* The active pending catalog is currently down to 9 IDs after resolving
+  `PY-INJECT-0058`.
+* The most recent full verification passed with 491 tests and 9 skipped:
   `./gradlew --no-daemon --no-build-cache --max-workers=1 :micronaut-inject-python-test:test`
   on May 21, 2026.
 * Per-slice verification used focused tests only; the full Python inject test

@@ -319,7 +319,7 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         return method.hasAnnotation("io.micronaut.context.annotation.Mapper")
             || method.hasAnnotation("io.micronaut.context.annotation.Mapper$Mapping")
             || method.hasDeclaredStereotype(Bean.class)
-            || method.hasStereotype(InterceptorBinding.class);
+            || method.hasStereotype(Introduction.class);
     }
 
     private void moveIntroductionInterfacesToImplementedInterfaces() {

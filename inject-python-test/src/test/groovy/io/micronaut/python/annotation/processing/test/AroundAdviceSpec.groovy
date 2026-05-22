@@ -580,7 +580,6 @@ class Service(BaseService, ContractService):
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0058")
     void "test concrete aop bean is resolvable by abstract base type"() {
         given:
         def pythonCode = '''
