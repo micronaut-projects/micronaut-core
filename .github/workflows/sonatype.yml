@@ -62,6 +62,7 @@ jobs:
           distribution: 'graalvm'
           java-version: ${{ matrix.java }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          native-image-job-reports: true
 
       - name: "🔧 Setup Gradle"
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6
