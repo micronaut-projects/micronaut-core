@@ -152,9 +152,10 @@ Current audit as of May 22, 2026:
 * The latest committed implementation slice is
   `24df730272 Fix Python nested configuration binding`, resolving
   `PY-INJECT-0090` and `PY-INJECT-0091`.
-* The latest focused test-only slice resolves `PY-INJECT-0093` by correcting
-  `PythonEventListenerSpec.test python event listener via interface with java event`;
-  the focused `:micronaut-inject-python-test:test --tests ...` command passes.
+* The latest focused test-only slice is
+  `5a609204d3 Fix Python event listener interface test`, resolving
+  `PY-INJECT-0093`; the focused
+  `:micronaut-inject-python-test:test --tests ...` command passes.
 
 Historical snapshot as of May 14, 2026:
 
