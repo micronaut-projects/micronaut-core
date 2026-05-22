@@ -2903,13 +2903,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     if (returnType.isAssignable(List.class)) {
                         ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
                         if (componentType != null && isGeneratedWrapperType(allClasses, componentType)) {
-                            yield RUNTIME_UTIL.invokeStatic(
+                            yield uncheckedCast(RUNTIME_UTIL.invokeStatic(
                                 "convertList",
                                 List.of(POLYGLOT_VALUE, POLYGLOT_VALUE_CONVERTER),
                                 ClassTypeDef.of(List.class),
                                 invokedValue,
                                 generatedWrapperConverter(componentType)
-                            );
+                            ), returnType);
                         }
                         ExpressionDef genericType = toClassExpression(componentType);
                         yield uncheckedCast(RUNTIME_UTIL

@@ -127,7 +127,33 @@ git status --short --branch
 
 ## Completion State
 
-As of May 14, 2026:
+Current audit as of May 22, 2026:
+
+* Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
+  from the included checkout; no local bundle override was used.
+* The direct-subclass inventory audit has no remaining uncataloged direct
+  subclasses.
+* `inject-python-test/DISABLED_TESTS.md` is the authoritative backlog and is
+  down to one pending ID: `PY-INJECT-0093`.
+* All `@PendingFeature` tests under `inject-python-test` are cataloged with
+  stable `PY-INJECT-XXXX` IDs. The only current `@PendingFeature` is
+  `PY-INJECT-0093` in `PythonEventListenerSpec`.
+* The latest assigned ID remains `PY-INJECT-0096`; use `PY-INJECT-0097` for
+  the next follow-up pending case.
+* The latest full Python inject verification passed:
+  `./gradlew --no-daemon --no-build-cache --max-workers=1 :micronaut-inject-python-test:test`
+  executed 491 tests with 1 skipped.
+* The latest Python inject module verification passed:
+  `./gradlew --no-daemon --no-build-cache --max-workers=1 :micronaut-inject-python:test`
+  executed 34 tests.
+* The latest Python docs/test-suite regression verification passed:
+  `./gradlew --no-daemon --no-build-cache --max-workers=1 :test-suite-python:test`
+  executed 183 tests.
+* The latest committed implementation slice is
+  `24df730272 Fix Python nested configuration binding`, resolving
+  `PY-INJECT-0090` and `PY-INJECT-0091`.
+
+Historical snapshot as of May 14, 2026:
 
 * Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
   from the included checkout; do not rely on a local bundle override.
@@ -262,11 +288,11 @@ The latest completed source slices are:
   `PY-INJECT-0085`.
 * `InterfaceConfigurationPropertiesSpec.groovy`, `InterfaceNestingSpec.groovy`,
   `EachPropertyNestingSpec.groovy`, and `RecordNestingSpec.groovy`: nested
-  Python configuration class runtime binding is pending as `PY-INJECT-0090`,
-  and nested `@EachProperty` list binding is pending as `PY-INJECT-0091`;
-  interface proxies, Java record accessors, and Java/Groovy visibility variants
-  are cataloged as unsupported, while scalar binding and nested prefix metadata
-  are covered by `ConfigurationPropertiesSpec`.
+  Python configuration class runtime binding and nested `@EachProperty` list
+  binding are resolved as `PY-INJECT-0090` and `PY-INJECT-0091`; interface
+  proxies, Java record accessors, and Java/Groovy visibility variants are
+  cataloged as unsupported, while scalar binding and nested prefix metadata are
+  covered by `ConfigurationPropertiesSpec`.
 * `EachBeanInterceptorSpec.groovy`: named `@EachBean` AOP target lookup is
   covered by `NamedAopAdviceSpec`; interceptor constructor injection of the
   current target `Qualifier` is pending as `PY-INJECT-0092`, while the full
@@ -339,7 +365,9 @@ The latest completed source slices are:
   interface construction (`PY-INJECT-0093`), `@EachProperty` classes
   implementing a Java interface (`PY-INJECT-0094`), method-level Python type
   variables (`PY-INJECT-0095`), and `PyronautCompiler.classpath(...)`
-  (`PY-INJECT-0096`).
+  (`PY-INJECT-0096`). The current catalog has since resolved
+  `PY-INJECT-0094`, `PY-INJECT-0095`, and `PY-INJECT-0096`; only
+  `PY-INJECT-0093` remains pending.
 
 No uncataloged direct subclasses remain for this pass.
 

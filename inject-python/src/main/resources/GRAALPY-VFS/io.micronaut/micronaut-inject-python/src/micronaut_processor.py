@@ -242,6 +242,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static)
                         if self.current_class is not None:
                             if node.name == "__init__":
+                                self._handle_constructor_instance_attributes(node, arguments)
                                 # Set as constructor
                                 self.current_class = self.current_class.withConstructor(func_def)
                             else:
@@ -480,7 +481,14 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 if is_enum:
                     self.current_class = self.current_class.withEnum(True, enum_values)
 
-                self.callback.apply(self.current_class)
+                completed_class = self.current_class
+                self.callback.apply(completed_class)
+                if previous_class is not None:
+                    # Keep Python nesting in the AST model. Micronaut's bean definition writer
+                    # discovers nested configuration readers through enclosed ClassElement
+                    # queries, so the parent ClassDef must carry its direct nested classes
+                    # instead of forcing later source-model code to infer them from "$" names.
+                    previous_class = previous_class.withNestedClass(completed_class)
             return result
         finally:
             self.current_class = previous_class
@@ -653,6 +661,49 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     self.current_class_attributes[-1] = updated_attr
                 # Update last_attribute reference
                 self.last_attribute = updated_attr
+
+    def _handle_constructor_instance_attributes(self, func_node, arguments):
+        """
+        Add simple self.x = parameter assignments from __init__ as readable attributes.
+        """
+        if self.current_class is None:
+            return
+        parameter_by_name = {arg.name(): arg for arg in arguments.arguments()}
+        existing_attributes = {attr.name() for attr in self.current_class_attributes}
+        existing_properties = set(self.current_class_properties.keys())
+        for stmt in func_node.body:
+            if not isinstance(stmt, ast.Assign) or len(stmt.targets) != 1:
+                continue
+            target = stmt.targets[0]
+            if not (
+                isinstance(target, ast.Attribute)
+                and isinstance(target.value, ast.Name)
+                and target.value.id == "self"
+                and isinstance(stmt.value, ast.Name)
+            ):
+                continue
+            attr_name = target.attr
+            if attr_name.startswith("_") or attr_name in existing_attributes or attr_name in existing_properties:
+                continue
+            parameter = parameter_by_name.get(stmt.value.id)
+            if parameter is None:
+                continue
+            if not self._is_constructor_readable_attribute_parameter(parameter):
+                continue
+            # Constructor-assigned instance attributes need to be part of the Python
+            # source model so generated stubs expose host-readable bean properties.
+            # Do not copy injection decorators like @Parameter to the attribute; the
+            # constructor parameter remains the injection point.
+            attr_def = JavaAttributeDef(attr_name, parameter.annotation(), parameter.typeAnnotation(), None, [], parameter.documentation(), False, None)
+            self.current_class_attributes.append(attr_def)
+            existing_attributes.add(attr_name)
+
+    def _is_constructor_readable_attribute_parameter(self, parameter):
+        for decorator in parameter.decorators():
+            annotation_name = decorator.annotationName()
+            if annotation_name == "io.micronaut.context.annotation.Parameter" or decorator.name() == "Parameter":
+                return True
+        return False
 
     def _is_script_assignment(self, node):
         if isinstance(getattr(node, "parent", None), ast.ClassDef):

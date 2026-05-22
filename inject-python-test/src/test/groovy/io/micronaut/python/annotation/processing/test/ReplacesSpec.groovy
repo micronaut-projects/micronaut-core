@@ -278,26 +278,28 @@ class MockShop(Shop):
         VisitorKind getVisitorKind() {
             return VisitorKind.ISOLATING
         }
+
+        @Override
+        int getOrder() {
+            // These fixtures mutate source elements before PythonStubGenerator decides
+            // which visitor-added factory methods need Java bridge methods.
+            100
+        }
     }
 
     static class VisitorProducesVisitor implements TypeElementVisitor<Object, Object> {
         static boolean ENABLED = false
-        ClassElement currentClass
 
         static void reset() {
             ENABLED = false
         }
 
         @Override
-        void visitClass(ClassElement element, VisitorContext context) {
-            currentClass = element
-        }
-
-        @Override
         void visitMethod(MethodElement element, VisitorContext context) {
             if (ENABLED && element.hasAnnotation("python.TestProduces")) {
-                if (!currentClass.hasAnnotation(Factory)) {
-                    currentClass.annotate(Factory)
+                ClassElement declaringType = element.declaringType
+                if (!declaringType.hasAnnotation(Factory)) {
+                    declaringType.annotate(Factory)
                 }
                 element.annotate(Bean)
             }
@@ -306,6 +308,13 @@ class MockShop(Shop):
         @Override
         VisitorKind getVisitorKind() {
             return VisitorKind.ISOLATING
+        }
+
+        @Override
+        int getOrder() {
+            // These fixtures mutate source elements before PythonStubGenerator decides
+            // which visitor-added factory methods need Java bridge methods.
+            100
         }
     }
 }
