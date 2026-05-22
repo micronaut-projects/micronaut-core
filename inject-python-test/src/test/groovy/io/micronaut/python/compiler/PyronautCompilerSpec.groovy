@@ -673,6 +673,42 @@ class Message:
         messageClass.getField("text").type == String
     }
 
+    def "test generated introspected Python stubs expose declared instance methods"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class Message:
+    text: str
+
+    def formattedDateCreated(self) -> str:
+        return "formatted: " + self.text
+'''
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .build()
+
+        when:
+        def classLoader = compiler.buildClassLoader()
+        def context = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .beanDefinitionsProvider(new InMemoryBeanDefinitionsProvider())
+            .build()
+            .start()
+        def messageClass = classLoader.loadClass("python.Message")
+        def message = messageClass.getConstructor(String).newInstance("today")
+
+        then:
+        messageClass.getMethod("formattedDateCreated").returnType == String
+        message.formattedDateCreated() == "formatted: today"
+
+        cleanup:
+        context?.close()
+    }
+
     def "test Python sources in multiple distinct packages are processed"() {
         given:
         def tempDir = File.createTempDir("pyronaut-test-multi-package", "")
@@ -916,12 +952,13 @@ class GenreRepository(CrudRepository[Genre, int]):
         tempTargetDir.deleteDir()
     }
 
-    def "test data repository join on nullable collection relation compiles"() {
+    def "test data repository join on nullable collection relation compiles with #optionalImport"() {
         given:
         def tempTargetDir = File.createTempDir("pyronaut-test-data-join-target", "")
-        def pythonCode = '''
+        def pythonCode = """
 from dataclasses import dataclass, field
-from typing import Annotated, Optional
+from typing import Annotated
+${optionalImport}
 
 from jakarta.validation.constraints import NotNull
 from micronaut.core.annotation import NonNull, Nullable
@@ -950,8 +987,8 @@ class Room:
 @JdbcRepository(dialect="H2")
 class RoomRepository(CrudRepository[Room, int]):
     @Join(value="messages", type=Join.Type.LEFT_FETCH)
-    def getById(self, id: Annotated[int, NonNull, NotNull]) -> Optional[Room]: ...
-'''
+    def getById(self, id: Annotated[int, NonNull, NotNull]) -> ${optionalType}[Room]: ...
+"""
 
         def compiler = PyronautCompiler.builder()
             .pythonCode(pythonCode)
@@ -967,6 +1004,136 @@ class RoomRepository(CrudRepository[Room, int]):
         classLoader.loadClass('python.RoomRepository') != null
 
         cleanup:
+        tempTargetDir.deleteDir()
+
+        where:
+        optionalImport                 | optionalType
+        "from typing import Optional"  | "Optional"
+        "from java.util import Optional" | "Optional"
+    }
+
+    def "test imported annotation exposes nested enum members"() {
+        given:
+        def tempTargetDir = File.createTempDir("pyronaut-test-annotation-nested-enum", "")
+        def pythonCode = '''
+from micronaut.data.annotation import Join
+
+@Join(value="messages", type=Join.Type.LEFT_FETCH)
+class RoomRepository:
+    pass
+'''
+
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .javaSrc("inject-python-test/src/test/java")
+            .targetDir(tempTargetDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def joinFile = new File(tempTargetDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}/micronaut/data/annotation/Join.py")
+        joinFile.exists()
+        def joinContent = joinFile.text
+        joinContent.contains('Type = java.type("io.micronaut.data.annotation.Join$Type")')
+        joinContent.contains("Join.Type = Type")
+
+        and:
+        def launcherFile = new File(tempTargetDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
+        launcherFile.exists()
+        launcherFile.text.contains('type=Join.Type.LEFT_FETCH')
+
+        cleanup:
+        tempTargetDir.deleteDir()
+    }
+
+    def "test file-backed data repository join with relative entity imports compiles"() {
+        given:
+        def tempSrcDir = File.createTempDir("pyronaut-test-data-join-src", "")
+        def tempTargetDir = File.createTempDir("pyronaut-test-data-join-target", "")
+
+        def entitiesDir = new File(tempSrcDir, "example/micronaut/entities")
+        def repositoriesDir = new File(tempSrcDir, "example/micronaut/repositories")
+        entitiesDir.mkdirs()
+        repositoriesDir.mkdirs()
+
+        new File(entitiesDir, "message.py").text = '''
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Annotated
+
+from micronaut.core.annotation import Nullable
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity, Relation
+
+if TYPE_CHECKING:
+    from .room import Room
+
+@dataclass
+@MappedEntity
+class Message:
+    content: str
+    room: Annotated["Room | None", Nullable, Relation(value="MANY_TO_ONE")] = None
+    id: Annotated[int | None, Id, GeneratedValue] = None
+'''
+
+        new File(entitiesDir, "room.py").text = '''
+from dataclasses import dataclass, field
+from typing import Annotated
+
+from micronaut.core.annotation import Nullable
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity, Relation
+
+from .message import Message
+
+@dataclass
+@MappedEntity
+class Room:
+    name: str
+    messages: Annotated[
+        list[Message] | None,
+        Nullable,
+        Relation(value="ONE_TO_MANY", mappedBy="room"),
+    ] = field(default_factory=list)
+    id: Annotated[int | None, Id, GeneratedValue] = None
+'''
+
+        new File(repositoriesDir, "room_repository.py").text = '''
+from typing import Annotated
+
+from jakarta.validation.constraints import NotNull
+from java.util import Optional
+from micronaut.core.annotation import NonNull
+from micronaut.data.annotation import Join
+from micronaut.data.jdbc.annotation import JdbcRepository
+from micronaut.data.repository import CrudRepository
+
+from ..entities.room import Room
+
+@JdbcRepository(dialect="H2")
+class RoomRepository(CrudRepository[Room, int]):
+    @Join(value="messages", type=Join.Type.LEFT_FETCH)
+    def getById(self, id: Annotated[int, NonNull, NotNull]) -> Optional[Room]: ...
+'''
+
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(tempSrcDir.absolutePath)
+            .javaSrc("inject-python-test/src/test/java")
+            .targetDir(tempTargetDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
+
+        then:
+        classLoader.loadClass('example.micronaut.repositories.RoomRepository') != null
+        def roomSource = new File(tempTargetDir, "example/micronaut/entities/Room.java").text
+        roomSource.contains("public List<Message> messages;")
+        roomSource.contains("public void setMessages(List<Message> arg1)")
+        roomSource.contains("GraalPyRuntimeUtil.convertList(arg1, (element) -> Message.fromPolyglotValue(element))")
+
+        cleanup:
+        tempSrcDir.deleteDir()
         tempTargetDir.deleteDir()
     }
 

@@ -956,7 +956,7 @@ def {simple_name}(*args, **kwargs):
                         if not (hasattr(enclosed, 'getKind') and hasattr(enclosed.getKind(), 'name')):
                             continue
                         kind = enclosed.getKind().name()
-                        if kind not in ('ANNOTATION_TYPE', 'INTERFACE', 'CLASS'):
+                        if kind not in ('ANNOTATION_TYPE', 'INTERFACE', 'CLASS', 'ENUM'):
                             continue
                         simple_name = str(enclosed.getSimpleName())
                         nested_element = (

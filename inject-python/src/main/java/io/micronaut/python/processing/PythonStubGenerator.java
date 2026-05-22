@@ -268,6 +268,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     boolean isConfigurationBuilderType = isConfigurationBuilderType(element);
 
                     List<PropertyElement> beanProperties = element.getBeanProperties();
+                    boolean hasDynamicBeanProperties = beanProperties.stream().anyMatch(PythonStubGenerator::isDynamicBeanProperty);
                     if (!isIntrospectedBean
                         && !isPythonDataclass(element)
                         && !hasConfigurationInjectConstructor(element)
@@ -440,6 +441,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                             .addModifiers(Modifier.PUBLIC)
                             .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> {
+                                    if (hasDynamicBeanProperties && pythonValueFinal != null) {
+                                        ExpressionDef storedValue = aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field"));
+                                        return storedValue.isNonNull().doIfElse(
+                                            storedValue.returning(),
+                                            ExpressionDef.nullValue().returning()
+                                        );
+                                    }
                                     if (beanProperties.isEmpty() && pythonValueFinal != null) {
                                         ExpressionDef storedValue = aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field"));
                                         ExpressionDef newValue = CONTEXT_HOLDER.invokeStatic(
@@ -571,23 +579,41 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         builder.addMethod(
                             constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                                 if (isIntrospectedBean) {
-                                    List<ExpressionDef> arguments = new ArrayList<>(List.of(
-                                        ExpressionDef.constant(element.getPackageName()),
-                                        ExpressionDef.constant(pythonSimpleName)
-                                    ));
+                                    List<StatementDef> assigns = new ArrayList<>();
+                                    if (hasDynamicBeanProperties) {
+                                        List<ExpressionDef> arguments = new ArrayList<>(List.of(
+                                            ExpressionDef.constant(element.getPackageName()),
+                                            ExpressionDef.constant(pythonSimpleName)
+                                        ));
+                                        for (int i = 0; i < parameters.length; i++) {
+                                            @NonNull ParameterElement parameter = parameters[i];
+                                            VariableDef.MethodParameter methodParameter = methodParameters.get(i);
+                                            coerceParameterToPolyglotValue(parameter, arguments, methodParameter);
+                                            int lastArgIndex = arguments.size() - 1;
+                                            arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
+                                        }
+                                        assigns.add(aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(
+                                            CONTEXT_HOLDER.invokeStatic(
+                                                isAbstractIntroCtor ? "newIntroduction" : "newInstance",
+                                                POLYGLOT_VALUE,
+                                                arguments
+                                            )
+                                        ));
+                                    }
                                     for (int i = 0; i < parameters.length; i++) {
                                         @NonNull ParameterElement parameter = parameters[i];
                                         VariableDef.MethodParameter methodParameter = methodParameters.get(i);
-                                        coerceParameterToPolyglotValue(parameter, arguments, methodParameter);
-                                        int lastArgIndex = arguments.size() - 1;
-                                        arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
+                                        PropertyElement beanProperty = findBeanProperty(beanProperties, parameter.getName());
+                                        if (beanProperty == null) {
+                                            continue;
+                                        }
+                                        FieldDef field = propertyFields.get(beanProperty.getName());
+                                        if (field == null) {
+                                            continue;
+                                        }
+                                        assigns.add(aThis.field(field).assign(convertPojoSetterValue(beanProperty, methodParameter)));
                                     }
-                                    ExpressionDef pythonInstance = CONTEXT_HOLDER.invokeStatic(
-                                        isAbstractIntroCtor ? "newIntroduction" : "newInstance",
-                                        POLYGLOT_VALUE,
-                                        arguments
-                                    );
-                                    return aThis.invokeConstructor(pythonInstance);
+                                    return StatementDef.multi(assigns);
                                 } else {
                                     List<ExpressionDef> arguments = new ArrayList<>(List.of(
                                         ExpressionDef.constant(element.getPackageName()),
@@ -704,6 +730,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             addBridgeMethod(methodElement, builder, context, methodElement.hasDeclaredAnnotation(JUNIT_TEST), false, addedMethodNames);
                         }
                     }
+                    if (isIntrospectedBean) {
+                        List<MethodElement> concreteDeclaredMethods = element.getEnclosedElements(
+                            ElementQuery.ALL_METHODS
+                                .onlyAccessible()
+                                .onlyInstance()
+                                .onlyDeclared()
+                                .filter(method -> shouldBridgeDeclaredPythonMethod(method, beanProperties))
+                        );
+                        for (MethodElement methodElement : concreteDeclaredMethods) {
+                            addBridgeMethod(methodElement, builder, context, methodElement.hasDeclaredAnnotation(JUNIT_TEST), false, addedMethodNames);
+                        }
+                    }
 
                     // Find injection methods (annotated with @Inject)
                     List<MethodElement> injectionMethods = element.getEnclosedElements(
@@ -777,8 +815,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             if (field == null) {
                                 continue;
                             }
-                            addSetterPojo(beanProperty, builder, field);
-                            addGetterPojo(beanProperty, builder, field);
+                            if (isDynamicBeanProperty(beanProperty)) {
+                                beanProperty.getWriteMethod().ifPresent(m -> addNamedSetterDynamic(beanProperty, builder));
+                                beanProperty.getReadMethod().ifPresent(m -> addNamedGetterDynamic(beanProperty, builder));
+                            } else {
+                                addSetterPojo(beanProperty, builder, field);
+                                addGetterPojo(beanProperty, builder, field);
+                            }
                         } else {
                              addSetterDynamic(beanProperty, builder);
                              addGetterDynamic(beanProperty, builder);
@@ -2428,6 +2471,31 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return key.append(')').toString();
     }
 
+    private static boolean shouldBridgeDeclaredPythonMethod(MethodElement methodElement, List<PropertyElement> beanProperties) {
+        if (methodElement.isAbstract()
+            || methodElement.isStatic()
+            || methodElement.isSynthetic()
+            || methodElement.isPrivate()) {
+            return false;
+        }
+        String methodName = methodElement.getName();
+        if (AS_POLYGLOT_VALUE.equals(methodName)) {
+            return false;
+        }
+        for (PropertyElement beanProperty : beanProperties) {
+            if (beanProperty.getReadMethod().map(MethodElement::getName).filter(methodName::equals).isPresent()
+                || beanProperty.getWriteMethod().map(MethodElement::getName).filter(methodName::equals).isPresent()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isDynamicBeanProperty(PropertyElement beanProperty) {
+        return beanProperty.getReadMethod().filter(method -> !method.isSynthetic()).isPresent()
+            || beanProperty.getWriteMethod().filter(method -> !method.isSynthetic()).isPresent();
+    }
+
     private static MethodElement resolveDeclaredBridgeMethod(ClassElement element, MethodElement interfaceMethod) {
         for (MethodElement method : element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyInstance())) {
             // Python annotations may omit the return type even when a Java interface
@@ -2587,7 +2655,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> aThis.field(field).returning())));
     }
 
-    private static void addSetterPojo(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef field) {
+    private void addSetterPojo(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef field) {
         TypeDef returnType = TypeDef.VOID;
         Optional<MethodElement> wm = beanProperty.getWriteMethod();
         boolean isSynthetic = wm.map(MethodElement::isSynthetic).orElse(true);
@@ -2600,7 +2668,35 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         propertySetter.addParameter(propertySourceType(beanProperty));
 
-        builder.addMethod(propertySetter.build(((aThis, methodParameters) -> aThis.field(field).assign(methodParameters.getFirst()))));
+        builder.addMethod(propertySetter.build(((aThis, methodParameters) ->
+            aThis.field(field).assign(convertPojoSetterValue(beanProperty, methodParameters.getFirst()))
+        )));
+    }
+
+    private ExpressionDef convertPojoSetterValue(PropertyElement beanProperty, VariableDef.MethodParameter methodParameter) {
+        ClassElement genericType = beanProperty.getGenericType();
+        if (genericType.isAssignable(List.class)) {
+            ClassElement componentType = genericType.getFirstTypeArgument().orElse(null);
+            if (componentType != null && isGeneratedWrapperType(allClasses, componentType)) {
+                return uncheckedCast(RUNTIME_UTIL.invokeStatic(
+                    "convertList",
+                    List.of(ClassTypeDef.of(List.class), POLYGLOT_VALUE_CONVERTER),
+                    ClassTypeDef.of(List.class),
+                    methodParameter,
+                    generatedWrapperConverter(componentType)
+                ), genericType);
+            }
+        }
+        return methodParameter;
+    }
+
+    private static @Nullable PropertyElement findBeanProperty(List<PropertyElement> beanProperties, String name) {
+        for (PropertyElement beanProperty : beanProperties) {
+            if (beanProperty.getName().equals(name)) {
+                return beanProperty;
+            }
+        }
+        return null;
     }
 
     private void addGetterDynamic(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder) {
@@ -2791,6 +2887,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // Check for collection types
                     if (returnType.isAssignable(List.class)) {
                         ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+                        if (componentType != null && isGeneratedWrapperType(allClasses, componentType)) {
+                            yield RUNTIME_UTIL.invokeStatic(
+                                "convertList",
+                                List.of(POLYGLOT_VALUE, POLYGLOT_VALUE_CONVERTER),
+                                ClassTypeDef.of(List.class),
+                                invokedValue,
+                                generatedWrapperConverter(componentType)
+                            );
+                        }
                         ExpressionDef genericType = toClassExpression(componentType);
                         yield uncheckedCast(RUNTIME_UTIL
                             .invokeStatic("convertList", ClassTypeDef.of(List.class),
@@ -2820,9 +2925,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ClassElement bodyType = returnType.getFirstTypeArgument().orElse(null);
                         if (bodyType == null || Object.class.getName().equals(bodyType.getName())) {
                             yield RUNTIME_UTIL
-                                .invokeStatic("convertValue", ClassTypeDef.OBJECT,
-                                    invokedValue, javaClassType(returnType).getStaticField("class", TypeDef.CLASS))
-                                .cast(erasedType(returnType));
+                                .invokeStatic("convertHttpResponse", ClassTypeDef.OBJECT,
+                                    invokedValue, CLASS_OBJECT)
+                                .cast(ClassTypeDef.of(HTTP_RESPONSE));
                         }
                         yield RUNTIME_UTIL
                             .invokeStatic("convertHttpResponse", ClassTypeDef.OBJECT,
@@ -3077,7 +3182,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
-    private ExpressionDef generatedWrapperConverter(ClassElement componentType) {
+    private static ExpressionDef generatedWrapperConverter(ClassElement componentType) {
         MethodDef convertMethod = MethodDef.builder("convert")
             .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
             .addParameter(ParameterDef.of("element", POLYGLOT_VALUE))
