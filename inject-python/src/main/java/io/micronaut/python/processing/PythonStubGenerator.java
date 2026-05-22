@@ -793,12 +793,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             addSetterPojo(beanProperty, builder, field);
                             addGetterPojo(beanProperty, builder, field);
                         } else {
-                             addSetterDynamic(beanProperty, builder);
+                             addSetterDynamic(beanProperty, builder, context);
                              addGetterDynamic(beanProperty, builder);
                              beanProperty.getWriteMethod().ifPresent(m -> {
                                  String beanStyle = beanSetterName(beanProperty.getName());
                                  if (!m.getName().equals(beanStyle)) {
-                                     addNamedSetterDynamic(beanProperty, builder);
+                                     addNamedSetterDynamic(beanProperty, builder, context);
                                  }
                              });
                              beanProperty.getReadMethod().ifPresent(m -> {
@@ -2652,13 +2652,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         })));
     }
 
-    private void addSetterDynamic(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder) {
+    private void addSetterDynamic(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, VisitorContext visitorContext) {
         TypeDef returnType = TypeDef.VOID;
         String setterName = beanSetterName(beanProperty.getName());
         MethodDef.MethodDefBuilder propertySetter = MethodDef
             .builder(setterName)
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
+        beanProperty.getWriteMethod().ifPresent(method -> copyAnnotations(method, propertySetter, ANNOTATION_PACKAGES_TO_COPY, visitorContext));
 
         propertySetter.addParameter(propertySourceType(beanProperty));
 
@@ -2681,13 +2682,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         })));
     }
 
-    private void addNamedSetterDynamic(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder) {
+    private void addNamedSetterDynamic(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, VisitorContext visitorContext) {
         TypeDef returnType = TypeDef.VOID;
         String setterName = beanProperty.getWriteMethod().map(MethodElement::getName).orElse(beanProperty.getName());
         MethodDef.MethodDefBuilder propertySetter = MethodDef
             .builder(setterName)
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
+        beanProperty.getWriteMethod().ifPresent(method -> copyAnnotations(method, propertySetter, ANNOTATION_PACKAGES_TO_COPY, visitorContext));
 
         propertySetter.addParameter(propertySourceType(beanProperty));
 

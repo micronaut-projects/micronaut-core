@@ -21,7 +21,6 @@ import io.micronaut.context.python.GraalPyRuntimeUtil
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.python.aop.TestAround
-import spock.lang.PendingFeature
 import spock.lang.Specification
 
 /**
@@ -395,7 +394,6 @@ class MethodLevelBean:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0075")
     void "test class level around advice applies to property setters"() {
         given:
         def pythonCode = '''

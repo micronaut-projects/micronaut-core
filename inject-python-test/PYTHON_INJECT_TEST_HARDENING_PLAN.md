@@ -138,11 +138,11 @@ As of May 14, 2026:
 * All `@PendingFeature` tests under `inject-python-test` are cataloged with
   stable `PY-INJECT-XXXX` IDs, including pre-existing Python compiler and
   runtime gaps that were outside the direct source inventory.
-* The active pending catalog is currently down to 7 IDs after resolving
-  `PY-INJECT-0070`.
-* The most recent full verification passed with 491 tests and 7 skipped:
+* The active pending catalog is currently down to 6 IDs after resolving
+  `PY-INJECT-0075`.
+* The most recent full verification passed with 491 tests and 6 skipped:
   `./gradlew --no-daemon --no-build-cache --max-workers=1 :micronaut-inject-python-test:test`
-  after resolving `PY-INJECT-0070`.
+  after resolving `PY-INJECT-0075`.
 * Per-slice verification used focused tests only; the full Python inject test
   task has now been run as the final sweep for this migration/catalog pass.
 * The most recent focused verification passed for
@@ -219,7 +219,7 @@ The latest completed source slices are:
 * `MappedIntroductionOnConcreteClassSpec.groovy`: Java annotation-mapped
   introduction on a concrete class is pending as `PY-INJECT-0074`.
 * `PropertyAdviceSpec.groovy`: class-level around advice on attribute-backed
-  property setters is pending as `PY-INJECT-0075`.
+  property setters is covered by resolved `PY-INJECT-0075`.
 * `IntroductionWithAroundOnConcreteClassSpec.groovy`: the portable combined
   introduction-and-around concrete-class behavior is covered for Java and Groovy
   sources; fixture matrices, exact executable method counts, JavaBean accessor

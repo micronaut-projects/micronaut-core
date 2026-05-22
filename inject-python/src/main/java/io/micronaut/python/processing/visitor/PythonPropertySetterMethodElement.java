@@ -23,6 +23,7 @@ import javax.lang.model.element.Element;
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -88,7 +89,15 @@ public final class PythonPropertySetterMethodElement extends AbstractPythonEleme
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return propertyElement.getTargetAnnotationMetadata();
+        AnnotationMetadata targetAnnotationMetadata = propertyElement.getTargetAnnotationMetadata();
+        if (!owningType.getAnnotationMetadata().isEmpty()) {
+            // Synthetic Python property accessors are generated from PropertyElement, not a
+            // Python function. Keep owning type metadata visible here so class-level AOP and
+            // executable metadata apply to generated accessors the same way they apply to
+            // regular Python methods.
+            targetAnnotationMetadata = new AnnotationMetadataHierarchy(owningType, targetAnnotationMetadata);
+        }
+        return targetAnnotationMetadata;
     }
 
     @Override
