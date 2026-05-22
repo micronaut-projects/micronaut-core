@@ -39,6 +39,9 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  */
 public final class ContextHolder {
 
+    private static final String NEW_UNINITIALIZED_INSTANCE = "__micronaut_new_uninitialized_instance";
+    private static final String SET_INSTANCE_PROPERTY = "__micronaut_set_instance_property";
+
     private static final AtomicBoolean REUSE_CONTEXT = new AtomicBoolean();
     private static volatile @Nullable Context context;
     private static volatile @Nullable ClassLoader contextClassLoader;
@@ -327,13 +330,80 @@ public final class ContextHolder {
     @UsedByGeneratedCode
     public static Value newInstance(@Nullable String packageName, String simpleName, java.util.Map<String, Object> props) {
         Value pythonClass = findClass(packageName, simpleName);
-        Value instance = instantiate(packageName, simpleName, new Object[0], pythonClass);
-        if (props != null && !props.isEmpty()) {
-            for (java.util.Map.Entry<String, Object> e : props.entrySet()) {
-                instance.putMember(e.getKey(), GraalPyRuntimeUtil.coerceToContext(e.getValue(), instance.getContext()));
+        return withContextClassLoader(() -> {
+            Value instance = instantiate(packageName, simpleName, new Object[0], pythonClass);
+            if (props != null && !props.isEmpty()) {
+                Value propertySetter = propertySetter(instance.getContext());
+                for (java.util.Map.Entry<String, Object> e : props.entrySet()) {
+                    propertySetter.execute(
+                        instance,
+                        e.getKey(),
+                        GraalPyRuntimeUtil.coerceToContext(e.getValue(), instance.getContext())
+                    );
+                }
             }
+            return instance;
+        });
+    }
+
+    /**
+     * Create a new frozen dataclass instance and set properties without invoking __init__.
+     *
+     * @param packageName The package name (nullable)
+     * @param simpleName  The simple class name
+     * @param props       Map of property names to values
+     * @return The new frozen dataclass instance with members populated.
+     */
+    @UsedByGeneratedCode
+    public static Value newFrozenDataclassInstance(@Nullable String packageName, String simpleName, java.util.Map<String, Object> props) {
+        Value pythonClass = findClass(packageName, simpleName);
+        return withContextClassLoader(() -> {
+            Value instance = uninitializedInstanceFactory(pythonClass.getContext()).execute(pythonClass);
+            if (props != null && !props.isEmpty()) {
+                Value propertySetter = propertySetter(instance.getContext());
+                for (java.util.Map.Entry<String, Object> e : props.entrySet()) {
+                    propertySetter.execute(
+                        instance,
+                        e.getKey(),
+                        GraalPyRuntimeUtil.coerceToContext(e.getValue(), instance.getContext())
+                    );
+                }
+            }
+            return instance;
+        });
+    }
+
+    private static Value uninitializedInstanceFactory(Context context) {
+        Value bindings = context.getBindings(PYTHON);
+        Value factory = bindings.getMember(NEW_UNINITIALIZED_INSTANCE);
+        if (factory == null || GraalPyRuntimeUtil.isNone(factory)) {
+            context.eval(
+                PYTHON,
+                """
+                def __micronaut_new_uninitialized_instance(cls):
+                    return object.__new__(cls)
+                """
+            );
+            factory = bindings.getMember(NEW_UNINITIALIZED_INSTANCE);
         }
-        return instance;
+        return factory;
+    }
+
+    private static Value propertySetter(Context context) {
+        Value bindings = context.getBindings(PYTHON);
+        Value setter = bindings.getMember(SET_INSTANCE_PROPERTY);
+        if (setter == null || GraalPyRuntimeUtil.isNone(setter)) {
+            context.eval(
+                PYTHON,
+                """
+                def __micronaut_set_instance_property(instance, name, value):
+                    object.__setattr__(instance, name, value)
+                    return instance
+                """
+            );
+            setter = bindings.getMember(SET_INSTANCE_PROPERTY);
+        }
+        return setter;
     }
 
     private static Value instantiate(@Nullable String packageName, String simpleName, Object[] args, Value pythonClass) {

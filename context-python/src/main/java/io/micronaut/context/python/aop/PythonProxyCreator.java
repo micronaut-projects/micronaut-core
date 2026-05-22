@@ -25,6 +25,7 @@ import io.micronaut.aop.runtime.RuntimeProxyCreator;
 import io.micronaut.aop.runtime.RuntimeProxyDefinition;
 import io.micronaut.context.python.ContextHolder;
 import io.micronaut.context.python.GraalPyRuntimeUtil;
+import io.micronaut.context.python.TargetTypeMapping;
 import io.micronaut.context.python.ValueCoercible;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -72,6 +73,12 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     private static final String SCOPED_PROXY_OVERRIDE_METHOD = "_micronaut_put_override";
     private static final String SCOPED_PROXY_SETTER_OVERRIDE_METHOD = "_micronaut_put_setter_override";
     private static final String SCOPED_PROXY_REGISTER_MEMBER_METHOD = "_micronaut_register_member";
+
+    private final Collection<TargetTypeMapping<?>> targetTypeMappings;
+
+    public PythonProxyCreator(Collection<TargetTypeMapping<?>> targetTypeMappings) {
+        this.targetTypeMappings = targetTypeMappings;
+    }
 
     @Override
     public <T> T createProxy(RuntimeProxyDefinition<T> proxyDefinition) {
@@ -657,14 +664,37 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         if (value.isNull()) {
             return null;
         }
+        if (value.isHostObject()) {
+            Object hostObject = value.asHostObject();
+            if (hostObject == null) {
+                return null;
+            }
+            if (type.isInstance(hostObject)) {
+                return type.cast(hostObject);
+            }
+        }
         if (type.isPrimitive()) {
             return value.as(type);
+        }
+        T mappedValue = mapTargetType(type, value);
+        if (mappedValue != null) {
+            return mappedValue;
         }
         try {
             return type.getDeclaredConstructor(Value.class).newInstance(value);
         } catch (Exception e) {
             return value.as(type);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> @Nullable T mapTargetType(Class<T> type, Value value) {
+        for (TargetTypeMapping<?> targetTypeMapping : targetTypeMappings) {
+            if (targetTypeMapping.targetType().equals(type)) {
+                return (T) targetTypeMapping.convert(value);
+            }
+        }
+        return null;
     }
 
     @Nullable

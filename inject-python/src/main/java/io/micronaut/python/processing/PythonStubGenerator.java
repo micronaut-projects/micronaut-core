@@ -464,6 +464,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // implement asPolyglotValue by reconstructing the Python object with current field values
                     if (isIntrospectedBean) {
                         final boolean isAbstractIntro = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
+                        final boolean isFrozenDataclass = isFrozenPythonDataclass(element);
                         builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                             .addModifiers(Modifier.PUBLIC)
                             .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> {
@@ -514,6 +515,28 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             POLYGLOT_VALUE,
                                             arguments
                                         );
+                                    } else if (isFrozenDataclass) {
+                                        List<ExpressionDef> mapEntries = new ArrayList<>();
+                                        for (PropertyElement beanProperty : beanProperties) {
+                                            FieldDef field = propertyFields.get(beanProperty.getName());
+                                            if (field == null) {
+                                                continue;
+                                            }
+                                            ExpressionDef fieldRef = aThis.field(field);
+                                            mapEntries.add(ExpressionDef.constant(beanProperty.getName()));
+                                            mapEntries.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef));
+                                        }
+                                        ExpressionDef propsMap = ClassTypeDef.of(AnnotationUtil.class)
+                                            .invokeStatic("mapOf", TypeDef.of(Map.class), mapEntries);
+                                        reconstructedValue = CONTEXT_HOLDER.invokeStatic(
+                                            "newFrozenDataclassInstance",
+                                            POLYGLOT_VALUE,
+                                            List.of(
+                                                ExpressionDef.constant(element.getPackageName()),
+                                                ExpressionDef.constant(pythonSimpleName),
+                                                propsMap
+                                            )
+                                        );
                                     } else {
                                         reconstructedValue = CONTEXT_HOLDER.invokeStatic(
                                             "newUninitializedInstance",
@@ -525,6 +548,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         );
                                     }
                                     if (pythonValueFinal != null) {
+                                        if (isFrozenDataclass && !isAbstractIntro) {
+                                            return reconstructedValue.returning();
+                                        }
                                         FieldDef pythonValueField = requireField(pythonValueFinal, "Expected graalpyInternalValue field");
                                         ExpressionDef storedValue = aThis.field(pythonValueField);
                                         List<StatementDef> syncStatements = new ArrayList<>();
@@ -1386,6 +1412,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         Value name = defaultFactory.getMember("__name__");
         return name.isString() && factoryName.equals(name.asString());
+    }
+
+    private static boolean isFrozenPythonDataclass(ClassElement element) {
+        return element instanceof AbstractPythonClassElement pythonClassElement
+            && pythonClassElement.getNativeType().frozenDataclass();
     }
 
     private static String constructorFactoryMethod(boolean introduction, boolean hasDefaultedParameters) {
@@ -3084,7 +3115,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         )));
     }
 
-    private ExpressionDef convertPojoSetterValue(PropertyElement beanProperty, VariableDef.MethodParameter methodParameter) {
+    private ExpressionDef convertPojoSetterValue(PropertyElement beanProperty, ExpressionDef methodParameter) {
         ClassElement genericType = beanProperty.getGenericType();
         if (genericType.isAssignable(List.class)) {
             ClassElement componentType = genericType.getFirstTypeArgument().orElse(null);

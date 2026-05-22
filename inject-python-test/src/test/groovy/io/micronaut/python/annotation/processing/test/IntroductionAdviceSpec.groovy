@@ -354,6 +354,62 @@ class TestCaller:
         interceptor.invoked == 4
     }
 
+    void "test introduction advice accepts generated Python host object argument from polyglot"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Introduction
+from micronaut.core.annotation import Introspected
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@dataclass
+@Introspected
+class Book:
+    title: str
+
+@Introduction
+def Stub(cls):
+    return cls
+
+@InterceptorBean(Stub)
+@Singleton
+class StubIntroduction(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        for param in context.getParameters().values():
+            return param.getValue().title
+        return None
+
+@Stub
+class Sender(ABC):
+    @abstractmethod
+    def send(self, book: Book) -> str:
+        pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def polyglot = context.getBean(org.graalvm.polyglot.Context)
+        def bookClass = context.classLoader.loadClass("python.Book")
+        def hostBook = polyglot.eval("python", "Book('The Guide')").as(bookClass)
+        def senderBean = getBean(context, "python.Sender")
+        Value sender = senderBean.asPolyglotValue()
+        polyglot.getBindings("python").putMember("senderBean", senderBean)
+        polyglot.getBindings("python").putMember("hostBook", hostBook)
+        polyglot.getBindings("python").putMember("response", io.micronaut.http.HttpResponse.ok(hostBook))
+
+        then:
+        sender.invokeMember("send", hostBook).asString() == "The Guide"
+        polyglot.eval("python", "senderBean.send(hostBook)").asString() == "The Guide"
+        polyglot.eval("python", "senderBean.send(response.getBody().orElse(None))").asString() == "The Guide"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test type level around advice on introduced abstract methods mutates arguments"() {
         given:
         def pythonCode = '''

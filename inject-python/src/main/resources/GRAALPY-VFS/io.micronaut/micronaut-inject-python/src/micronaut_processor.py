@@ -423,7 +423,11 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
             # Extract class docstring
             class_doc = self._extract_docstring(node)
-            self.current_class = JavaClassDef(class_name, self.package_name, bases, decorators, type_params, [], [], [], None, False, [], class_doc)
+            frozen_dataclass = any(
+                self._is_frozen_dataclass_decorator(dec)
+                for dec in node.decorator_list
+            )
+            self.current_class = JavaClassDef(class_name, self.package_name, bases, decorators, type_params, [], [], [], None, frozen_dataclass, False, [], class_doc)
             self.current_class_attributes = []
             self.current_class_properties = {}
             self.last_attribute = None
@@ -438,11 +442,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 result = super().visit(node)
             finally:
                 # Check if this is a dataclass and generate constructor if needed
-                is_dataclass = any(
-                    (isinstance(dec, ast.Name) and dec.id == "dataclass") or
-                    (isinstance(dec, ast.Attribute) and dec.attr == "dataclass")
-                    for dec in node.decorator_list
-                )
+                is_dataclass = any(self._is_dataclass_decorator(dec) for dec in node.decorator_list)
 
                 if is_dataclass and self.current_class.constructor() is None:
                     # Generate constructor from dataclass attributes
@@ -506,6 +506,21 @@ class MicronautAstVisitor(ast.NodeVisitor):
             self.current_class_properties = previous_class_properties
             self.current_class_nested_types = previous_nested_types
             self.last_attribute = previous_last_attribute
+
+    def _is_dataclass_decorator(self, decorator):
+        target = decorator.func if isinstance(decorator, ast.Call) else decorator
+        return (
+            (isinstance(target, ast.Name) and target.id == "dataclass") or
+            (isinstance(target, ast.Attribute) and target.attr == "dataclass")
+        )
+
+    def _is_frozen_dataclass_decorator(self, decorator):
+        if not isinstance(decorator, ast.Call) or not self._is_dataclass_decorator(decorator):
+            return False
+        for keyword in decorator.keywords:
+            if keyword.arg == "frozen" and isinstance(keyword.value, ast.Constant):
+                return keyword.value.value is True
+        return False
 
     def _handle_assign(self, node):
         """
