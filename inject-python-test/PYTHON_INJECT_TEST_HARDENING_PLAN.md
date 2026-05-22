@@ -138,8 +138,8 @@ As of May 14, 2026:
 * All `@PendingFeature` tests under `inject-python-test` are cataloged with
   stable `PY-INJECT-XXXX` IDs, including pre-existing Python compiler and
   runtime gaps that were outside the direct source inventory.
-* The active pending catalog is currently down to 4 IDs after resolving
-  `PY-INJECT-0083` and `PY-INJECT-0084`.
+* The active pending catalog is currently down to 3 IDs after resolving
+  `PY-INJECT-0085`.
 * The most recent full verification passed with 491 tests and 4 skipped:
   `./gradlew --no-daemon --no-build-cache --max-workers=1 :micronaut-inject-python-test:test`
   after resolving `PY-INJECT-0083` and `PY-INJECT-0084`.
@@ -258,7 +258,7 @@ The latest completed source slices are:
   beans registered through `BeanElementBuilder` is resolved as `PY-INJECT-0083`
   and `PY-INJECT-0084`.
 * `AnnotateReplacesSpec.groovy`: visitor-added `@Factory`, `@Bean`, and
-  `@Replaces` metadata for replacement factory methods is pending as
+  `@Replaces` metadata for replacement factory methods is resolved as
   `PY-INJECT-0085`.
 * `InterfaceConfigurationPropertiesSpec.groovy`, `InterfaceNestingSpec.groovy`,
   `EachPropertyNestingSpec.groovy`, and `RecordNestingSpec.groovy`: nested

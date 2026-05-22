@@ -17,6 +17,7 @@ package io.micronaut.python.processing;
 
 import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.ClassElement;
@@ -113,7 +114,7 @@ final class PythonPooledStubGenerator {
                 .onlyDeclared()
                 .annotated(ann -> ann.hasStereotype(Around.class)
                     || ann.hasStereotype(AnnotationUtil.SCOPE)
-                    || ann.hasDeclaredStereotype(Bean.class)
+                    || isDeclaredBeanMethod(ann)
                     || ann.hasStereotype("io.micronaut.context.annotation.Executable"))
         );
 
@@ -175,7 +176,7 @@ final class PythonPooledStubGenerator {
                 .onlyDeclared()
                 .annotated(ann -> ann.hasStereotype(Around.class)
                     || ann.hasStereotype(AnnotationUtil.SCOPE)
-                    || ann.hasDeclaredStereotype(Bean.class)
+                    || isDeclaredBeanMethod(ann)
                     || ann.hasStereotype("io.micronaut.context.annotation.Executable"))
         );
 
@@ -315,5 +316,12 @@ final class PythonPooledStubGenerator {
                 return StatementDef.multi(result, ExpressionDef.nullValue().returning());
             }
         })));
+    }
+
+    private static boolean isDeclaredBeanMethod(AnnotationMetadata annotationMetadata) {
+        // Visitors can add @Bean directly to Python methods after metadata parsing. Those
+        // methods still need Java bridge methods so generated bean definitions can call them.
+        return annotationMetadata.hasDeclaredAnnotation(Bean.class)
+            || annotationMetadata.hasDeclaredStereotype(Bean.class);
     }
 }
