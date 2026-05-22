@@ -140,9 +140,9 @@ As of May 14, 2026:
   runtime gaps that were outside the direct source inventory.
 * The active pending catalog is currently down to 7 IDs after resolving
   `PY-INJECT-0070`.
-* The most recent full verification passed with 491 tests and 8 skipped:
+* The most recent full verification passed with 491 tests and 7 skipped:
   `./gradlew --no-daemon --no-build-cache --max-workers=1 :micronaut-inject-python-test:test`
-  after resolving `PY-INJECT-0060`.
+  after resolving `PY-INJECT-0070`.
 * Per-slice verification used focused tests only; the full Python inject test
   task has now been run as the final sweep for this migration/catalog pass.
 * The most recent focused verification passed for
