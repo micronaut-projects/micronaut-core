@@ -6,6 +6,9 @@ micronautBuild {
     core {
         usesMicronautTest()
     }
+    binaryCompatibility {
+        enabledAfter("5.1.0")
+    }
 }
 
 dependencies {

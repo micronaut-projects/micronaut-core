@@ -2,6 +2,12 @@ plugins {
     id("io.micronaut.build.internal.convention-library")
 }
 
+micronautBuild {
+    binaryCompatibility {
+        enabledAfter("5.1.0")
+    }
+}
+
 dependencies {
     api(projects.micronautInjectPython)
     api(projects.micronautContext)
