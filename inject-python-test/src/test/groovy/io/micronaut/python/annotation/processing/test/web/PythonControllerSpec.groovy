@@ -145,6 +145,51 @@ def say_hello(name : str) -> HttpResponse[Message]:
         context?.close()
     }
 
+    void "test classless raw http response converts model body wrappers"() {
+        given:
+        def context = buildContext('''
+from dataclasses import dataclass, field
+from micronaut.core.annotation import Introspected
+from micronaut.http.annotation import Get
+from micronaut.http import HttpResponse
+
+@Introspected
+@dataclass
+class Message:
+    text: str
+
+@Introspected
+@dataclass
+class Room:
+    name: str
+    messages: list[Message] = field(default_factory=list)
+
+@Get("/classless/model")
+def model() -> HttpResponse:
+    return HttpResponse.ok({"room": Room("lobby", [Message("hello")])})
+
+''', true)
+
+        def controllerClass = context.classLoader.loadClass("python.Script")
+        def roomClass = context.classLoader.loadClass("python.Room")
+        def messageClass = context.classLoader.loadClass("python.Message")
+        def controller = context.getBean(controllerClass)
+        def response = controllerClass.getDeclaredMethod("model").invoke(controller)
+        def body = response.getBody().get()
+        def room = body["room"]
+
+        expect:
+        body instanceof Map
+        roomClass.isInstance(room)
+        room.getName() == "lobby"
+        room.getMessages().size() == 1
+        messageClass.isInstance(room.getMessages().get(0))
+        room.getMessages().get(0).getText() == "hello"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test classless python controller generic JSON entity body response"() {
         given:
         def context = buildContext('''

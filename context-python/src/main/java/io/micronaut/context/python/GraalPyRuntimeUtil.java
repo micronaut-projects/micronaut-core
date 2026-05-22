@@ -387,6 +387,32 @@ public final class GraalPyRuntimeUtil {
     }
 
     /**
+     * Convert a Java list that may contain GraalPy values using a generated element converter.
+     *
+     * @param list the source list
+     * @param converter the converter to apply to GraalPy elements
+     * @param <T> the expected list element type
+     * @return a Java List with converted elements
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> @Nullable List<T> convertList(@Nullable List<?> list, PolyglotValueConverter<T> converter) {
+        if (list == null) {
+            return null;
+        }
+        List<T> result = new ArrayList<>(list.size());
+        for (Object element : list) {
+            if (element == null) {
+                result.add(null);
+            } else if (element instanceof Value value) {
+                result.add(converter.convert(value));
+            } else {
+                result.add((T) element);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Convert a GraalPy Value representing a dict to a Java Map.
      * Recursively converts nested collections.
      *
@@ -624,6 +650,11 @@ public final class GraalPyRuntimeUtil {
     }
 
     private static <T> @Nullable T convertResponseBody(Object rawBody, Class<T> bodyType) {
+        if (Object.class.equals(bodyType)) {
+            @SuppressWarnings("unchecked")
+            T converted = (T) convertObjectResponseBody(rawBody);
+            return converted;
+        }
         if (bodyType.isInstance(rawBody)) {
             return bodyType.cast(rawBody);
         }
@@ -641,6 +672,29 @@ public final class GraalPyRuntimeUtil {
         } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
             return null;
         }
+    }
+
+    private static @Nullable Object convertObjectResponseBody(@Nullable Object rawBody) {
+        if (rawBody == null) {
+            return null;
+        }
+        if (rawBody instanceof ProxyObject proxyObject && proxyObject.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+            Object hostReference = proxyObject.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
+            if (hostReference instanceof ValueCoercible.HostObjectReference reference) {
+                return reference.value();
+            }
+        }
+        if (rawBody instanceof Value value) {
+            if (value.isHostObject()) {
+                return convertObjectResponseBody(value.asHostObject());
+            }
+            ValueCoercible host = valueCoercibleHost(value);
+            if (host != null) {
+                return host;
+            }
+            return value.as(Object.class);
+        }
+        return rawBody;
     }
 
     private static <T> @Nullable T convertMappedWrapper(Value value, Class<T> targetType) {

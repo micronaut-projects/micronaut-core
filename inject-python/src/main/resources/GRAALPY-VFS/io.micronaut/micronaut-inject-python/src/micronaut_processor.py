@@ -366,11 +366,11 @@ class MicronautAstVisitor(ast.NodeVisitor):
             case _:
                 return node
 
-    def _is_type_checking_guard(self, node):
-        if isinstance(node, ast.Name):
-            return node.id == 'TYPE_CHECKING'
-        if isinstance(node, ast.Attribute):
-            return node.attr == 'TYPE_CHECKING'
+    def _is_type_checking_guard(self, test_node):
+        if isinstance(test_node, ast.Name):
+            return test_node.id == "TYPE_CHECKING"
+        if isinstance(test_node, ast.Attribute):
+            return self._extract_type_name(test_node) in ("typing.TYPE_CHECKING", "TYPE_CHECKING")
         return False
 
     def _visit_class_def(self, node):

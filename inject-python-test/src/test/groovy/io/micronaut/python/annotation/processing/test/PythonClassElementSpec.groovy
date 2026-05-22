@@ -1573,6 +1573,89 @@ class TypeTestService(MyBase[$pythonTypeAnnotation]):
 
     }
 
+    def "test list return type converts generated Python elements to wrappers"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class Message:
+    content: str
+    id: int
+
+@Singleton
+class MessageService:
+    @Executable
+    def get_messages(self) -> list[Message]:
+        return [Message("hello", 1)]
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def result = getBean(context, "python.MessageService").get_messages()
+        def messageClass = context.classLoader.loadClass("python.Message")
+
+        then:
+        result.size() == 1
+        messageClass.isInstance(result[0])
+        result[0].getContent() == "hello"
+        result[0].getId() == 1
+
+        cleanup:
+        context?.close()
+    }
+
+    def "test pojo setter converts generated Python list elements to wrappers"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class Message:
+    content: str
+    id: int
+
+@Introspected
+@dataclass
+class Room:
+    name: str
+    messages: list[Message]
+    id: int
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def roomClass = context.classLoader.loadClass("python.Room")
+        def messageClass = context.classLoader.loadClass("python.Message")
+        def messageValue = ContextHolder.newInstance("python", "Message", "hello", 1)
+        def room = roomClass.getConstructor(String, List, Integer.TYPE).newInstance("room", [], 1)
+        room.setMessages([messageValue])
+        def messages = room.getMessages()
+        def constructedRoom = roomClass.getConstructor(String, List, Integer.TYPE).newInstance("room", [messageValue], 2)
+        def constructedMessages = constructedRoom.getMessages()
+
+        then:
+        messages.size() == 1
+        messageClass.isInstance(messages[0])
+        messages[0].getContent() == "hello"
+        messages[0].getId() == 1
+        constructedMessages.size() == 1
+        messageClass.isInstance(constructedMessages[0])
+        constructedMessages[0].getContent() == "hello"
+        constructedMessages[0].getId() == 1
+
+        cleanup:
+        context?.close()
+    }
+
     def "test __qualname__ attribute resolution in decorator parameters"() {
         given: "Python code with decorator using __qualname__"
         def pythonCode = '''

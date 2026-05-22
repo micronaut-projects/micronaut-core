@@ -91,7 +91,41 @@ class Person:
 
   @Override
   public String toString() {
-    return new java.lang.StringBuilder("Person[").append("name=").append(this.name).append(", ").append("age=").append(this.age).append(", ").append("address=").append(this.address).append("]").toString();
+    return new java.lang.StringBuilder("Person[").append("name=").append(this.name).append(", ").append("age=").append(this.age).append("]").toString();
+  }
+""")
+    }
+
+    void "toString omits collection and object graph properties"() {
+        given:
+        def pythonCode = '''\
+from dataclasses import dataclass, field
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class Message:
+    content: str
+    room: "Room | None" = None
+
+@Introspected
+@dataclass
+class Room:
+    name: str
+    messages: list[Message] = field(default_factory=list)
+'''
+
+        expect:
+        assertGeneratedSourceContains(pythonCode, """
+  @Override
+  public String toString() {
+    return new java.lang.StringBuilder("Message[").append("content=").append(this.content).append("]").toString();
+  }
+""")
+        assertGeneratedSourceContains(pythonCode, """
+  @Override
+  public String toString() {
+    return new java.lang.StringBuilder("Room[").append("name=").append(this.name).append("]").toString();
   }
 """)
     }

@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.util;
 
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -29,6 +30,7 @@ import io.micronaut.sourcegen.model.FieldDef;
 import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -65,9 +67,36 @@ public final class ObjectHelper {
         List<PropertyElement> readableProps = properties.stream()
             .filter(p -> !p.isWriteOnly())
             .toList();
-        createToStringMethod(classDefBuilder, selfType, readableProps, propertyFields);
+        List<PropertyElement> toStringProps = readableProps.stream()
+            .filter(ObjectHelper::isToStringSafe)
+            .toList();
+        createToStringMethod(classDefBuilder, selfType, toStringProps, propertyFields);
         createEqualsMethod(classDefBuilder, selfType, readableProps, propertyFields);
         createHashCodeMethod(classDefBuilder, selfType, readableProps, propertyFields);
+    }
+
+    private static boolean isToStringSafe(PropertyElement property) {
+        if (isSimpleToStringType(property.getType())) {
+            return true;
+        }
+        if (property.getType().isAssignable(Collection.class)) {
+            return property.getGenericType()
+                .getFirstTypeArgument()
+                .map(ObjectHelper::isSimpleToStringType)
+                .orElse(false);
+        }
+        if (property.getType().isAssignable(Map.class)) {
+            return false;
+        }
+        return false;
+    }
+
+    private static boolean isSimpleToStringType(ClassElement type) {
+        if (type.isPrimitive() || type.isEnum()) {
+            return true;
+        }
+        String typeName = type.getName();
+        return typeName.startsWith("java.lang.") || typeName.startsWith("java.time.");
     }
 
     private static void createToStringMethod(ClassDef.ClassDefBuilder classDefBuilder,
