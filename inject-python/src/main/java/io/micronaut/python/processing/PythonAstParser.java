@@ -348,7 +348,7 @@ public final class PythonAstParser {
     }
 
     /**
-     * The result of a transformation
+     * The result of a transformation.
      *
      * @param originalSource   The original source
      * @param code             The transformed code

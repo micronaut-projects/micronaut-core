@@ -75,6 +75,7 @@ import javax.lang.model.element.Element;
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.FunctionDef">Python AST FunctionDef</a>
  * @since 5.0.0
  */
+@SuppressWarnings("checkstyle:InnerTypeLast")
 public non-sealed class PythonMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider {
     private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
     private static final String ANN_VALID = "jakarta.validation.Valid";
@@ -426,7 +427,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         return owningType;
     }
 
-    boolean requiresResolvedParameterType() {
+    final boolean requiresResolvedParameterType() {
         // Keep ordinary getType() erased like Java/Groovy, but inherited generic AOP methods need
         // resolved parameter signatures so proxy override detection does not drop the introduced method.
         return !declaringType.equals(owningType)
@@ -990,7 +991,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         return placeholders;
     }
 
-    Map<String, ClassElement> getBoundGenericTypes() {
+    final Map<String, ClassElement> getBoundGenericTypes() {
         Map<String, Map<String, ClassElement>> allGenerics = getOwningType().getAllTypeArguments();
         ClassDef declaringClass = getNativeType().declaringClass();
         Map<String, ClassElement> declaringGenerics = declaringClass != null

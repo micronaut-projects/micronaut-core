@@ -413,7 +413,7 @@ public final class PyronautCompiler {
         }
 
         /**
-         * Sets compiler options
+         * Sets compiler options.
          * @param compilerOptions the compiler options
          * @return this builder
          */

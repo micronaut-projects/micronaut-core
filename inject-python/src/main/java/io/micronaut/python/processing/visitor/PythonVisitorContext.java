@@ -40,7 +40,7 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
 import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory;
 
-public class PythonVisitorContext implements VisitorContext {
+public final class PythonVisitorContext implements VisitorContext {
     private final MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
     private final Map<String, DecoratorDef> decorators;
     private final PythonProcessingEnvironment processingEnvironment;

@@ -48,7 +48,6 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -59,7 +58,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public class PythonTypeElementVisitorProcessor {
+public final class PythonTypeElementVisitorProcessor {
     private final ClassLoader classLoader;
 
     private Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors;

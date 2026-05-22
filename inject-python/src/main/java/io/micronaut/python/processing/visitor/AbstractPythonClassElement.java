@@ -70,6 +70,7 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
 import org.jspecify.annotations.NonNull;
 
+@SuppressWarnings({"checkstyle:DeclarationOrder", "checkstyle:InnerTypeLast"})
 public abstract sealed class AbstractPythonClassElement extends AbstractPythonElement
     implements ArrayableClassElement, ElementProvider permits PythonClassElement, PythonEnumElement, PythonGenericPlaceholderElement {
     public static final String PYTHON_DEFAULT_PACKAGE = "python";

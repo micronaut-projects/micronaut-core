@@ -31,6 +31,8 @@ import java.util.Objects;
  * @param repeatedName The repeatable annotation container name
  * @param members The decorator member values
  * @param stereotypes Stereotype decorators applied to this decorator
+ * @param memberDecorators Decorators applied to annotation members
+ * @param memberTypes Resolved annotation member types
  */
 public record DecoratorDef(
     String name,

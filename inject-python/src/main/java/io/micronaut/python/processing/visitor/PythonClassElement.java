@@ -37,7 +37,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -46,7 +45,6 @@ import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
 import org.graalvm.polyglot.Value;
-import org.jetbrains.annotations.Nullable;
 
 public final class PythonClassElement extends AbstractPythonClassElement {
     private static final String MEMBER_KEYS_PROPERTY = "memberKeys";

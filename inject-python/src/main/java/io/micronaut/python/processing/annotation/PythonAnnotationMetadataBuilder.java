@@ -35,7 +35,19 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
-import io.micronaut.python.processing.visitor.*;
+import io.micronaut.python.processing.visitor.AnnotationMemberDef;
+import io.micronaut.python.processing.visitor.ArgumentDef;
+import io.micronaut.python.processing.visitor.AttributeDef;
+import io.micronaut.python.processing.visitor.ClassDef;
+import io.micronaut.python.processing.visitor.DecoratorDef;
+import io.micronaut.python.processing.visitor.ElementDef;
+import io.micronaut.python.processing.visitor.FunctionDef;
+import io.micronaut.python.processing.visitor.PropertyDef;
+import io.micronaut.python.processing.visitor.PythonClassElement;
+import io.micronaut.python.processing.visitor.PythonVisitorContext;
+import io.micronaut.python.processing.visitor.ReturnDef;
+import io.micronaut.python.processing.visitor.ScriptDef;
+import io.micronaut.python.processing.visitor.TypeRef;
 import org.graalvm.polyglot.Value;
 import org.jetbrains.annotations.Nullable;
 
@@ -60,7 +72,7 @@ import java.util.Set;
  * @author Micronaut Team
  * @since 5.0.0
  */
-public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<ElementDef, DecoratorDef> {
+public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<ElementDef, DecoratorDef> {
     private final Map<String, DecoratorDef> decorators;
     private final PythonVisitorContext visitorContext;
     private final Map<String, String> binaryClassNameCache = new HashMap<>();

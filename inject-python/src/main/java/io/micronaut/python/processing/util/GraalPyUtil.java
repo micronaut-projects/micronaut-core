@@ -57,11 +57,11 @@ import io.micronaut.python.processing.visitor.PythonVisitorContext;
  */
 public final class GraalPyUtil {
     private static final Set<String> JAVA_KEYWORDS = Set.of(
-        "abstract","assert","boolean","break","byte","case","catch","char","class","const",
-        "continue","default","do","double","else","enum","extends","final","finally","float",
-        "for","goto","if","implements","import","instanceof","int","interface","long","native",
-        "new","package","private","protected","public","return","short","static","strictfp",
-        "super","switch","synchronized","this","throw","throws","transient","try","void","volatile","while"
+        "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const",
+        "continue", "default", "do", "double", "else", "enum", "extends", "final", "finally", "float",
+        "for", "goto", "if", "implements", "import", "instanceof", "int", "interface", "long", "native",
+        "new", "package", "private", "protected", "public", "return", "short", "static", "strictfp",
+        "super", "switch", "synchronized", "this", "throw", "throws", "transient", "try", "void", "volatile", "while"
     );
 
     /**
@@ -658,8 +658,10 @@ public final class GraalPyUtil {
                 ClassElement classElement = visitorContext.getClassElement(genericInfo.baseType).orElse(null);
                 if (classElement != null) {
                     List<? extends GenericPlaceholderElement> declaredGenericPlaceholders = classElement.getDeclaredGenericPlaceholders();
-                    if (!declaredGenericPlaceholders.isEmpty() && declaredGenericPlaceholders.size() == genericInfo.typeParameters.size()) {
-
+                    if (!declaredGenericPlaceholders.isEmpty()
+                        && declaredGenericPlaceholders.size() == genericInfo.typeParameters.size()) {
+                        // Generic remapping is handled by the concrete collection branches above.
+                        yield visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class));
                     }
                 }
                 yield visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class));
@@ -668,7 +670,7 @@ public final class GraalPyUtil {
     }
 
     /**
-     * Parses a generic type annotation like "list[int]" or "dict[str, int]"
+     * Parses a generic type annotation like "list[int]" or "dict[str, int]".
      */
     private static GenericTypeInfo parseGenericType(String typeAnnotation) {
         int bracketStart = typeAnnotation.indexOf('[');
@@ -706,7 +708,7 @@ public final class GraalPyUtil {
     }
 
     /**
-     * Parses type parameters separated by commas, handling nested generics
+     * Parses type parameters separated by commas, handling nested generics.
      */
     private static java.util.List<String> parseTypeParameters(String typeParamsStr) {
         java.util.List<String> parameters = new java.util.ArrayList<>();
@@ -1093,15 +1095,25 @@ public final class GraalPyUtil {
     }
 
     public static boolean isValidClassName(String className) {
-        if (className == null || className.isEmpty()) return false;
+        if (className == null || className.isEmpty()) {
+            return false;
+        }
         String[] parts = className.split("\\.");
         for (String part : parts) {
-            if (part.isEmpty()) return false;
-            if (!Character.isJavaIdentifierStart(part.charAt(0))) return false;
-            for (int i = 1; i < part.length(); i++) {
-                if (!Character.isJavaIdentifierPart(part.charAt(i))) return false;
+            if (part.isEmpty()) {
+                return false;
             }
-            if (isJavaKeyword(part)) return false; // Optional: check for Java keywords
+            if (!Character.isJavaIdentifierStart(part.charAt(0))) {
+                return false;
+            }
+            for (int i = 1; i < part.length(); i++) {
+                if (!Character.isJavaIdentifierPart(part.charAt(i))) {
+                    return false;
+                }
+            }
+            if (isJavaKeyword(part)) {
+                return false;
+            }
         }
         return true;
     }

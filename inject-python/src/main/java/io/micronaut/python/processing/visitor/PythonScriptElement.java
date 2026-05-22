@@ -32,7 +32,6 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
-import jakarta.inject.Singleton;
 import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
@@ -46,14 +45,15 @@ import java.util.ServiceLoader;
  * Scripts are modeled as singleton classes where module-level attributes
  * become injectable fields and module-level functions become methods.
  */
+@SuppressWarnings("checkstyle:DeclarationOrder")
 public final class PythonScriptElement extends AbstractPythonElement implements ClassElement, ElementProvider {
 
     private final ScriptDef scriptDef;
+    private final PythonProcessingEnvironment environment;
     /**
      * Query implementation for enclosed elements.
      */
     private final ScriptEnclosedElementsQuery enclosedElementsQuery = new ScriptEnclosedElementsQuery();
-    private final PythonProcessingEnvironment environment;
     protected ElementDef typeAnnotationsKey;
     private ElementAnnotationMetadata typeAnnotationMetadata;
 

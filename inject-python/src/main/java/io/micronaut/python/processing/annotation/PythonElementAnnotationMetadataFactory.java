@@ -132,7 +132,9 @@ public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnot
         );
     }
 
-    private record TypeAnnotationKey(Object nativeType, Object typeAnnotationsKey) {}
+    private record TypeAnnotationKey(Object nativeType, Object typeAnnotationsKey) {
+    }
 
-    private record FunctionTypeAnnotationKey(Object nativeType, String functionName) {}
+    private record FunctionTypeAnnotationKey(Object nativeType, String functionName) {
+    }
 }

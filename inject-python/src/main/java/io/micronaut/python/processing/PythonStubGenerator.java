@@ -20,7 +20,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -40,7 +39,6 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
@@ -92,6 +90,7 @@ import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
 import io.micronaut.python.processing.util.ObjectHelper;
 
+@SuppressWarnings({"FileLength", "checkstyle:DeclarationOrder"})
 public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     public static final TypeDef POLYGLOT_VALUE = TypeDef.of(Value.class);
@@ -121,14 +120,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         "org.jspecify.annotations.NonNull",
         "org.jspecify.annotations.Nullable"
     );
-    public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
-    public static final String ANN_JSON_PROPERTY = "com.fasterxml.jackson.annotation.JsonProperty";
-    public static final String ANN_JSON_CREATOR = "com.fasterxml.jackson.annotation.JsonCreator";
-
     private final Map<String, StubEntry> classBuilders = new LinkedHashMap<>();
     private final Map<String, InterfaceEntry> interfaceDefs = new LinkedHashMap<>();
     private final Map<String, AnnotationEntry> annotationDefs = new LinkedHashMap<>();
     private Map<String, ClassElement> allClasses = Map.of();
+
+    public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
+    public static final String ANN_JSON_PROPERTY = "com.fasterxml.jackson.annotation.JsonProperty";
+    public static final String ANN_JSON_CREATOR = "com.fasterxml.jackson.annotation.JsonCreator";
 
     @Override
     public TypeElementQuery query() {

@@ -111,7 +111,6 @@ public record FunctionDef(
         this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, null);
     }
 
-
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) {

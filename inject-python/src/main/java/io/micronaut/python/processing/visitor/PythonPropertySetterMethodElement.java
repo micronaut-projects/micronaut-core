@@ -31,8 +31,6 @@ import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
-import io.micronaut.inject.ast.annotation.MethodElementAnnotationMetadata;
-import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import org.jspecify.annotations.NonNull;

@@ -33,7 +33,7 @@ import java.util.List;
 /**
  * An in-memory version of {@link BeanDefinitionsProvider} for use with a class loader produced by {@link PyronautCompiler#buildClassLoader()}.
  */
-public class InMemoryBeanDefinitionsProvider implements BeanDefinitionsProvider {
+public final class InMemoryBeanDefinitionsProvider implements BeanDefinitionsProvider {
     private final boolean includeAllBeans;
 
     public InMemoryBeanDefinitionsProvider(boolean includeAllBeans) {
@@ -86,7 +86,7 @@ public class InMemoryBeanDefinitionsProvider implements BeanDefinitionsProvider 
         return finalList;
     }
 
-    protected List<BeanDefinitionReference<?>> getBuiltInBeanReferences() {
+    private List<BeanDefinitionReference<?>> getBuiltInBeanReferences() {
         return List.of(
                 new InterceptorRegistryBean(),
                 new BeanProviderDefinition(),
