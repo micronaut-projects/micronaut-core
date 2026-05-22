@@ -17,6 +17,8 @@ package io.micronaut.context.python.aop;
 
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorBinding;
+import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.aop.runtime.RuntimeProxyCreator;
 import io.micronaut.aop.runtime.RuntimeProxyDefinition;
@@ -24,8 +26,11 @@ import io.micronaut.context.python.ContextHolder;
 import io.micronaut.context.python.GraalPyRuntimeUtil;
 import io.micronaut.context.python.ValueCoercible;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.FieldInjectionPoint;
 import jakarta.inject.Singleton;
@@ -87,7 +92,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         Map<String, ProxyExecutable> introductionFunctions = new LinkedHashMap<>();
         for (Map.Entry<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> entry : interceptedMethodsByName.entrySet()) {
             String methodName = entry.getKey();
-            List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods = entry.getValue();
+            List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods = entry.getValue()
+                .stream()
+                .map(interceptedMethod -> withoutConcreteIntroductionInterceptors(proxyDefinition, interceptedMethod))
+                .toList();
             Value originalFunction = GraalPyRuntimeUtil.getRawClassMember(value, methodName);
             ProxyExecutable proxiedFunction = createProxiedFunction(
                 true,
@@ -114,6 +122,76 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             targetValue.putMember(entry.getKey(), entry.getValue());
         }
         return target;
+    }
+
+    private static <T> RuntimeProxyDefinition.InterceptedMethod<T> withoutConcreteIntroductionInterceptors(
+        RuntimeProxyDefinition<T> proxyDefinition,
+        RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod) {
+        if (interceptedMethod.executableMethod().isAbstract()) {
+            return interceptedMethod;
+        }
+        Interceptor<T, Object>[] interceptors = interceptedMethod.interceptors();
+        if (interceptors.length == 0) {
+            return interceptedMethod;
+        }
+        Set<String> introductionOnlyBindings = introductionOnlyBindings(interceptedMethod.executableMethod());
+        if (introductionOnlyBindings.isEmpty()) {
+            return interceptedMethod;
+        }
+        List<Interceptor<T, Object>> filteredInterceptors = new ArrayList<>(interceptors.length);
+        for (Interceptor<T, Object> interceptor : interceptors) {
+            if (!hasAnyBinding(proxyDefinition, interceptor, introductionOnlyBindings)) {
+                filteredInterceptors.add(interceptor);
+            }
+        }
+        if (filteredInterceptors.size() == interceptors.length) {
+            return interceptedMethod;
+        }
+        // Runtime introduction definitions resolve concrete methods as around interceptors plus
+        // introduction interceptors. Python already has a concrete target function for these methods,
+        // so introduction-only interceptors must be excluded before proxy execution.
+        return new RuntimeProxyDefinition.InterceptedMethod<>(
+            interceptedMethod.executableMethod(),
+            filteredInterceptors.toArray(Interceptor[]::new)
+        );
+    }
+
+    private static Set<String> introductionOnlyBindings(ExecutableMethod<?, ?> executableMethod) {
+        Set<String> introductionBindings = bindingNames(executableMethod.getAnnotationMetadata(), InterceptorKind.INTRODUCTION);
+        if (introductionBindings.isEmpty()) {
+            return introductionBindings;
+        }
+        Set<String> aroundBindings = bindingNames(executableMethod.getAnnotationMetadata(), InterceptorKind.AROUND);
+        introductionBindings.removeAll(aroundBindings);
+        return introductionBindings;
+    }
+
+    private static Set<String> bindingNames(AnnotationMetadata annotationMetadata, InterceptorKind kind) {
+        Set<String> bindingNames = new LinkedHashSet<>();
+        for (AnnotationValue<InterceptorBinding> binding : annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class)) {
+            if (binding.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == kind) {
+                binding.stringValue().ifPresent(bindingNames::add);
+            }
+        }
+        return bindingNames;
+    }
+
+    private static <T> boolean hasAnyBinding(
+        RuntimeProxyDefinition<T> proxyDefinition,
+        Interceptor<T, Object> interceptor,
+        Set<String> bindingNames) {
+        BeanDefinition<?> interceptorDefinition = proxyDefinition.beanContext()
+            .findBeanDefinition(interceptor.getClass())
+            .orElse(null);
+        if (interceptorDefinition == null) {
+            return false;
+        }
+        for (AnnotationValue<InterceptorBinding> binding : interceptorDefinition.getAnnotationMetadata().getAnnotationValuesByType(InterceptorBinding.class)) {
+            if (binding.stringValue().filter(bindingNames::contains).isPresent()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private <T> T createProxyTargetProxy(RuntimeProxyDefinition<T> proxyDefinition) {

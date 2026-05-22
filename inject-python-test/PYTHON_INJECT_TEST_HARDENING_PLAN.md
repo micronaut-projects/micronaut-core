@@ -138,11 +138,11 @@ As of May 14, 2026:
 * All `@PendingFeature` tests under `inject-python-test` are cataloged with
   stable `PY-INJECT-XXXX` IDs, including pre-existing Python compiler and
   runtime gaps that were outside the direct source inventory.
-* The active pending catalog is currently down to 9 IDs after resolving
-  `PY-INJECT-0058`.
-* The most recent full verification passed with 491 tests and 9 skipped:
+* The active pending catalog is currently down to 8 IDs after resolving
+  `PY-INJECT-0060`.
+* The most recent full verification passed with 491 tests and 8 skipped:
   `./gradlew --no-daemon --no-build-cache --max-workers=1 :micronaut-inject-python-test:test`
-  on May 21, 2026.
+  after resolving `PY-INJECT-0060`.
 * Per-slice verification used focused tests only; the full Python inject test
   task has now been run as the final sweep for this migration/catalog pass.
 * The most recent focused verification passed for
@@ -191,8 +191,8 @@ The latest completed source slices are:
   inherited class metadata, event type arguments, multiple lifecycle methods,
   and async listener behavior are covered through `PythonEventListenerSpec`.
 * `InterceptedAdapterSpec.groovy`: around advice on event-listener adapter
-  methods is pending as `PY-INJECT-0069` because the Python adapter path invokes
-  the around interceptor twice for one event.
+  methods is covered after the Python adapter path stopped invoking the around
+  interceptor twice for one event.
 * `SessionProxySpec.groovy`: Hibernate `Session`/`SessionFactory` JVM proxy
   method emission is cataloged as unsupported Java library proxy behavior.
 * `IntroductionInnerInterfaceSpec.groovy`: Java nested interface introduction
