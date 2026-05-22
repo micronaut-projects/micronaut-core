@@ -385,7 +385,7 @@ Likely first root-cause area:
   erase the generated wrapper receiver/class-literal where Java syntax requires
   a raw class while preserving generic metadata on Micronaut model elements.
 
-Resolved `test-suite-python` work item:
+`test-suite-python` regression watch item:
 
 * `micronaut.docs.server.exception.ExceptionHandlerSpec` failed because Python
   exceptions that extend Java `Throwable` generated only the normal Python
@@ -394,7 +394,11 @@ Resolved `test-suite-python` work item:
   `PythonStubGenerator` now emits that constructor for generated Python
   `Throwable` wrappers, allowing typed Micronaut exception handlers to match.
   `./gradlew --no-daemon --no-build-cache --max-workers=1 :test-suite-python:test --tests micronaut.docs.server.exception.ExceptionHandlerSpec`
-  passes after the fix.
+  passes at the current branch head. If this spec regresses again, investigate
+  the generated Python `Throwable` wrapper constructors, the GraalPy host
+  adapter exception remapping path, and the `ExceptionHandler<E, R>` generic
+  type arguments visible from the generated handler bean definition before
+  changing HTTP server exception handling.
 
 ## Gradle And GraalPy
 
