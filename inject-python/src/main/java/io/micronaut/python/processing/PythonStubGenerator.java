@@ -829,7 +829,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 continue;
                             }
                             if (isDynamicBeanProperty(beanProperty)) {
-                                beanProperty.getWriteMethod().ifPresent(m -> addNamedSetterDynamic(beanProperty, builder));
+                                beanProperty.getWriteMethod().ifPresent(m -> addNamedSetterDynamic(beanProperty, builder, context));
                                 beanProperty.getReadMethod().ifPresent(m -> addNamedGetterDynamic(beanProperty, builder));
                             } else {
                                 addSetterPojo(beanProperty, builder, field);
