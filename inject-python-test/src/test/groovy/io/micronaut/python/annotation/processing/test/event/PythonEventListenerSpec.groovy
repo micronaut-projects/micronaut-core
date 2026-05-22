@@ -6,7 +6,6 @@ import io.micronaut.context.event.ShutdownEvent
 import io.micronaut.context.event.StartupEvent
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import org.graalvm.polyglot.Value
-import spock.lang.PendingFeature
 import spock.util.concurrent.PollingConditions
 
 class PythonEventListenerSpec extends AbstractPythonTypeElementSpec {
@@ -130,7 +129,6 @@ class DisabledSampleEventListener:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0093")
     void "test python event listener via interface with java event"() {
         given:
         def context = buildContext('''
@@ -160,19 +158,19 @@ class SampleEventListener(ApplicationEventListener[StartupEvent]):
         self.counter = counter
 
     def onApplicationEvent(self, event : StartupEvent):
-        counter.increment()
+        self.counter.increment()
 
 
 ''')
 
         when:
-        def event = context.classLoader.loadClass('python.SampleEvent').newInstance("test")
+        def event = new StartupEvent(context)
         context.publishEvent(event)
         def counterService = getBean(context, "python.CounterService")
 
 
         then:
-        counterService.get_count() == 1
+        counterService.get_count() == 2
     }
 
     void "test python event listener via annotation with java event"() {
