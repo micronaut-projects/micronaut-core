@@ -15,9 +15,16 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.runtime.RuntimeProxy;
+import io.micronaut.context.annotation.Mixin;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.visitor.VisitorUtils;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -26,20 +33,24 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.TypeElementQuery;
+import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -47,7 +58,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public class PythonTypeElementVisitorProcessor {
+public final class PythonTypeElementVisitorProcessor {
     private final ClassLoader classLoader;
 
     private Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors;
@@ -69,10 +80,7 @@ public class PythonTypeElementVisitorProcessor {
         this.loadedVisitors = new ArrayList<>(typeElementVisitors.size());
 
         for (TypeElementVisitor<?, ?> visitor : typeElementVisitors) {
-            TypeElementVisitor.VisitorKind visitorKind = visitor.getVisitorKind();
-            TypeElementVisitor.VisitorKind incrementalProcessorKind = getIncrementalProcessorKind();
-
-            if (incrementalProcessorKind == visitorKind) {
+            if (isSupportedVisitorKind(visitor.getVisitorKind())) {
                 try {
                     loadedVisitors.add(new LoadedVisitor(visitor));
                 } catch (TypeNotPresentException | NoClassDefFoundError e) {
@@ -104,36 +112,142 @@ public class PythonTypeElementVisitorProcessor {
             loadedVisitor.getVisitor().start(pythonVisitorContext);
         }
 
-        Map<String, ClassElement> classes = environment.classes();
-        Map<String, ClassElement> scripts = environment.scripts();
+        applyMixins(environment, pythonVisitorContext);
+        List<ClassElement> allClasses = collectClassElements(environment, pythonVisitorContext);
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
-            for (ClassElement element : classes.values()) {
-                if (loadedVisitor.matchesClass(element)) {
-                    if (isAopProxy(element)) {
-                        element.annotate(RuntimeProxy.class, builder ->
-                            builder.value("io.micronaut.context.python.aop.PythonProxyCreator")
-                                .member("proxyTarget", true)
-                        );
-                    }
-                    visitClass(loadedVisitor, element, pythonVisitorContext);
+            for (ClassElement element : allClasses) {
+                if (element.hasAnnotation(Generated.class)) {
+                    continue;
                 }
-            }
-            // Also process script elements
-            for (ClassElement scriptElement : scripts.values()) {
-                if (loadedVisitor.matchesClass(scriptElement)) {
-                    if (isAopProxy(scriptElement)) {
-                        scriptElement.annotate(RuntimeProxy.class, builder ->
-                            builder.value("io.micronaut.context.python.aop.PythonProxyCreator")
-                                .member("proxyTarget", true)
-                        );
-                    }
-                    visitClass(loadedVisitor, scriptElement, pythonVisitorContext);
+                if (loadedVisitor.matchesClass(element)) {
+                    annotatePythonAopProxy(element);
+                    visitClass(loadedVisitor, element, pythonVisitorContext);
                 }
             }
         }
 
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             loadedVisitor.getVisitor().finish(pythonVisitorContext);
+        }
+        writeAssociatedBeanDefinitions(pythonVisitorContext);
+    }
+
+    private void applyMixins(PythonProcessingEnvironment environment, PythonVisitorContext pythonVisitorContext) {
+        for (ClassElement mixin : collectPythonClassElements(environment)) {
+            AnnotationValue<Mixin> mixinAnnotation = mixin.getAnnotation(Mixin.class);
+            if (mixinAnnotation == null) {
+                continue;
+            }
+            String target = mixinAnnotation.stringValue("target")
+                .orElse(mixinAnnotation.stringValue().orElse(null));
+            if (target == null || Object.class.getName().equals(target)) {
+                continue;
+            }
+            ClassElement mixinTarget = pythonVisitorContext.getClassElement(target).orElse(null);
+            if (mixinTarget == null) {
+                pythonVisitorContext.warn("Cannot access class: " + target, mixin);
+                continue;
+            }
+            VisitorUtils.applyMixin(mixinAnnotation, mixin, mixinTarget, pythonVisitorContext);
+            copyPythonPropertyMixinAnnotations(mixinAnnotation, mixin, mixinTarget);
+        }
+    }
+
+    private List<ClassElement> collectPythonClassElements(PythonProcessingEnvironment environment) {
+        Map<String, ClassElement> classes = environment.classes();
+        Map<String, ClassElement> scripts = environment.scripts();
+        List<ClassElement> allClasses = new ArrayList<>(classes.size() + scripts.size());
+        allClasses.addAll(classes.values());
+        allClasses.addAll(scripts.values());
+        return allClasses;
+    }
+
+    private List<ClassElement> collectClassElements(PythonProcessingEnvironment environment, PythonVisitorContext pythonVisitorContext) {
+        List<ClassElement> allClasses = collectPythonClassElements(environment);
+        Map<String, ClassElement> uniqueClasses = new LinkedHashMap<>();
+        allClasses.forEach(classElement -> uniqueClasses.putIfAbsent(classElement.getName(), classElement));
+        for (ClassElement classElement : new ArrayList<>(allClasses)) {
+            for (ClassElement importedElement : VisitorUtils.collectImportedElements(classElement, pythonVisitorContext)) {
+                // Imported-element collection can rediscover Python classes that are already part of
+                // the source environment. Type visitors may register associated beans, so visiting the
+                // same class twice would generate duplicate bean definitions for the same association.
+                uniqueClasses.putIfAbsent(importedElement.getName(), importedElement);
+            }
+        }
+        return new ArrayList<>(uniqueClasses.values());
+    }
+
+    private void copyPythonPropertyMixinAnnotations(AnnotationValue<Mixin> mixinAnnotation, ClassElement mixin, ClassElement mixinTarget) {
+        Map<String, PropertyElement> targetProperties = mixinTarget.getBeanProperties()
+            .stream()
+            .collect(Collectors.toMap(PropertyElement::getName, property -> property, (left, right) -> left));
+        for (PropertyElement mixinProperty : mixin.getBeanProperties()) {
+            PropertyElement targetProperty = targetProperties.get(mixinProperty.getName());
+            if (targetProperty != null && mixinProperty.getType().equals(targetProperty.getType())) {
+                copyAnnotations(mixinProperty, targetProperty, mixinAnnotation);
+            }
+        }
+    }
+
+    private void copyAnnotations(AnnotationMetadata source, Element target, AnnotationValue<Mixin> mixinAnnotation) {
+        for (String annotationName : source.getAnnotationNames()) {
+            if (shouldCopyMixinAnnotation(annotationName, mixinAnnotation)) {
+                AnnotationValue<?> annotation = source.getAnnotation(annotationName);
+                if (annotation != null) {
+                    target.annotate(annotation);
+                }
+            }
+        }
+    }
+
+    private boolean shouldCopyMixinAnnotation(String annotationName, AnnotationValue<Mixin> mixinAnnotation) {
+        if (Mixin.Filter.class.getName().equals(annotationName) || Mixin.class.getName().equals(annotationName)) {
+            return false;
+        }
+        String[] includedAnnotations = mixinAnnotation.stringValues("includeAnnotations");
+        if (includedAnnotations.length > 0) {
+            for (String includedAnnotation : includedAnnotations) {
+                if (annotationName.startsWith(includedAnnotation)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        for (String excludedAnnotation : mixinAnnotation.stringValues("excludeAnnotations")) {
+            if (annotationName.startsWith(excludedAnnotation)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void annotatePythonAopProxy(ClassElement element) {
+        if (!(element instanceof AbstractPythonClassElement) || !isAopProxy(element)) {
+            return;
+        }
+        if (element.hasStereotype(Around.class)) {
+            element.annotate(Around.class, builder -> builder.member("proxyTarget", true));
+        }
+        element.annotate(RuntimeProxy.class, builder ->
+            builder.value("io.micronaut.context.python.aop.PythonProxyCreator")
+                .member("proxyTarget", true)
+        );
+    }
+
+    private void writeAssociatedBeanDefinitions(PythonVisitorContext pythonVisitorContext) {
+        JavaVisitorContext javaVisitorContext = pythonVisitorContext.getJavaVisitorContext();
+        if (javaVisitorContext == null) {
+            return;
+        }
+        List<AbstractBeanDefinitionBuilder> beanElementBuilders = javaVisitorContext.getBeanElementBuilders();
+        if (beanElementBuilders.isEmpty()) {
+            return;
+        }
+        try {
+            AbstractBeanDefinitionBuilder.writeBeanDefinitionBuilders(pythonVisitorContext, beanElementBuilders);
+        } catch (IOException e) {
+            String message = e.getMessage();
+            pythonVisitorContext.fail("Unexpected error: " + (message != null ? message : e.getClass().getSimpleName()), null);
         }
     }
 
@@ -214,8 +328,9 @@ public class PythonTypeElementVisitorProcessor {
         return false;
     }
 
-    private TypeElementVisitor.VisitorKind getIncrementalProcessorKind() {
-        return TypeElementVisitor.VisitorKind.ISOLATING;
+    private boolean isSupportedVisitorKind(TypeElementVisitor.VisitorKind visitorKind) {
+        return visitorKind == TypeElementVisitor.VisitorKind.ISOLATING
+            || visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING;
     }
 
     /**

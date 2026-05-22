@@ -16,6 +16,7 @@
 package io.micronaut.build.internal.python;
 
 import org.gradle.api.DefaultTask;
+import org.gradle.api.GradleException;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.file.FileSystemOperations;
@@ -35,7 +36,9 @@ import org.gradle.api.tasks.options.Option;
 import org.gradle.process.ExecOperations;
 
 import javax.inject.Inject;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -112,18 +115,39 @@ public abstract class PythonCompile extends DefaultTask {
             // Compiler currently accepts a single directory, but maybe it should
             // accept a list of .py files instead
             if (location.getAsFile().isDirectory()) {
-                getExecOperations().javaexec(spec -> {
+                var compilerOutput = new ByteArrayOutputStream();
+                var sourceDir = location.getAsFile().getAbsolutePath();
+                var destDir = getDestinationDir().getAsFile().get().getAbsolutePath();
+                var result = getExecOperations().javaexec(spec -> {
                     spec.classpath(getCompilerClasspath(), getClasspath());
                     spec.systemProperties(getMergedSystemProperties());
                     spec.environment(getEnvironmentVariables().getOrElse(Map.of()));
                     spec.jvmArgs(getMergedJvmArgs());
                     spec.getMainClass().set(PYRONAUT_COMPILER_MAIN_CLASS);
-                    var sourceDir = location.getAsFile().getAbsolutePath();
-                    var destDir = getDestinationDir().getAsFile().get().getAbsolutePath();
+                    spec.setStandardOutput(compilerOutput);
+                    spec.setErrorOutput(compilerOutput);
+                    spec.setIgnoreExitValue(true);
                     spec.args(sourceDir, destDir);
                 });
+                var output = compilerOutput.toString(StandardCharsets.UTF_8);
+                if (result.getExitValue() != 0) {
+                    throw new GradleException("Python compilation failed for source directory [" +
+                        sourceDir + "] with exit code " + result.getExitValue() + "." +
+                        formatCompilerOutput(output));
+                }
+                if (!output.isBlank()) {
+                    getLogger().lifecycle(output.stripTrailing());
+                }
             }
         }
 
+    }
+
+    private static String formatCompilerOutput(String output) {
+        if (output.isBlank()) {
+            return "";
+        }
+        return System.lineSeparator() + "Compiler output:" +
+            System.lineSeparator() + output.stripTrailing();
     }
 }

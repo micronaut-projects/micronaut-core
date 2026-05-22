@@ -15,10 +15,13 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.aop.Around
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
+import io.micronaut.inject.ProxyBeanDefinition
+import io.micronaut.validation.Validated
 import jakarta.validation.Constraint
 import jakarta.validation.Valid
 import jakarta.validation.constraints.*
@@ -31,6 +34,138 @@ import org.intellij.lang.annotations.Language
  * @since 4.8.0
  */
 class ValidationAnnotationSpec extends AbstractPythonTypeElementSpec {
+
+    def "test constraints on singleton methods make them validated"() {
+        given:
+        @Language("python") def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from typing import Annotated
+from jakarta.validation import Valid
+from jakarta.validation.constraints import NotBlank
+
+@Singleton
+class ProductService:
+    @Executable
+    def set_name(self, name: Annotated[str, NotBlank]):
+        pass
+
+    @Executable
+    def set_nested(self, nested: Annotated[str, Valid]):
+        pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.ProductService")
+        def setName = definition.getExecutableMethods().find { it.methodName == "set_name" }
+        def setNested = definition.getExecutableMethods().find { it.methodName == "set_nested" }
+
+        then:
+        definition instanceof ProxyBeanDefinition
+        setName != null
+        setName.hasStereotype(Validated)
+        setNested != null
+        setNested.getAnnotationTypesByStereotype(Around).contains(Validated)
+
+        cleanup:
+        context?.close()
+    }
+
+    def "test inherited method validation metadata can be mutated by validation visitor"() {
+        given:
+        @Language("python") def pythonCode = '''
+from typing import Annotated
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.validation import Validated
+from jakarta.validation.constraints import Min, NotBlank
+
+@Validated
+class PetOperations:
+    @Executable
+    def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> str:
+        ...
+
+@Singleton
+@Validated
+class PetController(PetOperations):
+    @Executable
+    def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> str:
+        return name
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.PetController")
+        def save = definition.getExecutableMethods().find { it.methodName == "save" }
+
+        then:
+        definition instanceof ProxyBeanDefinition
+        save != null
+        save.hasStereotype(Validated)
+
+        cleanup:
+        context?.close()
+    }
+
+    def "test inherited route validation metadata can be mutated by validation visitor"() {
+        given:
+        @Language("python") def pythonCode = '''
+from typing import Annotated
+from micronaut.core.async_.annotation import SingleResult
+from micronaut.http.annotation import Controller, Post
+from micronaut.validation import Validated
+from jakarta.validation.constraints import Min, NotBlank
+
+@Validated
+class PetOperations:
+    @Post
+    @SingleResult
+    def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> str:
+        ...
+
+@Validated
+@Controller("/pets")
+class PetController(PetOperations):
+    @Post
+    @SingleResult
+    def save(self, name: Annotated[str, NotBlank], age: Annotated[int, Min(1)]) -> str:
+        return name
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.PetController")
+        def save = definition.getExecutableMethods().find { it.methodName == "save" }
+
+        then:
+        definition instanceof ProxyBeanDefinition
+        save != null
+        save.hasStereotype(Validated)
+
+        cleanup:
+        context?.close()
+    }
+
+    def "test class with only validation annotations is not a bean"() {
+        when:
+        def beanDefinition = buildBeanDefinition("python", "DefaultContract", '''
+from typing import Annotated
+from jakarta.validation.constraints import NotNull
+
+class Contract:
+    def parse_long(self, sequence: Annotated[str, NotNull]) -> int:
+        return 0
+
+class DefaultContract(Contract):
+    def parse_long(self, sequence: Annotated[str, NotNull]) -> int:
+        return 0
+''')
+
+        then:
+        beanDefinition == null
+    }
 
     def "test dataclass attributes with Jakarta validation annotations"() {
         given: "Python dataclass with validation annotations on attributes"

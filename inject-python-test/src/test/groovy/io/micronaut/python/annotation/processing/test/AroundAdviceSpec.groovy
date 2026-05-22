@@ -16,6 +16,10 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Value
+import io.micronaut.context.python.GraalPyRuntimeUtil
+import io.micronaut.core.annotation.Blocking
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.python.aop.TestAround
 import spock.lang.Specification
 
@@ -253,13 +257,544 @@ class TestClass:
         // Verify the bean is created and intercepted
         def testBean = getBean(context, "python.TestClass")
         testBean.greet("World") == "intercepted: Hello, World!"
-        testBean.$unbox().hasMember("fooBar")
-        testBean.$unbox().getMember("fooBar") != null
-        testBean.$unbox().getMember("fooBar").invokeMember("hello").asString() == "World"
+        def fooBar = GraalPyRuntimeUtil.getRawClassMember(testBean.$unbox(), "fooBar")
+        fooBar != null
+        fooBar.invokeMember("hello").asString() == "World"
 
         cleanup:
         context?.close()
     }
 
+    void "test method level interceptor matching"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Around
+from jakarta.inject import Singleton
+import java
+
+@Around
+def First(func):
+    return func
+
+@Around
+def Second(func):
+    return func
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(First)
+class FirstInterceptor(MethodInterceptor):
+    invoked: bool = False
+
+    def intercept(self, context : MethodInvocationContext):
+        self.invoked = True
+        return context.proceed()
+
+@InterceptorBean(Second)
+class SecondInterceptor(MethodInterceptor):
+    invoked: bool = False
+
+    def intercept(self, context : MethodInvocationContext):
+        self.invoked = True
+        return context.proceed()
+
+@Singleton
+class Test:
+    @First
+    def first(self) -> str:
+        return "first"
+
+    @Second
+    def second(self) -> str:
+        return "second"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def testBean = getBean(context, "python.Test")
+        def firstInterceptor = getBean(context, "python.FirstInterceptor")
+        def secondInterceptor = getBean(context, "python.SecondInterceptor")
+        def result = testBean.first()
+
+        then:
+        result == "first"
+        firstInterceptor.invoked
+        !secondInterceptor.invoked
+
+        when:
+        result = testBean.second()
+
+        then:
+        result == "second"
+        secondInterceptor.invoked
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test constructor value metadata is retained for around advised beans"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from micronaut.context.annotation import Executable, Value
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Around
+def Mutating(target):
+    return target
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        for param in context.getParameters().values():
+            if isinstance(param.getValue(), str):
+                param.setValue("changed")
+        return context.proceed()
+
+@Mutating
+@Singleton
+class ClassLevelBean:
+    def __init__(self, value: Annotated[str, Value("${foo.bar}")]):
+        self.value = value
+
+    @Executable
+    def some_method(self, some_val: str) -> str:
+        return self.value + " " + some_val
+
+@Singleton
+class MethodLevelBean:
+    def __init__(self, value: Annotated[str, Value("${foo.bar}")]):
+        self.value = value
+
+    @Mutating
+    @Executable
+    def some_method(self, some_val: str) -> str:
+        return self.value + " " + some_val
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, ["foo.bar": "test"])
+        def classLevelDefinition = getBeanDefinition(context, "python.ClassLevelBean")
+        def methodLevelDefinition = getBeanDefinition(context, "python.MethodLevelBean")
+        def classLevelBean = getBean(context, "python.ClassLevelBean")
+        def methodLevelBean = getBean(context, "python.MethodLevelBean")
+
+        then:
+        classLevelDefinition.constructor.arguments[0].annotationMetadata.stringValue(Value).get() == '${foo.bar}'
+        methodLevelDefinition.constructor.arguments[0].annotationMetadata.stringValue(Value).get() == '${foo.bar}'
+        classLevelBean.some_method("foo") == "test changed"
+        methodLevelBean.some_method("foo") == "test changed"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test class level around advice applies to property setters"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Around
+def Mutating(target):
+    return target
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        for param in context.getParameters().values():
+            if param.getName() == "name" and param.getValue() == "test":
+                param.setValue("changed")
+        return context.proceed()
+
+@Mutating
+@Singleton
+class MyPropertyBean:
+    name: str = None
+
+    def test(self, name: str) -> None:
+        pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def bean = getBean(context, "python.MyPropertyBean")
+        bean.name = "test"
+
+        then:
+        bean.name == "changed"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test overridden around-advised method inherits base method metadata"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from micronaut.context.annotation import Executable, Value
+from micronaut.core.annotation import Blocking
+from jakarta.inject import Singleton
+import java
+
+@Around
+def Mutating(cls):
+    return cls
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return context.proceed()
+
+class MyInterface:
+    @Blocking
+    @Executable
+    def some_method(self) -> str:
+        pass
+
+@Mutating
+@Singleton
+class MyBean(MyInterface):
+    def __init__(self, value: Annotated[str, Value("${foo.bar}")]):
+        self.value = value
+
+    def some_method(self) -> str:
+        return self.value
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, ["foo.bar": "test"])
+        def definition = getBeanDefinition(context, "python.MyBean")
+        def executableMethod = definition.executableMethods.find { it.methodName == "some_method" }
+        def requiredMethod = definition.getRequiredMethod("some_method")
+        def bean = getBean(context, "python.MyBean")
+
+        then:
+        definition != null
+        !definition.isAbstract()
+        definition.injectedFields.size() == 0
+        executableMethod != null
+        executableMethod.hasAnnotation(Blocking)
+        !executableMethod.hasDeclaredAnnotation(Blocking)
+        requiredMethod.hasAnnotation(Blocking)
+        bean.some_method() == "test"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test abstract aop annotated base types are not bean definitions"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from jakarta.inject import Singleton
+import java
+
+@Around
+def SomeAnnot(target):
+    return target
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(SomeAnnot)
+@Singleton
+class SomeInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return context.proceed()
+
+class ContractService(ABC):
+    @SomeAnnot
+    @abstractmethod
+    def interface_service_method(self) -> str:
+        pass
+
+class BaseService(ABC):
+    @SomeAnnot
+    def base_service_method(self) -> str:
+        return "base"
+
+@SomeAnnot
+class BaseAnnotatedService(ABC):
+    @abstractmethod
+    def missing(self) -> str:
+        pass
+
+@Singleton
+class Service(BaseService, ContractService):
+    @SomeAnnot
+    def service_method(self) -> str:
+        return "service"
+
+    def interface_service_method(self) -> str:
+        return "interface"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def service = getBean(context, "python.Service")
+
+        then:
+        service.service_method() == "service"
+
+        when:
+        context.classLoader.loadClass('python.$ContractService' + BeanDefinitionWriter.CLASS_SUFFIX)
+
+        then:
+        thrown(ClassNotFoundException)
+
+        when:
+        context.classLoader.loadClass('python.$BaseService' + BeanDefinitionWriter.CLASS_SUFFIX)
+
+        then:
+        thrown(ClassNotFoundException)
+
+        when:
+        context.classLoader.loadClass('python.$BaseService' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX)
+
+        then:
+        thrown(ClassNotFoundException)
+
+        when:
+        context.classLoader.loadClass('python.$BaseAnnotatedService' + BeanDefinitionWriter.CLASS_SUFFIX)
+
+        then:
+        thrown(ClassNotFoundException)
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test concrete aop bean is resolvable by abstract base type"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from jakarta.inject import Singleton
+import java
+
+@Around
+def SomeAnnot(target):
+    return target
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(SomeAnnot)
+@Singleton
+class SomeInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return context.proceed()
+
+class ContractService(ABC):
+    @SomeAnnot
+    @abstractmethod
+    def interface_service_method(self) -> str:
+        pass
+
+class BaseService(ABC):
+    @SomeAnnot
+    def base_service_method(self) -> str:
+        return "base"
+
+@Singleton
+class Service(BaseService, ContractService):
+    def interface_service_method(self) -> str:
+        return "interface"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def contractType = context.classLoader.loadClass("python.ContractService")
+        def service = getBean(context, "python.Service")
+
+        then:
+        context.getBean(contractType).is(service)
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test stereotype method level interceptor matching"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Around
+from jakarta.inject import Singleton
+import java
+
+@Around
+def First(func):
+    return func
+
+@First
+def FirstAlias(func):
+    return func
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(First)
+class FirstInterceptor(MethodInterceptor):
+    invoked: bool = False
+
+    def intercept(self, context : MethodInvocationContext):
+        self.invoked = True
+        return context.proceed()
+
+@Singleton
+class Test:
+    @FirstAlias
+    def run(self) -> str:
+        return "done"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def testBean = getBean(context, "python.Test")
+        def interceptor = getBean(context, "python.FirstInterceptor")
+
+        then:
+        testBean.run() == "done"
+        interceptor.invoked
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test multiple around annotations on a single method"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Around
+from jakarta.inject import Singleton
+import java
+
+@Around
+def First(func):
+    return func
+
+@Around
+def Second(func):
+    return func
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(First)
+class FirstInterceptor(MethodInterceptor):
+    invoked: bool = False
+
+    def intercept(self, context : MethodInvocationContext):
+        self.invoked = True
+        return context.proceed()
+
+@InterceptorBean(Second)
+class SecondInterceptor(MethodInterceptor):
+    invoked: bool = False
+
+    def intercept(self, context : MethodInvocationContext):
+        self.invoked = True
+        return context.proceed()
+
+@Singleton
+class Test:
+    @First
+    @Second
+    def run(self) -> str:
+        return "done"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def testBean = getBean(context, "python.Test")
+        def firstInterceptor = getBean(context, "python.FirstInterceptor")
+        def secondInterceptor = getBean(context, "python.SecondInterceptor")
+
+        then:
+        testBean.run() == "done"
+        firstInterceptor.invoked
+        secondInterceptor.invoked
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test interceptor with multiple around bindings requires all method bindings"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Around
+from jakarta.inject import Singleton
+import java
+
+@Around
+def First(func):
+    return func
+
+@Around
+def Second(func):
+    return func
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean([First, Second])
+class BothInterceptor(MethodInterceptor):
+    count: int = 0
+
+    def intercept(self, context : MethodInvocationContext):
+        self.count += 1
+        return context.proceed()
+
+@Singleton
+class Test:
+    @First
+    def first(self) -> str:
+        return "first"
+
+    @Second
+    def second(self) -> str:
+        return "second"
+
+    @First
+    @Second
+    def both(self) -> str:
+        return "both"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def testBean = getBean(context, "python.Test")
+        def interceptor = getBean(context, "python.BothInterceptor")
+        def result = testBean.first()
+
+        then:
+        result == "first"
+        interceptor.count == 0
+
+        when:
+        result = testBean.second()
+
+        then:
+        result == "second"
+        interceptor.count == 0
+
+        when:
+        result = testBean.both()
+
+        then:
+        result == "both"
+        interceptor.count == 1
+
+        cleanup:
+        context?.close()
+    }
 
 }

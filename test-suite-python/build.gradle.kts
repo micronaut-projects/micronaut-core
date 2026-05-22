@@ -1,9 +1,12 @@
+import io.micronaut.build.internal.python.PythonCompile
+
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
     id("io.micronaut.build.internal.python")
 }
 
 dependencies {
+    implementation(projects.micronautCoreProcessor)
     implementation(projects.micronautRuntime)
     implementation(projects.micronautContextPython)
     testImplementation(projects.micronautInjectPython)
@@ -50,4 +53,9 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     systemProperty("micronaut.python.pool.enabled", "false")
+}
+
+tasks.named<PythonCompile>("compileTestPython") {
+    dependsOn(tasks.named("classes"))
+    classpath.from(sourceSets.main.get().output)
 }

@@ -1,5 +1,8 @@
 package io.micronaut.python.annotation.processing.test
 
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Min
+import io.micronaut.python.annotation.processing.test.repository.MinimalCrudRepository
 import io.micronaut.python.compiler.PyronautCompiler
 import org.graalvm.polyglot.Value
 import spock.lang.PendingFeature
@@ -66,10 +69,12 @@ class MyPersonRepository(MinimalCrudRepository[MyPerson, int], new_style=True):
 
         when:
         def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.MyPersonRepository")
         Value bean = getBean(context, "python.MyPersonRepository").asPolyglotValue()
 
 
         then:
+        !definition.getTypeArguments(MinimalCrudRepository).isEmpty()
         bean != null
 
         when:
@@ -78,6 +83,260 @@ class MyPersonRepository(MinimalCrudRepository[MyPerson, int], new_style=True):
         then:
         def e = thrown(RuntimeException)
         e.message.contains("repo introduction interceptor executed")
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test introduction generic return and argument types from Java interface"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Introduction
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+MinimalCrudRepository = java.type("io.micronaut.python.annotation.processing.test.repository.MinimalCrudRepository")
+
+@dataclass
+class MyPerson:
+    id: int
+    name: str
+
+@Introduction
+def RepoIntro(cls):
+    return cls
+
+@InterceptorBean(RepoIntro)
+@Singleton
+class RepoIntroInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return None
+
+@RepoIntro
+class MyPersonRepository(MinimalCrudRepository[MyPerson, int], new_style=True):
+    pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.MyPersonRepository")
+        def save = definition.executableMethods.find { it.methodName == "save" }
+        def findById = definition.executableMethods.find { it.methodName == "findById" }
+        def findAll = definition.executableMethods.find { it.methodName == "findAll" }
+
+        then:
+        save.returnType.type.name == "python.MyPerson"
+        save.arguments[0].type.name == "python.MyPerson"
+        findById.arguments[0].type == Integer
+        findById.returnType.type == Optional
+        findById.returnType.typeVariables["T"].type.name == "python.MyPerson"
+        findAll.returnType.type == Iterable
+        findAll.returnType.typeVariables["T"].type.name == "python.MyPerson"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test introduction generic return and argument types from base class"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Generic, List, TypeVar
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Introduction
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+T = TypeVar("T")
+
+@dataclass
+class Person:
+    name: str
+
+@dataclass
+class SubPerson(Person):
+    age: int
+
+@Introduction
+def RepoIntro(cls):
+    return cls
+
+@InterceptorBean(RepoIntro)
+@Singleton
+class RepoIntroInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return None
+
+class MyInterface(Generic[T], ABC):
+    @abstractmethod
+    def get_person(self) -> T:
+        pass
+
+    @abstractmethod
+    def get_people(self) -> List[T]:
+        pass
+
+    @abstractmethod
+    def save(self, person: T) -> None:
+        pass
+
+    @abstractmethod
+    def save_all(self, people: List[T]) -> None:
+        pass
+
+@RepoIntro
+@Singleton
+@Executable
+class MyBean(MyInterface[SubPerson], ABC):
+    pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.MyBean")
+        def getPerson = definition.executableMethods.find { it.methodName == "get_person" }
+        def getPeople = definition.executableMethods.find { it.methodName == "get_people" }
+        def save = definition.executableMethods.find { it.methodName == "save" }
+        def saveAll = definition.executableMethods.find { it.methodName == "save_all" }
+        Value bean = getBean(context, "python.MyBean").asPolyglotValue()
+
+        then:
+        !definition.isAbstract()
+        definition.injectedFields.size() == 0
+        definition.executableMethods.size() == 4
+        getPerson.returnType.type.name == "python.SubPerson"
+        getPeople.returnType.type == List
+        getPeople.returnType.asArgument().hasTypeVariables()
+        getPeople.returnType.asArgument().typeVariables["E"].type.name == "python.SubPerson"
+        save.arguments[0].type.name == "python.SubPerson"
+        saveAll.arguments[0].type == List
+        saveAll.arguments[0].typeVariables["E"].type.name == "python.SubPerson"
+        bean.invokeMember("get_person").isNull()
+        bean.invokeMember("get_people").isNull()
+        bean.invokeMember("save", [null] as Object[]).isNull()
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test introduction bounded generic return types without concrete type argument"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Generic, List, TypeVar
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Introduction
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@dataclass
+class Person:
+    name: str
+
+@dataclass
+class SubPerson(Person):
+    age: int
+
+T = TypeVar("T", bound=Person)
+
+@Introduction
+def RepoIntro(cls):
+    return cls
+
+@InterceptorBean(RepoIntro)
+@Singleton
+class RepoIntroInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return None
+
+class MyInterface(Generic[T], ABC):
+    @abstractmethod
+    def get_person(self) -> T:
+        pass
+
+    @abstractmethod
+    def get_people(self) -> List[T]:
+        pass
+
+@RepoIntro
+@Singleton
+@Executable
+class MyBean(MyInterface, ABC):
+    pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.MyBean")
+        Value bean = getBean(context, "python.MyBean").asPolyglotValue()
+        def getPerson = definition.executableMethods.find { it.methodName == "get_person" }
+        def getPeople = definition.executableMethods.find { it.methodName == "get_people" }
+
+        then:
+        getPerson.returnType.type.name == "python.Person"
+        getPeople.returnType.type == List
+        getPeople.returnType.asArgument().typeVariables["E"].type.name == "python.Person"
+        bean.invokeMember("get_person").isNull()
+        bean.invokeMember("get_people").isNull()
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test introduction generic type argument annotations propagate to methods"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from typing import Annotated
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Introduction
+from jakarta.inject import Singleton
+from jakarta.validation import Valid
+from jakarta.validation.constraints import Min
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+DataCrudRepository = java.type("io.micronaut.python.annotation.processing.test.repository.DataCrudRepository")
+
+@dataclass
+class MyPerson:
+    id: int
+    name: str
+
+@Introduction
+def RepoIntro(cls):
+    return cls
+
+@InterceptorBean(RepoIntro)
+@Singleton
+class RepoIntroInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return None
+
+@RepoIntro
+class MyPersonRepository(DataCrudRepository[Annotated[MyPerson, Valid], Annotated[int, Min(5)]], new_style=True):
+    pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.MyPersonRepository")
+        def save = definition.executableMethods.find { it.methodName == "save" }
+        def findById = definition.executableMethods.find { it.methodName == "findById" }
+
+        then:
+        save != null
+        findById != null
+        save.arguments[0].annotationMetadata.hasAnnotation(Valid)
+        findById.arguments[0].annotationMetadata.hasAnnotation(Min)
+        findById.arguments[0].annotationMetadata.getValue(Min, Integer).get() == 5
+        findById.returnType.annotationMetadata.hasAnnotation(Valid)
 
         cleanup:
         context?.close()

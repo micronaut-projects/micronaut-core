@@ -16,6 +16,9 @@ repositories {
         maven {
             name = "graalPyBundle"
             url = uri(graalPyBundleRepo)
+            content {
+                includeGroupByRegex("org\\.graalvm(\\..*)?")
+            }
         }
     }
     mavenCentral()

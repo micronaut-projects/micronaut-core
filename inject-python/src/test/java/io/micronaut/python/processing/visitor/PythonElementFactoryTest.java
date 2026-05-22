@@ -193,7 +193,7 @@ class PythonElementFactoryTest {
             ConstructorElement constructorElement = factory.newConstructorElement(classElement, constructorDef, processingEnvironment.metadataFactory());
 
             assertNotNull(constructorElement);
-            assertEquals("__init__", constructorElement.getName()); // ConstructorElement overrides getName()
+            assertEquals("<init>", constructorElement.getName());
             assertEquals(classElement, constructorElement.getReturnType()); // Constructor returns the class type
             // Since ConstructorElement extends MethodElement, the underlying implementation is still PythonMethodElement
             assertTrue(constructorElement instanceof MethodElement);

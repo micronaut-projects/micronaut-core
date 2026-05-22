@@ -17,7 +17,10 @@ package io.micronaut.python.processing.visitor;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -37,7 +40,7 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
 import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory;
 
-public class PythonVisitorContext implements VisitorContext {
+public final class PythonVisitorContext implements VisitorContext {
     private final MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
     private final Map<String, DecoratorDef> decorators;
     private final PythonProcessingEnvironment processingEnvironment;
@@ -104,6 +107,10 @@ public class PythonVisitorContext implements VisitorContext {
 
     @Override
     public void fail(String message, Element element) {
+        if (javaVisitorContext != null) {
+            javaVisitorContext.fail(message, element);
+            return;
+        }
         System.err.println("ERROR: " + message + " @ " + element);
     }
 
@@ -229,9 +236,71 @@ public class PythonVisitorContext implements VisitorContext {
         }
         // Fallback to Java visitor context
         if (javaVisitorContext != null) {
-            return javaVisitorContext.getClassElement(name);
+            Optional<ClassElement> javaClass = javaVisitorContext.getClassElement(name);
+            if (javaClass.isPresent()) {
+                return javaClass;
+            }
         }
-        return Optional.empty();
+        return getDecoratorClassElement(name);
+    }
+
+    private Optional<ClassElement> getDecoratorClassElement(String name) {
+        DecoratorDef decoratorDef = decorators.get(name);
+        String defaultPackage = PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
+        if (decoratorDef == null && name.startsWith(defaultPackage)) {
+            decoratorDef = decorators.get(name.substring(defaultPackage.length()));
+        }
+        if (decoratorDef == null) {
+            for (DecoratorDef candidate : decorators.values()) {
+                if (candidate.annotationName().equals(name)
+                    || candidate.name().equals(name)
+                    || (name.startsWith(defaultPackage) && candidate.name().equals(name.substring(defaultPackage.length())))) {
+                    decoratorDef = candidate;
+                    break;
+                }
+            }
+        }
+        return decoratorDef == null ? Optional.empty() : Optional.of(toDecoratorClassElement(decoratorDef));
+    }
+
+    private ClassElement toDecoratorClassElement(DecoratorDef decoratorDef) {
+        String annotationName = decoratorDef.annotationName();
+        int packageIndex = annotationName.lastIndexOf('.');
+        String packageName = packageIndex > -1 ? annotationName.substring(0, packageIndex) : "";
+        String simpleName = packageIndex > -1 ? annotationName.substring(packageIndex + 1) : annotationName;
+
+        Set<String> memberNames = new LinkedHashSet<>();
+        memberNames.addAll(decoratorDef.memberTypes().keySet());
+        memberNames.addAll(decoratorDef.members().keySet());
+        memberNames.addAll(decoratorDef.memberDecorators().keySet());
+
+        List<FunctionDef> functions = new ArrayList<>(memberNames.size());
+        for (String memberName : memberNames) {
+            TypeRef memberType = decoratorDef.memberTypes().get(memberName);
+            ReturnDef returnType = ReturnDef.of(memberType == null ? new TypeRef("str") : memberType);
+            functions.add(new FunctionDef(
+                memberName,
+                ArgumentsDef.empty(),
+                decoratorDef.memberDecorators().getOrDefault(memberName, List.of()),
+                returnType
+            ));
+        }
+
+        ClassDef annotationDef = new ClassDef(
+            simpleName,
+            packageName,
+            List.of(),
+            decoratorDef.stereotypes(),
+            List.of(),
+            functions,
+            List.of(),
+            List.of(),
+            null,
+            false,
+            List.of(),
+            null
+        );
+        return new PythonClassElement(annotationDef, processingEnvironment);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package io.micronaut.python.annotation.processing.test.inject
 
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 
 class MethodInjectionSpec extends AbstractPythonTypeElementSpec {
@@ -40,6 +41,54 @@ class MainService:
         mainService.get_combined_message() == "Main service with: I am helping!"
 
         cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
+
+    void "test builder style method injection returns self"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton, Inject
+from micronaut.context.annotation import Bean, Executable, Factory
+
+import java
+
+URL = java.type("java.net.URL")
+
+@Factory
+class UrlFactory:
+    @Bean
+    def url(self) -> URL:
+        return URL("http://localhost")
+
+@Singleton
+class Test:
+    def __init__(self):
+        self.url = None
+        self.injection_returned_self = False
+
+    @Inject
+    def set_url(self, url: URL):
+        self.url = url
+        self.injection_returned_self = True
+        return self
+
+    @Executable
+    def get_url(self) -> str:
+        return self.url.toString()
+
+    @Executable
+    def did_injection_return_self(self) -> bool:
+        return self.injection_returned_self
+''')
+
+        when:
+        def bean = getBean(context, "python.Test")
+
+        then:
+        bean.get_url() == "http://localhost"
+        bean.did_injection_return_self()
+
+        cleanup:
         context?.close()
     }
 
@@ -223,6 +272,65 @@ class NamedQualifierService:
         service.get_thing_two_name() == "two"
 
         cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
+
+    void "test method injection qualifier metadata"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from jakarta.inject import Singleton, Named, Inject, Qualifier
+
+@Qualifier
+def One(func):
+    return func
+
+class Thing:
+    def get_name(self) -> str:
+        return "Thing"
+
+@Singleton
+@One
+class ThingOne(Thing):
+    def get_name(self) -> str:
+        return "one"
+
+@Singleton
+@Named("two")
+class ThingTwo(Thing):
+    def get_name(self) -> str:
+        return "two"
+
+@Singleton
+class QualifiedMethodService:
+    def __init__(self):
+        self.thing_one = None
+        self.thing_two = None
+
+    @Inject
+    def set_thing_one(self, thing_one: Annotated[Thing, One]):
+        self.thing_one = thing_one
+
+    @Inject
+    def set_thing_two(self, thing_two: Annotated[Thing, Named("two")]):
+        self.thing_two = thing_two
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.QualifiedMethodService")
+        def injectedArguments = definition.injectedMethods.collect { it.arguments[0] }
+        def bean = getBean(context, "python.QualifiedMethodService")
+
+        then:
+        definition.injectedMethods.size() == 2
+        injectedArguments.every {
+            it.annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).isPresent()
+        }
+        bean.asPolyglotValue().getMember("thing_one").invokeMember("get_name").asString() == "one"
+        bean.asPolyglotValue().getMember("thing_two").invokeMember("get_name").asString() == "two"
+
+        cleanup:
         context?.close()
     }
 }

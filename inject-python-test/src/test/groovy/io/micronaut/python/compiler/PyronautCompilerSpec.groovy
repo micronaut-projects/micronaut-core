@@ -18,7 +18,7 @@ package io.micronaut.python.compiler
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.GraalPyContextFactory
 import io.micronaut.python.processing.PythonAnnotationProcessor
-import spock.lang.PendingFeature
+import org.graalvm.polyglot.Value
 import spock.lang.Specification
 
 class PyronautCompilerSpec extends Specification {
@@ -136,6 +136,29 @@ class TestClass:
         targetDir.deleteDir()
     }
 
+    def "test compile to disk fails for invalid python source"() {
+        given:
+        def sourceDir = File.createTempDir("pyronaut-test-invalid-source", "")
+        def targetDir = File.createTempDir("pyronaut-test-invalid-target", "")
+        new File(sourceDir, "Broken.py").text = "class Broken("
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(sourceDir.absolutePath)
+            .targetDir(targetDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Broken.py")
+        e.message.contains("SyntaxError")
+
+        cleanup:
+        sourceDir.deleteDir()
+        targetDir.deleteDir()
+    }
+
     def "test Python exception subclass generates Throwable subtype"() {
         given:
         def pythonCode = '''
@@ -156,21 +179,56 @@ class OutOfStockException(RuntimeException):
 
         then:
         RuntimeException.isAssignableFrom(generatedException)
+        generatedException.getConstructor(Value) != null
     }
 
-    @PendingFeature(reason = "need to improve inheritance")
     def "test classpath support"() {
         given:
+        def tempDir = File.createTempDir("pyronaut-test-classpath", "")
+        def sourceDir = new File(tempDir, "src/example")
+        def classesDir = new File(tempDir, "classes")
+        sourceDir.mkdirs()
+        classesDir.mkdirs()
+        def externalSource = new File(sourceDir, "ExternalBase.java")
+        externalSource.text = '''
+package example;
+
+public class ExternalBase {
+    public String marker() {
+        return "base";
+    }
+}
+'''
+        def javac = javax.tools.ToolProvider.systemJavaCompiler
+        assert javac != null
+        assert javac.run(null, null, null, "-d", classesDir.absolutePath, externalSource.absolutePath) == 0
+
         def compiler = PyronautCompiler.builder()
-            .pythonCode("class Test: pass")
-            .classpath([new File("/tmp/fake.jar")])
+            .pythonCode('''
+import java
+from micronaut.context.annotation import Executable
+
+ExternalBase = java.type("example.ExternalBase")
+
+class Test:
+    @Executable
+    def make(self) -> ExternalBase:
+        return ExternalBase()
+''')
+            .classpath([classesDir])
             .build()
 
         when:
         def classLoader = compiler.buildClassLoader()
+        def generated = classLoader.loadClass("python.Test")
 
         then:
         classLoader != null
+        generated.getDeclaredMethod("make").returnType.name == "example.ExternalBase"
+        classLoader.loadClass("example.ExternalBase").name == "example.ExternalBase"
+
+        cleanup:
+        tempDir.deleteDir()
     }
 
     def "test annotation transformation and META-INF file generation"() {
@@ -857,6 +915,60 @@ class GenreRepository(CrudRepository[Genre, int]):
 
         cleanup:
         tempSrcDir.deleteDir()
+        tempTargetDir.deleteDir()
+    }
+
+    def "test data repository join on nullable collection relation compiles"() {
+        given:
+        def tempTargetDir = File.createTempDir("pyronaut-test-data-join-target", "")
+        def pythonCode = '''
+from dataclasses import dataclass, field
+from typing import Annotated, Optional
+
+from jakarta.validation.constraints import NotNull
+from micronaut.core.annotation import NonNull, Nullable
+from micronaut.data.annotation import GeneratedValue, Id, Join, MappedEntity, Relation
+from micronaut.data.jdbc.annotation import JdbcRepository
+from micronaut.data.repository import CrudRepository
+
+@dataclass
+@MappedEntity
+class Message:
+    content: str
+    room: Annotated["Room | None", Nullable, Relation(value="MANY_TO_ONE")] = None
+    id: Annotated[int | None, Id, GeneratedValue] = None
+
+@dataclass
+@MappedEntity
+class Room:
+    name: str
+    messages: Annotated[
+        list[Message] | None,
+        Nullable,
+        Relation(value="ONE_TO_MANY", mappedBy="room"),
+    ] = field(default_factory=list)
+    id: Annotated[int | None, Id, GeneratedValue] = None
+
+@JdbcRepository(dialect="H2")
+class RoomRepository(CrudRepository[Room, int]):
+    @Join(value="messages", type=Join.Type.LEFT_FETCH)
+    def getById(self, id: Annotated[int, NonNull, NotNull]) -> Optional[Room]: ...
+'''
+
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .javaSrc("inject-python-test/src/test/java")
+            .targetDir(tempTargetDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
+
+        then:
+        classLoader.loadClass('python.RoomRepository') != null
+
+        cleanup:
         tempTargetDir.deleteDir()
     }
 

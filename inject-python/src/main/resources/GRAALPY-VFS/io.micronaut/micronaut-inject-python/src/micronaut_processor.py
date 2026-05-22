@@ -108,6 +108,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.in_function = False  # Track if we're inside a function definition
         self.java_type_assignments = {}  # Track java.type() assignments: variable_name -> full_qualified_name
         self.java_keyword_method_aliases = {}  # Track keyword-safe aliases on Java type references
+        self.type_vars = {}  # Track TypeVar assignments: variable_name -> TypeVar
         self.imported_types = {}  # Track imported types: simple_name -> full_qualified_name
         self.local_classes = set()  # Track class names defined in this file
         self.local_constant_values = {}  # Track local class constants visible to annotation expressions
@@ -182,7 +183,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             return node
 
                     # Only check for micronaut decorators on top-level functions (not nested)
-                    if self.current_class is None and not was_in_function and is_micronaut_decorator(node, self):
+                    if self.current_class is None and not was_in_function and (
+                        is_micronaut_decorator(node, self) or is_python_decorator_function(node)
+                    ):
                         arg_dict = extract_arg_defaults(node)
                         member_decorators = extract_arg_decorators(self, node)
                         member_types = extract_arg_types(self, node)
@@ -239,6 +242,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static)
                         if self.current_class is not None:
                             if node.name == "__init__":
+                                self._handle_constructor_instance_attributes(node, arguments)
                                 # Set as constructor
                                 self.current_class = self.current_class.withConstructor(func_def)
                             else:
@@ -251,6 +255,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             case ast.Assign():
                 # Track java.type() assignments first
                 self._track_java_type_assignments(node)
+                self._track_type_var_assignment(node)
                 self._track_local_constant_assignment(node)
                 # Handle class attribute assignments (only at class body level, not inside methods)
                 if self.current_class is not None and not self.in_function:
@@ -328,6 +333,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
             case ast.Module():
                 # Process the module and create script element if we have script-level constructs
                 self.current_class = None
+                self.local_classes.update(
+                    stmt.name for stmt in node.body if isinstance(stmt, ast.ClassDef)
+                )
                 result = super().visit(node)
 
                 # Create script element if we have collected script attributes or functions
@@ -460,7 +468,14 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 if is_enum:
                     self.current_class = self.current_class.withEnum(True, enum_values)
 
-                self.callback.apply(self.current_class)
+                completed_class = self.current_class
+                self.callback.apply(completed_class)
+                if previous_class is not None:
+                    # Keep Python nesting in the AST model. Micronaut's bean definition writer
+                    # discovers nested configuration readers through enclosed ClassElement
+                    # queries, so the parent ClassDef must carry its direct nested classes
+                    # instead of forcing later source-model code to infer them from "$" names.
+                    previous_class = previous_class.withNestedClass(completed_class)
             return result
         finally:
             self.current_class = previous_class
@@ -586,6 +601,10 @@ class MicronautAstVisitor(ast.NodeVisitor):
             return
 
         for target in targets:
+            if isinstance(target, ast.Name):
+                if self.current_class is None:
+                    self.local_constant_values[target.id] = value
+                continue
             if not isinstance(target, ast.Attribute):
                 continue
             names = []
@@ -629,6 +648,49 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     self.current_class_attributes[-1] = updated_attr
                 # Update last_attribute reference
                 self.last_attribute = updated_attr
+
+    def _handle_constructor_instance_attributes(self, func_node, arguments):
+        """
+        Add simple self.x = parameter assignments from __init__ as readable attributes.
+        """
+        if self.current_class is None:
+            return
+        parameter_by_name = {arg.name(): arg for arg in arguments.arguments()}
+        existing_attributes = {attr.name() for attr in self.current_class_attributes}
+        existing_properties = set(self.current_class_properties.keys())
+        for stmt in func_node.body:
+            if not isinstance(stmt, ast.Assign) or len(stmt.targets) != 1:
+                continue
+            target = stmt.targets[0]
+            if not (
+                isinstance(target, ast.Attribute)
+                and isinstance(target.value, ast.Name)
+                and target.value.id == "self"
+                and isinstance(stmt.value, ast.Name)
+            ):
+                continue
+            attr_name = target.attr
+            if attr_name.startswith("_") or attr_name in existing_attributes or attr_name in existing_properties:
+                continue
+            parameter = parameter_by_name.get(stmt.value.id)
+            if parameter is None:
+                continue
+            if not self._is_constructor_readable_attribute_parameter(parameter):
+                continue
+            # Constructor-assigned instance attributes need to be part of the Python
+            # source model so generated stubs expose host-readable bean properties.
+            # Do not copy injection decorators like @Parameter to the attribute; the
+            # constructor parameter remains the injection point.
+            attr_def = JavaAttributeDef(attr_name, parameter.annotation(), parameter.typeAnnotation(), None, [], parameter.documentation(), False, None)
+            self.current_class_attributes.append(attr_def)
+            existing_attributes.add(attr_name)
+
+    def _is_constructor_readable_attribute_parameter(self, parameter):
+        for decorator in parameter.decorators():
+            annotation_name = decorator.annotationName()
+            if annotation_name == "io.micronaut.context.annotation.Parameter" or decorator.name() == "Parameter":
+                return True
+        return False
 
     def _is_script_assignment(self, node):
         if isinstance(getattr(node, "parent", None), ast.ClassDef):
@@ -934,6 +996,19 @@ class MicronautAstVisitor(ast.NodeVisitor):
             return f"{self.package_name}.{type_name}" if self.package_name else type_name
         return None
 
+    def _parse_forward_reference_type(self, type_name):
+        if not isinstance(type_name, str) or not type_name.strip():
+            return None
+        try:
+            parsed = ast.parse(type_name, mode='eval').body
+        except (SyntaxError, ValueError):
+            return None
+        if isinstance(parsed, ast.Constant) and parsed.value == type_name:
+            return None
+        if isinstance(parsed, ast.Str) and parsed.s == type_name:
+            return None
+        return parsed
+
     def _extract_type_name(self, type_node):
         """
         Extract a type name from an AST type node.
@@ -943,40 +1018,31 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # Handle string literals like 'Engine' or "Engine"
             if isinstance(type_node.value, str):
                 type_name = type_node.value
+                parsed_type = self._parse_forward_reference_type(type_name)
+                if parsed_type is not None:
+                    return self._extract_type_name(parsed_type)
                 # Check if this is a local class and qualify it
                 local_name = self._resolve_local_type_name(type_name)
                 if local_name:
                     return local_name
-                # Check if this is an imported type
-                imported_name = self.imported_types.get(type_name)
-                if imported_name:
-                    return imported_name
-                # Check if this is a Java type that was imported
-                return self.java_type_assignments.get(type_name, type_name)
+                return self._resolve_bound_type_name(type_name)
         elif isinstance(type_node, ast.Str):
             # Handle older Python versions with ast.Str
             type_name = type_node.s
+            parsed_type = self._parse_forward_reference_type(type_name)
+            if parsed_type is not None:
+                return self._extract_type_name(parsed_type)
             # Check if this is a local class and qualify it
             local_name = self._resolve_local_type_name(type_name)
             if local_name:
                 return local_name
-            # Check if this is an imported type
-            imported_name = self.imported_types.get(type_name)
-            if imported_name:
-                return imported_name
-            # Check if this is a Java type that was imported
-            return self.java_type_assignments.get(type_name, type_name)
+            return self._resolve_bound_type_name(type_name)
         elif isinstance(type_node, ast.Name):
-            # Check if this is an imported type first
-            imported_name = self.imported_types.get(type_node.id)
-            if imported_name:
-                return imported_name
             # Check if this is a local class
             local_name = self._resolve_local_type_name(type_node.id)
             if local_name:
                 return local_name
-            # Then check if this is a Java type that was imported
-            return self.java_type_assignments.get(type_node.id, type_node.id)
+            return self._resolve_bound_type_name(type_node.id)
         elif isinstance(type_node, ast.Attribute):
             # Handle qualified names like typing.List
             names = []
@@ -1006,6 +1072,17 @@ class MicronautAstVisitor(ast.NodeVisitor):
             return ast.unparse(type_node)
         else:
             return ast.dump(type_node)
+
+    def _resolve_bound_type_name(self, type_name):
+        imported_name = self.imported_types.get(type_name)
+        if imported_name and imported_name.startswith("typing."):
+            return imported_name
+        assigned_name = self.java_type_assignments.get(type_name)
+        if assigned_name:
+            return assigned_name
+        if imported_name:
+            return imported_name
+        return type_name
 
     def _extract_union_type(self, type_node):
         """
@@ -1164,6 +1241,13 @@ class MicronautAstVisitor(ast.NodeVisitor):
         type_params = []
         TypeVar = java.type("io.micronaut.python.processing.visitor.TypeVar")
 
+        def add_type_var(name):
+            if any(existing.name() == name for existing in type_params):
+                return
+            type_var = self.type_vars.get(name)
+            if type_var is not None:
+                type_params.append(type_var)
+
         # Check if the node has type_params (Python 3.12+)
         if hasattr(node, 'type_params') and node.type_params:
             for type_param in node.type_params:
@@ -1198,13 +1282,18 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             if isinstance(arg, ast.Name):
                                 # Simple TypeVar reference like T
                                 name = arg.id
-                                type_var = TypeVar(name, None, [])
-                                type_params.append(type_var)
+                                type_var = self.type_vars.get(name) or TypeVar(name, None, [])
+                                if not any(existing.name() == name for existing in type_params):
+                                    type_params.append(type_var)
                             elif isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and arg.func.id == 'TypeVar':
                                 # TypeVar call like TypeVar('T', bound=SomeType)
                                 type_var = self._parse_type_var_call(arg)
-                                if type_var:
+                                if type_var and not any(existing.name() == type_var.name() for existing in type_params):
                                     type_params.append(type_var)
+                    else:
+                        for arg in self._extract_subscript_args(base):
+                            if isinstance(arg, ast.Name):
+                                add_type_var(arg.id)
 
         return type_params
 
@@ -1251,10 +1340,37 @@ class MicronautAstVisitor(ast.NodeVisitor):
         This is a fallback for Python versions that don't support type_params.
         """
         type_params = []
-        TypeVar = java.type("io.micronaut.python.processing.visitor.TypeVar")
 
         # Look for type parameters in the function signature by examining type annotations
-        # For syntax like def func[S](param: S), we need to parse S from the annotations
+        # For Python versions before PEP 695 support, module-level TypeVar
+        # assignments are referenced from parameter and return annotations.
+        seen = set()
+        class_type_param_names = set()
+        if self.current_class is not None:
+            for type_param in self.current_class.typeParams():
+                class_type_param_names.add(type_param.name())
+
+        def collect(annotation):
+            if annotation is None:
+                return
+            for child in ast.walk(annotation):
+                if isinstance(child, ast.Name):
+                    type_var = self.type_vars.get(child.id)
+                    if type_var is not None and child.id not in seen and child.id not in class_type_param_names:
+                        seen.add(child.id)
+                        type_params.append(type_var)
+
+        for arg in getattr(func_node.args, "posonlyargs", []):
+            collect(arg.annotation)
+        for arg in func_node.args.args:
+            collect(arg.annotation)
+        for arg in func_node.args.kwonlyargs:
+            collect(arg.annotation)
+        if func_node.args.vararg is not None:
+            collect(func_node.args.vararg.annotation)
+        if func_node.args.kwarg is not None:
+            collect(func_node.args.kwarg.annotation)
+        collect(func_node.returns)
 
         # Check if the function name contains type parameters (e.g., def func[S](...))
         func_name = func_node.name
@@ -1268,8 +1384,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     param_names = [name.strip() for name in bracket_content.split(',')]
                     for param_name in param_names:
                         # Create TypeVar objects for each parameter name
-                        type_var = TypeVar(param_name, None, [])
-                        type_params.append(type_var)
+                        if param_name and param_name not in seen:
+                            seen.add(param_name)
+                            type_params.append(self.type_vars.get(param_name) or java.type("io.micronaut.python.processing.visitor.TypeVar")(param_name, None, []))
             except:
                 pass
 
@@ -1368,6 +1485,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
         elif isinstance(type_node, ast.Constant):
             # Handle string literals (forward references) like "Engine"
             if isinstance(type_node.value, str):
+                parsed_type = self._parse_forward_reference_type(type_node.value)
+                if parsed_type is not None:
+                    return self._parse_type(parsed_type)
                 name = self._extract_type_name(type_node)
                 return TypeRef(name)
             else:
@@ -1377,6 +1497,11 @@ class MicronautAstVisitor(ast.NodeVisitor):
         elif isinstance(type_node, ast.Subscript):
             # Generic type like 'MyBase[str]' or 'dict[str, int]'
             base_name = self._extract_type_name(type_node.value)
+            if base_name in ('Annotated', 'typing.Annotated'):
+                parsed_type, parsed_decorators = self._parse_annotated_type(type_node)
+                if parsed_type:
+                    return TypeRef(parsed_type.name(), parsed_type.typeArguments(), parsed_decorators)
+                return TypeRef("object")
             type_args = self._extract_subscript_args(type_node)
             # Recursively parse each type argument
             type_arg_defs = [self._parse_type(arg) for arg in type_args]
@@ -1427,6 +1552,18 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         elif hasattr(arg_node, 's') and isinstance(arg_node.s, str):
                             self.java_type_assignments[var_name] = arg_node.s
                             self._track_java_keyword_method_aliases(var_name, arg_node.s, explicit_java_type=True)
+
+    def _track_type_var_assignment(self, node):
+        """
+        Track module-level TypeVar assignments so pre-PEP 695 function generic
+        annotations such as `def build() -> Cache[K, V]` expose method type
+        variables to Micronaut.
+        """
+        if self.current_class is not None or len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
+            return
+        type_var = self._parse_type_var_call(node.value)
+        if type_var is not None:
+            self.type_vars[node.targets[0].id] = type_var
 
     def _track_java_keyword_method_aliases(self, var_name, full_qualified_name, explicit_java_type=False):
         if explicit_java_type:
@@ -1626,6 +1763,7 @@ def decorator_to_function(visitor, node):
 
             if decorator_declaration is not None:
                 members = extract_call_arguments_with_defaults(decorator_declaration, node, visitor)
+                members = resolve_annotation_member_constants(decorator_declaration.annotationName(), members, visitor)
                 return DecoratorDef(
                     decorator_name,
                     decorator_declaration.annotationName(),
@@ -1636,6 +1774,7 @@ def decorator_to_function(visitor, node):
             else:
                 # Direct annotation or Java annotation used as a decorator
                 members = extract_call_arguments_with_defaults(None, node, visitor)
+                members = resolve_annotation_member_constants(resolved_decorator_fqn, members, visitor)
                 # Resolve names in member values
                 resolved_members = {}
                 for key, value in members.items():
@@ -1665,6 +1804,24 @@ def decorator_to_function(visitor, node):
                 return DecoratorDef(decorator_name, resolved_decorator_fqn, None, resolved_members, [])
         case _:
             return None
+
+def resolve_annotation_member_constants(annotation_name, members, visitor=None):
+    if visitor is None or annotation_name != "jakarta.inject.Named":
+        return members
+    value = members.get("value")
+    if not isinstance(value, str):
+        return members
+    constant_value = None
+    if value in visitor.local_constant_values:
+        constant_value = visitor.local_constant_values[value]
+    elif visitor.current_class is not None:
+        class_name = visitor.current_class.name().replace("$", ".")
+        constant_value = visitor.local_constant_values.get(f"{class_name}.{value}")
+    if constant_value is None:
+        return members
+    resolved = dict(members)
+    resolved["value"] = constant_value
+    return resolved
 
 
 def convert_ast_value(node, visitor=None):
@@ -2012,11 +2169,44 @@ def is_micronaut_decorator(funcdef, visitor=None):
             decorator_name = extract_decorator_name(dec)
             if decorator_name:
                 existing_decorator = visitor.known_decorators.get(decorator_name)
-                if existing_decorator:
-                    annotation_name = existing_decorator.annotationName()
-                    if is_annotation_stereotype_for_python_decorator(annotation_name):
-                        return True
+                if existing_decorator and has_python_annotation_stereotype(existing_decorator):
+                    return True
 
+    return False
+
+def is_python_decorator_function(funcdef):
+    """
+    Returns true for top-level Python functions that have the normal decorator
+    shape, either `def ann(target): return target` or a decorator factory that
+    returns a nested decorator function.
+    """
+    if funcdef.name == "micronaut_annotation":
+        return False
+
+    nested_function_names = {
+        stmt.name
+        for stmt in funcdef.body
+        if isinstance(stmt, ast.FunctionDef)
+    }
+    argument_names = {arg.arg for arg in funcdef.args.args}
+
+    for stmt in ast.walk(funcdef):
+        if not isinstance(stmt, ast.Return):
+            continue
+        value = stmt.value
+        if isinstance(value, ast.Name):
+            if value.id in nested_function_names:
+                return True
+            if value.id in argument_names:
+                return True
+    return False
+
+def has_python_annotation_stereotype(decorator):
+    if is_annotation_stereotype_for_python_decorator(decorator.annotationName()):
+        return True
+    for stereotype in decorator.stereotypes():
+        if has_python_annotation_stereotype(stereotype):
+            return True
     return False
 
 def is_annotation_stereotype_for_python_decorator(annotation_name):
@@ -2025,6 +2215,7 @@ def is_annotation_stereotype_for_python_decorator(annotation_name):
     return annotation_name in {
         'io.micronaut.context.annotation.AnnotationExpressionContext',
         'io.micronaut.context.annotation.Bean',
+        'io.micronaut.context.annotation.DefaultScope',
         'io.micronaut.context.annotation.Prototype',
         'io.micronaut.context.annotation.Requires',
         'io.micronaut.core.bind.annotation.Bindable',

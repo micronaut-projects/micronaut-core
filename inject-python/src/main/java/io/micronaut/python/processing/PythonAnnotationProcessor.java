@@ -43,7 +43,15 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -56,10 +64,10 @@ import java.util.stream.Collectors;
  */
 @SupportedAnnotationTypes(PythonAnnotationProcessor.PYTHON_APPLICATION_ANNOTATION)
 public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor implements AutoCloseable {
-    static final String PYTHON_APPLICATION_ANNOTATION = "io.micronaut.context.python.annotation.PythonApplication";
     public static final String APPLICATION_PATH = "GRAALPY-VFS/micronaut-application/";
     public static final String APPLICATION_SRC_PATH = "GRAALPY-VFS/micronaut-application/src/";
     public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_SRC_PATH + "__main__.py";
+    static final String PYTHON_APPLICATION_ANNOTATION = "io.micronaut.context.python.annotation.PythonApplication";
     private static final Set<String> PYTHON_KEYWORDS = Set.of(
         "False", "None", "True", "and", "as", "assert", "async", "await", "break",
         "class", "continue", "def", "del", "elif", "else", "except", "finally",
@@ -658,6 +666,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         return false;
     }
 
+    /**
+     * Sets the class loader used for in-memory compiler execution.
+     *
+     * @param classLoader The class loader
+     */
     public void setClassLoader(ClassLoader classLoader) {
         this.classLoader = classLoader;
     }

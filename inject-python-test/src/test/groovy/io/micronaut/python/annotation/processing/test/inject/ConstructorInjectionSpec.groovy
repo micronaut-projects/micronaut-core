@@ -1,6 +1,7 @@
 package io.micronaut.python.annotation.processing.test.inject
 
 import io.micronaut.context.BeanProvider
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.runtime.server.EmbeddedServer
@@ -235,9 +236,58 @@ class Vehicle:
         then: "BeanProvider constructor injection should retain its generic bean type"
         providerArgument.type == BeanProvider
         providerArgument.typeParameters[0].type.name == "python.Engine"
+        definition.requiredComponents.contains(context.classLoader.loadClass("python.Engine"))
         carService.start() == "Vrooom! 8"
 
         cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
+
+    void "test constructor injection with jakarta provider"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+import java
+
+Provider = java.type("jakarta.inject.Provider")
+
+class Engine:
+    @Executable
+    def start(self) -> str:
+        return "base"
+
+@Singleton
+class V8Engine(Engine):
+    @Executable
+    def start(self) -> str:
+        return "Vrooom! 8"
+
+@Singleton
+class Vehicle:
+    def __init__(self, engine: Provider[Engine]):
+        self.engine = engine
+
+    @Executable
+    def start(self) -> str:
+        return self.engine.get().start()
+
+'''
+        when:
+        def context = buildContext(pythonCode)
+        def carService = getBean(context, "python.Vehicle")
+        def definition = getBeanDefinition(context, "python.Vehicle")
+        def providerArgument = definition.constructor.arguments[0]
+
+        then:
+        providerArgument.type.name == "jakarta.inject.Provider"
+        providerArgument.typeParameters[0].type.name == "python.Engine"
+        providerArgument.isProvider()
+        definition.requiredComponents.contains(context.classLoader.loadClass("python.Engine"))
+        carService.start() == "Vrooom! 8"
+
+        cleanup:
         context?.close()
     }
 
@@ -349,6 +399,56 @@ class ListConstructorService:
         listService.get_item_names() == "ItemA,ItemB"
 
         cleanup: "Ensure context is properly closed"
+        context?.close()
+    }
+
+    void "test constructor injection list excludes abstract beans"() {
+        given:
+        def context = buildContext('''
+from abc import ABC, abstractmethod
+from typing import List
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+class InterceptRule(ABC):
+    @abstractmethod
+    def name(self) -> str:
+        pass
+
+@Singleton
+class AbstractBean(InterceptRule, ABC):
+    @abstractmethod
+    def name(self) -> str:
+        pass
+
+@Singleton
+class ConcreteBean(InterceptRule):
+    @Executable
+    def name(self) -> str:
+        return "concrete"
+
+@Singleton
+class Test:
+    def __init__(self, rules: List[InterceptRule]):
+        self.rules = rules
+
+    @Executable
+    def rule_count(self) -> int:
+        return len(self.rules)
+
+    @Executable
+    def rule_names(self) -> str:
+        return ",".join(sorted([rule.name() for rule in self.rules]))
+''')
+
+        when:
+        def bean = getBean(context, "python.Test")
+
+        then:
+        bean.rule_count() == 1
+        bean.rule_names() == "concrete"
+
+        cleanup:
         context?.close()
     }
 
@@ -513,6 +613,103 @@ class Vehicle:
 
         then:
         vehicle.invokeMember("start").asString() == "Starting V8"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test constructor injection with multiple qualifiers"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from jakarta.inject import Singleton, Qualifier
+from micronaut.context.annotation import Executable
+
+@Qualifier
+def Synchronous(func):
+    return func
+
+@Qualifier
+def Asynchronous(func):
+    return func
+
+@Qualifier
+def PayBy(value: str):
+    def decorator(func):
+        return func
+    return decorator
+
+class Processor:
+    @Executable
+    def name(self) -> str:
+        return "processor"
+
+@Singleton
+@PayBy("credit")
+@Synchronous
+class CreditCardProcessor(Processor):
+    @Executable
+    def name(self) -> str:
+        return "sync-credit"
+
+@Singleton
+@PayBy("credit")
+@Asynchronous
+class AsyncCreditCardProcessor(Processor):
+    @Executable
+    def name(self) -> str:
+        return "async-credit"
+
+@Singleton
+@PayBy("transfer")
+@Synchronous
+class BankTransferProcessor(Processor):
+    @Executable
+    def name(self) -> str:
+        return "sync-transfer"
+
+@Singleton
+@PayBy("transfer")
+@Asynchronous
+class AsyncBankTransferProcessor(Processor):
+    @Executable
+    def name(self) -> str:
+        return "async-transfer"
+
+@Singleton
+class PaymentService:
+    def __init__(
+        self,
+        async_credit: Annotated[Processor, PayBy("credit"), Asynchronous],
+        sync_credit: Annotated[Processor, PayBy("credit"), Synchronous],
+        async_transfer: Annotated[Processor, PayBy("transfer"), Asynchronous],
+        sync_transfer: Annotated[Processor, PayBy("transfer"), Synchronous]
+    ):
+        self.async_credit = async_credit
+        self.sync_credit = sync_credit
+        self.async_transfer = async_transfer
+        self.sync_transfer = sync_transfer
+
+    @Executable
+    def names(self) -> str:
+        return ",".join([
+            self.async_credit.name(),
+            self.sync_credit.name(),
+            self.async_transfer.name(),
+            self.sync_transfer.name()
+        ])
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.PaymentService")
+        def bean = getBean(context, "python.PaymentService")
+
+        then:
+        definition.constructor.arguments.every {
+            it.annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).isPresent()
+        }
+        bean.names() == "async-credit,sync-credit,async-transfer,sync-transfer"
 
         cleanup:
         context?.close()

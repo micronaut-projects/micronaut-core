@@ -25,7 +25,6 @@ import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
-import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 
 /**

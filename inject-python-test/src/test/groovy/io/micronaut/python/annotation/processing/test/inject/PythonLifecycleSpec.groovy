@@ -15,9 +15,69 @@
  */
 package io.micronaut.python.annotation.processing.test.inject
 
+import io.micronaut.inject.DisposableBeanDefinition
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 
 class PythonLifecycleSpec extends AbstractPythonTypeElementSpec {
+
+    void "test post construct method alone does not create bean definition"() {
+        when:
+        def definition = buildBeanDefinition("python", "LifecycleService", '''
+from jakarta.annotation import PostConstruct
+
+class LifecycleService:
+    @PostConstruct
+    def initialize(self):
+        pass
+''')
+
+        then:
+        definition == null
+    }
+
+    void "test inject constructor without lifecycle method creates bean definition"() {
+        when:
+        def definition = buildBeanDefinition("python", "LifecycleService", '''
+from jakarta.inject import Inject
+
+class LifecycleService:
+    @Inject
+    def __init__(self):
+        pass
+''')
+
+        then:
+        definition != null
+        definition.postConstructMethods.empty
+        definition.preDestroyMethods.empty
+    }
+
+    void "test post construct and pre destroy metadata on inject constructor bean"() {
+        when:
+        def definition = buildBeanDefinition("python", "LifecycleService", '''
+from jakarta.annotation import PostConstruct, PreDestroy
+from jakarta.inject import Inject
+
+class LifecycleService:
+    @Inject
+    def __init__(self):
+        pass
+
+    @PostConstruct
+    def initialize(self):
+        pass
+
+    @PreDestroy
+    def close(self):
+        pass
+''')
+
+        then:
+        definition != null
+        definition.postConstructMethods.size() == 1
+        definition.preDestroyMethods.size() == 1
+        definition instanceof DisposableBeanDefinition
+    }
 
     void "test @PostConstruct method is called during bean initialization"() {
         given: "Python code with a singleton bean that has a @PostConstruct method"
@@ -252,5 +312,359 @@ class MainService:
 
         cleanup:
         context.close()
+    }
+
+    void "test lifecycle hooks on class-level around advised bean"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from micronaut.context.annotation import Executable
+from jakarta.annotation import PostConstruct, PreDestroy
+from jakarta.inject import Singleton
+import java
+
+@Around
+def Mutating(target):
+    return target
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return context.proceed()
+
+@Mutating
+@Singleton
+class LifecycleService:
+    def __init__(self):
+        self.count = 0
+
+    def some_method(self) -> str:
+        return "good"
+
+    @Executable
+    def get_count(self) -> int:
+        return self.count
+
+    @PostConstruct
+    def created(self):
+        self.count += 1
+
+    @PreDestroy
+    def destroyed(self):
+        self.count -= 1
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.LifecycleService")
+        def service = getBean(context, "python.LifecycleService")
+
+        then:
+        !definition.isAbstract()
+        definition.postConstructMethods.size() == 1
+        definition.preDestroyMethods.size() == 1
+        service.some_method() == "good"
+        service.get_count() == 1
+
+        when:
+        context.destroyBean(service)
+
+        then:
+        service.get_count() == 0
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test lifecycle hooks on method-level around advised bean"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from micronaut.context.annotation import Executable
+from jakarta.annotation import PostConstruct, PreDestroy
+from jakarta.inject import Singleton
+import java
+
+@Around
+def Mutating(target):
+    return target
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(Mutating)
+@Singleton
+class MutatingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return context.proceed()
+
+@Singleton
+class LifecycleService:
+    def __init__(self):
+        self.count = 0
+
+    @Mutating
+    def some_method(self) -> str:
+        return "good"
+
+    @Executable
+    def get_count(self) -> int:
+        return self.count
+
+    @PostConstruct
+    def created(self):
+        self.count += 1
+
+    @PreDestroy
+    def destroyed(self):
+        self.count -= 1
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.LifecycleService")
+        def service = getBean(context, "python.LifecycleService")
+
+        then:
+        !definition.isAbstract()
+        definition.postConstructMethods.size() == 1
+        definition.preDestroyMethods.size() == 1
+        service.some_method() == "good"
+        service.get_count() == 1
+
+        when:
+        context.destroyBean(service)
+
+        then:
+        service.get_count() == 0
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test post construct interceptor bindings on around advised bean and factory method"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import Around, InterceptorBean, InterceptorBinding, MethodInvocationContext
+from micronaut.context.annotation import Executable, Factory
+from jakarta.annotation import PostConstruct
+from jakarta.inject import Singleton
+import java
+
+InterceptorKind = java.type("io.micronaut.aop.InterceptorKind")
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Around
+@InterceptorBinding(kind=InterceptorKind.POST_CONSTRUCT)
+def LifecycleBinding(target):
+    return target
+
+@InterceptorBean(LifecycleBinding)
+@Singleton
+class AroundInterceptor(MethodInterceptor):
+    count: int = 0
+
+    def intercept(self, context: MethodInvocationContext):
+        self.count += 1
+        return context.proceed()
+
+@InterceptorBinding(value=LifecycleBinding, kind=InterceptorKind.POST_CONSTRUCT)
+@Singleton
+class PostConstructInterceptor(MethodInterceptor):
+    count: int = 0
+
+    def intercept(self, context: MethodInvocationContext):
+        self.count += 1
+        return context.proceed()
+
+@LifecycleBinding
+@Singleton
+class LifecycleService:
+    def __init__(self):
+        self.count = 0
+
+    @Executable
+    def call(self) -> str:
+        return "ok"
+
+    @Executable
+    def get_count(self) -> int:
+        return self.count
+
+    @PostConstruct
+    def init(self):
+        self.count += 1
+
+class Product:
+    @Executable
+    def call(self) -> str:
+        return "product"
+
+@Factory
+class ProductFactory:
+    @LifecycleBinding
+    @Singleton
+    def product(self) -> Product:
+        return Product()
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def aroundInterceptor = getBean(context, "python.AroundInterceptor")
+        def postConstructInterceptor = getBean(context, "python.PostConstructInterceptor")
+        def service = getBean(context, "python.LifecycleService")
+
+        then:
+        service.get_count() == 1
+        aroundInterceptor.count == 2
+        postConstructInterceptor.count == 1
+
+        when:
+        service.call()
+
+        then:
+        aroundInterceptor.count == 3
+        postConstructInterceptor.count == 1
+
+        when:
+        def product = getBean(context, "python.Product")
+
+        then:
+        product.call() == "product"
+        aroundInterceptor.count == 5
+        postConstructInterceptor.count == 2
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test lifecycle interceptor bindings without around advice"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import InterceptorBinding, MethodInvocationContext
+from micronaut.context.annotation import Executable
+from jakarta.annotation import PostConstruct
+from jakarta.inject import Singleton
+import java
+
+InterceptorKind = java.type("io.micronaut.aop.InterceptorKind")
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBinding(kind=InterceptorKind.PRE_DESTROY)
+@InterceptorBinding(kind=InterceptorKind.POST_CONSTRUCT)
+def LifecycleBinding(target):
+    return target
+
+@InterceptorBinding(value=LifecycleBinding, kind=InterceptorKind.POST_CONSTRUCT)
+@Singleton
+class PostConstructInterceptor(MethodInterceptor):
+    count: int = 0
+
+    def intercept(self, context: MethodInvocationContext):
+        self.count += 1
+        return context.proceed()
+
+@InterceptorBinding(value=LifecycleBinding, kind=InterceptorKind.PRE_DESTROY)
+@Singleton
+class PreDestroyInterceptor(MethodInterceptor):
+    count: int = 0
+
+    def intercept(self, context: MethodInvocationContext):
+        self.count += 1
+        return context.proceed()
+
+@LifecycleBinding
+@Singleton
+class LifecycleService:
+    def __init__(self):
+        self.initialized = False
+
+    @PostConstruct
+    def init(self):
+        self.initialized = True
+
+    @Executable
+    def is_initialized(self) -> bool:
+        return self.initialized
+
+    def call(self) -> str:
+        return "ok"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def postConstructInterceptor = getBean(context, "python.PostConstructInterceptor")
+        def preDestroyInterceptor = getBean(context, "python.PreDestroyInterceptor")
+        def service = getBean(context, "python.LifecycleService")
+
+        then:
+        service.is_initialized()
+        postConstructInterceptor.count == 1
+        preDestroyInterceptor.count == 0
+
+        when:
+        context.destroyBean(service)
+
+        then:
+        preDestroyInterceptor.count == 1
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test pre destroy interceptor binding on around advised bean"() {
+        given:
+        def pythonCode = '''
+from micronaut.aop import Around, InterceptorBinding, MethodInvocationContext
+from jakarta.annotation import PostConstruct
+from jakarta.inject import Singleton
+import java
+
+InterceptorKind = java.type("io.micronaut.aop.InterceptorKind")
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+System = java.type("java.lang.System")
+
+@Around
+@InterceptorBinding(kind=InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(kind=InterceptorKind.PRE_DESTROY)
+def LifecycleBinding(target):
+    return target
+
+@InterceptorBinding(value=LifecycleBinding, kind=InterceptorKind.PRE_DESTROY)
+@Singleton
+class PreDestroyInterceptor(MethodInterceptor):
+    count: int = 0
+
+    def intercept(self, context: MethodInvocationContext):
+        self.count += 1
+        System.setProperty("python.lifecycle.preDestroyInterceptor.count", str(self.count))
+        return context.proceed()
+
+@LifecycleBinding
+@Singleton
+class LifecycleService:
+    @PostConstruct
+    def init(self):
+        pass
+
+    def call(self) -> str:
+        return "ok"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def preDestroyInterceptor = getBean(context, "python.PreDestroyInterceptor")
+        def service = getBean(context, "python.LifecycleService")
+        service.call()
+        context.destroyBean(service)
+
+        then:
+        System.getProperty("python.lifecycle.preDestroyInterceptor.count") == "1"
+
+        cleanup:
+        System.clearProperty("python.lifecycle.preDestroyInterceptor.count")
+        context?.close()
     }
 }

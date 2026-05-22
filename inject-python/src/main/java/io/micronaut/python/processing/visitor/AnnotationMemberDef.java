@@ -30,6 +30,8 @@ import java.util.Objects;
  *
  * @param name       The name of the annotation member
  * @param memberType The member type of the annotation
+ * @param annotationMetadata The annotation metadata for the member
+ * @param decorators Decorators applied to the member
  * @author Micronaut Team
  * @since 5.0.0
  */
@@ -37,6 +39,15 @@ public record AnnotationMemberDef(String name,
                                   @Nullable ClassElement memberType,
                                   @Nullable AnnotationMetadata annotationMetadata,
                                   @Nullable List<DecoratorDef> decorators) implements ElementDef, AnnotationMetadataProvider {
+    public AnnotationMemberDef {
+        Objects.requireNonNull(name, "Annotation member name cannot be null");
+        if (decorators == null) {
+            decorators = List.of();
+        } else {
+            decorators = List.copyOf(decorators);
+        }
+    }
+
     public AnnotationMemberDef(String name,
                                @Nullable ClassElement memberType,
                                @Nullable AnnotationMetadata annotationMetadata) {
@@ -56,12 +67,4 @@ public record AnnotationMemberDef(String name,
         return annotationMetadata;
     }
 
-    public AnnotationMemberDef {
-        Objects.requireNonNull(name, "Annotation member name cannot be null");
-        if (decorators == null) {
-            decorators = List.of();
-        } else {
-            decorators = List.copyOf(decorators);
-        }
-    }
 }

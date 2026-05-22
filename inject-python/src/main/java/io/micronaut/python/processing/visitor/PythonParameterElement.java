@@ -20,7 +20,6 @@ import java.util.Objects;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
@@ -37,6 +36,10 @@ import io.micronaut.python.processing.util.GraalPyUtil;
  * @since 5.0.0
  */
 public final class PythonParameterElement extends AbstractPythonElement implements ParameterElement {
+    private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
+    private static final String ANN_VALID = "jakarta.validation.Valid";
+    private static final String ANN_VALIDATED_ELEMENT = "io.micronaut.validation.annotation.ValidatedElement";
+
     private final PythonProcessingEnvironment environment;
     private final ClassElement type;
     private final PythonMethodElement methodElement;
@@ -57,6 +60,9 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
         // Resolve parameter type
         this.type = resolveType(argumentDef);
         this.argumentDef = argumentDef;
+        if (hasValidationAnnotation(type)) {
+            annotate(ANN_VALIDATED_ELEMENT);
+        }
     }
 
     @Override
@@ -66,19 +72,22 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
 
     @Override
     public ClassElement getType() {
+        if (methodElement.requiresResolvedParameterType()) {
+            ClassElement classElement = resolveType(argumentDef, methodElement.getBoundGenericTypes());
+            if (!classElement.getTypeArguments().isEmpty()) {
+                classElement = classElement.getRawClassElement();
+            }
+            if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
+                return pythonClassElement.withTypeAnnotationsKey(argumentDef);
+            }
+            return classElement;
+        }
         return type;
     }
 
     @Override
     public ClassElement getGenericType() {
-        Map<String, Map<String, ClassElement>> allGenerics = methodElement.getOwningType().getAllTypeArguments();
-        ClassDef classDef = methodElement.getNativeType().declaringClass();
-        Map<String, ClassElement> boundGenerics = classDef != null ? allGenerics.getOrDefault(classDef.qualifiedName(), Map.of()) : Map.of();
-        ClassElement classElement = GraalPyUtil.resolvePythonTypeToJava(
-            getNativeType().typeAnnotation(),
-            environment.visitorContext(),
-            boundGenerics
-        );
+        ClassElement classElement = resolveType(argumentDef, methodElement.getBoundGenericTypes());
         if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
             return pythonClassElement.withTypeAnnotationsKey(argumentDef);
         }
@@ -86,13 +95,17 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
     }
 
     private ClassElement resolveType(ArgumentDef argumentDef) {
+        ClassElement classElement = resolveType(argumentDef, Map.of());
+        if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
+            return pythonClassElement.withTypeAnnotationsKey(argumentDef);
+        }
+        return classElement;
+    }
+
+    private ClassElement resolveType(ArgumentDef argumentDef, Map<String, ClassElement> boundTypes) {
         if (argumentDef.typeAnnotation() != null) {
             // Use the same type resolution logic as fields
-            ClassElement classElement = GraalPyUtil.resolvePythonTypeToJava(argumentDef.typeAnnotation(), environment.visitorContext(), Map.of());
-            if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
-                return pythonClassElement.withTypeAnnotationsKey(argumentDef);
-            }
-            return classElement;
+            return GraalPyUtil.resolvePythonTypeToJava(argumentDef.typeAnnotation(), environment.visitorContext(), boundTypes);
         }
 
         // Fall back to Object when no type annotation
@@ -122,5 +135,18 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
     @Override
     public ParameterElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return (ParameterElement) super.withAnnotationMetadata(annotationMetadata);
+    }
+
+    private static boolean hasValidationAnnotation(ClassElement classElement) {
+        AnnotationMetadata annotationMetadata = classElement.getAnnotationMetadata();
+        if (annotationMetadata.hasStereotype(ANN_CONSTRAINT) || annotationMetadata.hasAnnotation(ANN_VALID)) {
+            return true;
+        }
+        for (ClassElement typeArgument : classElement.getTypeArguments().values()) {
+            if (hasValidationAnnotation(typeArgument)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

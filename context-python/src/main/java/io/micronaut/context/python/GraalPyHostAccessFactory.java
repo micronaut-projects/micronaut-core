@@ -147,7 +147,7 @@ final class GraalPyHostAccessFactory {
     }
 
     private static @Nullable TargetTypeMapping<?> findMapping(@Nullable Value value, Collection<TargetTypeMapping<?>> mappings) {
-        if (value == null || value.isNull() || !value.hasMembers()) {
+        if (value == null || value.isNull() || value.isHostObject() || !value.hasMembers()) {
             return null;
         }
         Value cls = value.getMember(CLASS_META);
@@ -231,7 +231,7 @@ final class GraalPyHostAccessFactory {
     }
 
     private static @Nullable ValueCoercible valueCoercibleHost(@Nullable Value value) {
-        if (value == null || value.isNull() || !value.hasMembers() || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+        if (value == null || value.isNull() || value.isHostObject() || !value.hasMembers() || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
             return null;
         }
         Value hostReferenceValue = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);

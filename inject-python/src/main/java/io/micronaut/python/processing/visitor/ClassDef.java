@@ -33,6 +33,7 @@ import java.util.Objects;
  * @param functions The functions defined in the class.
  * @param attributes The attributes defined in the class.
  * @param properties The properties defined in the class.
+ * @param nestedClasses The direct nested classes defined in the class.
  * @param constructor The constructor function (__init__) if present.
  * @param isEnum Whether this class is an enum.
  * @param values The enum values if this is an enum.
@@ -48,6 +49,7 @@ public record ClassDef(
     List<FunctionDef> functions,
     List<AttributeDef> attributes,
     List<PropertyDef> properties,
+    List<ClassDef> nestedClasses,
     FunctionDef constructor,
     boolean isEnum,
     List<String> values,
@@ -58,29 +60,64 @@ public record ClassDef(
         Objects.requireNonNull(name, "Decorator name cannot be null");
         if (bases == null) {
             bases = List.of();
+        } else {
+            bases = List.copyOf(bases);
         }
         if (decorators == null) {
             decorators = List.of();
+        } else {
+            decorators = List.copyOf(decorators);
         }
         if (typeParams == null) {
             typeParams = List.of();
+        } else {
+            typeParams = List.copyOf(typeParams);
         }
 
         if (functions == null) {
             functions = List.of();
+        } else {
+            functions = List.copyOf(functions);
         }
 
         if (attributes == null) {
             attributes = List.of();
+        } else {
+            attributes = List.copyOf(attributes);
         }
 
         if (properties == null) {
             properties = List.of();
+        } else {
+            properties = List.copyOf(properties);
+        }
+
+        if (nestedClasses == null) {
+            nestedClasses = List.of();
+        } else {
+            nestedClasses = List.copyOf(nestedClasses);
         }
 
         if (values == null) {
             values = List.of();
+        } else {
+            values = List.copyOf(values);
         }
+    }
+
+    public ClassDef(String name,
+                    String packageName,
+                    List<TypeRef> bases,
+                    List<DecoratorDef> decorators,
+                    List<TypeVar> typeParams,
+                    List<FunctionDef> functions,
+                    List<AttributeDef> attributes,
+                    List<PropertyDef> properties,
+                    FunctionDef constructor,
+                    boolean isEnum,
+                    List<String> values,
+                    String documentation) {
+        this(name, packageName, bases, decorators, typeParams, functions, attributes, properties, List.of(), constructor, isEnum, values, documentation);
     }
 
     public ClassDef(String name) {
@@ -99,7 +136,7 @@ public record ClassDef(
             decorators, typeParams,
             functions,
             attributes,
-            properties, constructor.withClassDef(this), isEnum, values, documentation);
+            properties, nestedClasses, constructor.withClassDef(this), isEnum, values, documentation);
     }
 
     public ClassDef withFunction(FunctionDef function) {
@@ -116,6 +153,7 @@ public record ClassDef(
             functions,
             attributes,
             properties,
+            nestedClasses,
             constructor,
             isEnum,
             values,
@@ -129,7 +167,7 @@ public record ClassDef(
         AttributeDef attributeWithDeclaringClass = attribute.withDeclaringClass(this);
         List<AttributeDef> attributes = new ArrayList<>(this.attributes);
         attributes.add(attributeWithDeclaringClass);
-        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, constructor, isEnum, values, documentation);
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, isEnum, values, documentation);
     }
 
     public ClassDef withProperty(PropertyDef property) {
@@ -138,11 +176,18 @@ public record ClassDef(
         PropertyDef propertyWithDeclaringClass = property.withDeclaringClass(this);
         List<PropertyDef> properties = new ArrayList<>(this.properties);
         properties.add(propertyWithDeclaringClass);
-        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, constructor, isEnum, values, documentation);
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, isEnum, values, documentation);
+    }
+
+    public ClassDef withNestedClass(ClassDef nestedClass) {
+        Objects.requireNonNull(nestedClass, "Nested class cannot be null");
+        List<ClassDef> nestedClasses = new ArrayList<>(this.nestedClasses);
+        nestedClasses.add(nestedClass);
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, isEnum, values, documentation);
     }
 
     public ClassDef withEnum(boolean isEnum, List<String> values) {
-        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, constructor, isEnum, values, documentation);
+        return new ClassDef(name, packageName, bases, decorators, typeParams, functions, attributes, properties, nestedClasses, constructor, isEnum, values, documentation);
     }
 
     public String qualifiedName() {

@@ -1,5 +1,6 @@
 package io.micronaut.python.annotation.processing.test.annotate
 
+import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.GenericPlaceholderElement
@@ -33,6 +34,29 @@ class AnnotateMethodParameterClass:
 ''')
         then:
             validate(definition)
+    }
+
+    void 'test annotating method parameter element'() {
+        when:
+            def definition = buildBeanDefinition('python', 'AnnotateMethodParameterElementClass', '''
+from micronaut.context.annotation import Bean, Executable
+
+class MyBean2:
+    name: str
+
+@Bean
+class AnnotateMethodParameterElementClass:
+
+    @Executable
+    def receive(self, param: MyBean2) -> MyBean2:
+        return nil
+
+''')
+            def method = definition.findPossibleMethods("receive").findAny().get()
+            def argument = method.arguments[0]
+
+        then:
+            argument.annotationMetadata.stringValue("foo.bar.ParameterAnn", "foo").get() == "bar"
     }
 
     void validate(BeanDefinition definition) {
@@ -131,6 +155,24 @@ class AnnotateMethodParameterClass:
                 assert method2GenericType.getTypeAnnotationMetadata().isEmpty()
                 assert method2GenericType.getAnnotationMetadata().isEmpty()
 
+            }
+
+            if (classElement.getSimpleName() == "AnnotateMethodParameterElementClass") {
+                def receiveMethod = classElement.findMethod("receive").get()
+                def parameter = receiveMethod.getParameters()[0]
+
+                parameter.annotate("foo.bar.ParameterAnn") { AnnotationValueBuilder builder ->
+                    builder.member("foo", "bar")
+                }
+
+                assert parameter.getAnnotationMetadata().stringValue("foo.bar.ParameterAnn", "foo").get() == "bar"
+                assert context.getClassElement("python.AnnotateMethodParameterElementClass").get()
+                    .findMethod("receive").get()
+                    .getParameters()[0]
+                    .getAnnotationMetadata()
+                    .stringValue("foo.bar.ParameterAnn", "foo")
+                    .get() == "bar"
+                assert context.getClassElement("python.MyBean2").get().getAnnotationMetadata().isEmpty()
             }
 
         }

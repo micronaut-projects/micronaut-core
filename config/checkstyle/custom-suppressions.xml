@@ -7,7 +7,7 @@
 <suppressions>
 
     <suppress checks="FileLength"
-      files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|BeanDefinitionInjectProcessor.java|AbstractBeanDefinition.java|AbstractInitializableBeanDefinition.java|DefaultValidator.java|RoutingInBoundHandler.java|DefaultAnnotationMetadata.java|AbstractAnnotationMetadataBuilder.java"/>
+      files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java|BeanDefinitionInjectProcessor.java|AbstractBeanDefinition.java|AbstractInitializableBeanDefinition.java|DefaultValidator.java|RoutingInBoundHandler.java|DefaultAnnotationMetadata.java|AbstractAnnotationMetadataBuilder.java|PythonStubGenerator.java"/>
 
     <suppress checks="DeclarationOrder" files="UriTemplate.java"/>
 

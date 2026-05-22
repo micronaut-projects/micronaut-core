@@ -23,14 +23,23 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Mapper
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.expressions.EvaluatedExpressionReference
+import io.micronaut.data.annotation.Relation
+import io.micronaut.data.model.Association
+import io.micronaut.data.processor.model.SourcePersistentEntity
+import io.micronaut.data.processor.model.criteria.impl.SourcePersistentEntityCriteriaBuilderImpl
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PrimitiveElement
+import io.micronaut.python.compiler.PyronautCompiler
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
 import io.micronaut.python.compiler.RepeatableAnnotation
+import jakarta.validation.constraints.NotBlank
 import spock.lang.PendingFeature
 import spock.lang.Unroll
 
@@ -63,6 +72,31 @@ class TestClass:
         then:
         classElement != null
         classElement.getSimpleName() == "TestClass"
+    }
+
+    def "test class element exposes generated Python name"() {
+        expect:
+        buildClassElement('''
+class Test:
+    pass
+''') { ClassElement element ->
+            assert element.name == "python.Test"
+            assert element.canonicalName == "python.Test"
+            assert element.simpleName == "Test"
+            return element
+        }
+    }
+
+    def "test class element exposes generated Python package"() {
+        expect:
+        buildClassElement('''
+class Test:
+    pass
+''') { ClassElement element ->
+            assert element.package.name == "python"
+            assert element.package.simpleName == "python"
+            return element
+        }
     }
 
     def "test build class element with methods"() {
@@ -343,6 +377,95 @@ class MyBase(Generic[T]):
         }
     }
 
+    def "test nested collection return type keeps concrete generic model"() {
+        expect:
+        buildClassElement('''
+class NestedCollections:
+    def values(self) -> list[list[list[str]]]:
+        return []
+''') { ClassElement element ->
+            def method = element.findMethod("values").get()
+
+            def genericType = method.genericReturnType
+            def genericTypeLevel1 = genericType.typeArguments["E"]
+            assert !genericTypeLevel1.genericPlaceholder
+            assert !genericTypeLevel1.wildcard
+            def genericTypeLevel2 = genericTypeLevel1.typeArguments["E"]
+            assert !genericTypeLevel2.genericPlaceholder
+            assert !genericTypeLevel2.wildcard
+            def genericTypeLevel3 = genericTypeLevel2.typeArguments["E"]
+            assert genericTypeLevel3.name == String.name
+            assert !genericTypeLevel3.genericPlaceholder
+            assert !genericTypeLevel3.wildcard
+
+            def type = method.returnType
+            def typeLevel1 = type.typeArguments["E"]
+            assert !typeLevel1.genericPlaceholder
+            assert !typeLevel1.wildcard
+            def typeLevel2 = typeLevel1.typeArguments["E"]
+            assert !typeLevel2.genericPlaceholder
+            assert !typeLevel2.wildcard
+            def typeLevel3 = typeLevel2.typeArguments["E"]
+            assert typeLevel3.name == String.name
+            assert !typeLevel3.genericPlaceholder
+            assert !typeLevel3.wildcard
+            return element
+        }
+    }
+
+    def "test generic return type argument keeps class placeholder model"() {
+        given:
+        def pythonCode = '''
+from typing import Generic, TypeVar
+
+T = TypeVar('T')
+
+class Box(Generic[T]):
+    pass
+
+class MyGeneric(Generic[T]):
+    def items(self) -> list[T]:
+        return []
+
+    def box(self) -> Box[T]:
+        return Box()
+'''
+
+        expect:
+        buildClassElement(pythonCode, "MyGeneric") { ClassElement element ->
+            def items = element.findMethod("items").get()
+            def itemsGenericArgument = items.genericReturnType.typeArguments["E"]
+            def itemsArgument = items.returnType.typeArguments["E"]
+
+            assert itemsGenericArgument instanceof GenericPlaceholderElement
+            assert itemsGenericArgument.genericPlaceholder
+            assert !itemsGenericArgument.rawType
+            assert !itemsGenericArgument.wildcard
+            assert (itemsGenericArgument as GenericPlaceholderElement).variableName == "T"
+            assert (itemsGenericArgument as GenericPlaceholderElement).declaringElement.get() == element
+
+            assert itemsArgument instanceof GenericPlaceholderElement
+            assert itemsArgument.genericPlaceholder
+            assert !itemsArgument.rawType
+            assert !itemsArgument.wildcard
+            assert (itemsArgument as GenericPlaceholderElement).variableName == "T"
+            assert (itemsArgument as GenericPlaceholderElement).declaringElement.get() == element
+
+            def box = element.findMethod("box").get()
+            def boxGenericArgument = box.genericReturnType.typeArguments["T"]
+            def boxArgument = box.returnType.typeArguments["T"]
+
+            assert boxGenericArgument instanceof GenericPlaceholderElement
+            assert (boxGenericArgument as GenericPlaceholderElement).variableName == "T"
+            assert (boxGenericArgument as GenericPlaceholderElement).declaringElement.get() == element
+
+            assert boxArgument instanceof GenericPlaceholderElement
+            assert (boxArgument as GenericPlaceholderElement).variableName == "T"
+            assert (boxArgument as GenericPlaceholderElement).declaringElement.get() == element
+            return element
+        }
+    }
+
 
     def "test generic type arguments populated from actual types in inheritance"() {
         given:
@@ -373,6 +496,41 @@ class MyDerived(MyBase[str]):
             assert methods[0].returnType.name == Object.name
             assert methods[0].parameters[0].genericType.name == String.name
             assert methods[0].parameters[0].type.name == Object.name
+            return element
+        }
+    }
+
+    def "test generic type arguments expose concrete type members from base class"() {
+        given:
+        def pythonCode = '''
+from typing import Generic, TypeVar
+
+E = TypeVar('E')
+ID = TypeVar('ID')
+
+class Repo(Generic[E, ID]):
+    pass
+
+class MyBean:
+    name: str
+
+    def display_name(self) -> str:
+        return self.name
+
+class MyRepo(Repo[MyBean, int]):
+    pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "MyRepo") { ClassElement element ->
+            def repoTypeArguments = element.getTypeArguments("python.Repo")
+            def entityType = repoTypeArguments["E"]
+            def idType = repoTypeArguments["ID"]
+
+            assert entityType.simpleName == "MyBean"
+            assert entityType.getBeanProperties()*.name == ["name"]
+            assert entityType.getMethods()*.name.contains("display_name")
+            assert idType.name == "int"
             return element
         }
     }
@@ -545,6 +703,91 @@ class MyDataSource(DataSource):
         }
     }
 
+    def "test Java interface bridge methods use interface generic signatures"() {
+        given:
+        def pythonCode = '''
+import java
+
+from javax.sql import DataSource
+from jakarta.inject import Singleton
+from micronaut.context.event import BeanCreatedEvent, BeanCreatedEventListener
+from micronaut.core.bind import ArgumentBinder
+from micronaut.core.convert import ArgumentConversionContext, ConversionContext, TypeConverter
+from micronaut.core.type import Argument
+from micronaut.data.repository import CrudRepository
+from micronaut.http import HttpRequest, HttpResponse
+from micronaut.http.bind.binders import TypedRequestArgumentBinder
+from micronaut.http.filter import HttpServerFilter, ServerFilterChain
+from micronaut.http.server.netty import NettyServerCustomizer
+from micronaut.runtime.http.scope import RequestAware
+from java.lang import RuntimeException
+from java.time import LocalDate
+from java.util import Map, Optional
+
+ExceptionHandler = java.type("io.micronaut.http.server.exceptions.ExceptionHandler")
+Publisher = java.type("org.reactivestreams.Publisher")
+
+class MyDataSource(DataSource):
+    pass
+
+class RequestIdentifier(RequestAware):
+    def setRequest(self, request: HttpRequest):
+        pass
+
+class OutOfStockException(RuntimeException):
+    pass
+
+@Singleton
+class OutOfStockExceptionHandler(ExceptionHandler[OutOfStockException, HttpResponse]):
+    def handle(self, request: HttpRequest, e: OutOfStockException) -> HttpResponse:
+        return HttpResponse.badRequest()
+
+@Singleton
+class RegistryCustomizer(BeanCreatedEventListener[NettyServerCustomizer.Registry]):
+    def onCreated(self, event: BeanCreatedEvent[NettyServerCustomizer.Registry]) -> NettyServerCustomizer.Registry:
+        return event.getBean()
+
+@Singleton
+class MapToLocalDateConverter(TypeConverter[Map, LocalDate]):
+    def convert(self, source: Map, target_type: type[LocalDate], context: ConversionContext) -> Optional:
+        return Optional.empty()
+
+@Singleton
+class ShoppingCartRequestArgumentBinder(TypedRequestArgumentBinder):
+    def bind(self, context: ArgumentConversionContext, source: HttpRequest):
+        return ArgumentBinder.BindingResult.empty()
+
+    def argumentType(self):
+        return Argument.of(str)
+
+class ResponseFilter(HttpServerFilter):
+    def doFilter(self, request: HttpRequest, chain: ServerFilterChain) -> Publisher:
+        return chain.proceed(request)
+
+class Person:
+    pass
+
+class PersonRepository(CrudRepository[Person, int]):
+    pass
+'''
+
+        when:
+        def classLoader = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .build()
+            .buildClassLoader()
+
+        then:
+        classLoader.loadClass("python.MyDataSource") != null
+        classLoader.loadClass("python.RequestIdentifier") != null
+        classLoader.loadClass("python.OutOfStockExceptionHandler") != null
+        classLoader.loadClass("python.RegistryCustomizer") != null
+        classLoader.loadClass("python.MapToLocalDateConverter") != null
+        classLoader.loadClass("python.ShoppingCartRequestArgumentBinder") != null
+        classLoader.loadClass("python.ResponseFilter") != null
+        classLoader.loadClass("python.PersonRepository") != null
+    }
+
     def "test generic type arguments populated from function return types and arguments"() {
         given:
         def pythonCode = '''
@@ -575,11 +818,181 @@ class MyClass:
         }
     }
 
-    @PendingFeature(reason = """
-Function _parse_function_type_params in micronaut_processor.py cannot find type_params
+    def "test annotations from python types propagate to method type elements"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
 
-FunctionDef https://docs.python.org/3/library/ast.html#ast.FunctionDef defines type_params but only since 3.12 so maybe a Python version issue.
-""")
+@Introspected
+@dataclass
+class Product:
+    name: str
+
+class ProductService:
+    def save(self, product: Product) -> Product:
+        return product
+
+    def list_products(self, products: list[Product]) -> list[Product]:
+        return products
+'''
+
+        expect:
+        buildClassElement(pythonCode, "ProductService") { ClassElement element ->
+            def save = element.findMethod("save").get()
+            assert save.returnType.hasAnnotation("io.micronaut.core.annotation.Introspected")
+            assert save.genericReturnType.hasAnnotation("io.micronaut.core.annotation.Introspected")
+            assert save.parameters[0].type.hasAnnotation("io.micronaut.core.annotation.Introspected")
+            assert save.parameters[0].genericType.hasAnnotation("io.micronaut.core.annotation.Introspected")
+
+            def listProducts = element.findMethod("list_products").get()
+            def returnTypeArgument = listProducts.genericReturnType.firstTypeArgument.get()
+            assert returnTypeArgument.name == "python.Product"
+            assert returnTypeArgument.hasAnnotation("io.micronaut.core.annotation.Introspected")
+
+            def parameterTypeArgument = listProducts.parameters[0].genericType.firstTypeArgument.get()
+            assert parameterTypeArgument.name == "python.Product"
+            assert parameterTypeArgument.hasAnnotation("io.micronaut.core.annotation.Introspected")
+            return element
+        }
+    }
+
+    def "test nullability on generic return type arguments"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from java.util.concurrent import CompletionStage
+from micronaut.core.annotation import NonNull, Nullable
+
+class TypeTestService:
+    def not_nullable_method(self) -> CompletionStage[Annotated[str, NonNull]]:
+        pass
+
+    def nullable_method(self) -> CompletionStage[Annotated[str, Nullable]]:
+        pass
+
+    def pep604_nullable_method(self) -> CompletionStage[str | None]:
+        pass
+
+    def method(self) -> CompletionStage[str]:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "TypeTestService") { ClassElement element ->
+            def notNullableMethod = element.findMethod("not_nullable_method").get()
+            def nullableMethod = element.findMethod("nullable_method").get()
+            def pep604NullableMethod = element.findMethod("pep604_nullable_method").get()
+            def method = element.findMethod("method").get()
+
+            def notNullableType = notNullableMethod.genericReturnType.getFirstTypeArgument().get()
+            assert notNullableType.isNonNull()
+            assert !notNullableType.isNullable()
+
+            def nullableType = nullableMethod.genericReturnType.getFirstTypeArgument().get()
+            assert !nullableType.isNonNull()
+            assert nullableType.isNullable()
+
+            def pep604NullableType = pep604NullableMethod.genericReturnType.getFirstTypeArgument().get()
+            assert !pep604NullableType.isNonNull()
+            assert pep604NullableType.isNullable()
+
+            def type = method.genericReturnType.getFirstTypeArgument().get()
+            assert !type.isNonNull()
+            assert !type.isNullable()
+            return element
+        }
+    }
+
+    def "test quoted nullable forward reference property preserves target type"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from typing import Annotated
+from micronaut.core.annotation import Nullable
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity, Relation
+
+@dataclass
+@MappedEntity
+class Message:
+    room: Annotated["Room | None", Nullable, Relation(value="MANY_TO_ONE")] = None
+    id: Annotated[int | None, Id, GeneratedValue] = None
+
+@dataclass
+@MappedEntity
+class Room:
+    name: str
+    id: Annotated[int | None, Id, GeneratedValue] = None
+'''
+
+        expect:
+        buildClassElement(pythonCode, "Message") { ClassElement element ->
+            def room = element.beanProperties.find { it.name == "room" }
+            assert room != null
+            assert room.type.name == "python.Room"
+            assert room.type.isNullable()
+            assert room.hasAnnotation("io.micronaut.data.annotation.Relation")
+            assert room.enumValue(Relation, "value", Relation.Kind).get() == Relation.Kind.MANY_TO_ONE
+            def entity = new SourcePersistentEntity(element, ce -> new SourcePersistentEntity(ce, c -> null))
+            def association = entity.persistentProperties.find { it.name == "room" } as Association
+            assert association != null
+            assert association.associatedEntity.name == "python.Room"
+            assert association.associatedEntity.hasIdentity()
+            return element
+        }
+    }
+
+    def "test nullable collection property preserves element type"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass, field
+from typing import Annotated
+from micronaut.core.annotation import Nullable
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity, Relation
+
+@dataclass
+@MappedEntity
+class Message:
+    content: str
+    id: Annotated[int | None, Id, GeneratedValue] = None
+
+@dataclass
+@MappedEntity
+class Room:
+    messages: Annotated[
+        list[Message] | None,
+        Nullable,
+        Relation(value="ONE_TO_MANY", mappedBy="room"),
+    ] = field(default_factory=list)
+'''
+
+        expect:
+        buildClassElement(pythonCode, "Room") { ClassElement element ->
+            def messages = element.beanProperties.find { it.name == "messages" }
+            assert messages != null
+            assert messages.type.name == List.name
+            assert messages.type.isNullable()
+            assert messages.type.firstTypeArgument.get().name == "python.Message"
+            assert messages.genericType.firstTypeArgument.get().name == "python.Message"
+            assert messages.hasAnnotation("io.micronaut.data.annotation.Relation")
+            assert messages.enumValue(Relation, "value", Relation.Kind).get() == Relation.Kind.ONE_TO_MANY
+            assert messages.stringValue(Relation, "mappedBy").get() == "room"
+            def entity = new SourcePersistentEntity(element, ce -> new SourcePersistentEntity(ce, c -> null))
+            def association = entity.persistentProperties.find { it.name == "messages" } as Association
+            assert association != null
+            assert association.associatedEntity.name == "python.Message"
+            assert association.associatedEntity.hasIdentity()
+            Function<ClassElement, SourcePersistentEntity> resolver = ce -> new SourcePersistentEntity(ce, c -> null)
+            def criteriaBuilder = new SourcePersistentEntityCriteriaBuilderImpl(resolver)
+            def query = criteriaBuilder.createQuery()
+            def root = query.from(entity)
+            def join = root.join("messages")
+            assert join.persistentEntity.name == "python.Message"
+            assert join.persistentEntity.hasIdentity()
+            return element
+        }
+    }
+
     def "test method-level type variables"() {
         given:
         def pythonCode = '''
@@ -668,6 +1081,50 @@ class TypeTestService:
         }
     }
 
+    def "test collection return types are assignable to iterable"() {
+        expect:
+        buildClassElement('''
+from typing import List
+
+class TypeTestService:
+    def method1(self) -> list[str]:
+        return []
+
+    def method2(self) -> List[str]:
+        return []
+''') { ClassElement element ->
+            def method1ReturnType = element.findMethod("method1").get().returnType
+            def method2ReturnType = element.findMethod("method2").get().returnType
+
+            assert method1ReturnType.isAssignable(Iterable)
+            assert method2ReturnType.isAssignable(Iterable)
+            assert method1ReturnType.isAssignable(List)
+            assert method2ReturnType.isAssignable(List)
+            return element
+        }
+    }
+
+    def "test nullable collection return type is assignable from non nullable collection return type"() {
+        expect:
+        buildClassElement('''
+class CartItem:
+    pass
+
+class Cart:
+    def cart_items(self) -> list[CartItem] | None:
+        return None
+
+    def cart_items_not_nullable(self) -> list[CartItem]:
+        return []
+''', "Cart") { ClassElement element ->
+            def nullableReturnType = element.findMethod("cart_items").get().returnType
+            def nonNullableReturnType = element.findMethod("cart_items_not_nullable").get().returnType
+
+            assert nullableReturnType.isAssignable(nonNullableReturnType)
+            return element
+        }
+    }
+
     def "test method parameter bytes type resolves to byte array"() {
         given:
         def pythonCode = '''
@@ -687,6 +1144,131 @@ class TypeTestService:
             assert parameter.genericType.name == "byte"
             assert parameter.genericType.array
             assert parameter.genericType.arrayDimensions == 1
+            return element
+        }
+    }
+
+    def "test primitive method return and parameter types"() {
+        given:
+        def pythonCode = '''
+class PrimitiveService:
+    def calculate(self, count: int, enabled: bool, ratio: float) -> int:
+        return count
+'''
+
+        expect:
+        buildClassElement(pythonCode, "PrimitiveService") { ClassElement element ->
+            def method = element.findMethod("calculate").get()
+
+            assert method.returnType.name == "int"
+            assert method.returnType.canonicalName == "int"
+            assert method.returnType.primitive
+            assert method.returnType.nonNull
+            assert !method.returnType.nullable
+            assert method.genericReturnType.nonNull
+            assert !method.genericReturnType.nullable
+
+            assert method.parameters*.type*.name == ["int", "boolean", "double"]
+            assert method.parameters*.type*.canonicalName == ["int", "boolean", "double"]
+            assert method.parameters.every { it.type.primitive }
+            assert method.parameters.every { it.type.nonNull }
+            assert method.parameters.every { !it.type.nullable }
+            assert method.parameters.every { it.genericType.nonNull }
+            assert method.parameters.every { !it.genericType.nullable }
+            return element
+        }
+    }
+
+    def "test primitive method types compare with primitive elements"() {
+        given:
+        def pythonCode = '''
+class PrimitiveComparison:
+    def enabled(self, count: int) -> bool:
+        return count > 0
+'''
+
+        expect:
+        buildClassElement(pythonCode, "PrimitiveComparison") { ClassElement element ->
+            def method = element.findMethod("enabled").get()
+            def parameterType = method.parameters[0].type
+            def returnType = method.returnType
+
+            assert element != PrimitiveElement.BOOLEAN
+            assert element != PrimitiveElement.VOID
+            assert element != PrimitiveElement.BOOLEAN.withArrayDimensions(4)
+            assert PrimitiveElement.VOID != element
+            assert PrimitiveElement.INT != element
+            assert PrimitiveElement.INT.withArrayDimensions(2) != element
+            assert parameterType == PrimitiveElement.INT
+            assert PrimitiveElement.INT == parameterType
+            assert returnType == PrimitiveElement.BOOLEAN
+            assert PrimitiveElement.BOOLEAN == returnType
+            return element
+        }
+    }
+
+    def "test method element query filters declared abstract and concrete methods"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+
+class Parent(ABC):
+    def parent_method(self) -> bool:
+        return True
+
+    @abstractmethod
+    def inherited_abstract(self) -> bool:
+        pass
+
+class QueryService(Parent):
+    def declared_method(self) -> bool:
+        return True
+
+    @abstractmethod
+    def declared_abstract(self) -> bool:
+        pass
+'''
+
+        expect:
+        buildClassElement(pythonCode, "QueryService") { ClassElement element ->
+            def allMethods = element.getEnclosedElements(ElementQuery.ALL_METHODS)
+            def declared = element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+            def abstractMethods = element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAbstract())
+            def concrete = element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyConcrete())
+
+            assert allMethods*.name as Set == ["declared_method", "declared_abstract", "parent_method", "inherited_abstract"] as Set
+            assert declared*.name as Set == ["declared_method", "declared_abstract"] as Set
+            assert abstractMethods*.name as Set == ["declared_abstract", "inherited_abstract"] as Set
+            assert concrete*.name as Set == ["declared_method", "parent_method"] as Set
+            return element
+        }
+    }
+
+    def "test constructor element query returns declared and inherited constructors"() {
+        given:
+        def pythonCode = '''
+class Parent:
+    def __init__(self, name: str):
+        self.name = name
+
+class ConstructorService(Parent):
+    def __init__(self, name: str, count: int):
+        super().__init__(name)
+        self.count = count
+'''
+
+        expect:
+        buildClassElement(pythonCode, "ConstructorService") { ClassElement element ->
+            def declaredConstructors = element.getEnclosedElements(ElementQuery.CONSTRUCTORS)
+            def allConstructors = element.getEnclosedElements(ElementQuery.of(ConstructorElement))
+
+            assert declaredConstructors.size() == 1
+            assert declaredConstructors.first().declaringType.name == "python.ConstructorService"
+            assert declaredConstructors.first().parameters*.name == ["name", "count"]
+            assert declaredConstructors.first().parameters*.type*.name == [String.name, "int"]
+
+            assert allConstructors.size() == 2
+            assert allConstructors*.declaringType*.name as Set == ["python.Parent", "python.ConstructorService"] as Set
             return element
         }
     }
@@ -728,6 +1310,59 @@ class PetClient(PetOperations):
             assert method.annotationMetadata.hasStereotype("io.micronaut.http.annotation.HttpMethodMapping")
             assert method.methodAnnotationMetadata.hasAnnotation("io.micronaut.core.async.annotation.SingleResult")
             assert method.methodAnnotationMetadata.hasAnnotation("io.micronaut.http.annotation.Post")
+            return element
+        }
+    }
+
+    def "test override method inherits parameter annotations from python base method"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from jakarta.validation.constraints import NotBlank
+
+class Repository:
+    def save(self, name: Annotated[str, NotBlank]) -> str:
+        return name
+
+class DefaultRepository(Repository):
+    def save(self, name: str) -> str:
+        return name
+'''
+
+        expect:
+        buildClassElement(pythonCode, "DefaultRepository") { ClassElement element ->
+            def method = element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+                .find { it.name == "save" }
+
+            assert method.parameters[0].hasAnnotation(NotBlank)
+            return element
+        }
+    }
+
+    def "test overridden method reports python base method"() {
+        given:
+        def pythonCode = '''
+from typing import Annotated
+from jakarta.validation.constraints import NotBlank
+
+class Repository:
+    def save(self, name: Annotated[str, NotBlank]) -> str:
+        return name
+
+class DefaultRepository(Repository):
+    def save(self, name: str) -> str:
+        return name
+'''
+
+        expect:
+        buildClassElement(pythonCode, "DefaultRepository") { ClassElement element ->
+            MethodElement method = element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+                .find { it.name == "save" }
+            def overridden = method.overriddenMethods
+
+            assert overridden.size() == 1
+            assert overridden.first().declaringType.name == "python.Repository"
+            assert overridden.first().parameters[0].hasAnnotation(NotBlank)
             return element
         }
     }

@@ -1,5 +1,6 @@
 package io.micronaut.python.annotation.processing.test.annotate
 
+import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
@@ -17,7 +18,8 @@ import io.micronaut.http.annotation.Error
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
-import spock.lang.PendingFeature
+
+import java.lang.annotation.Native
 
 class AnnotationMetadataWriterSpec extends AbstractPythonTypeElementSpec {
 
@@ -92,6 +94,25 @@ class Test:
         metadata.getValue(Requires, "property").get() == 'value'
     }
 
+    void "test source retention annotations are not retained"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from typing import Annotated
+from jakarta.inject import Inject, Singleton
+from java.lang.annotation import Native
+
+@Singleton
+class Test:
+    some_field: Annotated[str, Inject, Native] = None
+''')
+
+        when:
+        def injectedArgument = definition.injectedMethods.first().arguments[0]
+
+        then:
+        !injectedArgument.annotationMetadata.hasAnnotation(Native)
+    }
+
     void "test repeatable annotations are combined"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
@@ -127,6 +148,99 @@ class Test:
         properties[3].get("name", String).get() == "prop1"
         properties[4].get("name", String).get() == "prop3"
         properties[4].getValue(String).get() == "value3"
+    }
+
+    void "test method annotation metadata overrides class property metadata"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import Executable, Property
+from jakarta.inject import Singleton
+
+@Property(name="myprop", value="xyz")
+@Singleton
+class Test:
+
+    @Property(name="myprop", value="abc")
+    @Executable
+    def someMethod(self):
+        pass
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod").annotationMetadata
+
+        then:
+        metadata.stringValue(Property).get() == "abc"
+    }
+
+    void "test configuration properties metadata aliases to configuration reader"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import ConfigurationProperties
+
+@ConfigurationProperties(value="xyz", includes=["abc"], excludes=["lol"])
+class Test:
+    pass
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.annotationMetadata
+
+        then:
+        metadata.stringValue(ConfigurationReader, "prefix").get() == "xyz"
+        metadata.stringValue(ConfigurationReader, "includes").get() == "abc"
+        metadata.stringValue(ConfigurationReader, "excludes").get() == "lol"
+    }
+
+    void "test configuration properties stub does not copy configuration reader decorator"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import ConfigurationProperties
+
+@ConfigurationProperties(value="xyz", includes=["abc"], excludes=["lol"])
+class Test:
+    pass
+''')
+
+        when:
+        def resource = definition.class.classLoader.getResource(
+            'META-INF/GRAALPY-VFS/micronaut-application/src/micronaut/context/annotation/ConfigurationProperties.py'
+        )
+        def stub = resource?.text
+
+        then:
+        resource != null
+        stub.contains('@micronaut_annotation("io.micronaut.context.annotation.ConfigurationProperties")')
+        !stub.contains('@ConfigurationReader')
+        !stub.contains('@micronaut_annotation("io.micronaut.context.annotation.ConfigurationReader")')
+
+        and:
+        definition.annotationMetadata.stringValue(ConfigurationReader, "prefix").get() == "xyz"
+        definition.annotationMetadata.stringValue(ConfigurationReader, "includes").get() == "abc"
+        definition.annotationMetadata.stringValue(ConfigurationReader, "excludes").get() == "lol"
+    }
+
+    void "test method annotation metadata merges configuration reader metadata"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.context.annotation import ConfigurationProperties, Executable
+
+@ConfigurationProperties(value="xyz", includes=["abc"], excludes=["lol"])
+class Test:
+
+    @ConfigurationProperties(value="qwe", excludes=["foo"])
+    @Executable
+    def someMethod(self):
+        pass
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod").annotationMetadata
+
+        then:
+        metadata.stringValue(ConfigurationReader, "prefix").get() == "qwe"
+        metadata.stringValue(ConfigurationReader, "includes").get() == "abc"
+        metadata.stringValue(ConfigurationReader, "excludes").get() == "foo"
     }
 
     void "test repeatable annotations are combined, lookup by name"() {
@@ -294,6 +408,32 @@ class Test:
         !method.arguments[1].isNullable()
     }
 
+    void "test generated nullable annotation stub skips missing meta annotations"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.core.annotation import Nullable
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+from typing import Annotated
+
+@Singleton
+class Test:
+
+    @Executable
+    def testMethod(self, name: Annotated[str, Nullable]) -> None:
+        pass
+''')
+
+        when:
+        def resource = definition.class.classLoader.getResource(
+            'META-INF/GRAALPY-VFS/micronaut-application/src/micronaut/core/annotation/Nullable.py'
+        )
+
+        then:
+        resource != null
+        !resource.text.contains('jakarta.annotation.Nullable')
+    }
+
     void "test PEP 604 nullable annotated parameter is captured in method parameter metadata"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
@@ -317,6 +457,54 @@ class Test:
         then:
         method.arguments[0].isNullable()
         !method.arguments[1].isNullable()
+    }
+
+    void "test nullable non null and PEP 604 on method return and parameters"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from micronaut.core.annotation import NonNull, Nullable
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+from typing import Annotated
+
+@Singleton
+class Test:
+
+    @Executable
+    def nullableMethod(self, test: Annotated[str, Nullable]) -> Annotated[str, Nullable]:
+        return test
+
+    @Executable
+    def pep604NullableMethod(self, test: str | None) -> str | None:
+        return test
+
+    @Executable
+    def notNullableMethod(self, test: Annotated[str, NonNull]) -> Annotated[str, NonNull]:
+        return test
+''')
+
+        when:
+        def nullableMethod = definition.executableMethods.find { it.methodName == "nullableMethod" }
+        def pep604NullableMethod = definition.executableMethods.find { it.methodName == "pep604NullableMethod" }
+        def notNullableMethod = definition.executableMethods.find { it.methodName == "notNullableMethod" }
+
+        then:
+        nullableMethod.returnType.asArgument().isNullable()
+        !nullableMethod.returnType.asArgument().isNonNull()
+        nullableMethod.arguments[0].isNullable()
+        !nullableMethod.arguments[0].isNonNull()
+
+        and:
+        pep604NullableMethod.returnType.asArgument().isNullable()
+        !pep604NullableMethod.returnType.asArgument().isNonNull()
+        pep604NullableMethod.arguments[0].isNullable()
+        !pep604NullableMethod.arguments[0].isNonNull()
+
+        and:
+        !notNullableMethod.returnType.asArgument().isNullable()
+        notNullableMethod.returnType.asArgument().isNonNull()
+        !notNullableMethod.arguments[0].isNullable()
+        notNullableMethod.arguments[0].isNonNull()
     }
 
     void "test Python annotation decorator is generated as Java annotation type"() {
@@ -397,6 +585,50 @@ def CustomAnnotation(
         requires.beans()[0].name == "javax.sql.DataSource"
         requires.classes()[0].name == "python.AnnotationContext"
         interceptorBinding.kind() == InterceptorKind.POST_CONSTRUCT
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test Python annotation expression context methods are bridged"() {
+        given:
+        def context = buildContext('''
+from typing import Annotated
+
+from jakarta.inject import Singleton
+from micronaut.context.annotation import AnnotationExpressionContext
+
+@Singleton
+class AnnotationContext:
+    def firstValue(self) -> str:
+        return "first value"
+
+@Singleton
+class AnnotationMemberContext:
+    def secondValue(self) -> str:
+        return "second value"
+
+@AnnotationExpressionContext(AnnotationContext)
+def CustomAnnotation(
+    value: Annotated[str, AnnotationExpressionContext(AnnotationMemberContext)] = "",
+):
+    def decorator(bean):
+        return bean
+    return decorator
+
+@Singleton
+@CustomAnnotation(value="#{firstValue() + secondValue()}")
+class Example:
+    pass
+''')
+
+        when:
+        BeanDefinition definition = getBeanDefinition(context, "python.Example")
+        def value = definition.annotationMetadata.getValue("python.CustomAnnotation", "value", Object).get()
+
+        then:
+        value == "first valuesecond value"
+        definition.annotationMetadata.hasEvaluatedExpressions()
 
         cleanup:
         context?.close()
@@ -512,6 +744,56 @@ class Test:
         // Using the annotation type to query avoids string name mismatches
         metadata.getValue(PrimitiveTypesAnnotation, "doubleArray", double[].class).orElse(new double[0]) == [1.1d] as double[]
         metadata.doubleValue(PrimitiveTypesAnnotation, "doubleArray").asDouble == 1.1d
+    }
+
+    void "test annotation default values are available from annotation value"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from jakarta.inject import Singleton
+
+def Topic(value: str, qos: int = 1):
+    def decorator(func):
+        return func
+    return decorator
+
+@Singleton
+@Topic("test")
+class Test:
+    pass
+''')
+
+        when:
+        def annotationValue = definition.getAnnotation("python.Topic")
+
+        then:
+        annotationValue.getRequiredValue("qos", Integer) == 1
+    }
+
+    void "test annotation default values are written for constructor arguments"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
+from typing import Annotated
+from jakarta.inject import Singleton
+
+def ParamAnn(value: str = "default"):
+    def decorator(func):
+        return func
+    return decorator
+
+@Singleton
+class Foo:
+    pass
+
+@Singleton
+class Test:
+    def __init__(self, foo: Annotated[Foo, ParamAnn]):
+        self.foo = foo
+''')
+
+        expect:
+        definition.constructor.arguments[0].annotationMetadata
+            .getAnnotationType("python.ParamAnn")
+            .isPresent()
     }
 
 }

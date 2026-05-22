@@ -2,6 +2,12 @@ plugins {
     id("io.micronaut.build.internal.convention-library")
 }
 
+micronautBuild {
+    binaryCompatibility {
+        enabledAfter("5.1.0")
+    }
+}
+
 dependencies {
     api(projects.micronautInjectPython)
     api(projects.micronautContext)
@@ -16,6 +22,8 @@ dependencies {
     testImplementation(platform(libs.test.boms.micronaut.validation))
     testImplementation(platform(libs.test.boms.micronaut.data))
     testImplementation(platform(libs.test.boms.micronaut.sql))
+    testImplementation(libs.managed.reactor)
+    testImplementation(projects.micronautInjectJavaHelper)
     testImplementation(libs.micronaut.validation)
     testImplementation("io.micronaut.data:micronaut-data-processor") {
         exclude(group = "io.micronaut")

@@ -53,6 +53,9 @@ public final class GraalPyRuntimeUtil {
         if (value == null || value.isNull()) {
             return true;
         }
+        if (value.isHostObject()) {
+            return false;
+        }
         try {
             Value metaObject = value.getMetaObject();
             if (metaObject != null && metaObject.isMetaObject() && "NoneType".equals(metaObject.getMetaSimpleName())) {
@@ -254,6 +257,46 @@ public final class GraalPyRuntimeUtil {
             function = bindings.getMember(functionName);
         }
         return function;
+    }
+
+    /**
+     * Return a value as {@link Object} so generated code can perform unchecked generic casts.
+     *
+     * @param value The value
+     * @return The value as an object
+     */
+    public static @Nullable Object asObject(@Nullable Object value) {
+        return value;
+    }
+
+    /**
+     * Unwraps a generated Python wrapper that crossed a polyglot boundary as a host or proxy object.
+     *
+     * @param value The source polyglot value
+     * @param targetType The expected Java wrapper type
+     * @return The existing host wrapper, or {@code null} when the value is not one
+     */
+    public static @Nullable Object unwrapHostObject(@Nullable Value value, Class<?> targetType) {
+        if (value == null || isNone(value)) {
+            return null;
+        }
+        if (value.isHostObject()) {
+            Object hostObject = value.asHostObject();
+            return targetType.isInstance(hostObject) ? hostObject : null;
+        }
+        if (!value.hasMembers() || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+            return null;
+        }
+        Value hostReferenceValue = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
+        if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
+            return null;
+        }
+        Object hostReference = hostReferenceValue.asHostObject();
+        if (hostReference instanceof ValueCoercible.HostObjectReference reference) {
+            ValueCoercible hostObject = reference.value();
+            return targetType.isInstance(hostObject) ? hostObject : null;
+        }
+        return null;
     }
 
     /**
@@ -502,10 +545,6 @@ public final class GraalPyRuntimeUtil {
             return null;
         }
 
-        T mappedWrapper = convertMappedWrapper(value, targetType);
-        if (mappedWrapper != null) {
-            return mappedWrapper;
-        }
         if (value.isHostObject()) {
             Object hostObject = value.asHostObject();
             if (hostObject instanceof ProxyObject proxyObject) {
@@ -517,6 +556,10 @@ public final class GraalPyRuntimeUtil {
             if (targetType.isInstance(hostObject)) {
                 return targetType.cast(hostObject);
             }
+        }
+        T mappedWrapper = convertMappedWrapper(value, targetType);
+        if (mappedWrapper != null) {
+            return mappedWrapper;
         }
         return value.as(targetType);
     }

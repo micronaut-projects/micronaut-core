@@ -8,6 +8,14 @@ PYTHON_KEYWORD_METHOD_ALIASES = {
     for name in keyword.kwlist
 }
 
+META_ANNOTATIONS_TO_SKIP_IN_SOURCE = {
+    # ConfigurationReader is compile-time metadata for the configuration binder.
+    # Python keeps these aliases in Micronaut annotation metadata; copying the
+    # meta-annotation onto the generated decorator source is unnecessary and can
+    # make the stub diverge from the Java APT model.
+    "io.micronaut.context.annotation.ConfigurationReader",
+}
+
 def normalize_python_keyword_alias(name: str) -> str:
     if name.endswith('_') and keyword.iskeyword(name[:-1]):
         return name[:-1]
@@ -283,7 +291,8 @@ def micronaut_annotation(name, repeated=None):
         Track direct java.type() aliases so Java interface bases can be stripped
         from runtime Python classes before GraalPy creates host adapters.
         """
-        self._track_java_type_assignment(node)
+        if self._track_java_type_assignment(node):
+            return None
         return self.generic_visit(node)
 
     def visit_Attribute(self, node: ast.Attribute):
@@ -429,15 +438,22 @@ def micronaut_annotation(name, repeated=None):
 
     def _track_java_type_assignment(self, node: ast.Assign):
         if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
-            return
+            return False
         class_name = self._java_type_name(node.value)
         if not class_name:
-            return
+            return False
         variable_name = node.targets[0].id
         self._track_java_keyword_method_aliases(variable_name)
         class_element = self.callback_get_class_element(class_name)
         if class_element:
+            if self._is_annotation_class(class_element):
+                decorator_code = self._generate_decorator_from_class_element(class_element, variable_name)
+                if decorator_code:
+                    self.transformed_code.append(decorator_code)
+                    return True
+                return variable_name in self.generated_decorators
             self._track_java_class(variable_name, class_element)
+        return False
 
     def _track_java_class(self, variable_name: str, class_element):
         try:
@@ -626,16 +642,19 @@ def micronaut_annotation(name, repeated=None):
         annotation_names = annotation_metadata.getAnnotationNames()
         for meta_annotation_name in annotation_names:
             # Skip retention and other built-in annotations that aren't user-facing
-            if not meta_annotation_name.startswith('java.lang.annotation.'):
+            if (not meta_annotation_name.startswith('java.lang.annotation.')
+                    and meta_annotation_name not in META_ANNOTATIONS_TO_SKIP_IN_SOURCE):
                 meta_class_element = self.callback_get_class_element(meta_annotation_name)
                 if not meta_class_element or not self._is_annotation_class(meta_class_element):
                     continue
+                meta_decorator_name = self._meta_decorator_name(meta_annotation_name, annotation_name, meta_class_element)
+                if meta_decorator_name == decorator_name and meta_annotation_name != annotation_name:
+                    continue
 
-                meta_annotations.append((meta_annotation_name, meta_class_element))
+                meta_annotations.append((meta_annotation_name, meta_class_element, meta_decorator_name))
 
-        for meta_annotation_name, meta_class_element in meta_annotations:
+        for meta_annotation_name, meta_class_element, meta_decorator_name in meta_annotations:
             # Generate decorator for the meta-annotation if not already generated
-            meta_decorator_name = self._meta_decorator_name(meta_annotation_name, annotation_name, meta_class_element)
             if meta_decorator_name not in self.generated_decorators:
                 meta_decorator_code = self._generate_decorator_from_class_element(meta_class_element, meta_decorator_name)
                 if meta_decorator_code:
@@ -647,7 +666,7 @@ def micronaut_annotation(name, repeated=None):
         import_lines = []
         current_package = '.'.join(annotation_name.split('.')[:-1])  # Package of current annotation
 
-        for meta_annotation_name, _ in meta_annotations:
+        for meta_annotation_name, _, _ in meta_annotations:
             if '$' in meta_annotation_name:
                 continue
 

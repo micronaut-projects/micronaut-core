@@ -16,7 +16,10 @@
 package io.micronaut.context.python.aop;
 
 import io.micronaut.aop.Adapter;
+import io.micronaut.aop.AroundConstruct;
 import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.InterceptorBinding;
+import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.aop.runtime.RuntimeProxyCreator;
 import io.micronaut.aop.runtime.RuntimeProxyDefinition;
@@ -24,8 +27,12 @@ import io.micronaut.context.python.ContextHolder;
 import io.micronaut.context.python.GraalPyRuntimeUtil;
 import io.micronaut.context.python.ValueCoercible;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.FieldInjectionPoint;
 import jakarta.inject.Singleton;
@@ -60,6 +67,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private static final String SCOPED_PROXY_FACTORY = "__micronaut_create_scoped_proxy";
     private static final String SCOPED_PROXY_OVERRIDE_METHOD = "_micronaut_put_override";
+    private static final String SCOPED_PROXY_SETTER_OVERRIDE_METHOD = "_micronaut_put_setter_override";
     private static final String SCOPED_PROXY_REGISTER_MEMBER_METHOD = "_micronaut_register_member";
 
     @Override
@@ -87,7 +95,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         Map<String, ProxyExecutable> introductionFunctions = new LinkedHashMap<>();
         for (Map.Entry<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> entry : interceptedMethodsByName.entrySet()) {
             String methodName = entry.getKey();
-            List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods = entry.getValue();
+            List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods = entry.getValue()
+                .stream()
+                .map(interceptedMethod -> withoutConcreteIntroductionInterceptors(proxyDefinition, interceptedMethod))
+                .toList();
             Value originalFunction = GraalPyRuntimeUtil.getRawClassMember(value, methodName);
             ProxyExecutable proxiedFunction = createProxiedFunction(
                 true,
@@ -116,10 +127,86 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         return target;
     }
 
+    private static <T> RuntimeProxyDefinition.InterceptedMethod<T> withoutConcreteIntroductionInterceptors(
+        RuntimeProxyDefinition<T> proxyDefinition,
+        RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod) {
+        if (interceptedMethod.executableMethod().isAbstract()) {
+            return interceptedMethod;
+        }
+        Interceptor<T, Object>[] interceptors = interceptedMethod.interceptors();
+        if (interceptors.length == 0) {
+            return interceptedMethod;
+        }
+        Set<String> introductionOnlyBindings = introductionOnlyBindings(interceptedMethod.executableMethod());
+        if (introductionOnlyBindings.isEmpty()) {
+            return interceptedMethod;
+        }
+        List<Interceptor<T, Object>> filteredInterceptors = new ArrayList<>(interceptors.length);
+        for (Interceptor<T, Object> interceptor : interceptors) {
+            if (!hasAnyBinding(proxyDefinition, interceptor, introductionOnlyBindings)) {
+                filteredInterceptors.add(interceptor);
+            }
+        }
+        if (filteredInterceptors.size() == interceptors.length) {
+            return interceptedMethod;
+        }
+        // Runtime introduction definitions resolve concrete methods as around interceptors plus
+        // introduction interceptors. Python already has a concrete target function for these methods,
+        // so introduction-only interceptors must be excluded before proxy execution.
+        return new RuntimeProxyDefinition.InterceptedMethod<>(
+            interceptedMethod.executableMethod(),
+            filteredInterceptors.toArray(Interceptor[]::new)
+        );
+    }
+
+    private static Set<String> introductionOnlyBindings(ExecutableMethod<?, ?> executableMethod) {
+        Set<String> introductionBindings = bindingNames(executableMethod.getAnnotationMetadata(), InterceptorKind.INTRODUCTION);
+        if (introductionBindings.isEmpty()) {
+            return introductionBindings;
+        }
+        Set<String> aroundBindings = bindingNames(executableMethod.getAnnotationMetadata(), InterceptorKind.AROUND);
+        introductionBindings.removeAll(aroundBindings);
+        return introductionBindings;
+    }
+
+    private static Set<String> bindingNames(AnnotationMetadata annotationMetadata, InterceptorKind kind) {
+        Set<String> bindingNames = new LinkedHashSet<>();
+        for (AnnotationValue<InterceptorBinding> binding : annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class)) {
+            if (binding.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == kind) {
+                binding.stringValue().ifPresent(bindingNames::add);
+            }
+        }
+        return bindingNames;
+    }
+
+    private static <T> boolean hasAnyBinding(
+        RuntimeProxyDefinition<T> proxyDefinition,
+        Interceptor<T, Object> interceptor,
+        Set<String> bindingNames) {
+        BeanDefinition<?> interceptorDefinition = proxyDefinition.beanContext()
+            .findBeanDefinition(interceptor.getClass())
+            .orElse(null);
+        if (interceptorDefinition == null) {
+            return false;
+        }
+        for (AnnotationValue<InterceptorBinding> binding : interceptorDefinition.getAnnotationMetadata().getAnnotationValuesByType(InterceptorBinding.class)) {
+            if (binding.stringValue().filter(bindingNames::contains).isPresent()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private <T> T createProxyTargetProxy(RuntimeProxyDefinition<T> proxyDefinition) {
         Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
         Value pythonClass = ContextHolder.findClass(type.getPackageName(), type.getSimpleName());
         Value proxyValue = createScopedProxyValue(pythonClass, () -> asValue(proxyDefinition.targetBean()));
+        if (hasAroundConstructAdvice(proxyDefinition)) {
+            // Python proxy-target AOP normally instantiates the target lazily through the scoped proxy.
+            // Around-construct advice is observable at bean creation time in Micronaut, so force target
+            // creation here while leaving method calls to resolve the current scoped target normally.
+            proxyDefinition.targetBean();
+        }
         for (String memberName : proxyMemberNames(proxyDefinition)) {
             proxyValue.getMember(SCOPED_PROXY_REGISTER_MEMBER_METHOD).execute(memberName);
         }
@@ -135,17 +222,32 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             String methodName = entry.getKey();
             List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods = entry.getValue();
             Value originalFunction = GraalPyRuntimeUtil.getRawClassMember(pythonClass, methodName);
-            ProxyExecutable proxiedFunction = createProxiedFunction(
-                false,
-                true,
-                pythonClass,
-                proxyDefinition::targetBean,
-                null,
-                null,
-                methodName,
-                interceptedMethods,
-                originalFunction
-            );
+            ProxyExecutable proxiedFunction;
+            if (isSyntheticPropertySetter(methodName, interceptedMethods, originalFunction)) {
+                String propertyName = NameUtils.getPropertyNameForSetter(methodName);
+                proxiedFunction = createProxiedPropertySetter(
+                    proxyDefinition::targetBean,
+                    methodName,
+                    propertyName,
+                    interceptedMethods
+                );
+                // JavaBean setters generated for Python attributes call Value.putMember(), which
+                // reaches Python __setattr__ on runtime proxies. Register the same chain by
+                // property name so Java and Python-style assignment both see property advice.
+                proxyValue.getMember(SCOPED_PROXY_SETTER_OVERRIDE_METHOD).execute(propertyName, proxiedFunction);
+            } else {
+                proxiedFunction = createProxiedFunction(
+                    false,
+                    true,
+                    pythonClass,
+                    proxyDefinition::targetBean,
+                    null,
+                    null,
+                    methodName,
+                    interceptedMethods,
+                    originalFunction
+                );
+            }
             proxyValue.getMember(SCOPED_PROXY_OVERRIDE_METHOD).execute(methodName, proxiedFunction);
         }
         T proxy = box(type, proxyValue);
@@ -153,6 +255,21 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             throw new IllegalStateException("Python proxy target cannot be null");
         }
         return proxy;
+    }
+
+    private static <T> boolean isSyntheticPropertySetter(
+        String methodName,
+        List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods,
+        @Nullable Value originalFunction
+    ) {
+        return originalFunction == null
+            && NameUtils.isSetterName(methodName)
+            && interceptedMethods.stream().anyMatch(method -> method.executableMethod().getArguments().length == 1);
+    }
+
+    private boolean hasAroundConstructAdvice(RuntimeProxyDefinition<?> proxyDefinition) {
+        return proxyDefinition.proxyBeanDefinition().getAnnotationMetadata().hasStereotype(AroundConstruct.class)
+            || proxyDefinition.proxyBeanDefinition().getConstructor().getAnnotationMetadata().hasStereotype(AroundConstruct.class);
     }
 
     private Set<String> proxyMemberNames(RuntimeProxyDefinition<?> proxyDefinition) {
@@ -200,6 +317,12 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = findInterceptedMethod(methodName, interceptedMethods, args);
             ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
             Interceptor<T, ?>[] interceptors = interceptedMethod.interceptors();
+            if (isIntroduction && executableMethod.hasStereotype(Adapter.class) && interceptors.length > 1) {
+                // Core adapter introduction resolution returns method-level around interceptors plus
+                // the adapter introduction. Python target methods are proxied separately, so keeping
+                // those around interceptors here would apply the same Python method advice twice.
+                interceptors = Arrays.copyOfRange(interceptors, interceptors.length - 1, interceptors.length);
+            }
             Object[] javaArgs = fromPolyglotArray(args, executableMethod.getArguments());
             @SuppressWarnings("unchecked")
             T tb;
@@ -241,6 +364,33 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         };
     }
 
+    private <T> ProxyExecutable createProxiedPropertySetter(
+        Supplier<T> targetBeanSupplier,
+        String methodName,
+        String propertyName,
+        List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods
+    ) {
+        return args -> {
+            RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = findInterceptedMethod(methodName, interceptedMethods, args);
+            ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
+            Object[] javaArgs = fromPolyglotArray(args, executableMethod.getArguments());
+            T targetBean = targetBeanSupplier.get();
+            if (targetBean == null) {
+                throw new IllegalStateException("Target bean has not been initialized yet");
+            }
+            Interceptor<T, ?>[] interceptors = interceptedMethod.interceptors();
+            Interceptor<T, ?>[] finalInterceptors = Arrays.copyOf(interceptors, interceptors.length + 1, Interceptor[].class);
+            finalInterceptors[finalInterceptors.length - 1] = invocationContext -> {
+                Value targetValue = asValue(targetBean);
+                Object value = invocationContext.getParameterValues()[0];
+                targetValue.putMember(propertyName, GraalPyRuntimeUtil.coerceToContext(value, targetValue.getContext()));
+                return null;
+            };
+            Object result = new MethodInterceptorChain(finalInterceptors, targetBean, executableMethod, javaArgs).proceed();
+            return unbox(result);
+        };
+    }
+
     private Value createScopedProxyValue(Value pythonClass, Supplier<Value> targetSupplier) {
         Value factory = scopedProxyFactory(pythonClass.getContext());
         return factory.execute(pythonClass, (ProxyExecutable) args -> targetSupplier.get());
@@ -258,6 +408,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                         def __init__(self, supplier):
                             object.__setattr__(self, "_micronaut_target_supplier", supplier)
                             object.__setattr__(self, "_micronaut_overrides", {})
+                            object.__setattr__(self, "_micronaut_setter_overrides", {})
 
                         def _micronaut_target(self):
                             target = object.__getattribute__(self, "_micronaut_target_supplier")()
@@ -266,6 +417,9 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
                         def _micronaut_put_override(self, name, value):
                             object.__getattribute__(self, "_micronaut_overrides")[name] = value
+
+                        def _micronaut_put_setter_override(self, name, value):
+                            object.__getattribute__(self, "_micronaut_setter_overrides")[name] = value
 
                         def _micronaut_register_member(self, name):
                             if isinstance(name, str) and not name.startswith("_"):
@@ -281,7 +435,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                                 object.__getattribute__(self, "_micronaut_register_member")(name)
 
                         def __getattribute__(self, name):
-                            if name in ("_micronaut_target_supplier", "_micronaut_overrides", "_micronaut_target", "_micronaut_put_override", "_micronaut_register_member", "_micronaut_sync_target_attributes"):
+                            if name in ("_micronaut_target_supplier", "_micronaut_overrides", "_micronaut_setter_overrides", "_micronaut_target", "_micronaut_put_override", "_micronaut_put_setter_override", "_micronaut_register_member", "_micronaut_sync_target_attributes"):
                                 return object.__getattribute__(self, name)
                             overrides = object.__getattribute__(self, "_micronaut_overrides")
                             if name in overrides:
@@ -290,8 +444,15 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                             return getattr(target, name)
 
                         def __setattr__(self, name, value):
-                            target = object.__getattribute__(self, "_micronaut_target")()
-                            setattr(target, name, value)
+                            setter_overrides = object.__getattribute__(self, "_micronaut_setter_overrides")
+                            if name in setter_overrides:
+                                # Attribute-backed Python beans expose PropertyElement setters, not
+                                # Python methods. Route assignments through the precomputed setter
+                                # chain so around advice can mutate parameters before the target write.
+                                setter_overrides[name](value)
+                            else:
+                                target = object.__getattribute__(self, "_micronaut_target")()
+                                setattr(target, name, value)
                             object.__getattribute__(self, "_micronaut_register_member")(name)
 
                         def __repr__(self):
@@ -445,7 +606,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                     Value next = iterator.getIteratorNextElement();
                     if (next != null && next.isString()) {
                         String methodName = next.asString();
-                        Value existingMember = pythonClass.getMember(methodName);
+                        Value existingMember = GraalPyRuntimeUtil.getRawClassMember(pythonClass, methodName);
                         if (existingMember == null || !existingMember.canExecute()) {
                             pythonClass.putMember(methodName, (ProxyExecutable) args -> null);
                         }

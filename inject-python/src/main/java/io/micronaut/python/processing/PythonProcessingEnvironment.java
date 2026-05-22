@@ -39,7 +39,9 @@ import javax.lang.model.element.Element;
  * @param environment The underlying Python environment containing classes and decorators.
  * @param annotationMetadataBuilder The builder for creating annotation metadata from Python elements.
  * @param metadataFactory The factory for creating element annotation metadata.
+ * @param javaVisitorContext The backing Java visitor context.
  * @param visitorContext The visitor context for processing Python elements.
+ * @param originatingElement The Java element that triggered Python processing.
  * @param classesCache The per-processing-run class element cache.
  * @param scriptsCache The per-processing-run script element cache.
  * @since 4.8.0
@@ -114,7 +116,6 @@ public record PythonProcessingEnvironment(
             new AtomicReference<>()
         );
     }
-
 
     /**
      * Creates a Python processing environment with the specified Python environment.

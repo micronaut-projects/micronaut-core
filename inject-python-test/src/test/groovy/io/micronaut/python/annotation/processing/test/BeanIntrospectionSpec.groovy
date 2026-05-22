@@ -18,6 +18,7 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.python.compiler.Serdeable
 
 /**
@@ -206,6 +207,35 @@ class TestClass:
         context?.close()
     }
 
+    void "test introspection includes inherited Python attributes"() {
+        given:
+        def pythonCode = '''
+from micronaut.core.annotation import Introspected
+
+class Parent:
+    parent_name: str
+
+@Introspected
+class Child(Parent):
+    name: str
+    count: int
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.Child")
+
+        then:
+        introspection != null
+        introspection.getPropertyNames() as Set == ["parent_name", "name", "count"] as Set
+        introspection.getProperty("parent_name").isPresent()
+        introspection.getProperty("name").isPresent()
+        introspection.getProperty("count").isPresent()
+
+        cleanup:
+        context?.close()
+    }
+
     void "test @Introspected on Python class with @property decorator"() {
         given:
         def pythonCode = '''
@@ -247,6 +277,43 @@ class TestPropertyClass:
         instance.full_name() == 'John Doe'
         // Note: Property access will depend on whether getters/setters are properly generated
         // This test verifies the basic structure is in place
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test generic placeholders for bean properties"() {
+        given:
+        def pythonCode = '''
+from micronaut.core.annotation import Introspected
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bound=str)
+
+@Introspected
+class Test(Generic[T]):
+    property: T
+    values: list[T]
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.Test")
+        def property = introspection.getRequiredProperty("property", String)
+        def propertyArgument = property.asArgument()
+        def values = introspection.getRequiredProperty("values", List)
+        def valueArgument = values.asArgument().getFirstTypeVariable().orElse(null)
+
+        then:
+        propertyArgument instanceof GenericPlaceholder
+        propertyArgument.variableName == "T"
+        propertyArgument.name == "property"
+        propertyArgument.type == String
+
+        valueArgument instanceof GenericPlaceholder
+        valueArgument.name == "E"
+        valueArgument.variableName == "T"
+        valueArgument.type == String
 
         cleanup:
         context?.close()
