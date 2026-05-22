@@ -138,8 +138,8 @@ As of May 14, 2026:
 * All `@PendingFeature` tests under `inject-python-test` are cataloged with
   stable `PY-INJECT-XXXX` IDs, including pre-existing Python compiler and
   runtime gaps that were outside the direct source inventory.
-* The active pending catalog is currently down to 8 IDs after resolving
-  `PY-INJECT-0060`.
+* The active pending catalog is currently down to 7 IDs after resolving
+  `PY-INJECT-0070`.
 * The most recent full verification passed with 491 tests and 8 skipped:
   `./gradlew --no-daemon --no-build-cache --max-workers=1 :micronaut-inject-python-test:test`
   after resolving `PY-INJECT-0060`.
@@ -204,8 +204,8 @@ The latest completed source slices are:
   around-construct-only method behavior, constructor-only binding, type plus
   constructor binding, and factory-method construction binding are covered by
   `AroundConstructSpec`. Combined `@Around` plus `@AroundConstruct` behavior is
-  pending as `PY-INJECT-0070`; the local Java annotation transformer fixture is
-  cataloged as unsupported.
+  also covered; the local Java annotation transformer fixture is cataloged as
+  unsupported.
 * `NamedAopAdviceSpec.groovy`: named refreshable `@EachProperty` factory beans
   and qualified AOP proxy lookup are covered by `NamedAopAdviceSpec`.
 * `ExecutableSuperclassSpec.groovy`: a factory subclass inheriting class-level

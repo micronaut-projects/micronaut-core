@@ -16,6 +16,7 @@
 package io.micronaut.context.python.aop;
 
 import io.micronaut.aop.Adapter;
+import io.micronaut.aop.AroundConstruct;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
@@ -198,6 +199,12 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
         Value pythonClass = ContextHolder.findClass(type.getPackageName(), type.getSimpleName());
         Value proxyValue = createScopedProxyValue(pythonClass, () -> asValue(proxyDefinition.targetBean()));
+        if (hasAroundConstructAdvice(proxyDefinition)) {
+            // Python proxy-target AOP normally instantiates the target lazily through the scoped proxy.
+            // Around-construct advice is observable at bean creation time in Micronaut, so force target
+            // creation here while leaving method calls to resolve the current scoped target normally.
+            proxyDefinition.targetBean();
+        }
         for (String memberName : proxyMemberNames(proxyDefinition)) {
             proxyValue.getMember(SCOPED_PROXY_REGISTER_MEMBER_METHOD).execute(memberName);
         }
@@ -231,6 +238,11 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             throw new IllegalStateException("Python proxy target cannot be null");
         }
         return proxy;
+    }
+
+    private boolean hasAroundConstructAdvice(RuntimeProxyDefinition<?> proxyDefinition) {
+        return proxyDefinition.proxyBeanDefinition().getAnnotationMetadata().hasStereotype(AroundConstruct.class)
+            || proxyDefinition.proxyBeanDefinition().getConstructor().getAnnotationMetadata().hasStereotype(AroundConstruct.class);
     }
 
     private Set<String> proxyMemberNames(RuntimeProxyDefinition<?> proxyDefinition) {
