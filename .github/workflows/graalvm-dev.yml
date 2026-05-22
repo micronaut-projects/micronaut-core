@@ -51,7 +51,7 @@ jobs:
           export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: Pre-Build Steps
-        uses: micronaut-projects/github-actions/graalvm/pre-build@300bf6db7c062dcba77c90bb90e475df31b2acab # master
+        uses: micronaut-projects/github-actions/graalvm/pre-build@9fefbe9a777a84ac4211027f613521ed22f4cd93 # master
         id: pre-build
         with:
           java: ${{ matrix.java }}
@@ -65,6 +65,7 @@ jobs:
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
           GRAALVM_QUICK_BUILD: true
+          NATIVE_IMAGE_OPTIONS: "-H:+ReportExceptionStackTraces"
         with:
           nativeTestTask: ${{ matrix.native_test_task }}
       - name: Post-Build Steps

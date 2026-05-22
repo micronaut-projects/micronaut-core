@@ -128,12 +128,6 @@ template repo will get propagated automatically. The files propagated are:
   * `release.yml`.
   * `sonatype.yml`.
 
-
-The `graalvm-dev.yml` and `graalvm-latest.yml` workflows were synced once to downstream projects and are now excluded
-from future files sync runs. Future changes to those workflows are maintained through
-[`micronaut-projects/github-actions`](https://github.com/micronaut-projects/github-actions/tree/master/graalvm).
-
-
 * Renovate configuration (`.github/renovate.json`).
 * Gradle wrapper.
 * `.gitignore`.
@@ -175,6 +169,9 @@ publish is not a new patch version, but a new minor or major, update the release
 If you are publishing a milestone or release candidate, check the pre-release checkbox.
 
 Note that the release tags must be preceded with `v`, e.g.: `v1.2.3`.
+
+The release workflow runs a vulnerability audit before publishing. Vulnerability findings are advisory for milestone and
+release-candidate tags such as `v1.2.3-M1` and `v1.2.3-RC1`, but they remain blocking for GA releases.
 
 Once you publish the GitHub release, the
 [Release GitHub Action workflow](https://github.com/micronaut-projects/micronaut-project-template/blob/master/.github/workflows/release.yml)
