@@ -130,7 +130,8 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      * @return The classloader
      */
     protected ClassLoader getClassLoader() {
-        return getClass().getClassLoader();
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        return contextClassLoader != null ? contextClassLoader : getClass().getClassLoader();
     }
 
     /**

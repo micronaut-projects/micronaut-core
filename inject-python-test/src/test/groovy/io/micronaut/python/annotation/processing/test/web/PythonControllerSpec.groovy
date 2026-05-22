@@ -3,6 +3,7 @@ package io.micronaut.python.annotation.processing.test.web
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Get
@@ -104,6 +105,72 @@ def say_hello(name : str) -> str:
 
         expect:
         client.toBlocking().retrieve("/classless/John") == "Hello John"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
+    void "test classless python controller route with media type constant"() {
+        given:
+        def context = buildContext('''
+from micronaut.http import MediaType
+from micronaut.http.annotation import Get
+
+@Get(value="/classless/media", produces=MediaType.TEXT_PLAIN)
+def media() -> str:
+    return "media"
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+
+        expect:
+        client.toBlocking().retrieve("/classless/media") == "media"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
+    void "test classless python controller with localized message source"() {
+        given:
+        def context = buildContext('''
+from typing import Annotated
+
+from jakarta.inject import Inject, Singleton
+from java.util import Locale
+from micronaut.context import LocalizedMessageSource, MessageSource, StaticMessageSource
+from micronaut.context.annotation import Factory
+from micronaut.http import MediaType
+from micronaut.http.annotation import Get
+
+message_source: Annotated[LocalizedMessageSource, Inject]
+
+@Factory
+class MessageSourceFactory:
+    @Singleton
+    def create_message_source(self) -> MessageSource:
+        source = StaticMessageSource()
+        source.addMessage("hello.world", "Hello World")
+        source.addMessage(Locale("es"), "hello.world", "Hola Mundo")
+        return source
+
+@Get(value="/classless/i18n", produces=MediaType.TEXT_PLAIN)
+def message() -> str:
+    return message_source.getMessage("hello.world").orElse("missing")
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+
+        expect:
+        client.toBlocking().retrieve(HttpRequest.GET("/classless/i18n").header(HttpHeaders.ACCEPT_LANGUAGE, "es")) == "Hola Mundo"
+        client.toBlocking().retrieve("/classless/i18n") == "Hello World"
 
         cleanup:
         client.close()
