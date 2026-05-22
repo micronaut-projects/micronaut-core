@@ -8,6 +8,7 @@ import io.micronaut.context.python.ValueCoercible
 import io.micronaut.core.io.Writable
 import io.micronaut.json.JsonMapper
 import org.graalvm.polyglot.Context
+import org.graalvm.polyglot.Value
 import spock.lang.Stepwise
 
 import java.nio.charset.StandardCharsets
@@ -443,6 +444,42 @@ class Message:
 
         then:
         json == '{"detail":{"name":"Hello"}}'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Serdeable frozen dataclass wrapper reconstructs Python value from Java fields"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from micronaut.python.compiler import Serdeable
+
+
+@Serdeable
+@dataclass(frozen=True)
+class Book:
+    isbn: str
+    name: str
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Context polyglot = ctx.getBean(Context)
+        Class<?> bookClass = ctx.classLoader.loadClass('python.Book')
+        def book = bookClass.getDeclaredConstructor(String, String)
+            .newInstance('1491950358', 'Building Microservices')
+        Value pythonBook = ((ValueCoercible) book).asPolyglotValue()
+        polyglot.getBindings("python").putMember("book", book)
+
+        then:
+        pythonBook.getMember('isbn').asString() == '1491950358'
+        pythonBook.getMember('name').asString() == 'Building Microservices'
+        polyglot.eval("python", "book.isbn").asString() == '1491950358'
+        polyglot.eval("python", "book.name").asString() == 'Building Microservices'
 
         cleanup:
         ctx?.close()

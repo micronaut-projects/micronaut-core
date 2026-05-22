@@ -493,7 +493,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         ExpressionDef propsMap = ClassTypeDef.of(AnnotationUtil.class)
                                             .invokeStatic("mapOf", TypeDef.of(Map.class), mapEntries);
                                         reconstructedValue = CONTEXT_HOLDER.invokeStatic(
-                                            "newInstance",
+                                            isFrozenPythonDataclass(element) ? "newFrozenDataclassInstance" : "newInstance",
                                             POLYGLOT_VALUE,
                                             List.of(
                                                 ExpressionDef.constant(element.getPackageName()),
@@ -1152,6 +1152,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .anyMatch(decorator -> "dataclass".equals(decorator.name()) || "dataclasses.dataclass".equals(decorator.name()));
         }
         return false;
+    }
+
+    private static boolean isFrozenPythonDataclass(ClassElement element) {
+        return element instanceof AbstractPythonClassElement pythonClassElement
+            && pythonClassElement.getNativeType().frozenDataclass();
     }
 
     private static boolean hasConfigurationInjectConstructor(ClassElement element) {
