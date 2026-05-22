@@ -795,6 +795,14 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                 elements.addAll(classNode.properties());
             }
 
+            if (elementType == ClassElement.class) {
+                // The Python processor models direct nested classes on the declaring ClassDef.
+                // BeanDefinitionWriter uses this enclosed ClassElement query to record nested
+                // configuration readers for runtime binding, so avoid rediscovering them from
+                // binary names here.
+                elements.addAll(classNode.nestedClasses());
+            }
+
             return elements;
         }
 
@@ -853,6 +861,12 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                 return new PythonFieldElement(attributeDef, environment, declaringClassElement, AbstractPythonClassElement.this, environment.metadataFactory());
             } else if (nativeType instanceof PropertyDef propertyDef) {
                 return new PythonPropertyElement(propertyDef, environment, declaringClassElement, AbstractPythonClassElement.this, environment.metadataFactory());
+            } else if (nativeType instanceof ClassDef classDef) {
+                ClassElement classElement = environment.classes().get(qualifiedClassName(classDef));
+                if (classElement != null) {
+                    return classElement;
+                }
+                return new PythonClassElement(classDef, environment);
             }
             throw new IllegalStateException("Unknown native type: " + nativeType.getClass());
         }

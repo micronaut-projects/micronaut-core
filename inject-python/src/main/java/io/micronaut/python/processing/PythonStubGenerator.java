@@ -2806,6 +2806,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // Check for collection types
                     if (returnType.isAssignable(List.class)) {
                         ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+                        if (componentType != null && isGeneratedWrapperType(allClasses, componentType)) {
+                            yield uncheckedCast(RUNTIME_UTIL.invokeStatic(
+                                "convertList",
+                                List.of(POLYGLOT_VALUE, POLYGLOT_VALUE_CONVERTER),
+                                ClassTypeDef.of(List.class),
+                                invokedValue,
+                                generatedWrapperConverter(componentType)
+                            ), returnType);
+                        }
                         ExpressionDef genericType = toClassExpression(componentType);
                         yield uncheckedCast(RUNTIME_UTIL
                             .invokeStatic("convertList", ClassTypeDef.of(List.class),
@@ -3092,7 +3101,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
-    private ExpressionDef generatedWrapperConverter(ClassElement componentType) {
+    private static ExpressionDef generatedWrapperConverter(ClassElement componentType) {
         MethodDef convertMethod = MethodDef.builder("convert")
             .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
             .addParameter(ParameterDef.of("element", POLYGLOT_VALUE))

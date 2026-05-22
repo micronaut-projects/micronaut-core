@@ -21,7 +21,6 @@ import io.micronaut.context.annotation.Property
 import io.micronaut.context.env.Environment
 import io.micronaut.inject.ValidatedBeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
-import spock.lang.PendingFeature
 
 /**
  * Tests for Python @ConfigurationProperties annotation.
@@ -724,7 +723,6 @@ class MyConfig:
         propertyInjection.arguments[0].annotationMetadata.synthesize(Property).name() == "foo.bar.*.baz.stuff"
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0090")
     void "test nested configuration properties bind nested classes"() {
         given:
         def pythonCode = '''
@@ -765,7 +763,6 @@ class OuterConfig:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0091")
     void "test each property nested configuration properties bind nested each property list"() {
         given:
         def pythonCode = '''

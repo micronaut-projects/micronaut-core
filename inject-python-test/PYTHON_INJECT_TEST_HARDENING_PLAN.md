@@ -262,11 +262,11 @@ The latest completed source slices are:
   `PY-INJECT-0085`.
 * `InterfaceConfigurationPropertiesSpec.groovy`, `InterfaceNestingSpec.groovy`,
   `EachPropertyNestingSpec.groovy`, and `RecordNestingSpec.groovy`: nested
-  Python configuration class runtime binding is pending as `PY-INJECT-0090`,
-  and nested `@EachProperty` list binding is pending as `PY-INJECT-0091`;
-  interface proxies, Java record accessors, and Java/Groovy visibility variants
-  are cataloged as unsupported, while scalar binding and nested prefix metadata
-  are covered by `ConfigurationPropertiesSpec`.
+  Python configuration class runtime binding and nested `@EachProperty` list
+  binding are resolved as `PY-INJECT-0090` and `PY-INJECT-0091`; interface
+  proxies, Java record accessors, and Java/Groovy visibility variants are
+  cataloged as unsupported, while scalar binding and nested prefix metadata are
+  covered by `ConfigurationPropertiesSpec`.
 * `EachBeanInterceptorSpec.groovy`: named `@EachBean` AOP target lookup is
   covered by `NamedAopAdviceSpec`; interceptor constructor injection of the
   current target `Qualifier` is pending as `PY-INJECT-0092`, while the full
