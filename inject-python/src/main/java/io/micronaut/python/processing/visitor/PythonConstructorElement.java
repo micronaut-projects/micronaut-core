@@ -73,7 +73,10 @@ public final class PythonConstructorElement extends PythonMethodElement implemen
 
     @Override
     public String getName() {
-        return "__init__";
+        // Micronaut's bean/introspection writers distinguish constructors from
+        // factory methods by the logical JVM constructor name. The underlying
+        // FunctionDef still represents Python's __init__ method.
+        return "<init>";
     }
 
     @Override

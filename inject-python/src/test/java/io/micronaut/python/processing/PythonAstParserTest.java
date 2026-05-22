@@ -639,7 +639,7 @@ class ProductMappers:
                 assertInstanceOf(PythonConstructorElement.class, constructorElement, "Constructor should be PythonMethodElement");
 
                 // Verify constructor method details
-                assertEquals("__init__", constructorElement.getName());
+                assertEquals("<init>", constructorElement.getName());
                 ParameterElement[] params = constructorElement.getParameters();
                 assertEquals(2, params.length, "Constructor should have 2 parameters");
                 assertEquals("name", params[0].getName());
