@@ -321,7 +321,6 @@ def includeGraalPyExtensions = includeGraalPyExtensionsProperty != null ? includ
 def graalPyBundleRepo = includeGraalPyExtensions ?
     ensureGraalPyBundleRepo(ensureGraalPyExtensionsCheckout(), graalpyVersion).tap {
         System.setProperty("micronaut.graalpy.bundle.repo", it.absolutePath)
-        System.setProperty("maven.repo.local", it.absolutePath)
     } :
     null
 
@@ -331,6 +330,9 @@ dependencyResolutionManagement {
             maven {
                 name = "graalPyBundle"
                 url = graalPyBundleRepo.toURI()
+                content {
+                    includeGroupByRegex("org\\.graalvm(\\..*)?")
+                }
             }
         }
         mavenCentral()
