@@ -138,11 +138,11 @@ As of May 14, 2026:
 * All `@PendingFeature` tests under `inject-python-test` are cataloged with
   stable `PY-INJECT-XXXX` IDs, including pre-existing Python compiler and
   runtime gaps that were outside the direct source inventory.
-* The active pending catalog is currently down to 6 IDs after resolving
-  `PY-INJECT-0075`.
-* The most recent full verification passed with 491 tests and 6 skipped:
+* The active pending catalog is currently down to 3 IDs after resolving
+  `PY-INJECT-0085`.
+* The most recent full verification passed with 491 tests and 4 skipped:
   `./gradlew --no-daemon --no-build-cache --max-workers=1 :micronaut-inject-python-test:test`
-  after resolving `PY-INJECT-0075`.
+  after resolving `PY-INJECT-0083` and `PY-INJECT-0084`.
 * Per-slice verification used focused tests only; the full Python inject test
   task has now been run as the final sweep for this migration/catalog pass.
 * The most recent focused verification passed for
@@ -255,10 +255,10 @@ The latest completed source slices are:
   `PY-INJECT-0082`.
 * `BuildElementBuilderAopOnMethodSpec.groovy` and
   `BuildElementBuilderAopOnTypeSpec.groovy`: AOP metadata applied to associated
-  beans registered through `BeanElementBuilder` is pending as `PY-INJECT-0083`
+  beans registered through `BeanElementBuilder` is resolved as `PY-INJECT-0083`
   and `PY-INJECT-0084`.
 * `AnnotateReplacesSpec.groovy`: visitor-added `@Factory`, `@Bean`, and
-  `@Replaces` metadata for replacement factory methods is pending as
+  `@Replaces` metadata for replacement factory methods is resolved as
   `PY-INJECT-0085`.
 * `InterfaceConfigurationPropertiesSpec.groovy`, `InterfaceNestingSpec.groovy`,
   `EachPropertyNestingSpec.groovy`, and `RecordNestingSpec.groovy`: nested
@@ -370,9 +370,9 @@ Priority order:
    `PY-INJECT-0015`.
 3. Fix Python source visitor and associated-bean gaps:
    `PY-INJECT-0025`, `PY-INJECT-0026`, `PY-INJECT-0027`, `PY-INJECT-0029`,
-   `PY-INJECT-0083`, `PY-INJECT-0084`, then related visitor/resource gaps such
-   as `PY-INJECT-0080`, `PY-INJECT-0081`, `PY-INJECT-0086`, and
-   `PY-INJECT-0087`.
+   `PY-INJECT-0083`, and `PY-INJECT-0084` are resolved. Continue with related
+   visitor/resource gaps such as `PY-INJECT-0080`, `PY-INJECT-0081`,
+   `PY-INJECT-0086`, and `PY-INJECT-0087` if they reappear.
 4. Continue with remaining runtime and model gaps in catalog order, grouping
    only when the shared implementation root cause is clear.
 

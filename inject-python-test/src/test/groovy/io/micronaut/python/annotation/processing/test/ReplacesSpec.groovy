@@ -24,7 +24,6 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
-import spock.lang.PendingFeature
 
 class ReplacesSpec extends AbstractPythonTypeElementSpec {
 
@@ -203,7 +202,6 @@ class ReplacementEngineFactory:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0085")
     void "test replaces can be applied to factory methods from a visitor"() {
         given:
         VisitorProducesVisitor.ENABLED = true
@@ -216,6 +214,18 @@ def TestProduces(target):
 
 def TestSpecializes(target):
     return target
+
+class PaymentProcessor:
+    def name(self) -> str:
+        return "base"
+
+class CreditCardProcessor(PaymentProcessor):
+    def name(self) -> str:
+        return "credit"
+
+class MockPaymentProcessor(PaymentProcessor):
+    def name(self) -> str:
+        return "mock"
 
 @Singleton
 class Catalog:
@@ -233,20 +243,13 @@ class MockShop(Shop):
     @TestProduces
     def get_payment_processor(self) -> PaymentProcessor:
         return MockPaymentProcessor()
-
-class PaymentProcessor:
-    pass
-
-class CreditCardProcessor(PaymentProcessor):
-    pass
-
-class MockPaymentProcessor(PaymentProcessor):
-    pass
 ''')
+        def paymentProcessorType = context.classLoader.loadClass("python.PaymentProcessor")
         def catalog = getBean(context, "python.Catalog").asPolyglotValue()
 
         expect:
-        catalog.getMember("payment_processor").toString().contains("MockPaymentProcessor")
+        context.getBeanDefinitions(paymentProcessorType).size() == 1
+        catalog.getMember("payment_processor").invokeMember("name").asString() == "mock"
 
         cleanup:
         VisitorProducesVisitor.reset()

@@ -51,6 +51,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -164,10 +165,17 @@ public class PythonTypeElementVisitorProcessor {
 
     private List<ClassElement> collectClassElements(PythonProcessingEnvironment environment, PythonVisitorContext pythonVisitorContext) {
         List<ClassElement> allClasses = collectPythonClassElements(environment);
+        Map<String, ClassElement> uniqueClasses = new LinkedHashMap<>();
+        allClasses.forEach(classElement -> uniqueClasses.putIfAbsent(classElement.getName(), classElement));
         for (ClassElement classElement : new ArrayList<>(allClasses)) {
-            allClasses.addAll(VisitorUtils.collectImportedElements(classElement, pythonVisitorContext));
+            for (ClassElement importedElement : VisitorUtils.collectImportedElements(classElement, pythonVisitorContext)) {
+                // Imported-element collection can rediscover Python classes that are already part of
+                // the source environment. Type visitors may register associated beans, so visiting the
+                // same class twice would generate duplicate bean definitions for the same association.
+                uniqueClasses.putIfAbsent(importedElement.getName(), importedElement);
+            }
         }
-        return allClasses;
+        return new ArrayList<>(uniqueClasses.values());
     }
 
     private void copyPythonPropertyMixinAnnotations(AnnotationValue<Mixin> mixinAnnotation, ClassElement mixin, ClassElement mixinTarget) {

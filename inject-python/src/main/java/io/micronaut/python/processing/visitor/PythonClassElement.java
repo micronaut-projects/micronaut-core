@@ -318,6 +318,9 @@ public final class PythonClassElement extends AbstractPythonClassElement {
     private static boolean isIntroductionFactoryMethod(MethodElement method) {
         return method.hasAnnotation("io.micronaut.context.annotation.Mapper")
             || method.hasAnnotation("io.micronaut.context.annotation.Mapper$Mapping")
+            // Visitors can add @Bean directly; treat that like @Bean stereotypes
+            // when deciding whether abstract methods require introduction wiring.
+            || method.hasDeclaredAnnotation(Bean.class)
             || method.hasDeclaredStereotype(Bean.class)
             || method.hasStereotype(Introduction.class);
     }

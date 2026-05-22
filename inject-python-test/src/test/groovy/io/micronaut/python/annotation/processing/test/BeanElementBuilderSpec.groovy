@@ -21,7 +21,8 @@ import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.python.annotation.processing.test.beanbuilder.ApplyAopToMe
-import spock.lang.PendingFeature
+import io.micronaut.python.annotation.processing.test.beanbuilder.Mutating
+import io.micronaut.python.processing.visitor.PythonClassElement
 
 class BeanElementBuilderSpec extends AbstractPythonTypeElementSpec {
 
@@ -37,34 +38,29 @@ class BeanElementBuilderTrigger:
 
         expect:
         context.containsBean(AssociatedBean)
+        context.getBeanDefinitions(AssociatedBean).size() == 1
 
         cleanup:
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0083")
     void "test AOP applied to method on type registered via builder"() {
         given:
         ApplyAopToMethodVisitor.ENABLED = true
         def context = buildContext('''
-from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from micronaut.aop import InterceptorBean, MethodInvocationContext
 from jakarta.inject import Singleton
 import java
 
 MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
 ApplyAopToMe = java.type("io.micronaut.python.annotation.processing.test.beanbuilder.ApplyAopToMe")
-
-@Around
-def Mutating(value: str):
-    def decorator(target):
-        return target
-    return decorator
+Mutating = java.type("io.micronaut.python.annotation.processing.test.beanbuilder.Mutating")
 
 @InterceptorBean(Mutating)
 @Singleton
 class MutatingInterceptor(MethodInterceptor):
     def intercept(self, context: MethodInvocationContext):
-        member = context.stringValue(Mutating).orElse(None)
+        member = context.stringValue("io.micronaut.python.annotation.processing.test.beanbuilder.Mutating").orElse(None)
         argument = context.getParameters().get(member)
         if argument is not None:
             argument.setValue("changed")
@@ -81,40 +77,34 @@ class Test:
     def plain(self, name: str) -> str:
         return self.apply_aop_to_me.plain(name)
 ''')
-        def test = getBean(context, "python.Test")
+        def test = getBean(context, "python.Test").asPolyglotValue()
 
         expect:
-        test.hello("john") == "Hello changed"
-        test.plain("john") == "Hello john"
+        test.invokeMember("hello", "john").asString() == "Hello changed"
+        test.invokeMember("plain", "john").asString() == "Hello john"
 
         cleanup:
         ApplyAopToMethodVisitor.ENABLED = false
         context?.close()
     }
 
-    @PendingFeature(reason = "Tracked in inject-python-test/DISABLED_TESTS.md: PY-INJECT-0084")
     void "test AOP applied to type registered via builder"() {
         given:
         ApplyAopToTypeVisitor.ENABLED = true
         def context = buildContext('''
-from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from micronaut.aop import InterceptorBean, MethodInvocationContext
 from jakarta.inject import Singleton
 import java
 
 MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
 ApplyAopToMe = java.type("io.micronaut.python.annotation.processing.test.beanbuilder.ApplyAopToMe")
-
-@Around
-def Mutating(value: str):
-    def decorator(target):
-        return target
-    return decorator
+Mutating = java.type("io.micronaut.python.annotation.processing.test.beanbuilder.Mutating")
 
 @InterceptorBean(Mutating)
 @Singleton
 class MutatingInterceptor(MethodInterceptor):
     def intercept(self, context: MethodInvocationContext):
-        member = context.stringValue(Mutating).orElse(None)
+        member = context.stringValue("io.micronaut.python.annotation.processing.test.beanbuilder.Mutating").orElse(None)
         argument = context.getParameters().get(member)
         if argument is not None:
             argument.setValue("changed")
@@ -131,11 +121,11 @@ class Test:
     def plain(self, name: str) -> str:
         return self.apply_aop_to_me.plain(name)
 ''')
-        def test = getBean(context, "python.Test")
+        def test = getBean(context, "python.Test").asPolyglotValue()
 
         expect:
-        test.hello("john") == "Hello changed"
-        test.plain("john") == "Hello changed"
+        test.invokeMember("hello", "john").asString() == "Hello changed"
+        test.invokeMember("plain", "john").asString() == "Hello changed"
 
         cleanup:
         ApplyAopToTypeVisitor.ENABLED = false
@@ -148,7 +138,7 @@ class Test:
     static class AssociatedBeanVisitor implements TypeElementVisitor<Object, Object> {
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
-            if (element.name == "python.BeanElementBuilderTrigger") {
+            if (isPythonSourceElement(element) && element.name == "python.BeanElementBuilderTrigger") {
                 context.getClassElement(AssociatedBean)
                     .ifPresent { associatedBean ->
                         element.addAssociatedBean(associatedBean)
@@ -167,8 +157,8 @@ class Test:
 
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
-            if (ENABLED && element.name == "python.Test") {
-                def annotationValue = AnnotationValue.builder("python.Mutating")
+            if (ENABLED && isPythonSourceElement(element) && element.name == "python.Test") {
+                def annotationValue = AnnotationValue.builder(Mutating.name)
                     .value("name")
                     .build()
                 context.getClassElement(ApplyAopToMe)
@@ -193,8 +183,8 @@ class Test:
 
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
-            if (ENABLED && element.name == "python.Test") {
-                def annotationValue = AnnotationValue.builder("python.Mutating")
+            if (ENABLED && isPythonSourceElement(element) && element.name == "python.Test") {
+                def annotationValue = AnnotationValue.builder(Mutating.name)
                     .value("name")
                     .build()
                 context.getClassElement(ApplyAopToMe)
@@ -210,5 +200,9 @@ class Test:
         VisitorKind getVisitorKind() {
             return VisitorKind.ISOLATING
         }
+    }
+
+    private static boolean isPythonSourceElement(ClassElement element) {
+        element instanceof PythonClassElement
     }
 }

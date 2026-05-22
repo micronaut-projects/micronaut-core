@@ -704,7 +704,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ann.hasStereotype(InterceptorBinding.class) ||
                         element.hasStereotype(Around.class) ||
                         ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
-                        ann.hasDeclaredStereotype(Bean.class) ||
+                        isDeclaredBeanMethod(ann) ||
                         isConfigurationBuilderType;
                     List<MethodElement> methodsToBridge = new ArrayList<>(element.getEnclosedElements(
                         ElementQuery.ALL_METHODS
@@ -2031,7 +2031,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             ann.hasAnnotation(AnnotationUtil.POST_CONSTRUCT) ||
                             ann.hasStereotype(Around.class) ||
                             ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
-                            ann.hasDeclaredStereotype(Bean.class)));
+                            isDeclaredBeanMethod(ann)));
 
             for (MethodElement methodElement : methodsToBridge) {
                 addBridgeMethod(
@@ -2323,7 +2323,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         addedMethodNames.add(key);
 
-        if (methodElement.hasDeclaredStereotype(Bean.class)) {
+        if (isDeclaredBeanMethod(methodElement.getAnnotationMetadata())) {
             // verify return type exists
             ClassElement genericReturnType = methodElement.getGenericReturnType();
             if (genericReturnType.isVoid()) {
@@ -3208,6 +3208,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .invokeStatic(FROM_POLYGLOT_VALUE, POLYGLOT_VALUE, methodParameters.get(0))
                 .returning());
         return new ExpressionDef.Lambda(POLYGLOT_VALUE_CONVERTER, convertMethod, implementation);
+    }
+
+    private static boolean isDeclaredBeanMethod(AnnotationMetadata annotationMetadata) {
+        // Visitors can add @Bean directly to Python methods after metadata parsing. Those
+        // methods still need Java bridge methods so generated bean definitions can call them.
+        return annotationMetadata.hasDeclaredAnnotation(Bean.class)
+            || annotationMetadata.hasDeclaredStereotype(Bean.class);
     }
 
     @Override
