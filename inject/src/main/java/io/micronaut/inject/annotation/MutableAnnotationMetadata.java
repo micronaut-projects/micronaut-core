@@ -182,12 +182,12 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             if (v instanceof CharSequence) {
                 return v.toString().contains(DefaultPropertyPlaceholderResolver.PREFIX);
             } else if (v instanceof String[] strings) {
-                return Arrays.stream(strings).anyMatch(s -> s.contains(DefaultPropertyPlaceholderResolver.PREFIX));
+                return Arrays.stream(strings).anyMatch(s -> s != null && s.contains(DefaultPropertyPlaceholderResolver.PREFIX));
             } else if (v instanceof AnnotationValue<?> annotationValue) {
                 return hasPropertyExpressions(annotationValue.getValues());
             } else if (v instanceof AnnotationValue<?>[] annotationValues) {
                 if (annotationValues.length > 0) {
-                    return Arrays.stream(annotationValues).anyMatch(av -> hasPropertyExpressions(av.getValues()));
+                    return Arrays.stream(annotationValues).anyMatch(av -> av != null && hasPropertyExpressions(av.getValues()));
                 } else {
                     return false;
                 }
@@ -1090,6 +1090,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 return hasEvaluatedExpressions(av.getValues());
             } else if (value instanceof AnnotationValue[] avArray) {
                 return Arrays.stream(avArray)
+                           .filter(av -> av != null)
                            .map(AnnotationValue::getValues)
                            .anyMatch(this::hasEvaluatedExpressions);
             } else {

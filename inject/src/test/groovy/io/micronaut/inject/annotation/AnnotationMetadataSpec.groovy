@@ -47,6 +47,18 @@ class AnnotationMetadataSpec extends Specification {
         noExceptionThrown()
     }
 
+    void "test null string array entries do not fail property expression check"() {
+        given:
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata()
+
+        when:
+        metadata.addAnnotation("foo.Bar", [value: ["", null] as String[]])
+
+        then:
+        noExceptionThrown()
+        !metadata.hasPropertyExpressions()
+    }
+
     AnnotationMetadata newMetadata(AnnotationValueBuilder... builders) {
 
         def values = builders.collect({ it.build() })
