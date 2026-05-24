@@ -27,7 +27,9 @@ class AnnotationMetadataSpec extends AbstractPythonTypeElementSpec {
         def definition = buildBeanDefinition("python", "TestListener", '''
 from jakarta.inject import Singleton
 from micronaut.context.annotation import Executable
+from micronaut.core.bind.annotation import Bindable
 
+@Bindable
 def SomeAnn(someValue: str = "OK"):
     def decorator(func):
         return func

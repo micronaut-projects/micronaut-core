@@ -208,10 +208,13 @@ class ReplacementEngineFactory:
         VisitorSpecializesVisitor.ENABLED = true
         def context = buildContext('''
 from jakarta.inject import Singleton
+from micronaut.core.bind.annotation import Bindable
 
+@Bindable
 def TestProduces(target):
     return target
 
+@Bindable
 def TestSpecializes(target):
     return target
 

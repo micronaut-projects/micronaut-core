@@ -456,7 +456,7 @@ class AsyncImportService:
         def metaInfDir = new File(tempDir, "META-INF")
         def singleResultFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/async_/annotation/SingleResult.py")
         singleResultFile.exists()
-        singleResultFile.text.contains('@micronaut_annotation("io.micronaut.core.async.annotation.SingleResult")')
+        singleResultFile.text.contains('@micronaut_annotation("io.micronaut.core.async.annotation.SingleResult"')
 
         def propagationInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/async_/propagation/__init__.py")
         propagationInit.exists()

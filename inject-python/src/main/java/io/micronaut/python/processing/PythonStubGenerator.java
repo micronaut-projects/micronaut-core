@@ -1496,12 +1496,39 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             return TypeDef.STRING;
         }
+        TypeDef annotationArrayType = annotationArrayMemberType(typeRef, visitorContext);
+        if (annotationArrayType != null) {
+            return annotationArrayType;
+        }
         ClassElement classElement = GraalPyUtil.resolvePythonTypeToJava(typeRef, visitorContext, Map.of());
         Value defaultValue = decoratorDef.members().get(memberName);
         if (classElement.getName().equals(Object.class.getName()) && defaultValue != null && defaultValue.isString()) {
             return TypeDef.STRING;
         }
         return TypeDef.of(classElement);
+    }
+
+    private static @Nullable TypeDef annotationArrayMemberType(TypeRef typeRef, PythonVisitorContext visitorContext) {
+        if (!isPythonListType(typeRef.name()) || typeRef.typeArguments().size() != 1) {
+            return null;
+        }
+        TypeRef componentType = typeRef.typeArguments().getFirst();
+        if (isClassLiteralType(componentType)) {
+            return ClassTypeDef.of(Class.class).array();
+        }
+        ClassElement componentElement = GraalPyUtil.resolvePythonTypeToJava(componentType, visitorContext, Map.of());
+        return TypeDef.of(componentElement).array();
+    }
+
+    private static boolean isPythonListType(String typeName) {
+        return "list".equals(typeName) || "List".equals(typeName) || "typing.List".equals(typeName);
+    }
+
+    private static boolean isClassLiteralType(TypeRef typeRef) {
+        return "type".equals(typeRef.name())
+            || "typing.Type".equals(typeRef.name())
+            || "Class".equals(typeRef.name())
+            || Class.class.getName().equals(typeRef.name());
     }
 
     private static @Nullable ExpressionDef annotationDefaultValue(
@@ -1515,6 +1542,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (defaultValue instanceof Value polyglotValue) {
             if (polyglotValue.isNull()) {
                 return null;
+            }
+            if (memberType instanceof TypeDef.Array arrayType
+                && polyglotValue.hasArrayElements()
+                && polyglotValue.getArraySize() == 0) {
+                return new ExpressionDef.Constant(arrayType, new Object[0]);
             }
             defaultValue = convertDefaultValue(polyglotValue, memberType, visitorContext);
         }
@@ -1558,7 +1590,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 members.put(memberName, value);
             }
         }
-        if (members.values().stream().anyMatch(PythonStubGenerator::containsSourcegenAnnotationValue)) {
+        if (members.values().stream().anyMatch(PythonStubGenerator::requiresLiteralAnnotationValue)) {
             return buildAnnotationDef(decoratorDef.annotationName(), members);
         }
         AnnotationValue<?> annotationValue = new AnnotationValue<>(decoratorDef.annotationName(), members);
@@ -1587,6 +1619,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     private static Object normalizeAnnotationDefMember(Object value) {
         if (value instanceof Object[] array) {
+            if (array.length == 0) {
+                return EmptyAnnotationArray.INSTANCE;
+            }
             List<Object> values = new ArrayList<>(array.length);
             for (Object element : array) {
                 values.add(normalizeAnnotationDefMember(element));
@@ -1594,6 +1629,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return values;
         }
         if (value instanceof Collection<?> collection) {
+            if (collection.isEmpty()) {
+                return EmptyAnnotationArray.INSTANCE;
+            }
             List<Object> values = new ArrayList<>(collection.size());
             for (Object element : collection) {
                 values.add(normalizeAnnotationDefMember(element));
@@ -1621,6 +1659,32 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     return true;
                 }
             }
+        }
+        return false;
+    }
+
+    private static final class EmptyAnnotationArray {
+        private static final EmptyAnnotationArray INSTANCE = new EmptyAnnotationArray();
+
+        private EmptyAnnotationArray() {
+        }
+
+        @Override
+        public String toString() {
+            return "{}";
+        }
+    }
+
+    private static boolean requiresLiteralAnnotationValue(Object value) {
+        return containsSourcegenAnnotationValue(value) || isEmptyArrayOrCollection(value);
+    }
+
+    private static boolean isEmptyArrayOrCollection(Object value) {
+        if (value instanceof Object[] array) {
+            return array.length == 0;
+        }
+        if (value instanceof Collection<?> collection) {
+            return collection.isEmpty();
         }
         return false;
     }

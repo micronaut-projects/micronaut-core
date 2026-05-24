@@ -18,6 +18,7 @@ import io.micronaut.http.annotation.Error
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.python.compiler.PrimitiveTypesAnnotation
+import jakarta.validation.Constraint
 
 import java.lang.annotation.Native
 
@@ -210,7 +211,7 @@ class Test:
 
         then:
         resource != null
-        stub.contains('@micronaut_annotation("io.micronaut.context.annotation.ConfigurationProperties")')
+        stub.contains('@micronaut_annotation("io.micronaut.context.annotation.ConfigurationProperties"')
         !stub.contains('@ConfigurationReader')
         !stub.contains('@micronaut_annotation("io.micronaut.context.annotation.ConfigurationReader")')
 
@@ -590,6 +591,45 @@ def CustomAnnotation(
         context?.close()
     }
 
+    void "test Python annotation decorator supports Java annotation array members"() {
+        given:
+        def context = buildContext('''
+import java
+
+from jakarta.validation import Constraint
+
+Class = java.type("java.lang.Class")
+
+@Constraint(validatedBy=[])
+def E164(
+    message: str = "{example.micronaut.E164.message}",
+    groups: list[Class] = [],
+    payload: list[Class] = [],
+):
+    def decorator(bean):
+        return bean
+    return decorator
+''')
+
+        when:
+        Class<?> annotationType = context.classLoader.loadClass("python.E164")
+        def constraint = annotationType.getAnnotation(Constraint)
+
+        then:
+        annotationType.isAnnotation()
+        constraint != null
+        constraint.validatedBy().length == 0
+        annotationType.getMethod("message").returnType == String
+        annotationType.getMethod("message").defaultValue == "{example.micronaut.E164.message}"
+        annotationType.getMethod("groups").returnType == Class[]
+        annotationType.getMethod("groups").defaultValue == [] as Class[]
+        annotationType.getMethod("payload").returnType == Class[]
+        annotationType.getMethod("payload").defaultValue == [] as Class[]
+
+        cleanup:
+        context?.close()
+    }
+
     void "test Python annotation expression context methods are bridged"() {
         given:
         def context = buildContext('''
@@ -750,7 +790,9 @@ class Test:
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
 from jakarta.inject import Singleton
+from micronaut.core.bind.annotation import Bindable
 
+@Bindable
 def Topic(value: str, qos: int = 1):
     def decorator(func):
         return func
@@ -774,7 +816,9 @@ class Test:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''
 from typing import Annotated
 from jakarta.inject import Singleton
+from micronaut.core.bind.annotation import Bindable
 
+@Bindable
 def ParamAnn(value: str = "default"):
     def decorator(func):
         return func
@@ -794,6 +838,29 @@ class Test:
         definition.constructor.arguments[0].annotationMetadata
             .getAnnotationType("python.ParamAnn")
             .isPresent()
+    }
+
+    void "test undecorated Python decorator function is not generated as annotation type"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+
+def PlainDecorator(func):
+    return func
+
+@Singleton
+class Test:
+    pass
+''')
+
+        when:
+        context.classLoader.loadClass("python.PlainDecorator")
+
+        then:
+        thrown(ClassNotFoundException)
+
+        cleanup:
+        context?.close()
     }
 
 }

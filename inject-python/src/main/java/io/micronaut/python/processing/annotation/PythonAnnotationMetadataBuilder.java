@@ -26,6 +26,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMapper;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -509,6 +510,15 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
         Object resolvedValue;
         if (annotationValue instanceof Value value) {
             if (member instanceof AnnotationMemberDef memberDef && memberDef.memberType() != null) {
+                if (isEnumArrayMember(memberDef.memberType()) || isClassArrayMember(memberDef.memberType())) {
+                    return normalizeAnnotationValue(
+                        originatingElement,
+                        annotationName,
+                        memberName,
+                        memberDef,
+                        value
+                    );
+                }
                 return normalizeAnnotationValue(
                     originatingElement,
                     annotationName,
@@ -572,7 +582,7 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
             return annotationClassValue;
         }
         if (value instanceof Class<?> classValue) {
-            return new AnnotationClassValue<>(classValue);
+            return new AnnotationClassValue<>(ReflectionUtils.getWrapperType(classValue));
         }
         if (value instanceof ClassElement classElement) {
             return new AnnotationClassValue<>(classElement.getRawClassElement().getName());
@@ -590,11 +600,76 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
             return annotationClassValue(GraalPyUtil.convertValueToJava(polyglotValue, visitorContext));
         }
         String typeName = rawTypeName(value.toString());
-        ClassElement classElement = GraalPyUtil.resolvePythonTypeToJava(typeName, visitorContext, Map.of());
-        if (!Object.class.getName().equals(classElement.getName()) || Object.class.getName().equals(typeName)) {
-            return new AnnotationClassValue<>(classElement.getName());
+        String pythonClassName = pythonClassName(typeName);
+        if (pythonClassName != null) {
+            return new AnnotationClassValue<>(pythonClassName);
         }
-        return new AnnotationClassValue<>(typeName);
+        String decoratorAnnotationName = decoratorAnnotationName(typeName);
+        if (decoratorAnnotationName != null) {
+            return new AnnotationClassValue<>(decoratorAnnotationName);
+        }
+        return new AnnotationClassValue<>(annotationClassName(typeName));
+    }
+
+    private @Nullable String pythonClassName(String typeName) {
+        Map<String, ClassDef> classes = visitorContext.getProcessingEnvironment().environment().classes();
+        ClassDef classDef = classes.get(typeName);
+        String defaultPackage = PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
+        if (classDef == null && typeName.startsWith(defaultPackage)) {
+            classDef = classes.get(typeName.substring(defaultPackage.length()));
+        }
+        if (classDef == null) {
+            classDef = classes.get(defaultPackage + typeName);
+        }
+        return classDef == null ? null : toQualifiedPythonName(classDef);
+    }
+
+    private String annotationClassName(String typeName) {
+        String builtinTypeName = builtinAnnotationClassName(typeName);
+        if (builtinTypeName != null) {
+            return builtinTypeName;
+        }
+        if (typeName.indexOf('.') > -1) {
+            JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
+            if (javaVisitorContext != null) {
+                ClassElement classElement = javaVisitorContext.getClassElement(typeName).orElse(null);
+                if (classElement != null) {
+                    return classElement.getName();
+                }
+            }
+        }
+        return typeName;
+    }
+
+    private static @Nullable String builtinAnnotationClassName(String typeName) {
+        return switch (typeName) {
+            case "object", "typing.Any", "Any" -> Object.class.getName();
+            case "int" -> Integer.class.getName();
+            case "float" -> Double.class.getName();
+            case "bool" -> Boolean.class.getName();
+            case "str" -> String.class.getName();
+            default -> null;
+        };
+    }
+
+    private @Nullable String decoratorAnnotationName(String typeName) {
+        Map<String, DecoratorDef> decorators = visitorContext.getProcessingEnvironment().environment().decorators();
+        DecoratorDef decoratorDef = decorators.get(typeName);
+        String defaultPackage = PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
+        if (decoratorDef == null && typeName.startsWith(defaultPackage)) {
+            decoratorDef = decorators.get(typeName.substring(defaultPackage.length()));
+        }
+        if (decoratorDef == null) {
+            for (DecoratorDef candidate : decorators.values()) {
+                if (candidate.annotationName().equals(typeName)
+                    || candidate.name().equals(typeName)
+                    || (typeName.startsWith(defaultPackage) && candidate.name().equals(typeName.substring(defaultPackage.length())))) {
+                    decoratorDef = candidate;
+                    break;
+                }
+            }
+        }
+        return decoratorDef == null ? null : decoratorDef.annotationName();
     }
 
     private static String rawTypeName(String typeName) {

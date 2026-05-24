@@ -101,6 +101,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         # maintain insertion order
         self.known_decorators = OrderedDict()
         self.known_decorator_functions = OrderedDict()
+        self.annotation_type_target_decorators = set()
         self.current_class = None
         self.current_class_attributes = []
         self.current_class_properties = {}  # Track properties being built: name -> PropertyDef
@@ -183,9 +184,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             return node
 
                     # Only check for micronaut decorators on top-level functions (not nested)
-                    if self.current_class is None and not was_in_function and (
-                        is_micronaut_decorator(node, self) or is_python_decorator_function(node)
-                    ):
+                    if self.current_class is None and not was_in_function and is_micronaut_decorator(node, self):
                         arg_dict = extract_arg_defaults(node)
                         member_decorators = extract_arg_decorators(self, node)
                         member_types = extract_arg_types(self, node)
@@ -204,6 +203,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             self,
                             get_micronaut_annotation_value('repeated', node)
                         )
+                        annotation_type_target = bool(get_micronaut_annotation_value('annotationTypeTarget', node))
 
                         # For decorators defined with Micronaut annotations like @Around, use package naming
                         if annotation_name is None:
@@ -212,6 +212,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         # Track the annotation name for type resolution
                         if annotation_name:
                             self.java_type_assignments[node.name] = annotation_name
+                            if annotation_type_target:
+                                self.annotation_type_target_decorators.add(annotation_name)
+                                self.annotation_type_target_decorators.add(node.name)
 
                         decorator_def = DecoratorDef(node.name, annotation_name, repeated_name, arg_dict, stereotypes, member_decorators, member_types)
                         self.known_decorators[node.name] = decorator_def
@@ -2143,11 +2146,9 @@ def is_micronaut_annotation_decorator(decorator_node):
 
 def is_micronaut_decorator(funcdef, visitor=None):
     """
-    Returns True if the ast.FunctionDef is a top-level function (not inside a class)
-    and has been transformed by the micronaut_transformer to create micronaut annotations,
-    or is decorated with Micronaut/jakarta.inject annotations.
-    This checks for functions that have @micronaut_annotation decorators or the _micronaut_annotations pattern,
-    or decorators imported from micronaut.* or jakarta.inject.* packages.
+    Returns True if the ast.FunctionDef is a generated Micronaut annotation
+    decorator, or a top-level Python decorator function decorated by an
+    annotation that can target annotation types.
     """
     if not isinstance(funcdef, ast.FunctionDef):
         return False
@@ -2163,13 +2164,17 @@ def is_micronaut_decorator(funcdef, visitor=None):
             if is_target:
                 return True
 
-    # Check if this function has decorators imported from micronaut.* or jakarta.inject.* packages
+    if visitor is None or not is_python_decorator_function(funcdef):
+        return False
+
+    # A top-level Python decorator function is an annotation declaration only
+    # when at least one annotation on that function is itself applicable to
+    # annotation types.
     if visitor is not None:
         for dec in funcdef.decorator_list:
-            decorator_name = extract_decorator_name(dec)
-            if decorator_name:
-                existing_decorator = visitor.known_decorators.get(decorator_name)
-                if existing_decorator and has_python_annotation_stereotype(existing_decorator):
+            decorator = decorator_to_function(visitor, dec)
+            if decorator is not None:
+                if decorator_targets_annotation_type(decorator, visitor):
                     return True
 
     return False
@@ -2201,26 +2206,96 @@ def is_python_decorator_function(funcdef):
                 return True
     return False
 
-def has_python_annotation_stereotype(decorator):
-    if is_annotation_stereotype_for_python_decorator(decorator.annotationName()):
+def decorator_targets_annotation_type(decorator, visitor=None, seen=None):
+    if decorator is None:
+        return False
+    if seen is None:
+        seen = set()
+    annotation_name = decorator.annotationName()
+    if annotation_name in seen:
+        return False
+    seen.add(annotation_name)
+    if visitor is not None:
+        annotation_type_targets = getattr(visitor, 'annotation_type_target_decorators', set())
+        if annotation_name in annotation_type_targets or decorator.name() in annotation_type_targets:
+            return True
+    if annotation_targets_annotation_type(annotation_name, visitor):
         return True
     for stereotype in decorator.stereotypes():
-        if has_python_annotation_stereotype(stereotype):
+        if decorator_targets_annotation_type(stereotype, visitor, seen):
             return True
     return False
 
-def is_annotation_stereotype_for_python_decorator(annotation_name):
-    if annotation_name.startswith('io.micronaut.aop') or annotation_name.startswith('jakarta.inject.'):
-        return True
-    return annotation_name in {
-        'io.micronaut.context.annotation.AnnotationExpressionContext',
-        'io.micronaut.context.annotation.Bean',
-        'io.micronaut.context.annotation.DefaultScope',
-        'io.micronaut.context.annotation.Prototype',
-        'io.micronaut.context.annotation.Requires',
-        'io.micronaut.core.bind.annotation.Bindable',
-        'io.micronaut.http.annotation.FilterMatcher',
-    }
+def annotation_targets_annotation_type(annotation_name, visitor=None):
+    if visitor is None or annotation_name is None:
+        return False
+    visitor_context = getattr(visitor, 'visitor_context', None)
+    if visitor_context is None:
+        return False
+    try:
+        class_element = visitor_context.getClassElement(annotation_name).orElse(None)
+        if class_element is None:
+            return False
+        if metadata_targets_annotation_type(class_element):
+            return True
+        if native_type_targets_annotation_type(class_element):
+            return True
+    except Exception:
+        return False
+    return False
+
+def metadata_targets_annotation_type(class_element):
+    try:
+        ElementType = java.type("java.lang.annotation.ElementType")
+        targets = class_element.getAnnotationMetadata().enumValues(
+            "java.lang.annotation.Target",
+            "value",
+            ElementType
+        )
+        for target in targets:
+            if str(target).endswith("ANNOTATION_TYPE"):
+                return True
+    except Exception:
+        pass
+
+    try:
+        annotation_metadata = class_element.getAnnotationMetadata()
+        target_annotation = annotation_metadata.getAnnotation("java.lang.annotation.Target")
+        if target_annotation and "ANNOTATION_TYPE" in str(target_annotation.getValues()):
+            return True
+        target_value = annotation_metadata.getValue("java.lang.annotation.Target").orElse(None)
+        if target_value is not None and "ANNOTATION_TYPE" in str(target_value):
+            return True
+        targets = annotation_metadata.stringValues("java.lang.annotation.Target")
+        for target in targets:
+            if str(target).endswith("ANNOTATION_TYPE"):
+                return True
+    except Exception:
+        return False
+    return False
+
+def native_type_targets_annotation_type(class_element):
+    try:
+        native_type = class_element.getNativeType()
+        if not native_type:
+            return False
+        java_element = native_type.element()
+        if java_element is None:
+            return False
+        for annotation_mirror in java_element.getAnnotationMirrors():
+            annotation_type = annotation_mirror.getAnnotationType()
+            annotation_element = annotation_type.asElement()
+            if str(annotation_element) != "java.lang.annotation.Target":
+                continue
+            for target_value in annotation_mirror.getElementValues().values():
+                if "ANNOTATION_TYPE" in target_value.toString():
+                    return True
+    except Exception:
+        return False
+    return False
+
+def has_python_annotation_stereotype(decorator):
+    return decorator_targets_annotation_type(decorator)
 
 def get_micronaut_annotation_value(name, funcdef):
     """

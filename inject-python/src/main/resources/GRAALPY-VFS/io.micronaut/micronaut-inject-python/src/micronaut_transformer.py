@@ -1,6 +1,7 @@
 import ast
 import keyword
 import re
+import java
 from typing import Optional, Dict, List, Any
 
 PYTHON_KEYWORD_METHOD_ALIASES = {
@@ -188,7 +189,7 @@ class MicronautTransformer(ast.NodeTransformer):
             # Add the micronaut_annotation function first
             if self.transformed_code:
                 micronaut_annotation_code = '''
-def micronaut_annotation(name, repeated=None):
+def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     """
     Decorator to mark functions as Micronaut annotations.
     """
@@ -584,6 +585,56 @@ def micronaut_annotation(name, repeated=None):
 
         return False
 
+    def _targets_annotation_type(self, class_element) -> bool:
+        """
+        Check if a ClassElement has @Target including ANNOTATION_TYPE.
+        """
+        try:
+            ElementType = java.type('java.lang.annotation.ElementType')
+            targets = class_element.getAnnotationMetadata().enumValues(
+                'java.lang.annotation.Target',
+                'value',
+                ElementType
+            )
+            for target in targets:
+                if str(target).endswith('ANNOTATION_TYPE'):
+                    return True
+        except Exception:
+            pass
+
+        try:
+            annotation_metadata = class_element.getAnnotationMetadata()
+            target_annotation = annotation_metadata.getAnnotation('java.lang.annotation.Target')
+            if target_annotation and 'ANNOTATION_TYPE' in str(target_annotation.getValues()):
+                return True
+            target_value = annotation_metadata.getValue('java.lang.annotation.Target').orElse(None)
+            if target_value is not None and 'ANNOTATION_TYPE' in str(target_value):
+                return True
+            targets = annotation_metadata.stringValues('java.lang.annotation.Target')
+            for target in targets:
+                if str(target).endswith('ANNOTATION_TYPE'):
+                    return True
+        except Exception:
+            pass
+
+        try:
+            native_type = class_element.getNativeType()
+            if native_type:
+                java_element = native_type.element()
+                if java_element:
+                    for annotation_mirror in java_element.getAnnotationMirrors():
+                        annotation_type = annotation_mirror.getAnnotationType()
+                        annotation_element = annotation_type.asElement()
+                        if str(annotation_element) == 'java.lang.annotation.Target':
+                            for target_value in annotation_mirror.getElementValues().values():
+                                if 'ANNOTATION_TYPE' in target_value.toString():
+                                    return True
+                            return False
+        except Exception:
+            pass
+
+        return False
+
     def _is_nested_class(self, class_element) -> bool:
         """
         Check if a ClassElement represents a nested (inner) class.
@@ -624,14 +675,14 @@ def micronaut_annotation(name, repeated=None):
         # Check for repeatable annotation
         repeatable_name = self._get_repeatable_name(annotation_metadata, class_element)
         repeatable_info = f', repeated="{repeatable_name}"' if repeatable_name else ''
-
+        annotation_target_info = ', annotationTypeTarget=True' if self._targets_annotation_type(class_element) else ''
         # Get annotation parameters to generate proper function signature
         param_info = self._get_annotation_parameters(class_element)
         param_signature = param_info['signature']
         param_handling = param_info['handling']
 
         # Collect meta-annotations to include as decorators
-        decorator_lines = [f'@micronaut_annotation("{annotation_name}"{repeatable_info})']
+        decorator_lines = [f'@micronaut_annotation("{annotation_name}"{repeatable_info}{annotation_target_info})']
 
         nested_members_prelude, nested_members_code = self._generate_nested_members_sections(class_element, decorator_name)
 
@@ -689,7 +740,7 @@ def micronaut_annotation(name, repeated=None):
         imports_section = '\n'.join(import_lines) + '\n\n' if import_lines else ''
 
         decorator_code = f'''
-{imports_section}def micronaut_annotation(name, repeated=None):
+{imports_section}def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     """
     Decorator to mark functions as Micronaut annotations.
     """
@@ -741,6 +792,7 @@ def {decorator_name}({param_signature}):
         # Check for repeatable annotation
         repeatable_name = self._get_repeatable_name(annotation_metadata, class_element)
         repeatable_info = f', repeated="{repeatable_name}"' if repeatable_name else ''
+        annotation_target_info = ', annotationTypeTarget=True' if self._targets_annotation_type(class_element) else ''
 
         # Get annotation parameters to generate proper function signature
         param_info = self._get_annotation_parameters(class_element)
@@ -750,7 +802,7 @@ def {decorator_name}({param_signature}):
         # Generate the decorator function with custom annotation name and micronaut_annotation
         nested_members_prelude, nested_members_code = self._generate_nested_members_sections(class_element, decorator_name)
         decorator_code = f'''
-def micronaut_annotation(name, repeated=None):
+def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     """
     Decorator to mark functions as Micronaut annotations.
     """
@@ -759,7 +811,7 @@ def micronaut_annotation(name, repeated=None):
     return decorator
 
 {nested_members_prelude}
-@micronaut_annotation("{custom_annotation_name}"{repeatable_info})
+@micronaut_annotation("{custom_annotation_name}"{repeatable_info}{annotation_target_info})
 def {decorator_name}({param_signature}):
     """
     Micronaut annotation decorator for {custom_annotation_name}.
