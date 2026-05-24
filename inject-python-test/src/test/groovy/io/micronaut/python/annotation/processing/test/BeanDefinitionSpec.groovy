@@ -291,8 +291,9 @@ class FooBar:
     void "test implicit named qualifier on type via stereotype"() {
         given:
         def definition = buildBeanDefinition("python", "FooBar", '''
-from jakarta.inject import Named, Singleton
+from jakarta.inject import Named, Qualifier, Singleton
 
+@Qualifier
 @Named
 def Meta(func):
     return func

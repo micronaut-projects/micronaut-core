@@ -102,6 +102,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.known_decorators = OrderedDict()
         self.known_decorator_functions = OrderedDict()
         self.annotation_type_target_decorators = set()
+        self.python_annotation_decorators = set()
         self.current_class = None
         self.current_class_attributes = []
         self.current_class_properties = {}  # Track properties being built: name -> PropertyDef
@@ -199,6 +200,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             self,
                             get_micronaut_annotation_value('name', node)
                         )
+                        is_python_defined_annotation_decorator = annotation_name is None
                         repeated_name = qualify_local_annotation_name(
                             self,
                             get_micronaut_annotation_value('repeated', node)
@@ -212,6 +214,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         # Track the annotation name for type resolution
                         if annotation_name:
                             self.java_type_assignments[node.name] = annotation_name
+                            if is_python_defined_annotation_decorator:
+                                self.python_annotation_decorators.add(annotation_name)
+                                self.python_annotation_decorators.add(node.name)
                             if annotation_type_target:
                                 self.annotation_type_target_decorators.add(annotation_name)
                                 self.annotation_type_target_decorators.add(node.name)
@@ -2193,7 +2198,8 @@ def is_python_decorator_function(funcdef):
         for stmt in funcdef.body
         if isinstance(stmt, ast.FunctionDef)
     }
-    argument_names = {arg.arg for arg in funcdef.args.args}
+    positional_argument_names = [arg.arg for arg in funcdef.args.args]
+    single_target_argument = positional_argument_names[0] if len(positional_argument_names) == 1 else None
 
     for stmt in ast.walk(funcdef):
         if not isinstance(stmt, ast.Return):
@@ -2202,7 +2208,7 @@ def is_python_decorator_function(funcdef):
         if isinstance(value, ast.Name):
             if value.id in nested_function_names:
                 return True
-            if value.id in argument_names:
+            if value.id == single_target_argument:
                 return True
     return False
 
@@ -2216,15 +2222,13 @@ def decorator_targets_annotation_type(decorator, visitor=None, seen=None):
         return False
     seen.add(annotation_name)
     if visitor is not None:
+        python_annotation_decorators = getattr(visitor, 'python_annotation_decorators', set())
+        if annotation_name in python_annotation_decorators or decorator.name() in python_annotation_decorators:
+            return True
         annotation_type_targets = getattr(visitor, 'annotation_type_target_decorators', set())
         if annotation_name in annotation_type_targets or decorator.name() in annotation_type_targets:
             return True
-    if annotation_targets_annotation_type(annotation_name, visitor):
-        return True
-    for stereotype in decorator.stereotypes():
-        if decorator_targets_annotation_type(stereotype, visitor, seen):
-            return True
-    return False
+    return annotation_targets_annotation_type(annotation_name, visitor)
 
 def annotation_targets_annotation_type(annotation_name, visitor=None):
     if visitor is None or annotation_name is None:
@@ -2236,18 +2240,50 @@ def annotation_targets_annotation_type(annotation_name, visitor=None):
         class_element = visitor_context.getClassElement(annotation_name).orElse(None)
         if class_element is None:
             return False
-        if metadata_targets_annotation_type(class_element):
+        if not class_element_is_annotation_type(class_element):
+            return False
+        if declared_metadata_targets_annotation_type(class_element):
             return True
-        if native_type_targets_annotation_type(class_element):
-            return True
+        return native_type_targets_annotation_type(class_element)
     except Exception:
         return False
-    return False
 
-def metadata_targets_annotation_type(class_element):
+def class_element_is_annotation_type(class_element):
+    try:
+        native_type = class_element.getNativeType()
+        if native_type_is_annotation_type(native_type):
+            return True
+        java_element = native_type_element(native_type)
+        if java_element is not None and java_element_is_annotation_type(java_element):
+            return True
+    except Exception:
+        pass
+
+    try:
+        if class_element.getPackageName().startswith("java.lang.annotation"):
+            return True
+    except Exception:
+        pass
+
+    try:
+        return class_element.getAnnotationMetadata().hasAnnotation("java.lang.annotation.Retention")
+    except Exception:
+        return False
+
+def declared_metadata_targets_annotation_type(class_element):
+    annotation_metadata = None
+    try:
+        annotation_metadata = class_element.getAnnotationMetadata()
+        target_annotation = annotation_metadata.findDeclaredAnnotation("java.lang.annotation.Target").orElse(None)
+        if target_annotation is not None:
+            return annotation_value_targets_annotation_type(target_annotation)
+    except Exception:
+        pass
+
     try:
         ElementType = java.type("java.lang.annotation.ElementType")
-        targets = class_element.getAnnotationMetadata().enumValues(
+        declared_metadata = annotation_metadata.getDeclaredMetadata() if annotation_metadata else class_element.getAnnotationMetadata().getDeclaredMetadata()
+        targets = declared_metadata.enumValues(
             "java.lang.annotation.Target",
             "value",
             ElementType
@@ -2259,37 +2295,103 @@ def metadata_targets_annotation_type(class_element):
         pass
 
     try:
-        annotation_metadata = class_element.getAnnotationMetadata()
-        target_annotation = annotation_metadata.getAnnotation("java.lang.annotation.Target")
+        declared_metadata = annotation_metadata.getDeclaredMetadata() if annotation_metadata else class_element.getAnnotationMetadata().getDeclaredMetadata()
+        target_annotation = declared_metadata.findDeclaredAnnotation("java.lang.annotation.Target").orElse(None)
         if target_annotation and "ANNOTATION_TYPE" in str(target_annotation.getValues()):
             return True
-        target_value = annotation_metadata.getValue("java.lang.annotation.Target").orElse(None)
-        if target_value is not None and "ANNOTATION_TYPE" in str(target_value):
-            return True
-        targets = annotation_metadata.stringValues("java.lang.annotation.Target")
-        for target in targets:
-            if str(target).endswith("ANNOTATION_TYPE"):
-                return True
     except Exception:
         return False
     return False
+
+def annotation_value_targets_annotation_type(annotation_value):
+    try:
+        ElementType = java.type("java.lang.annotation.ElementType")
+        for target in annotation_value.enumValues("value", ElementType):
+            if str(target).endswith("ANNOTATION_TYPE"):
+                return True
+    except Exception:
+        pass
+
+    try:
+        return "ANNOTATION_TYPE" in str(annotation_value.getValues())
+    except Exception:
+        return False
+
+def native_type_element(native_type):
+    if native_type is None:
+        return None
+    try:
+        return native_type.element()
+    except Exception:
+        return None
+
+def native_type_is_annotation_type(native_type):
+    if native_type is None:
+        return False
+    try:
+        return bool(native_type.isAnnotation())
+    except Exception:
+        return False
+
+def java_element_is_annotation_type(java_element):
+    try:
+        kind = java_element.getKind()
+        if hasattr(kind, "name"):
+            return kind.name() == "ANNOTATION_TYPE"
+        return str(kind).endswith("ANNOTATION_TYPE")
+    except Exception:
+        return False
 
 def native_type_targets_annotation_type(class_element):
     try:
         native_type = class_element.getNativeType()
         if not native_type:
             return False
-        java_element = native_type.element()
+        if native_class_targets_annotation_type(native_type):
+            return True
+        java_element = native_type_element(native_type)
         if java_element is None:
             return False
+        if not java_element_is_annotation_type(java_element):
+            return False
+        try:
+            Target = java.type("java.lang.annotation.Target")
+            target_annotation = java_element.getAnnotation(Target)
+            if target_annotation is not None:
+                for target in target_annotation.value():
+                    if str(target).endswith("ANNOTATION_TYPE"):
+                        return True
+                return False
+        except Exception:
+            pass
         for annotation_mirror in java_element.getAnnotationMirrors():
             annotation_type = annotation_mirror.getAnnotationType()
             annotation_element = annotation_type.asElement()
-            if str(annotation_element) != "java.lang.annotation.Target":
+            if str(annotation_element) != "java.lang.annotation.Target" and str(annotation_type) != "java.lang.annotation.Target":
                 continue
             for target_value in annotation_mirror.getElementValues().values():
-                if "ANNOTATION_TYPE" in target_value.toString():
+                target_text = str(target_value)
+                try:
+                    target_text += " " + str(target_value.toString())
+                except Exception:
+                    pass
+                if "ANNOTATION_TYPE" in target_text:
                     return True
+    except Exception:
+        return False
+    return False
+
+def native_class_targets_annotation_type(native_type):
+    try:
+        if not native_type.isAnnotation():
+            return False
+        Target = java.type("java.lang.annotation.Target")
+        target_annotation = native_type.getAnnotation(Target)
+        if target_annotation is None:
+            return False
+        for target in target_annotation.value():
+            if str(target).endswith("ANNOTATION_TYPE"):
+                return True
     except Exception:
         return False
     return False

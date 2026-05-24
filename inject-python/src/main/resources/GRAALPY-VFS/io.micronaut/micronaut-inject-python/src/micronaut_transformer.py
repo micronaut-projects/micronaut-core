@@ -587,11 +587,24 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
 
     def _targets_annotation_type(self, class_element) -> bool:
         """
-        Check if a ClassElement has @Target including ANNOTATION_TYPE.
+        Check if a ClassElement is directly applicable to annotation types.
         """
+        if not self._is_annotation_class(class_element):
+            return False
+
         try:
+            annotation_metadata = class_element.getAnnotationMetadata()
+            target_annotation = annotation_metadata.findDeclaredAnnotation('java.lang.annotation.Target').orElse(None)
+            if target_annotation is not None:
+                return self._annotation_value_targets_annotation_type(target_annotation)
+        except Exception:
+            pass
+
+        try:
+            annotation_metadata = class_element.getAnnotationMetadata()
             ElementType = java.type('java.lang.annotation.ElementType')
-            targets = class_element.getAnnotationMetadata().enumValues(
+            declared_metadata = annotation_metadata.getDeclaredMetadata()
+            targets = declared_metadata.enumValues(
                 'java.lang.annotation.Target',
                 'value',
                 ElementType
@@ -604,35 +617,94 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
 
         try:
             annotation_metadata = class_element.getAnnotationMetadata()
-            target_annotation = annotation_metadata.getAnnotation('java.lang.annotation.Target')
+            declared_metadata = annotation_metadata.getDeclaredMetadata()
+            target_annotation = declared_metadata.findDeclaredAnnotation('java.lang.annotation.Target').orElse(None)
             if target_annotation and 'ANNOTATION_TYPE' in str(target_annotation.getValues()):
                 return True
-            target_value = annotation_metadata.getValue('java.lang.annotation.Target').orElse(None)
-            if target_value is not None and 'ANNOTATION_TYPE' in str(target_value):
-                return True
-            targets = annotation_metadata.stringValues('java.lang.annotation.Target')
-            for target in targets:
-                if str(target).endswith('ANNOTATION_TYPE'):
-                    return True
         except Exception:
             pass
 
         try:
             native_type = class_element.getNativeType()
             if native_type:
-                java_element = native_type.element()
+                if self._native_class_targets_annotation_type(native_type):
+                    return True
+                java_element = self._native_type_element(native_type)
                 if java_element:
+                    if not self._java_element_is_annotation_type(java_element):
+                        return False
+                    try:
+                        Target = java.type('java.lang.annotation.Target')
+                        target_annotation = java_element.getAnnotation(Target)
+                        if target_annotation is not None:
+                            for target in target_annotation.value():
+                                if str(target).endswith('ANNOTATION_TYPE'):
+                                    return True
+                            return False
+                    except Exception:
+                        pass
                     for annotation_mirror in java_element.getAnnotationMirrors():
                         annotation_type = annotation_mirror.getAnnotationType()
                         annotation_element = annotation_type.asElement()
-                        if str(annotation_element) == 'java.lang.annotation.Target':
+                        if str(annotation_element) == 'java.lang.annotation.Target' or str(annotation_type) == 'java.lang.annotation.Target':
                             for target_value in annotation_mirror.getElementValues().values():
-                                if 'ANNOTATION_TYPE' in target_value.toString():
+                                target_text = str(target_value)
+                                try:
+                                    target_text += ' ' + str(target_value.toString())
+                                except Exception:
+                                    pass
+                                if 'ANNOTATION_TYPE' in target_text:
                                     return True
                             return False
         except Exception:
             pass
 
+        return False
+
+    def _annotation_value_targets_annotation_type(self, annotation_value) -> bool:
+        try:
+            ElementType = java.type('java.lang.annotation.ElementType')
+            for target in annotation_value.enumValues('value', ElementType):
+                if str(target).endswith('ANNOTATION_TYPE'):
+                    return True
+        except Exception:
+            pass
+
+        try:
+            return 'ANNOTATION_TYPE' in str(annotation_value.getValues())
+        except Exception:
+            return False
+
+    def _native_type_element(self, native_type):
+        if native_type is None:
+            return None
+        try:
+            return native_type.element()
+        except Exception:
+            return None
+
+    def _java_element_is_annotation_type(self, java_element) -> bool:
+        try:
+            kind = java_element.getKind()
+            if hasattr(kind, 'name'):
+                return kind.name() == 'ANNOTATION_TYPE'
+            return str(kind).endswith('ANNOTATION_TYPE')
+        except Exception:
+            return False
+
+    def _native_class_targets_annotation_type(self, native_type) -> bool:
+        try:
+            if not native_type.isAnnotation():
+                return False
+            Target = java.type('java.lang.annotation.Target')
+            target_annotation = native_type.getAnnotation(Target)
+            if target_annotation is None:
+                return False
+            for target in target_annotation.value():
+                if str(target).endswith('ANNOTATION_TYPE'):
+                    return True
+        except Exception:
+            return False
         return False
 
     def _is_nested_class(self, class_element) -> bool:

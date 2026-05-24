@@ -863,4 +863,26 @@ class Test:
         context?.close()
     }
 
+    void "test route handler with decorator shape is not generated as annotation type"() {
+        given:
+        def context = buildContext('''
+from typing import Annotated
+
+from micronaut.http.annotation import Body, Post
+
+@Post(value="/hello")
+def create(person: Annotated[str, Body]) -> str:
+    return person
+''')
+
+        when:
+        context.classLoader.loadClass("python.create")
+
+        then:
+        thrown(ClassNotFoundException)
+
+        cleanup:
+        context?.close()
+    }
+
 }
