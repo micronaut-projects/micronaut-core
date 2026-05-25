@@ -508,6 +508,33 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         }
                                         reconstructedValue = CONTEXT_HOLDER.invokeStatic(isAbstractIntro ? "newIntroduction" : "newInstance", POLYGLOT_VALUE, args);
                                     }
+                                    if (pythonValueFinal != null) {
+                                        FieldDef pythonValueField = requireField(pythonValueFinal, "Expected graalpyInternalValue field");
+                                        ExpressionDef storedValue = aThis.field(pythonValueField);
+                                        List<StatementDef> syncStatements = new ArrayList<>();
+                                        for (PropertyElement beanProperty : beanProperties) {
+                                            FieldDef field = propertyFields.get(beanProperty.getName());
+                                            if (field == null) {
+                                                continue;
+                                            }
+                                            ExpressionDef fieldRef = aThis.field(field);
+                                            syncStatements.add((StatementDef) RUNTIME_UTIL.invokeStatic(
+                                                "putMember",
+                                                TypeDef.VOID,
+                                                storedValue,
+                                                ExpressionDef.constant(beanProperty.getName()),
+                                                coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT)
+                                            ));
+                                        }
+                                        syncStatements.add(storedValue.returning());
+                                        return storedValue.isNonNull().doIfElse(
+                                            StatementDef.multi(syncStatements),
+                                            StatementDef.multi(
+                                                aThis.field(pythonValueField).assign(reconstructedValue),
+                                                aThis.field(pythonValueField).returning()
+                                            )
+                                        );
+                                    }
                                     return reconstructedValue.returning();
                                 })
                             ));

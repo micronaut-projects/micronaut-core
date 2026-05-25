@@ -155,6 +155,57 @@ class ContactEntity:
         context?.close()
     }
 
+    void "test bidirectional Python dataclass asPolyglotValue does not recursively reconstruct associations"() {
+        given:
+        def pythonCode = '''
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Annotated
+
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity, Relation
+
+@dataclass
+@MappedEntity("contact")
+class ContactEntity:
+    id: Annotated[int | None, Id, GeneratedValue]
+    firstName: str
+    lastName: str
+    phones: Annotated[
+        list[PhoneEntity],
+        Relation(value=Relation.Kind.ONE_TO_MANY, mappedBy="contact"),
+    ] = field(default_factory=list)
+
+@dataclass
+@MappedEntity("phone")
+class PhoneEntity:
+    id: Annotated[int | None, Id, GeneratedValue]
+    phone: str
+    contact: Annotated[ContactEntity, Relation(value=Relation.Kind.MANY_TO_ONE)]
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def contactIntrospection = getBeanIntrospection(context, "python.ContactEntity")
+        def phoneIntrospection = getBeanIntrospection(context, "python.PhoneEntity")
+        def contact = contactIntrospection.instantiate(null, "Sergio", "del Amo", null)
+        def phone = phoneIntrospection.instantiate(null, "555-0100", contact)
+        contactIntrospection.getRequiredProperty("phones", List).set(contact, [phone])
+        def contactValue = contact.asPolyglotValue()
+        def phonesValue = contactValue.getMember("phones")
+        def phoneValue = phonesValue.getArrayElement(0)
+
+        then:
+        contactValue.getMember("firstName").asString() == "Sergio"
+        phonesValue.hasArrayElements()
+        phonesValue.arraySize == 1
+        phoneValue.getMember("phone").asString() == "555-0100"
+        phoneValue.getMember("contact").getMember("firstName").asString() == "Sergio"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test @Introspected excludes merge generated proxy properties"() {
         given:
         def pythonCode = '''
