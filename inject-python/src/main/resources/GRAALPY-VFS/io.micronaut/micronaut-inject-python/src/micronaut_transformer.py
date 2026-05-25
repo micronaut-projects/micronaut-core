@@ -221,10 +221,29 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                     print(f"Error parsing generated decorator: {e}")
                     continue
 
-            # Insert generated nodes at the beginning of the module
-            node.body = generated_nodes + node.body
+            insert_at = self._generated_code_insert_index(node)
+            node.body = node.body[:insert_at] + generated_nodes + node.body[insert_at:]
 
         return node
+
+    def _generated_code_insert_index(self, node: ast.Module) -> int:
+        insert_at = 0
+        if node.body and self._is_module_docstring(node.body[0]):
+            insert_at = 1
+        while insert_at < len(node.body) and self._is_future_import(node.body[insert_at]):
+            insert_at += 1
+        return insert_at
+
+    def _is_module_docstring(self, node: ast.AST) -> bool:
+        if not isinstance(node, ast.Expr):
+            return False
+        value = node.value
+        if isinstance(value, ast.Constant):
+            return isinstance(value.value, str)
+        return isinstance(value, ast.Str)
+
+    def _is_future_import(self, node: ast.AST) -> bool:
+        return isinstance(node, ast.ImportFrom) and node.module == '__future__'
 
     def visit_ClassDef(self, node: ast.ClassDef) -> ast.ClassDef:
         """

@@ -1,6 +1,7 @@
 package io.micronaut.python.processing;
 
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -26,6 +27,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.ArgumentDef;
 import io.micronaut.python.processing.visitor.ArgumentsDef;
 import io.micronaut.python.processing.visitor.ClassDef;
@@ -80,6 +82,62 @@ public class PythonAstParserTest {
             assertEquals(1, environment.classes().size());
             assertEquals(List.of("DemoPropertySourceImporterTest"), transformResult.allClassNames());
         }
+    }
+
+    @Test
+    void testTransformKeepsFutureImportsBeforeGeneratedCode() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName())
+                    && args != null
+                    && args.length == 1
+                    && "java.lang.String".equals(args[0])) {
+                    return Optional.of(ClassElement.of(String.class));
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
+            "module docs"
+            from __future__ import annotations
+            from java.lang import String
+
+            class Demo:
+                value: String
+            """);
+
+        String runtimeCode = transformResult.runtimeCode();
+        int docstring = runtimeCode.indexOf("module docs");
+        int futureImport = runtimeCode.indexOf("from __future__ import annotations");
+        int javaImport = runtimeCode.indexOf("import java");
+        int javaTypeAssignment = runtimeCode.indexOf("String = java.type('java.lang.String')");
+        assertTrue(docstring > -1);
+        assertTrue(futureImport > docstring);
+        assertTrue(javaImport > futureImport);
+        assertTrue(javaTypeAssignment > javaImport);
     }
 
     @Test
