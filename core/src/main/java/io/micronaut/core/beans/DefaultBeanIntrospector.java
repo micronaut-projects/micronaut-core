@@ -48,13 +48,33 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     @Nullable
     private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
     private final ClassLoader classLoader;
+    private final boolean useContextClassLoader;
 
+    /**
+     * Creates an introspector that uses this class' class loader and may follow the context class loader setting.
+     */
     DefaultBeanIntrospector() {
-        this.classLoader = DefaultBeanIntrospector.class.getClassLoader();
+        this(DefaultBeanIntrospector.class.getClassLoader(), true);
     }
 
+    /**
+     * Creates an introspector bound to the supplied class loader.
+     *
+     * @param classLoader The class loader to load introspections
+     */
     DefaultBeanIntrospector(ClassLoader classLoader) {
+        this(classLoader, false);
+    }
+
+    /**
+     * Creates an introspector bound to the supplied class loader.
+     *
+     * @param classLoader The class loader to load introspections
+     * @param useContextClassLoader Whether to allow the context class loader setting to override the supplied class loader
+     */
+    private DefaultBeanIntrospector(ClassLoader classLoader, boolean useContextClassLoader) {
         this.classLoader = classLoader;
+        this.useContextClassLoader = useContextClassLoader;
     }
 
     @Override
@@ -83,8 +103,9 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     @SuppressWarnings("java:S1181")
     public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
         ArgumentUtils.requireNonNull("beanType", beanType);
+        ClassLoader effectiveClassLoader = resolveClassLoader();
         @SuppressWarnings("unchecked") final BeanIntrospectionReference<T> reference =
-                (BeanIntrospectionReference<T>) getIntrospections().get(beanType.getName());
+                (BeanIntrospectionReference<T>) getIntrospections(effectiveClassLoader).get(beanType.getName());
         try {
             if (reference != null) {
                 return Optional.of(reference).map((Function<BeanIntrospectionReference<T>, BeanIntrospection<T>>) ref -> {
@@ -93,19 +114,36 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                     }
                     return ref.load();
                 });
-            } else {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("No BeanIntrospection found for bean type: {}", beanType);
-                }
-                return Optional.empty();
             }
+            if (useContextClassLoader && Boolean.getBoolean(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER)) {
+                ClassLoader beanClassLoader = beanType.getClassLoader();
+                if (beanClassLoader != null && beanClassLoader != effectiveClassLoader) {
+                    @SuppressWarnings("unchecked") final BeanIntrospectionReference<T> beanClassLoaderReference =
+                            (BeanIntrospectionReference<T>) getIntrospections(beanClassLoader).get(beanType.getName());
+                    if (beanClassLoaderReference != null) {
+                        return Optional.of(beanClassLoaderReference).map((Function<BeanIntrospectionReference<T>, BeanIntrospection<T>>) ref -> {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("Found BeanIntrospection for type: {},", ref.getBeanType());
+                            }
+                            return ref.load();
+                        });
+                    }
+                }
+            }
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("No BeanIntrospection found for bean type: {}", beanType);
+            }
+            return Optional.empty();
         } catch (Throwable e) {
             throw new IntrospectionException("Error loading BeanIntrospection for type [" + beanType + "]: " + e.getMessage(), e);
         }
     }
 
     private Map<String, BeanIntrospectionReference<Object>> getIntrospections() {
-        ClassLoader effectiveClassLoader = resolveClassLoader();
+        return getIntrospections(resolveClassLoader());
+    }
+
+    private Map<String, BeanIntrospectionReference<Object>> getIntrospections(ClassLoader effectiveClassLoader) {
         if (effectiveClassLoader != classLoader) {
             return resolveIntrospections(effectiveClassLoader);
         }
@@ -123,7 +161,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     }
 
     private ClassLoader resolveClassLoader() {
-        if (Boolean.getBoolean(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER)) {
+        if (useContextClassLoader && Boolean.getBoolean(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER)) {
             ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
             if (contextClassLoader != null) {
                 return contextClassLoader;

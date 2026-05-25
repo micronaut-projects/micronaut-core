@@ -2239,6 +2239,41 @@ class MyConfig {
         beanIntrospection.getBeanProperties().size() == 2
     }
 
+    void "test shared introspector falls back to bean classloader when context classloader lacks introspection"() {
+        given:
+        ClassLoader classLoader = buildClassLoader("""
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test {
+    String name
+}
+""")
+        Class<?> beanType = classLoader.loadClass("test.Test")
+        def propertyName = "micronaut.introspections.use.context.classloader"
+        def previousProperty = System.getProperty(propertyName)
+        def previousContextClassLoader = Thread.currentThread().contextClassLoader
+
+        when:
+        System.setProperty(propertyName, "true")
+        Thread.currentThread().contextClassLoader = BeanIntrospector.classLoader
+        Optional<BeanIntrospection<Object>> beanIntrospection = BeanIntrospector.SHARED.findIntrospection(beanType)
+
+        then:
+        beanIntrospection.isPresent()
+        beanIntrospection.get().beanProperties.size() == 1
+
+        cleanup:
+        Thread.currentThread().contextClassLoader = previousContextClassLoader
+        if (previousProperty == null) {
+            System.clearProperty(propertyName)
+        } else {
+            System.setProperty(propertyName, previousProperty)
+        }
+    }
+
     void "test introspection on abstract class with extra getter"() {
         BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
 package test
