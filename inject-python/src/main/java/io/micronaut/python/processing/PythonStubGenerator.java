@@ -583,23 +583,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         builder.addMethod(
                             constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                                 if (isIntrospectedBean) {
-                                    List<ExpressionDef> arguments = new ArrayList<>(List.of(
-                                        ExpressionDef.constant(element.getPackageName()),
-                                        ExpressionDef.constant(pythonSimpleName)
-                                    ));
+                                    List<StatementDef> assignments = new ArrayList<>();
                                     for (int i = 0; i < parameters.length; i++) {
                                         @NonNull ParameterElement parameter = parameters[i];
-                                        VariableDef.MethodParameter methodParameter = methodParameters.get(i);
-                                        coerceParameterToPolyglotValue(parameter, arguments, methodParameter);
-                                        int lastArgIndex = arguments.size() - 1;
-                                        arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
+                                        FieldDef field = propertyFields.get(parameter.getName());
+                                        if (field != null) {
+                                            assignments.add(aThis.field(field).assign(methodParameters.get(i)));
+                                        }
                                     }
-                                    ExpressionDef pythonInstance = CONTEXT_HOLDER.invokeStatic(
-                                        isAbstractIntroCtor ? "newIntroduction" : "newInstance",
-                                        POLYGLOT_VALUE,
-                                        arguments
-                                    );
-                                    return aThis.invokeConstructor(pythonInstance);
+                                    return StatementDef.multi(assignments);
                                 } else {
                                     List<ExpressionDef> arguments = new ArrayList<>(List.of(
                                         ExpressionDef.constant(element.getPackageName()),
