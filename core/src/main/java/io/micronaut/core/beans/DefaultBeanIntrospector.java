@@ -84,7 +84,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         @SuppressWarnings("unchecked") final BeanIntrospectionReference<T> reference =
-                (BeanIntrospectionReference<T>) getIntrospections().get(beanType.getName());
+                (BeanIntrospectionReference<T>) findIntrospectionReference(beanType);
         try {
             if (reference != null) {
                 return Optional.of(reference).map((Function<BeanIntrospectionReference<T>, BeanIntrospection<T>>) ref -> {
@@ -102,6 +102,21 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         } catch (Throwable e) {
             throw new IntrospectionException("Error loading BeanIntrospection for type [" + beanType + "]: " + e.getMessage(), e);
         }
+    }
+
+    @Nullable
+    private BeanIntrospectionReference<Object> findIntrospectionReference(Class<?> beanType) {
+        String beanTypeName = beanType.getName();
+        BeanIntrospectionReference<Object> reference = getIntrospections().get(beanTypeName);
+        if (reference != null) {
+            return reference;
+        }
+        ClassLoader beanClassLoader = beanType.getClassLoader();
+        ClassLoader effectiveClassLoader = resolveClassLoader();
+        if (beanClassLoader != null && beanClassLoader != effectiveClassLoader) {
+            return resolveIntrospections(beanClassLoader).get(beanTypeName);
+        }
+        return null;
     }
 
     private Map<String, BeanIntrospectionReference<Object>> getIntrospections() {
