@@ -1090,6 +1090,24 @@ def {simple_name}(*args, **kwargs):
 
     def _get_nested_class_elements(self, class_element):
         nested_elements = []
+        seen_nested_names = set()
+
+        def add_nested_element(nested_element):
+            if not nested_element:
+                return
+            nested_name = nested_element.getName()
+            if nested_name in seen_nested_names:
+                return
+            seen_nested_names.add(nested_name)
+            nested_elements.append(nested_element)
+
+        def add_nested_by_simple_name(simple_name):
+            nested_element = (
+                self.callback_get_class_element(f"{class_element.getName()}${simple_name}") or
+                self.callback_get_class_element(f"{class_element.getName()}.{simple_name}")
+            )
+            add_nested_element(nested_element)
+
         try:
             native_type = class_element.getNativeType()
             if native_type and hasattr(native_type, 'element'):
@@ -1099,15 +1117,28 @@ def {simple_name}(*args, **kwargs):
                         if not (hasattr(enclosed, 'getKind') and hasattr(enclosed.getKind(), 'name')):
                             continue
                         kind = enclosed.getKind().name()
-                        if kind not in ('ANNOTATION_TYPE', 'INTERFACE', 'CLASS'):
+                        if kind not in ('ANNOTATION_TYPE', 'INTERFACE', 'CLASS', 'ENUM'):
                             continue
                         simple_name = str(enclosed.getSimpleName())
-                        nested_element = (
-                            self.callback_get_class_element(f"{class_element.getName()}${simple_name}") or
-                            self.callback_get_class_element(f"{class_element.getName()}.{simple_name}")
-                        )
-                        if nested_element:
-                            nested_elements.append(nested_element)
+                        add_nested_by_simple_name(simple_name)
+            if native_type and hasattr(native_type, 'getDeclaredClasses'):
+                for nested_class in native_type.getDeclaredClasses():
+                    simple_name = str(nested_class.getSimpleName())
+                    add_nested_by_simple_name(simple_name)
+            if hasattr(class_element, 'getMethods'):
+                parent_name = class_element.getName()
+                for method in class_element.getMethods():
+                    if not hasattr(method, 'getReturnType'):
+                        continue
+                    return_type = method.getReturnType()
+                    try:
+                        if return_type.isArray():
+                            return_type = return_type.fromArray()
+                    except Exception:
+                        pass
+                    return_type_name = return_type.getName()
+                    if return_type_name.startswith(parent_name + '$') or return_type_name.startswith(parent_name + '.'):
+                        add_nested_element(return_type)
         except Exception as e:
             print(f"Error generating nested members for {class_element.getName()}: {e}")
         return nested_elements

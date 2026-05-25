@@ -141,6 +141,151 @@ public class PythonAstParserTest {
     }
 
     @Test
+    void testAnnotationDecoratorExposesNestedEnumTypes() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        ClassElement annotationElement = fakeAnnotationElement(
+            "example.BeanProperties",
+            "BeanProperties",
+            new FakeNativeAnnotationType()
+        );
+        ClassElement nestedEnumElement = fakeClassElement(
+            "example.BeanProperties$AccessKind",
+            "AccessKind",
+            null
+        );
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1) {
+                    return switch ((String) args[0]) {
+                        case "example.BeanProperties" -> Optional.of(annotationElement);
+                        case "example.BeanProperties.AccessKind", "example.BeanProperties$AccessKind" -> Optional.of(nestedEnumElement);
+                        default -> Optional.empty();
+                    };
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
+            from example import BeanProperties
+
+            @BeanProperties(accessKind=BeanProperties.AccessKind.FIELD)
+            class Demo:
+                pass
+            """);
+
+        String runtimeCode = transformResult.runtimeCode();
+        int enumAssignment = runtimeCode.indexOf("BeanProperties.AccessKind = AccessKind");
+        int decoratorUsage = runtimeCode.indexOf("@BeanProperties(accessKind=BeanProperties.AccessKind.FIELD)");
+        assertTrue(runtimeCode.contains("AccessKind = java.type("));
+        assertTrue(enumAssignment > -1);
+        assertTrue(decoratorUsage > enumAssignment);
+    }
+
+    private static ClassElement fakeAnnotationElement(String name, String simpleName, Object nativeType) {
+        return fakeClassElement(name, simpleName, nativeType);
+    }
+
+    private static ClassElement fakeClassElement(String name, String simpleName, Object nativeType) {
+        return (ClassElement) Proxy.newProxyInstance(
+            ClassElement.class.getClassLoader(),
+            new Class<?>[] { ClassElement.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> name;
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                return switch (method.getName()) {
+                    case "getName" -> name;
+                    case "getSimpleName" -> simpleName;
+                    case "getPackageName" -> name.substring(0, name.indexOf('.'));
+                    case "getAnnotationMetadata" -> io.micronaut.core.annotation.AnnotationMetadata.EMPTY_METADATA;
+                    case "getNativeType" -> nativeType;
+                    case "getMethods", "getBeanProperties", "getEnclosedElements" -> List.of();
+                    case "getTypeArguments" -> Map.of();
+                    case "getDeclaredGenericPlaceholders" -> Map.of();
+                    case "getBoundGenericTypes" -> List.of();
+                    case "getAllTypeArguments" -> Map.of();
+                    default -> {
+                        if (Optional.class.equals(method.getReturnType())) {
+                            yield Optional.empty();
+                        }
+                        if (method.getReturnType().equals(boolean.class)) {
+                            yield false;
+                        }
+                        if (method.getReturnType().equals(int.class)) {
+                            yield 0;
+                        }
+                        yield null;
+                    }
+                };
+            }
+        );
+    }
+
+    public static final class FakeNativeAnnotationType {
+        public FakeNativeAnnotationElement element() {
+            return new FakeNativeAnnotationElement();
+        }
+    }
+
+    public static final class FakeNativeAnnotationElement {
+        public FakeElementKind getKind() {
+            return new FakeElementKind("ANNOTATION_TYPE");
+        }
+
+        public List<FakeEnclosedElement> getEnclosedElements() {
+            return List.of(new FakeEnclosedElement("ENUM", "AccessKind"));
+        }
+    }
+
+    public static final class FakeEnclosedElement {
+        private final String kind;
+        private final String simpleName;
+
+        FakeEnclosedElement(String kind, String simpleName) {
+            this.kind = kind;
+            this.simpleName = simpleName;
+        }
+
+        public FakeElementKind getKind() {
+            return new FakeElementKind(kind);
+        }
+
+        public String getSimpleName() {
+            return simpleName;
+        }
+    }
+
+    public record FakeElementKind(String name) {
+    }
+
+    @Test
     void testParseNestedPythonClassConstructorParameterType() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""
