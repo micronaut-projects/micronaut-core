@@ -1642,6 +1642,36 @@ class ProductMappers:
     }
 
     @Test
+    void testDataclassDefaultFactoryConstructorArgumentParsing() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass, field
+
+            @dataclass
+            class Contact:
+                id: int | None
+                name: str
+                phones: list[str] = field(default_factory=list)
+            """)) {
+
+            ClassDef contactClass = environment.classes().get("Contact");
+            assertNotNull(contactClass);
+            assertEquals(3, contactClass.attributes().size());
+            assertFalse(contactClass.attributes().get(0).hasDefaultValue());
+            assertFalse(contactClass.attributes().get(1).hasDefaultValue());
+            assertTrue(contactClass.attributes().get(2).hasDefaultValue());
+
+            FunctionDef constructor = contactClass.constructor();
+            assertNotNull(constructor);
+            List<ArgumentDef> arguments = constructor.arguments().arguments();
+            assertEquals(3, arguments.size());
+            assertFalse(arguments.get(0).hasDefaultValue());
+            assertFalse(arguments.get(1).hasDefaultValue());
+            assertTrue(arguments.get(2).hasDefaultValue());
+        }
+    }
+
+    @Test
     void testFieldBasedPropertySupport() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""

@@ -99,6 +99,62 @@ class TestDataClass:
         context?.close()
     }
 
+    void "test Python dataclass default factory fields accept null default and explicit list through introspection"() {
+        given:
+        def pythonCode = '''
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Annotated
+
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity, Relation
+
+if TYPE_CHECKING:
+    from .phone_entity import PhoneEntity
+
+@dataclass
+@MappedEntity("phone")
+class PhoneEntity:
+    id: Annotated[int | None, Id, GeneratedValue]
+    phone: str
+
+@dataclass
+@MappedEntity("contact")
+class ContactEntity:
+    id: Annotated[int | None, Id, GeneratedValue]
+    firstName: str
+    lastName: str
+    phones: Annotated[
+        list[PhoneEntity],
+        Relation(value=Relation.Kind.ONE_TO_MANY, mappedBy="contact"),
+    ] = field(default_factory=list)
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.ContactEntity")
+        def phoneIntrospection = getBeanIntrospection(context, "python.PhoneEntity")
+        def defaultedInstance = introspection.instantiate(null, "Sergio", "del Amo", null)
+        def defaultedPhones = introspection.getRequiredProperty("phones", List).get(defaultedInstance)
+        def phone = phoneIntrospection.instantiate(null, "555-0100")
+        def explicitInstance = introspection.instantiate(null, "Sergio", "del Amo", [phone])
+        def explicitPhones = introspection.getRequiredProperty("phones", List).get(explicitInstance)
+        def explicitPhonesValue = explicitInstance.asPolyglotValue().getMember("phones")
+
+        then:
+        introspection.constructorArguments*.name == ["id", "firstName", "lastName", "phones"]
+        defaultedPhones == []
+        defaultedInstance.asPolyglotValue().getMember("phones").hasArrayElements()
+        defaultedInstance.asPolyglotValue().getMember("phones").arraySize == 0
+        explicitPhones.size() == 1
+        explicitPhonesValue.hasArrayElements()
+        explicitPhonesValue.arraySize == 1
+        explicitPhonesValue.getArrayElement(0).getMember("phone").asString() == "555-0100"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test @Introspected excludes merge generated proxy properties"() {
         given:
         def pythonCode = '''

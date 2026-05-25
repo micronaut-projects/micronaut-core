@@ -47,6 +47,7 @@ import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.util.GraalPyUtil;
+import io.micronaut.python.processing.visitor.ArgumentDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.python.processing.visitor.TypeRef;
@@ -580,6 +581,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             );
                         }
                         final boolean isAbstractIntroCtor = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
+                        final int requiredConstructorParameterCount = requiredConstructorParameterCount(parameters);
+                        final boolean hasDefaultedConstructorParameters = requiredConstructorParameterCount < parameters.length;
                         builder.addMethod(
                             constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                                 if (isIntrospectedBean) {
@@ -587,6 +590,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         ExpressionDef.constant(element.getPackageName()),
                                         ExpressionDef.constant(pythonSimpleName)
                                     ));
+                                    if (hasDefaultedConstructorParameters) {
+                                        arguments.add(ExpressionDef.constant(requiredConstructorParameterCount));
+                                    }
                                     for (int i = 0; i < parameters.length; i++) {
                                         @NonNull ParameterElement parameter = parameters[i];
                                         VariableDef.MethodParameter methodParameter = methodParameters.get(i);
@@ -595,7 +601,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
                                     }
                                     ExpressionDef pythonInstance = CONTEXT_HOLDER.invokeStatic(
-                                        isAbstractIntroCtor ? "newIntroduction" : "newInstance",
+                                        constructorFactoryMethod(isAbstractIntroCtor, hasDefaultedConstructorParameters),
                                         POLYGLOT_VALUE,
                                         arguments
                                     );
@@ -605,6 +611,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         ExpressionDef.constant(element.getPackageName()),
                                         ExpressionDef.constant(pythonSimpleName)
                                     ));
+                                    if (hasDefaultedConstructorParameters) {
+                                        arguments.add(ExpressionDef.constant(requiredConstructorParameterCount));
+                                    }
                                     for (int i = 0; i < parameters.length; i++) {
                                         @NonNull ParameterElement parameter = parameters[i];
                                         VariableDef.MethodParameter methodParameter = methodParameters.get(i);
@@ -613,7 +622,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
                                     }
                                     ExpressionDef pythonInstance = CONTEXT_HOLDER.invokeStatic(
-                                        isAbstractIntroCtor ? "newIntroduction" : "newInstance",
+                                        constructorFactoryMethod(isAbstractIntroCtor, hasDefaultedConstructorParameters),
                                         POLYGLOT_VALUE,
                                         arguments
                                     );
@@ -1108,6 +1117,25 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .anyMatch(decorator -> "dataclass".equals(decorator.name()) || "dataclasses.dataclass".equals(decorator.name()));
         }
         return false;
+    }
+
+    private static int requiredConstructorParameterCount(ParameterElement[] parameters) {
+        int requiredParameterCount = parameters.length;
+        while (requiredParameterCount > 0 && hasDefaultValue(parameters[requiredParameterCount - 1])) {
+            requiredParameterCount--;
+        }
+        return requiredParameterCount;
+    }
+
+    private static boolean hasDefaultValue(ParameterElement parameter) {
+        return parameter.getNativeType() instanceof ArgumentDef argumentDef && argumentDef.hasDefaultValue();
+    }
+
+    private static String constructorFactoryMethod(boolean introduction, boolean hasDefaultedParameters) {
+        if (introduction) {
+            return hasDefaultedParameters ? "newIntroductionWithDefaultedTrailingNulls" : "newIntroduction";
+        }
+        return hasDefaultedParameters ? "newInstanceWithDefaultedTrailingNulls" : "newInstance";
     }
 
     private static boolean hasConfigurationInjectConstructor(ClassElement element) {
