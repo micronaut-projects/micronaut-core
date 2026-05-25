@@ -30,10 +30,12 @@ import org.graalvm.polyglot.Value;
  * @param annotation The full type annotation string.
  * @param typeName The extracted type name (e.g., TypeRef for "List[str]").
  * @param value The default value.
+ * @param hasDefaultValue Whether the attribute declaration includes a default value, including an explicit {@code None}.
  * @param decorators The decorators.
  * @param documentation The documentation string.
  * @param isStatic Whether the attribute is static (class-level).
  * @param declaringClass The class that declares this attribute.
+ * @param defaultFactoryName The dataclass default factory function name, when declared through {@code field(default_factory=...)}.
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.Assign">Python AST Assign</a>
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.AnnAssign">Python AST AnnAssign</a>
  */
@@ -42,18 +44,43 @@ public record AttributeDef(
     String annotation,
     TypeRef typeName,
     Value value,
+    boolean hasDefaultValue,
     List<DecoratorDef> decorators,
     String documentation,
     boolean isStatic,
-    ClassDef declaringClass
+    ClassDef declaringClass,
+    String defaultFactoryName
 ) implements ElementDef, MemberDef {
 
     public AttributeDef(String name) {
-        this(name, null, null, null, List.of(), null, false, null);
+        this(name, null, null, null, false, List.of(), null, false, null, null);
     }
 
     public AttributeDef(String name, String annotation, Value value) {
-        this(name, annotation, null, value, List.of(), null, false, null);
+        this(name, annotation, null, value, value != null, List.of(), null, false, null, null);
+    }
+
+    public AttributeDef(String name,
+                        String annotation,
+                        TypeRef typeName,
+                        Value value,
+                        List<DecoratorDef> decorators,
+                        String documentation,
+                        boolean isStatic,
+                        ClassDef declaringClass) {
+        this(name, annotation, typeName, value, value != null, decorators, documentation, isStatic, declaringClass, null);
+    }
+
+    public AttributeDef(String name,
+                        String annotation,
+                        TypeRef typeName,
+                        Value value,
+                        boolean hasDefaultValue,
+                        List<DecoratorDef> decorators,
+                        String documentation,
+                        boolean isStatic,
+                        ClassDef declaringClass) {
+        this(name, annotation, typeName, value, hasDefaultValue, decorators, documentation, isStatic, declaringClass, null);
     }
 
     public AttributeDef {
@@ -71,7 +98,7 @@ public record AttributeDef(
      * @return A new AttributeDef with the declaring class set
      */
     public AttributeDef withDeclaringClass(ClassDef declaringClass) {
-        return new AttributeDef(name, annotation, typeName, value, decorators, documentation, isStatic, declaringClass);
+        return new AttributeDef(name, annotation, typeName, value, hasDefaultValue, decorators, documentation, isStatic, declaringClass, defaultFactoryName);
     }
 
     @Override

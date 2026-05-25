@@ -24,6 +24,7 @@ import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
@@ -250,6 +251,24 @@ public final class ContextHolder {
     }
 
     /**
+     * Create a new abstract introduction instance, omitting trailing null arguments that correspond
+     * to Python constructor defaults.
+     *
+     * @param packageName The package name
+     * @param simpleName The simple name
+     * @param requiredArgCount The number of non-defaulted positional constructor arguments
+     * @param args The arguments
+     * @return The new instance
+     */
+    @UsedByGeneratedCode
+    public static Value newIntroductionWithDefaultedTrailingNulls(@Nullable String packageName,
+                                                                  String simpleName,
+                                                                  int requiredArgCount,
+                                                                  Object... args) {
+        return newIntroduction(packageName, simpleName, trimDefaultedTrailingNulls(requiredArgCount, args));
+    }
+
+    /**
      * Create a new instance for the given package name, simple name and args.
      *
      * @param packageName The package name
@@ -261,6 +280,38 @@ public final class ContextHolder {
     public static Value newInstance(@Nullable String packageName, String simpleName, Object... args) {
         Value pythonClass = findClass(packageName, simpleName);
         return instantiate(packageName, simpleName, args, pythonClass);
+    }
+
+    /**
+     * Create a new instance, omitting trailing null arguments that correspond to Python constructor
+     * defaults.
+     *
+     * @param packageName The package name
+     * @param simpleName The simple name
+     * @param requiredArgCount The number of non-defaulted positional constructor arguments
+     * @param args The arguments
+     * @return The new instance
+     */
+    @UsedByGeneratedCode
+    public static Value newInstanceWithDefaultedTrailingNulls(@Nullable String packageName,
+                                                             String simpleName,
+                                                             int requiredArgCount,
+                                                             Object... args) {
+        return newInstance(packageName, simpleName, trimDefaultedTrailingNulls(requiredArgCount, args));
+    }
+
+    /**
+     * Create a Python instance without invoking {@code __init__}.
+     *
+     * @param packageName The package name
+     * @param simpleName The simple name
+     * @return The new uninitialized instance
+     */
+    @UsedByGeneratedCode
+    public static Value newUninitializedInstance(@Nullable String packageName, String simpleName) {
+        Context context = getContext();
+        Value pythonClass = findClass(packageName, simpleName, context);
+        return context.eval(PYTHON, "lambda cls: object.__new__(cls)").execute(pythonClass);
     }
 
     /**
@@ -306,6 +357,14 @@ public final class ContextHolder {
     public static Value newInstance(String simpleName, Object... args) {
         Value pythonClass = findClass(simpleName);
         return instantiate(null, simpleName, args, pythonClass);
+    }
+
+    private static Object[] trimDefaultedTrailingNulls(int requiredArgCount, Object[] args) {
+        int length = args.length;
+        while (length > requiredArgCount && args[length - 1] == null) {
+            length--;
+        }
+        return length == args.length ? args : Arrays.copyOf(args, length);
     }
 
     public static Value findClass(@org.jspecify.annotations.Nullable String packageName, String simpleName) {

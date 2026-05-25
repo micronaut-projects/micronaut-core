@@ -21,6 +21,7 @@ import io.micronaut.context.python.GraalPyRuntimeUtil
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.python.aop.TestAround
+import io.micronaut.python.annotation.processing.test.aop.DefaultMethodChildContract
 import spock.lang.Specification
 
 /**
@@ -723,6 +724,43 @@ class Test:
         testBean.run() == "done"
         firstInterceptor.invoked
         secondInterceptor.invoked
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test around advice on inherited default interface method"() {
+        given:
+        def pythonCode = '''
+from io.micronaut.python.annotation.processing.test.aop import DefaultMethodChildContract
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from jakarta.inject import Singleton
+import java
+
+@Around
+def Mutating(target):
+    return target
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@InterceptorBean(Mutating)
+class TestAroundInterceptor(MethodInterceptor):
+    def intercept(self, context : MethodInvocationContext):
+        return f"intercepted: {context.proceed()}"
+
+@Mutating
+@Singleton
+class DefaultMethodBean(DefaultMethodChildContract):
+    def send(self, value: str, source=None) -> str:
+        return f"{value}:{source}"
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def bean = context.getBean(DefaultMethodChildContract)
+
+        then:
+        bean.send("value") == "intercepted: value:default"
 
         cleanup:
         context?.close()

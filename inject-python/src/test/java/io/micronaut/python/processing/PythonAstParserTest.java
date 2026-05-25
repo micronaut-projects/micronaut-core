@@ -1,6 +1,7 @@
 package io.micronaut.python.processing;
 
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -26,6 +27,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.ArgumentDef;
 import io.micronaut.python.processing.visitor.ArgumentsDef;
 import io.micronaut.python.processing.visitor.ClassDef;
@@ -80,6 +82,207 @@ public class PythonAstParserTest {
             assertEquals(1, environment.classes().size());
             assertEquals(List.of("DemoPropertySourceImporterTest"), transformResult.allClassNames());
         }
+    }
+
+    @Test
+    void testTransformKeepsFutureImportsBeforeGeneratedCode() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName())
+                    && args != null
+                    && args.length == 1
+                    && "java.lang.String".equals(args[0])) {
+                    return Optional.of(ClassElement.of(String.class));
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
+            "module docs"
+            from __future__ import annotations
+            from java.lang import String
+
+            class Demo:
+                value: String
+            """);
+
+        String runtimeCode = transformResult.runtimeCode();
+        int docstring = runtimeCode.indexOf("module docs");
+        int futureImport = runtimeCode.indexOf("from __future__ import annotations");
+        int javaImport = runtimeCode.indexOf("import java");
+        int javaTypeAssignment = runtimeCode.indexOf("String = java.type('java.lang.String')");
+        assertTrue(docstring > -1);
+        assertTrue(futureImport > docstring);
+        assertTrue(javaImport > futureImport);
+        assertTrue(javaTypeAssignment > javaImport);
+    }
+
+    @Test
+    void testAnnotationDecoratorExposesNestedEnumTypes() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        ClassElement annotationElement = fakeAnnotationElement(
+            "example.BeanProperties",
+            "BeanProperties",
+            new FakeNativeAnnotationType()
+        );
+        ClassElement nestedEnumElement = fakeClassElement(
+            "example.BeanProperties$AccessKind",
+            "AccessKind",
+            null
+        );
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1) {
+                    return switch ((String) args[0]) {
+                        case "example.BeanProperties" -> Optional.of(annotationElement);
+                        case "example.BeanProperties.AccessKind", "example.BeanProperties$AccessKind" -> Optional.of(nestedEnumElement);
+                        default -> Optional.empty();
+                    };
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
+            from example import BeanProperties
+
+            @BeanProperties(accessKind=BeanProperties.AccessKind.FIELD)
+            class Demo:
+                pass
+            """);
+
+        String runtimeCode = transformResult.runtimeCode();
+        int enumAssignment = runtimeCode.indexOf("BeanProperties.AccessKind = AccessKind");
+        int decoratorUsage = runtimeCode.indexOf("@BeanProperties(accessKind=BeanProperties.AccessKind.FIELD)");
+        assertTrue(runtimeCode.contains("AccessKind = java.type("));
+        assertTrue(enumAssignment > -1);
+        assertTrue(decoratorUsage > enumAssignment);
+    }
+
+    private static ClassElement fakeAnnotationElement(String name, String simpleName, Object nativeType) {
+        return fakeClassElement(name, simpleName, nativeType);
+    }
+
+    private static ClassElement fakeClassElement(String name, String simpleName, Object nativeType) {
+        return (ClassElement) Proxy.newProxyInstance(
+            ClassElement.class.getClassLoader(),
+            new Class<?>[] { ClassElement.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> name;
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                return switch (method.getName()) {
+                    case "getName" -> name;
+                    case "getSimpleName" -> simpleName;
+                    case "getPackageName" -> name.substring(0, name.indexOf('.'));
+                    case "getAnnotationMetadata" -> io.micronaut.core.annotation.AnnotationMetadata.EMPTY_METADATA;
+                    case "getNativeType" -> nativeType;
+                    case "getMethods", "getBeanProperties", "getEnclosedElements" -> List.of();
+                    case "getTypeArguments" -> Map.of();
+                    case "getDeclaredGenericPlaceholders" -> Map.of();
+                    case "getBoundGenericTypes" -> List.of();
+                    case "getAllTypeArguments" -> Map.of();
+                    default -> {
+                        if (Optional.class.equals(method.getReturnType())) {
+                            yield Optional.empty();
+                        }
+                        if (method.getReturnType().equals(boolean.class)) {
+                            yield false;
+                        }
+                        if (method.getReturnType().equals(int.class)) {
+                            yield 0;
+                        }
+                        yield null;
+                    }
+                };
+            }
+        );
+    }
+
+    public static final class FakeNativeAnnotationType {
+        public FakeNativeAnnotationElement element() {
+            return new FakeNativeAnnotationElement();
+        }
+    }
+
+    public static final class FakeNativeAnnotationElement {
+        public FakeElementKind getKind() {
+            return new FakeElementKind("ANNOTATION_TYPE");
+        }
+
+        public List<FakeEnclosedElement> getEnclosedElements() {
+            return List.of(new FakeEnclosedElement("ENUM", "AccessKind"));
+        }
+    }
+
+    public static final class FakeEnclosedElement {
+        private final String kind;
+        private final String simpleName;
+
+        FakeEnclosedElement(String kind, String simpleName) {
+            this.kind = kind;
+            this.simpleName = simpleName;
+        }
+
+        public FakeElementKind getKind() {
+            return new FakeElementKind(kind);
+        }
+
+        public String getSimpleName() {
+            return simpleName;
+        }
+    }
+
+    public record FakeElementKind(String name) {
     }
 
     @Test
@@ -755,6 +958,44 @@ class ProductMappers:
     }
 
     @Test
+    void testTypeCheckingImportsResolveForFieldAnnotations(@TempDir Path tempDir) throws IOException {
+        Path dependency = tempDir.resolve("Dependency.py");
+        Path main = tempDir.resolve("Main.py");
+        Files.writeString(dependency, """
+            class Dependency:
+                pass
+            """);
+        Files.writeString(main, """
+            from typing import TYPE_CHECKING
+
+            if TYPE_CHECKING:
+                from Dependency import Dependency
+
+            class Main:
+                dependency: Dependency
+            """);
+
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        List<Source> sources = List.of(
+            Source.newBuilder("python", dependency.toFile()).build(),
+            Source.newBuilder("python", main.toFile()).build()
+        );
+
+        try (PythonEnvironment environment = pythonProcessor.parse(sources, List.of(tempDir.toString()), null);
+             PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
+            ClassElement mainClass = processingEnvironment.classes().get("python.Main");
+            assertNotNull(mainClass);
+
+            FieldElement dependencyField = mainClass.getFields()
+                .stream()
+                .filter(field -> "dependency".equals(field.getName()))
+                .findFirst()
+                .orElseThrow();
+            assertEquals("python.Dependency", dependencyField.getType().getName());
+        }
+    }
+
+    @Test
     void testAbstractMethodDetection() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""
@@ -1397,6 +1638,36 @@ class ProductMappers:
                 assertTrue(countMaxValue.isPresent(), "Max annotation should have value");
                 assertEquals(100, countMaxValue.getAsInt(), "Max annotation should have value 100");
             }
+        }
+    }
+
+    @Test
+    void testDataclassDefaultFactoryConstructorArgumentParsing() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from dataclasses import dataclass, field
+
+            @dataclass
+            class Contact:
+                id: int | None
+                name: str
+                phones: list[str] = field(default_factory=list)
+            """)) {
+
+            ClassDef contactClass = environment.classes().get("Contact");
+            assertNotNull(contactClass);
+            assertEquals(3, contactClass.attributes().size());
+            assertFalse(contactClass.attributes().get(0).hasDefaultValue());
+            assertFalse(contactClass.attributes().get(1).hasDefaultValue());
+            assertTrue(contactClass.attributes().get(2).hasDefaultValue());
+
+            FunctionDef constructor = contactClass.constructor();
+            assertNotNull(constructor);
+            List<ArgumentDef> arguments = constructor.arguments().arguments();
+            assertEquals(3, arguments.size());
+            assertFalse(arguments.get(0).hasDefaultValue());
+            assertFalse(arguments.get(1).hasDefaultValue());
+            assertTrue(arguments.get(2).hasDefaultValue());
         }
     }
 

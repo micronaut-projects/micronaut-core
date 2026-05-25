@@ -17,8 +17,10 @@ package io.micronaut.python.processing.visitor;
 
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
@@ -35,6 +37,7 @@ import java.util.List;
  * @since 5.0.0
  */
 public final class PythonConstructorElement extends PythonMethodElement implements ConstructorElement {
+    private ParameterElement[] constructorParameters;
 
     /**
      * Constructs a new {@code PythonConstructorElement} from the given {@code FunctionDef}.
@@ -77,6 +80,21 @@ public final class PythonConstructorElement extends PythonMethodElement implemen
         // factory methods by the logical JVM constructor name. The underlying
         // FunctionDef still represents Python's __init__ method.
         return "<init>";
+    }
+
+    @Override
+    public ParameterElement[] getParameters() {
+        if (constructorParameters == null) {
+            ParameterElement[] parameters = super.getParameters();
+            List<ArgumentDef> arguments = getNativeType().arguments().arguments();
+            for (int i = 0; i < parameters.length && i < arguments.size(); i++) {
+                if (arguments.get(i).hasDefaultValue() && !parameters[i].hasDeclaredAnnotation(AnnotationUtil.NULLABLE)) {
+                    parameters[i].annotate(AnnotationUtil.NULLABLE);
+                }
+            }
+            constructorParameters = parameters;
+        }
+        return constructorParameters.clone();
     }
 
     @Override

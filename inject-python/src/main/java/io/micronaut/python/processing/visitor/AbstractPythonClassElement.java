@@ -79,6 +79,7 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     protected final PythonProcessingEnvironment environment;
     /** Query implementation for enclosed elements. */
     private final PythonEnclosedElementsQuery enclosedElementsQuery = new PythonEnclosedElementsQuery();
+    private Map<InheritedMethodKey, ElementAnnotationMetadata> inheritedInterfaceMethodAnnotationMetadata = new LinkedHashMap<>();
 
     protected ElementDef typeAnnotationsKey;
     private ElementAnnotationMetadata typeAnnotationMetadata;
@@ -95,6 +96,14 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         );
         this.environment = environment;
         this.arrayDimensions = arrayDimensions;
+    }
+
+    @Override
+    protected void copyValues(AbstractPythonElement element) {
+        super.copyValues(element);
+        if (element instanceof AbstractPythonClassElement classElement) {
+            classElement.inheritedInterfaceMethodAnnotationMetadata = inheritedInterfaceMethodAnnotationMetadata;
+        }
     }
 
     @Override
@@ -451,8 +460,23 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     }
 
     private MethodElement decorateMethodWithOwningTypeMetadata(MethodElement method) {
+        ElementAnnotationMetadata methodAnnotationMetadata = inheritedInterfaceMethodAnnotationMetadata.computeIfAbsent(
+            inheritedMethodKey(method),
+            key -> elementAnnotationMetadataFactory.buildMutable(MutableAnnotationMetadata.of(method.getMethodAnnotationMetadata()))
+        );
         return method.withAnnotationMetadata(
-            new AnnotationMetadataHierarchy(getAnnotationMetadata(), method.getMethodAnnotationMetadata())
+            new AnnotationMetadataHierarchy(getAnnotationMetadata(), methodAnnotationMetadata)
+        );
+    }
+
+    private InheritedMethodKey inheritedMethodKey(MethodElement method) {
+        return new InheritedMethodKey(
+            method.getDeclaringType().getName(),
+            method.getName(),
+            Arrays.stream(method.getParameters())
+                .map(parameter -> parameter.getGenericType().getDescription(false))
+                .toList(),
+            method.getGenericReturnType().getDescription(false)
         );
     }
 
@@ -879,5 +903,13 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     @Override
     public ClassElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return (ClassElement) super.withAnnotationMetadata(annotationMetadata);
+    }
+
+    private record InheritedMethodKey(
+        String declaringType,
+        String name,
+        List<String> parameterTypes,
+        String returnType
+    ) {
     }
 }

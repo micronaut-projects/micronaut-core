@@ -17,6 +17,10 @@ package io.micronaut.python.compiler
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.GraalPyContextFactory
+import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.data.model.Association
+import io.micronaut.data.model.runtime.RuntimePersistentEntity
+import io.micronaut.data.intercept.annotation.DataMethod
 import io.micronaut.python.processing.PythonAnnotationProcessor
 import org.graalvm.polyglot.Value
 import spock.lang.Specification
@@ -969,6 +973,166 @@ class RoomRepository(CrudRepository[Room, int]):
         classLoader.loadClass('python.RoomRepository') != null
 
         cleanup:
+        tempTargetDir.deleteDir()
+    }
+
+    def "test inherited data repository methods keep subclass-specific metadata"() {
+        given:
+        def tempTargetDir = File.createTempDir("pyronaut-test-data-repository-metadata-target", "")
+        def pythonCode = '''
+from dataclasses import dataclass
+from typing import Annotated
+
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity
+from micronaut.data.jdbc.annotation import JdbcRepository
+from micronaut.data.repository import CrudRepository
+
+@dataclass
+@MappedEntity
+class ContactEntity:
+    id: Annotated[int | None, Id, GeneratedValue]
+    firstName: str
+    lastName: str
+
+@dataclass
+@MappedEntity
+class PhoneEntity:
+    id: Annotated[int | None, Id, GeneratedValue]
+    phone: str
+
+@JdbcRepository(dialect="H2")
+class ContactRepository(CrudRepository[ContactEntity, int]):
+    pass
+
+@JdbcRepository(dialect="H2")
+class PhoneRepository(CrudRepository[PhoneEntity, int]):
+    pass
+'''
+
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .javaSrc("inject-python-test/src/test/java")
+            .targetDir(tempTargetDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
+        def contactDefinition = classLoader.loadClass('python.$ContactRepository$RuntimeProxy$Definition').newInstance()
+        def phoneDefinition = classLoader.loadClass('python.$PhoneRepository$RuntimeProxy$Definition').newInstance()
+        def contactSave = contactDefinition.executableMethods.find { it.methodName == "save" && it.arguments.length == 1 }
+        def phoneSave = phoneDefinition.executableMethods.find { it.methodName == "save" && it.arguments.length == 1 }
+
+        then:
+        contactSave != null
+        phoneSave != null
+        contactSave.arguments[0].type.name == "python.ContactEntity"
+        phoneSave.arguments[0].type.name == "python.PhoneEntity"
+        contactSave.classValue(DataMethod, DataMethod.META_MEMBER_ROOT_ENTITY).get().name == "python.ContactEntity"
+        phoneSave.classValue(DataMethod, DataMethod.META_MEMBER_ROOT_ENTITY).get().name == "python.PhoneEntity"
+
+        cleanup:
+        tempTargetDir.deleteDir()
+    }
+
+    def "test file backed association property keeps entity generic when projection uses same property name"() {
+        given:
+        def tempSrcDir = File.createTempDir("pyronaut-test-association-generic-src", "")
+        def tempTargetDir = File.createTempDir("pyronaut-test-association-generic-target", "")
+
+        def appDir = new File(tempSrcDir, "example/micronaut")
+        appDir.mkdirs()
+
+        new File(appDir, "contact_entity.py").text = '''
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Annotated
+
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity, Relation
+
+if TYPE_CHECKING:
+    from .phone_entity import PhoneEntity
+
+@dataclass
+@MappedEntity("contact")
+class ContactEntity:
+    id: Annotated[int | None, Id, GeneratedValue]
+    firstName: str
+    lastName: str
+    phones: Annotated[
+        list[PhoneEntity],
+        Relation(value=Relation.Kind.ONE_TO_MANY, mappedBy="contact"),
+    ] = field(default_factory=list)
+'''
+
+        new File(appDir, "phone_entity.py").text = '''
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Annotated
+
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity, Relation
+
+if TYPE_CHECKING:
+    from .contact_entity import ContactEntity
+
+@dataclass
+@MappedEntity("phone")
+class PhoneEntity:
+    id: Annotated[int | None, Id, GeneratedValue]
+    phone: str
+    contact: Annotated[ContactEntity, Relation(value=Relation.Kind.MANY_TO_ONE)]
+'''
+
+        new File(appDir, "contact_complete.py").text = '''
+from dataclasses import dataclass
+
+from micronaut.core.annotation import Introspected
+
+@dataclass
+@Introspected
+class ContactComplete:
+    id: int | None
+    firstName: str
+    lastName: str
+    phones: list[str] | None = None
+'''
+
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(tempSrcDir.absolutePath)
+            .javaSrc("inject-python-test/src/test/java")
+            .targetDir(tempTargetDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
+        BeanIntrospection introspection = classLoader.loadClass('example.micronaut.$ContactEntity$Introspection').newInstance() as BeanIntrospection
+        def phones = introspection.getRequiredProperty("phones", List)
+        def phoneArgument = phones.asArgument().getFirstTypeVariable().orElse(null)
+        BeanIntrospection completeIntrospection = classLoader.loadClass('example.micronaut.$ContactComplete$Introspection').newInstance() as BeanIntrospection
+        def completePhones = completeIntrospection.getRequiredProperty("phones", List)
+        def completePhoneArgument = completePhones.asArgument().getFirstTypeVariable().orElse(null)
+        def entity = new RuntimePersistentEntity(introspection) {
+            @Override
+            protected RuntimePersistentEntity getEntity(Class type) {
+                BeanIntrospection associatedIntrospection = classLoader.loadClass("${type.packageName}.\$${type.simpleName}\$Introspection").newInstance() as BeanIntrospection
+                return new RuntimePersistentEntity(associatedIntrospection)
+            }
+        }
+        def association = entity.getPropertyByName("phones") as Association
+
+        then:
+        phoneArgument != null
+        phoneArgument.type.name == "example.micronaut.PhoneEntity"
+        completePhoneArgument != null
+        completePhoneArgument.type.name == "java.lang.String"
+        completePhones.asArgument().isNullable()
+        association.associatedEntity.name == "example.micronaut.PhoneEntity"
+
+        cleanup:
+        tempSrcDir.deleteDir()
         tempTargetDir.deleteDir()
     }
 
