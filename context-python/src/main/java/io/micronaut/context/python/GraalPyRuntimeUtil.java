@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import org.graalvm.polyglot.Context;
@@ -173,6 +174,18 @@ public final class GraalPyRuntimeUtil {
             result[i] = coerceToContext(args[i], context);
         }
         return result;
+    }
+
+    /**
+     * Assign a member on a Python value after coercing the value into the same context.
+     *
+     * @param target The Python object to update
+     * @param name The member name
+     * @param value The member value
+     */
+    @UsedByGeneratedCode
+    public static void putMember(Value target, String name, @Nullable Object value) {
+        target.putMember(name, coerceToContext(value, target.getContext()));
     }
 
     /**

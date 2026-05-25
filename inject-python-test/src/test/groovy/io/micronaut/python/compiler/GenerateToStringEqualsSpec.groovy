@@ -26,11 +26,32 @@ class Person:
         assertGeneratedSourceContains(pythonCode, """
   @JsonCreator
   public Person(@JsonProperty("name") String name, @JsonProperty("age") int age, @JsonProperty("address") Address address) {
-    this(ContextHolder.newInstance("python", "Person", (Object) name, (Object) age, (Object) address));
+    this.name = name;
+    this.age = age;
+    this.address = address;
   }
 
   public Value asPolyglotValue() {
-    return ContextHolder.newInstance("python", "Person", (Object) this.name, (Object) this.age, (Object) this.address);
+    if (this.graalpyInternalValue != null) {
+      if (this.graalpyInternalValueSyncing) {
+        return this.graalpyInternalValue;
+      } else {
+        this.graalpyInternalValueSyncing = true;
+        GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "name", (Object) this.name);
+        GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "age", (Object) this.age);
+        GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", (Object) this.address);
+        this.graalpyInternalValueSyncing = false;
+        return this.graalpyInternalValue;
+      }
+    } else {
+      this.graalpyInternalValue = ContextHolder.newUninitializedInstance("python", "Person");
+      this.graalpyInternalValueSyncing = true;
+      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "name", (Object) this.name);
+      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "age", (Object) this.age);
+      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", (Object) this.address);
+      this.graalpyInternalValueSyncing = false;
+      return this.graalpyInternalValue;
+    }
   }
 
   public static Person fromPolyglotValue(Value arg1) {

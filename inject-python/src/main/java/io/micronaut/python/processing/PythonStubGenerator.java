@@ -47,6 +47,7 @@ import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.util.GraalPyUtil;
+import io.micronaut.python.processing.visitor.ArgumentDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.python.processing.visitor.TypeRef;
@@ -300,6 +301,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         pythonValue = pythonValueBuilder.build();
                         builder.addField(pythonValue);
                     }
+                    FieldDef pythonValueSyncing = null;
+                    if (isIntrospectedBean && pythonValue != null) {
+                        pythonValueSyncing = FieldDef.builder("graalpyInternalValueSyncing")
+                            .ofType(TypeDef.Primitive.BOOLEAN)
+                            .addModifiers(Modifier.PRIVATE)
+                            .build();
+                        builder.addField(pythonValueSyncing);
+                    }
 
                     StubEntry stubEntry = new StubEntry(builder, classElement, propertyFields);
                     classBuilders.put(classElement.getName(), stubEntry);
@@ -379,6 +388,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     // Constructor from polyglot Value
                     final FieldDef pythonValueFinal = pythonValue;
+                    final FieldDef pythonValueSyncingFinal = pythonValueSyncing;
                     if (!isIntrospectedBean && !extendsPythonClass && pythonValueFinal == null) {
                         throw new IllegalStateException("Expected graalpyInternalValue field to be initialized");
                     }
@@ -471,41 +481,76 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         );
                                     }
                                     ExpressionDef reconstructedValue;
-                                    var primaryCtor = element.getPrimaryConstructor().orElse(null);
-                                    if (primaryCtor == null) {
-                                        // No explicit constructor: instantiate with no args and set members via map
-                                        List<ExpressionDef> mapEntries = new ArrayList<>();
-                                        for (PropertyElement beanProperty : beanProperties) {
-                                            FieldDef field = propertyFields.get(beanProperty.getName());
-                                            ExpressionDef fieldRef = aThis.field(field);
-                                            mapEntries.add(ExpressionDef.constant(beanProperty.getName()));
-                                            mapEntries.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef));
+                                    if (isAbstractIntro) {
+                                        List<ExpressionDef> arguments = new ArrayList<>(List.of(
+                                            ExpressionDef.constant(element.getPackageName()),
+                                            ExpressionDef.constant(pythonSimpleName)
+                                        ));
+                                        var primaryCtor = element.getPrimaryConstructor().orElse(null);
+                                        if (primaryCtor != null) {
+                                            for (PropertyElement beanProperty : beanProperties) {
+                                                FieldDef field = propertyFields.get(beanProperty.getName());
+                                                if (field == null) {
+                                                    continue;
+                                                }
+                                                ExpressionDef fieldRef = aThis.field(field);
+                                                arguments.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT));
+                                            }
                                         }
-                                        ExpressionDef propsMap = ClassTypeDef.of(AnnotationUtil.class)
-                                            .invokeStatic("mapOf", TypeDef.of(Map.class), mapEntries);
                                         reconstructedValue = CONTEXT_HOLDER.invokeStatic(
-                                            "newInstance",
+                                            "newIntroduction",
+                                            POLYGLOT_VALUE,
+                                            arguments
+                                        );
+                                    } else {
+                                        reconstructedValue = CONTEXT_HOLDER.invokeStatic(
+                                            "newUninitializedInstance",
                                             POLYGLOT_VALUE,
                                             List.of(
                                                 ExpressionDef.constant(element.getPackageName()),
-                                                ExpressionDef.constant(pythonSimpleName),
-                                                propsMap
+                                                ExpressionDef.constant(pythonSimpleName)
                                             )
                                         );
-                                    } else {
-                                        // Constructor present: use positional args
-                                        List<ExpressionDef> args = new ArrayList<>();
-                                        args.add(ExpressionDef.constant(element.getPackageName()));
-                                        args.add(ExpressionDef.constant(pythonSimpleName));
+                                    }
+                                    if (pythonValueFinal != null) {
+                                        FieldDef pythonValueField = requireField(pythonValueFinal, "Expected graalpyInternalValue field");
+                                        ExpressionDef storedValue = aThis.field(pythonValueField);
+                                        List<StatementDef> syncStatements = new ArrayList<>();
+                                        if (pythonValueSyncingFinal != null) {
+                                            syncStatements.add(aThis.field(pythonValueSyncingFinal).assign(ExpressionDef.trueValue()));
+                                        }
                                         for (PropertyElement beanProperty : beanProperties) {
                                             FieldDef field = propertyFields.get(beanProperty.getName());
                                             if (field == null) {
                                                 continue;
                                             }
                                             ExpressionDef fieldRef = aThis.field(field);
-                                            args.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT));
+                                            syncStatements.add((StatementDef) RUNTIME_UTIL.invokeStatic(
+                                                "putMember",
+                                                TypeDef.VOID,
+                                                storedValue,
+                                                ExpressionDef.constant(beanProperty.getName()),
+                                                coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT)
+                                            ));
                                         }
-                                        reconstructedValue = CONTEXT_HOLDER.invokeStatic(isAbstractIntro ? "newIntroduction" : "newInstance", POLYGLOT_VALUE, args);
+                                        if (pythonValueSyncingFinal != null) {
+                                            syncStatements.add(aThis.field(pythonValueSyncingFinal).assign(ExpressionDef.falseValue()));
+                                        }
+                                        syncStatements.add(storedValue.returning());
+                                        StatementDef syncBody = StatementDef.multi(syncStatements);
+                                        StatementDef existingValueBody = syncBody;
+                                        if (pythonValueSyncingFinal != null) {
+                                            existingValueBody = aThis.field(pythonValueSyncingFinal)
+                                                .isTrue()
+                                                .doIfElse(storedValue.returning(), syncBody);
+                                        }
+                                        return storedValue.isNonNull().doIfElse(
+                                            existingValueBody,
+                                            StatementDef.multi(
+                                                aThis.field(pythonValueField).assign(reconstructedValue),
+                                                syncBody
+                                            )
+                                        );
                                     }
                                     return reconstructedValue.returning();
                                 })
@@ -580,15 +625,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             );
                         }
                         final boolean isAbstractIntroCtor = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
+                        final int requiredConstructorParameterCount = requiredConstructorParameterCount(parameters);
+                        final boolean hasDefaultedConstructorParameters = requiredConstructorParameterCount < parameters.length;
+                        final boolean constructorParametersBackedByFields = constructorParametersBackedByFields(parameters, propertyFields);
                         builder.addMethod(
                             constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
-                                if (isIntrospectedBean) {
+                                if (isIntrospectedBean && constructorParametersBackedByFields) {
                                     List<StatementDef> assignments = new ArrayList<>();
                                     for (int i = 0; i < parameters.length; i++) {
                                         @NonNull ParameterElement parameter = parameters[i];
                                         FieldDef field = propertyFields.get(parameter.getName());
                                         if (field != null) {
-                                            assignments.add(aThis.field(field).assign(methodParameters.get(i)));
+                                            ExpressionDef parameterValue = methodParameters.get(i);
+                                            ExpressionDef defaultValue = defaultedConstructorParameterValue(parameter);
+                                            if (defaultValue != null) {
+                                                parameterValue = parameterValue.isNull().doIfElse(defaultValue, parameterValue);
+                                            }
+                                            assignments.add(aThis.field(field).assign(parameterValue));
                                         }
                                     }
                                     return StatementDef.multi(assignments);
@@ -597,6 +650,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         ExpressionDef.constant(element.getPackageName()),
                                         ExpressionDef.constant(pythonSimpleName)
                                     ));
+                                    if (hasDefaultedConstructorParameters) {
+                                        arguments.add(ExpressionDef.constant(requiredConstructorParameterCount));
+                                    }
                                     for (int i = 0; i < parameters.length; i++) {
                                         @NonNull ParameterElement parameter = parameters[i];
                                         VariableDef.MethodParameter methodParameter = methodParameters.get(i);
@@ -605,11 +661,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
                                     }
                                     ExpressionDef pythonInstance = CONTEXT_HOLDER.invokeStatic(
-                                        isAbstractIntroCtor ? "newIntroduction" : "newInstance",
+                                        constructorFactoryMethod(isAbstractIntroCtor, hasDefaultedConstructorParameters),
                                         POLYGLOT_VALUE,
                                         arguments
                                     );
-                                    if (extendsPythonClass) {
+                                    if (isIntrospectedBean) {
+                                        return aThis.invokeConstructor(pythonInstance);
+                                    } else if (extendsPythonClass) {
                                         return aThis.superRef().invokeConstructor(pythonInstance);
                                     } else if (extendsHostClass) {
                                         List<ExpressionDef> superArguments = new ArrayList<>(methodParameters);
@@ -1100,6 +1158,69 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .anyMatch(decorator -> "dataclass".equals(decorator.name()) || "dataclasses.dataclass".equals(decorator.name()));
         }
         return false;
+    }
+
+    private static int requiredConstructorParameterCount(ParameterElement[] parameters) {
+        int requiredParameterCount = parameters.length;
+        while (requiredParameterCount > 0 && hasDefaultValue(parameters[requiredParameterCount - 1])) {
+            requiredParameterCount--;
+        }
+        return requiredParameterCount;
+    }
+
+    private static boolean constructorParametersBackedByFields(ParameterElement[] parameters, Map<String, FieldDef> propertyFields) {
+        for (ParameterElement parameter : parameters) {
+            if (!propertyFields.containsKey(parameter.getName())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean hasDefaultValue(ParameterElement parameter) {
+        return parameter.getNativeType() instanceof ArgumentDef argumentDef && argumentDef.hasDefaultValue();
+    }
+
+    private static @Nullable ExpressionDef defaultedConstructorParameterValue(ParameterElement parameter) {
+        ClassElement type = parameter.getGenericType();
+        if (type.isAssignable(List.class) && hasDataclassDefaultFactory(parameter, "list")) {
+            return ClassTypeDef.of(ArrayList.class).instantiate().cast(constructorParameterType(parameter));
+        }
+        if (type.isAssignable(Map.class) && hasDataclassDefaultFactory(parameter, "dict")) {
+            return ClassTypeDef.of(LinkedHashMap.class).instantiate().cast(constructorParameterType(parameter));
+        }
+        if (type.isAssignable(Set.class) && hasDataclassDefaultFactory(parameter, "set")) {
+            return ClassTypeDef.of(LinkedHashSet.class).instantiate().cast(constructorParameterType(parameter));
+        }
+        return null;
+    }
+
+    private static boolean hasDataclassDefaultFactory(ParameterElement parameter, String factoryName) {
+        if (!(parameter.getNativeType() instanceof ArgumentDef argumentDef)) {
+            return false;
+        }
+        if (argumentDef.defaultValue() instanceof String defaultFactoryName) {
+            return factoryName.equals(defaultFactoryName) || defaultFactoryName.endsWith("." + factoryName);
+        }
+        if (!(argumentDef.defaultValue() instanceof Value defaultValue)) {
+            return false;
+        }
+        if (!defaultValue.hasMember("default_factory")) {
+            return false;
+        }
+        Value defaultFactory = defaultValue.getMember("default_factory");
+        if (defaultFactory == null || !defaultFactory.hasMember("__name__")) {
+            return false;
+        }
+        Value name = defaultFactory.getMember("__name__");
+        return name.isString() && factoryName.equals(name.asString());
+    }
+
+    private static String constructorFactoryMethod(boolean introduction, boolean hasDefaultedParameters) {
+        if (introduction) {
+            return hasDefaultedParameters ? "newIntroductionWithDefaultedTrailingNulls" : "newIntroduction";
+        }
+        return hasDefaultedParameters ? "newInstanceWithDefaultedTrailingNulls" : "newInstance";
     }
 
     private static boolean hasConfigurationInjectConstructor(ClassElement element) {

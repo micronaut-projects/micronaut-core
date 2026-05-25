@@ -333,6 +333,12 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         last_seg = alias.name.split('.')[-1]
                         self.imported_types[last_seg] = mod_name
                 return super().visit(node)
+            case ast.If():
+                if self._is_type_checking_guard(node.test):
+                    for statement in node.body:
+                        if isinstance(statement, (ast.Import, ast.ImportFrom)):
+                            self.visit(statement)
+                return node
             case ast.Expr():
                 # Handle potential field docstrings - string literals that follow attribute assignments
                 if self.current_class is not None and self.last_attribute is not None:
@@ -359,6 +365,13 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 return result
             case _:
                 return node
+
+    def _is_type_checking_guard(self, node):
+        if isinstance(node, ast.Name):
+            return node.id == 'TYPE_CHECKING'
+        if isinstance(node, ast.Attribute):
+            return node.attr == 'TYPE_CHECKING'
+        return False
 
     def _visit_class_def(self, node):
         parent_class = self.current_class
@@ -438,11 +451,13 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         # Only include attributes with type annotations (required for dataclass)
                         if attr.typeName() and attr.typeName() != "None":
                             # Create argument with same name as attribute
+                            default_value = attr.defaultFactoryName() if attr.defaultFactoryName() is not None else attr.value()
                             arg_def = ArgumentDef.of(
                                 attr.name(),  # arg_name
                                 attr.annotation() or "",  # annotation
                                 attr.typeName(),  # type_annotation
-                                attr.value(),  # default_value (may be None)
+                                default_value,  # default_value (may be None)
+                                attr.hasDefaultValue(),  # default may be explicit None or an unevaluable expression
                                 attr.decorators(),  # decorators
                                 None  # param_doc
                             )
@@ -514,7 +529,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 type_name = None  # No type annotation for simple assignments
 
                 self._track_current_class_constant(attr_name, node.value)
-                attr_def = JavaAttributeDef(attr_name, None, type_name, value, [], None, is_static, None)
+                attr_def = JavaAttributeDef(attr_name, None, type_name, value, True, [], None, is_static, None)
                 self.current_class_attributes.append(attr_def)
 
     def _handle_ann_assign(self, node):
@@ -571,9 +586,30 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
                 if node.value:
                     self._track_current_class_constant(attr_name, node.value)
-                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, decorators, None, is_static, None)
+                default_factory_name = self._dataclass_default_factory_name(node.value)
+                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, node.value is not None, decorators, None, is_static, None, default_factory_name)
                 self.current_class_attributes.append(attr_def)
                 self.last_attribute = attr_def
+
+    def _dataclass_default_factory_name(self, value_node):
+        if not isinstance(value_node, ast.Call):
+            return None
+        function_name = self._callable_name(value_node.func)
+        if function_name not in ("field", "dataclasses.field"):
+            return None
+        for keyword in value_node.keywords:
+            if keyword.arg != "default_factory":
+                continue
+            return self._callable_name(keyword.value)
+        return None
+
+    def _callable_name(self, node):
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            owner = self._callable_name(node.value)
+            return f"{owner}.{node.attr}" if owner else node.attr
+        return None
 
     def _literal_constant_value(self, value_node):
         try:
@@ -646,10 +682,12 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     self.last_attribute.annotation(),
                     self.last_attribute.typeName(),
                     self.last_attribute.value(),
+                    self.last_attribute.hasDefaultValue(),
                     self.last_attribute.decorators(),
                     docstring.strip(),
                     self.last_attribute.isStatic(),
-                    None
+                    None,
+                    self.last_attribute.defaultFactoryName()
                 )
                 # Replace the last attribute in the list
                 if self.current_class_attributes and self.current_class_attributes[-1] == self.last_attribute:
@@ -689,7 +727,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # source model so generated stubs expose host-readable bean properties.
             # Do not copy injection decorators like @Parameter to the attribute; the
             # constructor parameter remains the injection point.
-            attr_def = JavaAttributeDef(attr_name, parameter.annotation(), parameter.typeAnnotation(), None, [], parameter.documentation(), False, None)
+            attr_def = JavaAttributeDef(attr_name, parameter.annotation(), parameter.typeAnnotation(), None, False, [], parameter.documentation(), False, None)
             self.current_class_attributes.append(attr_def)
             existing_attributes.add(attr_name)
 
@@ -739,7 +777,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 is_static = False  # Script attributes should be injectable
                 type_name = None  # No type annotation for simple assignments
 
-                attr_def = JavaAttributeDef(attr_name, None, type_name, value, [], None, is_static, None)
+                attr_def = JavaAttributeDef(attr_name, None, type_name, value, True, [], None, is_static, None)
                 self.current_script_attributes.append(attr_def)
 
     def _handle_script_ann_assign(self, node):
@@ -793,7 +831,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 # Script attributes are typically static
                 is_static = False
 
-                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, decorators, None, is_static, None)
+                attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, node.value is not None, decorators, None, is_static, None)
                 self.current_script_attributes.append(attr_def)
 
     def _is_script_function(self, node):
@@ -1662,6 +1700,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
             # Get default value
             default_value = default_values[i]
+            has_default = i >= num_no_defaults
             if default_value is not None:
                 try:
                     # Try to evaluate the value
@@ -1672,7 +1711,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # Get parameter documentation
             param_doc = param_docs.get(arg_name, None)
 
-            arguments.append(ArgumentDef.of(arg_name, annotation, type_annotation, default_value, decorators, param_doc))
+            arguments.append(ArgumentDef.of(arg_name, annotation, type_annotation, default_value, has_default, decorators, param_doc))
 
         return ArgumentsDef.of(arguments)
 
