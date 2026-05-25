@@ -333,6 +333,12 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         last_seg = alias.name.split('.')[-1]
                         self.imported_types[last_seg] = mod_name
                 return super().visit(node)
+            case ast.If():
+                if self._is_type_checking_guard(node.test):
+                    for statement in node.body:
+                        if isinstance(statement, (ast.Import, ast.ImportFrom)):
+                            self.visit(statement)
+                return node
             case ast.Expr():
                 # Handle potential field docstrings - string literals that follow attribute assignments
                 if self.current_class is not None and self.last_attribute is not None:
@@ -359,6 +365,13 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 return result
             case _:
                 return node
+
+    def _is_type_checking_guard(self, node):
+        if isinstance(node, ast.Name):
+            return node.id == 'TYPE_CHECKING'
+        if isinstance(node, ast.Attribute):
+            return node.attr == 'TYPE_CHECKING'
+        return False
 
     def _visit_class_def(self, node):
         parent_class = self.current_class

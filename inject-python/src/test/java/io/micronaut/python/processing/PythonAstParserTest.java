@@ -755,6 +755,44 @@ class ProductMappers:
     }
 
     @Test
+    void testTypeCheckingImportsResolveForFieldAnnotations(@TempDir Path tempDir) throws IOException {
+        Path dependency = tempDir.resolve("Dependency.py");
+        Path main = tempDir.resolve("Main.py");
+        Files.writeString(dependency, """
+            class Dependency:
+                pass
+            """);
+        Files.writeString(main, """
+            from typing import TYPE_CHECKING
+
+            if TYPE_CHECKING:
+                from Dependency import Dependency
+
+            class Main:
+                dependency: Dependency
+            """);
+
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        List<Source> sources = List.of(
+            Source.newBuilder("python", dependency.toFile()).build(),
+            Source.newBuilder("python", main.toFile()).build()
+        );
+
+        try (PythonEnvironment environment = pythonProcessor.parse(sources, List.of(tempDir.toString()), null);
+             PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
+            ClassElement mainClass = processingEnvironment.classes().get("python.Main");
+            assertNotNull(mainClass);
+
+            FieldElement dependencyField = mainClass.getFields()
+                .stream()
+                .filter(field -> "dependency".equals(field.getName()))
+                .findFirst()
+                .orElseThrow();
+            assertEquals("python.Dependency", dependencyField.getType().getName());
+        }
+    }
+
+    @Test
     void testAbstractMethodDetection() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""
