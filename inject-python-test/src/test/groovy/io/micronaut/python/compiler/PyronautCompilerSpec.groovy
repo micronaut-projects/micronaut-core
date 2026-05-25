@@ -17,6 +17,7 @@ package io.micronaut.python.compiler
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.GraalPyContextFactory
+import io.micronaut.data.intercept.annotation.DataMethod
 import io.micronaut.python.processing.PythonAnnotationProcessor
 import org.graalvm.polyglot.Value
 import spock.lang.Specification
@@ -967,6 +968,65 @@ class RoomRepository(CrudRepository[Room, int]):
 
         then:
         classLoader.loadClass('python.RoomRepository') != null
+
+        cleanup:
+        tempTargetDir.deleteDir()
+    }
+
+    def "test inherited data repository methods keep subclass-specific metadata"() {
+        given:
+        def tempTargetDir = File.createTempDir("pyronaut-test-data-repository-metadata-target", "")
+        def pythonCode = '''
+from dataclasses import dataclass
+from typing import Annotated
+
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity
+from micronaut.data.jdbc.annotation import JdbcRepository
+from micronaut.data.repository import CrudRepository
+
+@dataclass
+@MappedEntity
+class ContactEntity:
+    id: Annotated[int | None, Id, GeneratedValue]
+    firstName: str
+    lastName: str
+
+@dataclass
+@MappedEntity
+class PhoneEntity:
+    id: Annotated[int | None, Id, GeneratedValue]
+    phone: str
+
+@JdbcRepository(dialect="H2")
+class ContactRepository(CrudRepository[ContactEntity, int]):
+    pass
+
+@JdbcRepository(dialect="H2")
+class PhoneRepository(CrudRepository[PhoneEntity, int]):
+    pass
+'''
+
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .javaSrc("inject-python-test/src/test/java")
+            .targetDir(tempTargetDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
+        def contactDefinition = classLoader.loadClass('python.$ContactRepository$RuntimeProxy$Definition').newInstance()
+        def phoneDefinition = classLoader.loadClass('python.$PhoneRepository$RuntimeProxy$Definition').newInstance()
+        def contactSave = contactDefinition.executableMethods.find { it.methodName == "save" && it.arguments.length == 1 }
+        def phoneSave = phoneDefinition.executableMethods.find { it.methodName == "save" && it.arguments.length == 1 }
+
+        then:
+        contactSave != null
+        phoneSave != null
+        contactSave.arguments[0].type.name == "python.ContactEntity"
+        phoneSave.arguments[0].type.name == "python.PhoneEntity"
+        contactSave.classValue(DataMethod, DataMethod.META_MEMBER_ROOT_ENTITY).get().name == "python.ContactEntity"
+        phoneSave.classValue(DataMethod, DataMethod.META_MEMBER_ROOT_ENTITY).get().name == "python.PhoneEntity"
 
         cleanup:
         tempTargetDir.deleteDir()
