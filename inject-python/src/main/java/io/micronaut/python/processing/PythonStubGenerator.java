@@ -28,10 +28,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.VariableElement;
 
+import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.Introduction;
@@ -291,7 +292,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     }
 
                     FieldDef pythonValue = null;
-                    if (!extendsPythonClass) {
+                    if (!extendsPythonClass || isIntrospectedBean) {
                         FieldDef.FieldDefBuilder pythonValueBuilder = FieldDef.builder("graalpyInternalValue")
                             .ofType(POLYGLOT_VALUE)
                             .addModifiers(Modifier.PROTECTED);
@@ -335,14 +336,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             }
                             ClassElement returnTypeOverride = resolveInterfaceBridgeReturnType(interfaceMethod, anInterface);
                             // The generated Java stub must implement the Java interface signature,
-                            // not the Python source annotation signature. Python annotations such
-                            // as HttpRequest are naturally raw, but Java interfaces often declare
-                            // HttpRequest<?> or Class<T>; using the resolved interface method with
-                            // the parameterized interface arguments keeps wildcards and method type
-                            // variables intact and avoids same-erasure methods that fail to override.
-                            Map<String, ClassElement> signatureTypeArguments = resolvedTypeArguments(anInterface);
-                            MethodElement signatureMethod = canResolveSignaturePlaceholders(method, signatureTypeArguments) ? method : interfaceMethod;
-                            addBridgeMethod(bridgeMethod, builder, context, false, false, addedMethodNames, returnTypeOverride, signatureMethod, signatureTypeArguments);
+                            // not the Python source annotation signature. Python annotations are
+                            // often raw while Java interfaces may declare parameterized or wildcard
+                            // forms. Use the raw declaring method as the source signature and apply
+                            // the resolved interface arguments separately; using the already-resolved
+                            // method would collapse method variables such as CrudRepository's
+                            // <S extends E> into the entity type and produce same-erasure methods
+                            // that fail to override.
+                            Map<String, ClassElement> signatureTypeArguments = resolvedInterfaceMethodTypeArguments(anInterface, method);
+                            addBridgeMethod(bridgeMethod, builder, context, false, false, addedMethodNames, returnTypeOverride, method, interfaceMethod, signatureTypeArguments);
                             methodSet.add(method);
                         }
                     }
@@ -404,6 +406,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             List<StatementDef> assigns = new ArrayList<>();
                                             if (extendsPythonClass) {
                                                 assigns.add(aThis.superRef().invokeConstructor(val));
+                                                if (pythonValueFinal != null) {
+                                                    assigns.add(aThis.field(pythonValueFinal).assign(val));
+                                                }
                                             } else if (pythonValueFinal != null) {
                                                 assigns.add(aThis.field(pythonValueFinal).assign(val));
                                             }
@@ -930,6 +935,125 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return resolved;
     }
 
+    private static Map<String, ClassElement> resolvedInterfaceMethodTypeArguments(ClassElement anInterface, MethodElement method) {
+        ClassElement declaringType = method.getDeclaringType();
+        Map<String, ClassElement> inheritedTypeArguments = resolveInheritedInterfaceTypeArguments(anInterface, declaringType.getName(), new HashSet<>());
+        if (!inheritedTypeArguments.isEmpty()) {
+            return inheritedTypeArguments;
+        }
+        Map<String, ClassElement> directTypeArguments = resolvedTypeArguments(anInterface);
+        Map<String, ClassElement> declaringTypeArguments = anInterface.getTypeArguments(declaringType.getName());
+        if (declaringTypeArguments.isEmpty()) {
+            declaringTypeArguments = anInterface.getAllTypeArguments().getOrDefault(declaringType.getName(), Map.of());
+        }
+        if (declaringTypeArguments.isEmpty()) {
+            declaringTypeArguments = anInterface.getTypeArguments(declaringType.getRawClassElement().getName());
+        }
+        if (declaringTypeArguments.isEmpty()) {
+            declaringTypeArguments = anInterface.getAllTypeArguments().getOrDefault(declaringType.getRawClassElement().getName(), Map.of());
+        }
+        if (directTypeArguments.isEmpty()) {
+            return declaringTypeArguments;
+        }
+        if (declaringTypeArguments.isEmpty()) {
+            return directTypeArguments;
+        }
+        Map<String, ClassElement> resolved = new LinkedHashMap<>(directTypeArguments);
+        resolved.putAll(declaringTypeArguments);
+        return resolved;
+    }
+
+    private static Map<String, ClassElement> resolveInheritedInterfaceTypeArguments(
+        ClassElement type,
+        String targetTypeName,
+        Set<String> visitedTypes
+    ) {
+        String visitedKey = type.getName() + resolvedTypeArguments(type);
+        if (!visitedTypes.add(visitedKey)) {
+            return Map.of();
+        }
+        Map<String, ClassElement> typeArguments = resolvedTypeArguments(type);
+        if (sameRawTypeName(type, targetTypeName)) {
+            return typeArguments;
+        }
+        for (ClassElement anInterface : type.getInterfaces()) {
+            ClassElement resolvedInterface = withSubstitutedTypeArguments(anInterface, typeArguments);
+            Map<String, ClassElement> resolvedTypeArguments = resolveInheritedInterfaceTypeArguments(resolvedInterface, targetTypeName, visitedTypes);
+            if (!resolvedTypeArguments.isEmpty()) {
+                return resolvedTypeArguments;
+            }
+        }
+        return Map.of();
+    }
+
+    private static ClassElement withSubstitutedTypeArguments(
+        ClassElement type,
+        Map<String, ClassElement> replacements
+    ) {
+        Map<String, ClassElement> typeArguments = substituteTypeArguments(resolvedTypeArguments(type), replacements);
+        if (typeArguments.isEmpty()) {
+            return type;
+        }
+        try {
+            return type.withTypeArguments(typeArguments);
+        } catch (UnsupportedOperationException e) {
+            return type;
+        }
+    }
+
+    private static Map<String, ClassElement> substituteTypeArguments(
+        Map<String, ClassElement> typeArguments,
+        Map<String, ClassElement> replacements
+    ) {
+        if (typeArguments.isEmpty() || replacements.isEmpty()) {
+            return typeArguments;
+        }
+        Map<String, ClassElement> substituted = new LinkedHashMap<>(typeArguments.size());
+        for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
+            substituted.put(entry.getKey(), substituteTypeArgument(entry.getValue(), replacements));
+        }
+        return substituted;
+    }
+
+    private static ClassElement substituteTypeArgument(
+        ClassElement type,
+        Map<String, ClassElement> replacements
+    ) {
+        if (type instanceof GenericPlaceholderElement placeholder) {
+            ClassElement replacement = replacements.get(placeholder.getVariableName());
+            if (replacement != null) {
+                return replacement;
+            }
+        }
+        if (type instanceof WildcardElement) {
+            return type;
+        }
+        Map<String, ClassElement> typeArguments = type.getTypeArguments();
+        if (typeArguments.isEmpty()) {
+            return type;
+        }
+        Map<String, ClassElement> substituted = substituteTypeArguments(typeArguments, replacements);
+        if (substituted.equals(typeArguments)) {
+            return type;
+        }
+        try {
+            return type.withTypeArguments(substituted);
+        } catch (UnsupportedOperationException e) {
+            return type;
+        }
+    }
+
+    private static boolean sameRawTypeName(ClassElement type, String targetTypeName) {
+        if (type.getName().equals(targetTypeName)) {
+            return true;
+        }
+        try {
+            return type.getRawClassElement().getName().equals(targetTypeName);
+        } catch (UnsupportedOperationException e) {
+            return false;
+        }
+    }
+
     private static TypeDef withTypeAnnotations(TypeDef typeDef, ClassElement classElement) {
         AnnotationMetadata annotationMetadata = classElement.getTypeAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
@@ -981,12 +1105,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return TypeDef.wildcard();
         }
         if (anInterface instanceof GenericPlaceholderElement placeholder) {
+            ClassElement resolvedTypeArgument = resolveMappedTypeArgument(signatureTypeArguments.get(placeholder.getVariableName()));
+            if (resolvedTypeArgument != null
+                && (!(resolvedTypeArgument instanceof GenericPlaceholderElement) || !placeholder.equals(resolvedTypeArgument))) {
+                return sourceSignatureType(resolvedTypeArgument, typeArgument, signatureTypeArguments);
+            }
             if (placeholder.getDeclaringElement().filter(MethodElement.class::isInstance).isPresent()) {
                 return TypeDef.variable(placeholder.getVariableName());
-            }
-            ClassElement resolvedTypeArgument = signatureTypeArguments.get(placeholder.getVariableName());
-            if (resolvedTypeArgument != null && !placeholder.equals(resolvedTypeArgument)) {
-                return sourceSignatureType(resolvedTypeArgument, typeArgument, signatureTypeArguments);
             }
             Optional<ClassElement> resolved = placeholder.getResolved();
             if (resolved.isPresent() && !placeholder.equals(resolved.get())) {
@@ -1043,12 +1168,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return TypeDef.wildcard();
         }
         if (signatureType instanceof GenericPlaceholderElement placeholder) {
+            ClassElement resolvedTypeArgument = resolveMappedTypeArgument(signatureTypeArguments.get(placeholder.getVariableName()));
+            if (resolvedTypeArgument != null
+                && (!(resolvedTypeArgument instanceof GenericPlaceholderElement) || !placeholder.equals(resolvedTypeArgument))) {
+                return sourceSignatureType(resolvedTypeArgument, false, signatureTypeArguments);
+            }
             if (placeholder.getDeclaringElement().filter(MethodElement.class::isInstance).isPresent()) {
                 return TypeDef.variable(placeholder.getVariableName());
-            }
-            ClassElement resolvedTypeArgument = signatureTypeArguments.get(placeholder.getVariableName());
-            if (resolvedTypeArgument != null && !placeholder.equals(resolvedTypeArgument)) {
-                return sourceSignatureType(resolvedTypeArgument, false, signatureTypeArguments);
             }
             if (resolvedType != null && !isObjectType(resolvedType)) {
                 return sourceSignatureType(resolvedType, false, signatureTypeArguments);
@@ -1076,11 +1202,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         List.of(sourceSignatureType(resolvedClassType, true, signatureTypeArguments))
                     );
                 }
-            }
-            if ("io.micronaut.http.HttpRequest".equals(signatureType.getName())
-                && objectTypeArguments(typeArguments)
-                && objectTypeArguments(resolvedType)) {
-                return javaClassType(signatureType);
             }
             List<? extends GenericPlaceholderElement> declaredPlaceholders = signatureType.getDeclaredGenericPlaceholders();
             Map<String, ClassElement> resolvedTypeArguments = resolvedType == null ? Map.of() : resolvedType.getTypeArguments();
@@ -1114,10 +1235,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return sourceSignatureType(resolvedType, false, signatureTypeArguments);
         }
         return sourceSignatureType(signatureType, false, signatureTypeArguments);
-    }
-
-    private static boolean objectTypeArguments(@Nullable ClassElement type) {
-        return type != null && objectTypeArguments(type.getTypeArguments());
     }
 
     private static boolean objectTypeArguments(Map<String, ClassElement> typeArguments) {
@@ -1255,6 +1372,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .findFirst();
     }
 
+    private static @Nullable ClassElement resolveMappedTypeArgument(@Nullable ClassElement typeArgument) {
+        if (typeArgument instanceof GenericPlaceholderElement placeholder) {
+            Optional<ClassElement> resolved = placeholder.getResolved();
+            if (resolved.isPresent() && !placeholder.equals(resolved.get())) {
+                return resolved.get();
+            }
+            if (placeholder.isRawType()) {
+                return firstBound(placeholder);
+            }
+        }
+        return typeArgument;
+    }
+
     private static boolean isResolvedInterfaceTypeArgument(
         ClassElement resolvedType,
         Map<String, ClassElement> signatureTypeArguments
@@ -1262,57 +1392,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return signatureTypeArguments.values()
             .stream()
             .anyMatch(typeArgument -> typeArgument.getName().equals(resolvedType.getName()));
-    }
-
-    private static boolean canResolveSignaturePlaceholders(
-        MethodElement method,
-        Map<String, ClassElement> signatureTypeArguments
-    ) {
-        Set<String> methodTypeVariables = method.getDeclaredTypeVariables()
-            .stream()
-            .map(GenericPlaceholderElement::getVariableName)
-            .collect(Collectors.toSet());
-        if (!canResolveSignaturePlaceholders(method.getGenericReturnType(), signatureTypeArguments, methodTypeVariables)) {
-            return false;
-        }
-        for (ParameterElement parameter : method.getParameters()) {
-            if (!canResolveSignaturePlaceholders(parameter.getGenericType(), signatureTypeArguments, methodTypeVariables)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static boolean canResolveSignaturePlaceholders(
-        ClassElement type,
-        Map<String, ClassElement> signatureTypeArguments,
-        Set<String> methodTypeVariables
-    ) {
-        if (type instanceof GenericPlaceholderElement placeholder) {
-            String variableName = placeholder.getVariableName();
-            return methodTypeVariables.contains(variableName)
-                || signatureTypeArguments.containsKey(variableName)
-                || placeholder.getResolved().isPresent()
-                || placeholder.isRawType();
-        }
-        if (type instanceof WildcardElement wildcardElement) {
-            for (ClassElement lowerBound : wildcardElement.getLowerBounds()) {
-                if (!canResolveSignaturePlaceholders(lowerBound, signatureTypeArguments, methodTypeVariables)) {
-                    return false;
-                }
-            }
-            for (ClassElement upperBound : wildcardElement.getUpperBounds()) {
-                if (!canResolveSignaturePlaceholders(upperBound, signatureTypeArguments, methodTypeVariables)) {
-                    return false;
-                }
-            }
-        }
-        for (ClassElement typeArgument : type.getTypeArguments().values()) {
-            if (!canResolveSignaturePlaceholders(typeArgument, signatureTypeArguments, methodTypeVariables)) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private static TypeDef bridgeTypeArgument(
@@ -2280,6 +2359,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
+    private static Map<String, ClassElement> withoutDeclaredMethodTypeVariables(
+        Map<String, ClassElement> signatureTypeArguments,
+        MethodElement signatureMethod
+    ) {
+        List<? extends GenericPlaceholderElement> methodTypeVariables = signatureMethod.getDeclaredTypeVariables();
+        if (signatureTypeArguments.isEmpty() || methodTypeVariables.isEmpty()) {
+            return signatureTypeArguments;
+        }
+        Map<String, ClassElement> resolved = new LinkedHashMap<>(signatureTypeArguments);
+        for (GenericPlaceholderElement methodTypeVariable : methodTypeVariables) {
+            resolved.remove(methodTypeVariable.getVariableName());
+        }
+        return resolved;
+    }
+
     private static Map<String, ClassElement> inferMethodTypeBounds(
         MethodElement signatureMethod,
         MethodElement resolvedMethod
@@ -2447,6 +2541,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         @Nullable ClassElement returnTypeOverride,
         MethodElement signatureMethod,
         Map<String, ClassElement> signatureTypeArguments) {
+        addBridgeMethod(methodElement, builder, visitorContext, isJunit5Test, isScript, addedMethodNames, returnTypeOverride, signatureMethod, signatureMethod, signatureTypeArguments);
+    }
+
+    private void addBridgeMethod(
+        MethodElement methodElement,
+        ClassDef.ClassDefBuilder builder,
+        VisitorContext visitorContext,
+        boolean isJunit5Test,
+        boolean isScript,
+        Set<String> addedMethodNames,
+        @Nullable ClassElement returnTypeOverride,
+        MethodElement signatureMethod,
+        MethodElement resolvedSignatureMethod,
+        Map<String, ClassElement> signatureTypeArguments) {
         String pythonFunctionName = methodElement.getName();
         String key = bridgeMethodKey(methodElement);
         // Check if method name has already been added to avoid duplicates
@@ -2485,9 +2593,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         }
 
-        ClassElement effectiveReturnType = effectiveBridgeReturnType(methodElement, returnTypeOverride);
-        TypeDef methodSourceReturnType = bridgeSourceReturnType(methodElement, signatureMethod, effectiveReturnType, returnTypeOverride, isJunit5Test, signatureTypeArguments);
         Map<String, ClassElement> inferredMethodBounds = inferMethodTypeBounds(signatureMethod, methodElement);
+        Map<String, ClassElement> bridgeSignatureTypeArguments = withoutDeclaredMethodTypeVariables(signatureTypeArguments, signatureMethod);
+        ClassElement effectiveReturnType = effectiveBridgeReturnType(methodElement, returnTypeOverride);
+        TypeDef methodSourceReturnType = bridgeSourceReturnType(methodElement, signatureMethod, resolvedSignatureMethod, effectiveReturnType, returnTypeOverride, isJunit5Test, bridgeSignatureTypeArguments);
         boolean returnsMethodTypeVariable = !(methodElement instanceof PythonMethodElement) && !signatureMethod.getDeclaredTypeVariables().isEmpty();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .returns(methodSourceReturnType);
@@ -2496,16 +2605,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         } else {
             methodBuilder.addModifiers(Modifier.PUBLIC);
         }
-        addMethodTypeVariables(signatureMethod, methodBuilder, signatureTypeArguments, inferredMethodBounds);
+        addMethodTypeVariables(signatureMethod, methodBuilder, bridgeSignatureTypeArguments, inferredMethodBounds);
 
         copyAnnotations(methodElement, methodBuilder, ANNOTATION_PACKAGES_TO_COPY, visitorContext);
         @NonNull ParameterElement[] parameters = methodElement.getParameters();
         @NonNull ParameterElement[] signatureParameters = signatureMethod.getParameters();
+        @NonNull ParameterElement[] resolvedSignatureParameters = resolvedSignatureMethod.getParameters();
         for (int i = 0; i < parameters.length; i++) {
             @NonNull ParameterElement parameter = parameters[i];
             ParameterElement signatureParameter = i < signatureParameters.length ? signatureParameters[i] : parameter;
+            ParameterElement resolvedSignatureParameter = i < resolvedSignatureParameters.length ? resolvedSignatureParameters[i] : signatureParameter;
             ParameterDef parameterDef = ParameterDef
-                .builder(parameter.getName(), bridgeSourceParameterType(signatureMethod, signatureParameter, parameter, signatureTypeArguments)).build();
+                .builder(parameter.getName(), bridgeSourceParameterType(signatureMethod, signatureParameter, resolvedSignatureParameter, parameter, bridgeSignatureTypeArguments)).build();
             methodBuilder.addParameter(parameterDef);
         }
 
@@ -2547,13 +2658,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 } else {
                     if (effectiveReturnType.isVoid()) {
                         return (StatementDef) invokedValue;
-                    } else if (returnsMethodTypeVariable) {
-                        return StatementDef.multi(
-                            (StatementDef) invokedValue,
-                            ExpressionDef.nullValue().returning()
-                        );
                     } else {
-                        boolean bridgeSignature = signatureMethod != methodElement || !signatureTypeArguments.isEmpty() || returnTypeOverride != null;
+                        boolean bridgeSignature = signatureMethod != methodElement
+                            || !bridgeSignatureTypeArguments.isEmpty()
+                            || returnTypeOverride != null
+                            || returnsMethodTypeVariable;
                         return returnConvertedValue(allClasses, effectiveReturnType, invokedValue, bridgeSignature ? methodSourceReturnType : null);
                     }
                 }
@@ -2563,6 +2672,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static TypeDef bridgeSourceReturnType(
         MethodElement methodElement,
         MethodElement signatureMethod,
+        MethodElement resolvedSignatureMethod,
         ClassElement effectiveReturnType,
         @Nullable ClassElement returnTypeOverride,
         boolean isJunit5Test,
@@ -2577,19 +2687,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (isJunit5Test) {
             return TypeDef.Primitive.VOID;
         }
-        return bridgeSignatureType(signatureMethod.getGenericReturnType(), methodElement.getGenericReturnType(), signatureTypeArguments);
+        ClassElement resolvedReturnType = signatureMethod == resolvedSignatureMethod
+            ? methodElement.getGenericReturnType()
+            : resolvedSignatureMethod.getGenericReturnType();
+        return bridgeSignatureType(signatureMethod.getGenericReturnType(), resolvedReturnType, signatureTypeArguments);
     }
 
     private static TypeDef bridgeSourceParameterType(
         MethodElement signatureMethod,
         ParameterElement signatureParameter,
+        ParameterElement resolvedSignatureParameter,
         ParameterElement parameter,
         Map<String, ClassElement> signatureTypeArguments
     ) {
         ClassElement signatureType = signatureParameter.getGenericType();
-        if (Object.class.getName().equals(signatureParameter.getType().getName())
-            && "io.micronaut.http.HttpRequest".equals(signatureType.getName())) {
-            return TypeDef.parameterized(javaClassType(signatureType), List.of(TypeDef.wildcard()));
+        if (isRawGenericParameterSignature(signatureParameter, signatureType)) {
+            return javaClassType(signatureType);
         }
         List<? extends GenericPlaceholderElement> methodTypeVariables = signatureMethod.getDeclaredTypeVariables();
         if (Class.class.getName().equals(signatureType.getName()) && methodTypeVariables.size() == 1) {
@@ -2598,7 +2711,37 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 List.of(TypeDef.variable(methodTypeVariables.getFirst().getVariableName()))
             );
         }
-        return bridgeSignatureType(signatureParameter.getGenericType(), parameter.getGenericType(), signatureTypeArguments);
+        ClassElement resolvedParameterType = signatureParameter == resolvedSignatureParameter
+            ? parameter.getGenericType()
+            : resolvedSignatureParameter.getGenericType();
+        return bridgeSignatureType(signatureParameter.getGenericType(), resolvedParameterType, signatureTypeArguments);
+    }
+
+    private static boolean isRawGenericParameterSignature(ParameterElement signatureParameter, ClassElement signatureType) {
+        if (signatureType instanceof GenericPlaceholderElement || signatureType instanceof WildcardElement) {
+            return false;
+        }
+        Map<String, ClassElement> typeArguments = signatureType.getTypeArguments();
+        if (typeArguments.isEmpty() || !objectTypeArguments(typeArguments)) {
+            return false;
+        }
+        VariableElement variableElement = nativeVariableElement(signatureParameter);
+        if (variableElement != null) {
+            String declaredType = variableElement.asType().toString();
+            return !declaredType.contains("<") && sameRawTypeName(signatureType, declaredType);
+        }
+        return signatureType.isRawType();
+    }
+
+    private static @Nullable VariableElement nativeVariableElement(ParameterElement parameter) {
+        Object nativeType = parameter.getNativeType();
+        if (nativeType instanceof VariableElement variableElement) {
+            return variableElement;
+        }
+        if (nativeType instanceof ElementProvider elementProvider && elementProvider.element() instanceof VariableElement variableElement) {
+            return variableElement;
+        }
+        return null;
     }
 
     private static ClassElement effectiveBridgeReturnType(MethodElement methodElement, @Nullable ClassElement returnTypeOverride) {
@@ -2757,6 +2900,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return "get" + NameUtils.capitalize(name);
     }
 
+    private static String booleanBeanGetterName(String name) {
+        return "is" + NameUtils.capitalize(name);
+    }
+
     private static String beanSetterName(String name) {
         return "set" + NameUtils.capitalize(name);
     }
@@ -2767,13 +2914,32 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         boolean isSynthetic = rm.map(MethodElement::isSynthetic).orElse(true);
         String getterName = isSynthetic ? beanGetterName(beanProperty.getName(), beanProperty.getType()) :
             rm.get().getName();
+        addGetterPojo(beanProperty, builder, field, propertyType, getterName);
 
+        String booleanGetterName = booleanBeanGetterName(beanProperty.getName());
+        if (isBooleanProperty(beanProperty) && !booleanGetterName.equals(getterName)) {
+            addGetterPojo(beanProperty, builder, field, propertyType, booleanGetterName);
+        }
+    }
+
+    private static void addGetterPojo(
+        PropertyElement beanProperty,
+        ClassDef.ClassDefBuilder builder,
+        FieldDef field,
+        TypeDef propertyType,
+        String getterName
+    ) {
         MethodDef.MethodDefBuilder getterBuilder = MethodDef
             .builder(getterName)
             .addModifiers(Modifier.PUBLIC)
             .returns(propertyType);
 
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> aThis.field(field).returning())));
+    }
+
+    private static boolean isBooleanProperty(PropertyElement beanProperty) {
+        String typeName = beanProperty.getType().getName();
+        return "boolean".equals(typeName) || Boolean.class.getName().equals(typeName);
     }
 
     private static void addSetterPojo(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef field) {
@@ -3060,7 +3226,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (castType == null) {
             return expression;
         }
-        return RUNTIME_UTIL.invokeStatic("asObject", TypeDef.OBJECT, expression).cast(castType);
+        return RUNTIME_UTIL.invokeStatic("asObject", castType, expression);
     }
 
     private static StatementDef fromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value) {

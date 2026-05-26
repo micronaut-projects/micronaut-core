@@ -278,8 +278,9 @@ public final class GraalPyRuntimeUtil {
      * @param value The value
      * @return The value as an object
      */
-    public static @Nullable Object asObject(@Nullable Object value) {
-        return value;
+    @SuppressWarnings("unchecked")
+    public static <T> @Nullable T asObject(@Nullable Object value) {
+        return (T) value;
     }
 
     /**
