@@ -87,6 +87,13 @@ class ReflectParameterElement implements ParameterElement {
     }
 
     @Override
+    public ParameterElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        ReflectParameterElement element = new ReflectParameterElement(classElement, name);
+        element.annotationMetadata = MutableAnnotationMetadata.of(annotationMetadata);
+        return element;
+    }
+
+    @Override
     public <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
             final MutableAnnotationMetadata mutableAnnotationMetadata = new MutableAnnotationMetadata();

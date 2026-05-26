@@ -99,6 +99,75 @@ class TestDataClass:
         context?.close()
     }
 
+    void "test dataclass boolean getter overrides dynamic superclass boolean getter"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+class UserState:
+    enabled: bool
+
+@Introspected
+@dataclass
+class User(UserState):
+    name: str
+    enabled: bool
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.User")
+        def instance = introspection.instantiate("Sherlock", true)
+
+        then:
+        introspection.getRequiredProperty("enabled", boolean).get(instance)
+        instance.isEnabled()
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test dataclass subclass syncs introspected fields into polyglot value"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from typing import Annotated
+from micronaut.data.annotation import MappedEntity
+from micronaut.data.annotation import Id
+from micronaut.data.annotation import GeneratedValue
+
+class UserState:
+    username: str
+    password: str
+    enabled: bool
+
+@dataclass
+@MappedEntity
+class User(UserState):
+    username: str
+    password: str
+    enabled: bool
+    id: Annotated[int | None, Id, GeneratedValue] = None
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.User")
+        def instance = introspection.instantiate("sherlock", "secret", true, null)
+        introspection.getRequiredProperty("id", Integer).set(instance, 42)
+        def value = instance.asPolyglotValue()
+
+        then:
+        value.getMember("username").asString() == "sherlock"
+        value.getMember("password").asString() == "secret"
+        value.getMember("enabled").asBoolean()
+        value.getMember("id").asInt() == 42
+
+        cleanup:
+        context?.close()
+    }
+
     void "test Python dataclass default factory fields accept null default and explicit list through introspection"() {
         given:
         def pythonCode = '''
