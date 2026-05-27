@@ -290,7 +290,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             propertyFields.put(beanProperty.getName(), field);
                         }
                     }
-
                     FieldDef pythonValue = null;
                     if (!extendsPythonClass || isIntrospectedBean) {
                         FieldDef.FieldDefBuilder pythonValueBuilder = FieldDef.builder("graalpyInternalValue")
@@ -847,26 +846,31 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             addSetterPojo(beanProperty, builder, field);
                             addGetterPojo(beanProperty, builder, field);
                         } else {
-                             addSetterDynamic(beanProperty, builder, context);
-                             addGetterDynamic(beanProperty, builder);
-                             beanProperty.getWriteMethod().ifPresent(m -> {
-                                 String beanStyle = beanSetterName(beanProperty.getName());
-                                 if (!m.getName().equals(beanStyle)) {
-                                     addNamedSetterDynamic(beanProperty, builder, context);
-                                 }
-                             });
-                             beanProperty.getReadMethod().ifPresent(m -> {
-                                 String beanStyle = beanGetterName(beanProperty.getName(), beanProperty.getType());
-                                 if (!m.getName().equals(beanStyle)) {
-                                     addNamedGetterDynamic(beanProperty, builder);
-                                 }
-                             });
-                         }
-                     }
+                            addSetterDynamic(beanProperty, builder, context);
+                            addGetterDynamic(beanProperty, builder);
+                            beanProperty.getWriteMethod().ifPresent(m -> {
+                                String beanStyle = beanSetterName(beanProperty.getName());
+                                if (!m.getName().equals(beanStyle)) {
+                                    addNamedSetterDynamic(beanProperty, builder, context);
+                                }
+                            });
+                            beanProperty.getReadMethod().ifPresent(m -> {
+                                String beanStyle = beanGetterName(beanProperty.getName());
+                                if (!m.getName().equals(beanStyle)) {
+                                    addNamedGetterDynamic(beanProperty, builder);
+                                }
+                            });
+                        }
+                    }
 
-                     if (isIntrospectedBean) {
-                         ObjectHelper.addObjectMethods(builder, ClassTypeDef.of(typeName), beanProperties, propertyFields);
-                     }
+                    if (isIntrospectedBean) {
+                        ObjectHelper.addObjectMethods(builder, ClassTypeDef.of(typeName), beanProperties, propertyFields);
+                    }
+
+                    if (!beanProperties.isEmpty()) {
+                        builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible.GeneratedPropertyMembers"));
+                        addValueCoerciblePropertyMemberNames(builder, beanProperties);
+                    }
 
                 } catch (ProcessingException e) {
                     throw e;
@@ -2896,7 +2900,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return Class.class.getName().equals(interfaceTypeName) && Object.class.getName().equals(parameterTypeName);
     }
 
-    private static String beanGetterName(String name, ClassElement type) {
+    private static String beanGetterName(String name) {
         return "get" + NameUtils.capitalize(name);
     }
 
@@ -2908,11 +2912,55 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return "set" + NameUtils.capitalize(name);
     }
 
+    private void addValueCoerciblePropertyMemberNames(ClassDef.ClassDefBuilder builder, List<PropertyElement> beanProperties) {
+        // Precompute JavaBean accessor aliases for ValueCoercible. The runtime proxy only consults
+        // these generated tables, avoiding reflection over generated wrapper methods.
+        Map<String, String> getterMappings = new LinkedHashMap<>();
+        Map<String, String> setterMappings = new LinkedHashMap<>();
+        for (PropertyElement beanProperty : beanProperties) {
+            String propertyName = beanProperty.getName();
+            String beanGetter = beanGetterName(propertyName);
+            getterMappings.put(beanGetter, propertyName);
+            beanProperty.getReadMethod().ifPresent(method -> getterMappings.put(method.getName(), propertyName));
+
+            String beanSetter = beanSetterName(propertyName);
+            setterMappings.put(beanSetter, propertyName);
+            beanProperty.getWriteMethod().ifPresent(method -> setterMappings.put(method.getName(), propertyName));
+        }
+
+        builder.addMethod(MethodDef.builder("micronautValueCoercibleGetterPropertyName")
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .addParameter("key", TypeDef.STRING)
+            .returns(TypeDef.STRING)
+            .build((aThis, methodParameters) -> propertyNameMatchBody(methodParameters.getFirst(), getterMappings)));
+        builder.addMethod(MethodDef.builder("micronautValueCoercibleSetterPropertyName")
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .addParameter("key", TypeDef.STRING)
+            .returns(TypeDef.STRING)
+            .build((aThis, methodParameters) -> propertyNameMatchBody(methodParameters.getFirst(), setterMappings)));
+    }
+
+    private static StatementDef propertyNameMatchBody(VariableDef.MethodParameter key, Map<String, String> mappings) {
+        List<StatementDef> statements = new ArrayList<>(mappings.size() + 1);
+        for (Map.Entry<String, String> entry : mappings.entrySet()) {
+            statements.add(
+                ExpressionDef.constant(entry.getKey())
+                    .invoke("equals", TypeDef.Primitive.BOOLEAN, key)
+                    .isTrue()
+                    .doIf(ExpressionDef.constant(entry.getValue()).returning())
+            );
+        }
+        statements.add(ExpressionDef.nullValue().returning());
+        return StatementDef.multi(statements);
+    }
+
     private void addGetterPojo(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef field) {
         TypeDef propertyType = propertySourceType(beanProperty);
         Optional<MethodElement> rm = beanProperty.getReadMethod();
         boolean isSynthetic = rm.map(MethodElement::isSynthetic).orElse(true);
-        String getterName = isSynthetic ? beanGetterName(beanProperty.getName(), beanProperty.getType()) :
+        String getterName = isSynthetic ? beanGetterName(beanProperty.getName()) :
             rm.get().getName();
         addGetterPojo(beanProperty, builder, field, propertyType, getterName);
 
@@ -2960,7 +3008,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     private void addGetterDynamic(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder) {
         TypeDef propertyType = propertySourceType(beanProperty);
-        String getterName = beanGetterName(beanProperty.getName(), beanProperty.getType());
+        String getterName = beanGetterName(beanProperty.getName());
         MethodDef.MethodDefBuilder getterBuilder = MethodDef
             .builder(getterName)
             .addModifiers(Modifier.PUBLIC)

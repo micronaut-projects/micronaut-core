@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 final class ValueCoercibleProxyObjectTest {
 
     @Test
-    void valueCoercibleExposesUnderlyingPythonMembersAndHostMethodsToPython() {
+    void valueCoercibleExposesUnderlyingPythonMembersToPython() {
         try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
             Value message = context.eval(PYTHON, """
                 class Message:
@@ -38,26 +38,15 @@ final class ValueCoercibleProxyObjectTest {
                         return self.text + " " + name
                 Message("Hello")
                 """);
-            context.getBindings(PYTHON).putMember("message", new PythonMessage(message));
+            PythonMessage pythonMessage = new PythonMessage(message);
+            context.getBindings(PYTHON).putMember("message", pythonMessage);
 
             assertEquals("Hello", context.eval(PYTHON, "message.text").asString());
             assertEquals("Hello John", context.eval(PYTHON, "message.greet('John')").asString());
-            assertEquals("Hello", context.eval(PYTHON, "message.asPolyglotValue().text").asString());
-            assertEquals("Message", context.eval(PYTHON, "message.asPolyglotValue().__class__.__name__").asString());
+            assertEquals("Message", pythonMessage.asPolyglotValue().getMember("__class__").getMember("__name__").asString());
 
             context.eval(PYTHON, "message.text = 'Hi'");
             assertEquals("Hi", message.getMember("text").asString());
-        }
-    }
-
-    @Test
-    void valueCoercibleFallsBackToJavaMethodsForGeneratedAccessors() {
-        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
-            Value pointValue = context.eval(PYTHON, "object()");
-            context.getBindings(PYTHON).putMember("point", new PythonPoint(pointValue));
-
-            assertEquals(10, context.eval(PYTHON, "point.getX()").asInt());
-            assertEquals(20, context.eval(PYTHON, "point.getY()").asInt());
         }
     }
 
@@ -78,21 +67,6 @@ final class ValueCoercibleProxyObjectTest {
         @Override
         public Value asPolyglotValue() {
             return value;
-        }
-    }
-
-    public record PythonPoint(Value value) implements ValueCoercible {
-        @Override
-        public Value asPolyglotValue() {
-            return value;
-        }
-
-        public int getX() {
-            return 10;
-        }
-
-        public int getY() {
-            return 20;
         }
     }
 

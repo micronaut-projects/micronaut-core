@@ -2,9 +2,17 @@ package io.micronaut.python.annotation.processing.test
 
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
+import io.micronaut.data.intercept.annotation.DataMethod
+import io.micronaut.data.intercept.reactive.FindAllReactiveInterceptor
+import io.micronaut.data.intercept.reactive.FindPageReactiveInterceptor
+import io.micronaut.data.model.Pageable
+import io.micronaut.data.model.Sort
 import io.micronaut.python.annotation.processing.test.repository.MinimalCrudRepository
 import io.micronaut.python.compiler.PyronautCompiler
+import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.Value
+import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 import spock.lang.PendingFeature
 
 class IntroductionGenericInterfaceSpec extends AbstractPythonTypeElementSpec {
@@ -662,5 +670,112 @@ class MyPersonRepository(ABC, CrudRepository[MyPerson, int]):
 
         then:
         repositoryType != null
+    }
+
+    void "test micronaut data ReactorPageableRepository inherited pageable overload is retained"() {
+        given:
+        def pythonCode = '''
+import java
+Dialect = java.type("io.micronaut.data.model.query.builder.sql.Dialect")
+
+from dataclasses import dataclass
+from micronaut.data.annotation import MappedEntity
+from micronaut.data.annotation import Id
+from typing import Annotated
+from micronaut.data.jdbc.annotation import JdbcRepository
+from micronaut.data.repository.reactive import ReactorPageableRepository
+
+@dataclass
+@MappedEntity
+class Genre:
+    id : Annotated[int, Id]
+    name : str
+
+@JdbcRepository(dialect = "H2")
+class GenreRepository(ReactorPageableRepository[Genre, int]):
+    pass
+'''
+
+        when:
+        def definition = buildBeanDefinition("python", "GenreRepository\$RuntimeProxy", pythonCode)
+        def findAll = definition.executableMethods.findAll { it.methodName == "findAll" }
+        def sortFindAll = findAll.find { it.arguments.length == 1 && it.arguments[0].type == Sort }
+        def pageableFindAll = findAll.find { it.arguments.length == 1 && it.arguments[0].type == Pageable }
+        def runtimeFindAll = definition.beanType.methods.findAll { it.name == "findAll" && it.parameterTypes.length == 1 }
+        def runtimeSortFindAll = runtimeFindAll.find { it.parameterTypes[0] == Sort }
+        def runtimePageableFindAll = runtimeFindAll.find { it.parameterTypes[0] == Pageable }
+
+        then:
+        sortFindAll != null
+        pageableFindAll != null
+        runtimeSortFindAll != null
+        runtimePageableFindAll != null
+        sortFindAll.stringValue(DataMethod, DataMethod.META_MEMBER_INTERCEPTOR).get() == FindAllReactiveInterceptor.name
+        pageableFindAll.stringValue(DataMethod, DataMethod.META_MEMBER_INTERCEPTOR).get() == FindPageReactiveInterceptor.name
+    }
+
+    void "test injected micronaut data repository callable from Python selects pageable overload"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from typing import Annotated
+from micronaut.aop import InterceptorBean, MethodInvocationContext, Introduction
+from micronaut.data.annotation import Id, MappedEntity
+from micronaut.data.repository.reactive import ReactorPageableRepository
+from jakarta.inject import Inject, Singleton
+import java
+
+Flux = java.type("reactor.core.publisher.Flux")
+JavaList = java.type("java.util.List")
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+Mono = java.type("reactor.core.publisher.Mono")
+Page = java.type("io.micronaut.data.model.Page")
+Pageable = java.type("io.micronaut.data.model.Pageable")
+
+@dataclass
+@MappedEntity
+class Genre:
+    id: Annotated[int, Id]
+    name: str
+
+@Introduction
+def RepoIntro(cls):
+    return cls
+
+@InterceptorBean(RepoIntro)
+@Singleton
+class RepoIntroInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        argument = context.getExecutableMethod().getArguments()[0]
+        if argument.getType().getName().endswith("Pageable"):
+            return Mono.just(Page.of(JavaList.of("pageable"), Pageable.from_(0), 1))
+        return Flux.just("sort")
+
+@RepoIntro
+class GenreRepository(ReactorPageableRepository[Genre, int], new_style=True):
+    pass
+
+@Singleton
+class GenreCaller:
+    genre_repository: Annotated[GenreRepository, Inject]
+
+    def list_genres(self):
+        return Mono.from_(self.genre_repository.findAll(Pageable.from_(0))).map(page_content)
+
+def page_content(page):
+    return page.getContent()
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def caller = getBean(context, "python.GenreCaller").asPolyglotValue()
+        def result = caller.invokeMember("list_genres").asHostObject()
+
+        then:
+        result instanceof Publisher
+        Mono.from(result).block() == ["pageable"]
+
+        cleanup:
+        context?.close()
     }
 }

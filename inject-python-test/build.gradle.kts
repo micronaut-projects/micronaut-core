@@ -22,6 +22,7 @@ dependencies {
     testImplementation(platform(libs.test.boms.micronaut.validation))
     testImplementation(platform(libs.test.boms.micronaut.data))
     testImplementation(platform(libs.test.boms.micronaut.sql))
+    testImplementation(platform(libs.test.boms.micronaut.serde))
     testImplementation(libs.managed.reactor)
     testImplementation(projects.micronautInjectJavaHelper)
     testImplementation(libs.micronaut.validation)
@@ -32,6 +33,9 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     testImplementation("io.micronaut.data:micronaut-data-model") {
+        exclude(group = "io.micronaut")
+    }
+    testImplementation("io.micronaut.serde:micronaut-serde-api") {
         exclude(group = "io.micronaut")
     }
     testImplementation("jakarta.data:jakarta.data-api:1.1.0-M1")

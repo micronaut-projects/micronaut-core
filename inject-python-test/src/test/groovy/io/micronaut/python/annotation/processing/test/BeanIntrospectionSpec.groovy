@@ -561,6 +561,77 @@ class SerdeableDataClass:
         context?.close()
     }
 
+    void "test binary @Serdeable on Python @dataclass"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.serde.annotation import Serdeable
+
+@Serdeable
+@dataclass
+class BinarySerdeableDataClass:
+    name: str
+    age: int = 25
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.BinarySerdeableDataClass")
+
+        then:
+        introspection != null
+        introspection.hasStereotype(Introspected)
+        introspection.hasStereotype("io.micronaut.serde.annotation.Serdeable\$Serializable")
+        introspection.hasStereotype("io.micronaut.serde.annotation.Serdeable\$Deserializable")
+        introspection.getPropertyNames().length == 2
+        introspection.getProperty("name").isPresent()
+        introspection.getProperty("age").isPresent()
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test binary @Serdeable on Python @dataclass mapped entity"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from typing import Annotated
+
+from jakarta.validation.constraints import NotBlank
+from micronaut.data.annotation import GeneratedValue, Id, MappedEntity
+from micronaut.serde.annotation import Serdeable
+
+@dataclass
+@Serdeable
+@MappedEntity
+class Genre:
+    name: Annotated[str, NotBlank]
+    id: Annotated[int | None, Id, GeneratedValue] = None
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.Genre")
+
+        then:
+        introspection != null
+        introspection.hasStereotype(Introspected)
+        introspection.hasStereotype("io.micronaut.serde.annotation.Serdeable\$Serializable")
+        introspection.hasStereotype("io.micronaut.serde.annotation.Serdeable\$Deserializable")
+        introspection.getPropertyNames().length == 2
+        introspection.getProperty("name").isPresent()
+        introspection.getProperty("id").isPresent()
+
+        when:
+        def genre = introspection.instantiate("DevOps", 1)
+
+        then:
+        genre.getMemberKeys() as Set == ["name", "id"] as Set
+
+        cleanup:
+        context?.close()
+    }
+
     void "equals/hashCode/toString for @Introspected Python dataclass"() {
         given:
         def pythonCode = '''

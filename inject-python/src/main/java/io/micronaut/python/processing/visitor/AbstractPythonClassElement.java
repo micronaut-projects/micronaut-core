@@ -522,11 +522,25 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                 methodElement.getName().equals(inheritedMethod.getName()) &&
                 (methodElement.overrides(inheritedMethod) ||
                     methodElement.isSubSignature(inheritedMethod) ||
-                    methodElement.getParameters().length == inheritedMethod.getParameters().length)) {
+                    hasSameRawParameterTypes(methodElement, inheritedMethod))) {
                 return i;
             }
         }
         return -1;
+    }
+
+    private static boolean hasSameRawParameterTypes(MethodElement methodElement, MethodElement inheritedMethod) {
+        ParameterElement[] parameters = methodElement.getParameters();
+        ParameterElement[] inheritedParameters = inheritedMethod.getParameters();
+        if (parameters.length != inheritedParameters.length) {
+            return false;
+        }
+        for (int i = 0; i < parameters.length; i++) {
+            if (!parameters[i].getType().getName().equals(inheritedParameters[i].getType().getName())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
