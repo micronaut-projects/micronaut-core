@@ -17,12 +17,19 @@ package io.micronaut.context.python;
 
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
+import org.dataloader.MappedBatchLoader;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 final class ValueCoercibleProxyObjectTest {
 
@@ -74,10 +81,239 @@ final class ValueCoercibleProxyObjectTest {
         }
     }
 
-    private record PythonMessage(Value value) implements ValueCoercible {
+    @Test
+    void valueCoercibleCanBePassedBackToJavaAsGeneratedInterface() {
+        try (Context context = Context.newBuilder(PYTHON)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of(new PythonMessageMapping())))
+            .allowHostClassLookup(name -> true)
+            .build()) {
+            Value messageValue = context.eval(PYTHON, """
+                class PythonMessage:
+                    def __init__(self, text):
+                        self.text = text
+                PythonMessage("Hello")
+                """);
+            context.getBindings(PYTHON).putMember("message", new PythonMessage(messageValue));
+            context.getBindings(PYTHON).putMember("acceptor", new MessageAcceptor());
+
+            assertEquals("Hello John", context.eval(PYTHON, "acceptor.greet(message)").asString());
+        }
+    }
+
+    @Test
+    void pythonValueCanBePassedBackToJavaAsGeneratedInterface() {
+        try (Context context = Context.newBuilder(PYTHON)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of(new PythonMessageMapping())))
+            .build()) {
+            context.getBindings(PYTHON).putMember("acceptor", new MessageAcceptor());
+
+            assertEquals("Hello John", context.eval(PYTHON, """
+                class PythonMessage:
+                    def __init__(self, text):
+                        self.text = text
+                acceptor.greet(PythonMessage("Hello"))
+                """).asString());
+        }
+    }
+
+    @Test
+    void valueCoercibleCanBePassedBackToOverloadedStaticJavaMethodAsGeneratedInterface() {
+        try (Context context = Context.newBuilder(PYTHON)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of(new PythonMessageMapping())))
+            .allowHostClassLookup(name -> true)
+            .build()) {
+            Value messageValue = context.eval(PYTHON, """
+                class PythonMessage:
+                    def __init__(self, text):
+                        self.text = text
+                PythonMessage("Hello")
+                """);
+            context.getBindings(PYTHON).putMember("message", new PythonMessage(messageValue));
+            assertEquals("Hello John", context.eval(PYTHON, """
+                import java
+                StaticMessageAcceptor = java.type('io.micronaut.context.python.ValueCoercibleProxyObjectTest$StaticMessageAcceptor')
+                StaticMessageAcceptor.greet(message)
+                """).asString());
+        }
+    }
+
+    @Test
+    void pythonValueCanBePassedBackToOverloadedStaticJavaMethodAsGeneratedInterface() {
+        try (Context context = Context.newBuilder(PYTHON)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of(new PythonMessageMapping())))
+            .allowHostClassLookup(name -> true)
+            .build()) {
+            assertEquals("Hello John", context.eval(PYTHON, """
+                import java
+                StaticMessageAcceptor = java.type('io.micronaut.context.python.ValueCoercibleProxyObjectTest$StaticMessageAcceptor')
+
+                class PythonMessage:
+                    def __init__(self, text):
+                        self.text = text
+
+                StaticMessageAcceptor.greet(PythonMessage("Hello"))
+                """).asString());
+        }
+    }
+
+    @Test
+    void pythonValueWithMatchingPythonMethodCanBePassedBackToOverloadedStaticJavaMethodAsGeneratedInterface() {
+        try (Context context = Context.newBuilder(PYTHON)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of(new PythonMessageMapping())))
+            .allowHostClassLookup(name -> true)
+            .build()) {
+            assertEquals("Hello John", context.eval(PYTHON, """
+                import java
+                StaticMessageAcceptor = java.type('io.micronaut.context.python.ValueCoercibleProxyObjectTest$StaticMessageAcceptor')
+
+                class PythonMessage:
+                    def __init__(self, text):
+                        self.text = text
+
+                    def greet(self, name):
+                        return self.text + " " + name
+
+                StaticMessageAcceptor.greet(PythonMessage("Hello"))
+                """).asString());
+        }
+    }
+
+    @Test
+    void pythonValueCanBePassedBackToOverloadedStaticJavaMethodWhenFunctionalInterfacesShareMethodName() {
+        try (Context context = Context.newBuilder(PYTHON)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of(new PythonMessageMapping())))
+            .allowHostClassLookup(name -> true)
+            .build()) {
+            assertEquals("Hello John", context.eval(PYTHON, """
+                import java
+                SharedNameStaticMessageAcceptor = java.type('io.micronaut.context.python.ValueCoercibleProxyObjectTest$SharedNameStaticMessageAcceptor')
+
+                class PythonMessage:
+                    def __init__(self, text):
+                        self.text = text
+
+                    def greet(self, name):
+                        return self.text + " " + name
+
+                SharedNameStaticMessageAcceptor.greet(PythonMessage("Hello"))
+                """).asString());
+        }
+    }
+
+    @Test
+    void valueCoercibleCanBePassedToJavaDataloaderMappedBatchLoaderFactory() {
+        try (Context context = Context.newBuilder(PYTHON)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of(new PythonMappedBatchLoaderMapping())))
+            .allowHostClassLookup(name -> true)
+            .build()) {
+            Value loaderValue = context.eval(PYTHON, """
+                class PythonMappedBatchLoader:
+                    def load(self, keys):
+                        return None
+                PythonMappedBatchLoader()
+                """);
+            context.getBindings(PYTHON).putMember("batch_loader", new PythonMappedBatchLoader(loaderValue));
+
+            Value result = context.eval(PYTHON, """
+                import java
+                DataLoaderFactory = java.type('org.dataloader.DataLoaderFactory')
+
+                DataLoaderFactory.newMappedDataLoader(batch_loader)
+                """);
+
+            assertNotNull(result.asHostObject());
+        }
+    }
+
+    @Test
+    void valueCoercibleCanBePassedThroughPythonMethodToJavaDataloaderMappedBatchLoaderFactory() {
+        try (Context context = Context.newBuilder(PYTHON)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of(new PythonMappedBatchLoaderMapping())))
+            .allowHostClassLookup(name -> true)
+            .build()) {
+            Value factory = context.eval(PYTHON, """
+                import java
+                DataLoaderFactory = java.type('org.dataloader.DataLoaderFactory')
+
+                class DataLoaderRegistryFactory:
+                    def data_loader_registry(self, batch_loader):
+                        return DataLoaderFactory.newMappedDataLoader(batch_loader)
+
+                DataLoaderRegistryFactory()
+                """);
+            Value loaderValue = context.eval(PYTHON, """
+                class PythonMappedBatchLoader:
+                    def load(self, keys):
+                        return None
+                PythonMappedBatchLoader()
+                """);
+            PythonMappedBatchLoader batchLoader = new PythonMappedBatchLoader(loaderValue);
+
+            Value result = GraalPyRuntimeUtil.invokePythonMethod(
+                factory,
+                "data_loader_registry",
+                new Object[] {GraalPyRuntimeUtil.coerceToContext(batchLoader, factory.getContext())}
+            );
+
+            assertNotNull(result.asHostObject());
+        }
+    }
+
+    @Test
+    void pythonValueCanBePassedToJavaDataloaderMappedBatchLoaderFactory() {
+        try (Context context = Context.newBuilder(PYTHON)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of(new PythonMappedBatchLoaderMapping())))
+            .allowHostClassLookup(name -> true)
+            .build()) {
+            Value result = context.eval(PYTHON, """
+                import java
+                DataLoaderFactory = java.type('org.dataloader.DataLoaderFactory')
+
+                class PythonMappedBatchLoader:
+                    def load(self, keys):
+                        return None
+
+                DataLoaderFactory.newMappedDataLoader(PythonMappedBatchLoader())
+                """);
+
+            assertNotNull(result.asHostObject());
+        }
+    }
+
+    @Test
+    void bootstrapHostAccessLoadsTargetMappingsForReusableContexts() {
+        try (Context context = Context.newBuilder(PYTHON)
+            .allowHostAccess(GraalPyContextFactory.bootstrapHostAccess(ValueCoercibleProxyObjectTest.class.getClassLoader()))
+            .allowHostClassLookup(name -> true)
+            .build()) {
+            Value loaderValue = context.eval(PYTHON, """
+                class PythonMappedBatchLoader:
+                    def load(self, keys):
+                        return None
+                PythonMappedBatchLoader()
+                """);
+            context.getBindings(PYTHON).putMember("batch_loader", new PythonMappedBatchLoader(loaderValue));
+
+            Value result = context.eval(PYTHON, """
+                import java
+                DataLoaderFactory = java.type('org.dataloader.DataLoaderFactory')
+
+                DataLoaderFactory.newMappedDataLoader(batch_loader)
+                """);
+
+            assertNotNull(result.asHostObject());
+        }
+    }
+
+    private record PythonMessage(Value value) implements ValueCoercible, MessageGreeter {
         @Override
         public Value asPolyglotValue() {
             return value;
+        }
+
+        @Override
+        public String greet(String name) {
+            return value.getMember("text").asString() + " " + name;
         }
     }
 
@@ -113,6 +349,94 @@ final class ValueCoercibleProxyObjectTest {
     public static final class ThrowableAcceptor {
         public String message(Throwable throwable) {
             return throwable.getMessage();
+        }
+    }
+
+    public interface MessageGreeter {
+        String greet(String name);
+    }
+
+    public interface OtherMessageGreeter {
+        String greetOther(String name);
+    }
+
+    public interface ContextMessageGreeter {
+        String greet(String name, String context);
+    }
+
+    public record PythonMessageMapping() implements TargetTypeMapping<PythonMessage> {
+        @Override
+        public Class<PythonMessage> targetType() {
+            return PythonMessage.class;
+        }
+
+        @Override
+        public Class<?>[] assignableTargetTypes() {
+            return new Class<?>[] {MessageGreeter.class};
+        }
+
+        @Override
+        public PythonMessage convert(Value value) {
+            return new PythonMessage(value);
+        }
+    }
+
+    public static final class MessageAcceptor {
+        public String greet(MessageGreeter greeter) {
+            return greeter.greet("John");
+        }
+    }
+
+    public static final class StaticMessageAcceptor {
+        public static String greet(MessageGreeter greeter) {
+            return greeter.greet("John");
+        }
+
+        public static String greet(OtherMessageGreeter greeter) {
+            return greeter.greetOther("John");
+        }
+    }
+
+    public static final class SharedNameStaticMessageAcceptor {
+        public static String greet(MessageGreeter greeter) {
+            return greeter.greet("John");
+        }
+
+        public static String greet(ContextMessageGreeter greeter) {
+            return greeter.greet("John", "context");
+        }
+    }
+
+    public record PythonMappedBatchLoader(Value value) implements ValueCoercible, MappedBatchLoader<Integer, String> {
+        @Override
+        public Value asPolyglotValue() {
+            return value;
+        }
+
+        @Override
+        public CompletionStage<Map<Integer, String>> load(Set<Integer> keys) {
+            Map<Integer, String> result = new HashMap<>();
+            for (Integer key : keys) {
+                result.put(key, "value-" + key);
+            }
+            return CompletableFuture.completedFuture(result);
+        }
+    }
+
+    public record PythonMappedBatchLoaderMapping() implements TargetTypeMapping<PythonMappedBatchLoader> {
+        @Override
+        public Class<PythonMappedBatchLoader> targetType() {
+            return PythonMappedBatchLoader.class;
+        }
+
+        @Override
+        public Class<?>[] assignableTargetTypes() {
+            return new Class<?>[] {MappedBatchLoader.class};
+        }
+
+        @Override
+        public PythonMappedBatchLoader convert(Value value) {
+            return new PythonMappedBatchLoader(value);
         }
     }
 }

@@ -20,10 +20,15 @@ import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.proxy.ProxyObject;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Factory that creates the HostAccess bean used by the GraalPy Context.
@@ -48,8 +53,20 @@ final class GraalPyHostAccessFactory {
     @NonNull
     HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings) {
         HostAccess.Builder builder = HostAccess.newBuilder(HostAccess.ALL);
+        Map<Class<?>, List<TargetTypeMapping<?>>> assignableMappings = new LinkedHashMap<>();
         for (TargetTypeMapping<?> mapping : mappings) {
             register(builder, mapping, mappings);
+            for (Class<?> assignableTargetType : mapping.assignableTargetTypes()) {
+                if (assignableTargetType == null || assignableTargetType.equals(mapping.targetType())) {
+                    continue;
+                }
+                assignableMappings
+                    .computeIfAbsent(assignableTargetType, ignored -> new ArrayList<>())
+                    .add(mapping);
+            }
+        }
+        for (Map.Entry<Class<?>, List<TargetTypeMapping<?>>> entry : assignableMappings.entrySet()) {
+            registerAssignable(builder, entry.getKey(), entry.getValue(), mappings);
         }
         registerValueCoercibleHostMapping(builder, ValueCoercible.class);
         registerValueCoercibleHostMapping(builder, Throwable.class);
@@ -102,6 +119,37 @@ final class GraalPyHostAccessFactory {
         );
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void registerAssignable(HostAccess.Builder builder,
+                                           Class<?> target,
+                                           List<TargetTypeMapping<?>> targetMappings,
+                                           Collection<TargetTypeMapping<?>> allMappings) {
+        builder.targetTypeMapping(
+            Value.class,
+            (Class) target,
+            v -> {
+                ValueCoercible host = valueCoercibleHost(v);
+                if (host != null && target.isInstance(host)) {
+                    return true;
+                }
+                return findAssignableMapping(v, targetMappings, allMappings) != null;
+            },
+            v -> {
+                ValueCoercible host = valueCoercibleHost(v);
+                if (host != null && target.isInstance(host)) {
+                    return target.cast(host);
+                }
+                TargetTypeMapping<?> mapping = findAssignableMapping(v, targetMappings, allMappings);
+                if (mapping == null) {
+                    throw new IllegalArgumentException("Cannot resolve Python value to " + target.getName());
+                }
+                return target.cast(mapping.convert(v));
+            }
+        );
+        registerValueCoercibleAssignableHostMapping(builder, target);
+        registerProxyHostMapping(builder, target);
+    }
+
     private static void registerObjectMapping(HostAccess.Builder builder, Collection<TargetTypeMapping<?>> mappings) {
         builder.<Value, Object>targetTypeMapping(
             Value.class,
@@ -127,6 +175,26 @@ final class GraalPyHostAccessFactory {
                 return host != null && target.isInstance(host);
             },
             v -> target.cast(valueCoercibleHost(v))
+        );
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void registerValueCoercibleAssignableHostMapping(HostAccess.Builder builder, Class<?> target) {
+        builder.targetTypeMapping(
+            ValueCoercible.class,
+            (Class) target,
+            target::isInstance,
+            target::cast
+        );
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void registerProxyHostMapping(HostAccess.Builder builder, Class<?> target) {
+        builder.targetTypeMapping(
+            ProxyObject.class,
+            (Class) target,
+            value -> valueCoercibleHost(value, target) != null,
+            value -> target.cast(valueCoercibleHost(value, target))
         );
     }
 
@@ -159,6 +227,28 @@ final class GraalPyHostAccessFactory {
             return null;
         }
         for (TargetTypeMapping<?> mapping : mappings) {
+            if (mapping.targetType().equals(pythonClass)) {
+                return mapping;
+            }
+        }
+        return null;
+    }
+
+    private static @Nullable TargetTypeMapping<?> findAssignableMapping(@Nullable Value value,
+                                                                       List<TargetTypeMapping<?>> targetMappings,
+                                                                       Collection<TargetTypeMapping<?>> allMappings) {
+        if (value == null || value.isNull() || value.isHostObject() || !value.hasMembers()) {
+            return null;
+        }
+        Value cls = value.getMember(CLASS_META);
+        if (cls == null) {
+            return null;
+        }
+        Class<?> pythonClass = findPythonClass(cls, allMappings);
+        if (pythonClass == null) {
+            return null;
+        }
+        for (TargetTypeMapping<?> mapping : targetMappings) {
             if (mapping.targetType().equals(pythonClass)) {
                 return mapping;
             }
@@ -240,6 +330,17 @@ final class GraalPyHostAccessFactory {
         }
         Object hostReference = hostReferenceValue.asHostObject();
         if (hostReference instanceof ValueCoercible.HostObjectReference reference) {
+            return reference.value();
+        }
+        return null;
+    }
+
+    private static @Nullable ValueCoercible valueCoercibleHost(@Nullable ProxyObject value, Class<?> target) {
+        if (value == null || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+            return null;
+        }
+        Object hostReference = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
+        if (hostReference instanceof ValueCoercible.HostObjectReference reference && target.isInstance(reference.value())) {
             return reference.value();
         }
         return null;

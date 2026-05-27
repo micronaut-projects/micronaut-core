@@ -20,6 +20,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.generator.SourceGenerators;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
@@ -29,6 +30,10 @@ import io.micronaut.sourcegen.model.TypeDef;
 import org.graalvm.polyglot.Value;
 
 import javax.lang.model.element.Modifier;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Generates a simple TargetTypeMapping bean for each Python stub that delegates
@@ -37,6 +42,13 @@ import javax.lang.model.element.Modifier;
 public final class TargetTypeMappingGenerator implements TypeElementVisitor<Object, Object> {
 
     private static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
+    private static final String ASSIGNABLE_TARGET_TYPES = "assignableTargetTypes";
+    private static final String OBJECT = Object.class.getName();
+    private static final String VALUE_COERCIBLE = "io.micronaut.context.python.ValueCoercible";
+    private static final String POOLED_VALUE_COERCIBLE = "io.micronaut.context.python.PooledValueCoercible";
+    private static final String PROXY_OBJECT = "org.graalvm.polyglot.proxy.ProxyObject";
+    private static final String BOXED = "io.micronaut.core.graal.Boxed";
+    private static final String TARGET_TYPE_MAPPING = "io.micronaut.context.python.TargetTypeMapping";
 
     @Override
     public TypeElementQuery query() {
@@ -58,20 +70,77 @@ public final class TargetTypeMappingGenerator implements TypeElementVisitor<Obje
             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
             .addAnnotation(ClassTypeDef.of("jakarta.inject.Singleton"))
             .addSuperinterface(TypeDef.parameterized(
-                ClassTypeDef.of("io.micronaut.context.python.TargetTypeMapping"), thisType
+                ClassTypeDef.of(TARGET_TYPE_MAPPING), thisType
             ));
 
         builder.addMethod(MethodDef.builder("targetType")
             .addModifiers(Modifier.PUBLIC)
             .returns(TypeDef.parameterized(Class.class, thisType))
-            .build(((aThis, params) -> thisType.getStaticField("class", TypeDef.CLASS).returning())));
+            .build((aThis, params) -> thisType.getStaticField("class", TypeDef.CLASS).returning()));
 
         builder.addMethod(MethodDef.builder("convert")
             .addModifiers(Modifier.PUBLIC)
             .addParameter(ParameterDef.of("value", TypeDef.of(Value.class)))
             .returns(thisType)
-            .build(((aThis, params) -> thisType.invokeStatic(FROM_POLYGLOT_VALUE, thisType, params.getFirst()).returning())));
+            .build((aThis, params) -> thisType.invokeStatic(FROM_POLYGLOT_VALUE, thisType, params.getFirst()).returning()));
+
+        List<ClassElement> assignableTargetTypes = assignableTargetTypes(element);
+        if (!assignableTargetTypes.isEmpty()) {
+            TypeDef.Array classArray = TypeDef.Primitive.CLASS.array();
+            builder.addMethod(MethodDef.builder(ASSIGNABLE_TARGET_TYPES)
+                .addModifiers(Modifier.PUBLIC)
+                .returns(classArray)
+                .build((aThis, params) -> classArray.instantiate(
+                    assignableTargetTypes.stream()
+                        .map(targetType -> ClassTypeDef.of(targetType.getName()).getStaticField("class", TypeDef.CLASS))
+                        .toArray(ExpressionDef[]::new)
+                ).returning()));
+        }
 
         SourceGenerators.findByLanguage(VisitorContext.Language.JAVA).ifPresent(sg -> sg.write(builder.build(), context, element));
+        context.visitServiceDescriptor(TARGET_TYPE_MAPPING, mappingName, element);
+    }
+
+    private static List<ClassElement> assignableTargetTypes(ClassElement element) {
+        Map<String, ClassElement> targetTypes = new LinkedHashMap<>();
+        collectInterfaces(element, targetTypes);
+        element.getSuperType().ifPresent(superType -> collectSuperTypes(superType, targetTypes));
+        return new ArrayList<>(targetTypes.values());
+    }
+
+    private static void collectSuperTypes(ClassElement element, Map<String, ClassElement> targetTypes) {
+        ClassElement rawElement = element.getRawClassElement();
+        if (!addTargetType(rawElement, targetTypes)) {
+            return;
+        }
+        collectInterfaces(rawElement, targetTypes);
+        rawElement.getSuperType().ifPresent(superType -> collectSuperTypes(superType, targetTypes));
+    }
+
+    private static void collectInterfaces(ClassElement element, Map<String, ClassElement> targetTypes) {
+        for (ClassElement anInterface : element.getInterfaces()) {
+            ClassElement rawInterface = anInterface.getRawClassElement();
+            if (!addTargetType(rawInterface, targetTypes)) {
+                continue;
+            }
+            collectInterfaces(rawInterface, targetTypes);
+        }
+    }
+
+    private static boolean addTargetType(ClassElement element, Map<String, ClassElement> targetTypes) {
+        String name = element.getName();
+        if (isSkippedTargetType(name)) {
+            return false;
+        }
+        targetTypes.putIfAbsent(name, element);
+        return true;
+    }
+
+    private static boolean isSkippedTargetType(String name) {
+        return OBJECT.equals(name)
+            || VALUE_COERCIBLE.equals(name)
+            || POOLED_VALUE_COERCIBLE.equals(name)
+            || PROXY_OBJECT.equals(name)
+            || BOXED.equals(name);
     }
 }

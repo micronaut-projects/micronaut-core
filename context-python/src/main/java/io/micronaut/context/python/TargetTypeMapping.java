@@ -33,6 +33,14 @@ public interface TargetTypeMapping<T> {
     @NonNull Class<T> targetType();
 
     /**
+     * @return Additional erased Java target classes this mapping can satisfy.
+     */
+    @NonNull
+    default Class<?>[] assignableTargetTypes() {
+        return new Class<?>[0];
+    }
+
+    /**
      * Convert the given polyglot value to the target type.
      * Invoked by HostAccess when resolving Value.as(targetType).
      *
