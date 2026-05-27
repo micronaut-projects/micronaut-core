@@ -1015,7 +1015,11 @@ public class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                 av.getStereotypes().stream().map(this::toDecoratorDef).toList()
             ));
         }
-        return Optional.empty();
+        return javaVisitorContext.getClassElement(annotationName)
+            .map(annotationType -> new ClassDef(
+                annotationType.getName(),
+                toDecoratorDefs(annotationType.getAnnotationMetadata())
+            ));
     }
 
     private DecoratorDef toDecoratorDef(AnnotationValue<?> av) {

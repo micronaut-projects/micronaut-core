@@ -32,6 +32,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
@@ -48,6 +49,7 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -115,8 +117,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 null,
                 null,
                 targetBeanRef,
-                methodName,
-                interceptedMethods,
+                methodSelector(methodName, interceptedMethods),
                 originalFunction
             );
             introductionFunctions.put(methodName, proxiedFunction);
@@ -235,9 +236,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 String propertyName = NameUtils.getPropertyNameForSetter(methodName);
                 proxiedFunction = createProxiedPropertySetter(
                     proxyDefinition::targetBean,
-                    methodName,
                     propertyName,
-                    interceptedMethods
+                    methodSelector(methodName, interceptedMethods)
                 );
                 // JavaBean setters generated for Python attributes call Value.putMember(), which
                 // reaches Python __setattr__ on runtime proxies. Register the same chain by
@@ -251,8 +251,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                     proxyDefinition::targetBean,
                     null,
                     null,
-                    methodName,
-                    interceptedMethods,
+                    methodSelector(methodName, interceptedMethods),
                     originalFunction
                 );
             }
@@ -317,12 +316,11 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         @Nullable Supplier<T> targetBeanSupplier,
         @Nullable T targetBean,
         @Nullable AtomicReference<Object> targetBeanRef,
-        String methodName,
-        List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods,
+        MethodSelector<T> methodSelector,
         @Nullable Value originalFunction
     ) {
         return args -> {
-            RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = findInterceptedMethod(methodName, interceptedMethods, args);
+            RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = methodSelector.find(args);
             ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
             Interceptor<T, ?>[] interceptors = interceptedMethod.interceptors();
             if (isIntroduction && executableMethod.hasStereotype(Adapter.class) && interceptors.length > 1) {
@@ -374,12 +372,11 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private <T> ProxyExecutable createProxiedPropertySetter(
         Supplier<T> targetBeanSupplier,
-        String methodName,
         String propertyName,
-        List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods
+        MethodSelector<T> methodSelector
     ) {
         return args -> {
-            RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = findInterceptedMethod(methodName, interceptedMethods, args);
+            RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = methodSelector.find(args);
             ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
             Object[] javaArgs = fromPolyglotArray(args, executableMethod.getArguments());
             T targetBean = targetBeanSupplier.get();
@@ -482,17 +479,136 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         throw new IllegalStateException("Python proxy target must implement ValueCoercible: " + bean);
     }
 
-    private <T> RuntimeProxyDefinition.InterceptedMethod<T> findInterceptedMethod(
-        String methodName,
-        List<RuntimeProxyDefinition.InterceptedMethod<T>> methods,
-        Value[] args
-    ) {
-        for (RuntimeProxyDefinition.InterceptedMethod<T> method : methods) {
-            if (method.executableMethod().getArguments().length == args.length) {
-                return method;
+    private static boolean argumentsMatch(Argument<?>[] arguments, Value[] args) {
+        for (int i = 0; i < arguments.length; i++) {
+            if (!ValueCoercible.matchesArgument(args[i], arguments[i].getType())) {
+                return false;
             }
         }
-        throw new IllegalArgumentException("No overload found for method " + methodName + " with " + args.length + " arguments");
+        return true;
+    }
+
+    private static boolean isMoreSpecific(ExecutableMethod<?, ?> candidate, ExecutableMethod<?, ?> current) {
+        Argument<?>[] candidateArguments = candidate.getArguments();
+        Argument<?>[] currentArguments = current.getArguments();
+        boolean moreSpecific = false;
+        for (int i = 0; i < candidateArguments.length; i++) {
+            Class<?> candidateType = ReflectionUtils.getWrapperType(candidateArguments[i].getType());
+            Class<?> currentType = ReflectionUtils.getWrapperType(currentArguments[i].getType());
+            if (candidateType.equals(currentType)) {
+                continue;
+            }
+            if (currentType.isAssignableFrom(candidateType)) {
+                // When both overloads match a Python value equally, prefer the narrower generated
+                // argument type. This keeps Pageable dispatch ahead of inherited Sort dispatch.
+                moreSpecific = true;
+            } else if (candidateType.isAssignableFrom(currentType)) {
+                return false;
+            }
+        }
+        return moreSpecific;
+    }
+
+    private static <T> MethodSelector<T> methodSelector(
+        String methodName,
+        List<RuntimeProxyDefinition.InterceptedMethod<T>> methods
+    ) {
+        Set<Integer> arities = new HashSet<>();
+        Set<Integer> overloadedArities = new HashSet<>();
+        for (RuntimeProxyDefinition.InterceptedMethod<T> method : methods) {
+            int arity = method.executableMethod().getArguments().length;
+            if (!arities.add(arity)) {
+                overloadedArities.add(arity);
+            }
+        }
+        if (overloadedArities.isEmpty()) {
+            return new SimpleMethodSelector<>(methodName, methods);
+        }
+
+        Map<Integer, List<RuntimeProxyDefinition.InterceptedMethod<T>>> overloadedMethodsByArity = new LinkedHashMap<>();
+        for (RuntimeProxyDefinition.InterceptedMethod<T> method : methods) {
+            int arity = method.executableMethod().getArguments().length;
+            if (overloadedArities.contains(arity)) {
+                overloadedMethodsByArity.computeIfAbsent(arity, ignored -> new ArrayList<>()).add(method);
+            }
+        }
+        overloadedMethodsByArity.replaceAll((ignored, arityMethods) -> List.copyOf(arityMethods));
+        return new OverloadedMethodSelector<>(methodName, methods, overloadedMethodsByArity);
+    }
+
+    private interface MethodSelector<T> {
+        RuntimeProxyDefinition.InterceptedMethod<T> find(Value[] args);
+    }
+
+    private static final class SimpleMethodSelector<T> implements MethodSelector<T> {
+        private final String methodName;
+        private final List<RuntimeProxyDefinition.InterceptedMethod<T>> methods;
+
+        SimpleMethodSelector(String methodName, List<RuntimeProxyDefinition.InterceptedMethod<T>> methods) {
+            this.methodName = methodName;
+            this.methods = methods;
+        }
+
+        @Override
+        public RuntimeProxyDefinition.InterceptedMethod<T> find(Value[] args) {
+            for (RuntimeProxyDefinition.InterceptedMethod<T> method : methods) {
+                if (method.executableMethod().getArguments().length == args.length) {
+                    return method;
+                }
+            }
+            throw new IllegalArgumentException("No overload found for method " + methodName + " with " + args.length + " arguments");
+        }
+    }
+
+    private static final class OverloadedMethodSelector<T> implements MethodSelector<T> {
+        private final String methodName;
+        private final List<RuntimeProxyDefinition.InterceptedMethod<T>> methods;
+        private final Map<Integer, List<RuntimeProxyDefinition.InterceptedMethod<T>>> overloadedMethodsByArity;
+
+        OverloadedMethodSelector(
+            String methodName,
+            List<RuntimeProxyDefinition.InterceptedMethod<T>> methods,
+            Map<Integer, List<RuntimeProxyDefinition.InterceptedMethod<T>>> overloadedMethodsByArity
+        ) {
+            this.methodName = methodName;
+            this.methods = methods;
+            this.overloadedMethodsByArity = overloadedMethodsByArity;
+        }
+
+        @Override
+        public RuntimeProxyDefinition.InterceptedMethod<T> find(Value[] args) {
+            int arity = args.length;
+            List<RuntimeProxyDefinition.InterceptedMethod<T>> arityMatches = overloadedMethodsByArity.get(arity);
+            if (arityMatches == null) {
+                for (RuntimeProxyDefinition.InterceptedMethod<T> method : methods) {
+                    if (method.executableMethod().getArguments().length == arity) {
+                        return method;
+                    }
+                }
+                throw new IllegalArgumentException("No overload found for method " + methodName + " with " + arity + " arguments");
+            }
+
+            // Only duplicate-arity overload groups need argument-aware selection. Other method
+            // groups use SimpleMethodSelector and keep the old declaration-order arity scan.
+            RuntimeProxyDefinition.InterceptedMethod<T> bestMatch = null;
+            for (RuntimeProxyDefinition.InterceptedMethod<T> method : arityMatches) {
+                Argument<?>[] arguments = method.executableMethod().getArguments();
+                if (!argumentsMatch(arguments, args)) {
+                    continue;
+                }
+                if (bestMatch == null) {
+                    bestMatch = method;
+                    continue;
+                }
+                if (isMoreSpecific(method.executableMethod(), bestMatch.executableMethod())) {
+                    bestMatch = method;
+                }
+            }
+            if (bestMatch != null) {
+                return bestMatch;
+            }
+            return arityMatches.get(0);
+        }
     }
 
     @Nullable
@@ -529,9 +645,9 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 }
                 yield newArray;
             }
-            case Iterable<?> iterable -> {
-                List<Object> newList = new ArrayList<>();
-                for (Object o : iterable) {
+            case Collection<?> collection -> {
+                List<Object> newList = new ArrayList<>(collection.size());
+                for (Object o : collection) {
                     newList.add(unbox(o));
                 }
                 yield newList;

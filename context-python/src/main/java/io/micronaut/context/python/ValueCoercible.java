@@ -17,18 +17,13 @@ package io.micronaut.context.python;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.graal.Boxed;
+import io.micronaut.core.reflect.ReflectionUtils;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.graalvm.polyglot.proxy.ProxyObject;
 import org.jspecify.annotations.Nullable;
 
 import java.beans.Transient;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.Set;
 
 /**
  * A type that is coercible to a Truffle Value.
@@ -60,48 +55,91 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             }
             return member;
         }
-        Field field = findJavaField(key);
-        if (field != null) {
-            try {
-                return field.get(this);
-            } catch (IllegalAccessException e) {
-                throw new IllegalStateException("Cannot access field [" + key + "]", e);
-            }
+        Object getter = generatedGetter(key);
+        if (getter != null) {
+            return getter;
         }
-        if (hasJavaMethod(key)) {
-            return (ProxyExecutable) arguments -> invokeJavaMethod(this, key, arguments);
-        }
-        return null;
+        return generatedSetter(key);
     }
 
     @Override
     @Transient
     default Object getMemberKeys() {
-        Set<String> keys = new LinkedHashSet<>();
         Value value = asPolyglotValue();
         if (value.hasMembers()) {
-            keys.addAll(value.getMemberKeys());
+            return value.getMemberKeys().toArray(new String[0]);
         }
-        Arrays.stream(this.getClass().getFields())
-            .map(Field::getName)
-            .forEach(keys::add);
-        Arrays.stream(this.getClass().getMethods())
-            .filter(ValueCoercible::isProxyVisibleMethod)
-            .map(Method::getName)
-            .forEach(keys::add);
-        return keys.toArray(new String[0]);
+        return new String[0];
     }
 
     @Override
     default boolean hasMember(String key) {
-        return HOST_OBJECT_MEMBER.equals(key) || asPolyglotValue().hasMember(key) || findJavaField(key) != null || hasJavaMethod(key);
+        return HOST_OBJECT_MEMBER.equals(key) ||
+            asPolyglotValue().hasMember(key) ||
+            (this instanceof GeneratedPropertyMembers generatedMembers &&
+                (generatedMembers.micronautValueCoercibleGetterPropertyName(key) != null ||
+                    generatedMembers.micronautValueCoercibleSetterPropertyName(key) != null));
+    }
+
+    /**
+     * Build-time generated JavaBean accessor aliases for Python wrappers.
+     * <p>
+     * Only generated classes that need property aliases implement this contract. That keeps
+     * the generic {@link ValueCoercible} path free of Java method/field reflection while still
+     * preserving Python-side calls such as {@code getName()} for generated bean wrappers.
+     */
+    interface GeneratedPropertyMembers {
+        @Transient
+        @Nullable String micronautValueCoercibleGetterPropertyName(String key);
+
+        @Transient
+        @Nullable String micronautValueCoercibleSetterPropertyName(String key);
+    }
+
+    private @Nullable Object generatedGetter(String key) {
+        if (!(this instanceof GeneratedPropertyMembers generatedMembers)) {
+            return null;
+        }
+        String propertyName = generatedMembers.micronautValueCoercibleGetterPropertyName(key);
+        if (propertyName == null) {
+            return null;
+        }
+        return (ProxyExecutable) arguments -> {
+            if (arguments.length != 0) {
+                throw new IllegalArgumentException("Getter [" + key + "] expects no arguments");
+            }
+            Value member = asPolyglotValue().getMember(propertyName);
+            if (GraalPyRuntimeUtil.isNone(member)) {
+                return null;
+            }
+            return member;
+        };
+    }
+
+    private @Nullable Object generatedSetter(String key) {
+        if (!(this instanceof GeneratedPropertyMembers generatedMembers)) {
+            return null;
+        }
+        String propertyName = generatedMembers.micronautValueCoercibleSetterPropertyName(key);
+        if (propertyName == null) {
+            return null;
+        }
+        return (ProxyExecutable) arguments -> {
+            if (arguments.length != 1) {
+                throw new IllegalArgumentException("Setter [" + key + "] expects one argument");
+            }
+            Value value = arguments[0];
+            if (GraalPyRuntimeUtil.isNone(value)) {
+                asPolyglotValue().putMember(propertyName, null);
+            } else {
+                asPolyglotValue().putMember(propertyName, value);
+            }
+            return null;
+        };
     }
 
     @Override
     default void putMember(String key, Value value) {
-        if (trySetJavaField(key, value) || tryInvokeJavaSetter(key, value)) {
-            return;
-        }
         Value target = asPolyglotValue();
         Object member = value;
         if (GraalPyRuntimeUtil.isNone(value)) {
@@ -117,104 +155,64 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         target.putMember(key, member);
     }
 
-    private @Nullable Field findJavaField(String key) {
-        try {
-            Field field = this.getClass().getField(key);
-            return Modifier.isPublic(field.getModifiers()) ? field : null;
-        } catch (NoSuchFieldException e) {
-            return null;
+    record HostObjectReference(ValueCoercible value) {
+    }
+
+    /**
+     * Match one Python argument against a Java parameter type without conversion.
+     * <p>
+     * Runtime proxies expose all overloads for a Java method name through one Python callable.
+     * This quick check uses generated {@code ExecutableMethod} metadata and only boxes primitive
+     * types through {@link ReflectionUtils}; it deliberately avoids reflective probing of the
+     * generated proxy class while still letting Python-backed values expose their host wrapper via
+     * {@link #HOST_OBJECT_MEMBER}.
+     *
+     * @param value The Python argument
+     * @param targetType The Java parameter type
+     * @return Whether the argument can be passed to the generated method
+     */
+    static boolean matchesArgument(Value value, Class<?> targetType) {
+        Class<?> boxedType = ReflectionUtils.getWrapperType(targetType);
+        if (GraalPyRuntimeUtil.isNone(value)) {
+            return !targetType.isPrimitive();
         }
-    }
-
-    private boolean hasJavaMethod(String key) {
-        return hasProxyVisibleJavaMethod(this, key);
-    }
-
-    static boolean hasProxyVisibleJavaMethod(Object target, String key) {
-        return Arrays.stream(target.getClass().getMethods())
-            .anyMatch(method -> method.getName().equals(key) && isProxyVisibleMethod(method));
-    }
-
-    static boolean isProxyVisibleMethod(Method method) {
-        return Modifier.isPublic(method.getModifiers()) && method.getDeclaringClass() != Object.class;
-    }
-
-    static @Nullable Object invokeJavaMethod(Object target, String key, Value[] arguments) {
-        for (Method method : target.getClass().getMethods()) {
-            if (!method.getName().equals(key) || !isProxyVisibleMethod(method) || method.getParameterCount() != arguments.length) {
-                continue;
-            }
-            try {
-                method.setAccessible(true);
-                return method.invoke(target, convertArguments(arguments, method.getParameterTypes()));
-            } catch (IllegalArgumentException e) {
-                // Try another overload.
-            } catch (ReflectiveOperationException e) {
-                throw new IllegalStateException("Cannot invoke method [" + key + "]", e);
-            }
-        }
-        throw new IllegalArgumentException("No compatible method [" + key + "] found");
-    }
-
-    private boolean trySetJavaField(String key, Value value) {
-        Field field = findJavaField(key);
-        if (field == null) {
-            return false;
-        }
-        try {
-            field.set(this, convertArgument(value, field.getType()));
+        if (boxedType == Object.class || boxedType == Value.class) {
             return true;
-        } catch (IllegalAccessException e) {
-            throw new IllegalStateException("Cannot set field [" + key + "]", e);
         }
-    }
-
-    private boolean tryInvokeJavaSetter(String key, Value value) {
-        if (key.isEmpty()) {
-            return false;
+        Object hostObject = hostObject(value);
+        if (hostObject != null) {
+            return boxedType.isInstance(hostObject);
         }
-        String setterName = "set" + Character.toUpperCase(key.charAt(0)) + key.substring(1);
-        for (Method method : this.getClass().getMethods()) {
-            if (!method.getName().equals(setterName) || !isProxyVisibleMethod(method) || method.getParameterCount() != 1) {
-                continue;
-            }
-            try {
-                method.setAccessible(true);
-                method.invoke(this, convertArgument(value, method.getParameterTypes()[0]));
-                return true;
-            } catch (IllegalArgumentException e) {
-                // Try another overload.
-            } catch (ReflectiveOperationException e) {
-                throw new IllegalStateException("Cannot invoke setter [" + setterName + "]", e);
-            }
+        if (boxedType == String.class) {
+            return value.isString();
+        }
+        if (boxedType == Boolean.class) {
+            return value.isBoolean();
+        }
+        if (Number.class.isAssignableFrom(boxedType)) {
+            return value.isNumber();
+        }
+        if (boxedType == Character.class) {
+            return value.isString() && value.asString().length() == 1;
         }
         return false;
     }
 
-    private static Object[] convertArguments(Value[] arguments, Class<?>[] parameterTypes) {
-        Object[] converted = new Object[arguments.length];
-        for (int i = 0; i < arguments.length; i++) {
-            converted[i] = convertArgument(arguments[i], parameterTypes[i]);
+    private static @Nullable Object hostObject(Value value) {
+        if (value.isHostObject()) {
+            return value.asHostObject();
         }
-        return converted;
-    }
-
-    private static @Nullable Object convertArgument(Value value, Class<?> targetType) {
-        if (Value.class.equals(targetType)) {
-            return value;
-        }
-        if (GraalPyRuntimeUtil.isNone(value)) {
+        if (!value.hasMembers() || !value.hasMember(HOST_OBJECT_MEMBER)) {
             return null;
         }
-        if (value.isHostObject()) {
-            Object hostObject = value.asHostObject();
-            if (targetType.isInstance(hostObject)) {
-                return hostObject;
-            }
+        Value hostReferenceValue = value.getMember(HOST_OBJECT_MEMBER);
+        if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
+            return null;
         }
-        return GraalPyRuntimeUtil.convertValue(value, targetType);
-    }
-
-    record HostObjectReference(ValueCoercible value) {
+        Object hostReference = hostReferenceValue.asHostObject();
+        if (hostReference instanceof HostObjectReference reference) {
+            return reference.value();
+        }
+        return null;
     }
 }
