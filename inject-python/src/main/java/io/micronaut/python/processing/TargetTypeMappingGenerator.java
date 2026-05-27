@@ -45,6 +45,8 @@ public final class TargetTypeMappingGenerator implements TypeElementVisitor<Obje
     private static final String ASSIGNABLE_TARGET_TYPES = "assignableTargetTypes";
     private static final String OBJECT = Object.class.getName();
     private static final String VALUE_COERCIBLE = "io.micronaut.context.python.ValueCoercible";
+    private static final String GENERATED_PROPERTY_MEMBERS = "io.micronaut.context.python.ValueCoercible$GeneratedPropertyMembers";
+    private static final String GENERATED_PROPERTY_MEMBERS_CANONICAL = "io.micronaut.context.python.ValueCoercible.GeneratedPropertyMembers";
     private static final String POOLED_VALUE_COERCIBLE = "io.micronaut.context.python.PooledValueCoercible";
     private static final String PROXY_OBJECT = "org.graalvm.polyglot.proxy.ProxyObject";
     private static final String BOXED = "io.micronaut.core.graal.Boxed";
@@ -139,6 +141,8 @@ public final class TargetTypeMappingGenerator implements TypeElementVisitor<Obje
     private static boolean isSkippedTargetType(String name) {
         return OBJECT.equals(name)
             || VALUE_COERCIBLE.equals(name)
+            || GENERATED_PROPERTY_MEMBERS.equals(name)
+            || GENERATED_PROPERTY_MEMBERS_CANONICAL.equals(name)
             || POOLED_VALUE_COERCIBLE.equals(name)
             || PROXY_OBJECT.equals(name)
             || BOXED.equals(name);
