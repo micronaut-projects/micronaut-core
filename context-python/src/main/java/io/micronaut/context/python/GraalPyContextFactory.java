@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
 import io.micronaut.core.annotation.Order;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import jakarta.inject.Named;
@@ -36,6 +37,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
@@ -123,10 +125,16 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
             return ContextHolder.getContext();
         }
-        var context = buildContext(HostAccess.ALL, GraalPyEngineFactory.buildPythonEngine(), classLoader, options, applicationMain);
+        var context = buildContext(bootstrapHostAccess(classLoader), GraalPyEngineFactory.buildPythonEngine(), classLoader, options, applicationMain);
         ContextHolder.setReuseContext(true);
         ContextHolder.setContext(context, classLoader);
         return context;
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    static HostAccess bootstrapHostAccess(@NonNull ClassLoader classLoader) {
+        List<TargetTypeMapping<?>> mappings = (List) SoftServiceLoader.load(TargetTypeMapping.class, classLoader).collectAll();
+        return new GraalPyHostAccessFactory().hostAccess(mappings);
     }
 
     static @NonNull Context buildContext(HostAccess hostAccess, Engine engine, ClassLoader classLoader) throws IOException {

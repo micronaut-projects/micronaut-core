@@ -244,6 +244,49 @@ class Forecast:
         ContextHolder.resetContext()
     }
 
+    void "reusable context loads generated target mappings for overloaded static Java methods"() {
+        given:
+        String py = '''
+import java
+
+from jakarta.inject import Singleton
+
+TokenReaderLike = java.type("io.micronaut.python.annotation.processing.test.TokenReaderLike")
+
+
+@Singleton
+class PythonTokenReader(TokenReaderLike):
+    def findToken(self, header: str) -> str:
+        return "value-" + header
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+        ClassLoader classLoader = ctx.classLoader
+        ctx.close()
+        ContextHolder.setReuseContext(false)
+        ContextHolder.resetContext()
+
+        when:
+        Context polyglot = GraalPyContextFactory.bootstrapReusableContext(classLoader, Map.of(), "pyronaut_application.py")
+        def result = polyglot.eval("python", '''
+import java
+
+Factory = java.type("io.micronaut.python.annotation.processing.test.HostAccessEndToEndSpec$StaticTokenReaderFactory")
+PythonTokenReaderHost = java.type("python.PythonTokenReader")
+
+Factory.create(PythonTokenReaderHost.fromPolyglotValue(PythonTokenReader()))
+''')
+
+        then:
+        result.asString() == 'value-test'
+
+        cleanup:
+        ContextHolder.setReuseContext(false)
+        ContextHolder.resetContext()
+    }
+
     void "HostAccess exposes non-introspected dataclass properties on generated stub"() {
         given:
         String py = '''
@@ -571,6 +614,16 @@ class TemplateWritable(Writable):
     static final class ClassReceiver {
         static String className(Class<?> value) {
             value.getName()
+        }
+    }
+
+    static final class StaticTokenReaderFactory {
+        static String create(TokenReaderLike reader) {
+            reader.findToken("test")
+        }
+
+        static String create(HeaderTokenReaderLike reader) {
+            reader.findToken("test")
         }
     }
 }
