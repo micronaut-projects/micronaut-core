@@ -996,6 +996,86 @@ class ProductMappers:
     }
 
     @Test
+    void testLocalConstantsResolveInAnnotationMembers() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            def micronaut_annotation(name, repeated=None):
+                def decorator(func):
+                    return func
+                return decorator
+
+            @micronaut_annotation("example.Marker")
+            def Marker(*args, **kwargs):
+                def decorator(func):
+                    return func
+                return decorator
+
+            MARKER_VALUE = "resolved-local"
+
+            @Marker(MARKER_VALUE)
+            class Demo:
+                pass
+            """)) {
+            ClassDef demo = environment.classes().get("Demo");
+            assertNotNull(demo);
+
+            DecoratorDef marker = demo.decorators()
+                .stream()
+                .filter(decorator -> "example.Marker".equals(decorator.annotationName()))
+                .findFirst()
+                .orElseThrow();
+            assertEquals("resolved-local", marker.members().get("value").asString());
+        }
+    }
+
+    @Test
+    void testImportedConstantsResolveInAnnotationMembers(@TempDir Path tempDir) throws IOException {
+        Path packagePath = tempDir.resolve("example/micronaut");
+        Files.createDirectories(packagePath);
+        Path constants = packagePath.resolve("constants.py");
+        Path demo = packagePath.resolve("demo.py");
+        Files.writeString(constants, """
+            MARKER_VALUE = "resolved-import"
+            """);
+        Files.writeString(demo, """
+            from .constants import MARKER_VALUE
+
+            def micronaut_annotation(name, repeated=None):
+                def decorator(func):
+                    return func
+                return decorator
+
+            @micronaut_annotation("example.Marker")
+            def Marker(*args, **kwargs):
+                def decorator(func):
+                    return func
+                return decorator
+
+            @Marker(MARKER_VALUE)
+            class Demo:
+                pass
+            """);
+
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        List<Source> sources = List.of(
+            Source.newBuilder("python", demo.toFile()).build(),
+            Source.newBuilder("python", constants.toFile()).build()
+        );
+
+        try (PythonEnvironment environment = pythonProcessor.parse(sources, List.of(tempDir.toString()), null)) {
+            ClassDef demoClass = environment.classes().get("example.micronaut.Demo");
+            assertNotNull(demoClass);
+
+            DecoratorDef marker = demoClass.decorators()
+                .stream()
+                .filter(decorator -> "example.Marker".equals(decorator.annotationName()))
+                .findFirst()
+                .orElseThrow();
+            assertEquals("resolved-import", marker.members().get("value").asString());
+        }
+    }
+
+    @Test
     void testAbstractMethodDetection() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         try (PythonEnvironment environment = pythonProcessor.parse("""

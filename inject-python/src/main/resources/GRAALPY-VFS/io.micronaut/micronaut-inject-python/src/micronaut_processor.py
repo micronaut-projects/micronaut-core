@@ -165,6 +165,64 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
         return f"{base_pkg}.{imported_name}" if base_pkg else imported_name
 
+    def _source_file_for_import(self, level, module_name):
+        if not self.source_root:
+            return None
+
+        if level > 0:
+            parts = self.package_name.split('.') if self.package_name else []
+            up = max(0, level - 1)
+            module_parts = parts[:max(0, len(parts) - up)]
+            if module_name:
+                module_parts.extend(module_name.split('.'))
+        else:
+            if not module_name:
+                return None
+            module_parts = module_name.split('.')
+
+        module_path = os.path.join(self.source_root, *module_parts)
+        module_file = f"{module_path}.py"
+        if os.path.isfile(module_file):
+            return module_file
+
+        package_init = os.path.join(module_path, "__init__.py")
+        if os.path.isfile(package_init):
+            return package_init
+        return None
+
+    def _find_module_literal_constant(self, tree, imported_name):
+        for statement in tree.body:
+            value_node = None
+            targets = []
+            if isinstance(statement, ast.Assign):
+                value_node = statement.value
+                targets = statement.targets
+            elif isinstance(statement, ast.AnnAssign):
+                value_node = statement.value
+                targets = [statement.target]
+            if value_node is None:
+                continue
+
+            for target in targets:
+                if isinstance(target, ast.Name) and target.id == imported_name:
+                    return self._literal_constant_value(value_node)
+        return False, None
+
+    def _track_imported_constant_assignment(self, exposed_name, level, module_name, imported_name):
+        module_file = self._source_file_for_import(level, module_name)
+        if module_file is None:
+            return
+
+        try:
+            with open(module_file, "r", encoding="utf-8") as source_file:
+                tree = ast.parse(source_file.read(), filename=module_file)
+        except Exception:
+            return
+
+        resolved, value = self._find_module_literal_constant(tree, imported_name)
+        if resolved:
+            self.local_constant_values[exposed_name] = value
+
     def visit(self, node: ast.AST) -> ast.AST:
         match node:
             case ast.ClassDef():
@@ -308,9 +366,11 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         if alias.asname:
                             self.imported_types[alias.asname] = full_name
                             self._track_java_keyword_method_aliases(alias.asname, full_name)
+                            self._track_imported_constant_assignment(alias.asname, node.level, node.module, alias.name)
                         else:
                             self.imported_types[alias.name] = full_name
                             self._track_java_keyword_method_aliases(alias.name, full_name)
+                            self._track_imported_constant_assignment(alias.name, node.level, node.module, alias.name)
 
                 return super().visit(node)
             case ast.Import():
@@ -1896,9 +1956,13 @@ def convert_ast_value(node, visitor=None):
         # Class references - check if this is a type that should be resolved
         name = node.id
         if visitor is not None:
+            if hasattr(visitor, 'local_constant_values') and name in visitor.local_constant_values:
+                return visitor.local_constant_values[name]
             # Check imported types first
             imported_name = visitor.imported_types.get(name)
             if imported_name:
+                if hasattr(visitor, 'local_constant_values') and imported_name in visitor.local_constant_values:
+                    return visitor.local_constant_values[imported_name]
                 return imported_name
             # Then check Java type assignments
             resolved_name = visitor.java_type_assignments.get(name, name)
