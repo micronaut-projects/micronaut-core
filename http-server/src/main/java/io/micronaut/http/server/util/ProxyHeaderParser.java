@@ -157,6 +157,7 @@ public class ProxyHeaderParser {
 
     private void parseForwardedHost(String value) {
         if (value.startsWith("[")) {
+            // IPv6
             int closingBracketIndex = value.indexOf(']');
             if (closingBracketIndex == -1) {
                 return;
@@ -164,29 +165,28 @@ public class ProxyHeaderParser {
             String host = value.substring(0, closingBracketIndex + 1);
             if (closingBracketIndex == value.length() - 1) {
                 forwardedHost = host;
-                return;
-            }
-            if (value.charAt(closingBracketIndex + 1) == ':') {
+            } else if (value.charAt(closingBracketIndex + 1) == ':') {
                 Integer port = parsePort(value.substring(closingBracketIndex + 2));
                 if (port != null) {
                     forwardedHost = host;
                     forwardedPort = port;
                 }
             }
-            return;
-        }
-        int portSeparatorIndex = value.lastIndexOf(':');
-        if (portSeparatorIndex == -1) {
-            forwardedHost = value;
-            return;
-        }
-        if (value.indexOf(':') != portSeparatorIndex) {
-            return;
-        }
-        Integer port = parsePort(value.substring(portSeparatorIndex + 1));
-        if (port != null) {
-            forwardedHost = value.substring(0, portSeparatorIndex);
-            forwardedPort = port;
+        } else {
+            // IPv4
+            int portSeparatorIndex = value.lastIndexOf(':');
+            if (portSeparatorIndex == -1) {
+                forwardedHost = value;
+                return;
+            }
+            if (value.indexOf(':') != portSeparatorIndex) {
+                return;
+            }
+            Integer port = parsePort(value.substring(portSeparatorIndex + 1));
+            if (port != null) {
+                forwardedHost = value.substring(0, portSeparatorIndex);
+                forwardedPort = port;
+            }
         }
     }
 
@@ -198,7 +198,7 @@ public class ProxyHeaderParser {
                 return port;
             }
         } catch (NumberFormatException ignored) {
-            return null;
+            // Fall through
         }
         return null;
     }
