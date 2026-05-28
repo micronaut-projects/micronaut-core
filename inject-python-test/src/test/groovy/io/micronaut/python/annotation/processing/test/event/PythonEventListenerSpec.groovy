@@ -98,6 +98,63 @@ class StartupListener:
         context?.close()
     }
 
+    void "test event listener method adapter invokes constructor-injected python bean"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.aop import Around, InterceptorBean, MethodInvocationContext
+from micronaut.context.annotation import Executable
+from micronaut.context.event import StartupEvent
+from micronaut.runtime.event.annotation import EventListener
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Around
+def Transactional(func):
+    return func
+
+@InterceptorBean(Transactional)
+@Singleton
+class TransactionalInterceptor(MethodInterceptor):
+    count: int = 0
+
+    def intercept(self, context: MethodInvocationContext):
+        self.count += 1
+        return context.proceed()
+
+@Singleton
+class CounterService:
+    invocation_count : int = 0
+
+    def increment(self):
+        self.invocation_count += 1
+
+    @Executable
+    def get_count(self) -> int:
+        return self.invocation_count
+
+@Singleton
+class StartupListener:
+    def __init__(self, counter_service : CounterService):
+        self.counter_service = counter_service
+
+    @EventListener
+    @Transactional
+    def on_startup(self, event : StartupEvent):
+        self.counter_service.increment()
+''')
+
+        when:
+        def counterService = getBean(context, "python.CounterService")
+
+        then:
+        counterService.get_count() == 1
+
+        cleanup:
+        context?.close()
+    }
+
     void "test event listener with failing requirements is not present"() {
         given:
         def context = buildContext('''

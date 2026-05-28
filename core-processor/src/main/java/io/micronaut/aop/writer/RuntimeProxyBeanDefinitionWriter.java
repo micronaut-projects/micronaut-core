@@ -66,7 +66,7 @@ public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWrit
     private static final Method INTRODUCTION = ReflectionUtils.getRequiredInternalMethod(
         DefaultRuntimeProxyDefinition.class,
         "introduction",
-        BeanResolutionContext.class, BeanDefinition.class);
+        BeanResolutionContext.class, BeanDefinition.class, Object[].class);
 
     public RuntimeProxyBeanDefinitionWriter(ClassElement targetType, BeanDefinitionWriter parent, OptionalValues<Boolean> settings, VisitorContext visitorContext, AnnotationValue<?>... interceptorBinding) {
         super(RUNTIME_PROXY_SUFFIX, targetType, targetType, parent, settings, visitorContext, interceptorBinding);
@@ -120,7 +120,7 @@ public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWrit
             ExpressionDef runtimeProxyDefinition;
             if (isIntroduction) {
                 runtimeProxyDefinition = ClassTypeDef.of(DefaultRuntimeProxyDefinition.class)
-                    .invokeStatic(INTRODUCTION, methodParameters.getFirst(), aThis);
+                    .invokeStatic(INTRODUCTION, methodParameters.getFirst(), aThis, TypeDef.OBJECT.array().instantiate(constructorValues));
             } else {
                 runtimeProxyDefinition = ClassTypeDef.of(DefaultRuntimeProxyDefinition.class)
                     .invokeStatic(AROUND, methodParameters.getFirst(), aThis, ExpressionDef.constant(isProxyTarget), TypeDef.OBJECT.array().instantiate(constructorValues));

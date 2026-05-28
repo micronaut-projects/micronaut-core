@@ -70,6 +70,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private static final String SCOPED_PROXY_FACTORY = "__micronaut_create_scoped_proxy";
+    private static final String RAW_INSTANCE_FACTORY = "__micronaut_create_raw_instance";
     private static final String SCOPED_PROXY_OVERRIDE_METHOD = "_micronaut_put_override";
     private static final String SCOPED_PROXY_SETTER_OVERRIDE_METHOD = "_micronaut_put_setter_override";
     private static final String SCOPED_PROXY_REGISTER_MEMBER_METHOD = "_micronaut_register_member";
@@ -124,7 +125,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         }
         fillAllAbstractMethods(value);
         Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
-        Value targetValue = value.newInstance();
+        Value targetValue = newIntroductionTarget(proxyDefinition, value);
         T target = box(type, targetValue);
         if (target == null) {
             throw new IllegalStateException("Introduction proxy target cannot be null");
@@ -134,6 +135,25 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             targetValue.putMember(entry.getKey(), entry.getValue());
         }
         return target;
+    }
+
+    private Value newIntroductionTarget(RuntimeProxyDefinition<?> proxyDefinition, Value pythonClass) {
+        if (isAdapterIntroduction(proxyDefinition)) {
+            return rawInstanceFactory(pythonClass.getContext()).execute(pythonClass);
+        }
+        return pythonClass.newInstance(GraalPyRuntimeUtil.coerceArgumentsToContext(
+            pythonClass.getContext(),
+            proxyDefinition.constructorValues()
+        ));
+    }
+
+    private boolean isAdapterIntroduction(RuntimeProxyDefinition<?> proxyDefinition) {
+        for (RuntimeProxyDefinition.InterceptedMethod<?> interceptedMethod : proxyDefinition.interceptedMethods()) {
+            if (interceptedMethod.executableMethod().classValue(Adapter.class, ADAPTED_BEAN).isPresent()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static <T> RuntimeProxyDefinition.InterceptedMethod<T> withoutConcreteIntroductionInterceptors(
@@ -468,6 +488,22 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 """
             );
             factory = bindings.getMember(SCOPED_PROXY_FACTORY);
+        }
+        return factory;
+    }
+
+    private Value rawInstanceFactory(Context context) {
+        Value bindings = context.getBindings(PYTHON);
+        Value factory = bindings.getMember(RAW_INSTANCE_FACTORY);
+        if (factory == null || GraalPyRuntimeUtil.isNone(factory)) {
+            context.eval(
+                PYTHON,
+                """
+                def __micronaut_create_raw_instance(cls):
+                    return cls.__new__(cls)
+                """
+            );
+            factory = bindings.getMember(RAW_INSTANCE_FACTORY);
         }
         return factory;
     }
