@@ -42,4 +42,19 @@ class SuspendClientSpec {
         Assertions.assertNull(response)
     }
 
+    @Test
+    fun testSuspendClientReturnsTypealiasToList() {
+        // Regression test for https://github.com/micronaut-projects/micronaut-core/issues/12686
+        // KSP was emitting Argument.of(List, "T") with literal "T" instead of resolving
+        // the concrete type from the typealias, causing ClassCastException at runtime.
+        val server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to "SuspendClientSpec"))
+        val ctx = server.applicationContext
+        val bars = runBlocking {
+            ctx.getBean(SuspendClient::class.java).getBars()
+        }
+
+        Assertions.assertEquals(1, bars.size)
+        Assertions.assertEquals("hello", bars[0].name)
+    }
+
 }
