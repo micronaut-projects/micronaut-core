@@ -471,7 +471,14 @@ public final class AnnotationMetadataSupport {
     @SuppressWarnings("unchecked")
     static Optional<Constructor<InvocationHandler>> getProxyClass(Class<? extends Annotation> annotation) {
         return ANNOTATION_PROXY_CACHE.computeIfAbsent(annotation, aClass -> {
-            Class proxyClass = Proxy.getProxyClass(annotation.getClassLoader(), annotation, AnnotationValueProvider.class);
+            // Annotations loaded by the bootstrap or platform classloader (e.g. java.lang.Deprecated)
+            // cannot see Micronaut's AnnotationValueProvider; in that case fall back to the loader of
+            // AnnotationValueProvider, which still resolves the JDK annotation via parent delegation.
+            ClassLoader annotationLoader = annotation.getClassLoader();
+            ClassLoader proxyLoader = (annotationLoader == null || annotationLoader == ClassLoader.getPlatformClassLoader())
+                ? AnnotationValueProvider.class.getClassLoader()
+                : annotationLoader;
+            Class proxyClass = Proxy.getProxyClass(proxyLoader, annotation, AnnotationValueProvider.class);
             return ReflectionUtils.findConstructor(proxyClass, InvocationHandler.class);
         });
     }
