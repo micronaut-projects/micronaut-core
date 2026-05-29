@@ -1444,6 +1444,46 @@ class PetClient(PetOperations):
         }
     }
 
+    def "test recoverable python client method keeps typed recovery interceptor binding"() {
+        given:
+        def pythonCode = '''
+from abc import ABC, abstractmethod
+import java
+from micronaut.http.annotation import Get
+from micronaut.http.client.annotation import Client
+from micronaut.retry.annotation import Recoverable
+
+Publisher = java.type("org.reactivestreams.Publisher")
+
+class Book:
+    pass
+
+class BookCatalogueOperations(ABC):
+    @abstractmethod
+    def findAll(self) -> Publisher[Book]:
+        pass
+
+@Client("http://localhost:8081")
+@Recoverable(api=BookCatalogueOperations)
+class BookCatalogueClient(BookCatalogueOperations):
+    @Get("/books")
+    @abstractmethod
+    def findAll(self) -> Publisher[Book]:
+        pass
+'''
+
+        expect:
+        def definition = buildBeanDefinition("python", "BookCatalogueClient\$RuntimeProxy", pythonCode)
+        def method = definition.executableMethods.find { it.methodName == "findAll" }
+        def recoverableBinding = InterceptedMethodUtil.resolveInterceptorBinding(method.annotationMetadata, InterceptorKind.AROUND)
+            .find { it.stringValue().orElse(null) == "io.micronaut.retry.annotation.Recoverable" }
+
+        recoverableBinding != null
+        recoverableBinding.annotationClassValue("interceptorType")
+            .map { it.name }
+            .orElse(null) == "io.micronaut.retry.intercept.RecoveryInterceptor"
+    }
+
     def "test annotation expression values are converted to evaluated expression references"() {
         given:
         def pythonCode = '''

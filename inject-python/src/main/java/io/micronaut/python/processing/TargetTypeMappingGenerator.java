@@ -94,7 +94,7 @@ public final class TargetTypeMappingGenerator implements TypeElementVisitor<Obje
                 .returns(classArray)
                 .build((aThis, params) -> classArray.instantiate(
                     assignableTargetTypes.stream()
-                        .map(targetType -> ClassTypeDef.of(targetType.getName()).getStaticField("class", TypeDef.CLASS))
+                        .map(targetType -> javaClassType(targetType).getStaticField("class", TypeDef.CLASS))
                         .toArray(ExpressionDef[]::new)
                 ).returning()));
         }
@@ -146,5 +146,9 @@ public final class TargetTypeMappingGenerator implements TypeElementVisitor<Obje
             || POOLED_VALUE_COERCIBLE.equals(name)
             || PROXY_OBJECT.equals(name)
             || BOXED.equals(name);
+    }
+
+    private static ClassTypeDef javaClassType(ClassElement element) {
+        return ClassTypeDef.of(element.getName().replace('$', '.'), element.isInner());
     }
 }

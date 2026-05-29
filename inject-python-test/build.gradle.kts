@@ -25,6 +25,7 @@ dependencies {
     testImplementation(platform(libs.test.boms.micronaut.serde))
     testImplementation(libs.managed.reactor)
     testImplementation(projects.micronautInjectJavaHelper)
+    testImplementation(projects.micronautRetry)
     testImplementation(libs.micronaut.validation)
     testImplementation("io.micronaut.data:micronaut-data-processor") {
         exclude(group = "io.micronaut")

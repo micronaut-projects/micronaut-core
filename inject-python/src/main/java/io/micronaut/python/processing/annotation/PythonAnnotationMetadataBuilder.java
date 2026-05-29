@@ -21,11 +21,13 @@ import io.micronaut.aop.InterceptorKind;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMapper;
@@ -394,40 +396,99 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
     }
 
     private void addAroundInterceptorBindings(MutableAnnotationMetadata annotationMetadata, ElementDef element) {
-        Set<String> bindingAnnotationNames = new LinkedHashSet<>();
+        Map<String, AnnotationClassValue<?>> bindingAnnotationNames = new LinkedHashMap<>();
         for (DecoratorDef decorator : element.decorators()) {
             collectAroundBindingAnnotationNames(decorator, bindingAnnotationNames);
         }
         if (bindingAnnotationNames.isEmpty()) {
             return;
         }
-        Set<String> existingBindings = new LinkedHashSet<>();
+        List<AnnotationValue<InterceptorBinding>> existingBindings = annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class);
+        List<AnnotationValue<InterceptorBinding>> updatedBindings = new ArrayList<>(existingBindings.size() + bindingAnnotationNames.size());
+        Set<String> existingAroundBindings = new LinkedHashSet<>();
+        boolean changed = false;
         for (AnnotationValue<InterceptorBinding> binding : annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class)) {
-            if (binding.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND) {
-                binding.stringValue().ifPresent(existingBindings::add);
+            String bindingAnnotationName = binding.stringValue().orElse(null);
+            if (bindingAnnotationName != null
+                && binding.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND) {
+                existingAroundBindings.add(bindingAnnotationName);
+                AnnotationClassValue<?> interceptorType = bindingAnnotationNames.get(bindingAnnotationName);
+                if (interceptorType != null && !hasInterceptorType(binding, interceptorType)) {
+                    updatedBindings.add(buildAroundInterceptorBinding(bindingAnnotationName, interceptorType));
+                    changed = true;
+                    continue;
+                }
+            }
+            updatedBindings.add(binding);
+        }
+        for (Map.Entry<String, AnnotationClassValue<?>> entry : bindingAnnotationNames.entrySet()) {
+            String bindingAnnotationName = entry.getKey();
+            if (existingAroundBindings.add(bindingAnnotationName)) {
+                updatedBindings.add(buildAroundInterceptorBinding(bindingAnnotationName, entry.getValue()));
+                changed = true;
             }
         }
-        for (String bindingAnnotationName : bindingAnnotationNames) {
-            if (existingBindings.add(bindingAnnotationName)) {
-                annotationMetadata.addDeclaredRepeatable(
-                    AnnotationUtil.ANN_INTERCEPTOR_BINDINGS,
-                    AnnotationValue.builder(InterceptorBinding.class)
-                        .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(bindingAnnotationName))
-                        .member("kind", InterceptorKind.AROUND)
-                        .build()
-                );
+        if (changed) {
+            annotationMetadata.removeAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
+            annotationMetadata.removeAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+            for (AnnotationValue<InterceptorBinding> binding : updatedBindings) {
+                annotationMetadata.addDeclaredRepeatable(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS, binding);
             }
         }
     }
 
-    private void collectAroundBindingAnnotationNames(DecoratorDef decorator, Set<String> bindingAnnotationNames) {
+    private boolean hasInterceptorType(AnnotationValue<InterceptorBinding> binding, AnnotationClassValue<?> interceptorType) {
+        return binding.annotationClassValue("interceptorType")
+            .map(existingType -> existingType.getName().equals(interceptorType.getName()))
+            .orElse(false);
+    }
+
+    private AnnotationValue<InterceptorBinding> buildAroundInterceptorBinding(
+        String bindingAnnotationName,
+        @Nullable AnnotationClassValue<?> interceptorType
+    ) {
+        AnnotationValueBuilder<InterceptorBinding> binding = AnnotationValue.builder(InterceptorBinding.class)
+            .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(bindingAnnotationName))
+            .member("kind", InterceptorKind.AROUND);
+        if (interceptorType != null) {
+            binding.member("interceptorType", interceptorType);
+        }
+        return binding.build();
+    }
+
+    private void collectAroundBindingAnnotationNames(DecoratorDef decorator, Map<String, AnnotationClassValue<?>> bindingAnnotationNames) {
         DecoratorDef resolvedDecorator = resolveDecoratorDefinition(decorator);
         if (hasDirectAroundStereotype(resolvedDecorator)) {
-            bindingAnnotationNames.add(toBinaryClassName(decorator.annotationName()));
+            bindingAnnotationNames.putIfAbsent(
+                toBinaryClassName(decorator.annotationName()),
+                interceptorType(resolvedDecorator)
+            );
         }
         for (DecoratorDef stereotype : resolvedDecorator.stereotypes()) {
             collectAroundBindingAnnotationNames(stereotype, bindingAnnotationNames);
         }
+    }
+
+    private @Nullable AnnotationClassValue<?> interceptorType(DecoratorDef decorator) {
+        for (DecoratorDef stereotype : decorator.stereotypes()) {
+            if (Type.class.getName().equals(toBinaryClassName(stereotype.annotationName()))) {
+                AnnotationClassValue<?>[] values = annotationClassValues(stereotype.members().get(AnnotationMetadata.VALUE_MEMBER));
+                if (values.length > 0) {
+                    return values[0];
+                }
+            }
+        }
+        ClassElement javaAnnotationType = getJavaAnnotationType(decorator);
+        if (javaAnnotationType != null) {
+            AnnotationValue<Type> type = javaAnnotationType.getAnnotation(Type.class);
+            if (type != null) {
+                AnnotationClassValue<?>[] values = type.annotationClassValues(AnnotationMetadata.VALUE_MEMBER);
+                if (values.length > 0) {
+                    return values[0];
+                }
+            }
+        }
+        return null;
     }
 
     private DecoratorDef resolveDecoratorDefinition(DecoratorDef decorator) {
@@ -440,6 +501,16 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
             if (annotationName.equals(toBinaryClassName(candidate.annotationName()))) {
                 return candidate;
             }
+        }
+        Optional<ElementDef> annotationMirror = getAnnotationMirror(annotationName);
+        if (annotationMirror.isPresent()) {
+            return new DecoratorDef(
+                annotationName,
+                annotationName,
+                null,
+                Map.of(),
+                annotationMirror.get().decorators()
+            );
         }
         return decorator;
     }
