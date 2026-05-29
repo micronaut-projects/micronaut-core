@@ -137,7 +137,11 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
                 return conversionService.convertRequired(Collections.emptyMap(), argument);
             }
         } else if (context.isNullable()) {
-            final Object v = beanContext.findBean(argument, qualifier).orElse(null);
+            final Object v;
+            try (BeanResolutionContext rc = new DefaultBeanResolutionContext(beanContext, beanDefinition)) {
+                rc.setConfigurationPath(configurationPath);
+                v = rc.findBean(argument, qualifier).orElse(null);
+            }
             if (v != null) {
                 return conversionService.convertRequired(v, returnType);
             } else {
