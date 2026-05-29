@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EachPropertyNestedConfigurationPropertiesWithClassTest {
     @Test
-    void youCanNestEachPropertyWithConfigurationPropertiesInInterface() {
+    void youCanNestEachPropertyWithConfigurationPropertiesInClass() {
         final Map<String, Object> config = Map.of(
             "spec.name", "EachPropertyNestedConfigurationPropertiesWithClassTest",
             "mtms.datasource.named.foo.timeout", "2s",
