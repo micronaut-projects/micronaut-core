@@ -20,11 +20,11 @@ class MultipleMatchingNoSuchBeanSpec extends Specification {
 
         then:
         def ex = thrown(NoSuchBeanException)
-        ex.message.contains '''* [MyInterface] requires the presence of a bean of type [io.micronaut.context.MultipleMatchingNoSuchBeanSpec$BeanBConfig].
-                              | * [BeanBConfig] is disabled because:
+        ex.message.contains '''* MyInterface requires the presence of a bean of type io.micronaut.context.MultipleMatchingNoSuchBeanSpec$BeanBConfig.
+                              | * BeanBConfig is disabled because:
                               |  - Required property [excluded] with value [so ignored] not present'''.stripMargin()
-        ex.message.contains '''* [MyInterface] requires the presence of a bean of type [io.micronaut.context.MultipleMatchingNoSuchBeanSpec$BeanAConfig].
-                              | * [BeanAConfig] is disabled because:
+        ex.message.contains '''* MyInterface requires the presence of a bean of type io.micronaut.context.MultipleMatchingNoSuchBeanSpec$BeanAConfig.
+                              | * BeanAConfig is disabled because:
                               |  - Required property [excluded] with value [so ignored] not present'''.stripMargin()
 
         cleanup:

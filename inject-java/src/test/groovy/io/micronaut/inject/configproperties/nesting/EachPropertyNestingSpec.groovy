@@ -129,9 +129,9 @@ class ClassOuterConfig {
         then:
         def e = thrown(NoSuchBeanException)
         def lines = e.message.lines().toList()
-        lines[0] == 'No bean of type [test.ClassOuterConfig$ClassInnerConfig$ClassInnerEachConfig] exists for the given qualifier: @Named(\'foo-bar\'). '
-        lines[1] == '* [ClassInnerEachConfig] is disabled because:'
-        lines[2] == ' - Configuration requires entries under the prefix: [test.*.inner.inners.*]'
+        lines[0] == 'No bean of type test.ClassOuterConfig$ClassInnerConfig$ClassInnerEachConfig exists for the given qualifier: @Named(\'foo-bar\'). '
+        lines[1] == '* ClassInnerEachConfig is disabled because:'
+        lines[2] == ' - Configuration requires entries under the prefix: test.*.inner.inners.*'
     }
 
     @Override

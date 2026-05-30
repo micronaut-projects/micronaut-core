@@ -43,7 +43,7 @@ public record MatchesPresenceOfBeansCondition(
         for (AnnotationClassValue<?> bean : beans) {
             Class<?> type = bean.getType().orElse(null);
             if (type == null || !beanContext.containsBean(type)) {
-                context.fail("No bean of type [" + bean.getName() + "] present within context");
+                context.fail("No bean of type " + bean.getName() + " present within context");
                 return false;
             }
         }

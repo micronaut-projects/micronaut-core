@@ -28,9 +28,9 @@ import io.micronaut.core.type.Argument;
  */
 public class NoSuchBeanException extends BeanContextException {
 
-    private static final String MESSAGE_PREFIX = "No bean of type [";
-    private static final String MESSAGE_SUFFIX = "] exists.";
-    private static final String MESSAGE_EXISTS = "] exists";
+    private static final String MESSAGE_PREFIX = "No bean of type ";
+    private static final String MESSAGE_SUFFIX = " exists.";
+    private static final String MESSAGE_EXISTS = " exists";
     private static final String MESSAGE_FOR_THE_GIVEN_QUALIFIER = " for the given qualifier: ";
 
     /**

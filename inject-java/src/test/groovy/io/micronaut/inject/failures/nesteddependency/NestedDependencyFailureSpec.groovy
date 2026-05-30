@@ -35,7 +35,7 @@ class NestedDependencyFailureSpec extends Specification {
         e.message.normalize() == """\
 Failed to inject value for parameter [propD] of class: io.micronaut.inject.failures.nesteddependency.MyClassC
 
-Message: No bean of type [io.micronaut.inject.failures.nesteddependency.MyClassD] exists.$space
+Message: No bean of type io.micronaut.inject.failures.nesteddependency.MyClassD exists.$space
 Path Taken:$space
 new i.m.i.f.n.MyClassB()
 \\---> i.m.i.f.n.MyClassB#propA

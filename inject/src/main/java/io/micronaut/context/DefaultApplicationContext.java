@@ -376,12 +376,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
         messageBuilder
             .append(lineSeparator)
             .append(linePrefix)
-            .append("* [").append(beanType.getTypeString(true))
-            .append("] requires the presence of a bean of type [")
-            .append(dependentBean.getName())
-            .append("]");
+            .append("* ").append(beanType.getTypeString(true))
+            .append(" requires the presence of a bean of type ")
+            .append(dependentBean.getName());
         if (qualifier != null) {
-            messageBuilder.append(" with qualifier [").append(qualifier).append("]");
+            messageBuilder.append(" with qualifier ").append(qualifier);
         }
         messageBuilder.append(".");
 
@@ -436,20 +435,20 @@ public class DefaultApplicationContext extends DefaultBeanContext implements Con
         messageBuilder
             .append(lineSeparator)
             .append(linePrefix)
-            .append("* [")
-            .append(definition.asArgument().getTypeString(true));
+            .append("* ")
+            .append(definition.getBeanType().getSimpleName());
         if (!definition.getBeanType().equals(beanType.getType())) {
-            messageBuilder.append("] a candidate of [")
-                .append(beanType.getTypeString(true));
+            messageBuilder.append(", a candidate of ")
+                .append(beanType.getTypeString(true))
+                .append(",");
         }
-        messageBuilder.append("] is disabled because:")
+        messageBuilder.append(" is disabled because:")
             .append(lineSeparator);
         messageBuilder
             .append(linePrefix)
             .append(" - ")
-            .append("Configuration requires entries under the prefix: [")
-            .append(prefix)
-            .append("]");
+            .append("Configuration requires entries under the prefix: ")
+            .append(prefix);
     }
 
     private <T> String calculatePrefix(BeanResolutionContext resolutionContext, Qualifier<T> qualifier, BeanDefinition<?> definition) {

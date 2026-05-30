@@ -39,7 +39,7 @@ public record MatchesAbsenceOfClassNamesCondition(String[] classes) implements C
         final ClassLoader classLoader = context.getBeanContext().getClassLoader();
         for (String name : classes) {
             if (ClassUtils.isPresent(name, classLoader)) {
-                context.fail("Class [" + name + "] is not absent");
+                context.fail("Class " + name + " is not absent");
                 return false;
             }
         }

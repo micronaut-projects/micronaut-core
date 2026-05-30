@@ -38,7 +38,7 @@ class ConstructorDependencyFailureSpec extends Specification {
         e.message.normalize() == """\
 Failed to inject value for parameter [propA] of class: io.micronaut.inject.failures.ConstructorDependencyFailureSpec\$MyClassB
 
-Message: No bean of type [io.micronaut.inject.failures.ConstructorDependencyFailureSpec\$MyClassA] exists.$space
+Message: No bean of type io.micronaut.inject.failures.ConstructorDependencyFailureSpec\$MyClassA exists.$space
 Path Taken:$space
 new i.m.i.f.C\$MyClassB(MyClassA propA)
 \\---> new i.m.i.f.C\$MyClassB([MyClassA propA])"""

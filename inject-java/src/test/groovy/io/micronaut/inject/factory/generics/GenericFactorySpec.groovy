@@ -112,7 +112,7 @@ class CacheImpl implements Cache {
 
         then:
         def e  = thrown(DependencyInjectionException)
-        e.message.contains("No bean of type [genfact.Cache<java.lang.Boolean,java.lang.Integer>] exists")
+        e.message.contains("No bean of type genfact.Cache<java.lang.Boolean,java.lang.Integer> exists")
 
         cleanup:
         context.close()
@@ -185,7 +185,7 @@ class CacheImpl implements Cache {
 
         then:
         def e  = thrown(DependencyInjectionException)
-        e.message.contains("No bean of type [genfact.Cache<java.lang.Boolean,java.lang.Integer>] exists")
+        e.message.contains("No bean of type genfact.Cache<java.lang.Boolean,java.lang.Integer> exists")
 
         cleanup:
         context.close()

@@ -39,7 +39,7 @@ public record MatchesPresenceOfClassesCondition(
     public boolean matches(ConditionContext context) {
         for (AnnotationClassValue<?> classValue : classes) {
             if (classValue.getType().isEmpty()) {
-                context.fail("Class [" + classValue.getName() + "] is not present");
+                context.fail("Class " + classValue.getName() + " is not present");
                 return false;
             }
         }

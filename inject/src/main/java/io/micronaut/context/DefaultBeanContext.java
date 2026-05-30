@@ -2857,11 +2857,11 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
             if (beanType.getTypeName().startsWith(pkg + ".")) {
                 messageBuilder.append(lineSeparator)
                     .append(linePrefix)
-                    .append("* [")
+                    .append("* ")
                     .append(beanType.getTypeString(true))
-                    .append("] is disabled because it is within the package [")
+                    .append(" is disabled because it is within the package ")
                     .append(pkg)
-                    .append("] which is disabled due to bean requirements: ")
+                    .append(" which is disabled due to bean requirements: ")
                     .append(lineSeparator);
                 for (String failure : entry.getValue()) {
                     messageBuilder
@@ -2893,12 +2893,13 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                 messageBuilder
                     .append(lineSeparator)
                     .append(linePrefix)
-                    .append("* [").append(beanDefinition.asArgument().getTypeString(true));
+                    .append("* ").append(beanDefinition.getBeanType().getSimpleName());
                 if (!beanDefinition.getBeanType().equals(beanType.getType())) {
-                    messageBuilder.append("] a candidate of [")
-                        .append(beanType.getTypeString(true));
+                    messageBuilder.append(", a candidate of ")
+                        .append(beanType.getTypeString(true))
+                        .append(",");
                 }
-                messageBuilder.append("] is disabled because:")
+                messageBuilder.append(" is disabled because:")
                     .append(lineSeparator);
                 if (beanDefinition instanceof DisabledBean<T> disabledBean) {
                     for (String failure : disabledBean.reasons()) {
@@ -2907,9 +2908,11 @@ public class DefaultBeanContext implements InitializableBeanContext, Configurabl
                             .append(" - ")
                             .append(failure)
                             .append(lineSeparator);
-                        String prefix = "No bean of type [";
-                        if (failure.startsWith(prefix)) {
-                            ClassUtils.forName(failure.substring(prefix.length(), failure.indexOf("]")), classLoader)
+                        String prefix = "No bean of type ";
+                        String suffix = " present within context";
+                        if (failure.startsWith(prefix) && failure.endsWith(suffix)) {
+                            String className = failure.substring(prefix.length(), failure.length() - suffix.length());
+                            ClassUtils.forName(className, classLoader)
                                 .ifPresent(beanClass -> {
                                     messageBuilder.setLength(messageBuilder.length() - lineSeparator.length());
                                     resolveDisabledBeanMessage(linePrefix + " ",

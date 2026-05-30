@@ -233,7 +233,7 @@ interface MyConfig {
 
         then:"we expect a bean resolution"
         def e = thrown(NoSuchBeanException)
-        e.message.contains("No bean of type [test.MyConfig\$ChildConfig] exists")
+        e.message.contains("No bean of type test.MyConfig\$ChildConfig exists")
 
         cleanup:
         context.close()

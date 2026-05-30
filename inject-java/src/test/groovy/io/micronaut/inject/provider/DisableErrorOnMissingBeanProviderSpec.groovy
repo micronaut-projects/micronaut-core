@@ -73,7 +73,7 @@ class Test {
 
         then:
         def e = thrown(NoSuchBeanException)
-        e.message.contains("No bean of type [java.lang.String] exists for the given qualifier: @MyQualifier")
+        e.message.contains("No bean of type java.lang.String exists for the given qualifier: @MyQualifier")
 
         cleanup:
         context.close()
@@ -113,7 +113,7 @@ class Test {
 
         then:
         def e = thrown(NoSuchBeanException)
-        e.message.contains("No bean of type [java.lang.String] exists for the given qualifier: @MyQualifier")
+        e.message.contains("No bean of type java.lang.String exists for the given qualifier: @MyQualifier")
 
         cleanup:
         context.close()

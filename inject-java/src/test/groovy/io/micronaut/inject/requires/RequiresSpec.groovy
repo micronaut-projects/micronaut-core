@@ -40,10 +40,10 @@ class MyBean {
         then:
             def e = thrown(NoSuchBeanException)
             def lines = e.message.readLines()
-            lines[0] == "No bean of type [test.MyBean] exists. "
-            lines[1] == "* [MyBean] requires the presence of a bean of type [test.MyClient]."
-            lines[2] == " * [MyClient] requires the presence of a bean of type [test.MyConfiguration]."
-            lines[3] == "  * [MyConfiguration] is disabled because:"
+            lines[0] == "No bean of type test.MyBean exists. "
+            lines[1] == "* MyBean requires the presence of a bean of type test.MyClient."
+            lines[2] == " * MyClient requires the presence of a bean of type test.MyConfiguration."
+            lines[3] == "  * MyConfiguration is disabled because:"
             lines[4] == "   - Required property [myconf] not present"
         cleanup:
             context.close()
@@ -83,12 +83,12 @@ class MyBean {
         then:
             def e = thrown(NoSuchBeanException)
             def lines = e.message.readLines()
-            lines[0] == "No bean of type [test.MyBean] exists. "
-            lines[1] == "* [MyBean] requires the presence of a bean of type [test.MyClient]."
-            lines[2] == " * [MyClient] requires the presence of a bean of type [test.MyConfiguration]."
-            lines[3] == "  * [MyMultiConfiguration] a candidate of [MyConfiguration] is disabled because:"
-            lines[4] == "   - Configuration requires entries under the prefix: [myconf2.multiple.default]"
-            lines[5] == "  * [MyDefaultConfiguration] a candidate of [MyConfiguration] is disabled because:"
+            lines[0] == "No bean of type test.MyBean exists. "
+            lines[1] == "* MyBean requires the presence of a bean of type test.MyClient."
+            lines[2] == " * MyClient requires the presence of a bean of type test.MyConfiguration."
+            lines[3] == "  * MyMultiConfiguration, a candidate of MyConfiguration, is disabled because:"
+            lines[4] == "   - Configuration requires entries under the prefix: myconf2.multiple.default"
+            lines[5] == "  * MyDefaultConfiguration, a candidate of MyConfiguration, is disabled because:"
             lines[6] == "   - Required property [myconf] not present"
             lines.size() == 7
         cleanup:
@@ -136,14 +136,14 @@ class MyBean {
         then:
             def e = thrown(NoSuchBeanException)
             def lines = e.message.readLines()
-            lines[0] == "No bean of type [test.MyBean] exists. "
-            lines[1] == "* [MyBean] requires the presence of a bean of type [test.MyClient]."
-            lines[2] == " * [MyClient] requires the presence of a bean of type [test.MyConfiguration]."
-            lines[3] == "  * [MyDefaultConfiguration] a candidate of [MyConfiguration] is disabled because:"
+            lines[0] == "No bean of type test.MyBean exists. "
+            lines[1] == "* MyBean requires the presence of a bean of type test.MyClient."
+            lines[2] == " * MyClient requires the presence of a bean of type test.MyConfiguration."
+            lines[3] == "  * MyDefaultConfiguration, a candidate of MyConfiguration, is disabled because:"
             lines[4] == "   - Required property [myconf] not present"
-            lines[5] == "  * [MyMultiConfiguration] a candidate of [MyConfiguration] is disabled because:"
-            lines[6] == "   - No bean of type [test.MyHelper] present within context"
-            lines[7] == "   * [MyHelper] is disabled because:"
+            lines[5] == "  * MyMultiConfiguration, a candidate of MyConfiguration, is disabled because:"
+            lines[6] == "   - No bean of type test.MyHelper present within context"
+            lines[7] == "   * MyHelper is disabled because:"
             lines[8] == "    - Required property [myconf.helper] not present"
 
             lines.size() == 9
@@ -188,8 +188,8 @@ class MyBean {
         then:
         def e = thrown(NoSuchBeanException)
         def lines = e.message.readLines()
-        lines[0] == 'No bean of type [test.MyBean] exists. '
-        lines[1] == '* [MyBean] is disabled because:'
+        lines[0] == 'No bean of type test.MyBean exists. '
+        lines[1] == '* MyBean is disabled because:'
         lines[2] == " - Java major version [${Runtime.version().feature()}] must be at least 800"
 
         cleanup:
@@ -215,8 +215,8 @@ class MyBean {
         then:
         def e = thrown(NoSuchBeanException)
         def lines = e.message.readLines()
-        lines[0] == 'No bean of type [test.MyBean] exists. '
-        lines[1] == '* [MyBean] is disabled because:'
+        lines[0] == 'No bean of type test.MyBean exists. '
+        lines[1] == '* MyBean is disabled because:'
         lines[2] == ' - Required property [foo] with value [bar] not present'
 
         cleanup:

@@ -35,7 +35,7 @@ class FieldDependencyMissingFailureSpec extends Specification {
         e.message.normalize() == """\
 Failed to inject value for field [propA] of class: io.micronaut.inject.failures.fielddependencymissing.MyClassB
 
-Message: No bean of type [io.micronaut.inject.failures.fielddependencymissing.MyClassA] exists.$space
+Message: No bean of type io.micronaut.inject.failures.fielddependencymissing.MyClassA exists.$space
 Path Taken:$space
 new i.m.i.f.f.MyClassB()
 \\---> i.m.i.f.f.MyClassB#propA"""

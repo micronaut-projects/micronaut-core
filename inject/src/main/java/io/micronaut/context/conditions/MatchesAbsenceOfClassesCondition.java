@@ -38,7 +38,7 @@ public record MatchesAbsenceOfClassesCondition(AnnotationClassValue<?>[] classes
     public boolean matches(ConditionContext context) {
         for (AnnotationClassValue<?> classValue : classes) {
             if (classValue.getType().isPresent()) {
-                context.fail("Class [" + classValue.getName() + "] is not absent");
+                context.fail("Class " + classValue.getName() + " is not absent");
                 return false;
             }
         }

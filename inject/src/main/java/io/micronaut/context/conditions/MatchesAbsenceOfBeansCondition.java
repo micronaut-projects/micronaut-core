@@ -58,7 +58,7 @@ public record MatchesAbsenceOfBeansCondition(AnnotationClassValue<?>[] missingBe
                 );
                 for (BeanDefinition<?> beanDefinition : beanDefinitions) {
                     if (!beanDefinition.isAbstract()) {
-                        context.fail("Existing bean [" + beanDefinition.getName() + "] of type [" + type.getName() + "] registered in context");
+                        context.fail("Existing bean " + beanDefinition.getName() + " of type " + type.getName() + " registered in context");
                         return false;
                     }
                 }
