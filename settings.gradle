@@ -44,6 +44,14 @@ String firstGradleProperty(String... names) {
         if (value != null && !value.isBlank()) {
             return value
         }
+        value = System.getProperty(name)
+        if (value != null && !value.isBlank()) {
+            return value
+        }
+        value = System.getProperty("org.gradle.project.$name")
+        if (value != null && !value.isBlank()) {
+            return value
+        }
     }
     null
 }
@@ -316,11 +324,15 @@ File ensureGraalPyBundleRepo(File checkoutDir, String graalpyVersion) {
 }
 
 def graalpyVersion = versionFromCatalog("gradle/libs.versions.toml", "managed-graalpy")
+def explicitGraalPyBundleRepo = firstGradleProperty("micronaut.graalpy.bundle.repo", "pyronaut.graalpy.bundle.repo")
 def includeGraalPyExtensionsProperty = booleanGradleProperty("micronaut.include.graalpy.extensions")
-def includeGraalPyExtensions = includeGraalPyExtensionsProperty != null ? includeGraalPyExtensionsProperty : isSnapshotVersion(graalpyVersion)
+def includeGraalPyExtensions = explicitGraalPyBundleRepo != null || (includeGraalPyExtensionsProperty != null ? includeGraalPyExtensionsProperty : isSnapshotVersion(graalpyVersion))
 def graalPyBundleRepo = includeGraalPyExtensions ?
     ensureGraalPyBundleRepo(ensureGraalPyExtensionsCheckout(), graalpyVersion).tap {
         System.setProperty("micronaut.graalpy.bundle.repo", it.absolutePath)
+        System.setProperty("pyronaut.graalpy.bundle.repo", it.absolutePath)
+        System.setProperty("org.gradle.project.micronaut.graalpy.bundle.repo", it.absolutePath)
+        System.setProperty("org.gradle.project.pyronaut.graalpy.bundle.repo", it.absolutePath)
     } :
     null
 
