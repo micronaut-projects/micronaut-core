@@ -1956,8 +1956,6 @@ def convert_ast_value(node, visitor=None):
         # Class references - check if this is a type that should be resolved
         name = node.id
         if visitor is not None:
-            if hasattr(visitor, 'local_constant_values') and name in visitor.local_constant_values:
-                return visitor.local_constant_values[name]
             # Check imported types first
             imported_name = visitor.imported_types.get(name)
             if imported_name:

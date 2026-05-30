@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.StringTokenizer;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -61,6 +62,8 @@ public final class PyronautCompiler {
     private final ClassLoader parentClassLoader;
     private final Consumer<ClassElement> classElementCallback;
     private final List<String> compilerOptions;
+    private final boolean verboseErrors;
+    private final File errorDumpDirectory;
 
     private PyronautCompiler(Builder builder) {
         this.packageName = builder.packageName;
@@ -75,6 +78,8 @@ public final class PyronautCompiler {
         this.parentClassLoader = builder.parentClassLoader != null ? builder.parentClassLoader : PyronautCompiler.class.getClassLoader();
         this.classElementCallback = builder.classElementCallback;
         this.compilerOptions = builder.compilerOptions != null ? List.copyOf(builder.compilerOptions) : null;
+        this.verboseErrors = builder.verboseErrors;
+        this.errorDumpDirectory = builder.errorDumpDirectory;
         validateConfiguration();
     }
 
@@ -103,10 +108,10 @@ public final class PyronautCompiler {
      * This method is used when you want to load and run the application without writing to disk.
      *
      * @return A ClassLoader containing the compiled application classes
-     * @throws IllegalStateException if compilation fails
+     * @throws IllegalStateException if processing fails
      */
     public ClassLoader buildClassLoader() {
-        PyronautJavaCompiler compiler = new PyronautJavaCompiler();
+        PyronautJavaCompiler compiler = createCompiler();
         if (classElementCallback != null) {
             compiler.setClassElementCallback(classElementCallback);
         }
@@ -137,16 +142,26 @@ public final class PyronautCompiler {
      * Compile the application to the file system.
      * Requires that targetDir was specified in the builder.
      *
-     * @throws IllegalStateException if targetDir is not set or compilation fails
+     * @throws IllegalStateException if targetDir is not set or processing fails
      */
     public void compile() {
         if (targetDir == null) {
-            throw new IllegalStateException("targetDir must be specified for file system compilation mode");
+            throw new IllegalStateException("targetDir must be specified for file system processing mode");
         }
 
-        PyronautJavaCompiler compiler = new PyronautJavaCompiler();
+        PyronautJavaCompiler compiler = createCompiler();
         JavaFileObject[] sources = createJavaSources();
         compiler.compileToDisk(targetDir, sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
+    }
+
+    private PyronautJavaCompiler createCompiler() {
+        PyronautJavaCompiler compiler = new PyronautJavaCompiler();
+        compiler.setVerboseErrors(verboseErrors);
+        if (errorDumpDirectory != null) {
+            compiler.setErrorDumpDirectory(errorDumpDirectory);
+        }
+        compiler.setSourceSnapshots(createSourceSnapshots());
+        return compiler;
     }
 
     private void validateConfiguration() {
@@ -195,6 +210,38 @@ public final class PyronautCompiler {
         }
 
         return sources.toArray(new JavaFileObject[0]);
+    }
+
+    private List<PyronautJavaCompiler.SourceSnapshot> createSourceSnapshots() {
+        List<PyronautJavaCompiler.SourceSnapshot> snapshots = new ArrayList<>();
+        if (pythonCode != null && !pythonCode.isEmpty()) {
+            snapshots.add(new PyronautJavaCompiler.SourceSnapshot("python-code", "inline python code", pythonCode));
+        }
+        if (pythonSrc != null && !pythonSrc.isEmpty()) {
+            StringTokenizer tokenizer = new StringTokenizer(pythonSrc, ",");
+            while (tokenizer.hasMoreTokens()) {
+                Path dir = Paths.get(tokenizer.nextToken().trim());
+                if (!Files.isDirectory(dir)) {
+                    continue;
+                }
+                try (Stream<Path> paths = Files.walk(dir)) {
+                    paths.filter(Files::isRegularFile)
+                        .filter(path -> path.toString().endsWith(".py"))
+                        .forEach(path -> addSourceSnapshot(snapshots, path));
+                } catch (IOException ignored) {
+                    // Source reading failures will be reported by the annotation processor.
+                }
+            }
+        }
+        return snapshots;
+    }
+
+    private static void addSourceSnapshot(List<PyronautJavaCompiler.SourceSnapshot> snapshots, Path path) {
+        try {
+            snapshots.add(new PyronautJavaCompiler.SourceSnapshot(path.getFileName().toString(), path.toString(), Files.readString(path)));
+        } catch (IOException ignored) {
+            // Source reading failures will be reported by the annotation processor.
+        }
     }
 
     private void addJavaSourcesFromDirectory(List<JavaFileObject> sources, Path dir) throws IOException {
@@ -282,6 +329,8 @@ public final class PyronautCompiler {
         private ClassLoader parentClassLoader;
         private List<String> compilerOptions;
         private Consumer<ClassElement> classElementCallback;
+        private boolean verboseErrors;
+        private File errorDumpDirectory;
 
         private Builder() {
         }
@@ -321,7 +370,7 @@ public final class PyronautCompiler {
         }
 
         /**
-         * Set the Java source directory to scan for .java files to include in compilation.
+         * Set the Java source directory to scan for .java files to include in processing.
          *
          * @param javaSrc The Java source directory path
          * @return This builder
@@ -344,7 +393,7 @@ public final class PyronautCompiler {
         }
 
         /**
-         * Set the target directory for file system compilation mode.
+         * Set the target directory for file system processing mode.
          *
          * @param targetDir The target directory
          * @return This builder
@@ -355,7 +404,7 @@ public final class PyronautCompiler {
         }
 
         /**
-         * Set annotation processor path entries for compilation.
+         * Set annotation processor path entries for processing.
          *
          * @param annotationProcessorPath The classpath files
          * @return This builder
@@ -366,7 +415,7 @@ public final class PyronautCompiler {
         }
 
         /**
-         * Set additional classpath entries for compilation.
+         * Set additional classpath entries for processing.
          *
          * @param classpath The classpath files
          * @return This builder
@@ -388,7 +437,7 @@ public final class PyronautCompiler {
         }
 
         /**
-         * Set the parent classloader for in-memory compilation results.
+         * Set the parent classloader for in-memory processing results.
          * This lets generated application classes resolve user runtime dependencies
          * without requiring generated classes to be written to disk first.
          *
@@ -419,6 +468,28 @@ public final class PyronautCompiler {
          */
         public Builder options(List<String> compilerOptions) {
             this.compilerOptions = compilerOptions;
+            return this;
+        }
+
+        /**
+         * Include full diagnostics and stack traces in thrown compiler errors.
+         *
+         * @param verboseErrors Whether verbose errors should be thrown
+         * @return this builder
+         */
+        public Builder verboseErrors(boolean verboseErrors) {
+            this.verboseErrors = verboseErrors;
+            return this;
+        }
+
+        /**
+         * Set the directory used for full compiler error dump files.
+         *
+         * @param errorDumpDirectory The dump directory
+         * @return this builder
+         */
+        public Builder errorDumpDirectory(File errorDumpDirectory) {
+            this.errorDumpDirectory = errorDumpDirectory;
             return this;
         }
 

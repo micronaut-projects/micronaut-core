@@ -40,6 +40,7 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
@@ -109,7 +110,11 @@ public final class PythonTypeElementVisitorProcessor {
     public void process(PythonProcessingEnvironment environment) {
         PythonVisitorContext pythonVisitorContext = environment.visitorContext();
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
-            loadedVisitor.getVisitor().start(pythonVisitorContext);
+            try {
+                loadedVisitor.getVisitor().start(pythonVisitorContext);
+            } catch (Throwable e) {
+                failVisitor(pythonVisitorContext, loadedVisitor, "start", e);
+            }
         }
 
         applyMixins(environment, pythonVisitorContext);
@@ -121,15 +126,36 @@ public final class PythonTypeElementVisitorProcessor {
                 }
                 if (loadedVisitor.matchesClass(element)) {
                     annotatePythonAopProxy(element);
-                    visitClass(loadedVisitor, element, pythonVisitorContext);
+                    try {
+                        visitClass(loadedVisitor, element, pythonVisitorContext);
+                    } catch (Throwable e) {
+                        failVisitor(pythonVisitorContext, loadedVisitor, "visitClass", e);
+                    }
                 }
             }
         }
 
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
-            loadedVisitor.getVisitor().finish(pythonVisitorContext);
+            try {
+                loadedVisitor.getVisitor().finish(pythonVisitorContext);
+            } catch (Throwable e) {
+                failVisitor(pythonVisitorContext, loadedVisitor, "finish", e);
+            }
         }
         writeAssociatedBeanDefinitions(pythonVisitorContext);
+    }
+
+    private static void failVisitor(PythonVisitorContext visitorContext, LoadedVisitor loadedVisitor, String phase, Throwable throwable) {
+        if (throwable instanceof ProcessingException processingException) {
+            throw processingException;
+        }
+        String message = throwable.getMessage();
+        visitorContext.fail(String.format(
+            "TypeElementVisitor [%s] failed during %s: %s",
+            loadedVisitor.getVisitor().getClass().getName(),
+            phase,
+            message == null ? throwable.getClass().getSimpleName() : message
+        ), null);
     }
 
     private void applyMixins(PythonProcessingEnvironment environment, PythonVisitorContext pythonVisitorContext) {
@@ -339,7 +365,7 @@ public final class PythonTypeElementVisitorProcessor {
      * @return A collection of type element visitors.
      */
     @NonNull
-    protected synchronized Collection<? extends TypeElementVisitor<?, ?>> findTypeElementVisitors() {
+    synchronized Collection<? extends TypeElementVisitor<?, ?>> findTypeElementVisitors() {
         if (typeElementVisitors == null) {
             HashSet<String> warnings = new HashSet<>();
             typeElementVisitors = findCoreTypeElementVisitors(warnings);

@@ -19,6 +19,7 @@ dependencies {
     api(libs.jetbrains.annotations)
     api(libs.jakarta.inject.api)
 
+    testImplementation(libs.junit.jupiter)
     testImplementation(platform(libs.test.boms.micronaut.validation))
     testImplementation(platform(libs.test.boms.micronaut.data))
     testImplementation(platform(libs.test.boms.micronaut.sql))
