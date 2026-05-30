@@ -64,6 +64,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -734,7 +735,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     } else if (extendsPythonClass) {
                                         return aThis.superRef().invokeConstructor(pythonInstance);
                                     } else if (extendsHostClass) {
-                                        List<ExpressionDef> superArguments = new ArrayList<>(methodParameters);
+                                        List<ExpressionDef> superArguments = superConstructorArguments(superType, parameters, methodParameters);
                                         return StatementDef.multi(
                                             aThis.superRef().invokeConstructor(superArguments),
                                             aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance)
@@ -1369,6 +1370,31 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static boolean constructorParametersBackedByFields(ParameterElement[] parameters, Map<String, FieldDef> propertyFields) {
         for (ParameterElement parameter : parameters) {
             if (!propertyFields.containsKey(parameter.getName())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static List<ExpressionDef> superConstructorArguments(ClassElement superType,
+                                                                 ParameterElement[] parameters,
+                                                                 List<VariableDef.MethodParameter> methodParameters) {
+        return superType.getAccessibleConstructors()
+            .stream()
+            .sorted((left, right) -> Integer.compare(right.getParameters().length, left.getParameters().length))
+            .filter(constructor -> matchesConstructorPrefix(constructor, parameters))
+            .findFirst()
+            .map(constructor -> new ArrayList<ExpressionDef>(methodParameters.subList(0, constructor.getParameters().length)))
+            .orElseGet(() -> new ArrayList<>(methodParameters));
+    }
+
+    private static boolean matchesConstructorPrefix(ConstructorElement constructor, ParameterElement[] parameters) {
+        ParameterElement[] superParameters = constructor.getParameters();
+        if (superParameters.length > parameters.length) {
+            return false;
+        }
+        for (int i = 0; i < superParameters.length; i++) {
+            if (!superParameters[i].getType().isAssignable(parameters[i].getType())) {
                 return false;
             }
         }
