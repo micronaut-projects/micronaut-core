@@ -28,6 +28,7 @@ import java.beans.Transient;
 /**
  * A type that is coercible to a Truffle Value.
  */
+@SuppressWarnings({"checkstyle:InnerTypeLast", "checkstyle:MissingJavadocType"})
 public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     String HOST_OBJECT_MEMBER = "__micronaut_value_coercible_host__";
     String AS_POLYGLOT_VALUE_MEMBER = "asPolyglotValue";

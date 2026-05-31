@@ -53,6 +53,18 @@ import java.util.function.Consumer;
 
 /**
  * Python event loop backed by a Netty {@link EventLoop}.
+ *
+ * <p>This class is intentionally a narrow bridge between Python's asyncio transport
+ * protocol APIs and Micronaut's Netty event loop. It does not try to expose raw
+ * Netty channels to Python callers. The public nested transport/server/facade types
+ * are GraalPy host objects whose method names are part of the Python-facing surface,
+ * including snake_case names that mirror asyncio. Do not rename those methods to
+ * satisfy Java style checks unless the Python shims and tests are updated at the
+ * same time.</p>
+ *
+ * <p>All callbacks into Python protocols are made from the Netty event loop thread.
+ * When this loop is entered from a different Java thread, work is rescheduled onto
+ * Netty before touching channel state or invoking Python callbacks.</p>
  */
 @Internal
 public final class NettyPythonEventLoop implements PythonEventLoop {
@@ -557,6 +569,11 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
         };
     }
 
+    /*
+     * Python asyncio datagram addresses use tuple-like values, while Netty uses
+     * SocketAddress variants. Keep conversion small and explicit so unsupported
+     * address shapes fail before Netty writes a packet to an unintended target.
+     */
     private static @Nullable InetSocketAddress toSocketAddress(@Nullable Object address) {
         if (address == null) {
             return null;
@@ -589,6 +606,12 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
         return new Object[] {address.getHostString(), address.getPort()};
     }
 
+    /*
+     * Python's transport.get_extra_info("sockname"/"peername") expects either a
+     * (host, port) tuple-like value or a Unix-domain socket path. NIO domain
+     * sockets use the JDK address type, while native epoll/kqueue channels use
+     * Netty's DomainSocketAddress from netty-transport-native-unix-common.
+     */
     private static @Nullable Object toPythonAddress(SocketAddress address) {
         if (address instanceof InetSocketAddress inetSocketAddress) {
             return toPythonAddress(inetSocketAddress);
@@ -647,6 +670,11 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
             }
         }
 
+        /*
+         * For plain TCP, channelActive means asyncio can receive connection_made.
+         * For TLS, activation is delayed until SslHandshakeCompletionEvent succeeds
+         * so Python never sees an active transport before the secure session exists.
+         */
         private void activate(Channel channel) {
             if (transport != null) {
                 return;
@@ -736,8 +764,14 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
 
     /**
      * Netty-backed stream transport exposed to Python as a host object.
+     *
+     * <p>The snake_case methods are intentionally duplicated alongside Java-style
+     * methods. GraalPy member lookup is name based, and asyncio's transports call
+     * names such as {@code get_extra_info}, {@code pause_reading}, and
+     * {@code is_closing}. The Checkstyle suppression below protects that
+     * Python-facing contract.</p>
      */
-    @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod"})
+    @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod", "checkstyle:MethodName"})
     public static final class NettySocketTransport {
         private final Channel channel;
         private final Value protocol;
@@ -784,6 +818,11 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
             if (!canWriteEof()) {
                 throw new UnsupportedOperationException("TLS transports do not support write_eof");
             }
+            /*
+             * asyncio write_eof maps to a half-close for stream sockets. Netty
+             * only exposes shutdownOutput on SocketChannel; domain sockets and
+             * other channel types are closed as the conservative fallback.
+             */
             if (channel instanceof SocketChannel socketChannel) {
                 socketChannel.shutdownOutput().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
             } else {
@@ -842,6 +881,10 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
         }
 
         public @Nullable Object getExtraInfo(String name, @Nullable Object defaultValue) {
+            /*
+             * Keep this list intentionally small. Python code should get stable
+             * asyncio-style metadata, not the mutable Netty Channel or pipeline.
+             */
             return switch (name) {
                 case "socket" -> new NettySocketFacade(channel);
                 case "micronaut.netty" -> true;
@@ -913,8 +956,12 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
 
     /**
      * Netty-backed asyncio server exposed to Python as a host object.
+     *
+     * <p>Like transports, this host object exposes snake_case members because
+     * asyncio server helpers call names such as {@code start_serving},
+     * {@code serve_forever}, and {@code wait_closed} directly.</p>
      */
-    @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod"})
+    @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod", "checkstyle:MethodName"})
     public static final class NettyServer {
         private final Channel channel;
         private final CompletableFuture<Void> closed = new CompletableFuture<>();
@@ -926,6 +973,10 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
             this.serving = startServing;
             channel.closeFuture().addListener(future -> closed.complete(null));
             if (!startServing) {
+                /*
+                 * asyncio.start_server(..., start_serving=False) binds the server
+                 * socket without accepting connections until start_serving() runs.
+                 */
                 channel.config().setAutoRead(false);
             }
         }
@@ -980,6 +1031,10 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
 
     /**
      * Socket-like object for Python's server.sockets API.
+     *
+     * <p>Only address accessors are exposed. The accepted channel itself remains
+     * internal to avoid Python code mutating Netty state outside this event-loop
+     * bridge.</p>
      */
     @SuppressWarnings("UnusedMethod")
     public static final class NettyServerSocket {
@@ -1000,6 +1055,10 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
 
     /**
      * Socket-like facade for transport extras. Raw Netty channels stay internal to the runtime.
+     *
+     * <p>Python libraries commonly inspect {@code transport.get_extra_info("socket")}
+     * for {@code getsockname()} or {@code getpeername()}. This facade satisfies
+     * that expectation without exposing the Netty channel object.</p>
      */
     @SuppressWarnings("UnusedMethod")
     public static final class NettySocketFacade {
@@ -1020,6 +1079,10 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
 
     /**
      * SSL facade for Python transport extras. It exposes stable session data without exposing Netty handlers.
+     *
+     * <p>The values intentionally follow the shape of Python ssl transport extras
+     * closely enough for inspection and tests. The Netty {@link SslHandler} and
+     * underlying {@code SSLEngine} stay hidden.</p>
      */
     @SuppressWarnings("UnusedMethod")
     public static final class NettySslFacade {
@@ -1052,8 +1115,12 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
 
     /**
      * Netty-backed datagram transport exposed to Python as a host object.
+     *
+     * <p>Snake_case methods mirror asyncio datagram transport names. UDP writes
+     * may resolve tuple-style target addresses asynchronously on the same Netty
+     * event loop before flushing the packet.</p>
      */
-    @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod"})
+    @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod", "checkstyle:MethodName"})
     public static final class NettyDatagramTransport {
         private final Channel channel;
         private final Value protocol;

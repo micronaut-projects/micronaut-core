@@ -67,12 +67,12 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  */
 @Factory
 public class GraalPyContextFactory implements BeanDestroyedEventListener<org.graalvm.polyglot.Context>, GracefulShutdownCapable, Ordered {
-    private static final Logger LOG = LoggerFactory.getLogger(GraalPyContextFactory.class);
     public static final String APPLICATION_PATH = "META-INF/GRAALPY-VFS/micronaut-application";
     public static final String APPLICATION_SRC_PATH = APPLICATION_PATH + "/src/";
     public static final String INTERNAL_MAIN = "__main__.py";
     public static final String APPLICATION_MAIN = "main.py";
     public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
+    private static final Logger LOG = LoggerFactory.getLogger(GraalPyContextFactory.class);
     private static final long CONTEXT_CLOSE_GRACE_PERIOD_MILLIS = Math.max(
         0,
         Long.getLong("micronaut.python.context.close.grace-period-millis", 5_000L)

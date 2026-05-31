@@ -68,6 +68,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 @Internal
 @Singleton
 @NullMarked
+@SuppressWarnings({"checkstyle:InnerTypeLast", "checkstyle:MissingJavadocType"})
 public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private static final String SCOPED_PROXY_FACTORY = "__micronaut_create_scoped_proxy";
