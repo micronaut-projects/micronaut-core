@@ -1,0 +1,16 @@
+The `micronaut-context-python-netty` module integrates Python `asyncio` execution with the Micronaut Netty HTTP server. When the module is on the classpath and asyncio support is enabled, Micronaut binds Python coroutine execution to the Netty event loop that is processing the request. Timers, callbacks, awaited client calls, and supported networking APIs are scheduled from that event loop instead of borrowing a blocking Python pool thread. Awaiting an async Python `@Client` call from an async controller does not block the Netty event-loop thread while the client response is in flight.
+
+dependency:io.micronaut:micronaut-context-python-netty[scope="runtimeOnly"]
+
+The module provides the Python-visible event-loop behavior. Its Java runtime classes are framework internals and should not be used directly by applications.
+
+Active Python bridge executions participate in Micronaut graceful shutdown. When `micronaut.lifecycle.graceful-shutdown.enabled=true`, shutdown waits for active Python coroutine bridges and pooled Python executions using the same `GracefulShutdownCapable` lifecycle and `micronaut.lifecycle.graceful-shutdown.grace-period` timeout that other Micronaut runtime components use.
+
+Supported event-loop APIs include:
+
+* `asyncio.get_running_loop()`
+* `loop.create_future()` and `loop.create_task(...)`
+* `loop.call_soon(...)`, `loop.call_soon_threadsafe(...)`, `loop.call_later(...)`, and `loop.call_at(...)`
+* `asyncio.sleep(...)`, `asyncio.gather(...)`, `asyncio.TaskGroup`, and normal task cancellation
+* `loop.run_in_executor(None, ...)` using Micronaut's blocking executor
+* `loop.getaddrinfo(...)` and `loop.getnameinfo(...)` using Micronaut's blocking executor when socket fallback code needs name resolution

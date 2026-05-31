@@ -286,7 +286,15 @@ logging:
   loggingSystem: Logging System
 languageSupport:
   title: Language Support
-  python: Micronaut for Python
+  python:
+    title: Micronaut for Python
+    typeOrdering: Type Ordering and Forward References
+    keywords: Python Keywords in Java APIs
+    asyncAwait:
+      title: Async/Await
+      asyncioRuntime: Netty-Backed Asyncio Runtime
+      asyncioNetworking: Asyncio Networking and TLS
+      asyncioUnsupported: Unsupported Asyncio APIs
 management:
   title: Management & Monitoring
   buildingEndpoints:
