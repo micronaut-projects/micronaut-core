@@ -66,7 +66,7 @@ class PythonAsyncioSpec:
         self.client.toBlocking().retrieve("/async-backend/reset-stats")
         elapsed_millis = AsyncioConcurrentClientRunner.retrieveConcurrently(
             self.client,
-            "/async-demo/message",
+            "/async-demo/concurrent-message",
             "demo:backend",
             8,
         )

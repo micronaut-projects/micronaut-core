@@ -32,6 +32,10 @@ class AsyncDemoController:
         return "demo:" + await self.client.message()
     # end::awaitClient[]
 
+    @Get("/concurrent-message")
+    async def concurrent_message(self) -> str:
+        return "demo:" + await self.client.concurrent_message()
+
     # tag::awaitPublisher[]
     @Get("/publisher-message")
     async def publisher_message(self) -> str:

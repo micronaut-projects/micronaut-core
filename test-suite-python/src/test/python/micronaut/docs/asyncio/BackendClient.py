@@ -20,6 +20,11 @@ class BackendClient(ABC):
         ...
     # end::asyncClient[]
 
+    @Get("/concurrent-message")
+    @abstractmethod
+    async def concurrent_message(self) -> str:
+        ...
+
     # tag::publisherClient[]
     @Get("/publisher-message")
     @abstractmethod

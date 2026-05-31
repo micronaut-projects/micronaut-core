@@ -16,13 +16,18 @@ class AsyncBackendController:
     # tag::backend[]
     @Get("/message")
     async def message(self) -> str:
+        await asyncio.sleep(0.1)
+        return "backend"
+    # end::backend[]
+
+    @Get("/concurrent-message")
+    async def concurrent_message(self) -> str:
         AsyncioConcurrentClientRunner.enterActive()
         try:
             await asyncio.sleep(0.1)
             return "backend"
         finally:
             AsyncioConcurrentClientRunner.exitActive()
-    # end::backend[]
 
     # tag::publisherBackend[]
     @Get("/publisher-message")
