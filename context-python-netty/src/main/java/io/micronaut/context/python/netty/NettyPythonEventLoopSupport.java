@@ -187,56 +187,49 @@ final class NettyPythonEventLoopSupport {
     }
 
     private SslContextBuilder sslContextBuilder(Value options, boolean server) {
-        String certfile = stringOption(options, "certfile");
-        String keyfile = stringOption(options, "keyfile");
-        String keyPassword = stringOption(options, "key_password");
-        String cafile = stringOption(options, "cafile");
-        boolean trustAll = booleanOption(options, "trust_all", false);
-        SslContextBuilder builder;
-        if (server) {
-            if (StringUtils.isEmpty(certfile) || StringUtils.isEmpty(keyfile)) {
-                throw new IllegalArgumentException("Server TLS requires ssl['certfile'] and ssl['keyfile']");
+        return sslContextBuilder(new TlsOptionAccessor() {
+            @Override
+            public @Nullable String stringOption(String name) {
+                return NettyPythonEventLoopSupport.stringOption(options, name);
             }
-            builder = keyPassword == null
-                ? SslContextBuilder.forServer(new File(certfile), new File(keyfile))
-                : SslContextBuilder.forServer(new File(certfile), new File(keyfile), keyPassword);
-        } else {
-            builder = SslContextBuilder.forClient();
-            if (StringUtils.isNotEmpty(certfile) && StringUtils.isNotEmpty(keyfile)) {
-                builder.keyManager(new File(certfile), new File(keyfile), keyPassword);
+
+            @Override
+            public boolean booleanOption(String name, boolean defaultValue) {
+                return NettyPythonEventLoopSupport.booleanOption(options, name, defaultValue);
             }
-        }
-        if (StringUtils.isNotEmpty(cafile)) {
-            builder.trustManager(new File(cafile));
-        } else if (trustAll) {
-            builder.trustManager(InsecureTrustManagerFactory.INSTANCE);
-        }
-        String clientAuth = stringOption(options, "client_auth");
-        if (clientAuth != null) {
-            builder.clientAuth(switch (clientAuth.toLowerCase(Locale.ROOT)) {
-                case "need", "required", "require" -> ClientAuth.REQUIRE;
-                case "want", "optional" -> ClientAuth.OPTIONAL;
-                case "none", "false" -> ClientAuth.NONE;
-                default -> throw new IllegalArgumentException("Unsupported TLS client_auth value: " + clientAuth);
-            });
-        }
-        List<String> protocols = stringListOption(options, "protocols");
-        if (!protocols.isEmpty()) {
-            builder.protocols(protocols);
-        }
-        List<String> ciphers = stringListOption(options, "ciphers");
-        if (!ciphers.isEmpty()) {
-            builder.ciphers(ciphers);
-        }
-        return builder;
+
+            @Override
+            public List<String> stringListOption(String name) {
+                return NettyPythonEventLoopSupport.stringListOption(options, name);
+            }
+        }, server);
     }
 
     private SslContextBuilder sslContextBuilder(Map<?, ?> options, boolean server) {
-        String certfile = stringOption(options, "certfile");
-        String keyfile = stringOption(options, "keyfile");
-        String keyPassword = stringOption(options, "key_password");
-        String cafile = stringOption(options, "cafile");
-        boolean trustAll = booleanOption(options, "trust_all", false);
+        return sslContextBuilder(new TlsOptionAccessor() {
+            @Override
+            public @Nullable String stringOption(String name) {
+                return NettyPythonEventLoopSupport.stringOption(options, name);
+            }
+
+            @Override
+            public boolean booleanOption(String name, boolean defaultValue) {
+                return NettyPythonEventLoopSupport.booleanOption(options, name, defaultValue);
+            }
+
+            @Override
+            public List<String> stringListOption(String name) {
+                return NettyPythonEventLoopSupport.stringListOption(options, name);
+            }
+        }, server);
+    }
+
+    private SslContextBuilder sslContextBuilder(TlsOptionAccessor options, boolean server) {
+        String certfile = options.stringOption("certfile");
+        String keyfile = options.stringOption("keyfile");
+        String keyPassword = options.stringOption("key_password");
+        String cafile = options.stringOption("cafile");
+        boolean trustAll = options.booleanOption("trust_all", false);
         SslContextBuilder builder;
         if (server) {
             if (StringUtils.isEmpty(certfile) || StringUtils.isEmpty(keyfile)) {
@@ -256,7 +249,7 @@ final class NettyPythonEventLoopSupport {
         } else if (trustAll) {
             builder.trustManager(InsecureTrustManagerFactory.INSTANCE);
         }
-        String clientAuth = stringOption(options, "client_auth");
+        String clientAuth = options.stringOption("client_auth");
         if (clientAuth != null) {
             builder.clientAuth(switch (clientAuth.toLowerCase(Locale.ROOT)) {
                 case "need", "required", "require" -> ClientAuth.REQUIRE;
@@ -265,11 +258,11 @@ final class NettyPythonEventLoopSupport {
                 default -> throw new IllegalArgumentException("Unsupported TLS client_auth value: " + clientAuth);
             });
         }
-        List<String> protocols = stringListOption(options, "protocols");
+        List<String> protocols = options.stringListOption("protocols");
         if (!protocols.isEmpty()) {
             builder.protocols(protocols);
         }
-        List<String> ciphers = stringListOption(options, "ciphers");
+        List<String> ciphers = options.stringListOption("ciphers");
         if (!ciphers.isEmpty()) {
             builder.ciphers(ciphers);
         }
@@ -358,6 +351,15 @@ final class NettyPythonEventLoopSupport {
             return values;
         }
         return List.of(value.toString());
+    }
+
+    private interface TlsOptionAccessor {
+        @Nullable
+        String stringOption(String name);
+
+        boolean booleanOption(String name, boolean defaultValue);
+
+        List<String> stringListOption(String name);
     }
 
     record TlsOptions(SslContext sslContext,

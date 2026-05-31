@@ -605,10 +605,7 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
                     future.set_result(value)
                 else:
                     future.set_exception(RuntimeError(str(throwable)))
-            if throwable is None:
-                self.call_soon_threadsafe(apply_completion)
-            else:
-                self.call_soon_threadsafe(apply_completion)
+            self.call_soon_threadsafe(apply_completion)
         stage.whenComplete(complete)
         return future
 
@@ -870,7 +867,8 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
         view = memoryview(data)
         total_sent = 0
         while total_sent < len(view):
-            sent = await self._retry_socket_call(lambda: sock.send(view[total_sent:]))
+            remaining = view[total_sent:]
+            sent = await self._retry_socket_call(lambda: sock.send(remaining))
             if sent == 0:
                 raise RuntimeError("socket connection broken")
             total_sent += sent
