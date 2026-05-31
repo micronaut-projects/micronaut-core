@@ -35,15 +35,6 @@ import org.slf4j.LoggerFactory;
 final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
     private static final Logger LOG = LoggerFactory.getLogger(GraalPyEngineFactory.class);
 
-    static {
-        /*
-         * GraalPy's default automatic async-action mode creates a scheduled executor per Context
-         * named "python-actions-*". Micronaut tests and applications can create many short-lived
-         * contexts, so use the embedder polling mode and poll from Python bridge boundaries instead.
-         */
-        System.setProperty("python.AutomaticAsyncActions", System.getProperty("python.AutomaticAsyncActions", "false"));
-    }
-
     @Singleton
     @Named(GraalPyRuntimeUtil.PYTHON)
     Engine pythonEngine() {

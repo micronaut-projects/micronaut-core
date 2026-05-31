@@ -54,7 +54,6 @@ public final class GraalPyRuntimeUtil {
     private static final String TRANSFERABLE_MEMBER_NAMES = "__micronaut_transferable_member_names";
     private static final String PUT_MEMBER = "__micronaut_put_member";
     private static final String ASYNC_MEMBER_VALUE = "__micronaut_async_member_value";
-    private static final String POLL_ASYNC_ACTIONS = "PollPythonAsyncActions";
     private static final AsyncMemberAdapter ASYNC_MEMBER_ADAPTER = new AsyncMemberAdapter();
 
     /**
@@ -510,29 +509,7 @@ public final class GraalPyRuntimeUtil {
             }
             return member.execute(arguments);
         } finally {
-            pollAsyncActions(context);
             ContextHolder.exitExecution(context);
-        }
-    }
-
-    /**
-     * Poll GraalPy async actions when embedded contexts run with python.AutomaticAsyncActions=false.
-     * <p>
-     * GraalPy otherwise starts a scheduled executor per Context for signal handling, GIL handoff,
-     * and finalizer work. Micronaut creates many short-lived contexts in tests and may create
-     * additional event-loop contexts at runtime, so polling from bridge boundaries avoids retaining
-     * one executor per context while still allowing GraalPy to run pending async actions.
-     *
-     * @param context The context to poll.
-     */
-    static void pollAsyncActions(Context context) {
-        try {
-            Value poller = context.getPolyglotBindings().getMember(POLL_ASYNC_ACTIONS);
-            if (poller != null && poller.canExecute()) {
-                poller.executeVoid();
-            }
-        } catch (RuntimeException ignored) {
-            // The poller exists only when GraalPy is running in embedder polling mode.
         }
     }
 
