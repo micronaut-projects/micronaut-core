@@ -39,6 +39,7 @@ import io.micronaut.python.processing.visitor.PythonEnumElement;
 import io.micronaut.python.processing.visitor.PythonFieldElement;
 import io.micronaut.python.processing.visitor.PythonMethodElement;
 import io.micronaut.python.processing.visitor.PythonParameterElement;
+import io.micronaut.sourcegen.model.EnumDef;
 import jakarta.inject.Named;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
@@ -203,6 +204,73 @@ public class PythonAstParserTest {
         assertTrue(decoratorUsage > enumAssignment);
     }
 
+    @Test
+    void testJavaTypeAnnotationAliasIncludesGeneratedNestedAnnotationDecorator() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        ClassElement parentAnnotation = fakeAnnotationElement(
+            "example.Parent",
+            "Parent",
+            new FakeNativeAnnotationTypeWithMethod("example.Nested")
+        );
+        ClassElement nestedAnnotation = fakeAnnotationElement(
+            "example.Nested",
+            "Nested",
+            new FakeNativeAnnotationType()
+        );
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1) {
+                    return switch ((String) args[0]) {
+                        case "example.Parent" -> Optional.of(parentAnnotation);
+                        case "example.Nested" -> Optional.of(nestedAnnotation);
+                        default -> Optional.empty();
+                    };
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
+            import java
+
+            Parent = java.type("example.Parent")
+            Nested = java.type("example.Nested")
+
+            @Parent(member=Nested(value="one"))
+            class Demo:
+                pass
+            """);
+
+        String runtimeCode = transformResult.runtimeCode();
+        int nestedDefinition = runtimeCode.indexOf("def Nested(");
+        int decoratorUsage = runtimeCode.indexOf("@Parent(member=Nested(value='one'))");
+        assertTrue(nestedDefinition > -1);
+        assertTrue(decoratorUsage > nestedDefinition);
+        assertFalse(runtimeCode.contains("Nested = java.type"));
+    }
+
     private static ClassElement fakeAnnotationElement(String name, String simpleName, Object nativeType) {
         return fakeClassElement(name, simpleName, nativeType);
     }
@@ -254,6 +322,18 @@ public class PythonAstParserTest {
         }
     }
 
+    public static final class FakeNativeAnnotationTypeWithMethod {
+        private final String returnType;
+
+        FakeNativeAnnotationTypeWithMethod(String returnType) {
+            this.returnType = returnType;
+        }
+
+        public FakeNativeAnnotationElementWithMethod element() {
+            return new FakeNativeAnnotationElementWithMethod(returnType);
+        }
+    }
+
     public static final class FakeNativeAnnotationElement {
         public FakeElementKind getKind() {
             return new FakeElementKind("ANNOTATION_TYPE");
@@ -261,6 +341,38 @@ public class PythonAstParserTest {
 
         public List<FakeEnclosedElement> getEnclosedElements() {
             return List.of(new FakeEnclosedElement("ENUM", "AccessKind"));
+        }
+    }
+
+    public static final class FakeNativeAnnotationElementWithMethod {
+        private final String returnType;
+
+        FakeNativeAnnotationElementWithMethod(String returnType) {
+            this.returnType = returnType;
+        }
+
+        public FakeElementKind getKind() {
+            return new FakeElementKind("ANNOTATION_TYPE");
+        }
+
+        public List<FakeEnclosedMethodElement> getEnclosedElements() {
+            return List.of(new FakeEnclosedMethodElement(returnType));
+        }
+    }
+
+    public static final class FakeEnclosedMethodElement {
+        private final String returnType;
+
+        FakeEnclosedMethodElement(String returnType) {
+            this.returnType = returnType;
+        }
+
+        public FakeElementKind getKind() {
+            return new FakeElementKind("METHOD");
+        }
+
+        public FakeReturnType getReturnType() {
+            return new FakeReturnType(returnType);
         }
     }
 
@@ -283,6 +395,13 @@ public class PythonAstParserTest {
     }
 
     public record FakeElementKind(String name) {
+    }
+
+    public record FakeReturnType(String name) {
+        @Override
+        public String toString() {
+            return name;
+        }
     }
 
     @Test
@@ -784,6 +903,39 @@ class ProductMappers:
                 PythonEnumElement statusEnum = (PythonEnumElement) statusElement;
                 assertEquals("Status", statusEnum.getSimpleName());
                 assertEquals(List.of("ACTIVE", "INACTIVE", "PENDING"), statusEnum.values());
+            }
+        }
+    }
+
+    @Test
+    void testPythonEnumStubIsGeneratedAsJavaEnumDef() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        try (PythonEnvironment environment = pythonProcessor.parse("""
+            from enum import Enum
+
+            class Language(Enum):
+                GROOVY = "GROOVY"
+                JAVA = "JAVA"
+                KOTLIN = "KOTLIN"
+            """, "example.micronaut")) {
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment, null)) {
+                PythonEnumElement languageEnum = assertInstanceOf(
+                    PythonEnumElement.class,
+                    processingEnvironment.classes().get("example.micronaut.Language")
+                );
+
+                EnumDef enumDef = new PythonStubGenerator().buildEnumDef(languageEnum, null);
+
+                assertEquals("Language", enumDef.getSimpleName());
+                assertEquals(
+                    List.of("GROOVY", "JAVA", "KOTLIN"),
+                    enumDef.getEnumConstants().stream()
+                        .map(EnumDef.EnumConstantDef::name)
+                        .toList()
+                );
+                assertTrue(enumDef.getSuperinterfaces().isEmpty());
+                assertTrue(enumDef.getMethods().isEmpty());
             }
         }
     }
