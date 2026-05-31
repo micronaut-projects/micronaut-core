@@ -308,6 +308,74 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
+    void currentEventLoopRunsAsyncioTaskGroup() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                async def first():
+                    await asyncio.sleep(0.001)
+                    return "first"
+                async def second():
+                    await asyncio.sleep(0.001)
+                    return "second"
+                async def joined():
+                    async with asyncio.TaskGroup() as task_group:
+                        first_task = task_group.create_task(first())
+                        second_task = task_group.create_task(second())
+                    return f"{first_task.result()},{second_task.result()}"
+                joined()
+                """);
+
+            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+
+            eventLoop.runUntilComplete(stage);
+
+            assertEquals("first,second", stage.toCompletableFuture().get(1, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    @Test
+    void currentEventLoopRejectsUnsupportedTaskOptions() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                async def unsupported_options():
+                    loop = asyncio.get_running_loop()
+                    eager = asyncio.sleep(0)
+                    unknown = asyncio.sleep(0)
+                    try:
+                        loop.create_task(eager, eager_start=True)
+                    except NotImplementedError as exc:
+                        eager.close()
+                        eager_message = str(exc)
+                    try:
+                        loop.create_task(unknown, priority=1)
+                    except NotImplementedError as exc:
+                        unknown.close()
+                        unknown_message = str(exc)
+                    return f"{eager_message}|{unknown_message}"
+                unsupported_options()
+                """);
+
+            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+
+            eventLoop.runUntilComplete(stage);
+
+            String result = stage.toCompletableFuture().get(1, TimeUnit.SECONDS).toString();
+            assertTrue(result.contains("eager task execution is not supported"), result);
+            assertTrue(result.contains("priority"), result);
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    @Test
     void currentEventLoopRejectsNestedAsyncioRun() throws Exception {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));

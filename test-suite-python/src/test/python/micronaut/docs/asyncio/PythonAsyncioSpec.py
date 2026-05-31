@@ -37,6 +37,21 @@ class PythonAsyncioSpec:
         assert "demo:publisher-backend" == response, response
 
     @Test
+    def asyncControllerCanAwaitDefaultHttpClientExchange(self):
+        response = self.client.toBlocking().retrieve("/async-demo/http-client-exchange")
+        assert "exchange:backend" == response, response
+
+    @Test
+    def asyncControllerCanUseTaskGroup(self):
+        response = self.client.toBlocking().retrieve("/async-demo/task-group")
+        assert "backend:sleep" == response, response
+
+    @Test
+    def taskGroupCancelsSiblingTasksOnFailure(self):
+        response = self.client.toBlocking().retrieve("/async-demo/task-group-cancel")
+        assert "failed=True:cleanup=True" == response, response
+
+    @Test
     def classlessAsyncRouteCanAwaitClient(self):
         response = self.client.toBlocking().retrieve("/async-route-message")
         assert "route:backend" == response, response

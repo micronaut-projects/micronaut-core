@@ -516,7 +516,12 @@ class _MicronautAsyncioEventLoop(asyncio.AbstractEventLoop):
     def create_future(self):
         return futures.Future(loop=self)
 
-    def create_task(self, coro, *, name=None, context=None):
+    def create_task(self, coro, *, name=None, context=None, eager_start=None, **kwargs):
+        if eager_start is not None:
+            raise NotImplementedError("asyncio eager task execution is not supported by the Micronaut Netty event loop")
+        if kwargs:
+            unsupported = ", ".join(sorted(kwargs))
+            raise NotImplementedError(f"asyncio task keyword arguments are not supported by the Micronaut Netty event loop: {unsupported}")
         return tasks.Task(coro, loop=self, name=name, context=context)
 
     def get_debug(self):
