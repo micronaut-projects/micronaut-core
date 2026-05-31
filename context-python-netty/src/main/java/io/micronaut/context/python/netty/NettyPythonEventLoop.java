@@ -33,6 +33,7 @@ import io.netty.channel.EventLoop;
 import io.netty.channel.ServerChannel;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.resolver.AddressResolverGroup;
@@ -43,7 +44,6 @@ import org.jspecify.annotations.Nullable;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnixDomainSocketAddress;
-import java.lang.reflect.Method;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -596,13 +596,8 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
         if (address instanceof UnixDomainSocketAddress domainSocketAddress) {
             return domainSocketAddress.getPath().toString();
         }
-        if (address != null && address.getClass().getName().equals("io.netty.channel.unix.DomainSocketAddress")) {
-            try {
-                Method path = address.getClass().getMethod("path");
-                return path.invoke(address);
-            } catch (ReflectiveOperationException e) {
-                return null;
-            }
+        if (address instanceof DomainSocketAddress domainSocketAddress) {
+            return domainSocketAddress.path();
         }
         return null;
     }

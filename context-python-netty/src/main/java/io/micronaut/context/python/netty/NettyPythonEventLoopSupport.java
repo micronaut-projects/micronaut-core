@@ -27,6 +27,7 @@ import io.netty.channel.socket.nio.NioDomainSocketChannel;
 import io.netty.channel.socket.nio.NioServerDomainSocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -40,7 +41,6 @@ import org.jspecify.annotations.Nullable;
 
 import javax.net.ssl.SSLException;
 import java.io.File;
-import java.lang.reflect.Constructor;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnixDomainSocketAddress;
@@ -98,13 +98,7 @@ final class NettyPythonEventLoopSupport {
     SocketAddress domainSocketAddress(EventLoop eventLoop, String path) {
         String eventLoopClassName = eventLoop.getClass().getName();
         if (eventLoopClassName.contains(EPOLL) || eventLoopClassName.contains(KQUEUE)) {
-            try {
-                Class<?> addressClass = Class.forName("io.netty.channel.unix.DomainSocketAddress");
-                Constructor<?> constructor = addressClass.getConstructor(String.class);
-                return (SocketAddress) constructor.newInstance(path);
-            } catch (ReflectiveOperationException e) {
-                throw new IllegalStateException("Cannot create Netty domain socket address", e);
-            }
+            return DomainSocketAddressHolder.create(path);
         }
         return UnixDomainSocketAddress.of(path);
     }
@@ -360,6 +354,16 @@ final class NettyPythonEventLoopSupport {
         boolean booleanOption(String name, boolean defaultValue);
 
         List<String> stringListOption(String name);
+    }
+
+    private static final class DomainSocketAddressHolder {
+        private static SocketAddress create(String path) {
+            try {
+                return new DomainSocketAddress(path);
+            } catch (NoClassDefFoundError e) {
+                throw new UnsupportedOperationException("Netty domain socket support not on classpath", e);
+            }
+        }
     }
 
     record TlsOptions(SslContext sslContext,
