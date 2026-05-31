@@ -87,6 +87,29 @@ class GraalPyRuntimeUtilTest {
     }
 
     @Test
+    void testConvertPythonEnumValueToJavaEnum() {
+        Value language = context.eval("python", """
+            from enum import Enum
+
+            class Language(Enum):
+                GROOVY = "groovy"
+                JAVA = "java"
+                KOTLIN = "kotlin"
+
+            Language.JAVA
+            """);
+
+        assertEquals(TestLanguage.JAVA, GraalPyRuntimeUtil.convertValue(language, TestLanguage.class));
+    }
+
+    @Test
+    void testConvertPythonStringToJavaEnum() {
+        Value language = context.eval("python", "'KOTLIN'");
+
+        assertEquals(TestLanguage.KOTLIN, GraalPyRuntimeUtil.convertValue(language, TestLanguage.class));
+    }
+
+    @Test
     void testInvokePythonMethodBindsClassDescriptorWhenAttributeShadowsMethod() {
         Value instance = context.eval("python", """
             class Example:
@@ -419,5 +442,11 @@ class GraalPyRuntimeUtilTest {
         public Value asPolyglotValue() {
             throw new UnsupportedOperationException("This test should unwrap the host object without converting through Python");
         }
+    }
+
+    private enum TestLanguage {
+        GROOVY,
+        JAVA,
+        KOTLIN
     }
 }

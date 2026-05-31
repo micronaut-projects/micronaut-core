@@ -75,6 +75,8 @@ public final class GraalPyUtil {
     public static Object convertValueToJava(Value value, VisitorContext visitorContext) {
         if (value == null || value.isNull()) {
             return null;
+        } else if (value.isHostObject()) {
+            return value.asHostObject();
         } else if (value.isBoolean()) {
             return value.asBoolean();
         } else if (value.isNumber()) {
@@ -785,8 +787,8 @@ public final class GraalPyUtil {
         if (value == null || value.isNull()) {
             return null;
         }
-        if (value.isHostObject()) {
-            Object hostObject = value.asHostObject();
+        Object hostObject = hostObject(value);
+        if (hostObject != null) {
             if (hostObject instanceof AnnotationValue<?> annotationValue) {
                 return annotationValue;
             }
@@ -947,17 +949,17 @@ public final class GraalPyUtil {
                         }
                         return list.toArray(AnnotationClassValue[]::new);
                     } else if (componentType.isAssignable(java.lang.annotation.Annotation.class)) {
-                        AnnotationValue<?>[] array = new AnnotationValue<?>[(int) size];
+                        List<AnnotationValue<?>> list = new ArrayList<>();
                         for (int i = 0; i < size; i++) {
                             Value element = value.getArrayElement(i);
                             if (element != null) {
-                                Object converted = convertValueToJava(element, componentType, visitorContext);
-                                if (converted instanceof AnnotationValue<?> annotationValue) {
-                                    array[i] = annotationValue;
+                                AnnotationValue<?> annotationValue = toAnnotationValue(element, componentType, visitorContext);
+                                if (annotationValue != null) {
+                                    list.add(annotationValue);
                                 }
                             }
                         }
-                        return array;
+                        return list.toArray(AnnotationValue[]::new);
                     } else {
                         // Handle object arrays
                         Object[] array = new Object[(int) size];
@@ -1005,9 +1007,7 @@ public final class GraalPyUtil {
     private static AnnotationValue<?> toAnnotationValue(DecoratorDef decoratorDef,
                                                         ClassElement fallbackAnnotationType,
                                                         PythonVisitorContext visitorContext) {
-        ClassElement annotationType = visitorContext
-            .getClassElement(decoratorDef.annotationName())
-            .orElse(fallbackAnnotationType);
+        ClassElement annotationType = resolveAnnotationType(decoratorDef, fallbackAnnotationType, visitorContext);
         Map<CharSequence, Object> annotationValues = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : decoratorDef.members().entrySet()) {
             String memberName = annotationMemberName(entry.getKey());
@@ -1025,6 +1025,56 @@ public final class GraalPyUtil {
             }
         }
         return new AnnotationValue<>(decoratorDef.annotationName(), annotationValues);
+    }
+
+    private static @Nullable AnnotationValue<?> toAnnotationValue(Value value,
+                                                                  ClassElement fallbackAnnotationType,
+                                                                  PythonVisitorContext visitorContext) {
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        Object hostObject = hostObject(value);
+        if (hostObject instanceof AnnotationValue<?> annotationValue) {
+            return annotationValue;
+        }
+        if (hostObject instanceof DecoratorDef decoratorDef) {
+            return toAnnotationValue(decoratorDef, fallbackAnnotationType, visitorContext);
+        }
+        Object converted = convertValueToJava(value, visitorContext);
+        if (converted instanceof AnnotationValue<?> annotationValue) {
+            return annotationValue;
+        }
+        if (converted instanceof DecoratorDef decoratorDef) {
+            return toAnnotationValue(decoratorDef, fallbackAnnotationType, visitorContext);
+        }
+        return null;
+    }
+
+    private static ClassElement resolveAnnotationType(DecoratorDef decoratorDef,
+                                                      ClassElement fallbackAnnotationType,
+                                                      PythonVisitorContext visitorContext) {
+        JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
+        if (javaVisitorContext == null) {
+            return fallbackAnnotationType;
+        }
+        return javaVisitorContext
+            .getClassElement(decoratorDef.annotationName())
+            .orElse(fallbackAnnotationType);
+    }
+
+    private static @Nullable Object hostObject(Value value) {
+        if (value.isHostObject()) {
+            return value.asHostObject();
+        }
+        try {
+            Object object = value.as(Object.class);
+            if (object instanceof AnnotationValue<?> || object instanceof DecoratorDef) {
+                return object;
+            }
+        } catch (Exception ignored) {
+            // Not a host-backed object.
+        }
+        return null;
     }
 
     private static String annotationMemberName(Object memberName) {

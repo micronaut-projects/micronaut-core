@@ -44,6 +44,7 @@ import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.EnumElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.ProcessingException;
@@ -82,6 +83,7 @@ import io.micronaut.sourcegen.generator.SourceGenerator;
 import io.micronaut.sourcegen.generator.SourceGenerators;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
+import io.micronaut.sourcegen.model.EnumDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.InterfaceDef;
@@ -124,6 +126,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         "org.jspecify.annotations.Nullable"
     );
     private final Map<String, StubEntry> classBuilders = new LinkedHashMap<>();
+    private final Map<String, EnumEntry> enumDefs = new LinkedHashMap<>();
     private final Map<String, InterfaceEntry> interfaceDefs = new LinkedHashMap<>();
     private final Map<String, AnnotationEntry> annotationDefs = new LinkedHashMap<>();
     private Map<String, ClassElement> allClasses = Map.of();
@@ -146,6 +149,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     ClassDef.ClassDefBuilder builder = entry.builder;
                     sourceGenerator.write(builder.build(), visitorContext, entry.originatingElement);
                 }
+                for (EnumEntry entry : enumDefs.values()) {
+                    sourceGenerator.write(entry.enumDef, visitorContext, entry.originatingElement);
+                }
                 for (InterfaceEntry entry : interfaceDefs.values()) {
                     sourceGenerator.write(entry.interfaceDef, visitorContext, entry.originatingElement);
                 }
@@ -159,6 +165,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         } finally {
             classBuilders.clear();
+            enumDefs.clear();
             interfaceDefs.clear();
             annotationDefs.clear();
         }
@@ -213,6 +220,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     visitScript(scriptElement, context);
                 }
             } else if (element instanceof AbstractPythonClassElement classElement) {
+                if (classElement.isEnum()) {
+                    if (enumDefs.containsKey(classElement.getName())) {
+                        return;
+                    }
+                    enumDefs.put(classElement.getName(), new EnumEntry(buildEnumDef(classElement, context), classElement));
+                    return;
+                }
+
                 if (classElement.hasStereotype("io.micronaut.context.python.scope.ContextPooled")) {
                     if (classBuilders.containsKey(classElement.getName())) {
                         return;
@@ -2622,6 +2637,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
+    EnumDef buildEnumDef(AbstractPythonClassElement classElement, VisitorContext context) {
+        EnumDef.EnumDefBuilder enumBuilder = EnumDef.builder(classElement.getName())
+            .addModifiers(Modifier.PUBLIC)
+            .addAnnotation(Vetoed.class);
+        copyAnnotations(classElement, enumBuilder, ANNOTATION_PACKAGES_TO_COPY, context);
+        List<String> enumConstants = classElement instanceof EnumElement enumElement ? enumElement.values() : List.of();
+        for (String enumConstant : enumConstants) {
+            enumBuilder.addEnumConstant(enumConstant);
+        }
+        return enumBuilder.build();
+    }
+
     private void addBridgeMethod(
         MethodElement methodElement,
         ClassDef.ClassDefBuilder builder,
@@ -3570,7 +3597,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static boolean isGeneratedWrapperType(Map<String, ClassElement> allClasses, ClassElement type) {
-        return !type.isInterface() && (
+        return !type.isInterface() && !type.isEnum() && (
             allClasses.containsKey(type.getName()) ||
                 type.isAssignable("io.micronaut.context.python.ValueCoercible")
         );
@@ -3690,6 +3717,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     record AnnotationEntry(
         ObjectDef annotationDef,
         @Nullable Element originatingElement) {
+    }
+
+    record EnumEntry(
+        EnumDef enumDef,
+        Element originatingElement) {
     }
 
     record InterfaceEntry(

@@ -1021,8 +1021,10 @@ def {decorator_name}({param_signature}):
                                                  original_name = nested_annotation_element.getName()
 
                                                  # Generate the decorator with the correct annotation name
-                                                 self._generate_decorator_from_class_element_with_name(
+                                                 decorator_code = self._generate_decorator_from_class_element_with_name(
                                                      nested_annotation_element, annotation_simple_name, original_name)
+                                                 if decorator_code:
+                                                     self.transformed_code.append(decorator_code)
         except Exception as e:
             print(f"Error generating nested decorators for {class_element.getName()}: {e}")
 

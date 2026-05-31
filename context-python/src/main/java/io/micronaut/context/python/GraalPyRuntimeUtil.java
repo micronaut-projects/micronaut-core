@@ -597,6 +597,10 @@ public final class GraalPyRuntimeUtil {
                 return targetType.cast(hostObject);
             }
         }
+        T enumValue = convertEnumValue(value, targetType);
+        if (enumValue != null) {
+            return enumValue;
+        }
         T mappedWrapper = convertMappedWrapper(value, targetType);
         if (mappedWrapper != null) {
             return mappedWrapper;
@@ -750,6 +754,56 @@ public final class GraalPyRuntimeUtil {
             return reference.value();
         }
         return null;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T> @Nullable T convertEnumValue(Value value, Class<T> targetType) {
+        if (!targetType.isEnum()) {
+            return null;
+        }
+        String enumName = enumName(value);
+        if (enumName == null) {
+            return null;
+        }
+        try {
+            return (T) Enum.valueOf((Class) targetType.asSubclass(Enum.class), enumName);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static @Nullable String enumName(Value value) {
+        if (value.isString()) {
+            return value.asString();
+        }
+        String memberName = enumMemberString(value, "name");
+        if (memberName != null) {
+            return memberName;
+        }
+        String memberValue = enumMemberString(value, "value");
+        if (memberValue != null) {
+            return memberValue;
+        }
+        String stringValue = value.toString();
+        int lastDot = stringValue.lastIndexOf('.');
+        if (lastDot > -1 && lastDot < stringValue.length() - 1) {
+            return stringValue.substring(lastDot + 1);
+        }
+        return null;
+    }
+
+    private static @Nullable String enumMemberString(Value value, String memberName) {
+        if (!value.hasMembers() || !value.hasMember(memberName)) {
+            return null;
+        }
+        Value memberValue = value.getMember(memberName);
+        if (isNone(memberValue)) {
+            return null;
+        }
+        if (memberValue.isString()) {
+            return memberValue.asString();
+        }
+        return memberValue.toString();
     }
 
     /**
