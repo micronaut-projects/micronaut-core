@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -40,6 +41,7 @@ import io.micronaut.python.processing.visitor.PythonFieldElement;
 import io.micronaut.python.processing.visitor.PythonMethodElement;
 import io.micronaut.python.processing.visitor.PythonParameterElement;
 import io.micronaut.sourcegen.model.EnumDef;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import jakarta.inject.Named;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
@@ -271,11 +273,84 @@ public class PythonAstParserTest {
         assertFalse(runtimeCode.contains("Nested = java.type"));
     }
 
+    @Test
+    void testTransformSkipsJavaLangMetaAnnotationsInGeneratedSource() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        annotationMetadata.addDeclaredAnnotation("java.lang.Deprecated", Map.of());
+        ClassElement xmlProperty = fakeAnnotationElement(
+            "example.XmlProperty",
+            "XmlProperty",
+            new FakeNativeAnnotationType(),
+            annotationMetadata
+        );
+        ClassElement deprecated = fakeAnnotationElement(
+            "java.lang.Deprecated",
+            "Deprecated",
+            new FakeNativeAnnotationType()
+        );
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1) {
+                    return switch ((String) args[0]) {
+                        case "example.XmlProperty" -> Optional.of(xmlProperty);
+                        case "java.lang.Deprecated" -> Optional.of(deprecated);
+                        default -> Optional.empty();
+                    };
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
+            from example import XmlProperty
+
+            @XmlProperty()
+            class Demo:
+                pass
+            """);
+
+        String runtimeCode = transformResult.runtimeCode();
+        assertTrue(runtimeCode.contains("@micronaut_annotation('example.XmlProperty'"));
+        assertFalse(runtimeCode.contains("from java.lang.Deprecated import Deprecated"));
+        assertFalse(runtimeCode.contains("@Deprecated()"));
+    }
+
     private static ClassElement fakeAnnotationElement(String name, String simpleName, Object nativeType) {
-        return fakeClassElement(name, simpleName, nativeType);
+        return fakeAnnotationElement(name, simpleName, nativeType, AnnotationMetadata.EMPTY_METADATA);
+    }
+
+    private static ClassElement fakeAnnotationElement(String name, String simpleName, Object nativeType, AnnotationMetadata annotationMetadata) {
+        return fakeClassElement(name, simpleName, nativeType, annotationMetadata);
     }
 
     private static ClassElement fakeClassElement(String name, String simpleName, Object nativeType) {
+        return fakeClassElement(name, simpleName, nativeType, AnnotationMetadata.EMPTY_METADATA);
+    }
+
+    private static ClassElement fakeClassElement(String name, String simpleName, Object nativeType, AnnotationMetadata annotationMetadata) {
         return (ClassElement) Proxy.newProxyInstance(
             ClassElement.class.getClassLoader(),
             new Class<?>[] { ClassElement.class },
@@ -291,8 +366,8 @@ public class PythonAstParserTest {
                 return switch (method.getName()) {
                     case "getName" -> name;
                     case "getSimpleName" -> simpleName;
-                    case "getPackageName" -> name.substring(0, name.indexOf('.'));
-                    case "getAnnotationMetadata" -> io.micronaut.core.annotation.AnnotationMetadata.EMPTY_METADATA;
+                    case "getPackageName" -> name.substring(0, name.lastIndexOf('.'));
+                    case "getAnnotationMetadata" -> annotationMetadata;
                     case "getNativeType" -> nativeType;
                     case "getMethods", "getBeanProperties", "getEnclosedElements" -> List.of();
                     case "getTypeArguments" -> Map.of();

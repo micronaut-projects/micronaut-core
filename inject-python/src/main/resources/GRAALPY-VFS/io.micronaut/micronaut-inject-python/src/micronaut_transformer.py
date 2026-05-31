@@ -17,6 +17,11 @@ META_ANNOTATIONS_TO_SKIP_IN_SOURCE = {
     "io.micronaut.context.annotation.ConfigurationReader",
 }
 
+META_ANNOTATION_PACKAGES_TO_SKIP_IN_SOURCE = (
+    "java.lang.",
+    "java.lang.annotation.",
+)
+
 def normalize_python_keyword_alias(name: str) -> str:
     if name.endswith('_') and keyword.iskeyword(name[:-1]):
         return name[:-1]
@@ -784,8 +789,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         annotation_names = annotation_metadata.getAnnotationNames()
         for meta_annotation_name in annotation_names:
             # Skip retention and other built-in annotations that aren't user-facing
-            if (not meta_annotation_name.startswith('java.lang.annotation.')
-                    and meta_annotation_name not in META_ANNOTATIONS_TO_SKIP_IN_SOURCE):
+            if not self._skip_meta_annotation_in_source(meta_annotation_name):
                 meta_class_element = self.callback_get_class_element(meta_annotation_name)
                 if not meta_class_element or not self._is_annotation_class(meta_class_element):
                     continue
@@ -864,6 +868,12 @@ def {decorator_name}({param_signature}):
         self._generate_nested_decorators(class_element, import_name)
 
         return decorator_code
+
+    def _skip_meta_annotation_in_source(self, meta_annotation_name: str) -> bool:
+        return (
+            meta_annotation_name in META_ANNOTATIONS_TO_SKIP_IN_SOURCE
+            or meta_annotation_name.startswith(META_ANNOTATION_PACKAGES_TO_SKIP_IN_SOURCE)
+        )
 
     def _generate_decorator_from_class_element_with_name(self, class_element, import_name: str, custom_annotation_name: str) -> Optional[str]:
         """
