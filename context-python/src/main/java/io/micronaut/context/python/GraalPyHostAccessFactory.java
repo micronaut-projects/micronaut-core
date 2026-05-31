@@ -321,28 +321,36 @@ final class GraalPyHostAccessFactory {
     }
 
     private static @Nullable ValueCoercible valueCoercibleHost(@Nullable Value value) {
-        if (value == null || value.isNull() || value.isHostObject() || !value.hasMembers() || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+        try {
+            if (value == null || value.isNull() || value.isHostObject() || !value.hasMembers() || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+                return null;
+            }
+            Value hostReferenceValue = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
+            if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
+                return null;
+            }
+            Object hostReference = hostReferenceValue.asHostObject();
+            if (hostReference instanceof ValueCoercible.HostObjectReference reference) {
+                return reference.value();
+            }
+            return null;
+        } catch (UnsupportedOperationException e) {
             return null;
         }
-        Value hostReferenceValue = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
-        if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
-            return null;
-        }
-        Object hostReference = hostReferenceValue.asHostObject();
-        if (hostReference instanceof ValueCoercible.HostObjectReference reference) {
-            return reference.value();
-        }
-        return null;
     }
 
     private static @Nullable ValueCoercible valueCoercibleHost(@Nullable ProxyObject value, Class<?> target) {
-        if (value == null || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+        try {
+            if (value == null || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+                return null;
+            }
+            Object hostReference = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
+            if (hostReference instanceof ValueCoercible.HostObjectReference reference && target.isInstance(reference.value())) {
+                return reference.value();
+            }
+            return null;
+        } catch (UnsupportedOperationException e) {
             return null;
         }
-        Object hostReference = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
-        if (hostReference instanceof ValueCoercible.HostObjectReference reference && target.isInstance(reference.value())) {
-            return reference.value();
-        }
-        return null;
     }
 }

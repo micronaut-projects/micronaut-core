@@ -58,10 +58,6 @@ class Person:
     if (GraalPyRuntimeUtil.isNone(arg1)) {
       return null;
     }
-    Object hostObject = GraalPyRuntimeUtil.unwrapHostObject(arg1, Person.class);
-    if (hostObject != null) {
-      return (Person) hostObject;
-    }
     return new python.Person(arg1);
   }
 

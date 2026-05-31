@@ -21,16 +21,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyObject;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 /**
  * Runtime utility class for converting GraalPy Values to Java collections.
@@ -43,6 +51,11 @@ import org.jspecify.annotations.Nullable;
 public final class GraalPyRuntimeUtil {
 
     public static final String PYTHON = "python";
+    private static final String TRANSFERABLE_MEMBER_NAMES = "__micronaut_transferable_member_names";
+    private static final String PUT_MEMBER = "__micronaut_put_member";
+    private static final String ASYNC_MEMBER_VALUE = "__micronaut_async_member_value";
+    private static final String POLL_ASYNC_ACTIONS = "PollPythonAsyncActions";
+    private static final AsyncMemberAdapter ASYNC_MEMBER_ADAPTER = new AsyncMemberAdapter();
 
     /**
      * Returns whether the value represents Java null or Python None.
@@ -197,7 +210,275 @@ public final class GraalPyRuntimeUtil {
      */
     @UsedByGeneratedCode
     public static void putMember(Value target, String name, @Nullable Object value) {
-        target.putMember(name, coerceToContext(value, target.getContext()));
+        Context context = target.getContext();
+        memberSetter(context).executeVoid(target, name, coerceToContext(value, context));
+    }
+
+    /**
+     * Convert an injected Java member into a Python-context-local value suitable for async code.
+     *
+     * @param target The target Python object receiving the member.
+     * @param value The Java value to expose.
+     * @return A value that adapts Java async method results to Python awaitables.
+     */
+    public static @Nullable Object asyncMemberValue(Value target, @Nullable Object value) {
+        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Character) {
+            return value;
+        }
+        Context context = target.getContext();
+        if (value instanceof CompletionStage<?> completionStage) {
+            return PythonAsyncioRuntime.toAwaitable(context, completionStage);
+        }
+        return asyncMemberFactory(context).execute(value, ASYNC_MEMBER_ADAPTER, context);
+    }
+
+    private static Value memberSetter(Context context) {
+        Value bindings = context.getBindings(PYTHON);
+        Value setter = bindings.getMember(PUT_MEMBER);
+        if (setter == null || isNone(setter)) {
+            context.eval(
+                PYTHON,
+                """
+                def __micronaut_put_member(target, name, value):
+                    setattr(target, name, value)
+                """
+            );
+            setter = bindings.getMember(PUT_MEMBER);
+        }
+        return setter;
+    }
+
+    private static Value asyncMemberFactory(Context context) {
+        Value bindings = context.getBindings(PYTHON);
+        Value factory = bindings.getMember(ASYNC_MEMBER_VALUE);
+        if (factory == null || isNone(factory)) {
+            context.eval(
+                PYTHON,
+                """
+                def __micronaut_async_member_value(target, adapter, context):
+                    import asyncio
+                    import inspect
+
+                    def adapt(value):
+                        try:
+                            if inspect.isawaitable(value) or asyncio.isfuture(value):
+                                return value
+                        except Exception:
+                            pass
+                        adapted = adapter.adaptAwaitable(context, value)
+                        if adapted is not None:
+                            return adapted
+                        return value
+
+                    class _MicronautAsyncMember:
+                        def __init__(self, target, adapter, context):
+                            self._target = target
+                            self._adapter = adapter
+                            self._context = context
+
+                        def __getattr__(self, name):
+                            member = getattr(self._target, name)
+                            if callable(member):
+                                def invoke(*args, **kwargs):
+                                    return adapt(member(*args, **kwargs))
+                                return invoke
+                            return adapt(member)
+
+                    return _MicronautAsyncMember(target, adapter, context)
+                """
+            );
+            factory = bindings.getMember(ASYNC_MEMBER_VALUE);
+        }
+        return factory;
+    }
+
+    /**
+     * Adapter invoked from Python async member facades.
+     */
+    public static final class AsyncMemberAdapter {
+        private AsyncMemberAdapter() {
+        }
+
+        /**
+         * Adapt host values returned from Java members to values Python async code can consume.
+         *
+         * @param context The target Python context.
+         * @param value The host value.
+         * @return The adapted value.
+         */
+        public @Nullable Object adapt(Context context, @Nullable Object value) {
+            Value awaitable = adaptAwaitable(context, value);
+            if (awaitable != null) {
+                return awaitable;
+            }
+            return value;
+        }
+
+        /**
+         * Adapt a host async value returned from a Java member to a Python awaitable.
+         *
+         * @param context The target Python context.
+         * @param value The host value.
+         * @return The adapted Python awaitable, or null when the value is not async.
+         */
+        public @Nullable Value adaptAwaitable(Context context, @Nullable Object value) {
+            if (value instanceof CompletionStage<?> completionStage) {
+                return PythonAsyncioRuntime.toAwaitable(context, completionStage);
+            }
+            CompletionStage<?> publisherStage = publisherStage(value);
+            if (publisherStage != null) {
+                return PythonAsyncioRuntime.toAwaitable(context, publisherStage);
+            }
+            if (value instanceof Value polyglotValue) {
+                if (polyglotValue.isHostObject()) {
+                    Object hostObject = polyglotValue.asHostObject();
+                    if (hostObject instanceof CompletionStage<?> completionStage) {
+                        return PythonAsyncioRuntime.toAwaitable(context, completionStage);
+                    }
+                    CompletionStage<?> hostPublisherStage = publisherStage(hostObject);
+                    if (hostPublisherStage != null) {
+                        return PythonAsyncioRuntime.toAwaitable(context, hostPublisherStage);
+                    }
+                }
+                try {
+                    return PythonAsyncioRuntime.toAwaitable(context, polyglotValue.as(CompletionStage.class));
+                } catch (RuntimeException e) {
+                    // Fall through and return the original value.
+                }
+            }
+            return null;
+        }
+
+        private static @Nullable CompletionStage<?> publisherStage(@Nullable Object value) {
+            if (!Publishers.isConvertibleToPublisher(value)) {
+                return null;
+            }
+            Publisher<?> publisher;
+            try {
+                publisher = Publishers.convertToPublisher(ConversionService.SHARED, value);
+            } catch (RuntimeException e) {
+                return null;
+            }
+            PythonAsyncioRuntime.PythonCompletableFuture future = new PythonAsyncioRuntime.PythonCompletableFuture();
+            publisher.subscribe(new ScalarPublisherSubscriber(future));
+            return future;
+        }
+    }
+
+    /**
+     * Scalar reactive await bridge. It requests a single item, completes with the first value, and cancels upstream.
+     */
+    private static final class ScalarPublisherSubscriber implements Subscriber<Object> {
+        private final PythonAsyncioRuntime.PythonCompletableFuture future;
+        private final AtomicReference<Subscription> subscription = new AtomicReference<>();
+        private final AtomicBoolean done = new AtomicBoolean();
+
+        private ScalarPublisherSubscriber(PythonAsyncioRuntime.PythonCompletableFuture future) {
+            this.future = future;
+        }
+
+        @Override
+        public void onSubscribe(Subscription subscription) {
+            if (!this.subscription.compareAndSet(null, subscription)) {
+                subscription.cancel();
+                return;
+            }
+            future.setCancelCallback(subscription::cancel);
+            if (future.isCancelled()) {
+                subscription.cancel();
+            } else {
+                subscription.request(1);
+            }
+        }
+
+        @Override
+        public void onNext(Object value) {
+            if (done.compareAndSet(false, true)) {
+                future.complete(value);
+                Subscription current = subscription.get();
+                if (current != null) {
+                    current.cancel();
+                }
+            }
+        }
+
+        @Override
+        public void onError(Throwable throwable) {
+            if (done.compareAndSet(false, true)) {
+                future.completeExceptionally(throwable);
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            if (done.compareAndSet(false, true)) {
+                future.complete(null);
+            }
+        }
+    }
+
+    /**
+     * Copy simple and host-backed Python instance members into another context.
+     *
+     * @param source The source Python object.
+     * @param target The target Python object.
+     */
+    public static void copyTransferableMembers(Value source, Value target) {
+        if (source == null || target == null || isNone(source) || isNone(target) || !source.hasMembers()) {
+            return;
+        }
+        for (String key : transferableMemberNames(source)) {
+            if (key.startsWith("__")) {
+                continue;
+            }
+            Value member = source.getMember(key);
+            Object transferable = transferableMember(member);
+            if (transferable != null) {
+                putMember(target, key, transferable);
+            }
+        }
+    }
+
+    private static List<String> transferableMemberNames(Value source) {
+        Value bindings = source.getContext().getBindings(PYTHON);
+        Value names = bindings.getMember(TRANSFERABLE_MEMBER_NAMES);
+        if (names == null || isNone(names)) {
+            source.getContext().eval(PYTHON, """
+                def __micronaut_transferable_member_names(obj):
+                    try:
+                        return list(vars(obj).keys())
+                    except TypeError:
+                        return []
+                """);
+            names = bindings.getMember(TRANSFERABLE_MEMBER_NAMES);
+        }
+        Value result = names.execute(source);
+        List<String> keys = new ArrayList<>();
+        if (result.hasArrayElements()) {
+            for (long i = 0; i < result.getArraySize(); i++) {
+                keys.add(result.getArrayElement(i).asString());
+            }
+        }
+        return keys;
+    }
+
+    private static @Nullable Object transferableMember(@Nullable Value member) {
+        if (member == null || isNone(member)) {
+            return null;
+        }
+        if (member.isHostObject()) {
+            return member.asHostObject();
+        }
+        if (member.isBoolean()) {
+            return member.asBoolean();
+        }
+        if (member.isString()) {
+            return member.asString();
+        }
+        if (member.isNumber()) {
+            return member.as(Object.class);
+        }
+        return null;
     }
 
     /**
@@ -209,22 +490,50 @@ public final class GraalPyRuntimeUtil {
      * @return The invocation result
      */
     public static Value invokePythonMethod(Value receiver, String name, Object[] arguments) {
-        Value member = receiver.getMember(name);
-        if (member != null && member.canExecute()) {
-            return member.execute(arguments);
-        }
-        Value pythonClass = receiver.getMember("__class__");
-        Value rawMember = pythonClass == null ? null : getRawClassMember(pythonClass, name);
-        if (rawMember != null) {
-            Value boundMember = bindPythonDescriptor(rawMember, receiver, pythonClass);
-            if (boundMember.canExecute()) {
-                return boundMember.execute(arguments);
+        Context context = receiver.getContext();
+        ContextHolder.enterExecution(context);
+        try {
+            Value member = receiver.getMember(name);
+            if (member != null && member.canExecute()) {
+                return member.execute(arguments);
             }
+            Value pythonClass = receiver.getMember("__class__");
+            Value rawMember = pythonClass == null ? null : getRawClassMember(pythonClass, name);
+            if (rawMember != null) {
+                Value boundMember = bindPythonDescriptor(rawMember, receiver, pythonClass);
+                if (boundMember.canExecute()) {
+                    return boundMember.execute(arguments);
+                }
+            }
+            if (member == null) {
+                throw new IllegalArgumentException("No Python member [" + name + "] found");
+            }
+            return member.execute(arguments);
+        } finally {
+            pollAsyncActions(context);
+            ContextHolder.exitExecution(context);
         }
-        if (member == null) {
-            throw new IllegalArgumentException("No Python member [" + name + "] found");
+    }
+
+    /**
+     * Poll GraalPy async actions when embedded contexts run with python.AutomaticAsyncActions=false.
+     * <p>
+     * GraalPy otherwise starts a scheduled executor per Context for signal handling, GIL handoff,
+     * and finalizer work. Micronaut creates many short-lived contexts in tests and may create
+     * additional event-loop contexts at runtime, so polling from bridge boundaries avoids retaining
+     * one executor per context while still allowing GraalPy to run pending async actions.
+     *
+     * @param context The context to poll.
+     */
+    static void pollAsyncActions(Context context) {
+        try {
+            Value poller = context.getPolyglotBindings().getMember(POLL_ASYNC_ACTIONS);
+            if (poller != null && poller.canExecute()) {
+                poller.executeVoid();
+            }
+        } catch (RuntimeException ignored) {
+            // The poller exists only when GraalPy is running in embedder polling mode.
         }
-        return member.execute(arguments);
     }
 
     /**

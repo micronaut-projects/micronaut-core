@@ -361,6 +361,7 @@ include "core-reactive"
 include "core-processor"
 include "context"
 include 'context-python'
+include 'context-python-netty'
 include "context-propagation"
 include "discovery-core"
 include "function"

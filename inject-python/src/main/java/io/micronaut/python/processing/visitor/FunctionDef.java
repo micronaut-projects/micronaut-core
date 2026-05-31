@@ -34,6 +34,7 @@ import java.util.Objects;
  * @param documentation The function documentation string.
  * @param isAbstract Whether the function is abstract (decorated with @abstractmethod).
  * @param isStatic Whether the function is static (decorated with @staticmethod or @classmethod).
+ * @param isAsync Whether the function was declared with {@code async def}.
  * @param declaringClass Declaring class, can be null if there is none
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.FunctionDef">Python AST FunctionDef</a>
  */
@@ -47,6 +48,7 @@ public record FunctionDef(
     String documentation,
     boolean isAbstract,
     boolean isStatic,
+    boolean isAsync,
     ClassDef declaringClass
 ) implements ElementDef, MemberDef {
 
@@ -68,47 +70,51 @@ public record FunctionDef(
 
     // Simplified constructors for easier Python interop
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType) {
-        this(name, arguments, decorators, returnType, "", java.util.List.of(), null, false, false, null);
+        this(name, arguments, decorators, returnType, "", java.util.List.of(), null, false, false, false, null);
     }
 
     public FunctionDef(String name, ArgumentsDef arguments, ReturnDef returnType) {
-        this(name, arguments, java.util.List.of(), returnType, "", java.util.List.of(), null, false, false, null);
+        this(name, arguments, java.util.List.of(), returnType, "", java.util.List.of(), null, false, false, false, null);
     }
 
     public FunctionDef(String name) {
-        this(name, ArgumentsDef.empty(), java.util.List.of(), ReturnDef.none(), "", java.util.List.of(), null, false, false, null);
+        this(name, ArgumentsDef.empty(), java.util.List.of(), ReturnDef.none(), "", java.util.List.of(), null, false, false, false, null);
     }
 
     public FunctionDef(String name, List<DecoratorDef> decoratorList) {
-        this(name, ArgumentsDef.empty(), decoratorList, ReturnDef.none(), "", java.util.List.of(), null, false, false, null);
+        this(name, ArgumentsDef.empty(), decoratorList, ReturnDef.none(), "", java.util.List.of(), null, false, false, false, null);
     }
 
     // Backward compatibility constructors
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, List<DecoratorDef> decorators, String returnTypeAnnotation) {
         this(name, createArgumentsDef(argumentNames, argumentTypes), decorators,
              returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(new TypeRef(returnTypeAnnotation)) : ReturnDef.none(),
-             "", java.util.List.of(), null, false, false, null);
+             "", java.util.List.of(), null, false, false, false, null);
     }
 
     public FunctionDef(String name, List<String> argumentNames, List<String> argumentTypes, String returnTypeAnnotation) {
         this(name, createArgumentsDef(argumentNames, argumentTypes), java.util.List.of(),
              returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(new TypeRef(returnTypeAnnotation)) : ReturnDef.none(),
-             "", java.util.List.of(), null, false, false, null);
+             "", java.util.List.of(), null, false, false, false, null);
     }
 
     // Constructor for Python interop with return type decorators
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, String returnTypeAnnotation, List<DecoratorDef> returnTypeDecorators) {
         this(name, arguments, decorators,
              returnTypeAnnotation != null && !returnTypeAnnotation.isEmpty() ? ReturnDef.of(new TypeRef(returnTypeAnnotation), returnTypeDecorators) : ReturnDef.none(),
-             "", java.util.List.of(), null, false, false, null);
+             "", java.util.List.of(), null, false, false, false, null);
     }
 
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract) {
-        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, false, null);
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, false, false, null);
     }
 
     public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic) {
-        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, null);
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, false, null);
+    }
+
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, boolean isAsync) {
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, null);
     }
 
     @Override
@@ -154,6 +160,7 @@ public record FunctionDef(
             documentation,
             isAbstract,
             isStatic,
+            isAsync,
             classDef
         );
         return new FunctionDef(
@@ -166,6 +173,7 @@ public record FunctionDef(
             documentation,
             isAbstract,
             isStatic,
+            isAsync,
             classDef
         );
     }

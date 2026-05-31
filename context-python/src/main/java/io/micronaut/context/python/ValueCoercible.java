@@ -30,6 +30,7 @@ import java.beans.Transient;
  */
 public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     String HOST_OBJECT_MEMBER = "__micronaut_value_coercible_host__";
+    String AS_POLYGLOT_VALUE_MEMBER = "asPolyglotValue";
 
     /**
      * Converts the type to a Truffle value.
@@ -46,6 +47,14 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     default @Nullable Object getMember(String key) {
         if (HOST_OBJECT_MEMBER.equals(key)) {
             return new HostObjectReference(this);
+        }
+        if (AS_POLYGLOT_VALUE_MEMBER.equals(key)) {
+            return (ProxyExecutable) arguments -> {
+                if (arguments.length != 0) {
+                    throw new IllegalArgumentException("asPolyglotValue expects no arguments");
+                }
+                return asPolyglotValue();
+            };
         }
         Value value = asPolyglotValue();
         if (value.hasMember(key)) {
@@ -75,6 +84,7 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     @Override
     default boolean hasMember(String key) {
         return HOST_OBJECT_MEMBER.equals(key) ||
+            AS_POLYGLOT_VALUE_MEMBER.equals(key) ||
             asPolyglotValue().hasMember(key) ||
             (this instanceof GeneratedPropertyMembers generatedMembers &&
                 (generatedMembers.micronautValueCoercibleGetterPropertyName(key) != null ||
@@ -97,6 +107,11 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
 
         @Transient
         default boolean micronautValueCoercibleSetMember(String key, Value value) {
+            return false;
+        }
+
+        @Transient
+        default boolean micronautValueCoerciblePutMember(String key, Value value) {
             return false;
         }
     }
@@ -133,14 +148,16 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             if (arguments.length != 1) {
                 throw new IllegalArgumentException("Setter [" + key + "] expects one argument");
             }
+            Value target = asPolyglotValue();
             Value value = arguments[0];
             if (!generatedMembers.micronautValueCoercibleSetMember(key, value)) {
                 if (GraalPyRuntimeUtil.isNone(value)) {
-                    asPolyglotValue().putMember(propertyName, null);
+                    target.putMember(propertyName, null);
                 } else {
-                    asPolyglotValue().putMember(propertyName, value);
+                    target.putMember(propertyName, value);
                 }
             }
+            generatedMembers.micronautValueCoerciblePutMember(propertyName, target.getMember(propertyName));
             return null;
         };
     }
@@ -164,6 +181,9 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             }
         }
         target.putMember(key, member);
+        if (this instanceof GeneratedPropertyMembers generatedMembers && target.hasMember(key)) {
+            generatedMembers.micronautValueCoerciblePutMember(key, target.getMember(key));
+        }
     }
 
     record HostObjectReference(ValueCoercible value) {

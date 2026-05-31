@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -134,10 +135,10 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             description.append(owner.getDescription(simple)).append(":").append(System.lineSeparator());
             indent = "      ";
         }
-        ClassElement genericReturnType = getGenericReturnType();
+        ClassElement genericReturnType = getDescriptionReturnType();
         description
             .append(indent)
-            .append("def ").append(getName())
+            .append(isAsync() ? "async def " : "def ").append(getName())
             .append("(")
             .append(isStatic() ? "cls" : "self")
             .append(")")
@@ -166,6 +167,15 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     @Override
     public boolean isAbstract() {
         return getNativeType().isAbstract();
+    }
+
+    /**
+     * Returns whether this method was declared with {@code async def}.
+     *
+     * @return Whether this method was declared with {@code async def}.
+     */
+    public boolean isAsync() {
+        return getNativeType().isAsync();
     }
 
     @Override
@@ -520,10 +530,10 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                     getBoundGenericTypes()
                 );
 
-                resolvedGenericReturnType = withDeclaredReturnAnnotationMetadata(returnDef, baseType);
+                resolvedGenericReturnType = asyncBridgeReturnType(functionDef, withDeclaredReturnAnnotationMetadata(returnDef, baseType));
             } else {
                 // Fall back to void/Object
-                resolvedGenericReturnType = PrimitiveElement.VOID;
+                resolvedGenericReturnType = asyncBridgeReturnType(functionDef, PrimitiveElement.VOID);
             }
             if (resolvedGenericReturnType instanceof AbstractPythonClassElement pythonClassElement) {
                 resolvedGenericReturnType = pythonClassElement.withTypeAnnotationsKey(functionDef);
@@ -546,10 +556,63 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                 return pythonClassElement.withTypeAnnotationsKey(functionDef);
             }
 
-            return baseType;
+            return asyncBridgeReturnType(functionDef, baseType);
         }
         // Fall back to void/Object
+        return asyncBridgeReturnType(functionDef, PrimitiveElement.VOID);
+    }
+
+    private ClassElement getDescriptionReturnType() {
+        if (!isAsync()) {
+            return getGenericReturnType();
+        }
+        ReturnDef returnDef = getNativeType().returnType();
+        if (returnDef != null && returnDef.typeAnnotation() != null) {
+            return withDeclaredReturnAnnotationMetadata(
+                returnDef,
+                GraalPyUtil.resolvePythonTypeToJava(
+                    returnDef.typeAnnotation(),
+                    environment.visitorContext(),
+                    getBoundGenericTypes()
+                )
+            );
+        }
         return PrimitiveElement.VOID;
+    }
+
+    private ClassElement asyncBridgeReturnType(FunctionDef functionDef, ClassElement awaitedType) {
+        if (!functionDef.isAsync()) {
+            return awaitedType;
+        }
+        ClassElement completionStage = environment.visitorContext()
+            .getClassElement(CompletionStage.class.getName())
+            .orElseGet(() -> ClassElement.of(CompletionStage.class));
+        ClassElement stageValueType = asyncStageValueType(awaitedType);
+        try {
+            return completionStage.withTypeArguments(Map.of("T", stageValueType));
+        } catch (UnsupportedOperationException e) {
+            return ClassElement.of(CompletionStage.class, AnnotationMetadata.EMPTY_METADATA, Map.of("T", stageValueType));
+        }
+    }
+
+    private ClassElement asyncStageValueType(ClassElement awaitedType) {
+        if (awaitedType.isVoid()) {
+            return ClassElement.of(Void.class);
+        }
+        if (!awaitedType.isPrimitive()) {
+            return awaitedType;
+        }
+        return switch (awaitedType.getName()) {
+            case "boolean" -> ClassElement.of(Boolean.class);
+            case "byte" -> ClassElement.of(Byte.class);
+            case "char" -> ClassElement.of(Character.class);
+            case "double" -> ClassElement.of(Double.class);
+            case "float" -> ClassElement.of(Float.class);
+            case "int" -> ClassElement.of(Integer.class);
+            case "long" -> ClassElement.of(Long.class);
+            case "short" -> ClassElement.of(Short.class);
+            default -> awaitedType;
+        };
     }
 
     private ClassElement withDeclaredReturnAnnotationMetadata(ReturnDef returnDef, ClassElement baseType) {

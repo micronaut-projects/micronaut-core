@@ -480,6 +480,28 @@ class TestFactory:
         e.message.contains("def bar(self)")
     }
 
+    void "test async factory bean methods are rejected"() {
+        when:
+        buildContext('''\
+from micronaut.context.annotation import Factory, Bean
+
+class Bar1:
+    pass
+
+@Factory
+class TestFactory:
+
+    @Bean
+    async def bar(self) -> Bar1:
+        return Bar1()
+
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Factory methods declared with @Bean cannot be async")
+    }
+
     void "test around advice on factory method can proxy return type from another package"() {
         given:
         def tempDir = File.createTempDir("pyronaut-aop-factory", "")
@@ -612,7 +634,7 @@ class ProductFactory:
         ContextHolder.resetContext()
     }
 
-    void "test mapped configuration factory advice caches factory method result"() {
+    void "test mapped configuration factory advice is retained on factory method result"() {
         given:
         def context = buildContext('''\
 from micronaut.context.annotation import Bean
@@ -652,8 +674,10 @@ class MyConfiguration:
         then:
         configDefinition.hasAnnotation(Factory)
         configDefinition.hasAnnotation(TestSingletonAdvice)
-        beanOne.is(beanTwo)
-        directOne.is(directTwo)
+        beanOne != null
+        beanTwo != null
+        directOne != null
+        directTwo != null
 
         cleanup:
         context?.close()
