@@ -112,6 +112,96 @@ class ReplacementPrimaryEngine(Engine):
         context?.close()
     }
 
+    void "test replacement by subtype resolves for supertype injection point"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable, Replaces
+
+class EmailSender:
+    @Executable
+    def send(self) -> str:
+        return "base"
+
+class TransactionalEmailSender(EmailSender):
+    @Executable
+    def send(self) -> str:
+        return "transactional"
+
+@Singleton
+class DefaultEmailSender(TransactionalEmailSender):
+    @Executable
+    def send(self) -> str:
+        return "default"
+
+@Singleton
+@Replaces(TransactionalEmailSender)
+class EmailSenderReplacement(TransactionalEmailSender):
+    @Executable
+    def send(self) -> str:
+        return "replacement"
+
+@Singleton
+class EmailController:
+    def __init__(self, email_sender: EmailSender):
+        self.email_sender = email_sender
+
+    @Executable
+    def send(self) -> str:
+        return self.email_sender.send()
+''')
+
+        when:
+        def senderType = context.classLoader.loadClass("python.EmailSender")
+        def senders = context.getBeansOfType(senderType)
+        def controller = getBean(context, "python.EmailController").asPolyglotValue()
+
+        then:
+        senders.size() == 1
+        controller.invokeMember("send").asString() == "replacement"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test python replacement of java subtype resolves for java supertype injection point"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Named, Singleton
+from micronaut.context.annotation import Executable, Replaces
+from io.micronaut.python.annotation.processing.test.replaces import EmailSender, TransactionalEmailSender
+
+@Singleton
+@Named("javaxmail")
+@Replaces(value=EmailSender, named="javaxmail")
+class EmailSenderReplacement(EmailSender, TransactionalEmailSender):
+    @Executable
+    def send(self) -> str:
+        return "replacement"
+
+@Singleton
+class EmailController:
+    def __init__(self, email_sender: EmailSender):
+        self.email_sender = email_sender
+
+    @Executable
+    def send(self) -> str:
+        return self.email_sender.send()
+''', true)
+
+        when:
+        def senderType = context.classLoader.loadClass("io.micronaut.python.annotation.processing.test.replaces.EmailSender")
+        def senders = context.getBeansOfType(senderType)
+        def controller = getBean(context, "python.EmailController").asPolyglotValue()
+
+        then:
+        senders.size() == 1
+        controller.invokeMember("send").asString() == "replacement"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test factory can replace another factory"() {
         given:
         def context = buildContext('''
