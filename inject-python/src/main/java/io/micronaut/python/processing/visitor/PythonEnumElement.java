@@ -16,11 +16,14 @@
 package io.micronaut.python.processing.visitor;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
+import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
 /**
@@ -85,6 +88,23 @@ public final class PythonEnumElement extends AbstractPythonClassElement implemen
                 return new PythonEnumConstantElement(constantDef, environment, this, this, environment.metadataFactory());
             })
             .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<PropertyElement> getBeanProperties() {
+        return filterEnumConstants(super.getBeanProperties());
+    }
+
+    @Override
+    public List<PropertyElement> getBeanProperties(PropertyElementQuery propertyElementQuery) {
+        return filterEnumConstants(super.getBeanProperties(propertyElementQuery));
+    }
+
+    private List<PropertyElement> filterEnumConstants(List<PropertyElement> properties) {
+        Set<String> enumConstants = Set.copyOf(values());
+        return properties.stream()
+            .filter(property -> !enumConstants.contains(property.getName()))
+            .toList();
     }
 
     @Override

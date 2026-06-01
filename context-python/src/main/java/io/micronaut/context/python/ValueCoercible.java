@@ -94,6 +94,11 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
 
         @Transient
         @Nullable String micronautValueCoercibleSetterPropertyName(String key);
+
+        @Transient
+        default boolean micronautValueCoercibleSetMember(String key, Value value) {
+            return false;
+        }
     }
 
     private @Nullable Object generatedGetter(String key) {
@@ -129,10 +134,12 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
                 throw new IllegalArgumentException("Setter [" + key + "] expects one argument");
             }
             Value value = arguments[0];
-            if (GraalPyRuntimeUtil.isNone(value)) {
-                asPolyglotValue().putMember(propertyName, null);
-            } else {
-                asPolyglotValue().putMember(propertyName, value);
+            if (!generatedMembers.micronautValueCoercibleSetMember(key, value)) {
+                if (GraalPyRuntimeUtil.isNone(value)) {
+                    asPolyglotValue().putMember(propertyName, null);
+                } else {
+                    asPolyglotValue().putMember(propertyName, value);
+                }
             }
             return null;
         };
@@ -140,6 +147,10 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
 
     @Override
     default void putMember(String key, Value value) {
+        if (this instanceof GeneratedPropertyMembers generatedMembers
+            && generatedMembers.micronautValueCoercibleSetMember(key, value)) {
+            return;
+        }
         Value target = asPolyglotValue();
         Object member = value;
         if (GraalPyRuntimeUtil.isNone(value)) {

@@ -55,6 +55,64 @@ class Status(enum.Enum):
         }
     }
 
+    void "test enum constants are not bean properties"() {
+        expect:
+        buildClassElement('''
+from enum import Enum
+
+class Player(Enum):
+    WHITE = "w"
+    BLACK = "b"
+
+    def to_string(self) -> str:
+        return self.value
+''') { EnumElement element ->
+            assert element.values() == ["WHITE", "BLACK"]
+            assert element.elements()*.name == ["WHITE", "BLACK"]
+            assert !element.getBeanProperties()*.name.contains("WHITE")
+            assert !element.getBeanProperties()*.name.contains("BLACK")
+            assert element.findMethod("to_string").isPresent()
+            return element
+        }
+    }
+
+    void "test enum JsonValue method is preserved as annotation metadata and backs Java toString"() {
+        given:
+        def source = '''
+from enum import Enum
+
+from com.fasterxml.jackson.annotation import JsonValue
+
+class Player(Enum):
+    WHITE = "w"
+    BLACK = "b"
+
+    @JsonValue
+    def to_string(self) -> str:
+        return self.value
+'''
+
+        expect:
+        buildClassElement(source) { EnumElement element ->
+            def method = element.findMethod("to_string").get()
+            assert method.hasAnnotation("com.fasterxml.jackson.annotation.JsonValue")
+            return element
+        }
+
+        when:
+        def context = buildContext(source)
+        Class<? extends Enum> playerType = context.classLoader.loadClass("python.Player")
+        def white = Enum.valueOf(playerType, "WHITE")
+        def black = Enum.valueOf(playerType, "BLACK")
+
+        then:
+        white.toString() == "w"
+        black.toString() == "b"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test enum method return and parameter types"() {
         expect:
         buildClassElement('''

@@ -168,6 +168,41 @@ class User(UserState):
         context?.close()
     }
 
+    void "test Python enum dataclass field is restored as Python enum in polyglot value"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from enum import Enum
+
+from micronaut.core.annotation import Introspected
+
+class Player(Enum):
+    WHITE = "w"
+    BLACK = "b"
+
+@Introspected
+@dataclass
+class GameStateDTO:
+    player: Player
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def playerType = context.classLoader.loadClass("python.Player")
+        def white = Enum.valueOf(playerType, "WHITE")
+        def introspection = getBeanIntrospection(context, "python.GameStateDTO")
+        def instance = introspection.instantiate(white)
+        def playerValue = instance.asPolyglotValue().getMember("player")
+
+        then:
+        !playerValue.isHostObject()
+        playerValue.getMember("name").asString() == "WHITE"
+        playerValue.getMember("value").asString() == "w"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test Python dataclass default factory fields accept null default and explicit list through introspection"() {
         given:
         def pythonCode = '''
@@ -507,6 +542,7 @@ from micronaut.python.compiler import Serdeable
 class SerdeableDataClass:
     name: str
     age: int = 25
+    active: bool = False
 '''
 
         when:
@@ -518,17 +554,21 @@ class SerdeableDataClass:
         introspection.hasStereotype(Serdeable.Serializable)
         introspection.hasStereotype(Serdeable.Deserializable)
         introspection.getBeanType().getSimpleName() == "SerdeableDataClass"
-        introspection.getPropertyNames().length == 2
+        introspection.getPropertyNames().length == 3
         introspection.getProperty("name").isPresent()
         introspection.getProperty("age").isPresent()
+        introspection.getProperty("active").isPresent()
 
         when:"instantiating with constructor arguments"
-        def instance = introspection.instantiate("John", 30)
+        def instance = introspection.instantiate("John", 30, true)
 
         then:"instance is created correctly"
         instance != null
         introspection.getRequiredProperty("name", String).get(instance) == "John"
         introspection.getRequiredProperty("age", int).get(instance) == 30
+        introspection.getRequiredProperty("active", boolean).get(instance)
+        instance.class.methods.any { it.name == "isActive" && it.parameterCount == 0 && it.returnType == boolean }
+        instance.isActive()
 
         cleanup:
         context?.close()
@@ -572,6 +612,7 @@ from micronaut.serde.annotation import Serdeable
 class BinarySerdeableDataClass:
     name: str
     age: int = 25
+    active: bool = False
 '''
 
         when:
@@ -583,9 +624,18 @@ class BinarySerdeableDataClass:
         introspection.hasStereotype(Introspected)
         introspection.hasStereotype("io.micronaut.serde.annotation.Serdeable\$Serializable")
         introspection.hasStereotype("io.micronaut.serde.annotation.Serdeable\$Deserializable")
-        introspection.getPropertyNames().length == 2
+        introspection.getPropertyNames().length == 3
         introspection.getProperty("name").isPresent()
         introspection.getProperty("age").isPresent()
+        introspection.getProperty("active").isPresent()
+
+        when:
+        def instance = introspection.instantiate("John", 30, true)
+
+        then:
+        introspection.getRequiredProperty("active", boolean).get(instance)
+        instance.class.methods.any { it.name == "isActive" && it.parameterCount == 0 && it.returnType == boolean }
+        instance.isActive()
 
         cleanup:
         context?.close()

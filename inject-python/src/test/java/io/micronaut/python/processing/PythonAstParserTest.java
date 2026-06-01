@@ -40,6 +40,7 @@ import io.micronaut.python.processing.visitor.PythonFieldElement;
 import io.micronaut.python.processing.visitor.PythonMethodElement;
 import io.micronaut.python.processing.visitor.PythonParameterElement;
 import io.micronaut.sourcegen.model.EnumDef;
+import io.micronaut.sourcegen.model.MethodDef;
 import jakarta.inject.Named;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
@@ -934,8 +935,9 @@ class ProductMappers:
                         .map(EnumDef.EnumConstantDef::name)
                         .toList()
                 );
-                assertTrue(enumDef.getSuperinterfaces().isEmpty());
-                assertTrue(enumDef.getMethods().isEmpty());
+                assertTrue(enumDef.getFields().isEmpty());
+                assertEquals(1, enumDef.getSuperinterfaces().size());
+                assertEquals(List.of("asPolyglotValue", "fromPolyglotValue"), enumDef.getMethods().stream().map(MethodDef::getName).toList());
             }
         }
     }
