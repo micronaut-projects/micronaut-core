@@ -2602,7 +2602,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         List<ExpressionDef> parameters,
         VariableDef.MethodParameter methodParam,
         @Nullable ExpressionDef targetContext) {
-        ExpressionDef parameter = coerceTypedElementToPolyglotValue(param, methodParam);
+        ExpressionDef parameter;
+        ClassElement genericType = param.getGenericType();
+        if (genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement) {
+            parameter = RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), methodParam);
+        } else if (genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement) {
+            parameter = RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), methodParam);
+        } else {
+            parameter = methodParam;
+        }
         if (targetContext != null) {
             parameter = RUNTIME_UTIL.invokeStatic("coerceToContext", TypeDef.OBJECT, parameter, targetContext);
         }

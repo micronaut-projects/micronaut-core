@@ -152,9 +152,6 @@ public final class GraalPyRuntimeUtil {
         if (value instanceof PooledValueCoercible pooledValueCoercible) {
             return pooledValueCoercible.asPolyglotValue(context);
         }
-        if (value instanceof ValueCoercible valueCoercible) {
-            return valueCoercible.asPolyglotValue();
-        }
         if (value instanceof List<?> list) {
             List<Object> result = new ArrayList<>(list.size());
             for (Object element : list) {
