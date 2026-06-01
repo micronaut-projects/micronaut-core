@@ -34,6 +34,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
@@ -210,32 +211,19 @@ public class DefaultHttpClient implements
     private static final int DEFAULT_HTTPS_PORT = 443;
     private static final String REDIRECT_COUNT = "micronaut.http.client.redirect-count";
 
-    /**
-     * Which headers <i>not</i> to copy from the first request when redirecting to a second request. There doesn't
-     * appear to be a spec for this. {@link java.net.HttpURLConnection} seems to drop all headers, but that would be a
-     * breaking change.
-     * <p>
-     * Stored as a {@link HttpHeaders} with empty values because presumably someone thought about optimizing those
-     * already.
-     */
-    private static final HttpHeaders REDIRECT_HEADER_BLOCKLIST;
-
-    static {
-        REDIRECT_HEADER_BLOCKLIST = new DefaultHttpHeaders();
-        // The host should be recalculated based on the location
-        REDIRECT_HEADER_BLOCKLIST.add(HttpHeaderNames.HOST, "");
-        // post body headers
-        REDIRECT_HEADER_BLOCKLIST.add(HttpHeaderNames.CONTENT_TYPE, "");
-        REDIRECT_HEADER_BLOCKLIST.add(HttpHeaderNames.CONTENT_LENGTH, "");
-        REDIRECT_HEADER_BLOCKLIST.add(HttpHeaderNames.TRANSFER_ENCODING, "");
-        REDIRECT_HEADER_BLOCKLIST.add(HttpHeaderNames.CONNECTION, "");
-    }
-
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
     final ConnectionManager connectionManager;
 
+    private final Supplier<DefaultHttpHeaders> redirectSameOriginPreserveBodyHeaders =
+        SupplierUtil.memoized(() -> buildRedirectFilteredHeaders(false, true));
+    private final Supplier<DefaultHttpHeaders> redirectCrossOriginPreserveBodyHeaders =
+        SupplierUtil.memoized(() -> buildRedirectFilteredHeaders(true, true));
+    private final Supplier<DefaultHttpHeaders> redirectSameOriginNonPreserveBodyHeaders =
+        SupplierUtil.memoized(() -> buildRedirectFilteredHeaders(false, false));
+    private final Supplier<DefaultHttpHeaders> redirectCrossOriginNonPreserveBodyHeaders =
+        SupplierUtil.memoized(() -> buildRedirectFilteredHeaders(true, false));
     private final List<HttpFilterResolver.FilterEntry<HttpClientFilter>> clientFilterEntries;
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
@@ -1846,6 +1834,24 @@ public class DefaultHttpClient implements
         void accept(T1 t1, T2 t2) throws Exception;
     }
 
+    private DefaultHttpHeaders buildRedirectFilteredHeaders(boolean crossOrigin, boolean preserveBody) {
+        DefaultHttpHeaders headers = new DefaultHttpHeaders();
+        for (String header : configuration.getRedirectAlwaysFilteredHeaders()) {
+            headers.add(header, "");
+        }
+        if (crossOrigin) {
+            for (String header : configuration.getRedirectCrossOriginFilteredHeaders()) {
+                headers.add(header, "");
+            }
+        }
+        if (!preserveBody) {
+            for (String header : configuration.getRedirectAdditionalNonPreserveBodyFilteredHeaders()) {
+                headers.add(header, "");
+            }
+        }
+        return headers;
+    }
+
     /**
      * Key used for connection pooling and determining host/port.
      */
@@ -2068,7 +2074,6 @@ public class DefaultHttpClient implements
                     redirectRequest = io.micronaut.http.HttpRequest.GET(location);
                 }
 
-                setRedirectHeaders(finalRequest, redirectRequest);
 
                 int redirectCount = finalRequest.getAttribute(REDIRECT_COUNT, Integer.class).orElse(0) + 1;
                 if (redirectCount > configuration.getMaxRedirects()) {
@@ -2076,6 +2081,8 @@ public class DefaultHttpClient implements
                     return;
                 }
                 redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
+
+                setRedirectHeaders(finalRequest, redirectRequest, code == 307);
 
                 Flux.from(resolveRedirectURI(parentRequest, redirectRequest))
                         .flatMap(makeRedirectHandler(parentRequest, redirectRequest))
@@ -2101,21 +2108,49 @@ public class DefaultHttpClient implements
             buildResponse(responsePromise, msg, httpStatus);
         }
 
-        private void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<Object> redirectRequest) {
-            if (request != null) {
-                for (Map.Entry<String, List<String>> originalHeader : request.getHeaders()) {
-                    if (!REDIRECT_HEADER_BLOCKLIST.contains(originalHeader.getKey())) {
-                        final List<String> originalHeaderValue = originalHeader.getValue();
-                        if (originalHeaderValue != null && !originalHeaderValue.isEmpty()) {
-                            for (String value : originalHeaderValue) {
-                                if (value != null) {
-                                    redirectRequest.header(originalHeader.getKey(), value);
-                                }
-                            }
+
+        private void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request,
+                                        MutableHttpRequest<Object> redirectRequest,
+                                        boolean preserveBody) {
+            if (request == null) {
+                return;
+            }
+            boolean sameOrigin = isSameOrigin(request.getUri(), redirectRequest.getUri());
+            DefaultHttpHeaders headersToBlock = resolveRedirectFilteredHeaders(!sameOrigin, preserveBody);
+            for (Map.Entry<String, List<String>> originalHeader : request.getHeaders()) {
+                String headerName = originalHeader.getKey();
+                if (headersToBlock.contains(headerName)) {
+                    continue;
+                }
+                final List<String> originalHeaderValue = originalHeader.getValue();
+                if (originalHeaderValue != null && !originalHeaderValue.isEmpty()) {
+                    for (String value : originalHeaderValue) {
+                        if (value != null) {
+                            redirectRequest.header(headerName, value);
                         }
                     }
                 }
             }
+        }
+
+        private boolean isSameOrigin(URI requestUri, URI redirectUri) {
+            try {
+                if (redirectUri.getScheme() == null) {
+                    redirectUri = requestUri.resolve(redirectUri);
+                }
+                return new RequestKey(DefaultHttpClient.this, requestUri)
+                    .equals(new RequestKey(DefaultHttpClient.this, redirectUri));
+            } catch (Exception e) {
+                // fallback
+                return false;
+            }
+        }
+
+        private DefaultHttpHeaders resolveRedirectFilteredHeaders(boolean crossOrigin, boolean preserveBody) {
+            if (crossOrigin) {
+                return preserveBody ? redirectCrossOriginPreserveBodyHeaders.get() : redirectCrossOriginNonPreserveBodyHeaders.get();
+            }
+            return preserveBody ? redirectSameOriginPreserveBodyHeaders.get() : redirectSameOriginNonPreserveBodyHeaders.get();
         }
 
         protected abstract Function<URI, Publisher<? extends O>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest);

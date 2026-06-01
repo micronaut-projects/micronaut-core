@@ -1,5 +1,12 @@
 This section documents breaking changes between Micronaut versions
 
+=== HTTP client redirect forwarding no longer retains authorization headers cross-origin by default
+
+The Netty HTTP client no longer forwards `Authorization`, `Proxy-Authorization`, or `Cookie` headers on cross-origin redirects by default.
+This applies to both normal redirects and preserve-body redirects (`307` and `308`).
+
+If needed, this behavior can be customized through `HttpClientConfiguration`.
+
 == 3.9.0
 
 Since Micronaut Framework 3.9.0, CORS `allowed-origins` configuration does not support regular expressions to prevent accidentally exposing your API. You can use `allowed-origins-regex`, if you wish to support a regular expression.
