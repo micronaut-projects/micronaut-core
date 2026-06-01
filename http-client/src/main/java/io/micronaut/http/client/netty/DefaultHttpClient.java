@@ -1829,11 +1829,6 @@ public class DefaultHttpClient implements
         }
     }
 
-    @FunctionalInterface
-    interface ThrowingBiConsumer<T1, T2> {
-        void accept(T1 t1, T2 t2) throws Exception;
-    }
-
     private DefaultHttpHeaders buildRedirectFilteredHeaders(boolean crossOrigin, boolean preserveBody) {
         DefaultHttpHeaders headers = new DefaultHttpHeaders();
         for (String header : configuration.getRedirectAlwaysFilteredHeaders()) {
@@ -1850,6 +1845,11 @@ public class DefaultHttpClient implements
             }
         }
         return headers;
+    }
+
+    @FunctionalInterface
+    interface ThrowingBiConsumer<T1, T2> {
+        void accept(T1 t1, T2 t2) throws Exception;
     }
 
     /**
@@ -2107,7 +2107,6 @@ public class DefaultHttpClient implements
             }
             buildResponse(responsePromise, msg, httpStatus);
         }
-
 
         private void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request,
                                         MutableHttpRequest<Object> redirectRequest,
