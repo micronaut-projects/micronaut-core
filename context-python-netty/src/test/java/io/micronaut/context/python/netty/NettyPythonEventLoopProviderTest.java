@@ -22,8 +22,10 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.DefaultEventLoop;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.resolver.AddressResolverGroup;
 import org.junit.jupiter.api.Test;
 
+import java.net.InetSocketAddress;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledFuture;
@@ -32,6 +34,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class NettyPythonEventLoopProviderTest {
@@ -82,6 +86,34 @@ final class NettyPythonEventLoopProviderTest {
 
             Thread.sleep(100);
             assertFalse(invoked.get());
+        } finally {
+            eventLoop.shutdownGracefully().syncUninterruptibly();
+        }
+    }
+
+    @Test
+    void cachesResolverGroupPerEventLoop() {
+        DefaultEventLoop eventLoop = new DefaultEventLoop();
+        try {
+            NettyPythonEventLoopSupport support = new NettyPythonEventLoopSupport();
+
+            AddressResolverGroup<InetSocketAddress> first = support.resolver(eventLoop);
+            AddressResolverGroup<InetSocketAddress> second = support.resolver(eventLoop);
+
+            assertSame(first, second);
+            support.closeAll().toCompletableFuture().join();
+        } finally {
+            eventLoop.shutdownGracefully().syncUninterruptibly();
+        }
+    }
+
+    @Test
+    void reusePortRequiresNativeEventLoopSupport() {
+        DefaultEventLoop eventLoop = new DefaultEventLoop();
+        try {
+            NettyPythonEventLoopSupport support = new NettyPythonEventLoopSupport();
+
+            assertNull(support.reusePortOption(eventLoop));
         } finally {
             eventLoop.shutdownGracefully().syncUninterruptibly();
         }

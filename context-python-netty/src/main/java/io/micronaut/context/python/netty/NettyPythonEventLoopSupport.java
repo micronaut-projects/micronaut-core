@@ -20,6 +20,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.netty.channel.NettyChannelType;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoop;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
@@ -28,6 +29,7 @@ import io.netty.channel.socket.nio.NioServerDomainSocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
+import io.netty.channel.unix.UnixChannelOption;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -62,6 +64,7 @@ final class NettyPythonEventLoopSupport {
     private static final String EPOLL = ".epoll.";
     private static final String KQUEUE = ".kqueue.";
     private final Set<Channel> channels = ConcurrentHashMap.newKeySet();
+    private final Map<EventLoop, AddressResolverGroup<InetSocketAddress>> resolvers = new ConcurrentHashMap<>();
 
     Class<? extends Channel> channelClass(EventLoop eventLoop, NettyChannelType type) {
         String eventLoopClassName = eventLoop.getClass().getName();
@@ -81,10 +84,30 @@ final class NettyPythonEventLoopSupport {
     }
 
     AddressResolverGroup<InetSocketAddress> resolver(EventLoop eventLoop) {
-        return new DnsAddressResolverGroup(
+        return resolvers.computeIfAbsent(eventLoop, this::newResolver);
+    }
+
+    @Nullable
+    ChannelOption<Boolean> reusePortOption(EventLoop eventLoop) {
+        String eventLoopClassName = eventLoop.getClass().getName();
+        if (eventLoopClassName.contains(EPOLL) || eventLoopClassName.contains(KQUEUE)) {
+            return UnixChannelOption.SO_REUSEPORT;
+        }
+        return null;
+    }
+
+    private AddressResolverGroup<InetSocketAddress> newResolver(EventLoop eventLoop) {
+        AddressResolverGroup<InetSocketAddress> resolver = new DnsAddressResolverGroup(
             () -> (DatagramChannel) newChannel(eventLoop, NettyChannelType.DATAGRAM_SOCKET),
             DnsServerAddressStreamProviders.platformDefault()
         );
+        eventLoop.terminationFuture().addListener(ignored -> {
+            AddressResolverGroup<InetSocketAddress> removed = resolvers.remove(eventLoop);
+            if (removed != null) {
+                removed.close();
+            }
+        });
+        return resolver;
     }
 
     Channel newChannel(EventLoop eventLoop, NettyChannelType type) {
@@ -109,6 +132,7 @@ final class NettyPythonEventLoopSupport {
     }
 
     CompletionStage<Void> closeAll() {
+        closeResolvers();
         List<Channel> snapshot = List.copyOf(channels);
         if (snapshot.isEmpty()) {
             return CompletableFuture.completedFuture(null);
@@ -128,6 +152,12 @@ final class NettyPythonEventLoopSupport {
             })
             .toArray(CompletableFuture[]::new);
         return CompletableFuture.allOf(futures);
+    }
+
+    private void closeResolvers() {
+        List<AddressResolverGroup<InetSocketAddress>> snapshot = List.copyOf(resolvers.values());
+        resolvers.clear();
+        snapshot.forEach(AddressResolverGroup::close);
     }
 
     @Nullable TlsOptions tlsOptions(@Nullable Object ssl,

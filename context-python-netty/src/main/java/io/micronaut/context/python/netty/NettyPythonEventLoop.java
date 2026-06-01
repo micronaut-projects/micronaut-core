@@ -242,7 +242,11 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
                         }
                     });
                 if (reusePort) {
-                    bootstrap.option(ChannelOption.SO_REUSEADDR, true);
+                    ChannelOption<Boolean> reusePortOption = support.reusePortOption(eventLoop);
+                    if (reusePortOption == null) {
+                        throw new UnsupportedOperationException("reuse_port requires a Netty native transport that supports SO_REUSEPORT");
+                    }
+                    bootstrap.option(reusePortOption, true);
                 }
                 InetSocketAddress bindAddress = host == null ? new InetSocketAddress(port) : InetSocketAddress.createUnresolved(host, port);
                 resolveAddress(bindAddress, future, resolvedBind -> {
@@ -458,7 +462,11 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
                     .option(ChannelOption.SO_BROADCAST, allowBroadcast)
                     .handler(new NettyDatagramHandler(protocol));
                 if (reusePort) {
-                    bootstrap.option(ChannelOption.SO_REUSEADDR, true);
+                    ChannelOption<Boolean> reusePortOption = support.reusePortOption(eventLoop);
+                    if (reusePortOption == null) {
+                        throw new UnsupportedOperationException("reuse_port requires a Netty native transport that supports SO_REUSEPORT");
+                    }
+                    bootstrap.option(reusePortOption, true);
                 }
                 InetSocketAddress bindAddress = local == null ? new InetSocketAddress(0) : local;
                 resolveAddress(bindAddress, future, resolvedBind -> bootstrap.bind(resolvedBind).addListener((ChannelFutureListener) bindFuture -> {
