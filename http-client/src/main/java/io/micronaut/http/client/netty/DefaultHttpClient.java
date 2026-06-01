@@ -38,6 +38,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.core.util.functional.ThrowingFunction;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.BasicHttpAttributes;
@@ -200,6 +201,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty.
@@ -226,32 +228,20 @@ public class DefaultHttpClient implements
     private static final int DEFAULT_HTTPS_PORT = 443;
     private static final String REDIRECT_COUNT = "micronaut.http.client.redirect-count";
 
-    /**
-     * When following a 307 or 308 redirect, body related headers should be kept. Standard hop-by-hop
-     * and host-specific headers are still dropped.
-     */
-    private static final HttpHeaders REDIRECT_HEADER_BLOCKLIST_PRESERVE_BODY = new DefaultHttpHeaders()
-        .add(HttpHeaderNames.HOST, "")
-        .add(HttpHeaderNames.CONNECTION, "");
-
-    /**
-     * When following 3xx responses (that are not 307 or 308) the request bodies are dropped and converted
-     * to GET requests. Therefore, headers related to the content and length of the request body must
-     * also be stripped along with standard hop-by-hop and host-specific headers.
-     */
-    private static final HttpHeaders REDIRECT_HEADER_BLOCKLIST = new DefaultHttpHeaders()
-        .add(HttpHeaderNames.HOST, "")
-        .add(HttpHeaderNames.TRANSFER_ENCODING, "")
-        .add(HttpHeaderNames.CONNECTION, "")
-        .add(HttpHeaderNames.CONTENT_TYPE, "")
-        .add(HttpHeaderNames.CONTENT_LENGTH, "");
-
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
     ConnectionManager connectionManager;
 
     private MessageBodyHandlerRegistry handlerRegistry;
+    private final Supplier<DefaultHttpHeaders> redirectSameOriginPreserveBodyHeaders =
+        SupplierUtil.memoized(() -> buildRedirectFilteredHeaders(false, true));
+    private final Supplier<DefaultHttpHeaders> redirectCrossOriginPreserveBodyHeaders =
+        SupplierUtil.memoized(() -> buildRedirectFilteredHeaders(true, true));
+    private final Supplier<DefaultHttpHeaders> redirectSameOriginNonPreserveBodyHeaders =
+        SupplierUtil.memoized(() -> buildRedirectFilteredHeaders(false, false));
+    private final Supplier<DefaultHttpHeaders> redirectCrossOriginNonPreserveBodyHeaders =
+        SupplierUtil.memoized(() -> buildRedirectFilteredHeaders(true, false));
     private final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
@@ -1650,10 +1640,8 @@ public class DefaultHttpClient implements
                     if (code == 307 || code == 308) {
                         redirectRequest = io.micronaut.http.HttpRequest.create(request.getMethod(), location);
                         request.getBody().ifPresent(redirectRequest::body);
-                        setRedirectHeaders(request, redirectRequest, REDIRECT_HEADER_BLOCKLIST_PRESERVE_BODY);
                     } else {
                         redirectRequest = io.micronaut.http.HttpRequest.GET(location);
-                        setRedirectHeaders(request, redirectRequest, REDIRECT_HEADER_BLOCKLIST);
                     }
 
                     int redirectCount = request.getAttribute(REDIRECT_COUNT, Integer.class).orElse(0) + 1;
@@ -1661,9 +1649,12 @@ public class DefaultHttpClient implements
                         return ExecutionFlow.error(decorate(new HttpClientException("Maximum number of redirects exceeded at redirect count: " + redirectCount)));
                     }
                     redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
-                    
+
                     return resolveRedirectURI(request, redirectRequest)
-                        .flatMap(uri -> sendRequestWithRedirects(propagatedContext, blockHint, redirectRequest.uri(uri), readResponse));
+                        .flatMap(uri -> {
+                            setRedirectHeaders(request, redirectRequest.uri(uri), code == 307 || code == 308);
+                            return sendRequestWithRedirects(propagatedContext, blockHint, redirectRequest.uri(uri), readResponse);
+                        });
                 } else {
                     io.micronaut.http.HttpHeaders headers = byteBodyResponse.getHeaders();
                     if (log.isTraceEnabled()) {
@@ -2077,23 +2068,60 @@ public class DefaultHttpClient implements
         return result;
     }
 
-    private static void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request,
-                                           MutableHttpRequest<Object> redirectRequest,
-                                           HttpHeaders headersToBlock) {
-        if (request != null) {
-            for (Map.Entry<String, List<String>> originalHeader : request.getHeaders()) {
-                if (!headersToBlock.contains(originalHeader.getKey())) {
-                    final List<String> originalHeaderValue = originalHeader.getValue();
-                    if (originalHeaderValue != null && !originalHeaderValue.isEmpty()) {
-                        for (String value : originalHeaderValue) {
-                            if (value != null) {
-                                redirectRequest.header(originalHeader.getKey(), value);
-                            }
-                        }
+    private void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request,
+                                    MutableHttpRequest<Object> redirectRequest,
+                                    boolean preserveBody) {
+        if (request == null) {
+            return;
+        }
+        boolean sameOrigin;
+        try {
+            sameOrigin = new RequestKey(this, request.getUri())
+                .equals(new RequestKey(this, redirectRequest.getUri()));
+        } catch (Exception e) {
+            // fallback
+            sameOrigin = false;
+        }
+        DefaultHttpHeaders headersToBlock = resolveRedirectFilteredHeaders(!sameOrigin, preserveBody);
+        for (Map.Entry<String, List<String>> originalHeader : request.getHeaders()) {
+            String headerName = originalHeader.getKey();
+            if (headersToBlock.contains(headerName)) {
+                continue;
+            }
+            final List<String> originalHeaderValue = originalHeader.getValue();
+            if (originalHeaderValue != null && !originalHeaderValue.isEmpty()) {
+                for (String value : originalHeaderValue) {
+                    if (value != null) {
+                        redirectRequest.header(headerName, value);
                     }
                 }
             }
         }
+    }
+
+    private DefaultHttpHeaders resolveRedirectFilteredHeaders(boolean crossOrigin, boolean preserveBody) {
+        if (crossOrigin) {
+            return preserveBody ? redirectCrossOriginPreserveBodyHeaders.get() : redirectCrossOriginNonPreserveBodyHeaders.get();
+        }
+        return preserveBody ? redirectSameOriginPreserveBodyHeaders.get() : redirectSameOriginNonPreserveBodyHeaders.get();
+    }
+
+    private DefaultHttpHeaders buildRedirectFilteredHeaders(boolean crossOrigin, boolean preserveBody) {
+        DefaultHttpHeaders headers = new DefaultHttpHeaders();
+        for (String header : configuration.getRedirectAlwaysFilteredHeaders()) {
+            headers.add(header, "");
+        }
+        if (crossOrigin) {
+            for (String header : configuration.getRedirectCrossOriginFilteredHeaders()) {
+                headers.add(header, "");
+            }
+        }
+        if (!preserveBody) {
+            for (String header : configuration.getRedirectAdditionalNonPreserveBodyFilteredHeaders()) {
+                headers.add(header, "");
+            }
+        }
+        return headers;
     }
 
     private BodySizeLimits sizeLimits() {
