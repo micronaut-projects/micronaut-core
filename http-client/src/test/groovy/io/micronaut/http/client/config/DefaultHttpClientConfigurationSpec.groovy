@@ -37,6 +37,7 @@ class DefaultHttpClientConfigurationSpec extends Specification {
         'shutdown-timeout'          | 'shutdownTimeout'        | '100ms' | Optional.of(Duration.ofMillis(100))
         'shutdown-timeout'          | 'shutdownTimeout'        | '15s'   | Optional.of(Duration.ofSeconds(15))
         'follow-redirects'          | 'followRedirects'        | 'false' | false
+        'max-redirects'             | 'maxRedirects'           | '7'     | 7
         'max-header-size'           | 'maxHeaderSize'          | '16384' | 16384
     }
 

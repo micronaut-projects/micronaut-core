@@ -224,6 +224,7 @@ public class DefaultHttpClient implements
     private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
+    private static final String REDIRECT_COUNT = "micronaut.http.client.redirect-count";
 
     /**
      * When following a 307 or 308 redirect, body related headers should be kept. Standard hop-by-hop
@@ -1655,6 +1656,12 @@ public class DefaultHttpClient implements
                         setRedirectHeaders(request, redirectRequest, REDIRECT_HEADER_BLOCKLIST);
                     }
 
+                    int redirectCount = request.getAttribute(REDIRECT_COUNT, Integer.class).orElse(0) + 1;
+                    if (redirectCount > configuration.getMaxRedirects()) {
+                        return ExecutionFlow.error(decorate(new HttpClientException("Maximum number of redirects exceeded at redirect count: " + redirectCount)));
+                    }
+                    redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
+                    
                     return resolveRedirectURI(request, redirectRequest)
                         .flatMap(uri -> sendRequestWithRedirects(propagatedContext, blockHint, redirectRequest.uri(uri), readResponse));
                 } else {

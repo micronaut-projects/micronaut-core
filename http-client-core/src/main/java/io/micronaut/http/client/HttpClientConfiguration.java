@@ -116,6 +116,12 @@ public abstract class HttpClientConfiguration {
     public static final boolean DEFAULT_FOLLOW_REDIRECTS = true;
 
     /**
+     * The default maximum number of redirects to follow.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_REDIRECTS = 5;
+
+    /**
      * The default value.
      */
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
@@ -174,6 +180,8 @@ public abstract class HttpClientConfiguration {
     private Charset defaultCharset = StandardCharsets.UTF_8;
 
     private boolean followRedirects = DEFAULT_FOLLOW_REDIRECTS;
+
+    private int maxRedirects = DEFAULT_MAX_REDIRECTS;
 
     private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
     private boolean decompressionEnabled = true;
@@ -236,6 +244,7 @@ public abstract class HttpClientConfiguration {
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
             this.eventLoopGroup = copy.eventLoopGroup;
             this.followRedirects = copy.followRedirects;
+            this.maxRedirects = copy.maxRedirects;
             this.logLevel = copy.logLevel;
             this.loggerName = copy.loggerName;
             this.maxContentLength = copy.maxContentLength;
@@ -420,6 +429,24 @@ public abstract class HttpClientConfiguration {
      */
     public void setFollowRedirects(boolean followRedirects) {
         this.followRedirects = followRedirects;
+    }
+
+    /**
+     * The maximum number of redirects to follow.
+     *
+     * @return The maximum number of redirects
+     */
+    public int getMaxRedirects() {
+        return maxRedirects;
+    }
+
+    /**
+     * Sets the maximum number of redirects to follow. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_REDIRECTS}).
+     *
+     * @param maxRedirects The maximum number of redirects
+     */
+    public void setMaxRedirects(int maxRedirects) {
+        this.maxRedirects = maxRedirects;
     }
 
     /**
