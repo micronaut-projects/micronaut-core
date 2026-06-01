@@ -85,6 +85,39 @@ class HelloController:
         context?.close()
     }
 
+    void "test python controller binds path variable to Python enum value"() {
+        given:
+        def context = buildContext('''
+from enum import Enum
+from micronaut.http.annotation import Controller, Get
+
+
+class Player(Enum):
+    WHITE = "w"
+    BLACK = "b"
+
+
+@Controller("/game")
+class GameController:
+    @Get("/{player}")
+    def player(self, player: Player) -> str:
+        return player.value
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+
+        expect:
+        client.toBlocking().retrieve("/game/w") == "w"
+        client.toBlocking().retrieve("/game/b") == "b"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
     void "test classless python controller route with execute on"() {
         given:
         def context = buildContext('''

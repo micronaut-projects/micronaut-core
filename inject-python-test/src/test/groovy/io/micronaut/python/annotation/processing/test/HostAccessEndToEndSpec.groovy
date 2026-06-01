@@ -528,6 +528,137 @@ class Book:
         ctx?.close()
     }
 
+    void "Serdeable frozen dataclass wrapper reconstructs Python enum fields from Java enum fields"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from enum import Enum
+from micronaut.python.compiler import Serdeable
+
+
+class Player(Enum):
+    WHITE = "w"
+    BLACK = "b"
+
+
+@Serdeable
+@dataclass(frozen=True)
+class Move:
+    player: Player
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Context polyglot = ctx.getBean(Context)
+        Class<?> moveClass = ctx.classLoader.loadClass('python.Move')
+        Class<?> playerClass = ctx.classLoader.loadClass('python.Player')
+        def white = Enum.valueOf((Class<Enum>) playerClass, "WHITE")
+        def move = moveClass.getDeclaredConstructor(playerClass).newInstance(white)
+        Value pythonMove = ((ValueCoercible) move).asPolyglotValue()
+        polyglot.getBindings("python").putMember("move", move)
+
+        then:
+        white.name() == "WHITE"
+        pythonMove.getMember('player').getMember('value').asString() == 'w'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "generated dataclass wrapper setters called from Python update Java fields"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from enum import Enum
+from micronaut.core.annotation import Introspected
+
+
+class Player(Enum):
+    WHITE = "w"
+    BLACK = "b"
+
+
+@Introspected
+@dataclass
+class Game:
+    draw: bool = False
+    winner: Player | None = None
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Context polyglot = ctx.getBean(Context)
+        Class<?> gameClass = ctx.classLoader.loadClass('python.Game')
+        Class<?> playerClass = ctx.classLoader.loadClass('python.Player')
+        def game = polyglot.eval("python", "Game()").as(gameClass)
+        polyglot.getBindings("python").putMember("game", game)
+        polyglot.eval("python", "game.setDraw(True)")
+        polyglot.eval("python", "game.setWinner(Player.BLACK)")
+        def black = Enum.valueOf((Class<Enum>) playerClass, "BLACK")
+
+        then:
+        game.getDraw()
+        game.isDraw()
+        game.getWinner() == black
+        ((ValueCoercible) game).asPolyglotValue().getMember("draw").asBoolean()
+        ((ValueCoercible) game).asPolyglotValue().getMember("winner").getMember("value").asString() == "b"
+        polyglot.eval("python", "game.draw").asBoolean()
+        polyglot.eval("python", "game.winner.value").asString() == "b"
+
+        when:
+        polyglot.eval("python", "game.draw = False")
+        polyglot.eval("python", "game.winner = Player.WHITE")
+        def white = Enum.valueOf((Class<Enum>) playerClass, "WHITE")
+
+        then:
+        !game.getDraw()
+        !game.isDraw()
+        game.getWinner() == white
+        !((ValueCoercible) game).asPolyglotValue().getMember("draw").asBoolean()
+        ((ValueCoercible) game).asPolyglotValue().getMember("winner").getMember("value").asString() == "w"
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python enum value converts to generated enum when passed to Java Object method"() {
+        given:
+        String py = '''
+from enum import Enum
+
+
+class Player(Enum):
+    WHITE = "w"
+    BLACK = "b"
+
+
+'''
+
+        ApplicationContext ctx = buildContext(py, true)
+
+        when:
+        Context polyglot = ctx.getBean(Context)
+        Class<?> playerClass = ctx.classLoader.loadClass('python.Player')
+        Value pythonBlack = polyglot.eval("python", "Player.BLACK")
+        def javaBlack = pythonBlack.as(playerClass)
+        polyglot.getBindings("python").putMember("json_mapper", ctx.getBean(JsonMapper))
+        String json = polyglot.eval("python", "json_mapper.writeValueAsString(Player.BLACK)").asString()
+
+        then:
+        playerClass.isInstance(javaBlack)
+        javaBlack.name() == "BLACK"
+        json == '"BLACK"'
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "Serdeable Python dataclasses serialize list properties"() {
         given:
         String py = '''

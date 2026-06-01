@@ -286,6 +286,34 @@ public final class ContextHolder {
     }
 
     /**
+     * Resolve a Python enum constant by its Java enum name.
+     *
+     * @param packageName The package name
+     * @param simpleName  The simple name
+     * @param name        The enum constant name
+     * @return The Python enum constant
+     */
+    @UsedByGeneratedCode
+    public static Value enumValue(@Nullable String packageName, String simpleName, String name) {
+        Value pythonClass = findClass(packageName, simpleName);
+        return withContextClassLoader(() -> {
+            Value enumValue = pythonClass.getMember(name);
+            if (enumValue != null && !GraalPyRuntimeUtil.isNone(enumValue)) {
+                return enumValue;
+            }
+            Value members = pythonClass.getMember("__members__");
+            if (members != null && members.hasHashEntries()) {
+                enumValue = members.getHashValue(name);
+                if (enumValue != null && !GraalPyRuntimeUtil.isNone(enumValue)) {
+                    return enumValue;
+                }
+            }
+            String qualifiedName = packageName == null || PYTHON.equals(packageName) ? simpleName : packageName + "." + simpleName;
+            throw new IllegalArgumentException("Cannot resolve Python enum constant: " + qualifiedName + "." + name);
+        });
+    }
+
+    /**
      * Create a new instance, omitting trailing null arguments that correspond to Python constructor
      * defaults.
      *

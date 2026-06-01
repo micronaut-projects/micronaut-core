@@ -89,10 +89,8 @@ public final class GraalPyRuntimeUtil {
         return
             map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, (entry) -> {
                 Object v = entry.getValue();
-                if (v instanceof ValueCoercible valueCoercible && !(v instanceof PooledValueCoercible)) {
-                    return valueCoercible.asPolyglotValue();
-                }
-                return v;
+                Object coerced = coerceValue(v);
+                return coerced instanceof PooledValueCoercible ? v : coerced;
             }));
     }
 
@@ -109,11 +107,22 @@ public final class GraalPyRuntimeUtil {
         }
         return
             list.stream().map(v -> {
-                if (v instanceof ValueCoercible valueCoercible && !(v instanceof PooledValueCoercible)) {
-                    return valueCoercible.asPolyglotValue();
-                }
-                return v;
+                Object coerced = coerceValue(v);
+                return coerced instanceof PooledValueCoercible ? v : coerced;
             }).toList();
+    }
+
+    /**
+     * Coerce a generated Python-backed Java wrapper back to its native Python value.
+     * @param value The value
+     * @return The native Python value when available
+     */
+    @UsedByGeneratedCode
+    public static @Nullable Object coerceValue(@Nullable Object value) {
+        if (value instanceof ValueCoercible valueCoercible && !(value instanceof PooledValueCoercible)) {
+            return valueCoercible.asPolyglotValue();
+        }
+        return value;
     }
 
     /**
@@ -129,6 +138,9 @@ public final class GraalPyRuntimeUtil {
         }
         if (value instanceof PooledValueCoercible pooledValueCoercible) {
             return pooledValueCoercible.asPolyglotValue(context);
+        }
+        if (value instanceof ValueCoercible valueCoercible) {
+            return valueCoercible.asPolyglotValue();
         }
         if (value instanceof List<?> list) {
             List<Object> result = new ArrayList<>(list.size());
