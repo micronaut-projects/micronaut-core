@@ -89,6 +89,62 @@ public class PythonAstParserTest {
     }
 
     @Test
+    void testRuntimeTransformAddsFutureAnnotationsBeforeGeneratedCode() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName())
+                    && args != null
+                    && args.length == 1
+                    && "java.security.Principal".equals(args[0])) {
+                    return Optional.of(ClassElement.of(java.security.Principal.class));
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
+            "module docs"
+            from java.security import Principal
+
+            class Demo:
+                def index(self, principal: Principal | None = None) -> dict:
+                    return {}
+            """);
+
+        String runtimeCode = transformResult.runtimeCode();
+        int docstring = runtimeCode.indexOf("module docs");
+        int futureImport = runtimeCode.indexOf("from __future__ import annotations");
+        int javaImport = runtimeCode.indexOf("import java");
+        int javaTypeAssignment = runtimeCode.indexOf("Principal = java.type('java.security.Principal')");
+        assertTrue(docstring > -1);
+        assertTrue(futureImport > docstring);
+        assertTrue(javaImport > futureImport);
+        assertTrue(javaTypeAssignment > javaImport);
+    }
+
+    @Test
     void testTransformKeepsFutureImportsBeforeGeneratedCode() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(

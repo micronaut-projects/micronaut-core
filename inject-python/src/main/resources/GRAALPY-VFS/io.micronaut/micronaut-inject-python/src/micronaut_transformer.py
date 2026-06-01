@@ -177,6 +177,9 @@ class MicronautTransformer(ast.NodeTransformer):
         # First visit all nodes to collect imports
         self.generic_visit(node)
 
+        if self.strip_java_interface_bases:
+            self._ensure_future_annotations(node)
+
         # Add generated code at the beginning
         if self.transformed_code or self.java_type_assignments or self.has_java_import:
             # Create AST nodes for the generated code
@@ -238,6 +241,30 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         while insert_at < len(node.body) and self._is_future_import(node.body[insert_at]):
             insert_at += 1
         return insert_at
+
+    def _ensure_future_annotations(self, node: ast.Module) -> None:
+        if self._has_future_annotations(node):
+            return
+
+        future_import = ast.ImportFrom(
+            module='__future__',
+            names=[ast.alias(name='annotations', asname=None)],
+            level=0
+        )
+        ast.fix_missing_locations(future_import)
+
+        insert_at = 0
+        if node.body and self._is_module_docstring(node.body[0]):
+            insert_at = 1
+        while insert_at < len(node.body) and self._is_future_import(node.body[insert_at]):
+            insert_at += 1
+        node.body.insert(insert_at, future_import)
+
+    def _has_future_annotations(self, node: ast.Module) -> bool:
+        return any(
+            self._is_future_import(statement) and any(alias.name == 'annotations' for alias in statement.names)
+            for statement in node.body
+        )
 
     def _is_module_docstring(self, node: ast.AST) -> bool:
         if not isinstance(node, ast.Expr):

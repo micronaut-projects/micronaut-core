@@ -631,10 +631,16 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
             annotationValue = enumValues(annotationValue);
         } else if (isClassArrayMember(memberType)) {
             annotationValue = annotationClassValues(annotationValue);
+        } else if (isArrayMember(memberType)) {
+            annotationValue = arrayValues(memberType.fromArray(), annotationValue);
         } else if (isClassMember(memberType)) {
             annotationValue = annotationClassValue(annotationValue);
         }
         return resolveEvaluatedExpressionReferences(originatingElement, annotationName, memberName, annotationValue);
+    }
+
+    private boolean isArrayMember(@Nullable ClassElement memberType) {
+        return memberType != null && memberType.isArray();
     }
 
     private boolean isClassMember(@Nullable ClassElement memberType) {
@@ -793,6 +799,124 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
         if (classValue != null) {
             values.add(classValue);
         }
+    }
+
+    private Object arrayValues(ClassElement componentType, @Nullable Object value) {
+        List<Object> values = new ArrayList<>();
+        collectArrayValues(componentType, value, values);
+        return toArray(componentType, values);
+    }
+
+    private void collectArrayValues(ClassElement componentType, @Nullable Object value, List<Object> values) {
+        if (value == null) {
+            return;
+        }
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return;
+            }
+            if (polyglotValue.hasArrayElements()) {
+                int size = Math.toIntExact(polyglotValue.getArraySize());
+                for (int i = 0; i < size; i++) {
+                    collectArrayValues(componentType, polyglotValue.getArrayElement(i), values);
+                }
+                return;
+            }
+            values.add(GraalPyUtil.convertValueToJava(polyglotValue, componentType, visitorContext));
+            return;
+        }
+        if (value.getClass().isArray()) {
+            int size = Array.getLength(value);
+            for (int i = 0; i < size; i++) {
+                collectArrayValues(componentType, Array.get(value, i), values);
+            }
+            return;
+        }
+        if (value instanceof Iterable<?> iterable) {
+            for (Object element : iterable) {
+                collectArrayValues(componentType, element, values);
+            }
+            return;
+        }
+        values.add(value);
+    }
+
+    private Object toArray(ClassElement componentType, List<Object> values) {
+        return switch (componentType.getName()) {
+            case "boolean" -> {
+                boolean[] array = new boolean[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toBoolean(values.get(i));
+                }
+                yield array;
+            }
+            case "byte" -> {
+                byte[] array = new byte[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toNumber(values.get(i)).byteValue();
+                }
+                yield array;
+            }
+            case "char" -> {
+                char[] array = new char[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    String stringValue = values.get(i).toString();
+                    array[i] = stringValue.isEmpty() ? '\0' : stringValue.charAt(0);
+                }
+                yield array;
+            }
+            case "double" -> {
+                double[] array = new double[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toNumber(values.get(i)).doubleValue();
+                }
+                yield array;
+            }
+            case "float" -> {
+                float[] array = new float[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toNumber(values.get(i)).floatValue();
+                }
+                yield array;
+            }
+            case "int" -> {
+                int[] array = new int[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toNumber(values.get(i)).intValue();
+                }
+                yield array;
+            }
+            case "long" -> {
+                long[] array = new long[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toNumber(values.get(i)).longValue();
+                }
+                yield array;
+            }
+            case "short" -> {
+                short[] array = new short[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toNumber(values.get(i)).shortValue();
+                }
+                yield array;
+            }
+            case "java.lang.String" -> {
+                String[] array = new String[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = values.get(i).toString();
+                }
+                yield array;
+            }
+            default -> values.toArray(Object[]::new);
+        };
+    }
+
+    private Number toNumber(Object value) {
+        return value instanceof Number number ? number : Double.valueOf(value.toString());
+    }
+
+    private boolean toBoolean(Object value) {
+        return value instanceof Boolean booleanValue ? booleanValue : Boolean.parseBoolean(value.toString());
     }
 
     private Object resolveEvaluatedExpressionReferences(
