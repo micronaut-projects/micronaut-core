@@ -18,6 +18,8 @@ package io.micronaut.http.client;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
@@ -37,9 +39,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -143,6 +147,23 @@ public abstract class HttpClientConfiguration {
 
     private boolean followRedirects = DEFAULT_FOLLOW_REDIRECTS;
 
+    private Set<String> redirectAlwaysFilteredHeaders = new LinkedHashSet<>(CollectionUtils.setOf(
+        HttpHeaders.HOST,
+        HttpHeaders.CONNECTION
+    ));
+
+    private Set<String> redirectAdditionalNonPreserveBodyFilteredHeaders = new LinkedHashSet<>(CollectionUtils.setOf(
+        HttpHeaders.CONTENT_LENGTH,
+        HttpHeaders.CONTENT_TYPE,
+        HttpHeaders.TRANSFER_ENCODING
+    ));
+
+    private Set<String> redirectCrossOriginFilteredHeaders = new LinkedHashSet<>(CollectionUtils.setOf(
+        HttpHeaders.AUTHORIZATION,
+        HttpHeaders.PROXY_AUTHORIZATION,
+        HttpHeaders.COOKIE
+    ));
+
     private int maxRedirects = DEFAULT_MAX_REDIRECTS;
 
     private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
@@ -187,6 +208,9 @@ public abstract class HttpClientConfiguration {
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
             this.eventLoopGroup = copy.eventLoopGroup;
             this.followRedirects = copy.followRedirects;
+            this.redirectAlwaysFilteredHeaders = copy.redirectAlwaysFilteredHeaders;
+            this.redirectAdditionalNonPreserveBodyFilteredHeaders = copy.redirectAdditionalNonPreserveBodyFilteredHeaders;
+            this.redirectCrossOriginFilteredHeaders = copy.redirectCrossOriginFilteredHeaders;
             this.maxRedirects = copy.maxRedirects;
             this.logLevel = copy.logLevel;
             this.loggerName = copy.loggerName;
@@ -325,6 +349,58 @@ public abstract class HttpClientConfiguration {
      */
     public void setFollowRedirects(boolean followRedirects) {
         this.followRedirects = followRedirects;
+    }
+
+    /**
+     * @return Header names that are always filtered for redirects.
+     * By default this includes {@code Host} and {@code Connection}.
+     */
+    public Set<String> getRedirectAlwaysFilteredHeaders() {
+        return Collections.unmodifiableSet(redirectAlwaysFilteredHeaders);
+    }
+
+    /**
+     * Sets the header names that are always filtered for redirects.
+     *
+     * @param redirectAlwaysFilteredHeaders The always-filtered redirect header list
+     */
+    public void setRedirectAlwaysFilteredHeaders(Set<String> redirectAlwaysFilteredHeaders) {
+        this.redirectAlwaysFilteredHeaders = redirectAlwaysFilteredHeaders == null ? new LinkedHashSet<>() : new LinkedHashSet<>(redirectAlwaysFilteredHeaders);
+    }
+
+    /**
+     * @return Additional header names filtered for redirects that do not preserve the request body.
+     * These headers are filtered in addition to {@link #getRedirectAlwaysFilteredHeaders()}.
+     */
+    public Set<String> getRedirectAdditionalNonPreserveBodyFilteredHeaders() {
+        return Collections.unmodifiableSet(redirectAdditionalNonPreserveBodyFilteredHeaders);
+    }
+
+    /**
+     * Sets the additional header names filtered for redirects that do not preserve the request body.
+     * These headers are filtered in addition to {@link #getRedirectAlwaysFilteredHeaders()}.
+     *
+     * @param redirectAdditionalNonPreserveBodyFilteredHeaders The additional non-preserve-body redirect header filter list
+     */
+    public void setRedirectAdditionalNonPreserveBodyFilteredHeaders(Set<String> redirectAdditionalNonPreserveBodyFilteredHeaders) {
+        this.redirectAdditionalNonPreserveBodyFilteredHeaders = redirectAdditionalNonPreserveBodyFilteredHeaders == null ? new LinkedHashSet<>() : new LinkedHashSet<>(redirectAdditionalNonPreserveBodyFilteredHeaders);
+    }
+
+    /**
+     * @return Header names that are additionally filtered for cross-origin redirects.
+     * By default this includes {@code Authorization}, {@code Proxy-Authorization}, and {@code Cookie}.
+     */
+    public Set<String> getRedirectCrossOriginFilteredHeaders() {
+        return Collections.unmodifiableSet(redirectCrossOriginFilteredHeaders);
+    }
+
+    /**
+     * Sets the header names that are additionally filtered for cross-origin redirects.
+     *
+     * @param redirectCrossOriginFilteredHeaders The cross-origin redirect header filter list
+     */
+    public void setRedirectCrossOriginFilteredHeaders(Set<String> redirectCrossOriginFilteredHeaders) {
+        this.redirectCrossOriginFilteredHeaders = redirectCrossOriginFilteredHeaders == null ? new LinkedHashSet<>() : new LinkedHashSet<>(redirectCrossOriginFilteredHeaders);
     }
 
     /**

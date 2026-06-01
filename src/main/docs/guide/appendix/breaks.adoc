@@ -1,5 +1,12 @@
 This section documents breaking changes between Micronaut versions
 
+=== HTTP client redirect forwarding no longer retains authorization headers cross-origin by default
+
+The Netty HTTP client no longer forwards `Authorization`, `Proxy-Authorization`, or `Cookie` headers on cross-origin redirects by default.
+This applies to both normal redirects and preserve-body redirects (`307` and `308`).
+
+If needed, this behavior can be customized through `HttpClientConfiguration`.
+
 == 3.8.7
 
 Micronaut Framework 3.8.7 updates to https://bitbucket.org/snakeyaml/snakeyaml/wiki/Changes[SnakeYAML 2.0] which addresses https://nvd.nist.gov/vuln/detail/CVE-2022-1471[CVE-2022-1471]. Many organizations' policies forbid their teams to use Micronaut Framework if the framework depends on a vulnerable dependency, even if the framework is unaffected. Micronaut Framework is not affected by https://nvd.nist.gov/vuln/detail/CVE-2022-1471[CVE-2022-1471].

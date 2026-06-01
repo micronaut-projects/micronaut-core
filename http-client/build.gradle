@@ -33,6 +33,7 @@ dependencies {
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
     }
+    testImplementation(libs.junit.jupiter.params)
 }
 
 //tasks.withType(Test).configureEach {
