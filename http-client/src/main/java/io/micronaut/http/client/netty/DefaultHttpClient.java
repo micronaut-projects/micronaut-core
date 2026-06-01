@@ -2069,8 +2069,8 @@ public class DefaultHttpClient implements
                 }
 
                 setRedirectHeaders(finalRequest, redirectRequest);
-                
-                int redirectCount = parentRequest.getAttribute(REDIRECT_COUNT, Integer.class).orElse(0) + 1;
+
+                int redirectCount = finalRequest.getAttribute(REDIRECT_COUNT, Integer.class).orElse(0) + 1;
                 if (redirectCount > configuration.getMaxRedirects()) {
                     responsePromise.tryFailure(new HttpClientException("Maximum number of redirects exceeded at redirect count: " + redirectCount));
                     return;
