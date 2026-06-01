@@ -208,6 +208,7 @@ public class DefaultHttpClient implements
     private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
+    private static final String REDIRECT_COUNT = "micronaut.http.client.redirect-count";
 
     /**
      * Which headers <i>not</i> to copy from the first request when redirecting to a second request. There doesn't
@@ -2068,6 +2069,14 @@ public class DefaultHttpClient implements
                 }
 
                 setRedirectHeaders(finalRequest, redirectRequest);
+                
+                int redirectCount = parentRequest.getAttribute(REDIRECT_COUNT, Integer.class).orElse(0) + 1;
+                if (redirectCount > configuration.getMaxRedirects()) {
+                    responsePromise.tryFailure(new HttpClientException("Maximum number of redirects exceeded at redirect count: " + redirectCount));
+                    return;
+                }
+                redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
+
                 Flux.from(resolveRedirectURI(parentRequest, redirectRequest))
                         .flatMap(makeRedirectHandler(parentRequest, redirectRequest))
                         .subscribe(new NettyPromiseSubscriber<>(responsePromise));
