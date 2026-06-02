@@ -2601,7 +2601,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         @Nullable ExpressionDef targetContext) {
         ExpressionDef parameter = coerceTypedElementToPolyglotValue(param, methodParam);
         if (targetContext != null) {
-            parameter = RUNTIME_UTIL.invokeStatic("coerceToContext", TypeDef.OBJECT, parameter, targetContext);
+            parameter = RUNTIME_UTIL.invokeStatic("coerceToContext", TypeDef.OBJECT, parameter, targetContext, classLiteral(param.getGenericType()));
         }
         parameters.add(parameter);
     }

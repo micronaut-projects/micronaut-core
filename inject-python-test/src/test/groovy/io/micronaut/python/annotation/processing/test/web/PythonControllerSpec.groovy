@@ -563,6 +563,62 @@ class ForecastController:
         context?.close()
     }
 
+    void "test python controller returns dataclass from validated service"() {
+        given:
+        def context = buildContext('''
+from dataclasses import dataclass
+from typing import Annotated
+
+from jakarta.inject import Singleton
+from jakarta.validation.constraints import Pattern
+from micronaut.core.annotation import Introspected
+from micronaut.http.annotation import Controller, Get
+from micronaut.validation import Validated
+
+
+@Introspected
+@dataclass(frozen=True)
+class Greeting:
+    id: int
+    content: str
+
+
+@Singleton
+@Validated
+class GreetingService:
+    def __init__(self):
+        self.counter = 0
+
+    def greeting(self, name: Annotated[str, Pattern(regexp="\\\\D+")]) -> Greeting:
+        self.counter += 1
+        return Greeting(self.counter, f"Hola, {name}!")
+
+
+@Controller("/validated-greetings")
+class GreetingController:
+    def __init__(self, greetingService: GreetingService):
+        self.greetingService = greetingService
+
+    @Get("/{name}")
+    def greeting(self, name: str) -> Greeting:
+        return self.greetingService.greeting(name)
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+
+        expect:
+        context.getBean(JsonMapper).readValue(client.toBlocking().retrieve("/validated-greetings/John"), Map) == [
+            content: "Hola, John!",
+            id: 1
+        ]
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
     void "test python controller generic JSON exchange"() {
         given:
         def context = buildContext('''

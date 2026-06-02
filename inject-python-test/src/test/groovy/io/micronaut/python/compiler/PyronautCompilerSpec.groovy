@@ -388,6 +388,43 @@ class MyRepeatableService:
         tempDir.deleteDir()
     }
 
+    def "test nested repeatable annotation transformation"() {
+        given:
+        def pythonCode = '''
+from micronaut.python.compiler import NestedRepeatableAnnotation
+
+@NestedRepeatableAnnotation("first")
+@NestedRepeatableAnnotation("second")
+class MyNestedRepeatableService:
+    pass
+'''
+        def tempDir = File.createTempDir("pyronaut-test-nested-repeatable", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .javaSrc("inject-python-test/src/test/java")
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def metaInfDir = new File(tempDir, "META-INF")
+        def transformedFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler/NestedRepeatableAnnotation.py")
+        transformedFile.exists()
+        def transformedContent = transformedFile.text
+        transformedContent.contains('@micronaut_annotation("io.micronaut.python.compiler.NestedRepeatableAnnotation", repeated="io.micronaut.python.compiler.NestedRepeatableAnnotation.List")')
+        transformedContent.contains("def NestedRepeatableAnnotation(")
+        !transformedContent.contains("@List()")
+
+        def packageInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler/__init__.py")
+        packageInit.exists()
+        packageInit.text.contains("from .NestedRepeatableAnnotation import NestedRepeatableAnnotation")
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
     def "test transactional annotation transformation skips unavailable meta annotations"() {
         given:
         def pythonCode = '''
