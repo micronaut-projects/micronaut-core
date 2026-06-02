@@ -79,6 +79,7 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
+import io.netty.handler.codec.http2.DefaultHttp2Headers;
 import io.netty.handler.codec.http2.DefaultHttp2PushPromiseFrame;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.Http2FrameCodec;
@@ -482,11 +483,10 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
                 throw new IllegalArgumentException("Request must have an absolute path");
             }
             String query = configuredUri.getQuery();
-            String fragment = configuredUri.getFragment();
 
-            URI fixedUri;
+            URI pathUri;
             try {
-                fixedUri = new URI(scheme, authority, path, query, fragment);
+                pathUri = new URI(null, null, path, query, null);
             } catch (URISyntaxException e) {
                 throw new IllegalArgumentException("Illegal URI", e);
             }
@@ -514,13 +514,22 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
             }
 
             // request used to compute the headers for the PUSH_PROMISE frame
-            io.netty.handler.codec.http.HttpRequest outboundRequest = new DefaultHttpRequest(
-                inboundRequest.protocolVersion(),
-                inboundRequest.method(),
-                fixedUri.toString(),
-                inboundRequest.headers()
-            );
-            Http2Headers outboundHeaders = HttpConversionUtil.toHttp2Headers(outboundRequest, false);
+            Http2Headers outboundHeaders = new DefaultHttp2Headers(true, inboundRequest.headers().size() + 4);
+            outboundHeaders.method(inboundRequest.method().asciiName());
+            outboundHeaders.scheme(scheme);
+            outboundHeaders.path(pathUri.toString());
+            if (authority != null) {
+                if (authority.isEmpty()) {
+                    outboundHeaders.authority("");
+                } else {
+                    int start = authority.indexOf('@') + 1;
+                    if (start == authority.length()) {
+                        throw new IllegalArgumentException("authority: " + authority);
+                    }
+                    outboundHeaders.authority(authority.subSequence(start, authority.length()));
+                }
+            }
+            HttpConversionUtil.toHttp2Headers(inboundRequest.headers(), outboundHeaders);
 
             if (channelHandlerContext.channel() instanceof Http2StreamChannel streamChannel) {
                 int ourStream = streamChannel.stream().id();
