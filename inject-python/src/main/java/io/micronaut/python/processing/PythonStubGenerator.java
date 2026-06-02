@@ -2686,6 +2686,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .addModifiers(Modifier.PUBLIC)
                 .returns(TypeDef.STRING)
                 .build((aThis, parameters) -> aThis.invoke(jsonValueMethod.getName(), TypeDef.STRING).returning()));
+        } else if (jsonValueMethod == null && addedMethodNames.add("toString()")) {
+            enumBuilder.addMethod(MethodDef.builder("jsonValue")
+                .addAnnotation("com.fasterxml.jackson.annotation.JsonValue")
+                .addModifiers(Modifier.PUBLIC)
+                .returns(TypeDef.STRING)
+                .build((aThis, parameters) -> aThis.invoke("name", TypeDef.STRING).returning()));
+            enumBuilder.addMethod(MethodDef.builder("toString")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PUBLIC)
+                .returns(TypeDef.STRING)
+                .build((aThis, parameters) -> aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
+                    .invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant("value"))
+                    .invoke("asString", TypeDef.STRING)
+                    .returning()));
         }
         return enumBuilder.build();
     }

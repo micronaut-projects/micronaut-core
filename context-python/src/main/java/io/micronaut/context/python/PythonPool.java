@@ -147,13 +147,16 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
                         }
                         addPooledContext();
                     }
-                } catch (IllegalStateException ignored) {
-                    // ignore during shutdown
                 } catch (PolyglotException e) {
-                    if (!e.isCancelled()) {
+                    if (e.isCancelled() && closed) {
+                        LOG.debug("Python pool warmup cancelled during shutdown", e);
+                    } else {
+                        LOG.warn("Unexpected Python pool warmup failure", e);
                         throw e;
                     }
-                    // ignore during shutdown
+                } catch (RuntimeException e) {
+                    LOG.warn("Unexpected Python pool warmup failure", e);
+                    throw e;
                 }
             }, "python-pool-warmup");
             t.setDaemon(true);
@@ -299,8 +302,16 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         if (closed) {
             try {
                 GraalPyContextFactory.closeContext(c, true);
-            } catch (Exception e) {
-                LOG.warn("Error while closing context: " + e.getMessage(), e);
+            } catch (PolyglotException e) {
+                if (e.isCancelled()) {
+                    LOG.debug("Python pool context close cancelled during shutdown", e);
+                } else {
+                    LOG.warn("Unexpected error while closing Python pool context", e);
+                    throw e;
+                }
+            } catch (RuntimeException | Error e) {
+                LOG.warn("Unexpected error while closing Python pool context", e);
+                throw e;
             }
             return;
         }
@@ -317,13 +328,16 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         Thread t = new Thread(() -> {
             try {
                 addPooledContext();
-            } catch (IllegalStateException ignored) {
-                // ignore during shutdown
             } catch (PolyglotException e) {
-                if (!e.isCancelled()) {
+                if (e.isCancelled() && closed) {
+                    LOG.debug("Python pool replenishment cancelled during shutdown", e);
+                } else {
+                    LOG.warn("Unexpected Python pool replenishment failure", e);
                     throw e;
                 }
-                // ignore during shutdown
+            } catch (RuntimeException e) {
+                LOG.warn("Unexpected Python pool replenishment failure", e);
+                throw e;
             }
         }, "python-pool-replenish");
         t.setDaemon(true);
@@ -404,7 +418,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
 
     @Override
     public void onDestroyed(@NonNull BeanDestroyedEvent<Context> event) {
-        ContextHolder.onNoActiveExecutions(snapshotIncludingPrimary(), () -> closePool(false));
+        ContextHolder.onNoActiveExecutionsAfterCurrentFrame(event.getBean(), () -> closePool(true));
     }
 
     @Override
@@ -438,13 +452,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         contexts.addAll(snapshot);
         contexts.addAll(eventLoopSnapshot);
         for (Context context : contexts) {
-            GraalPyContextFactory.closeContextAsync(context, cancelIfExecuting)
-                .whenComplete((ignored, throwable) -> {
-                    if (throwable != null) {
-                        LOG.warn("Error while closing context: " + throwable.getMessage(), throwable);
-                    }
-                }
-            );
+            GraalPyContextFactory.closeContext(context, cancelIfExecuting);
         }
     }
 }

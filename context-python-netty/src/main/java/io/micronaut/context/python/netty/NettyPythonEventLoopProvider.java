@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.netty.channel.EventLoop;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
@@ -39,7 +40,12 @@ public final class NettyPythonEventLoopProvider implements PythonEventLoopProvid
 
     @Override
     public Optional<PythonEventLoop> current() {
-        return Optional.ofNullable(CURRENT.get());
+        return Optional.ofNullable(currentLoop());
+    }
+
+    @Override
+    public @Nullable NettyPythonEventLoop currentLoop() {
+        return CURRENT.get();
     }
 
     @Override

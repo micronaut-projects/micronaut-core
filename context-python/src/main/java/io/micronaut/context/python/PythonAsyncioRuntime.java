@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
+import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
 
@@ -28,13 +29,12 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Runtime helpers for Python coroutine bridge methods.
@@ -44,15 +44,33 @@ public final class PythonAsyncioRuntime {
     private static final String SCHEDULER_NAME = "__micronaut_asyncio_to_completion_stage";
     private static final String AWAITABLE_FACTORY_NAME = "__micronaut_completion_stage_awaitable";
     private static final String AWAITABLE_COMPLETER_NAME = "__micronaut_complete_completion_stage_awaitable";
-    private static final AtomicBoolean ENABLED = new AtomicBoolean(true);
-    private static volatile List<PythonEventLoopProvider> eventLoopProviders = List.of();
-    private static volatile @Nullable ExecutorService executorService;
-    private static volatile @Nullable BeanProvider<ExecutorService> executorServiceProvider;
+    private static volatile RuntimeState state = new RuntimeState(true, List.of(), null, null);
     private static final ExecutorAdapter EXECUTOR_ADAPTER = new ExecutorAdapter();
     private static final String ASYNCIO_MODULE_NAME = "micronaut_asyncio";
     private static final String ASYNCIO_MODULE_BINDING = "__micronaut_asyncio_module";
     private static final String ASYNCIO_MODULE_SOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_asyncio.py";
     private static final ExceptionCompleter EXCEPTION_COMPLETER = new ExceptionCompleter();
+    private static final String ASYNCIO_FALLBACK_LOADER_NAME = "__micronaut_load_asyncio_module";
+    private static final AtomicReference<@Nullable String> ASYNCIO_FALLBACK_SOURCE = new AtomicReference<>();
+    private static final Source IMPORT_ASYNCIO_MODULE_SOURCE = Source.newBuilder(
+        GraalPyRuntimeUtil.PYTHON,
+        "import importlib as __micronaut_importlib\n"
+            + ASYNCIO_MODULE_BINDING
+            + " = __micronaut_importlib.import_module('"
+            + ASYNCIO_MODULE_NAME
+            + "')",
+        "micronaut-import-asyncio-runtime.py"
+    ).cached(true).buildLiteral();
+    private static final Source ASYNCIO_FALLBACK_LOADER_SOURCE = Source.newBuilder(GraalPyRuntimeUtil.PYTHON, """
+        import sys as __micronaut_sys
+        import types as __micronaut_types
+
+        def __micronaut_load_asyncio_module(source):
+            module = __micronaut_types.ModuleType('micronaut_asyncio')
+            __micronaut_sys.modules['micronaut_asyncio'] = module
+            exec(source, module.__dict__)
+            return module
+        """, "micronaut-load-asyncio-runtime.py").cached(true).buildLiteral();
 
     private PythonAsyncioRuntime() {
     }
@@ -66,7 +84,8 @@ public final class PythonAsyncioRuntime {
     @SuppressWarnings({"rawtypes", "FutureReturnValueIgnored"})
     @UsedByGeneratedCode
     public static CompletionStage toCompletionStage(Value value) {
-        if (!ENABLED.get()) {
+        RuntimeState runtimeState = state;
+        if (!runtimeState.enabled()) {
             throw new IllegalStateException("Python asyncio support is disabled. Set micronaut.python.asyncio.enabled=true to enable async Python bridge methods.");
         }
         PythonCompletableFuture future = new PythonCompletableFuture();
@@ -77,16 +96,14 @@ public final class PythonAsyncioRuntime {
         Context context = value.getContext();
         ContextHolder.enterExecution(context);
         future.whenComplete((ignored, ignoredThrowable) -> ContextHolder.exitExecution(context));
-        Optional<PythonEventLoop> currentEventLoop = currentEventLoop();
-        PythonEventLoop eventLoop = currentEventLoop.orElse(null);
+        PythonEventLoop eventLoop = currentEventLoop(runtimeState);
         Runnable scheduler = () -> schedule(context, value, future, eventLoop);
-        if (currentEventLoop.isPresent()) {
-            PythonEventLoop current = currentEventLoop.get();
-            if (current.inEventLoop()) {
+        if (eventLoop != null) {
+            if (eventLoop.inEventLoop()) {
                 scheduler.run();
             } else {
                 try {
-                    current.execute(scheduler);
+                    eventLoop.execute(scheduler);
                 } catch (Throwable e) {
                     future.completeExceptionally(e);
                 }
@@ -105,21 +122,21 @@ public final class PythonAsyncioRuntime {
      * @return An asyncio future.
      */
     public static Value toAwaitable(Context context, CompletionStage<?> stage) {
-        if (!ENABLED.get()) {
+        RuntimeState runtimeState = state;
+        if (!runtimeState.enabled()) {
             throw new IllegalStateException("Python asyncio support is disabled. Set micronaut.python.asyncio.enabled=true to enable async Python bridge methods.");
         }
         Value future;
-        Optional<PythonEventLoop> currentEventLoop = currentEventLoop();
-        PythonEventLoop eventLoop = currentEventLoop.orElse(null);
-        synchronized (context) {
+        PythonEventLoop eventLoop = currentEventLoop(runtimeState);
+        future = ContextHolder.withContextLock(context, () -> {
             scheduler(context);
-            future = awaitableFactory(context).execute(eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER, stage.toCompletableFuture());
-        }
+            return awaitableFactory(context).execute(eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER, stage.toCompletableFuture());
+        });
         stage.whenComplete((result, throwable) -> {
             Runnable completion = () -> completeAwaitable(context, future, result, throwable);
-            if (currentEventLoop.isPresent()) {
+            if (eventLoop != null) {
                 try {
-                    currentEventLoop.get().execute(completion);
+                    eventLoop.execute(completion);
                 } catch (Throwable e) {
                     completeAwaitable(context, future, null, e);
                 }
@@ -136,41 +153,45 @@ public final class PythonAsyncioRuntime {
      * @param enabled Whether async bridge execution is enabled.
      */
     public static void setEnabled(boolean enabled) {
-        ENABLED.set(enabled);
+        updateState(current -> new RuntimeState(enabled, current.eventLoopProviders(), current.executorService(), current.executorServiceProvider()));
     }
 
     static void setEventLoopProviders(Collection<PythonEventLoopProvider> providers) {
-        eventLoopProviders = List.copyOf(providers);
+        updateState(current -> new RuntimeState(current.enabled(), List.copyOf(providers), current.executorService(), current.executorServiceProvider()));
     }
 
     static void setExecutorService(@Nullable ExecutorService executorService) {
-        PythonAsyncioRuntime.executorService = executorService;
+        updateState(current -> new RuntimeState(current.enabled(), current.eventLoopProviders(), executorService, current.executorServiceProvider()));
     }
 
     static void setExecutorServiceProvider(@Nullable BeanProvider<ExecutorService> executorServiceProvider) {
-        PythonAsyncioRuntime.executorServiceProvider = executorServiceProvider;
+        updateState(current -> new RuntimeState(current.enabled(), current.eventLoopProviders(), current.executorService(), executorServiceProvider));
     }
 
-    private static Optional<PythonEventLoop> currentEventLoop() {
-        for (PythonEventLoopProvider provider : eventLoopProviders) {
-            Optional<PythonEventLoop> eventLoop = provider.current();
-            if (eventLoop.isPresent()) {
+    private static void updateState(java.util.function.Function<RuntimeState, RuntimeState> updater) {
+        state = updater.apply(state);
+    }
+
+    private static @Nullable PythonEventLoop currentEventLoop(RuntimeState runtimeState) {
+        for (PythonEventLoopProvider provider : runtimeState.eventLoopProviders()) {
+            PythonEventLoop eventLoop = provider.currentLoop();
+            if (eventLoop != null) {
                 return eventLoop;
             }
         }
-        return Optional.empty();
+        return null;
     }
 
-    static Optional<PythonEventLoop> currentEventLoopForContext() {
-        return currentEventLoop();
+    static @Nullable PythonEventLoop currentEventLoopForContext() {
+        return currentEventLoop(state);
     }
 
     private static void schedule(Context context, Value value, PythonCompletableFuture future, @Nullable PythonEventLoop eventLoop) {
         try {
-            synchronized (context) {
+            ContextHolder.withContextLock(context, () -> {
                 Value scheduler = scheduler(context);
                 scheduler.executeVoid(value, future, EXCEPTION_COMPLETER, eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER);
-            }
+            });
         } catch (Throwable e) {
             future.completeExceptionally(e);
         }
@@ -198,14 +219,7 @@ public final class PythonAsyncioRuntime {
 
     private static void importAsyncioModule(Context context, Value bindings) {
         try {
-            context.eval(
-                GraalPyRuntimeUtil.PYTHON,
-                "import importlib as __micronaut_importlib\n"
-                    + ASYNCIO_MODULE_BINDING
-                    + " = __micronaut_importlib.import_module('"
-                    + ASYNCIO_MODULE_NAME
-                    + "')"
-            );
+            context.eval(IMPORT_ASYNCIO_MODULE_SOURCE);
         } catch (PolyglotException e) {
             String message = e.getMessage();
             if (message == null || !message.contains("ModuleNotFoundError")) {
@@ -217,37 +231,29 @@ public final class PythonAsyncioRuntime {
 
     private static void loadAsyncioModuleSource(Context context, Value bindings) {
         try (InputStream inputStream = PythonAsyncioRuntime.class.getClassLoader().getResourceAsStream(ASYNCIO_MODULE_SOURCE)) {
-            if (inputStream == null) {
-                throw new IllegalStateException("Missing Micronaut asyncio Python runtime resource: " + ASYNCIO_MODULE_SOURCE);
+            String source = ASYNCIO_FALLBACK_SOURCE.get();
+            if (source == null) {
+                if (inputStream == null) {
+                    throw new IllegalStateException("Missing Micronaut asyncio Python runtime resource: " + ASYNCIO_MODULE_SOURCE);
+                }
+                String created = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+                if (!ASYNCIO_FALLBACK_SOURCE.compareAndSet(null, created)) {
+                    source = ASYNCIO_FALLBACK_SOURCE.get();
+                } else {
+                    source = created;
+                }
             }
-            bindings.putMember("__micronaut_asyncio_source", new String(inputStream.readAllBytes(), StandardCharsets.UTF_8));
-            context.eval(
-                GraalPyRuntimeUtil.PYTHON,
-                "import types as __micronaut_types\n"
-                    + "import sys as __micronaut_sys\n"
-                    + ASYNCIO_MODULE_BINDING
-                    + " = __micronaut_types.ModuleType('"
-                    + ASYNCIO_MODULE_NAME
-                    + "')\n"
-                    + "__micronaut_sys.modules['"
-                    + ASYNCIO_MODULE_NAME
-                    + "'] = "
-                    + ASYNCIO_MODULE_BINDING
-                    + "\n"
-                    + "exec(__micronaut_asyncio_source, "
-                    + ASYNCIO_MODULE_BINDING
-                    + ".__dict__)\n"
-                    + "del __micronaut_asyncio_source"
-            );
+            Value module = ContextHolder.helper(context, ASYNCIO_FALLBACK_LOADER_NAME, ASYNCIO_FALLBACK_LOADER_SOURCE).execute(source);
+            bindings.putMember(ASYNCIO_MODULE_BINDING, module);
         } catch (IOException e) {
             throw new IllegalStateException("Cannot load Micronaut asyncio Python runtime resource: " + ASYNCIO_MODULE_SOURCE, e);
         }
     }
 
     private static void completeAwaitable(Context context, Value future, @Nullable Object result, @Nullable Throwable throwable) {
-        synchronized (context) {
+        ContextHolder.withContextLock(context, () -> {
             awaitableCompleter(context).executeVoid(future, result, throwable);
-        }
+        });
     }
 
     /**
@@ -295,9 +301,7 @@ public final class PythonAsyncioRuntime {
                     @Nullable Object result = null;
                     @Nullable Throwable failure = null;
                     try {
-                        synchronized (context) {
-                            result = executorResult(callback.execute());
-                        }
+                        result = ContextHolder.withContextLock(context, () -> executorResult(callback.execute()));
                     } catch (Throwable e) {
                         failure = e;
                     }
@@ -334,11 +338,12 @@ public final class PythonAsyncioRuntime {
         }
 
         private static @Nullable ExecutorService blockingExecutor() {
-            ExecutorService executor = executorService;
+            RuntimeState runtimeState = state;
+            ExecutorService executor = runtimeState.executorService();
             if (executor != null) {
                 return executor;
             }
-            BeanProvider<ExecutorService> provider = executorServiceProvider;
+            BeanProvider<ExecutorService> provider = runtimeState.executorServiceProvider();
             if (provider != null && provider.isResolvable()) {
                 return provider.get();
             }
@@ -350,7 +355,8 @@ public final class PythonAsyncioRuntime {
      * CompletableFuture variant that can propagate Java cancellation to a Python task.
      */
     public static final class PythonCompletableFuture extends CompletableFuture<Object> {
-        private volatile @Nullable Runnable cancelCallback;
+        private static final Runnable CANCELLED = new CancelledCallback();
+        private final AtomicReference<@Nullable Runnable> cancelCallback = new AtomicReference<>();
 
         /**
          * Set a callback invoked when this future is cancelled.
@@ -358,8 +364,13 @@ public final class PythonAsyncioRuntime {
          * @param cancelCallback The cancellation callback.
          */
         public void setCancelCallback(Runnable cancelCallback) {
-            this.cancelCallback = cancelCallback;
-            if (isCancelled()) {
+            if (!this.cancelCallback.compareAndSet(null, cancelCallback)) {
+                if (this.cancelCallback.get() == CANCELLED) {
+                    cancelCallback.run();
+                }
+                return;
+            }
+            if (isCancelled() && this.cancelCallback.compareAndSet(cancelCallback, CANCELLED)) {
                 cancelCallback.run();
             }
         }
@@ -368,12 +379,24 @@ public final class PythonAsyncioRuntime {
         public boolean cancel(boolean mayInterruptIfRunning) {
             boolean cancelled = super.cancel(mayInterruptIfRunning);
             if (cancelled) {
-                Runnable callback = cancelCallback;
-                if (callback != null) {
+                Runnable callback = cancelCallback.getAndSet(CANCELLED);
+                if (callback != null && callback != CANCELLED) {
                     callback.run();
                 }
             }
             return cancelled;
         }
+    }
+
+    private static final class CancelledCallback implements Runnable {
+        @Override
+        public void run() {
+        }
+    }
+
+    private record RuntimeState(boolean enabled,
+                                List<PythonEventLoopProvider> eventLoopProviders,
+                                @Nullable ExecutorService executorService,
+                                @Nullable BeanProvider<ExecutorService> executorServiceProvider) {
     }
 }

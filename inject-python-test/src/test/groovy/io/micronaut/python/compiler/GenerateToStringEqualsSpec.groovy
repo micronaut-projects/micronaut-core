@@ -39,7 +39,7 @@ class Person:
         this.graalpyInternalValueSyncing = true;
         GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "name", (Object) this.name);
         GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "age", (Object) this.age);
-        GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", (Object) this.address);
+        GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", GraalPyRuntimeUtil.coerceValue(this.address));
         this.graalpyInternalValueSyncing = false;
         return this.graalpyInternalValue;
       }
@@ -48,7 +48,7 @@ class Person:
       this.graalpyInternalValueSyncing = true;
       GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "name", (Object) this.name);
       GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "age", (Object) this.age);
-      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", (Object) this.address);
+      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", GraalPyRuntimeUtil.coerceValue(this.address));
       this.graalpyInternalValueSyncing = false;
       return this.graalpyInternalValue;
     }

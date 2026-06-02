@@ -47,13 +47,6 @@ import java.util.Map;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
@@ -73,25 +66,6 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     public static final String APPLICATION_MAIN = "main.py";
     public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
     private static final Logger LOG = LoggerFactory.getLogger(GraalPyContextFactory.class);
-    private static final long CONTEXT_CLOSE_GRACE_PERIOD_MILLIS = Math.max(
-        0,
-        Long.getLong("micronaut.python.context.close.grace-period-millis", 5_000L)
-    );
-    private static final long CONTEXT_CLOSE_CANCEL_PERIOD_MILLIS = Math.max(
-        0,
-        Long.getLong("micronaut.python.context.close.cancel-period-millis", 1_000L)
-    );
-    private static final AtomicInteger CONTEXT_CLOSE_THREAD_COUNTER = new AtomicInteger();
-    private static final ExecutorService CONTEXT_CLOSE_EXECUTOR = Executors.newCachedThreadPool(runnable -> {
-        Thread thread = new Thread(runnable, "python-context-close-" + CONTEXT_CLOSE_THREAD_COUNTER.incrementAndGet());
-        thread.setDaemon(true);
-        return thread;
-    });
-    private static final ScheduledExecutorService CONTEXT_CLOSE_TIMEOUT_EXECUTOR = Executors.newSingleThreadScheduledExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "python-context-close-timeout");
-        thread.setDaemon(true);
-        return thread;
-    });
 
     private final ApplicationContext applicationContext;
     private boolean providedContext = false;
@@ -257,15 +231,11 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         if (!ContextHolder.isReuseContext()) {
             var ctx = event.getBean();
             if (ctx != null) {
-                ContextHolder.onNoActiveExecutions(ctx, () -> {
-                    closeContextAsync(ctx, false).whenComplete((ignored, throwable) -> {
-                        if (throwable != null) {
-                            LOG.warn("Error while closing Python context: " + throwable.getMessage(), throwable);
-                        }
-                        if (!providedContext && ContextHolder.isCurrentContext(ctx)) {
-                            ContextHolder.resetContext();
-                        }
-                    });
+                ContextHolder.onNoActiveExecutionsAfterCurrentFrame(ctx, () -> {
+                    closeContext(ctx, true);
+                    if (!providedContext && ContextHolder.isCurrentContext(ctx)) {
+                        ContextHolder.resetContext();
+                    }
                 });
                 return;
             }
@@ -276,153 +246,27 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     }
 
     static void closeContext(Context ctx, boolean cancelIfExecuting) {
-        CompletableFuture<Void> close = closeContextAsync(ctx, cancelIfExecuting).toCompletableFuture();
-        long waitMillis = contextCloseWaitMillis(cancelIfExecuting);
-        try {
-            close.get(waitMillis, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (ExecutionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            if (cause instanceof Error error) {
-                throw error;
-            }
-            throw new IllegalStateException(cause);
-        } catch (TimeoutException e) {
-            LOG.warn(
-                "Python context close did not complete within {} ms; continuing shutdown. " +
-                    "A daemon close thread may remain until GraalPy finishes its internal thread shutdown.",
-                waitMillis
-            );
-        }
-    }
-
-    static CompletionStage<Void> closeContextAsync(Context ctx, boolean cancelIfExecuting) {
-        CompletableFuture<Void> result = new CompletableFuture<>();
-        submitContextClose(ctx, cancelIfExecuting, result);
-        scheduleContextCloseTimeouts(ctx, result, cancelIfExecuting);
-        return result;
-    }
-
-    private static void submitContextClose(Context ctx, boolean cancelIfExecuting, CompletableFuture<Void> result) {
-        CONTEXT_CLOSE_EXECUTOR.execute(() -> {
-            if (result.isDone()) {
-                return;
-            }
-            try {
-                if (closeContextDirect(ctx, cancelIfExecuting) == ContextCloseResult.RETRY_WHEN_IDLE) {
-                    if (!result.isDone()) {
-                        ContextHolder.deferNoActiveExecutionListener(() ->
-                            ContextHolder.onNoActiveExecutions(ctx, () -> submitContextClose(ctx, cancelIfExecuting, result))
-                        );
-                    }
-                    return;
-                }
-                result.complete(null);
-            } catch (Throwable e) {
-                result.completeExceptionally(e);
-            }
-        });
-    }
-
-    private static void scheduleContextCloseTimeouts(Context ctx,
-                                                     CompletableFuture<Void> result,
-                                                     boolean cancelIfExecuting) {
-        long graceMillis = cancelIfExecuting ? CONTEXT_CLOSE_CANCEL_PERIOD_MILLIS : CONTEXT_CLOSE_GRACE_PERIOD_MILLIS;
-        scheduleContextCloseTimeout(() -> {
-            if (result.isDone()) {
-                return;
-            }
-            if (!cancelIfExecuting) {
-                LOG.warn(
-                    "Python context graceful close exceeded {} ms; continuing shutdown while the daemon close task finishes.",
-                    CONTEXT_CLOSE_GRACE_PERIOD_MILLIS
-                );
-                result.complete(null);
-            } else {
-                completeTimedOutContextClose(ctx, result);
-            }
-        }, graceMillis);
-    }
-
-    private static void scheduleContextCloseTimeout(Runnable task, long delayMillis) {
-        var ignored = CONTEXT_CLOSE_TIMEOUT_EXECUTOR.schedule(task, delayMillis, TimeUnit.MILLISECONDS);
-    }
-
-    private static void completeTimedOutContextClose(Context ctx, CompletableFuture<Void> result) {
-        if (!result.isDone()) {
-            if (ContextHolder.hasActiveExecutions(ctx)) {
-                LOG.warn(
-                    "Python context cancellation close exceeded {} ms, but the context is executing; deferring shutdown continuation.",
-                    CONTEXT_CLOSE_CANCEL_PERIOD_MILLIS
-                );
-                scheduleContextCloseTimeout(() -> completeTimedOutContextClose(ctx, result), CONTEXT_CLOSE_CANCEL_PERIOD_MILLIS);
-                return;
-            }
-            LOG.warn(
-                "Python context cancellation close exceeded {} ms; continuing shutdown while the daemon close task finishes.",
-                CONTEXT_CLOSE_CANCEL_PERIOD_MILLIS
-            );
-            result.complete(null);
-        }
-    }
-
-    private static long contextCloseWaitMillis(boolean cancelIfExecuting) {
-        long waitMillis = CONTEXT_CLOSE_CANCEL_PERIOD_MILLIS + 500L;
-        if (!cancelIfExecuting) {
-            waitMillis += CONTEXT_CLOSE_GRACE_PERIOD_MILLIS;
-        }
-        return waitMillis;
-    }
-
-    private enum ContextCloseResult {
-        CLOSED,
-        RETRY_WHEN_IDLE
-    }
-
-    private static ContextCloseResult closeContextDirect(Context ctx, boolean cancelIfExecuting) {
         boolean closed = false;
         try {
             ctx.close(cancelIfExecuting);
             closed = true;
         } catch (IllegalStateException e) {
-            if (cancelIfExecuting) {
-                throw e;
-            }
-            /*
-             * Bean destruction is the final owner of this Context. A graceful shutdown waits for
-             * Micronaut-tracked Python bridge executions to finish, but GraalPy can still report
-             * a transient entered context while unwinding a callback. Defer and retry instead of
-             * cancelling immediately; cancellation during normal websocket teardown has exposed
-             * GraalPy GIL assertions.
-             */
-            return ContextCloseResult.RETRY_WHEN_IDLE;
+            LOG.warn("Unexpected failure while closing Python context", e);
+            throw e;
         } catch (PolyglotException e) {
             if (!e.isCancelled()) {
+                LOG.warn("Unexpected polyglot failure while closing Python context", e);
                 throw e;
             }
             closed = true;
         } catch (AssertionError e) {
-            /*
-             * GraalPy can report this Truffle assertion while a context close is racing with
-             * cancellation/unwinding of a just-finished Python execution. At this point the
-             * runtime is already on the hard-close path, so treat only this exact assertion as
-             * equivalent to a cancelled close and continue cleanup. Other assertion failures are
-             * still propagated.
-             */
-            if (!"The TruffleContext must be entered.".equals(e.getMessage())) {
-                throw e;
-            }
-            closed = true;
+            LOG.warn("Unexpected assertion while closing Python context", e);
+            throw e;
         } finally {
             if (closed) {
                 ContextHolder.unregisterContextEngine(ctx);
             }
         }
-        return ContextCloseResult.CLOSED;
     }
 
     @Override

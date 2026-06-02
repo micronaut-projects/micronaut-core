@@ -42,6 +42,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
@@ -52,6 +53,47 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class PythonAsyncioRuntimeTest {
+
+    @Test
+    void cancellationCallbackRunsWhenRegisteredBeforeCancel() {
+        PythonAsyncioRuntime.PythonCompletableFuture future = new PythonAsyncioRuntime.PythonCompletableFuture();
+        AtomicInteger calls = new AtomicInteger();
+
+        future.setCancelCallback(calls::incrementAndGet);
+
+        assertTrue(future.cancel(true));
+        assertEquals(1, calls.get());
+        future.cancel(true);
+        assertEquals(1, calls.get());
+    }
+
+    @Test
+    void cancellationCallbackRunsWhenRegisteredAfterCancel() {
+        PythonAsyncioRuntime.PythonCompletableFuture future = new PythonAsyncioRuntime.PythonCompletableFuture();
+        AtomicInteger calls = new AtomicInteger();
+
+        assertTrue(future.cancel(true));
+        future.setCancelCallback(calls::incrementAndGet);
+
+        assertEquals(1, calls.get());
+    }
+
+    @Test
+    void concurrentCancellationAndCallbackRegistrationRunsCallbackOnce() throws Exception {
+        for (int i = 0; i < 1_000; i++) {
+            PythonAsyncioRuntime.PythonCompletableFuture future = new PythonAsyncioRuntime.PythonCompletableFuture();
+            AtomicInteger calls = new AtomicInteger();
+            Thread register = new Thread(() -> future.setCancelCallback(calls::incrementAndGet));
+            Thread cancel = new Thread(() -> future.cancel(true));
+
+            register.start();
+            cancel.start();
+            register.join();
+            cancel.join();
+
+            assertEquals(1, calls.get());
+        }
+    }
 
     @Test
     void completesImmediatelyForNonAwaitableValue() throws Exception {

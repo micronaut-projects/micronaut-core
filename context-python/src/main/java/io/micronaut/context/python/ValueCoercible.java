@@ -190,6 +190,64 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     record HostObjectReference(ValueCoercible value) {
     }
 
+    static @Nullable ValueCoercible hostObject(@Nullable Value value) {
+        Object hostObject = rawHostObject(value);
+        return hostObject instanceof ValueCoercible valueCoercible ? valueCoercible : null;
+    }
+
+    static @Nullable ValueCoercible hostObject(@Nullable ProxyObject value) {
+        Object hostObject = rawHostObject(value);
+        return hostObject instanceof ValueCoercible valueCoercible ? valueCoercible : null;
+    }
+
+    static @Nullable Object hostObject(@Nullable Value value, Class<?> targetType) {
+        Object hostObject = rawHostObject(value);
+        return targetType.isInstance(hostObject) ? hostObject : null;
+    }
+
+    static @Nullable Object hostObject(@Nullable ProxyObject value, Class<?> targetType) {
+        Object hostObject = rawHostObject(value);
+        return targetType.isInstance(hostObject) ? hostObject : null;
+    }
+
+    private static @Nullable Object rawHostObject(@Nullable Value value) {
+        try {
+            if (value == null || value.isNull()) {
+                return null;
+            }
+            if (value.isHostObject()) {
+                Object hostObject = value.asHostObject();
+                if (hostObject instanceof HostObjectReference reference) {
+                    return reference.value();
+                }
+                return hostObject;
+            }
+            if (!value.hasMembers() || !value.hasMember(HOST_OBJECT_MEMBER)) {
+                return null;
+            }
+            Value hostReferenceValue = value.getMember(HOST_OBJECT_MEMBER);
+            if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
+                return null;
+            }
+            Object hostReference = hostReferenceValue.asHostObject();
+            return hostReference instanceof HostObjectReference reference ? reference.value() : null;
+        } catch (UnsupportedOperationException e) {
+            return null;
+        }
+    }
+
+    private static @Nullable Object rawHostObject(@Nullable ProxyObject value) {
+        try {
+            if (value == null || !value.hasMember(HOST_OBJECT_MEMBER)) {
+                return null;
+            }
+            Object hostReference = value.getMember(HOST_OBJECT_MEMBER);
+            return hostReference instanceof HostObjectReference reference ? reference.value() : null;
+        } catch (UnsupportedOperationException e) {
+            return null;
+        }
+    }
+
     /**
      * Match one Python argument against a Java parameter type without conversion.
      * <p>
@@ -211,9 +269,9 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         if (boxedType == Object.class || boxedType == Value.class) {
             return true;
         }
-        Object hostObject = hostObject(value);
+        Object hostObject = ValueCoercible.hostObject(value, boxedType);
         if (hostObject != null) {
-            return boxedType.isInstance(hostObject);
+            return true;
         }
         if (boxedType == String.class) {
             return value.isString();
@@ -221,8 +279,23 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         if (boxedType == Boolean.class) {
             return value.isBoolean();
         }
-        if (Number.class.isAssignableFrom(boxedType)) {
-            return value.isNumber();
+        if (boxedType == Byte.class) {
+            return value.fitsInByte();
+        }
+        if (boxedType == Short.class) {
+            return value.fitsInShort();
+        }
+        if (boxedType == Integer.class) {
+            return value.fitsInInt();
+        }
+        if (boxedType == Long.class) {
+            return value.fitsInLong();
+        }
+        if (boxedType == Float.class) {
+            return value.fitsInFloat();
+        }
+        if (boxedType == Double.class) {
+            return value.fitsInDouble();
         }
         if (boxedType == Character.class) {
             return value.isString() && value.asString().length() == 1;
@@ -230,21 +303,4 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         return false;
     }
 
-    private static @Nullable Object hostObject(Value value) {
-        if (value.isHostObject()) {
-            return value.asHostObject();
-        }
-        if (!value.hasMembers() || !value.hasMember(HOST_OBJECT_MEMBER)) {
-            return null;
-        }
-        Value hostReferenceValue = value.getMember(HOST_OBJECT_MEMBER);
-        if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
-            return null;
-        }
-        Object hostReference = hostReferenceValue.asHostObject();
-        if (hostReference instanceof HostObjectReference reference) {
-            return reference.value();
-        }
-        return null;
-    }
 }

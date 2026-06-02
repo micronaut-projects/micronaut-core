@@ -21,27 +21,27 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Minimal scheduler abstraction used by Python asyncio integration.
+ * Event-loop operations required to drive Micronaut-managed Python asyncio tasks.
  */
 @Internal
 public interface PythonEventLoop {
 
     /**
-     * Returns whether the current thread is this event-loop thread.
+     * Used to decide whether Python work can run immediately or must be queued.
      *
      * @return Whether the current thread is this event-loop thread.
      */
     boolean inEventLoop();
 
     /**
-     * Execute a callback on the event loop.
+     * Queue a callback for serialized execution on the loop.
      *
      * @param runnable The callback.
      */
     void execute(Runnable runnable);
 
     /**
-     * Schedule a callback on the event loop.
+     * Queue a callback after the requested delay using loop time.
      *
      * @param runnable The callback.
      * @param delay The delay.
@@ -51,7 +51,7 @@ public interface PythonEventLoop {
     ScheduledFuture<?> schedule(Runnable runnable, long delay, TimeUnit unit);
 
     /**
-     * Returns event-loop time in seconds.
+     * Returns the monotonic time base exposed to Python's asyncio APIs.
      *
      * @return Event-loop time in seconds.
      */

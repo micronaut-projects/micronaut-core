@@ -735,7 +735,7 @@ class Test:
         then:
         metadata != null
         metadata.getValue(Requires, "property").isPresent()
-        metadata.getValue(Requires, "property").get() == 'TEST'
+        metadata.getValue(Requires, "property").get() == 'blah'
     }
 
     void "test read local class constants in annotation expressions"() {

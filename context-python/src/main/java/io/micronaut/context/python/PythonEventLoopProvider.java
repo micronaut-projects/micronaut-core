@@ -16,6 +16,7 @@
 package io.micronaut.context.python;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -26,7 +27,16 @@ import java.util.Optional;
 public interface PythonEventLoopProvider {
 
     /**
-     * Returns the current Python event loop, if one is active.
+     * Fast path for code that only needs the active loop instance.
+     *
+     * @return The current Python event loop, or null when none is active.
+     */
+    default @Nullable PythonEventLoop currentLoop() {
+        return current().orElse(null);
+    }
+
+    /**
+     * Compatibility wrapper for callers that prefer Optional.
      *
      * @return The current Python event loop, if one is active.
      */
