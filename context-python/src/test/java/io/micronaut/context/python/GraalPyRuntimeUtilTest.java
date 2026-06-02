@@ -243,6 +243,47 @@ class GraalPyRuntimeUtilTest {
     }
 
     @Test
+    void testDeclaredTypeCoercionPreservesMapImplementingHostObject() {
+        HostModel model = new HostModel();
+        model.put("existing", "value");
+
+        Object result = GraalPyRuntimeUtil.coerceToContext(model, context, HostModelInterface.class);
+
+        assertSame(model, result);
+    }
+
+    @Test
+    void testDeclaredTypeCoercionPreservesConcreteMapImplementingHostObject() {
+        HostModel model = new HostModel();
+        model.put("existing", "value");
+
+        Object result = GraalPyRuntimeUtil.coerceToContext(model, context, HostModel.class);
+
+        assertSame(model, result);
+    }
+
+    @Test
+    void testDeclaredTypeCoercionPreservesObjectDeclaredMapImplementingHostObject() {
+        HostModel model = new HostModel();
+        model.put("existing", "value");
+
+        Object result = GraalPyRuntimeUtil.coerceToContext(model, context, Object.class);
+
+        assertSame(model, result);
+    }
+
+    @Test
+    void testDeclaredTypeCoercionCopiesDeclaredMap() {
+        HostModel model = new HostModel();
+        model.put("existing", "value");
+
+        Object result = GraalPyRuntimeUtil.coerceToContext(model, context, Map.class);
+
+        assertTrue(result instanceof Map);
+        assertEquals(Map.of("existing", "value"), result);
+    }
+
+    @Test
     void testConvertHostOptional() {
         context.getBindings("python").putMember("optional", Optional.of("value"));
 
@@ -418,6 +459,19 @@ class GraalPyRuntimeUtilTest {
         @Override
         public Value asPolyglotValue() {
             throw new UnsupportedOperationException("This test should unwrap the host object without converting through Python");
+        }
+    }
+
+    interface HostModelInterface {
+
+        void addAttribute(String name, Object value);
+    }
+
+    static final class HostModel extends java.util.HashMap<String, Object> implements HostModelInterface {
+
+        @Override
+        public void addAttribute(String name, Object value) {
+            put(name, value);
         }
     }
 }

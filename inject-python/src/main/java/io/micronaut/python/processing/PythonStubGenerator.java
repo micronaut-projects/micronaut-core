@@ -2210,7 +2210,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             parameter = methodParam;
         }
         if (targetContext != null) {
-            parameter = RUNTIME_UTIL.invokeStatic("coerceToContext", TypeDef.OBJECT, parameter, targetContext);
+            parameter = RUNTIME_UTIL.invokeStatic("coerceToContext", TypeDef.OBJECT, parameter, targetContext, classLiteral(genericType));
         }
         parameters.add(parameter);
     }

@@ -161,6 +161,42 @@ public final class GraalPyRuntimeUtil {
     }
 
     /**
+     * Coerce a value using the generated Java bridge's declared parameter type.
+     * Some host objects implement collection interfaces as an implementation
+     * detail and should stay host objects unless the Python method declares the
+     * plain collection contract.
+     *
+     * @param value The value to coerce
+     * @param context The target context
+     * @param declaredType The declared Java bridge parameter type
+     * @return The coerced value
+     */
+    public static @Nullable Object coerceToContext(@Nullable Object value, Context context, Class<?> declaredType) {
+        if (value == null) {
+            return null;
+        }
+        if (declaredType == null) {
+            return coerceToContext(value, context);
+        }
+        if (value instanceof PooledValueCoercible pooledValueCoercible) {
+            return pooledValueCoercible.asPolyglotValue(context);
+        }
+        if (value instanceof List<?> && List.class.equals(declaredType)) {
+            return coerceToContext(value, context);
+        }
+        if (value instanceof Map<?, ?> && Map.class.equals(declaredType)) {
+            return coerceToContext(value, context);
+        }
+        if (value instanceof Set<?> && Set.class.equals(declaredType)) {
+            return coerceToContext(value, context);
+        }
+        if (value instanceof Object[] && declaredType.isArray()) {
+            return coerceToContext(value, context);
+        }
+        return value;
+    }
+
+    /**
      * Coerce arguments passed into a target Python context.
      *
      * @param context The target context
