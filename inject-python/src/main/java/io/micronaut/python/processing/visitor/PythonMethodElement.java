@@ -522,8 +522,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
                 resolvedGenericReturnType = withDeclaredReturnAnnotationMetadata(returnDef, baseType);
             } else {
-                // Fall back to void/Object
-                resolvedGenericReturnType = PrimitiveElement.VOID;
+                resolvedGenericReturnType = unannotatedReturnType(functionDef);
             }
             if (resolvedGenericReturnType instanceof AbstractPythonClassElement pythonClassElement) {
                 resolvedGenericReturnType = pythonClassElement.withTypeAnnotationsKey(functionDef);
@@ -548,7 +547,13 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
             return baseType;
         }
-        // Fall back to void/Object
+        return unannotatedReturnType(functionDef);
+    }
+
+    private ClassElement unannotatedReturnType(FunctionDef functionDef) {
+        if (functionDef.hasReturnValue()) {
+            return environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class));
+        }
         return PrimitiveElement.VOID;
     }
 

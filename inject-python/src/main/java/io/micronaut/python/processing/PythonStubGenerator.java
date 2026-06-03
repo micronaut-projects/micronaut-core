@@ -109,6 +109,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final ClassTypeDef POLYGLOT_VALUE_CONVERTER = ClassTypeDef.of("io.micronaut.context.python.PolyglotValueConverter");
     public static final String GENERATOR_NAME = "python";
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
+    private static final String PUBLISHER = "org.reactivestreams.Publisher";
     private static final String ANN_CONFIGURATION_BUILDER = "io.micronaut.context.annotation.ConfigurationBuilder";
     private static final String ANN_CONFIGURATION_INJECT = "io.micronaut.context.annotation.ConfigurationInject";
     private static final String ANN_CONFIGURATION_READER = "io.micronaut.context.annotation.ConfigurationReader";
@@ -3494,6 +3495,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case "java.lang.String" ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING));
+                case "java.lang.Object" ->
+                    RUNTIME_UTIL.invokeStatic("convertObject", ClassTypeDef.OBJECT, invokedValue);
                 default -> {
                     // Check for collection types
                     if (returnType.isAssignable(List.class)) {
@@ -3532,6 +3535,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         yield uncheckedCast(RUNTIME_UTIL
                             .invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class),
                                 invokedValue, genericType), returnType);
+                    } else if (returnType.isAssignable(PUBLISHER)) {
+                        ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+                        yield uncheckedCast(RUNTIME_UTIL
+                            .invokeStatic("convertPublisher", ClassTypeDef.of(PUBLISHER),
+                                invokedValue, toClassExpression(componentType)), returnType);
                     } else if (returnType.isAssignable(HTTP_RESPONSE)) {
                         ClassElement bodyType = returnType.getFirstTypeArgument().orElse(null);
                         if (bodyType == null || Object.class.getName().equals(bodyType.getName())) {

@@ -65,6 +65,99 @@ public String authenticate(HttpRequest<Object> request_context, GenericAuthentic
 ''')
     }
 
+    void "bridge method uses inherited generic signature for untyped Python parameters"() {
+        expect:
+        assertGeneratedSourceContains('''
+from jakarta.inject import Singleton
+from io.micronaut.python.compiler import GenericHttpRequestAuthenticationProvider
+
+
+@Singleton
+class PythonUntypedHttpAuthenticationProvider(GenericHttpRequestAuthenticationProvider):
+    def authenticate(self, request_context, auth_request) -> str:
+        return "ok"
+''', '''
+public String authenticate(HttpRequest<Object> requestContext, GenericAuthenticationRequest<String, String> authRequest) {
+''')
+    }
+
+    void "bridge method converts unannotated Object return values"() {
+        expect:
+        assertGeneratedSourceContains('''
+from micronaut.http import HttpResponse, HttpStatus
+from micronaut.http.annotation import Controller, Post
+
+@Controller("/untyped-response")
+class UntypedResponseController:
+    @Post
+    def redirect(self):
+        return HttpResponse.status(HttpStatus.SEE_OTHER)
+''', '''
+return GraalPyRuntimeUtil.convertObject(pythonResult);
+''')
+    }
+
+    void "bridge method keeps unannotated no-value return methods void"() {
+        expect:
+        assertGeneratedSourceContains('''
+from micronaut.http.annotation import Controller, Get
+
+@Controller("/void")
+class VoidController:
+    @Get("/no-return")
+    def no_return(self):
+        self.called = True
+
+    @Get("/bare-return")
+    def bare_return(self):
+        return
+
+    @Get("/none-return")
+    def none_return(self):
+        return None
+''', '''
+public void no_return() {
+''')
+        assertGeneratedSourceContains('''
+from micronaut.http.annotation import Controller, Get
+
+@Controller("/void")
+class VoidController:
+    @Get("/no-return")
+    def no_return(self):
+        self.called = True
+
+    @Get("/bare-return")
+    def bare_return(self):
+        return
+
+    @Get("/none-return")
+    def none_return(self):
+        return None
+''', '''
+public void bare_return() {
+''')
+        assertGeneratedSourceContains('''
+from micronaut.http.annotation import Controller, Get
+
+@Controller("/void")
+class VoidController:
+    @Get("/no-return")
+    def no_return(self):
+        self.called = True
+
+    @Get("/bare-return")
+    def bare_return(self):
+        return
+
+    @Get("/none-return")
+    def none_return(self):
+        return None
+''', '''
+public void none_return() {
+''')
+    }
+
     void "bridge method preserves resolved wildcard generic signature"() {
         expect:
         assertGeneratedSourceContains('''
