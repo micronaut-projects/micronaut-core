@@ -59,6 +59,9 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Runs Micronaut type element visitors against Python class elements.
+ */
 public final class PythonTypeElementVisitorProcessor {
     private final ClassLoader classLoader;
 

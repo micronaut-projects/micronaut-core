@@ -122,6 +122,7 @@ public record ClassDef(
         this(name, packageName, bases, decorators, typeParams, functions, attributes, properties, List.of(), constructor, false, isEnum, values, documentation);
     }
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     public ClassDef(String name,
                     String packageName,
                     List<TypeRef> bases,

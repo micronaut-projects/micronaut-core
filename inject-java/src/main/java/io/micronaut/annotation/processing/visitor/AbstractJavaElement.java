@@ -389,7 +389,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
             }
         }
         if (upperType.isPrimitive()) {
-            // TODO: Support primitives for wildcards (? extends byte[])
+            // Primitive wildcard bounds are not represented as wildcard elements.
             return upperType;
         }
         if (!(upperType instanceof JavaClassElement javaUpperType)

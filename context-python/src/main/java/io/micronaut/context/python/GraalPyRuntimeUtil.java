@@ -121,6 +121,12 @@ public final class GraalPyRuntimeUtil {
      */
     @UsedByGeneratedCode
     public static @Nullable Object coerceValue(@Nullable Object value) {
+        if (value instanceof Throwable) {
+            return value;
+        }
+        if (value instanceof ValueCoercible.GeneratedPropertyMembers) {
+            return value;
+        }
         if (value instanceof ValueCoercible valueCoercible && !(value instanceof PooledValueCoercible)) {
             return valueCoercible.asPolyglotValue();
         }
@@ -325,6 +331,7 @@ public final class GraalPyRuntimeUtil {
     /**
      * Return a value as {@link Object} so generated code can perform unchecked generic casts.
      *
+     * @param <T> The target object type
      * @param value The value
      * @return The value as an object
      */
@@ -582,7 +589,7 @@ public final class GraalPyRuntimeUtil {
      * @return a Java Set with converted elements
      */
     public static <T> @Nullable Set<T> convertSet(Value graalValue, Class<T> elementType) {
-        // TODO: Ideally a custom Set implementation that doesn't create a new map would be better here
+        // A custom Set implementation that doesn't create a new map would be better here.
         if (isNone(graalValue)) {
             return null;
         }
@@ -847,6 +854,26 @@ public final class GraalPyRuntimeUtil {
         return null;
     }
 
+    /**
+     * Convert a Python enum value to the string representation exposed by Python.
+     *
+     * @param value The Python enum value
+     * @return The enum string value
+     */
+    public static String enumStringValue(Value value) {
+        Value target = value;
+        if (value != null && value.hasMembers() && value.hasMember("value")) {
+            target = value.getMember("value");
+        }
+        if (isNone(target)) {
+            return "null";
+        }
+        if (target.isString()) {
+            return target.asString();
+        }
+        return target.toString();
+    }
+
     private static @Nullable ValueCoercible valueCoercibleHost(Value value) {
         if (value == null || value.isNull() || !value.hasMembers() || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
             return null;
@@ -874,6 +901,11 @@ public final class GraalPyRuntimeUtil {
         try {
             return (T) Enum.valueOf((Class) targetType.asSubclass(Enum.class), enumName);
         } catch (IllegalArgumentException e) {
+            for (Enum<?> enumConstant : targetType.asSubclass(Enum.class).getEnumConstants()) {
+                if (enumName.equals(enumConstant.toString())) {
+                    return (T) enumConstant;
+                }
+            }
             return null;
         }
     }

@@ -1121,7 +1121,10 @@ def {simple_name}(*args, **kwargs):
                 binary_name = self._to_binary_nested_name(class_element.getName(), nested_name)
                 needs_java = True
                 lines.append(f'''
-{simple_name} = java.type("{binary_name}")
+try:
+    {simple_name} = java.type("{binary_name}")
+except Exception:
+    {simple_name} = None
 {parent_name}.{simple_name} = {simple_name}
 ''')
 

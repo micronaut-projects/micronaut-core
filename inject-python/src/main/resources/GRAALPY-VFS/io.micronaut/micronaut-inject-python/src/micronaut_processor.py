@@ -148,6 +148,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.imported_types = {}  # Track imported types: simple_name -> full_qualified_name
         self.local_classes = set()  # Track class names defined in this file
         self.local_constant_values = {}  # Track local class constants visible to annotation expressions
+        self.module_constant_names = set()  # Track module-level constants that should stay symbolic in metadata
         self.current_class_nested_types = {}  # Track nested classes visible in the current class body
         # Script handling
         self.current_script = None
@@ -758,6 +759,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         for target in targets:
             if isinstance(target, ast.Name):
                 if self.current_class is None:
+                    self.module_constant_names.add(target.id)
                     self.local_constant_values[target.id] = value
                 continue
             if not isinstance(target, ast.Attribute):
@@ -1920,7 +1922,7 @@ def decorator_to_function(visitor, node):
                 resolved_decorator_fqn = decorator_name
 
             if decorator_declaration is not None:
-                members = extract_call_arguments_with_defaults(decorator_declaration, node, visitor)
+                members = extract_call_arguments_with_defaults(decorator_declaration, node, visitor, decorator_declaration.annotationName())
                 members = resolve_annotation_member_constants(decorator_declaration.annotationName(), members, visitor)
                 return DecoratorDef(
                     decorator_name,
@@ -1931,7 +1933,7 @@ def decorator_to_function(visitor, node):
                 )
             else:
                 # Direct annotation or Java annotation used as a decorator
-                members = extract_call_arguments_with_defaults(None, node, visitor)
+                members = extract_call_arguments_with_defaults(None, node, visitor, resolved_decorator_fqn)
                 members = resolve_annotation_member_constants(resolved_decorator_fqn, members, visitor)
                 # Resolve names in member values
                 resolved_members = {}
@@ -1982,7 +1984,11 @@ def resolve_annotation_member_constants(annotation_name, members, visitor=None):
     return resolved
 
 
-def convert_ast_value(node, visitor=None):
+def preserve_symbolic_module_constant(annotation_name, member_name):
+    return annotation_name == "io.micronaut.context.annotation.Requires" and member_name == "property"
+
+
+def convert_ast_value(node, visitor=None, symbolic_module_constant=False):
     """
     Convert an AST node to a Python value, handling complex expressions like lists.
     If visitor is provided, resolve Java type names to fully qualified names and Java constants to their values.
@@ -1992,6 +1998,8 @@ def convert_ast_value(node, visitor=None):
         # Class references - check if this is a type that should be resolved
         name = node.id
         if visitor is not None:
+            if symbolic_module_constant and hasattr(visitor, 'module_constant_names') and name in visitor.module_constant_names:
+                return name
             if hasattr(visitor, 'local_constant_values') and name in visitor.local_constant_values:
                 return visitor.local_constant_values[name]
             # Check imported types first
@@ -2089,10 +2097,19 @@ def convert_ast_call_to_decorator(node, visitor=None):
         return decorator_to_function(visitor, node)
     return None
 
-def merge_keyword_argument(result, kw, visitor=None):
+def convert_annotation_member_value(annotation_name, member_name, node, visitor=None):
+    return convert_ast_value(
+        node,
+        visitor,
+        preserve_symbolic_module_constant(annotation_name, member_name)
+    )
+
+
+def merge_keyword_argument(result, kw, visitor=None, annotation_name=None):
     if kw.arg is not None:
-        value = convert_ast_value(kw.value, visitor)
-        result[normalize_python_keyword_alias(kw.arg)] = value
+        member_name = normalize_python_keyword_alias(kw.arg)
+        value = convert_annotation_member_value(annotation_name, member_name, kw.value, visitor)
+        result[member_name] = value
         return
 
     for key, value in extract_keyword_expansion(kw.value, visitor).items():
@@ -2238,7 +2255,7 @@ def extract_arg_types(visitor, func_node):
                 member_types[normalize_python_keyword_alias(arg.arg)] = parsed_type
     return member_types
 
-def extract_call_arguments_with_defaults(funcdef, call, visitor=None):
+def extract_call_arguments_with_defaults(funcdef, call, visitor=None, annotation_name=None):
     """
     Given an ast.FunctionDef (can be None) and an ast.Call node,
     return a dict mapping argument names (from funcdef) or integer indices (if funcdef is None)
@@ -2252,11 +2269,12 @@ def extract_call_arguments_with_defaults(funcdef, call, visitor=None):
         # Java annotations conventionally use "value" for the first positional argument,
         # including mixed calls like @Get("/path", produces="text/plain").
         for i, arg in enumerate(call.args):
-            value = convert_ast_value(arg, visitor)
-            result["value" if i == 0 else f"arg{i}"] = value
+            member_name = "value" if i == 0 else f"arg{i}"
+            value = convert_annotation_member_value(annotation_name, member_name, arg, visitor)
+            result[member_name] = value
         # Handle keyword arguments
         for kw in call.keywords:
-            merge_keyword_argument(result, kw, visitor)
+            merge_keyword_argument(result, kw, visitor, annotation_name)
     else:
         # Get parameter names from function definition
         try:
@@ -2269,23 +2287,24 @@ def extract_call_arguments_with_defaults(funcdef, call, visitor=None):
         # If no named parameters but we have positional args, assume single arg uses "value"
         if len(param_names) == 0:
             for i, arg in enumerate(call.args):
-                value = convert_ast_value(arg, visitor)
-                result["value" if i == 0 else f"arg{i}"] = value
+                member_name = "value" if i == 0 else f"arg{i}"
+                value = convert_annotation_member_value(annotation_name, member_name, arg, visitor)
+                result[member_name] = value
             # Handle keyword arguments
             for kw in call.keywords:
-                merge_keyword_argument(result, kw, visitor)
+                merge_keyword_argument(result, kw, visitor, annotation_name)
         else:
             # Normal case with named parameters
             # Map positional arguments by their position in the parameter list
             for i, arg in enumerate(call.args):
                 if i < len(param_names):
                     param_name = param_names[i]
-                    value = convert_ast_value(arg, visitor)
+                    value = convert_annotation_member_value(annotation_name, param_name, arg, visitor)
                     result[param_name] = value
 
             # Map keyword arguments by their parameter names
             for kw in call.keywords:
-                merge_keyword_argument(result, kw, visitor)
+                merge_keyword_argument(result, kw, visitor, annotation_name)
 
     return result
 

@@ -30,6 +30,7 @@ import java.beans.Transient;
  */
 public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     String HOST_OBJECT_MEMBER = "__micronaut_value_coercible_host__";
+    String AS_POLYGLOT_VALUE_MEMBER = "asPolyglotValue";
 
     /**
      * Converts the type to a Truffle value.
@@ -46,6 +47,14 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     default @Nullable Object getMember(String key) {
         if (HOST_OBJECT_MEMBER.equals(key)) {
             return new HostObjectReference(this);
+        }
+        if (AS_POLYGLOT_VALUE_MEMBER.equals(key)) {
+            return (ProxyExecutable) arguments -> {
+                if (arguments.length != 0) {
+                    throw new IllegalArgumentException("asPolyglotValue expects no arguments");
+                }
+                return asPolyglotValue();
+            };
         }
         Value value = asPolyglotValue();
         if (value.hasMember(key)) {
@@ -75,30 +84,11 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     @Override
     default boolean hasMember(String key) {
         return HOST_OBJECT_MEMBER.equals(key) ||
+            AS_POLYGLOT_VALUE_MEMBER.equals(key) ||
             asPolyglotValue().hasMember(key) ||
             (this instanceof GeneratedPropertyMembers generatedMembers &&
                 (generatedMembers.micronautValueCoercibleGetterPropertyName(key) != null ||
                     generatedMembers.micronautValueCoercibleSetterPropertyName(key) != null));
-    }
-
-    /**
-     * Build-time generated JavaBean accessor aliases for Python wrappers.
-     * <p>
-     * Only generated classes that need property aliases implement this contract. That keeps
-     * the generic {@link ValueCoercible} path free of Java method/field reflection while still
-     * preserving Python-side calls such as {@code getName()} for generated bean wrappers.
-     */
-    interface GeneratedPropertyMembers {
-        @Transient
-        @Nullable String micronautValueCoercibleGetterPropertyName(String key);
-
-        @Transient
-        @Nullable String micronautValueCoercibleSetterPropertyName(String key);
-
-        @Transient
-        default boolean micronautValueCoercibleSetMember(String key, Value value) {
-            return false;
-        }
     }
 
     private @Nullable Object generatedGetter(String key) {
@@ -166,9 +156,6 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         target.putMember(key, member);
     }
 
-    record HostObjectReference(ValueCoercible value) {
-    }
-
     /**
      * Match one Python argument against a Java parameter type without conversion.
      * <p>
@@ -225,5 +212,33 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             return reference.value();
         }
         return null;
+    }
+
+    /**
+     * Build-time generated JavaBean accessor aliases for Python wrappers.
+     * <p>
+     * Only generated classes that need property aliases implement this contract. That keeps
+     * the generic {@link ValueCoercible} path free of Java method/field reflection while still
+     * preserving Python-side calls such as {@code getName()} for generated bean wrappers.
+     */
+    interface GeneratedPropertyMembers {
+        @Transient
+        @Nullable String micronautValueCoercibleGetterPropertyName(String key);
+
+        @Transient
+        @Nullable String micronautValueCoercibleSetterPropertyName(String key);
+
+        @Transient
+        default boolean micronautValueCoercibleSetMember(String key, Value value) {
+            return false;
+        }
+    }
+
+    /**
+     * Reference to the source host object exposed through a polyglot value.
+     *
+     * @param value The host value
+     */
+    record HostObjectReference(ValueCoercible value) {
     }
 }

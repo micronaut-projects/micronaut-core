@@ -631,6 +631,8 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
             annotationValue = enumValues(annotationValue);
         } else if (isClassArrayMember(memberType)) {
             annotationValue = annotationClassValues(annotationValue);
+        } else if (isAnnotationArrayMember(memberType)) {
+            annotationValue = annotationValues(memberType.fromArray(), annotationValue);
         } else if (isArrayMember(memberType)) {
             annotationValue = arrayValues(memberType.fromArray(), annotationValue);
         } else if (isClassMember(memberType)) {
@@ -649,6 +651,14 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
 
     private boolean isClassArrayMember(@Nullable ClassElement memberType) {
         return memberType != null && memberType.isArray() && isClassMember(memberType.fromArray());
+    }
+
+    private boolean isAnnotationArrayMember(@Nullable ClassElement memberType) {
+        return memberType != null && memberType.isArray() && isAnnotationMember(memberType.fromArray());
+    }
+
+    private boolean isAnnotationMember(@Nullable ClassElement memberType) {
+        return memberType != null && memberType.isAssignable(Annotation.class);
     }
 
     private @Nullable AnnotationClassValue<?> annotationClassValue(@Nullable Object value) {
@@ -805,6 +815,66 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
         List<Object> values = new ArrayList<>();
         collectArrayValues(componentType, value, values);
         return toArray(componentType, values);
+    }
+
+    private AnnotationValue<?>[] annotationValues(ClassElement componentType, @Nullable Object value) {
+        List<AnnotationValue<?>> values = new ArrayList<>();
+        collectAnnotationValues(componentType, value, values);
+        return values.toArray(AnnotationValue[]::new);
+    }
+
+    private void collectAnnotationValues(ClassElement componentType, @Nullable Object value, List<AnnotationValue<?>> values) {
+        if (value == null) {
+            return;
+        }
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return;
+            }
+            if (polyglotValue.hasArrayElements()) {
+                int size = Math.toIntExact(polyglotValue.getArraySize());
+                for (int i = 0; i < size; i++) {
+                    collectAnnotationValues(componentType, polyglotValue.getArrayElement(i), values);
+                }
+                return;
+            }
+            addAnnotationValue(componentType, polyglotValue, values);
+            return;
+        }
+        if (value.getClass().isArray()) {
+            int size = Array.getLength(value);
+            for (int i = 0; i < size; i++) {
+                collectAnnotationValues(componentType, Array.get(value, i), values);
+            }
+            return;
+        }
+        if (value instanceof Iterable<?> iterable) {
+            for (Object element : iterable) {
+                collectAnnotationValues(componentType, element, values);
+            }
+            return;
+        }
+        addAnnotationValue(componentType, value, values);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void addAnnotationValue(ClassElement componentType, Object value, List<AnnotationValue<?>> values) {
+        if (value instanceof AnnotationValue<?> annotationValue) {
+            values.add(annotationValue);
+            return;
+        }
+        if (value instanceof DecoratorDef decoratorDef) {
+            values.add(toAnnotationValue(decoratorDef));
+            return;
+        }
+        if (value instanceof Value polyglotValue) {
+            Object converted = GraalPyUtil.convertValueToJava(polyglotValue, componentType, visitorContext);
+            if (converted instanceof AnnotationValue<?> annotationValue) {
+                values.add(annotationValue);
+            } else if (converted instanceof DecoratorDef decoratorDef) {
+                values.add(toAnnotationValue(decoratorDef));
+            }
+        }
     }
 
     private void collectArrayValues(ClassElement componentType, @Nullable Object value, List<Object> values) {

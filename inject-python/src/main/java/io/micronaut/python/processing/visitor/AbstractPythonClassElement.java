@@ -70,6 +70,9 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
 import org.jspecify.annotations.NonNull;
 
+/**
+ * Base class element implementation shared by Python class-like elements.
+ */
 @SuppressWarnings({"checkstyle:DeclarationOrder", "checkstyle:InnerTypeLast"})
 public abstract sealed class AbstractPythonClassElement extends AbstractPythonElement
     implements ArrayableClassElement, ElementProvider permits PythonClassElement, PythonEnumElement, PythonGenericPlaceholderElement {

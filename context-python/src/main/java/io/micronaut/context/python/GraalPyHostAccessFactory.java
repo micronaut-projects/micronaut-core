@@ -336,7 +336,7 @@ final class GraalPyHostAccessFactory {
     }
 
     private static @Nullable ValueCoercible valueCoercibleHost(@Nullable ProxyObject value, Class<?> target) {
-        if (value == null || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
+        if (value == null || !hasProxyMember(value, ValueCoercible.HOST_OBJECT_MEMBER)) {
             return null;
         }
         Object hostReference = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
@@ -344,5 +344,13 @@ final class GraalPyHostAccessFactory {
             return reference.value();
         }
         return null;
+    }
+
+    private static boolean hasProxyMember(ProxyObject value, String memberName) {
+        try {
+            return value.hasMember(memberName);
+        } catch (UnsupportedOperationException e) {
+            return false;
+        }
     }
 }

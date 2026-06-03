@@ -81,9 +81,6 @@ final class PyronautJavaCompiler {
     private File errorDumpDirectory = DEFAULT_ERROR_DUMP_DIRECTORY;
     private List<SourceSnapshot> sourceSnapshots = List.of();
 
-    record SourceSnapshot(String name, String path, String content) {
-    }
-
     /**
      * Set the callback to be invoked for each class element created during processing.
      * This is primarily used for testing purposes.
@@ -430,17 +427,6 @@ final class PyronautJavaCompiler {
         return writer.toString();
     }
 
-    private record DumpResult(File file, String failureMessage) {
-        static DumpResult written(File file) {
-            return new DumpResult(file, null);
-        }
-
-        static DumpResult failed(Exception exception) {
-            String message = exception.getMessage();
-            return new DumpResult(null, message == null ? exception.getClass().getSimpleName() : message);
-        }
-    }
-
     private static void shutdownProcessors(List<Processor> processors) {
         for (Processor processor : processors) {
             if (processor instanceof AutoCloseable autoCloseable) {
@@ -591,5 +577,19 @@ final class PyronautJavaCompiler {
             classLoader = new URLClassLoader(cp.toArray(new URL[0]), classLoader);
         }
         return classLoader;
+    }
+
+    record SourceSnapshot(String name, String path, String content) {
+    }
+
+    private record DumpResult(File file, String failureMessage) {
+        static DumpResult written(File file) {
+            return new DumpResult(file, null);
+        }
+
+        static DumpResult failed(Exception exception) {
+            String message = exception.getMessage();
+            return new DumpResult(null, message == null ? exception.getClass().getSimpleName() : message);
+        }
     }
 }

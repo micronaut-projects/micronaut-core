@@ -1514,7 +1514,5 @@ public class MediaType implements CharSequence {
                 parameterStart = parameterValueEnd + 1;
             }
         }
-
-
     }
 }
