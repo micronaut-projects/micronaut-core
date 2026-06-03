@@ -6,8 +6,11 @@ import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.json.JsonMapper
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import io.micronaut.runtime.server.EmbeddedServer
@@ -79,6 +82,194 @@ class HelloController:
         expect:
         definition.getRequiredMethod("say_hello", String).stringValue(Get, "produces").get() == 'text/plain'
         client.toBlocking().retrieve("/hello/John") == "Hello John"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
+    void "test python controller binds multipart part parameter"() {
+        given:
+        def context = buildContext('''
+from typing import Annotated
+from micronaut.http import MediaType
+from micronaut.http.annotation import Controller, Part, Post
+
+@Controller("/form")
+class FormController:
+    @Post(value = "/name", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+    def name(self, name: Annotated[str, Part]) -> str:
+        return name
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(HttpClient, embeddedServer.URL)
+        def body = MultipartBody.builder().addPart("name", "sherlock").build()
+
+        expect:
+        client.toBlocking().retrieve(
+            HttpRequest.POST("/form/name", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE),
+            String
+        ) == "sherlock"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
+    void "test python controller can return reactive http response"() {
+        given:
+        def context = buildContext('''
+import java
+from typing import Annotated
+from jakarta.inject import Singleton
+from micronaut.core.async_.annotation import SingleResult
+from micronaut.http import HttpResponse, HttpStatus, MediaType, MutableHttpResponse
+from micronaut.http.annotation import Controller, Part, Post
+
+Flux = java.type("reactor.core.publisher.Flux")
+Publisher = java.type("org.reactivestreams.Publisher")
+
+@Singleton
+class RedirectSource:
+    def responses(self) -> Publisher:
+        return Flux.just("ok")
+
+@Controller("/reactive-login")
+class ReactiveController:
+    def __init__(self, source: RedirectSource):
+        self.source = source
+
+    @SingleResult
+    @Post(
+        consumes=[MediaType.TEXT_HTML, MediaType.MULTIPART_FORM_DATA],
+        produces=MediaType.TEXT_HTML,
+    )
+    def redirect(self, name: Annotated[str | None, Part] = None) -> Publisher[MutableHttpResponse]:
+        return (
+            Flux.from_(self.source.responses())
+            .map(lambda ignored: HttpResponse.status(HttpStatus.SEE_OTHER).header("Location", f"/target/{name}"))
+            .defaultIfEmpty(HttpResponse.status(HttpStatus.UNAUTHORIZED))
+        )
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(
+            HttpClient,
+            embeddedServer.URL,
+            new DefaultHttpClientConfiguration(followRedirects: false)
+        )
+        def body = MultipartBody.builder().addPart("name", "sherlock").build()
+
+        when:
+        def response = client.toBlocking().exchange(
+            HttpRequest.POST("/reactive-login", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE),
+            String
+        )
+
+        then:
+        response.status().code == 303
+        response.header("Location") == "/target/sherlock"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
+    void "test python controller can return unannotated http response host object"() {
+        given:
+        def context = buildContext('''
+from micronaut.http import HttpResponse, HttpStatus, MediaType
+from micronaut.http.annotation import Controller, Post
+
+@Controller("/untyped-response")
+class UntypedResponseController:
+    @Post(consumes=MediaType.APPLICATION_FORM_URLENCODED, produces=MediaType.TEXT_HTML)
+    def redirect(self):
+        return HttpResponse.status(HttpStatus.SEE_OTHER).header("Location", "/target")
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(
+            HttpClient,
+            embeddedServer.URL,
+            new DefaultHttpClientConfiguration(followRedirects: false)
+        )
+
+        when:
+        def response = client.toBlocking().exchange(
+            HttpRequest.POST("/untyped-response", "").contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE),
+            String
+        )
+
+        then:
+        response.status().code == 303
+        response.header("Location") == "/target"
+
+        cleanup:
+        client.close()
+        context?.close()
+    }
+
+    void "test python controller replaces generic java controller with reactive http response"() {
+        given:
+        def context = buildContext('''
+import java
+from typing import Annotated
+from micronaut.context.annotation import Replaces
+from micronaut.core.async_.annotation import SingleResult
+from micronaut.http import HttpResponse, HttpStatus, MediaType, MutableHttpResponse
+from micronaut.http.annotation import Controller, Part, Post
+from io.micronaut.python.annotation.processing.test.web import GenericLoginController
+
+Flux = java.type("reactor.core.publisher.Flux")
+Publisher = java.type("org.reactivestreams.Publisher")
+
+@Replaces(GenericLoginController)
+@Controller("/generic-login")
+class ReplacementLoginController:
+    @SingleResult
+    @Post(
+        consumes=[MediaType.TEXT_HTML, MediaType.MULTIPART_FORM_DATA],
+        produces=MediaType.TEXT_HTML,
+    )
+    def login(self, name: Annotated[str | None, Part] = None) -> Publisher[MutableHttpResponse]:
+        return (
+            Flux.just(name)
+            .map(lambda n: HttpResponse.status(HttpStatus.SEE_OTHER).header("Location", f"/target/{n}"))
+            .defaultIfEmpty(HttpResponse.status(HttpStatus.UNAUTHORIZED))
+        )
+
+''', true)
+
+        def embeddedServer = context.getBean(EmbeddedServer)
+        embeddedServer.start()
+        def client = context.createBean(
+            HttpClient,
+            embeddedServer.URL,
+            new DefaultHttpClientConfiguration(followRedirects: false)
+        )
+        def replacedControllerType = context.classLoader.loadClass("io.micronaut.python.annotation.processing.test.web.GenericLoginController")
+        def replacementControllerType = context.classLoader.loadClass("python.ReplacementLoginController")
+        def body = MultipartBody.builder().addPart("name", "sherlock").build()
+
+        when:
+        def response = client.toBlocking().exchange(
+            HttpRequest.POST("/generic-login", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE),
+            String
+        )
+
+        then:
+        context.getBeanDefinitions(replacedControllerType).isEmpty()
+        context.getBeanDefinitions(replacementControllerType).size() == 1
+        response.status().code == 303
+        response.header("Location") == "/target/sherlock"
 
         cleanup:
         client.close()

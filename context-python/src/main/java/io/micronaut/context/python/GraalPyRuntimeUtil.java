@@ -25,12 +25,14 @@ import java.util.stream.Collectors;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyObject;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 
 /**
  * Runtime utility class for converting GraalPy Values to Java collections.
@@ -329,6 +331,16 @@ public final class GraalPyRuntimeUtil {
     @SuppressWarnings("unchecked")
     public static <T> @Nullable T asObject(@Nullable Object value) {
         return (T) value;
+    }
+
+    /**
+     * Convert a GraalPy value to a general Java object while preserving host objects.
+     *
+     * @param value The source polyglot value
+     * @return The converted object
+     */
+    public static @Nullable Object convertObject(@Nullable Value value) {
+        return convertObjectResponseBody(value);
     }
 
     /**
@@ -674,6 +686,35 @@ public final class GraalPyRuntimeUtil {
     }
 
     /**
+     * Convert each item emitted by a Python-returned publisher to the declared Java item type.
+     *
+     * @param publisher The source publisher
+     * @param itemType The declared publisher item type
+     * @param <T> The item type
+     * @return The converted publisher
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Publisher<T> convertPublisher(Publisher<?> publisher, Class<T> itemType) {
+        return Publishers.map((Publisher<Object>) publisher, item -> convertPublishedValue(item, itemType));
+    }
+
+    /**
+     * Convert a GraalPy Value representing a publisher to a typed Java publisher.
+     *
+     * @param value The source polyglot publisher
+     * @param itemType The declared publisher item type
+     * @param <T> The item type
+     * @return The converted publisher
+     */
+    public static <T> @Nullable Publisher<T> convertPublisher(Value value, Class<T> itemType) {
+        Publisher<?> publisher = convertValue(value, Publisher.class);
+        if (publisher == null) {
+            return null;
+        }
+        return convertPublisher(publisher, itemType);
+    }
+
+    /**
      * Convert a response body to the declared Java body type.
      *
      * @param response The source response
@@ -699,6 +740,23 @@ public final class GraalPyRuntimeUtil {
             return ((MutableHttpResponse<T>) mutableResponse).body(convertedBody);
         }
         return (HttpResponse<T>) response;
+    }
+
+    private static <T> @Nullable T convertPublishedValue(@Nullable Object item, Class<T> itemType) {
+        if (item == null || itemType.isInstance(item)) {
+            return itemType.cast(item);
+        }
+        if (item instanceof HttpResponse<?> response && HttpResponse.class.isAssignableFrom(itemType)) {
+            return itemType.cast(convertHttpResponse(response, Object.class));
+        }
+        if (item instanceof Value value) {
+            return convertValue(value, itemType);
+        }
+        try {
+            return convertValue(Value.asValue(item), itemType);
+        } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
+            return itemType.cast(item);
+        }
     }
 
     private static <T> @Nullable T convertResponseBody(Object rawBody, Class<T> bodyType) {

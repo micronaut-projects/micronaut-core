@@ -71,6 +71,40 @@ def is_placeholder_method(funcdef):
                 return True
     return False
 
+def has_return_value(funcdef):
+    """
+    Returns True if the function body contains a return statement with a value.
+    Bare `return` and `return None` keep the method void for Java/JUnit callers.
+    """
+    class ReturnValueVisitor(ast.NodeVisitor):
+        def __init__(self):
+            self.found = False
+
+        def visit_Return(self, node):
+            value = node.value
+            if (
+                value is not None
+                and not (isinstance(value, ast.Constant) and value.value is None)
+                and not (isinstance(value, ast.NameConstant) and value.value is None)
+            ):
+                self.found = True
+
+        def visit_FunctionDef(self, node):
+            return
+
+        def visit_AsyncFunctionDef(self, node):
+            return
+
+        def visit_ClassDef(self, node):
+            return
+
+    visitor = ReturnValueVisitor()
+    for stmt in funcdef.body:
+        visitor.visit(stmt)
+        if visitor.found:
+            return True
+    return False
+
 def is_static_method(func_node):
     """
     Check if a function node represents a static method (has @staticmethod or @classmethod decorator).
@@ -305,7 +339,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         )
                         is_static = is_static_method(node)
 
-                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static)
+                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static, has_return_value(node))
                         if self.current_class is not None:
                             if node.name == "__init__":
                                 self._handle_constructor_instance_attributes(node, arguments)
@@ -535,7 +569,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             "",  # ??? (not sure what this is)
                             [],  # ??? (not sure what this is)
                             None,  # func_doc
-                            False  # is_abstract
+                            False,  # is_abstract
+                            False,  # is_static
+                            False  # has_return_value
                         )
                         self.current_class = self.current_class.withConstructor(dataclass_constructor)
 
@@ -1343,7 +1379,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         is_abstract = is_abstract_method(func_node)
         is_static = is_static_method(func_node)
 
-        func_def = JavaFuncDef(func_node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract, is_static)
+        func_def = JavaFuncDef(func_node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract, is_static, has_return_value(func_node))
 
         # Update the property based on type
         if property_type == "getter":

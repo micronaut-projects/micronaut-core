@@ -4,6 +4,7 @@ import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.aop.Introduction
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.Introspected
 import org.jspecify.annotations.NonNull
@@ -140,6 +141,24 @@ class Outer {
         expect:
         introspection.getRequiredProperty("name", String).stringValue("foo.bar.Ann", 'foo')
                 .get() == 'bar'
+    }
+
+    void "test reflected parameter element supports annotation metadata copy"() {
+        given:
+        ParameterElement parameter = ParameterElement.of(String, "name")
+        parameter.annotate(RuntimeAnn) { AnnotationValueBuilder builder ->
+            builder.member("foo", "bar")
+        }
+
+        when:
+        ParameterElement copy = parameter.withAnnotationMetadata(parameter.getAnnotationMetadata())
+
+        then:
+        copy !== parameter
+        copy.getName() == "name"
+        copy.getType().getName() == String.name
+        copy.stringValue(RuntimeAnn, "foo").get() == "bar"
+        parameter.withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA).getAnnotationMetadata().isEmpty()
     }
 
     @Override

@@ -315,6 +315,9 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             int representedMethodIndex = representedInterfaceMethodIndex(allElements, inheritedMethod);
             if (representedMethodIndex == -1) {
                 allElements.add((T) decorateInheritedInterfaceMethod(inheritedMethod));
+            } else if (allElements.get(representedMethodIndex) instanceof PythonMethodElement representedMethod
+                && inheritedMethod.isAbstract()) {
+                allElements.set(representedMethodIndex, (T) representedMethod.withParameters(inheritedMethod.getParameters()));
             } else if (allElements.get(representedMethodIndex) instanceof MethodElement representedMethod
                 && !representedMethod.getDeclaringType().equals(this)
                 && representedMethod.isAbstract()) {
