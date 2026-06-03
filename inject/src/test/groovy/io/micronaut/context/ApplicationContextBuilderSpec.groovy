@@ -125,6 +125,7 @@ class ApplicationContextBuilderSpec extends Specification {
         given:
         CustomScopeRegistry registry = null
         ApplicationContext context = ApplicationContext.builder()
+            .bootstrapEnvironment(false)
             .customScopeRegistry({ BeanContext beanContext ->
                 registry = new DefaultCustomScopeRegistry(beanContext)
                 registry
@@ -136,7 +137,7 @@ class ApplicationContextBuilderSpec extends Specification {
 
         then:
         registry != null
-        context.customScopeRegistry.is(registry)
+        ((DefaultApplicationContext) context).getCustomScopeRegistry().is(registry)
 
         cleanup:
         context.close()
