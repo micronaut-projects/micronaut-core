@@ -47,6 +47,7 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.qualifiers.Qualified;
+import io.micronaut.inject.proxy.InterceptedMethodProvider;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
@@ -602,6 +603,16 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         if (parentWriter != null && !isProxyTarget) {
             processAlreadyVisitedMethods(parentWriter);
+        }
+        if (!proxiedMethods.isEmpty()) {
+            proxyBuilder.addSuperinterface(TypeDef.of(InterceptedMethodProvider.class));
+            proxyBuilder.addMethod(MethodDef.builder("interceptedMethods")
+                .addModifiers(Modifier.PUBLIC)
+                .returns(ClassTypeDef.of(ExecutableMethod.class).array())
+                .build((aThis, methodParameters) -> aThis.field(proxyMethodsField)
+                    .invoke("clone", TypeDef.OBJECT)
+                    .cast(ClassTypeDef.of(ExecutableMethod.class).array())
+                    .returning()));
         }
 
         interceptorsListParameter.annotate(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
