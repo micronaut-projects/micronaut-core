@@ -65,7 +65,7 @@ class Http2ServerPushSpec extends Specification {
     EmbeddedServer embeddedServer
 
     @Ignore
-    def 'with push enabled: automatic'() {
+    void 'with push enabled: automatic'() {
         given:
         def runner = new Runner()
         runner.run(true, '/serverPush/automatic')
