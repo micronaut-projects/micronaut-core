@@ -1288,6 +1288,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         interceptedTarget,
                         registration instanceof BeanDisposingRegistration ? ((BeanDisposingRegistration<T>) registration).getDependents() : null
                     ));
+                    interceptedProxy.clearCachedInterceptedTarget();
                 }
             }
             return;
@@ -1300,6 +1301,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (targetBeanRegistration.isPresent()) {
             BeanRegistration<T> targetRegistration = targetBeanRegistration.get();
             customScope.remove(targetRegistration.identifier);
+            if (registration.bean instanceof InterceptedBeanProxy<?> interceptedProxy) {
+                interceptedProxy.clearCachedInterceptedTarget();
+            }
         }
     }
 

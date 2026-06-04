@@ -134,6 +134,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         "hasCachedInterceptedTarget"
     );
 
+    private static final Method METHOD_CLEAR_CACHED_INTERCEPTED_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        InterceptedProxy.class,
+        "clearCachedInterceptedTarget"
+    );
+
     private static final Method METHOD_BEAN_DEFINITION_GET_REQUIRED_METHOD = ReflectionUtils.getRequiredInternalMethod(
         BeanDefinition.class,
         "getRequiredMethod",
@@ -687,9 +692,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     proxyBeanDefinitionField,
                     beanQualifierField
                 );
-                proxyBuilder.addMethod(
-                    getHasCachedInterceptedTargetMethod(targetField)
-                );
+                proxyBuilder.addMethod(getHasCachedInterceptedTargetMethod(targetField));
+                proxyBuilder.addMethod(getClearCachedInterceptedTargetMethod(targetField));
             } else {
                 interceptedTargetMethod = getLazyInterceptedTargetMethod(
                     beanResolutionContextField,
@@ -1045,6 +1049,14 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             .addModifiers(Modifier.PUBLIC)
             .addParameters(METHOD_HAS_CACHED_INTERCEPTED_METHOD.getParameterTypes())
             .build((aThis, methodParameters) -> aThis.field(targetField).isNonNull().returning());
+    }
+
+    private MethodDef getClearCachedInterceptedTargetMethod(FieldDef targetField) {
+        Objects.requireNonNull(targetField);
+        return MethodDef.builder(METHOD_CLEAR_CACHED_INTERCEPTED_METHOD.getName())
+            .addModifiers(Modifier.PUBLIC)
+            .addParameters(METHOD_CLEAR_CACHED_INTERCEPTED_METHOD.getParameterTypes())
+            .build((aThis, methodParameters) -> aThis.field(targetField).assign(ExpressionDef.nullValue()));
     }
 
     /**
