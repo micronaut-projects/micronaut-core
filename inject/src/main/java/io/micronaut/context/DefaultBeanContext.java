@@ -3013,6 +3013,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (candidates.size() == 1) {
             return candidates.iterator().next();
         }
+        Optional<BeanDefinition<T>> customResolved = beanResolutionCustomizer.resolveNonUniqueBean(beanType, qualifier, candidates);
+        if (customResolved.isPresent()) {
+            return customResolved.get();
+        }
         Collection<BeanDefinition<T>> originalCandidates = candidates;
         candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredStereotype(Secondary.class)).toList();
         if (candidates.size() == 1) {

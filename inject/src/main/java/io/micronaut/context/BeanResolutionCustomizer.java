@@ -19,7 +19,9 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.QualifiedBeanType;
+import org.jspecify.annotations.Nullable;
 
+import java.util.Collection;
 import java.util.Optional;
 
 /**
@@ -68,6 +70,23 @@ public interface BeanResolutionCustomizer {
      */
     default boolean isCandidateBean(Argument<?> beanType, QualifiedBeanType<?> candidate) {
         return candidate.isCandidateBean(beanType);
+    }
+
+    /**
+     * Resolve one bean from multiple qualified candidates before the default
+     * {@code @Secondary}, order, and default-implementation resolution rules are applied.
+     *
+     * @param beanType The requested bean type
+     * @param qualifier The requested qualifier
+     * @param candidates The qualified candidates
+     * @param <T> The bean type
+     * @return The resolved bean, or empty to use default resolution
+     * @since 5.1
+     */
+    default <T> Optional<BeanDefinition<T>> resolveNonUniqueBean(Argument<T> beanType,
+                                                                 @Nullable Qualifier<T> qualifier,
+                                                                 Collection<BeanDefinition<T>> candidates) {
+        return Optional.empty();
     }
 
     /**
