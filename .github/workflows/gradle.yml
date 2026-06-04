@@ -21,8 +21,8 @@ jobs:
       matrix:
         java: ['8', '11', '15']
     steps:
-      - uses: actions/cache@v2.1.6
       - uses: actions/checkout@v6.0.3
+      - uses: actions/cache@v5.0.5
         with:
           path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
