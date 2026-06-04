@@ -522,9 +522,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
                 if (authority.isEmpty()) {
                     outboundHeaders.authority("");
                 } else {
-                    int start = authority.indexOf('@') + 1;
                     if (start == authority.length()) {
-                        throw new IllegalArgumentException("authority: " + authority);
+                        throw new IllegalArgumentException("Invalid authority: missing host");
                     }
                     outboundHeaders.authority(authority.subSequence(start, authority.length()));
                 }
