@@ -596,6 +596,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                         if (configureBeanVisitor(aopProxyWriter)) {
                             return;
                         }
+                        configureProducedBeanProxyConstructor(aopProxyWriter);
 
                         configureInjectionPoints(aopProxyWriter);
 
@@ -610,6 +611,21 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             } else {
                 return beanWriter;
             }
+        }
+    }
+
+    private void configureProducedBeanProxyConstructor(BeanDefinitionVisitor beanDefinitionVisitor) {
+        if (getProducingElement() instanceof ClassElement) {
+            return;
+        }
+        if (constructorElement != null) {
+            beanDefinitionVisitor.visitBeanDefinitionConstructor(
+                constructorElement,
+                constructorElement.isReflectionRequired(),
+                visitorContext
+            );
+        } else {
+            beanDefinitionVisitor.visitDefaultConstructor(AnnotationMetadata.EMPTY_METADATA, visitorContext);
         }
     }
 

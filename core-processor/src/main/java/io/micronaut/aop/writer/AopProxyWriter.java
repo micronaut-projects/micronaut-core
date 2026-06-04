@@ -124,6 +124,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         "interceptedTarget"
     );
 
+    private static final Method METHOD_OBJECT_TO_STRING = ReflectionUtils.getRequiredMethod(
+        Object.class,
+        "toString"
+    );
+
     private static final Method METHOD_HAS_CACHED_INTERCEPTED_METHOD = ReflectionUtils.getRequiredInternalMethod(
         InterceptedProxy.class,
         "hasCachedInterceptedTarget"
@@ -700,6 +705,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                         .invoke(COPY_BEAN_CONTEXT_FOR_LAZY_PROXY_TARGET_METHOD, aThis.field(proxyBeanDefinitionField))
                 )
             ));
+            proxyBuilder.addMethod(getLazyProxyTargetToStringMethod());
         } else {
             if (hotswap) {
                 proxyBuilder.addSuperinterface(TypeDef.parameterized(HotSwappableInterceptedProxy.class, targetType));
@@ -949,6 +955,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 proxyBeanDefinitionField,
                 beanQualifierField
             ).returning());
+    }
+
+    private MethodDef getLazyProxyTargetToStringMethod() {
+        return MethodDef.override(METHOD_OBJECT_TO_STRING)
+            .build((aThis, methodParameters) -> aThis.invoke(METHOD_INTERCEPTED_TARGET).invoke(METHOD_OBJECT_TO_STRING).returning());
     }
 
     private MethodDef getCacheLazyTargetInterceptedTargetMethod(FieldDef targetField,
