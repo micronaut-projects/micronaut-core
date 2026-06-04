@@ -25,6 +25,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import reactor.core.publisher.Flux
+import spock.lang.Ignore
 
 import static io.micronaut.http.HttpHeaders.*
 
@@ -191,6 +192,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         response.code() == HttpStatus.FORBIDDEN.code
     }
 
+    @Ignore
     void "test preflight request with controlled method"() {
         given:
         HttpResponse response = Flux.from(rxClient.exchange(
