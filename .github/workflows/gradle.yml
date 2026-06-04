@@ -47,7 +47,7 @@ jobs:
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
         run: ./gradlew publishToSonatype docs --no-daemon
       - name: Determine docs target repository
-        uses: haya14busa/action-cond@v1
+        uses: haya14busa/action-cond@v1.2.1
         id: docs_target
         with:
           cond: ${{ github.repository == 'micronaut-projects/micronaut-core' }}
