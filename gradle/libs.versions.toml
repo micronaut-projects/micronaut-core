@@ -148,6 +148,7 @@ managed-springboot = "2.5.3"
 managed-swagger = "2.1.10"
 managed-validation = "2.0.1.Final"
 managed-testcontainers = "1.15.3"
+testcontainers = "2.0.5" # for Docker API compatibility
 managed-snakeyaml = "1.29"
 managed-zipkin-reporter = "2.16.3"
 
@@ -535,7 +536,7 @@ smallrye = { module = "io.smallrye:smallrye-fault-tolerance", version.ref = "sma
 
 systemlambda = { module = "com.github.stefanbirkner:system-lambda", version.ref = "systemlambda" }
 
-testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "managed-testcontainers" }
+testcontainers-spock = { module = "org.testcontainers:testcontainers-spock", version.ref = "testcontainers" }
 
 vertx = { module = "io.vertx:vertx-core", version.ref = "vertx" }
 vertx-webclient = { module = "io.vertx:vertx-web-client", version.ref = "vertx" }
