@@ -537,7 +537,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                 beanClass.getEnclosedElements(
                     ElementQuery.ALL_METHODS
                         .onlyInstance()
-                        .modifiers(mods -> !mods.contains(ElementModifier.FINAL) && mods.contains(ElementModifier.PUBLIC))
+                        .modifiers(mods -> !mods.contains(ElementModifier.FINAL) && !mods.contains(ElementModifier.PRIVATE))
                 ).forEach(method -> {
                     InternalBeanElementMethod ibem = new InternalBeanElementMethod(
                         method,
