@@ -3,6 +3,13 @@ import org.apache.tools.ant.taskdefs.condition.Os
 buildscript {
     repositories {
         maven { url "https://plugins.gradle.org/m2/" }
+        mavenCentral()
+        maven {
+            url "https://repo.grails.org/grails/core"
+            content {
+                includeGroup "org.ysb33r.gradle"
+            }
+        }
     }
     dependencies {
         classpath "gradle.plugin.com.energizedwork.webdriver-binaries:webdriver-binaries-gradle-plugin:$webdriverBinariesVersion"

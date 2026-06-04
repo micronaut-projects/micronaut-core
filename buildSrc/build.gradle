@@ -3,10 +3,25 @@ plugins {
 }
 
 repositories {
+    mavenCentral()
     gradlePluginPortal()
+    maven {
+        url "https://repo.grails.org/grails/core"
+        content {
+            includeGroup "org.xhtmlrenderer"
+            includeModule "io.github.groovylang.groovydoc", "groovydoc-gradle-plugin"
+        }
+    }
+}
+
+configurations.configureEach {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("io.github.groovylang.groovydoc:io.github.groovylang.groovydoc.gradle.plugin"))
+            .using(module("io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1"))
+    }
 }
 
 dependencies {
-    implementation "io.micronaut.build.internal:micronaut-gradle-plugins:5.4.1"
+    implementation "io.micronaut.build.internal:micronaut-gradle-plugins:4.1.1"
     implementation "org.tomlj:tomlj:1.0.0"
 }

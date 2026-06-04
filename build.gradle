@@ -2,6 +2,19 @@ buildscript {
     repositories {
         gradlePluginPortal()
         mavenCentral()
+        maven {
+            url "https://repo.grails.org/grails/core"
+            content {
+                includeGroup "org.xhtmlrenderer"
+                includeModule "io.github.groovylang.groovydoc", "groovydoc-gradle-plugin"
+            }
+        }
+    }
+    configurations.classpath {
+        resolutionStrategy.dependencySubstitution {
+            substitute(module("io.github.groovylang.groovydoc:io.github.groovylang.groovydoc.gradle.plugin"))
+                .using(module("io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1"))
+        }
     }
     dependencies {
         classpath "gradle.plugin.com.github.jengelman.gradle.plugins:shadow:7.0.0"
