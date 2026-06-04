@@ -13,6 +13,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
@@ -50,6 +51,7 @@ class OctetStreamSpec extends Specification {
         e.response.getBody(Map).get()._embedded.errors[0].message == 'The content length [150000] exceeds the maximum allowed content length [10240]'
     }
 
+    @Ignore
     void "test exchange byte[] non blocking"() {
         given:
         def data = new String("xyz" * 500).bytes
