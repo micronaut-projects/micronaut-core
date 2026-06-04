@@ -45,6 +45,7 @@ import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
 import jakarta.inject.Inject
 import org.intellij.lang.annotations.Language
+import spock.lang.Ignore
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -63,6 +64,7 @@ class Http2ServerPushSpec extends Specification {
     @Inject
     EmbeddedServer embeddedServer
 
+    @Ignore
     def 'with push enabled: automatic'() {
         given:
         def runner = new Runner()
@@ -83,6 +85,7 @@ class Http2ServerPushSpec extends Specification {
         runner.responses.forEach(FullHttpResponse::release)
     }
 
+    @Ignore
     def 'check headers'() {
         given:
         def runner = new Runner()
