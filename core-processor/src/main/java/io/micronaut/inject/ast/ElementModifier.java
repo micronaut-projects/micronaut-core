@@ -35,7 +35,8 @@ public enum ElementModifier {
     VOLATILE,
     SYNCHRONIZED,
     NATIVE,
-    STRICTFP;
+    STRICTFP,
+    SEALED;
 
     /**
      * @return The name of the modifier as presented in source code.

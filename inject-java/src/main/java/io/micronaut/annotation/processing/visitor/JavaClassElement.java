@@ -355,6 +355,19 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     @Override
+    public boolean isSealed() {
+        return !classElement.getPermittedSubclasses().isEmpty();
+    }
+
+    @Override
+    public Collection<ClassElement> getPermittedSubclasses() {
+        return classElement.getPermittedSubclasses()
+            .stream()
+            .map(typeMirror -> newClassElement(typeMirror, getTypeArguments()))
+            .toList();
+    }
+
+    @Override
     public boolean isPrimitive() {
         return ClassUtils.getPrimitiveType(getName()).isPresent();
     }
