@@ -270,7 +270,7 @@ class CorsFilterSpec extends Specification {
         HttpResponse response = corsHandler.handleRequest(request).get()
 
         then: "the response is not modified"
-        2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.of(Argument.of(List,String))) >> Optional.of(['X-Header', 'Y-Header'])
+        2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.of(Argument.of(List,String))) >> Optional.of(['X-Header', ' Y-Header'])
         1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, ConversionContext.of(HttpMethod.class)) >> Optional.of(HttpMethod.GET)
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_METHODS) == 'GET'
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN) == 'http://www.foo.com' // The origin is echo'd
@@ -301,7 +301,7 @@ class CorsFilterSpec extends Specification {
         HttpResponse response = corsHandler.handleRequest(request).get()
 
         then: "the response is not modified"
-        2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.of(Argument.of(List,String))) >> Optional.of(['X-Header', 'Y-Header'])
+        2 * headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.of(Argument.of(List,String))) >> Optional.of(['X-Header', ' Y-Header'])
         1 * headers.getFirst(ACCESS_CONTROL_REQUEST_METHOD, ConversionContext.of(HttpMethod.class)) >> Optional.of(HttpMethod.GET)
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_METHODS) == 'GET'
         response.getHeaders().get(ACCESS_CONTROL_ALLOW_ORIGIN) == 'http://www.foo.com' // The origin is echo'd

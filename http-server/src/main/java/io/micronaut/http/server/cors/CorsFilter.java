@@ -225,7 +225,9 @@ public class CorsFilter implements HttpServerFilter {
      * @param response             The {@link MutableHttpResponse} object
      */
     protected void setAllowHeaders(List<?> optionalAllowHeaders, MutableHttpResponse response) {
-        List<String> allowHeaders = optionalAllowHeaders.stream().map(Object::toString).collect(Collectors.toList());
+        List<String> allowHeaders = optionalAllowHeaders.stream()
+            .map(header -> header.toString().trim())
+            .collect(Collectors.toList());
         if (corsConfiguration.isSingleHeader()) {
             String headerValue = String.join(",", allowHeaders);
             if (StringUtils.isNotEmpty(headerValue)) {
