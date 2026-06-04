@@ -30,7 +30,6 @@ import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.runtime.Micronaut
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Unroll
 
@@ -142,7 +141,6 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         response.header("Content-Encoding") == null // removed by the decoder
     }
 
-    @Ignore
     void "test custom headers"() {
         when:
         HttpResponse<?> response = Flux.from(rxClient.exchange(HttpRequest.GET("/java/response/custom-headers")))
@@ -154,10 +152,9 @@ class HttpResponseSpec extends AbstractMicronautSpec {
                 }).blockFirst()
         HttpHeaders headers = response.headers
 
-        then: // The content length header was replaced, not appended
-        !headers.names().contains("content-type")
-        !headers.names().contains("Content-Length")
-        headers.contains("content-length")
+        then:
+        headers.getAll("Content-Type") == ["text/plain"]
+        headers.getAll("Content-Length") == ["3"]
         response.header("Content-Type") == "text/plain"
         response.header("Content-Length") == "3"
     }
