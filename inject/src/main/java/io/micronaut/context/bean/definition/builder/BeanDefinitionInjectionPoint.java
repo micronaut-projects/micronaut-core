@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
  * @author Denis Stepanov
  * @since 5.0
  */
-public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetadataProviderRecordStyle {
+public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetadataAccessor {
 
     /**
      * @return The type of the injection point

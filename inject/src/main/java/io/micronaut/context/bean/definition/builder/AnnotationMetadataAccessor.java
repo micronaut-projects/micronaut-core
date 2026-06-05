@@ -20,13 +20,13 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 
 /**
- * Record-friendly abstraction for {@link AnnotationMetadataProvider} implementations.
+ * Record-friendly accessor for {@link AnnotationMetadataProvider} implementations.
  *
  * @author Denis Stepanov
  * @since 5.0
  */
 @Internal
-sealed interface AnnotationMetadataProviderRecordStyle extends AnnotationMetadataProvider permits BeanDefinitionInjectionPoint, MemberDefinition {
+sealed interface AnnotationMetadataAccessor extends AnnotationMetadataProvider permits BeanDefinitionInjectionPoint, MemberDefinition {
 
     /**
      * @return The annotation metadata backing this provider
