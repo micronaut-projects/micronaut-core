@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.beans.visitor;
 
-import io.micronaut.core.type.Builder;
+import io.micronaut.core.type.Buildable;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
@@ -91,7 +91,7 @@ import java.util.stream.IntStream;
  */
 @NullUnmarked
 @Internal
-final class BeanIntrospectionWriter implements OriginatingElements, Builder<List<OutputObjectDef>> {
+final class BeanIntrospectionWriter implements OriginatingElements, Buildable<List<OutputObjectDef>> {
     private static final String INTROSPECTION_SUFFIX = "$Introspection";
 
     private static final String FIELD_CONSTRUCTOR_ANNOTATION_METADATA = "$FIELD_CONSTRUCTOR_ANNOTATION_METADATA";

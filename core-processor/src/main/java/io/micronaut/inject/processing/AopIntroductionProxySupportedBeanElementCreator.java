@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.processing;
 
-import io.micronaut.core.type.Builder;
+import io.micronaut.core.type.Buildable;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.processing.definition.ElementBeanDefinitionBuilder;
 import io.micronaut.inject.processing.definition.ElementBeanDefinitionBuilderFactory;
@@ -57,7 +57,7 @@ final class AopIntroductionProxySupportedBeanElementCreator<R> extends DeclaredB
         ElementBeanDefinitionBuilder<R> beanDefinitionBuilder = createBeanDefinitionBuilder();
         build(beanDefinitionBuilder);
         List<R> result = new ArrayList<>(introductionProxyBuilder.build());
-        for (Builder<List<R>> additionalBuilder : additionalBuilders) {
+        for (Buildable<List<R>> additionalBuilder : additionalBuilders) {
             result.addAll(additionalBuilder.build());
         }
         return result;

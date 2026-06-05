@@ -15,7 +15,7 @@
  */
 package io.micronaut.expressions;
 
-import io.micronaut.core.type.Builder;
+import io.micronaut.core.type.Buildable;
 import io.micronaut.context.expressions.AbstractEvaluatedExpression;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
@@ -52,7 +52,7 @@ import java.util.List;
  */
 @Internal
 @NullUnmarked
-public final class EvaluatedExpressionWriter implements Builder<OutputObjectDef> {
+public final class EvaluatedExpressionWriter implements Buildable<OutputObjectDef> {
 
     private static final Method DO_EVALUATE_METHOD
         = ReflectionUtils.getRequiredMethod(AbstractEvaluatedExpression.class, "doEvaluate", ExpressionEvaluationContext.class);

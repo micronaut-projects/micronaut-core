@@ -16,7 +16,7 @@
 package io.micronaut.context.beans.definition;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.type.Builder;
+import io.micronaut.core.type.Buildable;
 
 import java.util.List;
 
@@ -30,7 +30,7 @@ import java.util.List;
  * @author Denis Stepanov
  * @since 5.1.0
  */
-public interface BeanDefinitionBuilder<C, M, F, R> extends Builder<R> {
+public interface BeanDefinitionBuilder<C, M, F, R> extends Buildable<R> {
 
     /**
      * Adds an executable method to the bean definition.

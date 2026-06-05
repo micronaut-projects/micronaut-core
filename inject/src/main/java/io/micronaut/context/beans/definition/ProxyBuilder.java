@@ -15,7 +15,7 @@
  */
 package io.micronaut.context.beans.definition;
 
-import io.micronaut.core.type.Builder;
+import io.micronaut.core.type.Buildable;
 
 /**
  * Builder abstraction for proxy-oriented bean definitions.
@@ -26,7 +26,7 @@ import io.micronaut.core.type.Builder;
  * @author Denis Stepanov
  * @since 5.1.0
  */
-public interface ProxyBuilder<C, M, R> extends Builder<R> {
+public interface ProxyBuilder<C, M, R> extends Buildable<R> {
 
     /**
      * Adds an interface to be implemented by the proxy.

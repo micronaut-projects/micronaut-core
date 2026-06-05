@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.core.type.Builder;
+import io.micronaut.core.type.Buildable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.BuildTimeInit;
 import io.micronaut.core.annotation.Internal;
@@ -48,7 +48,7 @@ import java.util.Set;
  * Internal utility class for writing annotation metadata with evaluated expressions.
  */
 @Internal
-public final class EvaluatedExpressionProcessor implements Builder<List<OutputObjectDef>> {
+public final class EvaluatedExpressionProcessor implements Buildable<List<OutputObjectDef>> {
     private static final Set<String> WRITTEN_CLASSES = new HashSet<>();
 
     private final Collection<ExpressionWithContext> evaluatedExpressions = new ArrayList<>(2);

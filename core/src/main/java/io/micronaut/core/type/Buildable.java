@@ -22,7 +22,7 @@ package io.micronaut.core.type;
  * @author Denis Stepanov
  * @since 5.1.0
  */
-public interface Builder<R> {
+public interface Buildable<R> {
 
     /**
      * Builds the result.

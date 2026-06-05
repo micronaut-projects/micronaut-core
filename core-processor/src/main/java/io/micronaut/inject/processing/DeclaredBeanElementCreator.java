@@ -20,7 +20,7 @@ import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.type.Builder;
+import io.micronaut.core.type.Buildable;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -77,7 +77,7 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     private static final String MSG_TARGET_METHOD_PREFIX = "] to target method [";
 
     protected final boolean isAopProxy;
-    protected final List<Builder<List<R>>> additionalBuilders = new ArrayList<>();
+    protected final List<Buildable<List<R>>> additionalBuilders = new ArrayList<>();
     private final AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
     private ElementProxyBuilder<R> aopProxyBuilder;
 
@@ -120,7 +120,7 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
         if (aopProxyBuilder != null) {
             result.addAll(aopProxyBuilder.build());
         }
-        for (Builder<List<R>> additionalBuilder : additionalBuilders) {
+        for (Buildable<List<R>> additionalBuilder : additionalBuilders) {
             result.addAll(additionalBuilder.build());
         }
         return result;

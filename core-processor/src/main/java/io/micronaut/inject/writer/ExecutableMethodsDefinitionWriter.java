@@ -17,7 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.context.AbstractExecutableMethodsDefinition;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.type.Builder;
+import io.micronaut.core.type.Buildable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
@@ -66,7 +66,7 @@ import java.util.function.Function;
  */
 @NullUnmarked
 @Internal
-public class ExecutableMethodsDefinitionWriter implements Builder<OutputObjectDef> {
+public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObjectDef> {
     public static final String CLASS_SUFFIX = "$Exec";
 
     public static final Method GET_EXECUTABLE_AT_INDEX_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "getExecutableMethodByIndex", int.class);
