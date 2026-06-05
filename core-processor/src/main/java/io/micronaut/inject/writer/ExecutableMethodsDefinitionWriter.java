@@ -25,7 +25,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethodsDefinition;
-import io.micronaut.inject.OutputObjectDef;
+import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.annotation.AnnotationMetadataGenUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;

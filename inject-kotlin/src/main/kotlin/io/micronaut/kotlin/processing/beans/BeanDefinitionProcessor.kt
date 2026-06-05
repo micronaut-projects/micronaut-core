@@ -27,8 +27,8 @@ import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.Modifier
 import io.micronaut.core.annotation.Generated
 import io.micronaut.core.annotation.Vetoed
-import io.micronaut.inject.DefaultElementBeanDefinitionBuilderFactory
-import io.micronaut.inject.OutputObjectDef
+import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory
+import io.micronaut.inject.processing.definition.OutputObjectDef
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.writer.BeanDefinitionWriter

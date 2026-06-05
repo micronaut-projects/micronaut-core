@@ -41,7 +41,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.OutputObjectDef;
+import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.ast.ClassElement;

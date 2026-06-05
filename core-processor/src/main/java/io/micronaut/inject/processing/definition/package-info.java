@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 /**
- * Micronaut core type, argument, and builder abstractions.
+ * Element-based bean definition builder implementations used by Micronaut annotation processors.
  *
- * @author graemerocher
- * @since 1.0
+ * @author Graeme Rocher
+ * @since 5.1.0
  */
 @NullMarked
-package io.micronaut.core.type;
+package io.micronaut.inject.processing.definition;
 
 import org.jspecify.annotations.NullMarked;

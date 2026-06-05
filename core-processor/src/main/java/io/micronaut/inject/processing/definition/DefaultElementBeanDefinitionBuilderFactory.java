@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject;
+package io.micronaut.inject.processing.definition;
 
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject;
+package io.micronaut.inject.processing.definition;
 
 import io.micronaut.context.beans.definition.BeanDefinitionBuilderFactory;
 import io.micronaut.context.beans.definition.ConstructorDefinition;

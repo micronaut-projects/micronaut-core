@@ -17,8 +17,8 @@ package io.micronaut.inject.processing;
 
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.ElementBeanDefinitionBuilderFactory;
-import io.micronaut.inject.ElementProxyBuilder;
+import io.micronaut.inject.processing.definition.ElementBeanDefinitionBuilderFactory;
+import io.micronaut.inject.processing.definition.ElementProxyBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;

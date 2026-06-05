@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject;
+package io.micronaut.inject.processing.definition;
 
 import io.micronaut.context.beans.definition.BeanDefinitionBuilder;
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint;
 import io.micronaut.context.beans.definition.FieldDefinition;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;

@@ -26,7 +26,7 @@ import io.micronaut.expressions.context.DefaultExpressionCompilationContextFacto
 import io.micronaut.expressions.context.ExpressionEvaluationContext;
 import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.expressions.util.EvaluatedExpressionsUtils;
-import io.micronaut.inject.OutputObjectDef;
+import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;

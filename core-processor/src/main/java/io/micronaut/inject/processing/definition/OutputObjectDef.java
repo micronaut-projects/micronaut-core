@@ -13,27 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject;
+package io.micronaut.inject.processing.definition;
 
-import io.micronaut.context.beans.definition.ProxyBuilder;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.writer.OriginatingElements;
-
-import java.util.List;
+import io.micronaut.sourcegen.model.ObjectDef;
+import org.jspecify.annotations.Nullable;
 
 /**
- * Proxy builder that operates on {@link ClassElement} definitions.
+ * Aggregates the generated {@link ObjectDef} together with service metadata.
  *
- * @param <R> The builder result type
+ * @param objectDef           The generated object definition
+ * @param serviceClass        The service to be registered
+ * @param originatingElements The originating elements
  * @author Denis Stepanov
  * @since 5.1.0
  */
-public interface ElementProxyBuilder<R> extends ProxyBuilder<ClassElement, MethodElement, List<R>>, OriginatingElements {
-
-    /**
-     * @return The underlying bean definition builder used to materialize the proxy
-     */
-    ElementBeanDefinitionBuilder<R> beanDefinitionBuilder();
-
+public record OutputObjectDef(ObjectDef objectDef, @Nullable Class<?> serviceClass, OriginatingElements originatingElements) {
 }

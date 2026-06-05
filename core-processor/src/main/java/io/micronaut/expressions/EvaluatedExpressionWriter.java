@@ -27,7 +27,7 @@ import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.expressions.parser.exception.ExpressionParsingException;
-import io.micronaut.inject.OutputObjectDef;
+import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;

@@ -20,8 +20,8 @@ import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.visitor.GroovyNativeElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
-import io.micronaut.inject.DefaultElementBeanDefinitionBuilderFactory
-import io.micronaut.inject.OutputObjectDef
+import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory
+import io.micronaut.inject.processing.definition.OutputObjectDef
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.visitor.VisitorContext

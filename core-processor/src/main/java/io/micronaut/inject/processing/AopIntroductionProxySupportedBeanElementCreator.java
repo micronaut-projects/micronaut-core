@@ -17,9 +17,9 @@ package io.micronaut.inject.processing;
 
 import io.micronaut.core.type.Builder;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.ElementBeanDefinitionBuilder;
-import io.micronaut.inject.ElementBeanDefinitionBuilderFactory;
-import io.micronaut.inject.ElementProxyBuilder;
+import io.micronaut.inject.processing.definition.ElementBeanDefinitionBuilder;
+import io.micronaut.inject.processing.definition.ElementBeanDefinitionBuilderFactory;
+import io.micronaut.inject.processing.definition.ElementProxyBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;

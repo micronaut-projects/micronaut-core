@@ -13,20 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject;
-
-import io.micronaut.inject.writer.OriginatingElements;
-import io.micronaut.sourcegen.model.ObjectDef;
-import org.jspecify.annotations.Nullable;
-
 /**
- * Aggregates the generated {@link ObjectDef} together with service metadata.
+ * Builder model APIs for describing bean definitions, injection points, lifecycle methods, and proxy definitions.
  *
- * @param objectDef           The generated object definition
- * @param serviceClass        The service to be registered
- * @param originatingElements The originating elements
  * @author Denis Stepanov
  * @since 5.1.0
  */
-public record OutputObjectDef(ObjectDef objectDef, @Nullable Class<?> serviceClass, OriginatingElements originatingElements) {
-}
+@NullMarked
+package io.micronaut.context.beans.definition;
+
+import org.jspecify.annotations.NullMarked;

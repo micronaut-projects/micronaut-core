@@ -21,8 +21,8 @@ import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.order.OrderUtil
-import io.micronaut.inject.DefaultElementBeanDefinitionBuilderFactory
-import io.micronaut.inject.OutputObjectDef
+import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory
+import io.micronaut.inject.processing.definition.OutputObjectDef
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
 import io.micronaut.inject.writer.BeanDefinitionWriter
