@@ -23,32 +23,32 @@ import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Executable method that delegates {@link InterceptedInitializingBeanDefinition} initialization to the interceptor chain.
+ * Executable method that delegates {@link InitializableIntercepted} initialization to the interceptor chain.
  *
  * @param <T> The intercepted bean type
  * @author Denis Stepanov
  * @since 5.0
  */
 @Internal
-public final class InterceptedInitializingExecutableMethod<T> extends AbstractExecutableMethod<T, T> {
+final class InitalizableInterceptedMethod<T> extends InterceptedMethod<T, T> {
 
-    private final InterceptedInitializingBeanDefinition<T> interceptedInitializingBeanDefinition;
+    private final InitializableIntercepted<T> initializableIntercepted;
     private final BeanResolutionContext beanResolutionContext;
     private final BeanContext beanContext;
     private final T bean;
 
     /**
-     * @param interceptedInitializingBeanDefinition The intercepted initializing bean definition
+     * @param initializableIntercepted The intercepted initializing bean definition
      * @param beanResolutionContext                 The resolution context
      * @param beanContext                           The bean context
      * @param bean                                  The bean to initialize
      */
-    InterceptedInitializingExecutableMethod(InterceptedInitializingBeanDefinition<T> interceptedInitializingBeanDefinition,
-                                            BeanResolutionContext beanResolutionContext,
-                                            BeanContext beanContext,
-                                            T bean) {
-        super(interceptedInitializingBeanDefinition.getBeanType(), "initialize", Argument.of(interceptedInitializingBeanDefinition.getBeanType()));
-        this.interceptedInitializingBeanDefinition = interceptedInitializingBeanDefinition;
+    InitalizableInterceptedMethod(InitializableIntercepted<T> initializableIntercepted,
+                                  BeanResolutionContext beanResolutionContext,
+                                  BeanContext beanContext,
+                                  T bean) {
+        super(initializableIntercepted.getBeanType(), "initialize", Argument.of(initializableIntercepted.getBeanType()));
+        this.initializableIntercepted = initializableIntercepted;
         this.beanResolutionContext = beanResolutionContext;
         this.beanContext = beanContext;
         this.bean = bean;
@@ -56,11 +56,11 @@ public final class InterceptedInitializingExecutableMethod<T> extends AbstractEx
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return interceptedInitializingBeanDefinition.getAnnotationMetadata();
+        return initializableIntercepted.getAnnotationMetadata();
     }
 
     @Override
     protected T invokeInternal(T instance, @Nullable Object[] arguments) {
-        return interceptedInitializingBeanDefinition.doInitialize(beanResolutionContext, beanContext, bean);
+        return initializableIntercepted.doInitialize(beanResolutionContext, beanContext, bean);
     }
 }

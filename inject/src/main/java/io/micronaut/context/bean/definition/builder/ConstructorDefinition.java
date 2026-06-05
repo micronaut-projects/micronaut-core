@@ -31,4 +31,10 @@ public record ConstructorDefinition<K, C>(C constructorElement,
                                           AnnotationMetadata annotationMetadata,
                                           List<BeanDefinitionInjectionPoint<K>> injectionPoints,
                                           boolean requiresReflection) implements MemberDefinition<K> {
+
+    public ConstructorDefinition {
+        BeanDefinitionBuilderValidation.requireNonNull(constructorElement, "constructorElement");
+        BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+        injectionPoints = BeanDefinitionBuilderValidation.requireNonNullElements(injectionPoints, "injectionPoints");
+    }
 }

@@ -15,60 +15,41 @@
  */
 package io.micronaut.aop.beandefinition;
 
-import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.chain.ConstructorInterceptorChain;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
+import io.micronaut.inject.InstantiatableBeanDefinition;
 import org.jspecify.annotations.Nullable;
 
-import java.util.List;
-import java.util.Map;
-
 /**
- * Intercepted {@link ParametrizedInstantiatableBeanDefinition}.
+ * Intercepted {@link InstantiatableBeanDefinition}.
  *
  * @param <T> The bean definition type
  * @author Denis Stepanov
  * @since 5.0
  */
 @Internal
-public interface InterceptedParametrizedInstantiateBeanDefinition<T> extends ParametrizedInstantiatableBeanDefinition<T> {
-
-    /**
-     * Resolves the interceptors that should wrap instantiation.
-     *
-     * @param resolutionContext The resolution context
-     * @param context           The bean context
-     * @param constructorValues The constructor argument values
-     * @return The interceptors to apply or {@code null} if none
-     */
-    default @Nullable List<BeanRegistration<Interceptor<T, T>>> resolveInterceptors(BeanResolutionContext resolutionContext, BeanContext context, @Nullable Object[] constructorValues) {
-        return null;
-    }
+public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefinition<T> {
 
     /**
      * Resolve the construction values.
      *
-     * @param resolutionContext      The resolution context
-     * @param context                The bean context
-     * @param requiredArgumentValues The required argument values
+     * @param resolutionContext The resolution context
+     * @param context           The bean context
      * @return the construction values
      */
-    @Nullable Object[] resolveInstantiationValues(BeanResolutionContext resolutionContext, BeanContext context, Map<String, Object> requiredArgumentValues);
+    @Nullable Object[] resolveInstantiationValues(BeanResolutionContext resolutionContext, BeanContext context);
 
     @Override
-    default T doInstantiate(BeanResolutionContext resolutionContext, BeanContext context, Map<String, Object> requiredArgumentValues) {
-        @Nullable Object[] values = resolveInstantiationValues(resolutionContext, context, requiredArgumentValues);
+    default T instantiate(BeanResolutionContext resolutionContext, BeanContext context) {
         return ConstructorInterceptorChain.instantiate(
             resolutionContext,
             context,
-            resolveInterceptors(resolutionContext, context, values),
+            null,
             this,
-            new InterceptedParametrizedBeanConstructor<>(this, resolutionContext, context),
-            values
+            new InterceptedConstructor<>(this, resolutionContext, context),
+            resolveInstantiationValues(resolutionContext, context)
         );
     }
 

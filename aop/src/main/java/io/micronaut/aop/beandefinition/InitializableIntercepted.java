@@ -19,38 +19,38 @@ import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.DisposableBeanDefinition;
+import io.micronaut.inject.InitializingBeanDefinition;
 
 import java.util.Objects;
 
 /**
- * Intercepted {@link DisposableBeanDefinition}.
+ * Intercepted {@link InitializingBeanDefinition}.
  *
  * @param <T> The bean definition type
  * @author Denis Stepanov
  * @since 5.0
  */
 @Internal
-public interface InterceptedDisposeBeanDefinition<T> extends DisposableBeanDefinition<T> {
+public interface InitializableIntercepted<T> extends InitializingBeanDefinition<T> {
 
     @Override
-    default T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
-        return Objects.requireNonNull(MethodInterceptorChain.dispose(
+    default T initialize(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+        return Objects.requireNonNull(MethodInterceptorChain.initialize(
             resolutionContext,
             context,
             this,
-            new InterceptedDisposeExecutableMethod<>(this, resolutionContext, context, bean),
+            new InitalizableInterceptedMethod<>(this, resolutionContext, context, bean),
             bean
         ));
     }
 
     /**
-     * The original {@link #dispose(BeanResolutionContext, BeanContext, Object)} call that should be intercepted.
+     * The original {@link #initialize(BeanResolutionContext, BeanContext, Object)} call that should be intercepted.
      *
      * @param resolutionContext The resolution context
      * @param context           The bean context
      * @param bean              The bean
      * @return The intercepted result
      */
-    T doDispose(BeanResolutionContext resolutionContext, BeanContext context, T bean);
+    T doInitialize(BeanResolutionContext resolutionContext, BeanContext context, T bean);
 }

@@ -23,6 +23,7 @@ import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.utils.BeanInjectionUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.OriginatingElements;
@@ -116,14 +117,18 @@ public interface ElementBeanDefinitionBuilder<R> extends BeanDefinitionBuilder<C
             fieldElement.getName(),
             visitorContext
         );
-        addFieldInjection(
-            new FieldDefinition<>(
-                fieldElement,
-                annotationMetadata,
-                injectionPoint,
-                reflectionRequired,
-                isOptional)
-        );
+        try {
+            addFieldInjection(
+                new FieldDefinition<>(
+                    fieldElement,
+                    annotationMetadata,
+                    injectionPoint,
+                    reflectionRequired,
+                    isOptional)
+            );
+        } catch (IllegalArgumentException e) {
+            throw new ProcessingException(fieldElement, e.getMessage(), e);
+        }
         return this;
     }
 

@@ -116,24 +116,40 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
 
     @Override
     public ElementBeanDefinitionBuilder<OutputObjectDef> constructor(ConstructorDefinition<ClassElement, MethodElement> constructorDefinition) {
-        return new BeanDefinitionWriter(constructorDefinition, visitorContext);
+        try {
+            return new BeanDefinitionWriter(constructorDefinition, visitorContext);
+        } catch (IllegalArgumentException e) {
+            throw new ProcessingException(constructorDefinition == null ? null : constructorDefinition.constructorElement(), e.getMessage(), e);
+        }
     }
 
     @Override
     public ElementBeanDefinitionBuilder<OutputObjectDef> constructor(ConstructorDefinition<ClassElement, MethodElement> constructorDefinition,
                                                                      @Nullable String beanDefinitionName,
                                                                      @Nullable AnnotationMetadata annotationMetadata) {
-        return new BeanDefinitionWriter(constructorDefinition, beanDefinitionName, annotationMetadata, visitorContext);
+        try {
+            return new BeanDefinitionWriter(constructorDefinition, beanDefinitionName, annotationMetadata, visitorContext);
+        } catch (IllegalArgumentException e) {
+            throw new ProcessingException(constructorDefinition == null ? null : constructorDefinition.constructorElement(), e.getMessage(), e);
+        }
     }
 
     @Override
     public ElementBeanDefinitionBuilder<OutputObjectDef> factoryMethod(MethodDefinition<ClassElement, MethodElement> methodDefinition) {
-        return new BeanDefinitionWriter(methodDefinition, visitorContext, uniqueIdentifier++);
+        try {
+            return new BeanDefinitionWriter(methodDefinition, visitorContext, uniqueIdentifier++);
+        } catch (IllegalArgumentException e) {
+            throw new ProcessingException(methodDefinition == null ? null : methodDefinition.methodElement(), e.getMessage(), e);
+        }
     }
 
     @Override
     public ElementBeanDefinitionBuilder<OutputObjectDef> factoryField(FieldDefinition<ClassElement, FieldElement> fieldDefinition) {
-        return new BeanDefinitionWriter(fieldDefinition, visitorContext);
+        try {
+            return new BeanDefinitionWriter(fieldDefinition, visitorContext);
+        } catch (IllegalArgumentException e) {
+            throw new ProcessingException(fieldDefinition == null ? null : fieldDefinition.fieldElement(), e.getMessage(), e);
+        }
     }
 
     @Override

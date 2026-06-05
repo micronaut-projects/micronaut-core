@@ -137,16 +137,20 @@ final class ConfigurationReaderBeanElementCreator<R> extends DeclaredBeanElement
                     parameter.getName(),
                     visitorContext
                 );
-                beanDefinitionBuilder.addMethodInjection(
-                    new MethodDefinition<>(
-                        methodElement,
-                        annotationMetadata,
-                        List.of(injectionPoint),
-                        reflectionRequired,
-                        true,
-                        true,
-                        null)
-                );
+                try {
+                    beanDefinitionBuilder.addMethodInjection(
+                        new MethodDefinition<>(
+                            methodElement,
+                            annotationMetadata,
+                            List.of(injectionPoint),
+                            reflectionRequired,
+                            true,
+                            true,
+                            null)
+                    );
+                } catch (IllegalArgumentException e) {
+                    throw new ProcessingException(methodElement, e.getMessage(), e);
+                }
                 claimed = true;
             } else if (propertyElement.getWriteAccessKind() == PropertyElement.AccessKind.FIELD && field.isPresent()) {
                 FieldElement fieldElement = field.get();
@@ -236,15 +240,19 @@ final class ConfigurationReaderBeanElementCreator<R> extends DeclaredBeanElement
 
     private List<MethodDefinition<ClassElement, MethodElement>> convertBuilderMethods(List<ConfigurationBuilderPropertyDefinition> elements) {
         return elements.stream().map(e -> {
-            List<BeanDefinitionInjectionPoint<ClassElement>> injectionPoints = new ArrayList<>();
-            BeanDefinitionInjectionPoint.PropertyInjectionPoint<ClassElement> booleanInjectionPoint = null;
             MethodElement method = e.method();
-            if (method.getParameters().length == 0) {
-                booleanInjectionPoint = new PropertyInjectionPoint<>(e.type(), e.method(), e.name(), e.path());
-            } else {
-                injectionPoints.add(new PropertyInjectionPoint<>(e.type(), method.getParameters()[0], e.name(), e.path()));
+            try {
+                List<BeanDefinitionInjectionPoint<ClassElement>> injectionPoints = new ArrayList<>();
+                BeanDefinitionInjectionPoint.PropertyInjectionPoint<ClassElement> booleanInjectionPoint = null;
+                if (method.getParameters().length == 0) {
+                    booleanInjectionPoint = new PropertyInjectionPoint<>(e.type(), e.method(), e.name(), e.path());
+                } else {
+                    injectionPoints.add(new PropertyInjectionPoint<>(e.type(), method.getParameters()[0], e.name(), e.path()));
+                }
+                return new MethodDefinition<>(method, method, injectionPoints, false, false, false, booleanInjectionPoint);
+            } catch (IllegalArgumentException ex) {
+                throw new ProcessingException(method, ex.getMessage(), ex);
             }
-            return new MethodDefinition<>(method, method, injectionPoints, false, false, false, booleanInjectionPoint);
         }).toList();
     }
 

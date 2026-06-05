@@ -15,12 +15,11 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.aop.beandefinition.InterceptedDisposeBeanDefinition;
-import io.micronaut.aop.beandefinition.InterceptedInitializingBeanDefinition;
-import io.micronaut.aop.beandefinition.InterceptedInstantiateBeanDefinition;
-import io.micronaut.aop.beandefinition.InterceptedParametrizedInstantiateBeanDefinition;
-import io.micronaut.aop.beandefinition.ProxyInterceptedInstantiateBeanDefinition;
-import io.micronaut.aop.beandefinition.ProxyInterceptedParametrizedInstantiateBeanDefinition;
+import io.micronaut.aop.beandefinition.DisposableIntercepted;
+import io.micronaut.aop.beandefinition.InitializableIntercepted;
+import io.micronaut.aop.beandefinition.ParameterizedInterceptedBeanDefinition;
+import io.micronaut.aop.beandefinition.ProxyInterceptedBeanDefinition;
+import io.micronaut.aop.beandefinition.ParameterizedProxyBeanDefinition;
 import io.micronaut.context.AbstractInitializableBeanDefinition;
 import io.micronaut.context.AbstractInitializableBeanDefinitionAndReference;
 import io.micronaut.context.BeanContext;
@@ -573,19 +572,19 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         ReflectionUtils.getRequiredInternalMethod(InitializingBeanDefinition.class, "initialize", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method METHOD_DO_INITIALIZE =
-        ReflectionUtils.getRequiredInternalMethod(InterceptedInitializingBeanDefinition.class, "doInitialize", BeanResolutionContext.class, BeanContext.class, Object.class);
+        ReflectionUtils.getRequiredInternalMethod(InitializableIntercepted.class, "doInitialize", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method METHOD_DEFAULT_INITIALIZE =
-        ReflectionUtils.getRequiredInternalMethod(InterceptedInitializingBeanDefinition.class, "initialize", BeanResolutionContext.class, BeanContext.class, Object.class);
+        ReflectionUtils.getRequiredInternalMethod(InitializableIntercepted.class, "initialize", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method METHOD_DISPOSE =
         ReflectionUtils.getRequiredInternalMethod(DisposableBeanDefinition.class, "dispose", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method METHOD_DO_DISPOSE =
-        ReflectionUtils.getRequiredInternalMethod(InterceptedDisposeBeanDefinition.class, "doDispose", BeanResolutionContext.class, BeanContext.class, Object.class);
+        ReflectionUtils.getRequiredInternalMethod(DisposableIntercepted.class, "doDispose", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method METHOD_DEFAULT_DISPOSE =
-        ReflectionUtils.getRequiredInternalMethod(InterceptedDisposeBeanDefinition.class, "dispose", BeanResolutionContext.class, BeanContext.class, Object.class);
+        ReflectionUtils.getRequiredInternalMethod(DisposableIntercepted.class, "dispose", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method DESTROY_INJECT_SCOPED_BEANS_METHOD = ReflectionUtils.getRequiredInternalMethod(BeanResolutionContext.class, "destroyInjectScopedBeans");
     private static final Method CHECK_IF_SHOULD_LOAD_METHOD = ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class,
@@ -601,11 +600,11 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final Method GET_INTERCEPTED_TYPE_METHOD = ReflectionUtils.getRequiredMethod(AdvisedBeanType.class, "getInterceptedType");
     private static final Method PARAMETRIZED_DO_INSTANTIATE_METHOD = ReflectionUtils.getRequiredMethod(ParametrizedInstantiatableBeanDefinition.class, "doInstantiate", BeanResolutionContext.class, BeanContext.class, Map.class);
     private static final Method INSTANTIATE_METHOD = ReflectionUtils.getRequiredMethod(InstantiatableBeanDefinition.class, "instantiate", BeanResolutionContext.class, BeanContext.class);
-    private static final Method DO_INSTANTIATE_INTERCEPTED_METHOD = ReflectionUtils.getRequiredMethod(InterceptedInstantiateBeanDefinition.class, "doInstantiate", BeanResolutionContext.class, BeanContext.class, Object[].class);
-    private static final Method INTERCEPTED_DEFAULT_INSTANTIATE_METHOD = ReflectionUtils.getRequiredMethod(InterceptedInstantiateBeanDefinition.class, "instantiate", BeanResolutionContext.class, BeanContext.class);
-    private static final Method RESOLVE_INSTANTIATION_VALUES_METHOD = ReflectionUtils.getRequiredMethod(InterceptedInstantiateBeanDefinition.class, "resolveInstantiationValues", BeanResolutionContext.class, BeanContext.class);
-    private static final Method RESOLVE_PARAMETRIZED_INSTANTIATION_VALUES_METHOD = ReflectionUtils.getRequiredMethod(InterceptedParametrizedInstantiateBeanDefinition.class, "resolveInstantiationValues", BeanResolutionContext.class, BeanContext.class, Map.class);
-    private static final Method INTERCEPTED_PARAMETRIZED_DEFAULT_INSTANTIATE_METHOD = ReflectionUtils.getRequiredMethod(InterceptedParametrizedInstantiateBeanDefinition.class, "instantiate", BeanResolutionContext.class, BeanContext.class);
+    private static final Method DO_INSTANTIATE_INTERCEPTED_METHOD = ReflectionUtils.getRequiredMethod(io.micronaut.aop.beandefinition.InterceptedBeanDefinition.class, "doInstantiate", BeanResolutionContext.class, BeanContext.class, Object[].class);
+    private static final Method INTERCEPTED_DEFAULT_INSTANTIATE_METHOD = ReflectionUtils.getRequiredMethod(io.micronaut.aop.beandefinition.InterceptedBeanDefinition.class, "instantiate", BeanResolutionContext.class, BeanContext.class);
+    private static final Method RESOLVE_INSTANTIATION_VALUES_METHOD = ReflectionUtils.getRequiredMethod(io.micronaut.aop.beandefinition.InterceptedBeanDefinition.class, "resolveInstantiationValues", BeanResolutionContext.class, BeanContext.class);
+    private static final Method RESOLVE_PARAMETRIZED_INSTANTIATION_VALUES_METHOD = ReflectionUtils.getRequiredMethod(ParameterizedInterceptedBeanDefinition.class, "resolveInstantiationValues", BeanResolutionContext.class, BeanContext.class, Map.class);
+    private static final Method INTERCEPTED_PARAMETRIZED_DEFAULT_INSTANTIATE_METHOD = ReflectionUtils.getRequiredMethod(ParameterizedInterceptedBeanDefinition.class, "instantiate", BeanResolutionContext.class, BeanContext.class);
 
     private static final Method COLLECTION_UTILS_ENUM_SET_METHOD = ReflectionUtils.getRequiredMethod(CollectionUtils.class, "enumSet", Enum[].class);
     private static final Method IS_INNER_CONFIGURATION_METHOD = ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class, "isInnerConfiguration", Class.class);
@@ -1235,10 +1234,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         if (needsPostConstruct()) {
             classDefBuilder.addSuperinterface(TypeDef.of(InitializingBeanDefinition.class));
             if (isPostConstructIntercepted()) {
-                classDefBuilder.addSuperinterface(TypeDef.of(InterceptedInitializingBeanDefinition.class));
+                classDefBuilder.addSuperinterface(TypeDef.of(InitializableIntercepted.class));
                 if (superBeanDefinition) {
                     classDefBuilder.addMethod(MethodDef.override(METHOD_INITIALIZE)
-                        .build((aThis, methodParameters) -> aThis.superRef(ClassTypeDef.of(InterceptedInitializingBeanDefinition.class))
+                        .build((aThis, methodParameters) -> aThis.superRef(ClassTypeDef.of(InitializableIntercepted.class))
                             .invoke(METHOD_DEFAULT_INITIALIZE, methodParameters).returning()));
                 }
                 classDefBuilder.addMethod(
@@ -1255,10 +1254,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         if (needsPreDestroy()) {
             classDefBuilder.addSuperinterface(TypeDef.of(DisposableBeanDefinition.class));
             if (isPreDestroyIntercepted()) {
-                classDefBuilder.addSuperinterface(TypeDef.of(InterceptedDisposeBeanDefinition.class));
+                classDefBuilder.addSuperinterface(TypeDef.of(DisposableIntercepted.class));
                 if (superBeanDefinition) {
                     classDefBuilder.addMethod(MethodDef.override(METHOD_DISPOSE)
-                        .build((aThis, methodParameters) -> aThis.superRef(ClassTypeDef.of(InterceptedDisposeBeanDefinition.class))
+                        .build((aThis, methodParameters) -> aThis.superRef(ClassTypeDef.of(DisposableIntercepted.class))
                             .invoke(METHOD_DEFAULT_DISPOSE, methodParameters).returning()));
                 }
                 classDefBuilder.addMethod(
@@ -1353,19 +1352,19 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             if (isParametrized) {
                 resolveValuesMethod = RESOLVE_PARAMETRIZED_INSTANTIATION_VALUES_METHOD;
                 if (isAopProxy) {
-                    interceptedInterface = ClassTypeDef.of(ProxyInterceptedParametrizedInstantiateBeanDefinition.class);
+                    interceptedInterface = ClassTypeDef.of(ParameterizedProxyBeanDefinition.class);
                     defaultInstantiateMethod = INTERCEPTED_PARAMETRIZED_DEFAULT_INSTANTIATE_METHOD;
                 } else {
-                    interceptedInterface = ClassTypeDef.of(InterceptedParametrizedInstantiateBeanDefinition.class);
+                    interceptedInterface = ClassTypeDef.of(ParameterizedInterceptedBeanDefinition.class);
                     defaultInstantiateMethod = null;
                 }
             } else {
                 resolveValuesMethod = RESOLVE_INSTANTIATION_VALUES_METHOD;
                 if (isAopProxy) {
-                    interceptedInterface = ClassTypeDef.of(ProxyInterceptedInstantiateBeanDefinition.class);
+                    interceptedInterface = ClassTypeDef.of(ProxyInterceptedBeanDefinition.class);
                     defaultInstantiateMethod = INTERCEPTED_DEFAULT_INSTANTIATE_METHOD;
                 } else {
-                    interceptedInterface = ClassTypeDef.of(InterceptedInstantiateBeanDefinition.class);
+                    interceptedInterface = ClassTypeDef.of(io.micronaut.aop.beandefinition.InterceptedBeanDefinition.class);
                     defaultInstantiateMethod = null;
                 }
             }

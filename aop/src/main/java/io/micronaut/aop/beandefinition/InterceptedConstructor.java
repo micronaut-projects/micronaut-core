@@ -32,33 +32,33 @@ import org.jspecify.annotations.Nullable;
  * @since 5.0
  */
 @Internal
-final class InterceptedParametrizedBeanConstructor<T> implements BeanConstructor<T> {
+final class InterceptedConstructor<T> implements BeanConstructor<T> {
 
-    private final InterceptedParametrizedInstantiateBeanDefinition<T> interceptedInstantiateBeanDefinition;
+    private final InterceptedBeanDefinition<T> interceptedBeanDefinition;
     private final BeanResolutionContext beanResolutionContext;
     private final BeanContext beanContext;
     private final AnnotationMetadata annotationMetadata;
 
     /**
-     * @param interceptedInstantiateBeanDefinition The intercepted bean definition
+     * @param interceptedBeanDefinition The intercepted bean definition
      * @param beanResolutionContext                The resolution context
      * @param beanContext                          The bean context
      */
-    InterceptedParametrizedBeanConstructor(InterceptedParametrizedInstantiateBeanDefinition<T> interceptedInstantiateBeanDefinition,
-                                           BeanResolutionContext beanResolutionContext,
-                                           BeanContext beanContext) {
-        this.interceptedInstantiateBeanDefinition = interceptedInstantiateBeanDefinition;
+    InterceptedConstructor(InterceptedBeanDefinition<T> interceptedBeanDefinition,
+                           BeanResolutionContext beanResolutionContext,
+                           BeanContext beanContext) {
+        this.interceptedBeanDefinition = interceptedBeanDefinition;
         this.beanResolutionContext = beanResolutionContext;
         this.beanContext = beanContext;
         this.annotationMetadata = new AnnotationMetadataHierarchy(
-            interceptedInstantiateBeanDefinition.getAnnotationMetadata(),
-            interceptedInstantiateBeanDefinition.getConstructor().getAnnotationMetadata()
+            interceptedBeanDefinition.getAnnotationMetadata(),
+            interceptedBeanDefinition.getConstructor().getAnnotationMetadata()
         );
     }
 
     @Override
     public T instantiate(@Nullable Object... parameterValues) {
-        return interceptedInstantiateBeanDefinition.doInstantiate(beanResolutionContext, beanContext, parameterValues);
+        return interceptedBeanDefinition.doInstantiate(beanResolutionContext, beanContext, parameterValues);
     }
 
     @Override
@@ -68,11 +68,11 @@ final class InterceptedParametrizedBeanConstructor<T> implements BeanConstructor
 
     @Override
     public Class<T> getDeclaringBeanType() {
-        return interceptedInstantiateBeanDefinition.getBeanType();
+        return interceptedBeanDefinition.getBeanType();
     }
 
     @Override
     public Argument<?>[] getArguments() {
-        return interceptedInstantiateBeanDefinition.getConstructor().getArguments();
+        return interceptedBeanDefinition.getConstructor().getArguments();
     }
 }

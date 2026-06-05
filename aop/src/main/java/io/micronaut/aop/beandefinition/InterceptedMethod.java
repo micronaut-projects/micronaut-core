@@ -47,7 +47,7 @@ import java.util.Objects;
  * @since 5.0
  */
 @Internal
-abstract sealed class AbstractExecutableMethod<T, R> implements UnsafeExecutable<T, R>, ExecutableMethod<T, R>, EnvironmentConfigurable, io.micronaut.core.type.Executable<T, R> permits InterceptedDisposeExecutableMethod, InterceptedInitializingExecutableMethod {
+abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>, ExecutableMethod<T, R>, EnvironmentConfigurable, io.micronaut.core.type.Executable<T, R> permits InterceptedDisposeMethod, InitalizableInterceptedMethod {
 
     protected final Class<T> declaringType;
     protected final String methodName;
@@ -72,10 +72,10 @@ abstract sealed class AbstractExecutableMethod<T, R> implements UnsafeExecutable
      * @param arguments         The arguments
      */
     @SuppressWarnings("WeakerAccess")
-    protected AbstractExecutableMethod(Class<T> declaringType,
-                                       String methodName,
-                                       Argument<R> genericReturnType,
-                                       Argument<?>... arguments) {
+    protected InterceptedMethod(Class<T> declaringType,
+                                String methodName,
+                                Argument<R> genericReturnType,
+                                Argument<?>... arguments) {
         Objects.requireNonNull(declaringType, "Declaring type cannot be null");
         Objects.requireNonNull(methodName, "Method name cannot be null");
 
@@ -102,8 +102,8 @@ abstract sealed class AbstractExecutableMethod<T, R> implements UnsafeExecutable
      * @param methodName    The method name
      */
     @SuppressWarnings("WeakerAccess")
-    protected AbstractExecutableMethod(Class<T> declaringType,
-                                       String methodName) {
+    protected InterceptedMethod(Class<T> declaringType,
+                                String methodName) {
         this(declaringType, methodName, (Argument<R>) Argument.VOID, Argument.ZERO_ARGUMENTS);
     }
 
@@ -147,7 +147,7 @@ abstract sealed class AbstractExecutableMethod<T, R> implements UnsafeExecutable
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        AbstractExecutableMethod<T, R> that = (AbstractExecutableMethod<T, R>) o;
+        InterceptedMethod<T, R> that = (InterceptedMethod<T, R>) o;
         return Objects.equals(declaringType, that.declaringType) &&
             Objects.equals(methodName, that.methodName) &&
             Arrays.equals(argTypes, that.argTypes);
@@ -252,12 +252,12 @@ abstract sealed class AbstractExecutableMethod<T, R> implements UnsafeExecutable
 
         @Override
         public boolean isSuspended() {
-            return AbstractExecutableMethod.this.isSuspend();
+            return InterceptedMethod.this.isSuspend();
         }
 
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
-            return AbstractExecutableMethod.this.getAnnotationMetadata();
+            return InterceptedMethod.this.getAnnotationMetadata();
         }
 
         @Override

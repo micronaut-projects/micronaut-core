@@ -32,9 +32,9 @@ import org.jspecify.annotations.Nullable;
  * @since 5.0
  */
 @Internal
-final class InterceptedBeanConstructor<T> implements BeanConstructor<T> {
+final class InterceptedParametrizedConstructor<T> implements BeanConstructor<T> {
 
-    private final InterceptedInstantiateBeanDefinition<T> interceptedInstantiateBeanDefinition;
+    private final ParameterizedInterceptedBeanDefinition<T> interceptedInstantiateBeanDefinition;
     private final BeanResolutionContext beanResolutionContext;
     private final BeanContext beanContext;
     private final AnnotationMetadata annotationMetadata;
@@ -44,9 +44,9 @@ final class InterceptedBeanConstructor<T> implements BeanConstructor<T> {
      * @param beanResolutionContext                The resolution context
      * @param beanContext                          The bean context
      */
-    InterceptedBeanConstructor(InterceptedInstantiateBeanDefinition<T> interceptedInstantiateBeanDefinition,
-                               BeanResolutionContext beanResolutionContext,
-                               BeanContext beanContext) {
+    InterceptedParametrizedConstructor(ParameterizedInterceptedBeanDefinition<T> interceptedInstantiateBeanDefinition,
+                                       BeanResolutionContext beanResolutionContext,
+                                       BeanContext beanContext) {
         this.interceptedInstantiateBeanDefinition = interceptedInstantiateBeanDefinition;
         this.beanResolutionContext = beanResolutionContext;
         this.beanContext = beanContext;

@@ -36,6 +36,22 @@ public record MethodDefinition<K, M>(M methodElement,
                                      boolean isSetter,
                                      BeanDefinitionInjectionPoint.@Nullable PropertyInjectionPoint<K> booleanInjectionPoint) implements MemberDefinition<K> {
 
+    public MethodDefinition(M methodElement,
+                            AnnotationMetadata annotationMetadata,
+                            List<BeanDefinitionInjectionPoint<K>> injectionPoints,
+                            boolean requiresReflection,
+                            boolean isOptional,
+                            boolean isSetter,
+                            BeanDefinitionInjectionPoint.@Nullable PropertyInjectionPoint<K> booleanInjectionPoint) {
+        this.methodElement = BeanDefinitionBuilderValidation.requireNonNull(methodElement, "methodElement");
+        this.annotationMetadata = BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+        this.injectionPoints = BeanDefinitionBuilderValidation.requireNonNullElements(injectionPoints, "injectionPoints");
+        this.requiresReflection = requiresReflection;
+        this.isOptional = isOptional;
+        this.isSetter = isSetter;
+        this.booleanInjectionPoint = booleanInjectionPoint;
+    }
+
     /**
      * Creates a method definition.
      *

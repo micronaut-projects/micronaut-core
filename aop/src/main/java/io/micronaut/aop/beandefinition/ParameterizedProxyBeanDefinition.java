@@ -35,7 +35,8 @@ import java.util.Map;
  * @since 5.0
  */
 @Internal
-public interface ProxyInterceptedParametrizedInstantiateBeanDefinition<T> extends InterceptedParametrizedInstantiateBeanDefinition<T> {
+public interface ParameterizedProxyBeanDefinition<T>
+    extends ParameterizedInterceptedBeanDefinition<T> {
 
     @Override
     default T doInstantiate(BeanResolutionContext resolutionContext, BeanContext context, Map<String, Object> requiredArgumentValues) {
@@ -46,7 +47,7 @@ public interface ProxyInterceptedParametrizedInstantiateBeanDefinition<T> extend
             context,
             interceptors,
             this,
-            new InterceptedParametrizedBeanConstructor<>(this, resolutionContext, context),
+            new InterceptedParametrizedConstructor<>(this, resolutionContext, context),
             5,
             constructorValues
         );

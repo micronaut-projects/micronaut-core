@@ -23,32 +23,32 @@ import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Executable method that delegates {@link InterceptedDisposeBeanDefinition} disposal to the interceptor chain.
+ * Executable method that delegates {@link DisposableIntercepted} disposal to the interceptor chain.
  *
  * @param <T> The intercepted bean type
  * @author Denis Stepanov
  * @since 5.0
  */
 @Internal
-public final class InterceptedDisposeExecutableMethod<T> extends AbstractExecutableMethod<T, T> {
+final class InterceptedDisposeMethod<T> extends InterceptedMethod<T, T> {
 
-    private final InterceptedDisposeBeanDefinition<T> interceptedDisposeBeanDefinition;
+    private final DisposableIntercepted<T> disposableIntercepted;
     private final BeanResolutionContext beanResolutionContext;
     private final BeanContext beanContext;
     private final T bean;
 
     /**
-     * @param interceptedDisposeBeanDefinition The intercepted dispose bean definition
+     * @param disposableIntercepted The intercepted dispose bean definition
      * @param beanResolutionContext            The resolution context
      * @param beanContext                      The bean context
      * @param bean                             The bean being disposed
      */
-    InterceptedDisposeExecutableMethod(InterceptedDisposeBeanDefinition<T> interceptedDisposeBeanDefinition,
-                                       BeanResolutionContext beanResolutionContext,
-                                       BeanContext beanContext,
-                                       T bean) {
-        super(interceptedDisposeBeanDefinition.getBeanType(), "dispose", Argument.of(interceptedDisposeBeanDefinition.getBeanType()));
-        this.interceptedDisposeBeanDefinition = interceptedDisposeBeanDefinition;
+    InterceptedDisposeMethod(DisposableIntercepted<T> disposableIntercepted,
+                             BeanResolutionContext beanResolutionContext,
+                             BeanContext beanContext,
+                             T bean) {
+        super(disposableIntercepted.getBeanType(), "dispose", Argument.of(disposableIntercepted.getBeanType()));
+        this.disposableIntercepted = disposableIntercepted;
         this.beanResolutionContext = beanResolutionContext;
         this.beanContext = beanContext;
         this.bean = bean;
@@ -56,11 +56,11 @@ public final class InterceptedDisposeExecutableMethod<T> extends AbstractExecuta
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return interceptedDisposeBeanDefinition.getAnnotationMetadata();
+        return disposableIntercepted.getAnnotationMetadata();
     }
 
     @Override
     protected T invokeInternal(T instance, @Nullable Object[] arguments) {
-        return interceptedDisposeBeanDefinition.doDispose(beanResolutionContext, beanContext, bean);
+        return disposableIntercepted.doDispose(beanResolutionContext, beanContext, bean);
     }
 }

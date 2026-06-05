@@ -75,13 +75,17 @@ public class BeanInjectionUtils {
                                                                                     FieldElement fieldElement,
                                                                                     boolean requiresReflection,
                                                                                     VisitorContext visitorContext) {
-        return new FieldDefinition<>(
-            fieldElement,
-            fieldElement,
-            BeanInjectionUtils.getInjectionPoint(beanType, fieldElement.getGenericType(), fieldElement, fieldElement.getName(), visitorContext),
-            requiresReflection,
-            false
-        );
+        try {
+            return new FieldDefinition<>(
+                fieldElement,
+                fieldElement,
+                BeanInjectionUtils.getInjectionPoint(beanType, fieldElement.getGenericType(), fieldElement, fieldElement.getName(), visitorContext),
+                requiresReflection,
+                false
+            );
+        } catch (IllegalArgumentException e) {
+            throw toProcessingException(fieldElement, e);
+        }
     }
 
     /**
@@ -99,12 +103,16 @@ public class BeanInjectionUtils {
                                                                                        AnnotationMetadata annotationMetadata,
                                                                                        boolean requiresReflection,
                                                                                        VisitorContext visitorContext) {
-        return new MethodDefinition<>(
-            methodElement,
-            annotationMetadata,
-            Arrays.stream(methodElement.getSuspendParameters()).map(p -> BeanInjectionUtils.getInjectionPoint(beanType, p.getGenericType(), p, p.getName(), visitorContext)).toList(),
-            requiresReflection
-        );
+        try {
+            return new MethodDefinition<>(
+                methodElement,
+                annotationMetadata,
+                Arrays.stream(methodElement.getSuspendParameters()).map(p -> BeanInjectionUtils.getInjectionPoint(beanType, p.getGenericType(), p, p.getName(), visitorContext)).toList(),
+                requiresReflection
+            );
+        } catch (IllegalArgumentException e) {
+            throw toProcessingException(methodElement, e);
+        }
     }
 
     /**
@@ -149,12 +157,16 @@ public class BeanInjectionUtils {
                                                                                                  AnnotationMetadata annotationMetadata,
                                                                                                  VisitorContext visitorContext,
                                                                                                  boolean requiresReflection) {
-        return new ConstructorDefinition<>(
-            constructorElement,
-            annotationMetadata,
-            Arrays.stream(constructorElement.getParameters()).map(p -> BeanInjectionUtils.getInjectionPoint(constructorElement.getOwningType(), p.getGenericType(), p, p.getName(), visitorContext)).toList(),
-            requiresReflection
-        );
+        try {
+            return new ConstructorDefinition<>(
+                constructorElement,
+                annotationMetadata,
+                Arrays.stream(constructorElement.getParameters()).map(p -> BeanInjectionUtils.getInjectionPoint(constructorElement.getOwningType(), p.getGenericType(), p, p.getName(), visitorContext)).toList(),
+                requiresReflection
+            );
+        } catch (IllegalArgumentException e) {
+            throw toProcessingException(constructorElement, e);
+        }
     }
 
     /**
@@ -174,19 +186,23 @@ public class BeanInjectionUtils {
                                                                                        boolean requiresReflection,
                                                                                        String name,
                                                                                        VisitorContext visitorContext) {
-        BeanDefinitionInjectionPoint<ClassElement> injectionPoint;
-        if (isInnerType(beanType, genericType)) {
-            injectionPoint = getInjectionPoint(beanType, genericType, annotationMetadata, name, visitorContext);
-        } else if (!isConfigurationProperties(beanType) || requiresReflection) {
-            injectionPoint = createPropertyOrValueInjectionPoint(genericType, annotationMetadata, name);
-            if (injectionPoint == null) {
-                throw new IllegalStateException("Expected a property or a value");
-            }
+        try {
+            BeanDefinitionInjectionPoint<ClassElement> injectionPoint;
+            if (isInnerType(beanType, genericType)) {
+                injectionPoint = getInjectionPoint(beanType, genericType, annotationMetadata, name, visitorContext);
+            } else if (!isConfigurationProperties(beanType) || requiresReflection) {
+                injectionPoint = createPropertyOrValueInjectionPoint(genericType, annotationMetadata, name);
+                if (injectionPoint == null) {
+                    throw new IllegalStateException("Expected a property or a value");
+                }
 
-        } else {
-            injectionPoint = createPropertyInjection(genericType, annotationMetadata, name);
+            } else {
+                injectionPoint = createPropertyInjection(genericType, annotationMetadata, name);
+            }
+            return injectionPoint;
+        } catch (IllegalArgumentException e) {
+            throw toProcessingException(annotationMetadata, e);
         }
-        return injectionPoint;
     }
 
     private static boolean isInnerType(ClassElement beanType, ClassElement genericType) {
@@ -220,47 +236,59 @@ public class BeanInjectionUtils {
                                                                                AnnotationMetadata annotationMetadata,
                                                                                String parameterName,
                                                                                VisitorContext visitorContext) {
-        if (isAnnotatedWithParameter(annotationMetadata)) {
-            return new ParameterInjectionPoint<>(genericType, annotationMetadata, parameterName);
-        }
-        boolean isArray;
-        if (!isInnerType(beanType, genericType)) {
-            BeanDefinitionInjectionPoint<ClassElement> result = createPropertyOrValueInjectionPoint(genericType, annotationMetadata, parameterName);
-            if (result != null) {
-                return result;
+        try {
+            if (isAnnotatedWithParameter(annotationMetadata)) {
+                return new ParameterInjectionPoint<>(genericType, annotationMetadata, parameterName);
             }
-        }
-        isArray = genericType.isArray();
-        if (genericType.isAssignable(Collection.class) || isArray) {
-            ClassElement typeArgument = genericType.isArray() ? genericType.fromArray() : genericType.getFirstTypeArgument().orElse(null);
-            if (typeArgument != null && !typeArgument.isPrimitive()) {
-                if (typeArgument.isAssignable(BeanRegistration.class)) {
-                    return new BeanRegistrationsInjectionPoint<>(genericType, annotationMetadata, typeArgument.getFirstTypeArgument().orElseThrow());
-                } else {
-                    return new BeansInjectionPoint<>(genericType, annotationMetadata, typeArgument);
+            boolean isArray;
+            if (!isInnerType(beanType, genericType)) {
+                BeanDefinitionInjectionPoint<ClassElement> result = createPropertyOrValueInjectionPoint(genericType, annotationMetadata, parameterName);
+                if (result != null) {
+                    return result;
                 }
-            } else {
-                return new BeanInjectionPoint<>(genericType, annotationMetadata);
             }
-        } else if (isInjectableMap(genericType)) {
-            Map<String, ClassElement> mapArguments = genericType.getTypeArguments(Map.class);
-            ClassElement objectType = objectType(visitorContext);
-            ClassElement injectBeanType = mapArguments.getOrDefault("V", objectType);
-            return new MapOfBeansInjectionPoint<>(genericType, annotationMetadata, injectBeanType);
-        } else if (genericType.isAssignable(Stream.class)) {
-            ClassElement objectType = objectType(visitorContext);
-            ClassElement injectBeanType = genericType.getFirstTypeArgument().orElse(objectType);
-            return new StreamOfBeansInjectionPoint<>(genericType, annotationMetadata, injectBeanType);
-        } else if (genericType.isAssignable(Optional.class)) {
-            ClassElement objectType = objectType(visitorContext);
-            ClassElement injectBeanType = genericType.getFirstTypeArgument().orElse(objectType);
-            return new OptionalBeanInjectionPoint<>(genericType, annotationMetadata, injectBeanType);
-        } else if (genericType.isAssignable(BeanRegistration.class)) {
-            ClassElement objectType = objectType(visitorContext);
-            ClassElement injectBeanType = genericType.getFirstTypeArgument().orElse(objectType);
-            return new BeanRegistrationInjectionPoint<>(genericType, annotationMetadata, injectBeanType);
+            isArray = genericType.isArray();
+            if (genericType.isAssignable(Collection.class) || isArray) {
+                ClassElement typeArgument = genericType.isArray() ? genericType.fromArray() : genericType.getFirstTypeArgument().orElse(null);
+                if (typeArgument != null && !typeArgument.isPrimitive()) {
+                    if (typeArgument.isAssignable(BeanRegistration.class)) {
+                        return new BeanRegistrationsInjectionPoint<>(genericType, annotationMetadata, typeArgument.getFirstTypeArgument().orElseThrow());
+                    } else {
+                        return new BeansInjectionPoint<>(genericType, annotationMetadata, typeArgument);
+                    }
+                } else {
+                    return new BeanInjectionPoint<>(genericType, annotationMetadata);
+                }
+            } else if (isInjectableMap(genericType)) {
+                Map<String, ClassElement> mapArguments = genericType.getTypeArguments(Map.class);
+                ClassElement objectType = objectType(visitorContext);
+                ClassElement injectBeanType = mapArguments.getOrDefault("V", objectType);
+                return new MapOfBeansInjectionPoint<>(genericType, annotationMetadata, injectBeanType);
+            } else if (genericType.isAssignable(Stream.class)) {
+                ClassElement objectType = objectType(visitorContext);
+                ClassElement injectBeanType = genericType.getFirstTypeArgument().orElse(objectType);
+                return new StreamOfBeansInjectionPoint<>(genericType, annotationMetadata, injectBeanType);
+            } else if (genericType.isAssignable(Optional.class)) {
+                ClassElement objectType = objectType(visitorContext);
+                ClassElement injectBeanType = genericType.getFirstTypeArgument().orElse(objectType);
+                return new OptionalBeanInjectionPoint<>(genericType, annotationMetadata, injectBeanType);
+            } else if (genericType.isAssignable(BeanRegistration.class)) {
+                ClassElement objectType = objectType(visitorContext);
+                ClassElement injectBeanType = genericType.getFirstTypeArgument().orElse(objectType);
+                return new BeanRegistrationInjectionPoint<>(genericType, annotationMetadata, injectBeanType);
+            }
+            return new BeanInjectionPoint<>(genericType, annotationMetadata);
+        } catch (IllegalArgumentException e) {
+            throw toProcessingException(annotationMetadata, e);
         }
-        return new BeanInjectionPoint<>(genericType, annotationMetadata);
+    }
+
+    private static ProcessingException toProcessingException(AnnotationMetadata annotationMetadata, IllegalArgumentException e) {
+        return toProcessingException(annotationMetadata instanceof Element element ? element : null, e);
+    }
+
+    private static ProcessingException toProcessingException(@Nullable Element element, IllegalArgumentException e) {
+        return new ProcessingException(element, e.getMessage(), e);
     }
 
     private static ClassElement objectType(VisitorContext visitorContext) {

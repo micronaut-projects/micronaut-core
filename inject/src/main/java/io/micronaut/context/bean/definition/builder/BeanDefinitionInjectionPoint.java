@@ -37,6 +37,11 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      * @param <K> The element kind
      */
     record ParameterInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, String name) implements BeanDefinitionInjectionPoint<K> {
+        public ParameterInjectionPoint {
+            BeanDefinitionBuilderValidation.requireNonNull(type, "type");
+            BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+            BeanDefinitionBuilderValidation.requireNonNull(name, "name");
+        }
     }
 
     /**
@@ -45,6 +50,12 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      * @param <K> The element kind
      */
     record PropertyInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, String propertyName, String propertyPath) implements BeanDefinitionInjectionPoint<K> {
+        public PropertyInjectionPoint {
+            BeanDefinitionBuilderValidation.requireNonNull(type, "type");
+            BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+            BeanDefinitionBuilderValidation.requireNonNull(propertyName, "propertyName");
+            BeanDefinitionBuilderValidation.requireNonNull(propertyPath, "propertyPath");
+        }
     }
 
     /**
@@ -53,6 +64,11 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      * @param <K> The element kind
      */
     record ValueInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, String value, boolean hasExpression) implements BeanDefinitionInjectionPoint<K> {
+        public ValueInjectionPoint {
+            BeanDefinitionBuilderValidation.requireNonNull(type, "type");
+            BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+            BeanDefinitionBuilderValidation.requireNonNull(value, "value");
+        }
     }
 
     /**
@@ -61,6 +77,10 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      * @param <K> The element kind
      */
     record BeanInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata) implements BeanDefinitionInjectionPoint<K> {
+        public BeanInjectionPoint {
+            BeanDefinitionBuilderValidation.requireNonNull(type, "type");
+            BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+        }
     }
 
     /**
@@ -69,6 +89,11 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      * @param <K> The element kind
      */
     record BeansInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, K beanType) implements BeanDefinitionInjectionPoint<K> {
+        public BeansInjectionPoint {
+            BeanDefinitionBuilderValidation.requireNonNull(type, "type");
+            BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+            BeanDefinitionBuilderValidation.requireNonNull(beanType, "beanType");
+        }
     }
 
     /**
@@ -77,6 +102,11 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      * @param <K> The element kind
      */
     record BeanRegistrationInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, K beanType) implements BeanDefinitionInjectionPoint<K> {
+        public BeanRegistrationInjectionPoint {
+            BeanDefinitionBuilderValidation.requireNonNull(type, "type");
+            BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+            BeanDefinitionBuilderValidation.requireNonNull(beanType, "beanType");
+        }
     }
 
     /**
@@ -85,6 +115,11 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      * @param <K> The element kind
      */
     record BeanRegistrationsInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, K beanType) implements BeanDefinitionInjectionPoint<K> {
+        public BeanRegistrationsInjectionPoint {
+            BeanDefinitionBuilderValidation.requireNonNull(type, "type");
+            BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+            BeanDefinitionBuilderValidation.requireNonNull(beanType, "beanType");
+        }
     }
 
     /**
@@ -93,6 +128,11 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      * @param <K> The element kind
      */
     record MapOfBeansInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, K beanType) implements BeanDefinitionInjectionPoint<K> {
+        public MapOfBeansInjectionPoint {
+            BeanDefinitionBuilderValidation.requireNonNull(type, "type");
+            BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+            BeanDefinitionBuilderValidation.requireNonNull(beanType, "beanType");
+        }
     }
 
     /**
@@ -101,6 +141,11 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      * @param <K> The element kind
      */
     record StreamOfBeansInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, K beanType) implements BeanDefinitionInjectionPoint<K> {
+        public StreamOfBeansInjectionPoint {
+            BeanDefinitionBuilderValidation.requireNonNull(type, "type");
+            BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+            BeanDefinitionBuilderValidation.requireNonNull(beanType, "beanType");
+        }
     }
 
     /**
@@ -109,5 +154,10 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      * @param <K> The element kind
      */
     record OptionalBeanInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, K beanType) implements BeanDefinitionInjectionPoint<K> {
+        public OptionalBeanInjectionPoint {
+            BeanDefinitionBuilderValidation.requireNonNull(type, "type");
+            BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+            BeanDefinitionBuilderValidation.requireNonNull(beanType, "beanType");
+        }
     }
 }

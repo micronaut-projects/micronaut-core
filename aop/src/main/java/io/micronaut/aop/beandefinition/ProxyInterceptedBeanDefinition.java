@@ -15,51 +15,40 @@
  */
 package io.micronaut.aop.beandefinition;
 
+import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.chain.ConstructorInterceptorChain;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import org.jspecify.annotations.Nullable;
 
+import java.util.List;
+
 /**
- * Intercepted {@link InstantiatableBeanDefinition}.
+ * Intercepted {@link InstantiatableBeanDefinition} that carries constructor interceptor metadata
+ * for runtime proxy beans.
  *
  * @param <T> The bean definition type
  * @author Denis Stepanov
  * @since 5.0
  */
 @Internal
-public interface InterceptedInstantiateBeanDefinition<T> extends InstantiatableBeanDefinition<T> {
-
-    /**
-     * Resolve the construction values.
-     *
-     * @param resolutionContext The resolution context
-     * @param context           The bean context
-     * @return the construction values
-     */
-    @Nullable Object[] resolveInstantiationValues(BeanResolutionContext resolutionContext, BeanContext context);
+public interface ProxyInterceptedBeanDefinition<T> extends InterceptedBeanDefinition<T> {
 
     @Override
     default T instantiate(BeanResolutionContext resolutionContext, BeanContext context) {
+        @Nullable Object[] constructorValues = resolveInstantiationValues(resolutionContext, context);
+        List<BeanRegistration<Interceptor<T, T>>> interceptors = (List) constructorValues[constructorValues.length - 2];
         return ConstructorInterceptorChain.instantiate(
             resolutionContext,
             context,
-            null,
+            interceptors,
             this,
-            new InterceptedBeanConstructor<>(this, resolutionContext, context),
-            resolveInstantiationValues(resolutionContext, context)
+            new InterceptedConstructor<>(this, resolutionContext, context),
+            5,
+            constructorValues
         );
     }
-
-    /**
-     * The original {@link #instantiate(BeanResolutionContext, BeanContext)} call that should be intercepted.
-     *
-     * @param resolutionContext The resolution context
-     * @param context           The bean context
-     * @param parameterValues   The construction values
-     * @return The intercepted result
-     */
-    T doInstantiate(BeanResolutionContext resolutionContext, BeanContext context, @Nullable Object[] parameterValues);
 }

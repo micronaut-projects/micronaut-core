@@ -33,6 +33,12 @@ public record FieldDefinition<K, F>(F fieldElement,
                                     boolean requiresReflection,
                                     boolean isOptional) implements MemberDefinition<K> {
 
+    public FieldDefinition {
+        BeanDefinitionBuilderValidation.requireNonNull(fieldElement, "fieldElement");
+        BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+        BeanDefinitionBuilderValidation.requireNonNull(injectionPoint, "injectionPoint");
+    }
+
     @Override
     public List<BeanDefinitionInjectionPoint<K>> injectionPoints() {
         return List.of();
