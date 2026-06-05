@@ -71,13 +71,6 @@ jobs:
           name: binary-compatibility-reports
           path: "**/build/reports/binary-compatibility-*.html"
 
-      - name: "📦 Publish to Sonatype Snapshots"
-        if: success() && github.event_name == 'push' && matrix.java == '11'
-        env:
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-        run: ./gradlew publishToSonatype docs --no-daemon
-
       - name: "❓ Determine docs target repository"
         uses: haya14busa/action-cond@v1
         id: docs_target
