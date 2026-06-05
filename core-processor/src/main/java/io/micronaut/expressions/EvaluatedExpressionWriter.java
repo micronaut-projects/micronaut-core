@@ -15,7 +15,7 @@
  */
 package io.micronaut.expressions;
 
-import io.micronaut.context.bean.definition.builder.Builder;
+import io.micronaut.core.type.Builder;
 import io.micronaut.context.expressions.AbstractEvaluatedExpression;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;

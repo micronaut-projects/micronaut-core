@@ -17,7 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.context.AbstractExecutableMethodsDefinition;
 import io.micronaut.context.annotation.Executable;
-import io.micronaut.context.bean.definition.builder.Builder;
+import io.micronaut.core.type.Builder;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.bean.definition.builder;
+package io.micronaut.core.type;
 
 /**
  * Generic builder contract.
@@ -25,6 +25,8 @@ package io.micronaut.context.bean.definition.builder;
 public interface Builder<R> {
 
     /**
+     * Builds the result.
+     *
      * @return The builder result
      */
     R build();

@@ -22,9 +22,9 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.InstantiatableBeanDefinition;
-import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Intercepted {@link InstantiatableBeanDefinition} that carries constructor interceptor metadata
@@ -39,7 +39,10 @@ public interface ProxyInterceptedBeanDefinition<T> extends InterceptedBeanDefini
 
     @Override
     default T instantiate(BeanResolutionContext resolutionContext, BeanContext context) {
-        @Nullable Object[] constructorValues = resolveInstantiationValues(resolutionContext, context);
+        Object[] constructorValues = Objects.requireNonNull(
+            resolveInstantiationValues(resolutionContext, context),
+            "Resolved instantiation values cannot be null"
+        );
         List<BeanRegistration<Interceptor<T, T>>> interceptors = (List) constructorValues[constructorValues.length - 2];
         return ConstructorInterceptorChain.instantiate(
             resolutionContext,

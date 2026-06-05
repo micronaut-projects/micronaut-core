@@ -30,7 +30,7 @@ import org.jspecify.annotations.Nullable;
  * @since 5.1.0
  */
 @Internal
-final class InitalizableInterceptedMethod<T> extends InterceptedMethod<T, T> {
+final class InitializableInterceptedMethod<T> extends InterceptedMethod<T, T> {
 
     private final InitializableIntercepted<T> initializableIntercepted;
     private final BeanResolutionContext beanResolutionContext;
@@ -39,14 +39,14 @@ final class InitalizableInterceptedMethod<T> extends InterceptedMethod<T, T> {
 
     /**
      * @param initializableIntercepted The intercepted initializing bean definition
-     * @param beanResolutionContext                 The resolution context
-     * @param beanContext                           The bean context
-     * @param bean                                  The bean to initialize
+     * @param beanResolutionContext    The resolution context
+     * @param beanContext              The bean context
+     * @param bean                     The bean to initialize
      */
-    InitalizableInterceptedMethod(InitializableIntercepted<T> initializableIntercepted,
-                                  BeanResolutionContext beanResolutionContext,
-                                  BeanContext beanContext,
-                                  T bean) {
+    InitializableInterceptedMethod(InitializableIntercepted<T> initializableIntercepted,
+                                   BeanResolutionContext beanResolutionContext,
+                                   BeanContext beanContext,
+                                   T bean) {
         super(initializableIntercepted.getBeanType(), "initialize", Argument.of(initializableIntercepted.getBeanType()));
         this.initializableIntercepted = initializableIntercepted;
         this.beanResolutionContext = beanResolutionContext;

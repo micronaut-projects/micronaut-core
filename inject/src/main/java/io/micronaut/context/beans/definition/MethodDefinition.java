@@ -44,7 +44,7 @@ public record MethodDefinition<K, M>(M methodElement,
                             boolean isSetter,
                             BeanDefinitionInjectionPoint.@Nullable PropertyInjectionPoint<K> booleanInjectionPoint) {
         this.methodElement = BeanDefinitionBuilderValidation.requireNonNull(methodElement, "methodElement");
-        this.annotationMetadata = BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
+        this.annotationMetadata = BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, BeanDefinitionBuilderValidation.ANNOTATION_METADATA);
         this.injectionPoints = BeanDefinitionBuilderValidation.requireNonNullElements(injectionPoints, "injectionPoints");
         this.requiresReflection = requiresReflection;
         this.isOptional = isOptional;
@@ -64,16 +64,4 @@ public record MethodDefinition<K, M>(M methodElement,
         this(methodElement, annotationMetadata, injectionPoints, requiresReflection, false, false, null);
     }
 
-    /**
-     * Creates a method definition marking the method as a setter if required.
-     *
-     * @param methodElement      The method element
-     * @param annotationMetadata The annotation metadata
-     * @param injectionPoints    The injection points
-     * @param requiresReflection Whether reflective invocation is required
-     * @param isSetter           Whether the method acts as a setter
-     */
-    public MethodDefinition(M methodElement, AnnotationMetadata annotationMetadata, List<BeanDefinitionInjectionPoint<K>> injectionPoints, boolean requiresReflection, boolean isSetter) {
-        this(methodElement, annotationMetadata, injectionPoints, requiresReflection, false, isSetter, null);
-    }
 }

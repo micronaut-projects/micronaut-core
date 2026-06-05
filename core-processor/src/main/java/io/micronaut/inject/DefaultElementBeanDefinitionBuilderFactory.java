@@ -119,7 +119,7 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
         try {
             return new BeanDefinitionWriter(constructorDefinition, visitorContext);
         } catch (IllegalArgumentException e) {
-            throw new ProcessingException(constructorDefinition == null ? null : constructorDefinition.constructorElement(), e.getMessage(), e);
+            throw new ProcessingException(constructorDefinition.constructorElement(), e.getMessage(), e);
         }
     }
 
@@ -130,7 +130,7 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
         try {
             return new BeanDefinitionWriter(constructorDefinition, beanDefinitionName, annotationMetadata, visitorContext);
         } catch (IllegalArgumentException e) {
-            throw new ProcessingException(constructorDefinition == null ? null : constructorDefinition.constructorElement(), e.getMessage(), e);
+            throw new ProcessingException(constructorDefinition.constructorElement(), e.getMessage(), e);
         }
     }
 
@@ -139,7 +139,7 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
         try {
             return new BeanDefinitionWriter(methodDefinition, visitorContext, uniqueIdentifier++);
         } catch (IllegalArgumentException e) {
-            throw new ProcessingException(methodDefinition == null ? null : methodDefinition.methodElement(), e.getMessage(), e);
+            throw new ProcessingException(methodDefinition.methodElement(), e.getMessage(), e);
         }
     }
 
@@ -148,7 +148,7 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
         try {
             return new BeanDefinitionWriter(fieldDefinition, visitorContext);
         } catch (IllegalArgumentException e) {
-            throw new ProcessingException(fieldDefinition == null ? null : fieldDefinition.fieldElement(), e.getMessage(), e);
+            throw new ProcessingException(fieldDefinition.fieldElement(), e.getMessage(), e);
         }
     }
 

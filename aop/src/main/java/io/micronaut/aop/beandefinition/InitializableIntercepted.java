@@ -39,7 +39,7 @@ public interface InitializableIntercepted<T> extends InitializingBeanDefinition<
             resolutionContext,
             context,
             this,
-            new InitalizableInterceptedMethod<>(this, resolutionContext, context, bean),
+            new InitializableInterceptedMethod<>(this, resolutionContext, context, bean),
             bean
         ));
     }

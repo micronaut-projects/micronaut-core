@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.processing;
 
-import io.micronaut.context.bean.definition.builder.Builder;
+import io.micronaut.core.type.Builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ElementBeanDefinitionBuilder;
 import io.micronaut.inject.ElementBeanDefinitionBuilderFactory;

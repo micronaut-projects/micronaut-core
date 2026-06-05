@@ -18,6 +18,7 @@ package io.micronaut.context.bean.definition.builder;
 import io.micronaut.core.annotation.AnnotationMetadata;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Describes a field injection in a bean definition.
@@ -34,13 +35,13 @@ public record FieldDefinition<K, F>(F fieldElement,
                                     boolean isOptional) implements MemberDefinition<K> {
 
     public FieldDefinition {
-        BeanDefinitionBuilderValidation.requireNonNull(fieldElement, "fieldElement");
-        BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
-        BeanDefinitionBuilderValidation.requireNonNull(injectionPoint, "injectionPoint");
+        Objects.requireNonNull(fieldElement, "fieldElement");
+        Objects.requireNonNull(annotationMetadata, BeanDefinitionBuilderValidation.ANNOTATION_METADATA);
+        Objects.requireNonNull(injectionPoint, "injectionPoint");
     }
 
     @Override
     public List<BeanDefinitionInjectionPoint<K>> injectionPoints() {
-        return List.of();
+        return List.of(injectionPoint);
     }
 }

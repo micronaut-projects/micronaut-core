@@ -471,7 +471,7 @@ public final class DispatchWriter implements ClassOutputWriter {
     /**
      * @return if intercepted method dispatch have been added
      */
-   public boolean isHasInterceptedMethod() {
+    public boolean isHasInterceptedMethod() {
         return hasInterceptedMethod;
     }
 

@@ -34,7 +34,7 @@ public record ConstructorDefinition<K, C>(C constructorElement,
 
     public ConstructorDefinition {
         BeanDefinitionBuilderValidation.requireNonNull(constructorElement, "constructorElement");
-        BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, "annotationMetadata");
-        injectionPoints = BeanDefinitionBuilderValidation.requireNonNullElements(injectionPoints, "injectionPoints");
+        BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, BeanDefinitionBuilderValidation.ANNOTATION_METADATA);
+        BeanDefinitionBuilderValidation.requireNonNullElements(injectionPoints, "injectionPoints");
     }
 }

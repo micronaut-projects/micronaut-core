@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.beans.visitor;
 
-import io.micronaut.context.bean.definition.builder.Builder;
+import io.micronaut.core.type.Builder;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Generated;

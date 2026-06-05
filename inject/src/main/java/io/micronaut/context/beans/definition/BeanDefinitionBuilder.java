@@ -16,6 +16,7 @@
 package io.micronaut.context.bean.definition.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.type.Builder;
 
 import java.util.List;
 

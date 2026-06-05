@@ -22,10 +22,10 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
-import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Intercepted {@link ParametrizedInstantiatableBeanDefinition} that retains proxy interceptor data.
@@ -40,7 +40,10 @@ public interface ParameterizedProxyBeanDefinition<T>
 
     @Override
     default T doInstantiate(BeanResolutionContext resolutionContext, BeanContext context, Map<String, Object> requiredArgumentValues) {
-        @Nullable Object[] constructorValues = resolveInstantiationValues(resolutionContext, context, requiredArgumentValues);
+        Object[] constructorValues = Objects.requireNonNull(
+            resolveInstantiationValues(resolutionContext, context, requiredArgumentValues),
+            "Resolved instantiation values cannot be null"
+        );
         List<BeanRegistration<Interceptor<T, T>>> interceptors = (List) constructorValues[constructorValues.length - 2];
         return ConstructorInterceptorChain.instantiate(
             resolutionContext,

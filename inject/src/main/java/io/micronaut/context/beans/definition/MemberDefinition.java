@@ -15,26 +15,22 @@
  */
 package io.micronaut.context.bean.definition.builder;
 
-import io.micronaut.core.util.ArgumentUtils;
-
 import java.util.List;
 
-final class BeanDefinitionBuilderValidation {
+/**
+ * Common contract for bean definition members.
+ *
+ * @param <K> The bean element kind type
+ * @author Denis Stepanov
+ * @since 5.1.0
+ */
+public sealed interface MemberDefinition<K> extends AnnotationMetadataAccessor permits ConstructorDefinition, FieldDefinition, MethodDefinition {
 
-    private BeanDefinitionBuilderValidation() {
-    }
+    /**
+     * Returns the injection points contributed by this member definition.
+     *
+     * @return The injection points contributed by this member definition
+     */
+    List<BeanDefinitionInjectionPoint<K>> injectionPoints();
 
-    static <T> T requireNonNull(T value, String name) {
-        return ArgumentUtils.requireNonNull(name, value);
-    }
-
-    static <T> List<T> requireNonNullElements(List<T> values, String name) {
-        requireNonNull(values, name);
-        for (int i = 0; i < values.size(); i++) {
-            if (values.get(i) == null) {
-                throw new NullPointerException("Argument [" + name + "] cannot contain null element at index " + i);
-            }
-        }
-        return values;
-    }
 }

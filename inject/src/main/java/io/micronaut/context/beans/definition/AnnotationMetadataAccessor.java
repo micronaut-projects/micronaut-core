@@ -29,11 +29,15 @@ import io.micronaut.core.annotation.Internal;
 sealed interface AnnotationMetadataAccessor extends AnnotationMetadataProvider permits BeanDefinitionInjectionPoint, MemberDefinition {
 
     /**
+     * Returns the annotation metadata backing this provider.
+     *
      * @return The annotation metadata backing this provider
      */
     AnnotationMetadata annotationMetadata();
 
     /**
+     * Returns the annotation metadata associated with this element.
+     *
      * @return The annotation metadata associated with this element
      */
     @Override

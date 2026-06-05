@@ -15,9 +15,12 @@
  */
 package io.micronaut.context.bean.definition.builder;
 
+import io.micronaut.core.type.Builder;
+
 /**
  * Builder abstraction for proxy-oriented bean definitions.
  *
+ * @param <C> The class type
  * @param <M> The method element type
  * @param <R> The builder result
  * @author Denis Stepanov
