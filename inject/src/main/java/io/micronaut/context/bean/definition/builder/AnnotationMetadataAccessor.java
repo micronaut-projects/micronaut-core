@@ -23,7 +23,7 @@ import io.micronaut.core.annotation.Internal;
  * Record-friendly accessor for {@link AnnotationMetadataProvider} implementations.
  *
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 @Internal
 sealed interface AnnotationMetadataAccessor extends AnnotationMetadataProvider permits BeanDefinitionInjectionPoint, MemberDefinition {

@@ -140,7 +140,7 @@ public interface MethodElement extends MemberElement {
      *
      * @param name The name of the parameter
      * @return The method parameter with the name supplied
-     * @since 5.0
+     * @since 5.1.0
      */
     default ParameterElement getParameter(String name) {
         for (ParameterElement parameter : getParameters()) {
@@ -156,7 +156,7 @@ public interface MethodElement extends MemberElement {
      *
      * @param name The name of the parameter
      * @return The parameter index or -1
-     * @since 5.0
+     * @since 5.1.0
      */
     default int findParameterIndex(String name) {
         ParameterElement[] parameters = getParameters();

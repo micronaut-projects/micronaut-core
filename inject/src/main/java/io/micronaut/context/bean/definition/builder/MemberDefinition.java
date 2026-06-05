@@ -22,7 +22,7 @@ import java.util.List;
  *
  * @param <K> The bean element kind type
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 sealed public interface MemberDefinition<K> extends AnnotationMetadataAccessor permits ConstructorDefinition, FieldDefinition, MethodDefinition {
 

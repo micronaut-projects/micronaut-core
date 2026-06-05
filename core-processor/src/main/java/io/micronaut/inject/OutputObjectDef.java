@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
  * @param serviceClass        The service to be registered
  * @param originatingElements The originating elements
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 public record OutputObjectDef(ObjectDef objectDef, @Nullable Class<?> serviceClass, OriginatingElements originatingElements) {
 }

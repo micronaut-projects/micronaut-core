@@ -27,7 +27,7 @@ import org.jspecify.annotations.Nullable;
  *
  * @param <T> The bean definition type
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 @Internal
 public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefinition<T> {

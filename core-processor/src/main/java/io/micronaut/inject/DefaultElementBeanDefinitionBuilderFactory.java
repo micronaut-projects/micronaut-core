@@ -55,7 +55,7 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
  * Default {@link ElementBeanDefinitionBuilderFactory} implementation backed by {@link io.micronaut.inject.writer.BeanDefinitionWriter}.
  *
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDefinitionBuilderFactory<OutputObjectDef> {
     private static final String ANN_VALIDATED = "io.micronaut.validation.Validated";

@@ -65,7 +65,7 @@ public interface ExecutableMethodsDefinition<T> {
      *
      * @return Whether the bean definition requires method processing
      * @see io.micronaut.context.annotation.Executable#processOnStartup()
-     * @since 5.0
+     * @since 5.1.0
      */
     default boolean requiresMethodProcessing() {
         for (ExecutableMethod<T, ?> executableMethod : getExecutableMethods()) {

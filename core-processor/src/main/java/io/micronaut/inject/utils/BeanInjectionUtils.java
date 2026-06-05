@@ -58,7 +58,7 @@ import java.util.stream.Stream;
  * Utility methods for creating {@link io.micronaut.context.bean.definition.builder.BeanDefinitionInjectionPoint} instances.
  *
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 public class BeanInjectionUtils {
 

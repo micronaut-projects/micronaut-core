@@ -20,7 +20,7 @@ package io.micronaut.context.bean.definition.builder;
  *
  * @param <R> The builder result
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 public interface Builder<R> {
 

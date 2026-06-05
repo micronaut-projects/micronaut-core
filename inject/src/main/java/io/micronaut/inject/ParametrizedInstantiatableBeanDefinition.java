@@ -92,7 +92,7 @@ public interface ParametrizedInstantiatableBeanDefinition<T> extends Instantiata
      *
      * @param parametrizedInstantiatableBeanDefinition The parameterized bean definition
      * @return the required arguments
-     * @since 5.0
+     * @since 5.1.0
      */
     static Argument<Object>[] resolveRequiredArguments(ParametrizedInstantiatableBeanDefinition<?> parametrizedInstantiatableBeanDefinition) {
         Argument<?>[] arguments = parametrizedInstantiatableBeanDefinition.getConstructor().getArguments();
@@ -113,7 +113,7 @@ public interface ParametrizedInstantiatableBeanDefinition<T> extends Instantiata
      * @param parametrizedInstantiatableBeanDefinition The parameterized bean definition
      * @param requiredArgumentValues                   The required arguments
      * @return the required arguments
-     * @since 5.0
+     * @since 5.1.0
      */
     static Map<String, Object> resolveParameterizedArgumentValues(BeanResolutionContext resolutionContext,
                                                                   ParametrizedInstantiatableBeanDefinition<?> parametrizedInstantiatableBeanDefinition,

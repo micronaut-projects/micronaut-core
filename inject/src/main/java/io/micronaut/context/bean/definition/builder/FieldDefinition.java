@@ -25,7 +25,7 @@ import java.util.List;
  * @param <K> The bean element kind type
  * @param <F> The field representation type
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 public record FieldDefinition<K, F>(F fieldElement,
                                     AnnotationMetadata annotationMetadata,

@@ -26,7 +26,7 @@ import java.util.List;
  * @param <K> The bean element kind type
  * @param <M> The method representation type
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 public record MethodDefinition<K, M>(M methodElement,
                                      AnnotationMetadata annotationMetadata,

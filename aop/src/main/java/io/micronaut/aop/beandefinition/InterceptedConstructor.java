@@ -29,7 +29,7 @@ import org.jspecify.annotations.Nullable;
  *
  * @param <T> The intercepted bean type
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 @Internal
 final class InterceptedConstructor<T> implements BeanConstructor<T> {

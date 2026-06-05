@@ -27,7 +27,7 @@ import org.jspecify.annotations.Nullable;
  * @param <F>   The field type
  * @param <R>   The builder result
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 public interface BeanDefinitionBuilderFactory<C, Ctr, M, F, R> {
 

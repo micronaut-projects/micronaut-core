@@ -27,7 +27,7 @@ import java.util.List;
  *
  * @param <R> The builder result type
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 public interface ElementProxyBuilder<R> extends ProxyBuilder<ClassElement, MethodElement, List<R>>, OriginatingElements {
 

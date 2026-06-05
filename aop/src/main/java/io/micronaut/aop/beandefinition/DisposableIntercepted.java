@@ -28,7 +28,7 @@ import java.util.Objects;
  *
  * @param <T> The bean definition type
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 @Internal
 public interface DisposableIntercepted<T> extends DisposableBeanDefinition<T> {

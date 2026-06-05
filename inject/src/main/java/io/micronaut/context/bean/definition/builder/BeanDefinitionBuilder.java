@@ -27,7 +27,7 @@ import java.util.List;
  * @param <F> The field type
  * @param <R> The builder result
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 public interface BeanDefinitionBuilder<C, M, F, R> extends Builder<R> {
 

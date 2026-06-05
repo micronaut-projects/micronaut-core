@@ -44,7 +44,7 @@ import java.util.Objects;
  * @param <T> The declaring type
  * @param <R> The result of the method call
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 @Internal
 abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>, ExecutableMethod<T, R>, EnvironmentConfigurable, io.micronaut.core.type.Executable<T, R> permits InterceptedDisposeMethod, InitalizableInterceptedMethod {

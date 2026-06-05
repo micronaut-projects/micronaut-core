@@ -38,7 +38,7 @@ import static io.micronaut.inject.utils.BeanInjectionUtils.createMethodDefinitio
  *
  * @param <R> The builder result type
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 public interface ElementBeanDefinitionBuilder<R> extends BeanDefinitionBuilder<ClassElement, MethodElement, FieldElement, List<R>>, OriginatingElements, Toggleable {
 

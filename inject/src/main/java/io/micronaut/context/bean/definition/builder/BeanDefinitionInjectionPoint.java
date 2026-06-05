@@ -22,7 +22,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
  *
  * @param <T> The element type
  * @author Denis Stepanov
- * @since 5.0
+ * @since 5.1.0
  */
 public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetadataAccessor {
 
