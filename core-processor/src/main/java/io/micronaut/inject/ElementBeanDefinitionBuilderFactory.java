@@ -15,10 +15,10 @@
  */
 package io.micronaut.inject;
 
-import io.micronaut.context.bean.definition.builder.BeanDefinitionBuilderFactory;
-import io.micronaut.context.bean.definition.builder.ConstructorDefinition;
-import io.micronaut.context.bean.definition.builder.FieldDefinition;
-import io.micronaut.context.bean.definition.builder.MethodDefinition;
+import io.micronaut.context.beans.definition.BeanDefinitionBuilderFactory;
+import io.micronaut.context.beans.definition.ConstructorDefinition;
+import io.micronaut.context.beans.definition.FieldDefinition;
+import io.micronaut.context.beans.definition.MethodDefinition;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;

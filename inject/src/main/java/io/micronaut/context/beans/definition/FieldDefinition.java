@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.bean.definition.builder;
+package io.micronaut.context.beans.definition;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 
@@ -36,7 +36,7 @@ public record FieldDefinition<K, F>(F fieldElement,
 
     public FieldDefinition {
         Objects.requireNonNull(fieldElement, "fieldElement");
-        Objects.requireNonNull(annotationMetadata, BeanDefinitionBuilderValidation.ANNOTATION_METADATA);
+        Objects.requireNonNull(annotationMetadata, BeanDefinitionInjectionPoint.ANNOTATION_METADATA);
         Objects.requireNonNull(injectionPoint, "injectionPoint");
     }
 

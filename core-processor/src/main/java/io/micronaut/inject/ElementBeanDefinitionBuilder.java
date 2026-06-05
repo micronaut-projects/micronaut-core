@@ -15,9 +15,9 @@
  */
 package io.micronaut.inject;
 
-import io.micronaut.context.bean.definition.builder.BeanDefinitionBuilder;
-import io.micronaut.context.bean.definition.builder.BeanDefinitionInjectionPoint;
-import io.micronaut.context.bean.definition.builder.FieldDefinition;
+import io.micronaut.context.beans.definition.BeanDefinitionBuilder;
+import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint;
+import io.micronaut.context.beans.definition.FieldDefinition;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.ast.ClassElement;

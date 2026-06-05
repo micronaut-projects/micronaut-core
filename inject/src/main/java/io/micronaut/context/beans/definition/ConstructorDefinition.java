@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.bean.definition.builder;
+package io.micronaut.context.beans.definition;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Describes a constructor used in a bean definition.
@@ -33,8 +34,8 @@ public record ConstructorDefinition<K, C>(C constructorElement,
                                           boolean requiresReflection) implements MemberDefinition<K> {
 
     public ConstructorDefinition {
-        BeanDefinitionBuilderValidation.requireNonNull(constructorElement, "constructorElement");
-        BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, BeanDefinitionBuilderValidation.ANNOTATION_METADATA);
-        BeanDefinitionBuilderValidation.requireNonNullElements(injectionPoints, "injectionPoints");
+        Objects.requireNonNull(constructorElement, "constructorElement");
+        Objects.requireNonNull(annotationMetadata, BeanDefinitionInjectionPoint.ANNOTATION_METADATA);
+        MethodDefinition.requireNonNullElements(injectionPoints);
     }
 }

@@ -22,18 +22,18 @@ import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.context.bean.definition.builder.BeanDefinitionInjectionPoint;
-import io.micronaut.context.bean.definition.builder.BeanDefinitionInjectionPoint.BeanInjectionPoint;
-import io.micronaut.context.bean.definition.builder.BeanDefinitionInjectionPoint.BeanRegistrationInjectionPoint;
-import io.micronaut.context.bean.definition.builder.BeanDefinitionInjectionPoint.BeanRegistrationsInjectionPoint;
-import io.micronaut.context.bean.definition.builder.BeanDefinitionInjectionPoint.BeansInjectionPoint;
-import io.micronaut.context.bean.definition.builder.BeanDefinitionInjectionPoint.MapOfBeansInjectionPoint;
-import io.micronaut.context.bean.definition.builder.BeanDefinitionInjectionPoint.OptionalBeanInjectionPoint;
-import io.micronaut.context.bean.definition.builder.BeanDefinitionInjectionPoint.ParameterInjectionPoint;
-import io.micronaut.context.bean.definition.builder.BeanDefinitionInjectionPoint.StreamOfBeansInjectionPoint;
-import io.micronaut.context.bean.definition.builder.ConstructorDefinition;
-import io.micronaut.context.bean.definition.builder.FieldDefinition;
-import io.micronaut.context.bean.definition.builder.MethodDefinition;
+import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint;
+import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.BeanInjectionPoint;
+import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.BeanRegistrationInjectionPoint;
+import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.BeanRegistrationsInjectionPoint;
+import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.BeansInjectionPoint;
+import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.MapOfBeansInjectionPoint;
+import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.OptionalBeanInjectionPoint;
+import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.ParameterInjectionPoint;
+import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint.StreamOfBeansInjectionPoint;
+import io.micronaut.context.beans.definition.ConstructorDefinition;
+import io.micronaut.context.beans.definition.FieldDefinition;
+import io.micronaut.context.beans.definition.MethodDefinition;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.inject.ast.ClassElement;
@@ -55,7 +55,7 @@ import java.util.TreeMap;
 import java.util.stream.Stream;
 
 /**
- * Utility methods for creating {@link io.micronaut.context.bean.definition.builder.BeanDefinitionInjectionPoint} instances.
+ * Utility methods for creating {@link BeanDefinitionInjectionPoint} instances.
  *
  * @author Denis Stepanov
  * @since 5.1.0

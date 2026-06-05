@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.bean.definition.builder;
+package io.micronaut.context.beans.definition;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Describes a method-related contribution to a bean definition.
@@ -43,9 +44,9 @@ public record MethodDefinition<K, M>(M methodElement,
                             boolean isOptional,
                             boolean isSetter,
                             BeanDefinitionInjectionPoint.@Nullable PropertyInjectionPoint<K> booleanInjectionPoint) {
-        this.methodElement = BeanDefinitionBuilderValidation.requireNonNull(methodElement, "methodElement");
-        this.annotationMetadata = BeanDefinitionBuilderValidation.requireNonNull(annotationMetadata, BeanDefinitionBuilderValidation.ANNOTATION_METADATA);
-        this.injectionPoints = BeanDefinitionBuilderValidation.requireNonNullElements(injectionPoints, "injectionPoints");
+        this.methodElement = Objects.requireNonNull(methodElement, "methodElement");
+        this.annotationMetadata = Objects.requireNonNull(annotationMetadata, BeanDefinitionInjectionPoint.ANNOTATION_METADATA);
+        this.injectionPoints = requireNonNullElements(injectionPoints);
         this.requiresReflection = requiresReflection;
         this.isOptional = isOptional;
         this.isSetter = isSetter;
@@ -64,4 +65,13 @@ public record MethodDefinition<K, M>(M methodElement,
         this(methodElement, annotationMetadata, injectionPoints, requiresReflection, false, false, null);
     }
 
+    static <T> List<T> requireNonNullElements(List<T> values) {
+        Objects.requireNonNull(values, "injectionPoints");
+        for (int i = 0; i < values.size(); i++) {
+            if (values.get(i) == null) {
+                throw new NullPointerException("Argument [" + "injectionPoints" + "] cannot contain null element at index " + i);
+            }
+        }
+        return values;
+    }
 }

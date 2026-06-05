@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject;
 
-import io.micronaut.context.bean.definition.builder.ProxyBuilder;
+import io.micronaut.context.beans.definition.ProxyBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.writer.OriginatingElements;
