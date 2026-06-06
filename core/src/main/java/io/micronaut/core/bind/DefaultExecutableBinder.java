@@ -24,7 +24,11 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 
 import org.jspecify.annotations.Nullable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Default implementation of the {@link ExecutableBinder} interface.

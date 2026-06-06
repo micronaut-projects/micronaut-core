@@ -25,7 +25,12 @@ import org.jspecify.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * A conversion context is a context object supplied to a {@link TypeConverter} that allows more accurate conversion.

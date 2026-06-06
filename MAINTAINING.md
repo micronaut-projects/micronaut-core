@@ -170,6 +170,9 @@ If you are publishing a milestone or release candidate, check the pre-release ch
 
 Note that the release tags must be preceded with `v`, e.g.: `v1.2.3`.
 
+The release workflow runs a vulnerability audit before publishing. Vulnerability findings are advisory for milestone and
+release-candidate tags such as `v1.2.3-M1` and `v1.2.3-RC1`, but they remain blocking for GA releases.
+
 Once you publish the GitHub release, the
 [Release GitHub Action workflow](https://github.com/micronaut-projects/micronaut-project-template/blob/master/.github/workflows/release.yml)
 will kick off, performing the following steps:

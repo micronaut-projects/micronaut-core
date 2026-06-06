@@ -38,6 +38,7 @@ import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import org.jspecify.annotations.NullMarked;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -87,6 +87,20 @@ class AnnotationMetadataSpec extends Specification {
         !(synthesized as AnnotationValueProvider).annotationValue().contains(AnnotationUtil.NON_BINDING_ATTRIBUTE)
     }
 
+    void "test buildAnnotation works for bootstrap-loaded JDK annotations"() {
+        // Regression test for https://github.com/micronaut-projects/micronaut-jaxrs/issues/640
+        // java.lang.Deprecated is loaded by the bootstrap classloader (getClassLoader() == null).
+        // The proxy must implement both the annotation type and AnnotationValueProvider, so the
+        // chosen classloader has to be able to see AnnotationValueProvider.
+        when:
+        Deprecated deprecated = AnnotationMetadataSupport.buildAnnotation(Deprecated, null)
+
+        then:
+        noExceptionThrown()
+        deprecated != null
+        deprecated.annotationType() == Deprecated
+    }
+
     AnnotationMetadata newMetadata(AnnotationValueBuilder... builders) {
 
         def values = builders.collect({ it.build() })
