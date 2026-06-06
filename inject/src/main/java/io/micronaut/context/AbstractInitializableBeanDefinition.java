@@ -73,6 +73,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -771,7 +772,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             if (this instanceof ParametrizedInstantiatableBeanDefinition<?> parametrizedInstantiatableBeanDefinition) {
                 requiredParametrizedArguments = ParametrizedInstantiatableBeanDefinition.resolveRequiredArguments(parametrizedInstantiatableBeanDefinition);
             } else {
-                throw new IllegalStateException("Expected instance of " + ParametrizedInstantiatableBeanDefinition.class.getName());
+                requiredParametrizedArguments = Argument.ZERO_ARGUMENTS;
             }
         }
         return requiredParametrizedArguments;
@@ -799,7 +800,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                 ParametrizedInstantiatableBeanDefinition.resolveParameterizedArgumentValues(resolutionContext, parametrizedInstantiatableBeanDefinition, requiredArgumentValues)
             );
         }
-        throw new IllegalStateException("Expected instance of " + ParametrizedInstantiatableBeanDefinition.class.getName());
+        return doInstantiate(
+            resolutionContext,
+            context,
+            requiredArgumentValues == null ? Collections.emptyMap() : new LinkedHashMap<>(requiredArgumentValues)
+        );
     }
 
     /**

@@ -33,6 +33,7 @@ import org.jspecify.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -80,7 +81,7 @@ public class Qualifiers {
      * @return The resolved qualifier
      */
     public static @Nullable <T> Qualifier<T> forArgument(Argument<?> argument) {
-        return of(argument.getAnnotationMetadata());
+        return of(Objects.requireNonNull(argument, "Argument cannot be null").getAnnotationMetadata());
     }
 
     /**
