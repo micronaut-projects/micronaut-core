@@ -1701,6 +1701,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                                                    List<VariableDef.MethodParameter> methodParameters,
                                                                    boolean isParametrized,
                                                                    List<StatementDef> additionalStatements) {
+        if (elementProducerDefinition instanceof FieldDefinition<?, ?>) {
+            return Collections.emptyList();
+        }
         Supplier<VariableDef> constructorDefSupplier = new Supplier<>() {
 
             VariableDef constructorDef;

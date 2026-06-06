@@ -27,6 +27,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Argument;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -118,6 +119,9 @@ public interface ParametrizedInstantiatableBeanDefinition<T> extends Instantiata
     static Map<String, Object> resolveParameterizedArgumentValues(BeanResolutionContext resolutionContext,
                                                                   ParametrizedInstantiatableBeanDefinition<?> parametrizedInstantiatableBeanDefinition,
                                                                   Map<String, Object> requiredArgumentValues) {
+        if (requiredArgumentValues == null) {
+            requiredArgumentValues = Collections.emptyMap();
+        }
         for (Argument<?> requiredArgument : parametrizedInstantiatableBeanDefinition.getRequiredArguments()) {
             String argumentName = requiredArgument.getName();
             Object value = requiredArgumentValues.get(argumentName);
