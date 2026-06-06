@@ -38,6 +38,12 @@ import java.util.Objects;
 public interface ParameterizedProxyBeanDefinition<T>
     extends ParameterizedInterceptedBeanDefinition<T> {
 
+    /**
+     * Number of internal constructor parameters appended for runtime proxy construction:
+     * intercepted bean, resolution context, bean context, proxy target bean definition, and interceptor registrations.
+     */
+    int ADDITIONAL_PROXY_CONSTRUCTOR_PARAMETERS_COUNT = 5;
+
     @Override
     default T doInstantiate(BeanResolutionContext resolutionContext, BeanContext context, Map<String, Object> requiredArgumentValues) {
         Object[] constructorValues = Objects.requireNonNull(
@@ -51,7 +57,7 @@ public interface ParameterizedProxyBeanDefinition<T>
             interceptors,
             this,
             new InterceptedParametrizedConstructor<>(this, resolutionContext, context),
-            5,
+            ADDITIONAL_PROXY_CONSTRUCTOR_PARAMETERS_COUNT,
             constructorValues
         );
     }

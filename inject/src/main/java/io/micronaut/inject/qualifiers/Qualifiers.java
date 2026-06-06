@@ -93,6 +93,7 @@ public class Qualifiers {
      */
     @SuppressWarnings("unchecked")
     public static @Nullable <T> Qualifier<T> of(AnnotationMetadata annotationMetadata) {
+        Objects.requireNonNull(annotationMetadata, "Annotation metadata cannot be null");
         boolean hasMetadata = !annotationMetadata.isEmpty();
 
         List<String> qualifierTypes = hasMetadata ? AnnotationUtil.findQualifierAnnotationsNames(annotationMetadata) : null;
