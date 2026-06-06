@@ -792,7 +792,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Deprecated(forRemoval = true, since = "5.0")
     public T instantiate(BeanResolutionContext resolutionContext,
                                BeanContext context,
-                               Map<String, Object> requiredArgumentValues) throws BeanInstantiationException {
+                               @Nullable Map<String, Object> requiredArgumentValues) throws BeanInstantiationException {
         if (this instanceof ParametrizedInstantiatableBeanDefinition<?> parametrizedInstantiatableBeanDefinition) {
             return doInstantiate(
                 resolutionContext,

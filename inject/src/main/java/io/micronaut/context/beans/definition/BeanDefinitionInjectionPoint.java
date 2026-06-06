@@ -30,7 +30,7 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
 
     String ANNOTATION_METADATA = "annotationMetadata";
     String BEAN_TYPE = "beanType";
-    String TYPE = "type";
+    String TYPE_MEMBER = "type";
 
     /**
      * Returns the type of the injection point.
@@ -46,7 +46,7 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      */
     record ParameterInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, String name) implements BeanDefinitionInjectionPoint<K> {
         public ParameterInjectionPoint {
-            Objects.requireNonNull(type, TYPE);
+            Objects.requireNonNull(type, TYPE_MEMBER);
             Objects.requireNonNull(annotationMetadata, ANNOTATION_METADATA);
             Objects.requireNonNull(name, "name");
         }
@@ -59,7 +59,7 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      */
     record PropertyInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, String propertyName, String propertyPath) implements BeanDefinitionInjectionPoint<K> {
         public PropertyInjectionPoint {
-            Objects.requireNonNull(type, TYPE);
+            Objects.requireNonNull(type, TYPE_MEMBER);
             Objects.requireNonNull(annotationMetadata, ANNOTATION_METADATA);
             Objects.requireNonNull(propertyName, "propertyName");
             Objects.requireNonNull(propertyPath, "propertyPath");
@@ -73,7 +73,7 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      */
     record ValueInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, String value, boolean hasExpression) implements BeanDefinitionInjectionPoint<K> {
         public ValueInjectionPoint {
-            Objects.requireNonNull(type, TYPE);
+            Objects.requireNonNull(type, TYPE_MEMBER);
             Objects.requireNonNull(annotationMetadata, ANNOTATION_METADATA);
             Objects.requireNonNull(value, AnnotationMetadata.VALUE_MEMBER);
         }
@@ -86,7 +86,7 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      */
     record BeanInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata) implements BeanDefinitionInjectionPoint<K> {
         public BeanInjectionPoint {
-            Objects.requireNonNull(type, TYPE);
+            Objects.requireNonNull(type, TYPE_MEMBER);
             Objects.requireNonNull(annotationMetadata, ANNOTATION_METADATA);
         }
     }
@@ -98,7 +98,7 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      */
     record BeansInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, K beanType) implements BeanDefinitionInjectionPoint<K> {
         public BeansInjectionPoint {
-            Objects.requireNonNull(type, TYPE);
+            Objects.requireNonNull(type, TYPE_MEMBER);
             Objects.requireNonNull(annotationMetadata, ANNOTATION_METADATA);
             Objects.requireNonNull(beanType, BEAN_TYPE);
         }
@@ -111,7 +111,7 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      */
     record BeanRegistrationInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, K beanType) implements BeanDefinitionInjectionPoint<K> {
         public BeanRegistrationInjectionPoint {
-            Objects.requireNonNull(type, TYPE);
+            Objects.requireNonNull(type, TYPE_MEMBER);
             Objects.requireNonNull(annotationMetadata, ANNOTATION_METADATA);
             Objects.requireNonNull(beanType, BEAN_TYPE);
         }
@@ -124,7 +124,7 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      */
     record BeanRegistrationsInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, K beanType) implements BeanDefinitionInjectionPoint<K> {
         public BeanRegistrationsInjectionPoint {
-            Objects.requireNonNull(type, TYPE);
+            Objects.requireNonNull(type, TYPE_MEMBER);
             Objects.requireNonNull(annotationMetadata, ANNOTATION_METADATA);
             Objects.requireNonNull(beanType, BEAN_TYPE);
         }
@@ -137,7 +137,7 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      */
     record MapOfBeansInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, K beanType) implements BeanDefinitionInjectionPoint<K> {
         public MapOfBeansInjectionPoint {
-            Objects.requireNonNull(type, TYPE);
+            Objects.requireNonNull(type, TYPE_MEMBER);
             Objects.requireNonNull(annotationMetadata, ANNOTATION_METADATA);
             Objects.requireNonNull(beanType, BEAN_TYPE);
         }
@@ -150,7 +150,7 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      */
     record StreamOfBeansInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, K beanType) implements BeanDefinitionInjectionPoint<K> {
         public StreamOfBeansInjectionPoint {
-            Objects.requireNonNull(type, TYPE);
+            Objects.requireNonNull(type, TYPE_MEMBER);
             Objects.requireNonNull(annotationMetadata, ANNOTATION_METADATA);
             Objects.requireNonNull(beanType, BEAN_TYPE);
         }
@@ -163,7 +163,7 @@ public sealed interface BeanDefinitionInjectionPoint<T> extends AnnotationMetada
      */
     record OptionalBeanInjectionPoint<K>(K type, AnnotationMetadata annotationMetadata, K beanType) implements BeanDefinitionInjectionPoint<K> {
         public OptionalBeanInjectionPoint {
-            Objects.requireNonNull(type, TYPE);
+            Objects.requireNonNull(type, TYPE_MEMBER);
             Objects.requireNonNull(annotationMetadata, ANNOTATION_METADATA);
             Objects.requireNonNull(beanType, BEAN_TYPE);
         }

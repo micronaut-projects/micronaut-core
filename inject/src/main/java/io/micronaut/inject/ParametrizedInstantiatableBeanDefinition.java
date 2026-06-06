@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Argument;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -63,7 +64,7 @@ public interface ParametrizedInstantiatableBeanDefinition<T> extends Instantiata
      */
     default T instantiate(BeanResolutionContext resolutionContext,
                           BeanContext context,
-                          Map<String, Object> requiredArgumentValues) throws BeanInstantiationException {
+                          @Nullable Map<String, Object> requiredArgumentValues) throws BeanInstantiationException {
         return doInstantiate(
             resolutionContext,
             context,
@@ -118,7 +119,7 @@ public interface ParametrizedInstantiatableBeanDefinition<T> extends Instantiata
      */
     static Map<String, Object> resolveParameterizedArgumentValues(BeanResolutionContext resolutionContext,
                                                                   ParametrizedInstantiatableBeanDefinition<?> parametrizedInstantiatableBeanDefinition,
-                                                                  Map<String, Object> requiredArgumentValues) {
+                                                                  @Nullable Map<String, Object> requiredArgumentValues) {
         if (requiredArgumentValues == null) {
             requiredArgumentValues = Collections.emptyMap();
         }
