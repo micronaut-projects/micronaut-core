@@ -390,7 +390,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
             int dispatchIndex = dispatchWriter.addMethod(beanClassElement, element);
             beanMethods.add(new BeanMethodData(element, dispatchIndex));
             this.evaluatedExpressionProcessor.processEvaluatedExpressions(element.getAnnotationMetadata(), beanClassElement);
-            for (ParameterElement parameter : element.getParameters()) {
+            for (ParameterElement parameter : element.getSuspendParameters()) {
                 this.evaluatedExpressionProcessor.processEvaluatedExpressions(parameter.getAnnotationMetadata(), beanClassElement);
             }
         }
@@ -507,11 +507,11 @@ final class BeanIntrospectionWriter implements OriginatingElements, ClassOutputW
                 // 3: annotation metadata
                 getAnnotationMetadataExpression(beanMethodData.methodElement.getAnnotationMetadata(), loadClassValueExpressionFn),
                 // 4: arguments
-                beanMethodData.methodElement.getParameters().length == 0 ? ExpressionDef.nullValue() : ArgumentExpUtils.pushBuildArgumentsForMethod(
+                beanMethodData.methodElement.getSuspendParameters().length == 0 ? ExpressionDef.nullValue() : ArgumentExpUtils.pushBuildArgumentsForMethod(
                     annotationMetadata,
                     beanClassElement,
                     introspectionTypeDef,
-                    Arrays.asList(beanMethodData.methodElement.getParameters()),
+                    Arrays.asList(beanMethodData.methodElement.getSuspendParameters()),
                     loadClassValueExpressionFn
                 ),
                 // 5: method index

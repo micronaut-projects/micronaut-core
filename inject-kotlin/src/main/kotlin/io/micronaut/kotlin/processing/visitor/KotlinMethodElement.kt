@@ -61,14 +61,24 @@ internal open class KotlinMethodElement(
 
     override val resolvedParameters: List<ParameterElement> by lazy {
         presetParameters
-            ?: declaration.parameters.map {
-                KotlinParameterElement(
-                    null,
-                    this,
-                    it,
-                    elementAnnotationMetadataFactory,
-                    visitorContext
-                )
+            ?: buildList {
+                declaration.extensionReceiver?.let { extensionReceiver ->
+                    add(
+                        ParameterElement.of(
+                            newClassElement(nativeType, extensionReceiver.resolve(), emptyMap()),
+                            "\$this"
+                        )
+                    )
+                }
+                addAll(declaration.parameters.map {
+                    KotlinParameterElement(
+                        null,
+                        this@KotlinMethodElement,
+                        it,
+                        elementAnnotationMetadataFactory,
+                        visitorContext
+                    )
+                })
             }
     }
 
