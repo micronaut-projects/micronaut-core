@@ -20,7 +20,7 @@ jobs:
     outputs:
       matrix: ${{ steps.build-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Build Matrix
         uses: micronaut-projects/github-actions/graalvm/build-matrix@9fefbe9a777a84ac4211027f613521ed22f4cd93 # master
         id: build-matrix
@@ -45,7 +45,7 @@ jobs:
           sudo rm -rf /usr/lib/jvm/*
           unset JAVA_HOME
           export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Pre-Build Steps
         uses: micronaut-projects/github-actions/graalvm/pre-build@9fefbe9a777a84ac4211027f613521ed22f4cd93 # master
         id: pre-build
