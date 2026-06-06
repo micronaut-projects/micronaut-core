@@ -6,6 +6,6 @@ import jakarta.inject.Singleton;
 
 @Singleton
 @RuntimeProxy(ByteBuddyRuntimeProxy.class)
-public class ButeBuddyProxyTargetProxyingClass<A extends CharSequence> extends ProxyTargetClass<A> {
+public class ByteBuddyProxyTargetProxyingClass<A extends CharSequence> extends ProxyTargetClass<A> {
 
 }

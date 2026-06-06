@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.writer;
+package io.micronaut.core.type;
 
 /**
- * Extended version of {@link ClassWriterOutputVisitor} for types that write beans.
+ * Generic builder contract.
  *
- * @since 3.5.2
+ * @param <R> The builder result
+ * @author Denis Stepanov
+ * @since 5.1.0
  */
-public interface BeanClassWriter extends ClassOutputWriter {
+public interface Buildable<R> {
+
     /**
-     * @return The bean definition visitor
+     * Builds the result.
+     *
+     * @return The builder result
      */
-    BeanDefinitionVisitor getBeanDefinitionVisitor();
+    R build();
+
 }

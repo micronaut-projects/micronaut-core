@@ -12,6 +12,24 @@ class MatchArgumentSpec extends Specification {
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run()
 
+    void "test forArgument rejects null with clear message"() {
+        when:
+            Qualifiers.forArgument(null)
+
+        then:
+            def e = thrown(NullPointerException)
+            e.message == "Argument cannot be null"
+    }
+
+    void "test of rejects null metadata with clear message"() {
+        when:
+            Qualifiers.of(null)
+
+        then:
+            def e = thrown(NullPointerException)
+            e.message == "Annotation metadata cannot be null"
+    }
+
     void "test match serialize specific argument"() {
         given:
             def argument = Argument.of(MySerializer, [Argument.of(List, [Argument.STRING] as Argument[])] as Argument[])
@@ -299,5 +317,3 @@ class MatchArgumentSpec extends Specification {
     static class NumberReader<T extends Number> implements MyReader2<T> {}
 
 }
-
-

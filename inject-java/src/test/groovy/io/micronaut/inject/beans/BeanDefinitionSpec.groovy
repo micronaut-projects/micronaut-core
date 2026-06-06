@@ -10,6 +10,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.TypeInformation
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.annotation.AnnotationMetadataSupport
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 import test.another.BeanWithPackagePrivate
@@ -879,6 +880,7 @@ record ProductDTO(String name, String price, String distributor) {
 ''')
 
         expect:
+        AnnotationMetadataSupport.getRepeatableAnnotation(Mapper.Mapping.class.name)
         definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper)
         definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper.Mapping)
     }
