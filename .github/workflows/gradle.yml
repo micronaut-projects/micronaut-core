@@ -70,20 +70,3 @@ jobs:
         with:
           name: binary-compatibility-reports
           path: "**/build/reports/binary-compatibility-*.html"
-
-      - name: "❓ Determine docs target repository"
-        uses: haya14busa/action-cond@v1
-        id: docs_target
-        with:
-          cond: ${{ github.repository == 'micronaut-projects/micronaut-core' }}
-          if_true: "micronaut-projects/micronaut-docs"
-          if_false: ${{ github.repository }}
-
-      - name: "📑 Publish to Github Pages"
-        if: success() && github.event_name == 'push' && matrix.java == '11'
-        uses: micronaut-projects/github-pages-deploy-action@master
-        env:
-          TARGET_REPOSITORY: ${{ steps.docs_target.outputs.value }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          BRANCH: gh-pages
-          FOLDER: build/docs
