@@ -141,7 +141,7 @@ public interface BeanContextConfiguration {
 
     /**
      * @return The bean resolution customizer.
-     * @since 5.1
+     * @since 5.1.0
      */
     default BeanResolutionCustomizer beanResolutionCustomizer() {
         return BeanResolutionCustomizer.DEFAULT;
@@ -149,7 +149,7 @@ public interface BeanContextConfiguration {
 
     /**
      * @return The custom scope registry factory.
-     * @since 5.1
+     * @since 5.1.0
      */
     @Nullable
     default Function<@NonNull BeanContext, @NonNull CustomScopeRegistry> customScopeRegistryFactory() {

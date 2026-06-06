@@ -71,7 +71,7 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
      * @param bean               The bean
      * @param rootBeanDefinition The root bean definition for the current resolution
      * @param dependentBeans     The direct dependent beans created for this bean
-     * @since 5.1
+     * @since 5.1.0
      */
     public BeanCreatedEvent(BeanContext beanContext,
                             BeanDefinition<T> beanDefinition,
@@ -104,7 +104,7 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
 
     /**
      * @return The root bean definition for the current resolution, if available
-     * @since 5.1
+     * @since 5.1.0
      */
     public @Nullable BeanDefinition<?> getRootBeanDefinition() {
         return rootBeanDefinition;
@@ -112,7 +112,7 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
 
     /**
      * @return The direct dependent beans created for this bean
-     * @since 5.1
+     * @since 5.1.0
      */
     public List<BeanRegistration<?>> getDependentBeans() {
         return dependentBeans;

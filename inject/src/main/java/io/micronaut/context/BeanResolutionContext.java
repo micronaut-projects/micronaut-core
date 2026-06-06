@@ -90,7 +90,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      *
      * @param proxyBeanDefinition The proxy bean definition
      * @return The bean resolution context
-     * @since 5.1
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
     default BeanResolutionContext copyForLazyProxyTarget(BeanDefinition<?> proxyBeanDefinition) {
@@ -227,7 +227,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * @return The current dependent beans that must be destroyed by an upstream bean.
      *
-     * @since 5.1
+     * @since 5.1.0
      */
     default List<BeanRegistration<?>> getDependentBeans() {
         return Collections.emptyList();

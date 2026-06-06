@@ -362,7 +362,7 @@ public interface ApplicationContextBuilder {
      *
      * @param customizer The bean resolution customizer, or null to use the default
      * @return This builder
-     * @since 5.1
+     * @since 5.1.0
      */
     default ApplicationContextBuilder beanResolutionCustomizer(@Nullable BeanResolutionCustomizer customizer) {
         return this;
@@ -373,7 +373,7 @@ public interface ApplicationContextBuilder {
      *
      * @param factory The custom scope registry factory, or null to use the default
      * @return This builder
-     * @since 5.1
+     * @since 5.1.0
      */
     default ApplicationContextBuilder customScopeRegistry(@Nullable Function<BeanContext, CustomScopeRegistry> factory) {
         return this;

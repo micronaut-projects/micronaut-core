@@ -205,7 +205,7 @@ public interface ClassElement extends TypedElement {
 
     /**
      * @return Whether this element is sealed.
-     * @since 5.0.0
+     * @since 5.1.0
      */
     default boolean isSealed() {
         return false;
@@ -213,7 +213,7 @@ public interface ClassElement extends TypedElement {
 
     /**
      * @return The permitted subclasses for this sealed element.
-     * @since 5.0.0
+     * @since 5.1.0
      */
     default Collection<ClassElement> getPermittedSubclasses() {
         return Collections.emptyList();
