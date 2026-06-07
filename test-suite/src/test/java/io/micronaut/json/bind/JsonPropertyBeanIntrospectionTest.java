@@ -414,6 +414,37 @@ class JsonPropertyBeanIntrospectionTest {
     }
 
     @Test
+    void jsonPropertyAnnotatedPrivateFinalFieldsCanUseExistingBeanAccessors() {
+        BeanIntrospection<JsonPropertyPrivateFinalAccessorBean> introspection =
+            BeanIntrospection.getIntrospection(JsonPropertyPrivateFinalAccessorBean.class);
+        BeanProperty<JsonPropertyPrivateFinalAccessorBean, String> property =
+            introspection.getRequiredProperty("homePageUrl", String.class);
+        JsonPropertyPrivateFinalAccessorBean bean =
+            new JsonPropertyPrivateFinalAccessorBean("https://example.org/");
+
+        assertEquals("home_page_url", property.stringValue(JsonProperty.class).orElseThrow());
+        assertEquals("home_page_url", property.stringValue(Introspected.Property.class, "name").orElseThrow());
+        assertEquals("https://example.org/-getter", property.get(bean));
+        assertEquals(true, property.isReadOnly());
+        assertThrows(UnsupportedOperationException.class, () -> property.set(bean, "https://micronaut.io/"));
+    }
+
+    @Test
+    void jsonPropertyAnnotatedRecordComponentsCanUseRecordAccessors() {
+        BeanIntrospection<JsonPropertyRecord> introspection =
+            BeanIntrospection.getIntrospection(JsonPropertyRecord.class);
+        BeanProperty<JsonPropertyRecord, String> property =
+            introspection.getRequiredProperty("homePageUrl", String.class);
+        JsonPropertyRecord bean = new JsonPropertyRecord("https://example.org/");
+
+        assertEquals("home_page_url", property.stringValue(JsonProperty.class).orElseThrow());
+        assertEquals("home_page_url", property.stringValue(Introspected.Property.class, "name").orElseThrow());
+        assertEquals("https://example.org/", property.get(bean));
+        assertEquals(true, property.isReadOnly());
+        assertThrows(UnsupportedOperationException.class, () -> property.set(bean, "https://micronaut.io/"));
+    }
+
+    @Test
     void jsonGetterAndJsonSetterMembersAreRecognizedAsBeanProperties() {
         BeanIntrospection<JsonGetterSetterBean> introspection = BeanIntrospection.getIntrospection(JsonGetterSetterBean.class);
 
@@ -948,6 +979,24 @@ class JsonPropertyBeanIntrospectionTest {
         public void setWriteOnlyFieldWithAccessors(String writeOnlyFieldWithAccessors) {
             this.writeOnlyFieldWithAccessors = writeOnlyFieldWithAccessors + "-setter";
         }
+    }
+
+    @Introspected
+    static final class JsonPropertyPrivateFinalAccessorBean {
+        @JsonProperty("home_page_url")
+        private final String homePageUrl;
+
+        JsonPropertyPrivateFinalAccessorBean(String homePageUrl) {
+            this.homePageUrl = homePageUrl;
+        }
+
+        public String getHomePageUrl() {
+            return homePageUrl + "-getter";
+        }
+    }
+
+    @Introspected
+    record JsonPropertyRecord(@JsonProperty("home_page_url") String homePageUrl) {
     }
 
     @Introspected
