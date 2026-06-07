@@ -28,7 +28,7 @@ import java.util.List;
  * Makes each use of Jakarta Persistence's Access annotation also represent an {@link Introspected.Property}.
  *
  * @author Denis Stepanov
- * @since 5.0.0
+ * @since 5.1.0
  */
 @Internal
 public final class JakartaAccessAnnotationMapper implements NamedAnnotationMapper {

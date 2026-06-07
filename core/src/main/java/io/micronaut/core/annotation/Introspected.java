@@ -262,7 +262,7 @@ public @interface Introspected {
     /**
      * Allows a field or method to be treated as an introspected property.
      *
-     * @since 5.0.0
+     * @since 5.1.0
      */
     @Documented
     @Retention(RUNTIME)

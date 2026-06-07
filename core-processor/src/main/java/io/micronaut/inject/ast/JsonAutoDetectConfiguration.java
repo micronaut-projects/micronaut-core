@@ -28,7 +28,7 @@ import static java.lang.annotation.RetentionPolicy.CLASS;
  * Internal metadata mapped from Jackson's {@code JsonAutoDetect}.
  *
  * @author Denis Stepanov
- * @since 5.0.0
+ * @since 5.1.0
  */
 @Internal
 @Documented

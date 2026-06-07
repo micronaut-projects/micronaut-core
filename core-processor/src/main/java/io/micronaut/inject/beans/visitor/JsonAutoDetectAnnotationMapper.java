@@ -28,7 +28,7 @@ import java.util.List;
  * Maps Jackson's JsonAutoDetect to internal bean property visibility configuration.
  *
  * @author Denis Stepanov
- * @since 5.0.0
+ * @since 5.1.0
  */
 @Internal
 public final class JsonAutoDetectAnnotationMapper implements NamedAnnotationMapper {

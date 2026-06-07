@@ -1,5 +1,8 @@
 import io.micronaut.build.internal.ext.MicronautCoreExtension
 import io.micronaut.build.internal.ext.DefaultMicronautCoreExtension
+import io.micronaut.build.compat.AcceptedApiChangesRule
+import me.champeau.gradle.japicmp.JapicmpTask
+import org.gradle.api.tasks.PathSensitivity
 
 plugins {
     id "io.micronaut.build.internal.common"
@@ -51,6 +54,20 @@ tasks.withType(GroovyCompile).configureEach {
     options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
     options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
     groovyOptions.forkOptions.memoryMaximumSize = "2g"
+}
+
+tasks.withType(JapicmpTask).configureEach {
+    def acceptedApiChanges = rootProject.layout.projectDirectory.file("config/accepted-api-changes.json")
+    inputs.file(acceptedApiChanges)
+        .withPropertyName("accepted-api-changes-root")
+        .withPathSensitivity(PathSensitivity.NONE)
+        .optional(true)
+    richReport {
+        addViolationTransformer(
+            AcceptedApiChangesRule.class,
+            [(AcceptedApiChangesRule.CHANGES_FILE): acceptedApiChanges.asFile.absolutePath]
+        )
+    }
 }
 
 // This is for reproducible builds
@@ -119,4 +136,3 @@ spotless {
         targetExclude '**/io/micronaut/http/netty/stream/package-info.java'
     }
 }
-

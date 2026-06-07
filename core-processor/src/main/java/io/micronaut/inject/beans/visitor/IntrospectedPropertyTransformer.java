@@ -28,7 +28,7 @@ import java.util.List;
  * Normalizes {@link Introspected.Property} name members.
  *
  * @author Denis Stepanov
- * @since 5.0.0
+ * @since 5.1.0
  */
 @Internal
 public final class IntrospectedPropertyTransformer implements TypedAnnotationTransformer<Introspected.Property> {

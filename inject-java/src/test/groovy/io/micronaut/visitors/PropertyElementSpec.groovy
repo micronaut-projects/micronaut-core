@@ -428,4 +428,122 @@ class ConflictingPropertyNames {
         def e = thrown(RuntimeException)
         e.message.contains('The @Introspected.Property value and name members must match when both are declared')
     }
+
+    void "test inaccessible introspected property field fails compilation"() {
+        when:
+        buildBeanIntrospection('test.InaccessiblePropertyField', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class InaccessiblePropertyField {
+    @Introspected.Property(accessKind = Introspected.Property.Access.READ)
+    private String name;
+}
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains(
+                'Element annotated with @Introspected.Property cannot be used as an introspected property: the field is not accessible'
+        )
+    }
+
+    void "test inaccessible introspected property method fails compilation"() {
+        when:
+        buildBeanIntrospection('test.InaccessiblePropertyMethod', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class InaccessiblePropertyMethod {
+    @Introspected.Property(accessKind = Introspected.Property.Access.READ)
+    private String name() {
+        return "test";
+    }
+}
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains(
+                'Element annotated with @Introspected.Property cannot be used as an introspected property: the method is not accessible'
+        )
+    }
+
+    void "test introspected property method must provide declared access"() {
+        when:
+        buildBeanIntrospection('test.InvalidPropertyMethodAccess', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class InvalidPropertyMethodAccess {
+    @Introspected.Property(accessKind = Introspected.Property.Access.WRITE)
+    public String name() {
+        return "test";
+    }
+}
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains(
+                'Element annotated with @Introspected.Property cannot be used as an introspected property: ' +
+                        'write access requires a one-argument method or a zero-argument void method'
+        )
+    }
+
+    void "test introspected property field must provide declared access"() {
+        when:
+        buildBeanIntrospection('test.InvalidPropertyFieldAccess', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class InvalidPropertyFieldAccess {
+    @Introspected.Property(accessKind = Introspected.Property.Access.WRITE)
+    public final String name = "test";
+}
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains(
+                'Element annotated with @Introspected.Property cannot be used as an introspected property: ' +
+                        'write access requires a non-final field'
+        )
+    }
+
+    void "test introspected property method can ignore other accessors"() {
+        given:
+        ClassElement classElement = buildClassElement('''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class MethodIgnoresOtherAccessors {
+    private String name;
+
+    public CharSequence getName() {
+        return name;
+    }
+
+    @Introspected.Property(ignoreOtherAccessors = true)
+    public String name() {
+        return name;
+    }
+}
+''')
+        def beanProperty = classElement.beanProperties.find { it.name == 'name' }
+
+        expect:
+        beanProperty.type.name == String.name
+        beanProperty.readMethod.get().name == 'name'
+    }
 }
