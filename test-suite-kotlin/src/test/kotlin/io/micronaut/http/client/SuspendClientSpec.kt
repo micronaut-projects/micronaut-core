@@ -56,5 +56,5 @@ class SuspendClientSpec {
             Assertions.assertEquals(1, bars.size)
             Assertions.assertEquals("hello", bars[0].name)
         }
-
+    }
 }
