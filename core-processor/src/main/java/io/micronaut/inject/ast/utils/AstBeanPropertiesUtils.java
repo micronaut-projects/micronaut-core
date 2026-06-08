@@ -54,6 +54,7 @@ import java.util.function.Supplier;
 public final class AstBeanPropertiesUtils {
 
     private static final String ANN_INTROSPECTED_PROPERTY = Introspected.Property.class.getName();
+    private static final String ANN_JAKARTA_ACCESS = "jakarta.persistence.Access";
     private static final String MEMBER_IGNORE_OTHER_ACCESSORS = "ignoreOtherAccessors";
 
     private AstBeanPropertiesUtils() {
@@ -83,22 +84,22 @@ public final class AstBeanPropertiesUtils {
                                                               Function<MethodElement, Optional<String>> customWriterPropertyNameResolver,
                                                               Function<BeanPropertyData, @Nullable PropertyElement> propertyCreator) {
         BeanProperties.Visibility visibility = configuration.getVisibility();
-        Set<BeanProperties.AccessKind> accessKinds = configuration.getAccessKinds();
 
         Set<String> includes = configuration.getIncludes();
         Set<String> excludes = configuration.getExcludes();
         String[] readPrefixes = configuration.getReadPrefixes();
         String[] writePrefixes = configuration.getWritePrefixes();
         var isRecord = classElement.isRecord();
+        Set<BeanProperties.AccessKind> effectiveAccessKinds = resolveAccessKinds(configuration, classElement);
 
         var props = new LinkedHashMap<String, BeanPropertyData>();
         for (MethodElement methodElement : methodsSupplier.get()) {
             // Records include everything
-            boolean hasIntrospectedProperty = methodElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY);
+            boolean isIntrospectedPropertyMethod = isIntrospectedPropertyMethod(methodElement);
             boolean isExcludedMethod = (methodElement.isStatic() && !configuration.isAllowStaticProperties()) ||
                 (!excludeElementsInRole && isMethodInRole(methodElement));
             if (isExcludedMethod) {
-                if (hasIntrospectedProperty) {
+                if (isIntrospectedPropertyMethod) {
                     failInvalidIntrospectedProperty(
                         methodElement,
                         "the method is excluded from bean property resolution"
@@ -106,16 +107,15 @@ public final class AstBeanPropertiesUtils {
                 }
                 continue;
             }
-            if (hasIntrospectedProperty) {
+            if (isIntrospectedPropertyMethod) {
                 validateIntrospectedPropertyMethod(methodElement, visibility);
             }
             String methodName = methodElement.getName();
             if (methodName.equals("getMetaClass")) {
                 continue;
             }
-            boolean isIntrospectedPropertyMethod = isIntrospectedPropertyMethod(methodElement, visibility);
             if (isRecord) {
-                boolean isAccessor = canMethodBeUsedForAccess(methodElement, accessKinds, visibility) ||
+                boolean isAccessor = canMethodBeUsedForAccess(methodElement, effectiveAccessKinds, visibility) ||
                     isIntrospectedPropertyMethod;
                 if (!isAccessor) {
                     continue;
@@ -126,7 +126,7 @@ public final class AstBeanPropertiesUtils {
                 && methodElement.getParameters().length == 0) {
                 String propertyName = customReaderPropertyNameResolver.apply(methodElement)
                     .orElseGet(() -> getPropertyNameForGetter(methodName, readPrefixes));
-                boolean isAccessor = canMethodBeUsedForRead(methodElement, methodName, accessKinds, visibility, configuration) ||
+                boolean isAccessor = canMethodBeUsedForRead(methodElement, methodName, effectiveAccessKinds, visibility, configuration) ||
                     isIntrospectedPropertyMethod;
                 processGetter(
                     props,
@@ -140,7 +140,7 @@ public final class AstBeanPropertiesUtils {
                 && canMethodBeUsedForWrite(methodElement, configuration, visibility)) {
                 String propertyName = customWriterPropertyNameResolver.apply(methodElement)
                     .orElseGet(() -> getPropertyNameForSetter(methodName, writePrefixes));
-                boolean isAccessor = canMethodBeUsedForWriteAccess(methodElement, accessKinds, visibility, configuration) ||
+                boolean isAccessor = canMethodBeUsedForWriteAccess(methodElement, effectiveAccessKinds, visibility, configuration) ||
                     isIntrospectedPropertyMethod;
                 processSetter(
                     classElement,
@@ -173,11 +173,11 @@ public final class AstBeanPropertiesUtils {
             }
         }
         for (FieldElement fieldElement : fieldSupplier.get()) {
-            boolean hasIntrospectedProperty = fieldElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY);
+            boolean isIntrospectedPropertyField = isIntrospectedPropertyField(fieldElement);
             boolean isExcludedField = (fieldElement.isStatic() && !configuration.isAllowStaticProperties()) ||
                 (!excludeElementsInRole && isFieldInRole(fieldElement));
             if (isExcludedField) {
-                if (hasIntrospectedProperty) {
+                if (isIntrospectedPropertyField) {
                     failInvalidIntrospectedProperty(
                         fieldElement,
                         "the field is excluded from bean property resolution"
@@ -187,10 +187,10 @@ public final class AstBeanPropertiesUtils {
             }
             String propertyName = fieldElement.getSimpleName();
             boolean isAccessor = propertyFields.contains(propertyName) ||
-                isIntrospectedPropertyField(fieldElement, visibility) ||
-                canFieldBeUsedForAccess(fieldElement, accessKinds, visibility, configuration);
+                isIntrospectedPropertyField ||
+                canFieldBeUsedForAccess(fieldElement, effectiveAccessKinds, visibility, configuration);
             if (!isAccessor && !props.containsKey(propertyName)) {
-                if (hasIntrospectedProperty) {
+                if (isIntrospectedPropertyField) {
                     validateIntrospectedPropertyField(fieldElement, visibility, null);
                 }
                 continue;
@@ -199,7 +199,7 @@ public final class AstBeanPropertiesUtils {
             boolean ignoreOtherAccessors = ignoresOtherAccessors(fieldElement);
             resolveReadAccessForField(fieldElement, isAccessor, beanPropertyData, ignoreOtherAccessors);
             resolveWriteAccessForField(fieldElement, isAccessor, beanPropertyData, ignoreOtherAccessors);
-            if (hasIntrospectedProperty) {
+            if (isIntrospectedPropertyField) {
                 validateIntrospectedPropertyField(fieldElement, visibility, beanPropertyData);
             }
             registerIntrospectedPropertyAccess(beanPropertyData, fieldElement);
@@ -266,6 +266,19 @@ public final class AstBeanPropertiesUtils {
             }
         }
         return beanProperties;
+    }
+
+    private static Set<BeanProperties.AccessKind> resolveAccessKinds(PropertyElementQuery configuration,
+                                                                     ClassElement classElement) {
+        Optional<String> accessType = classElement.stringValue(ANN_JAKARTA_ACCESS);
+        if (accessType.isEmpty()) {
+            return configuration.getAccessKinds();
+        }
+        return switch (accessType.get()) {
+            case "FIELD" -> EnumSet.of(BeanProperties.AccessKind.FIELD);
+            case "PROPERTY" -> EnumSet.of(BeanProperties.AccessKind.METHOD);
+            default -> configuration.getAccessKinds();
+        };
     }
 
     private static boolean isIntrospectedPropertyReader(MethodElement methodElement, BeanProperties.Visibility visibility) {
@@ -338,12 +351,12 @@ public final class AstBeanPropertiesUtils {
             isIntrospectedPropertyWriter(methodElement, visibility);
     }
 
-    private static boolean isIntrospectedPropertyField(FieldElement fieldElement, BeanProperties.Visibility visibility) {
-        return fieldElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY) && isAccessible(fieldElement, visibility);
+    private static boolean isIntrospectedPropertyField(FieldElement fieldElement) {
+        return fieldElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY);
     }
 
-    private static boolean isIntrospectedPropertyMethod(MethodElement methodElement, BeanProperties.Visibility visibility) {
-        return methodElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY) && isAccessible(methodElement, visibility);
+    private static boolean isIntrospectedPropertyMethod(MethodElement methodElement) {
+        return methodElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY);
     }
 
     private static boolean ignoresOtherAccessors(MemberElement memberElement) {

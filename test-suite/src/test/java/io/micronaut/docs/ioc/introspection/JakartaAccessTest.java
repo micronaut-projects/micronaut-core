@@ -34,10 +34,14 @@ class JakartaAccessTest {
     void testJakartaPersistenceFieldAccessAttributeIsRecognizedAsBeanProperty() {
         BeanIntrospection<JpaPropertyAccessEntity> introspection = BeanIntrospection.getIntrospection(JpaPropertyAccessEntity.class);
         BeanProperty<JpaPropertyAccessEntity, String> property = introspection.getRequiredProperty("fieldAccess", String.class);
+        BeanProperty<JpaPropertyAccessEntity, Long> idProperty = introspection.getRequiredProperty("id", Long.class);
         JpaPropertyAccessEntity entity = new JpaPropertyAccessEntity();
 
         assertMappedAccess(property, AccessType.FIELD);
 
+        idProperty.set(entity, 123L);
+        assertEquals(123L, entity.id);
+        assertEquals(123L, idProperty.get(entity));
         property.set(entity, "field");
         assertEquals("field", entity.fieldAccess);
         assertEquals("field", property.get(entity));
@@ -47,10 +51,14 @@ class JakartaAccessTest {
     void testJakartaPersistencePropertyAccessAttributeIsRecognizedAsBeanProperty() {
         BeanIntrospection<JpaFieldAccessEntity> introspection = BeanIntrospection.getIntrospection(JpaFieldAccessEntity.class);
         BeanProperty<JpaFieldAccessEntity, String> property = introspection.getRequiredProperty("propertyAccess", String.class);
+        BeanProperty<JpaFieldAccessEntity, Long> idProperty = introspection.getRequiredProperty("id", Long.class);
         JpaFieldAccessEntity entity = new JpaFieldAccessEntity();
 
         assertMappedAccess(property, AccessType.PROPERTY);
 
+        idProperty.set(entity, 456L);
+        assertEquals(456L, entity.id);
+        assertEquals(456L, idProperty.get(entity));
         property.set(entity, "property");
         assertEquals("property-setter", entity.propertyAccess);
         assertEquals("property-setter-getter", property.get(entity));
