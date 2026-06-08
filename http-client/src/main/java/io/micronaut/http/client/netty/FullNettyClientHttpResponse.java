@@ -57,7 +57,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, NettyHttpResponseBuilder {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpClient.class);
 
     private final NettyHttpHeaders headers;
     private final NettyCookies nettyCookies;

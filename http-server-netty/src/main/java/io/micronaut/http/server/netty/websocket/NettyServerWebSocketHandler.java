@@ -22,6 +22,8 @@ import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
@@ -34,12 +36,13 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.CoroutineHelper;
 import io.micronaut.http.server.netty.NettyEmbeddedServices;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
-import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
@@ -62,8 +65,8 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.context.Context;
 
 import java.security.Principal;
 import java.util.List;
@@ -71,6 +74,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -99,7 +104,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     private final Argument<?> bodyArgument;
     @Nullable
     private final Argument<?> pongArgument;
-    private final ThreadSelection threadSelection;
+    private final ThreadSelectionConfiguration threadSelection;
     private final ExecutorSelector executorSelector;
 
     /**
@@ -123,7 +128,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         HttpRequest<?> request,
         UriRouteMatch<Object, Object> routeMatch,
         ChannelHandlerContext ctx,
-        ThreadSelection threadSelection,
+        ThreadSelectionConfiguration threadSelection,
         ExecutorSelector executorSelector,
         @Nullable CoroutineHelper coroutineHelper) {
         super(
@@ -188,12 +193,14 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         this.coroutineHelper = coroutineHelper;
         RouteAttributes.setRouteMatch(request, routeMatch);
 
-        Flux.from(callOpenMethod(ctx)).subscribe(v -> { }, t -> {
-            forwardErrorToUser(ctx, e -> {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + e.getMessage(), e);
-                }
-            }, t);
+        callOpenMethod(ctx).onComplete((v, t) -> {
+            if (t != null) {
+                forwardErrorToUser(ctx, e -> {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + e.getMessage(), e);
+                    }
+                }, t);
+            }
         });
 
         ApplicationEventPublisher<WebSocketSessionOpenEvent> eventPublisher =
@@ -337,49 +344,51 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     @Override
-    protected Object invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
+    protected ExecutionFlow<?> invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
         if (coroutineHelper != null) {
             Executable<?, ?> target = boundExecutable.getTarget();
             if (target instanceof ExecutableMethod<?, ?> executableMethod) {
                 if (executableMethod.isSuspend()) {
-                    return Flux.deferContextual(ctx -> {
-                        try {
-                            coroutineHelper.setupCoroutineContext(originatingRequest, ctx, PropagatedContext.getOrEmpty());
+                    try {
+                        coroutineHelper.setupCoroutineContext(originatingRequest, Context.empty(), PropagatedContext.getOrEmpty());
 
-                            Object immediateReturnValue = invokeExecutable0(boundExecutable, messageHandler);
+                        Object immediateReturnValue = invokeExecutable0(boundExecutable, messageHandler);
 
-                            if (KotlinUtils.isKotlinCoroutineSuspended(immediateReturnValue)) {
-                                return Mono.fromCompletionStage(ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(originatingRequest));
-                            } else {
-                                return Mono.empty();
+                        if (KotlinUtils.isKotlinCoroutineSuspended(immediateReturnValue)) {
+                            Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(originatingRequest);
+                            if (supplier == null) {
+                                return ExecutionFlow.empty();
                             }
-                        } catch (Exception e) {
-                            return Flux.error(e);
+                            return CompletableFutureExecutionFlow.just(supplier.get());
+                        } else {
+                            return ExecutionFlow.empty();
                         }
-                    });
+                    } catch (Exception e) {
+                        return ExecutionFlow.error(e);
+                    }
                 }
             }
         }
         return invokeExecutable0(boundExecutable, messageHandler);
     }
 
-    private Object invokeExecutable0(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
-        return this.executorSelector.select(messageHandler.getExecutableMethod(), threadSelection)
-            .map(
-                executorService -> {
-                    ReturnType<?> returnType = messageHandler.getExecutableMethod().getReturnType();
-                    Mono<?> result;
-                    if (returnType.isReactive()) {
-                        result = Mono.from((Publisher<?>) boundExecutable.invoke(messageHandler.getTarget()))
-                                     .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, originatingRequest));
-                    } else if (returnType.isAsync()) {
-                        result = Mono.fromFuture((Supplier<CompletableFuture<?>>) invokeWithContext(boundExecutable, messageHandler));
-                    } else {
-                        result = Mono.fromSupplier(invokeWithContext(boundExecutable, messageHandler));
-                    }
-                    return (Object) result.subscribeOn(Schedulers.fromExecutor(executorService));
-                }
-            ).orElseGet(invokeWithContext(boundExecutable, messageHandler));
+    private ExecutionFlow<?> invokeExecutable0(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
+        Executor executor = executorSelector.selectExecutor(messageHandler.getExecutableMethod(), threadSelection);
+        ReturnType<?> returnType = messageHandler.getExecutableMethod().getReturnType();
+        return ExecutionFlow.async(executor, () -> {
+            Object result = invokeWithContext(boundExecutable, messageHandler).get();
+            if (returnType.isReactive() || Publishers.isConvertibleToPublisher(result)) {
+                return ReactiveExecutionFlow.fromPublisher(Publishers.convertToPublisher(conversionService, result))
+                    .putInContext(ServerRequestContext.KEY, originatingRequest);
+            }
+            if (returnType.isAsync()) {
+                CompletionStage<Object> future = result instanceof CompletionStage<?> stage
+                    ? stage.thenApply(v -> v)
+                    : ((CompletableFuture<?>) result).thenApply(v -> v);
+                return CompletableFutureExecutionFlow.just(future);
+            }
+            return ExecutionFlow.just(result);
+        });
     }
 
     private Supplier<?> invokeWithContext(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {

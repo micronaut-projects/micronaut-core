@@ -250,6 +250,151 @@ class Interceptor2 implements ConstructorInterceptor<Object> {
         context.close()
     }
 
+    void 'test around construct proxy with multiple constructor arguments'() {
+        given:
+        ApplicationContext context = buildContext("""
+package proxytargetconstructargs;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.inject.Singleton;
+import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@TestAnn
+@Singleton
+class MyBean {
+    private final Dependency dependency;
+    private final Helper helper;
+    private final Other other;
+
+    MyBean(Dependency dependency, Helper helper, Other other) {
+        this.dependency = dependency;
+        this.helper = helper;
+        this.other = other;
+    }
+
+    String test() {
+        return dependency.name() + "-" + helper.name() + "-" + other.name();
+    }
+}
+
+@TestAnn
+@Prototype
+class MyParametrizedBean {
+    private final Dependency dependency;
+    private final Helper helper;
+    private final Other other;
+    private final String name;
+
+    MyParametrizedBean(Dependency dependency, Helper helper, Other other, @Parameter String name) {
+        this.dependency = dependency;
+        this.helper = helper;
+        this.other = other;
+        this.name = name;
+    }
+
+    String test() {
+        return name + "-" + dependency.name() + "-" + helper.name() + "-" + other.name();
+    }
+}
+
+@Singleton
+class Dependency {
+    String name() {
+        return "dependency";
+    }
+}
+
+@Singleton
+class Helper {
+    String name() {
+        return "helper";
+    }
+}
+
+@Singleton
+class Other {
+    String name() {
+        return "other";
+    }
+}
+
+@Target(TYPE)
+@Retention(RUNTIME)
+@Around
+@AroundConstruct
+@interface TestAnn {
+}
+
+@Singleton
+@InterceptorBean(TestAnn.class)
+class TestConstructInterceptor implements ConstructorInterceptor<Object> {
+    int invoked;
+    java.util.List<Object[]> invocations = new java.util.ArrayList<>();
+
+    @Override
+    public Object intercept(ConstructorInvocationContext<Object> context) {
+        invoked++;
+        invocations.add(context.getParameterValues());
+        return context.proceed();
+    }
+}
+
+@Singleton
+@InterceptorBinding(TestAnn.class)
+class TestMethodInterceptor implements MethodInterceptor {
+    int invoked;
+
+    @Override
+    public Object intercept(MethodInvocationContext context) {
+        invoked++;
+        return context.proceed();
+    }
+}
+""")
+
+        when:
+        def constructorInterceptor = getBean(context, 'proxytargetconstructargs.TestConstructInterceptor')
+        def methodInterceptor = getBean(context, 'proxytargetconstructargs.TestMethodInterceptor')
+        def bean = getBean(context, 'proxytargetconstructargs.MyBean')
+
+        then:
+        bean instanceof Intercepted
+        bean.test() == 'dependency-helper-other'
+        constructorInterceptor.invocations.any { parameters ->
+            parameters.size() == 3 &&
+                    parameters[0].class.name == 'proxytargetconstructargs.Dependency' &&
+                    parameters[1].class.name == 'proxytargetconstructargs.Helper' &&
+                    parameters[2].class.name == 'proxytargetconstructargs.Other'
+        }
+        methodInterceptor.invoked == 1
+
+        when:
+        constructorInterceptor.invoked = 0
+        constructorInterceptor.invocations.clear()
+        methodInterceptor.invoked = 0
+        def parametrizedBeanClass = context.classLoader.loadClass('proxytargetconstructargs.MyParametrizedBean')
+        def parametrizedBean = context.createBean(parametrizedBeanClass, Collections.singletonMap('name', 'value'))
+
+        then:
+        parametrizedBean instanceof Intercepted
+        parametrizedBean.test() == 'value-dependency-helper-other'
+        constructorInterceptor.invocations.any { parameters ->
+            parameters.size() == 4 &&
+                    parameters[0].class.name == 'proxytargetconstructargs.Dependency' &&
+                    parameters[1].class.name == 'proxytargetconstructargs.Helper' &&
+                    parameters[2].class.name == 'proxytargetconstructargs.Other' &&
+                    parameters[3] == 'value'
+        }
+        methodInterceptor.invoked == 1
+
+        cleanup:
+        context.close()
+    }
+
     void 'test around construct on type and constructor'() {
         given:
         ApplicationContext context = buildContext("""
@@ -831,4 +976,3 @@ class AnotherInterceptor implements Interceptor {
         }
     }
 }
-

@@ -18,6 +18,7 @@ package io.micronaut.context.beans;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanContextConfiguration;
 import io.micronaut.context.BeanDefinitionsProvider;
+import io.micronaut.context.BeanResolutionCustomizer;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DisabledBean;
 import io.micronaut.context.Qualifier;
@@ -107,6 +108,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     private final ClassLoader classLoader;
     @Nullable
     private Beans beans;
+    private final BeanResolutionCustomizer beanResolutionCustomizer;
 
     private final List<BeanDefinitionProducer> additionalBeanDefinitions = new ArrayList<>();
     private final List<BeanConfiguration> additionalBeanConfigurations = new ArrayList<>();
@@ -128,6 +130,10 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         this.beansPredicate = contextConfiguration.beansPredicate();
         this.beanConfigurationsPredicate = contextConfiguration.beanConfiguraionsPredicate();
         this.beanDefinitionReferencesProvider = contextConfiguration.getBeanDefinitionsProvider();
+        this.beanResolutionCustomizer = Objects.requireNonNull(
+            contextConfiguration.beanResolutionCustomizer(),
+            "Bean resolution customizer cannot be null"
+        );
         this.classLoader = contextConfiguration.getClassLoader();
         if (beans == null) {
             beans = createBeans(resolveBeanDefinitionReferences(), List.of());
@@ -246,6 +252,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                             next = iterator.next().getDefinitionIfEnabled(
                                 beanResolutionContext != null ? beanResolutionContext.getContext() : Objects.requireNonNull(beanContext, "Bean context is required"),
                                 beanResolutionContext,
+                                beanResolutionCustomizer,
                                 beanType,
                                 refPredicate,
                                 defPredicate
@@ -670,6 +677,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         @Nullable
         <T> BeanDefinition<T> getDefinitionIfEnabled(BeanContext context,
                                                      @Nullable BeanResolutionContext resolutionContext,
+                                                     BeanResolutionCustomizer beanResolutionCustomizer,
                                                      @Nullable Argument<T> beanType,
                                                      @Nullable Predicate<BeanDefinitionReference<T>> refPredicate,
                                                      @Nullable Predicate<BeanDefinition<T>> defPredicate) {
@@ -682,7 +690,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                     }
                 }
                 BeanDefinition<T> def = (BeanDefinition<T>) defObject;
-                if (beanType != null && !(beanType.getType().equals(Object.class) || def.isCandidateBean(beanType))) {
+                if (beanType != null && !(beanType.getType().equals(Object.class) || beanResolutionCustomizer.isCandidateBean(beanType, def))) {
                     return null;
                 }
                 if (defPredicate != null && !defPredicate.test(def)) {
@@ -698,7 +706,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                 }
                 return null;
             }
-            if (beanType != null && !(beanType.getType().equals(Object.class) || ref.isCandidateBean(beanType))) {
+            if (beanType != null && !(beanType.getType().equals(Object.class) || beanResolutionCustomizer.isCandidateBean(beanType, ref))) {
                 return null;
             }
             if (refPredicate != null && !refPredicate.test(ref)) {

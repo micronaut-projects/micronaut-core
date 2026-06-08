@@ -18,7 +18,7 @@ package io.micronaut.web.router;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
+import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
@@ -28,11 +28,14 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -311,6 +314,11 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      */
     @Nullable
     ExecutorService getExecutor(@Nullable ThreadSelection threadSelection);
+
+    default Executor getExecutor(ThreadSelectionConfiguration configuration) {
+        ExecutorService es = getExecutor(configuration.getThreadSelection());
+        return es == null ? ImmediateExecutor.INSTANCE : es;
+    }
 
     /**
      * @return true if the route needs request body to be read

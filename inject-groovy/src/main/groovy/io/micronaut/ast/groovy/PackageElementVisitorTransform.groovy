@@ -65,7 +65,7 @@ final class PackageElementVisitorTransform implements ASTTransformation, Compila
                 }
             }
         }
-
+        visitorContext.finish()
     }
 
     @Override

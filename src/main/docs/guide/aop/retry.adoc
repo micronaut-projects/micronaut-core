@@ -16,7 +16,7 @@ For example:
 
 snippet::io.micronaut.docs.aop.retry.BookService[tags="simple", indent=0, title="Simple Retry Example"]
 
-With the above example if the `listBooks()` method throws a RuntimeException, it is retried until the maximum number of attempts is reached.
+With the above example if the `listBooks()` method throws an Exception, it is retried until the maximum number of attempts is reached.
 
 The `multiplier` value of the `@Retryable` annotation can be used to configure a multiplier used to calculate the delay between retries, allowing exponential retry support.
 
@@ -49,6 +49,34 @@ The api:retry.annotation.CircuitBreaker[] annotation is a variation of the `@Ret
 snippet::io.micronaut.docs.aop.retry.BookService[tags="circuit", indent=0, title="Applying CircuitBreaker Advice"]
 
 The above example retries the `findBooks` method three times and then opens the circuit for 30 seconds, rethrowing the original exception and preventing potential downstream traffic such as HTTP requests and I/O operations flooding the system.
+
+== Programmatic Retry
+
+For cases where annotations are not desirable, Micronaut Retry also provides programmatic retry creation through typed policies and injected factory beans.
+
+Create a policy once and derive reusable operations from the injected factory:
+
+snippet::io.micronaut.docs.aop.retry.ProgrammaticBookService[tags="programmatic-policy", indent=0, title="Creating a Programmatic Retry Policy"]
+
+The programmatic API uses typed values such as `Duration` and `int` instead of annotation strings.
+
+For synchronous work, execute the supplier directly through `RetryOperations`:
+
+snippet::io.micronaut.docs.aop.retry.ProgrammaticBookService[tags="programmatic-sync", indent=0, title="Programmatic Retry for Synchronous Code"]
+
+Reactive retry is also supported. Pass a supplier so each retry attempt creates a fresh `Publisher`:
+
+snippet::io.micronaut.docs.aop.retry.ProgrammaticBookService[tags="programmatic-reactive", indent=0, title="Programmatic Retry for Reactive Code"]
+
+For asynchronous work, pass a supplier that creates a new `CompletionStage` for each attempt:
+
+snippet::io.micronaut.docs.aop.retry.ProgrammaticBookService[tags="programmatic-async", indent=0, title="Programmatic Retry for Asynchronous Code"]
+
+== Programmatic Circuit Breaker
+
+Programmatic circuit breakers are created in the same way, using a typed `CircuitBreakerPolicy` and an injected `CircuitBreakerOperationsFactory`. The resulting `CircuitBreakerOperations` instance owns the shared breaker state.
+
+snippet::io.micronaut.docs.aop.retry.ProgrammaticBookService[tags="programmatic-circuit", indent=0, title="Programmatic Circuit Breaker"]
 
 == Factory Bean Retry
 

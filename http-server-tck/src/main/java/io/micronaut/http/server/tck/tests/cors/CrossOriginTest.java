@@ -17,7 +17,6 @@ package io.micronaut.http.server.tck.tests.cors;
 
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
@@ -36,12 +35,13 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.cors.CrossOrigin;
 import io.micronaut.http.server.tck.CorsUtils;
 import io.micronaut.http.server.util.HttpHostResolver;
-import io.micronaut.http.uri.UriBuilder;
-import jakarta.inject.Singleton;
-import org.junit.jupiter.api.Test;
-import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
+import io.micronaut.http.tck.ServerUnderTest;
+import io.micronaut.http.uri.UriBuilder;
+import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
@@ -49,8 +49,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.function.BiConsumer;
 
+import static io.micronaut.http.server.tck.CorsUtils.assertCorsHeaders;
 import static io.micronaut.http.tck.TestScenario.asserts;
-import static io.micronaut.http.server.tck.CorsUtils.*;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -73,7 +73,7 @@ public class CrossOriginTest {
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
-                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false);
                     assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
                 })
                 .build()));
@@ -97,7 +97,7 @@ public class CrossOriginTest {
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
-                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false);
                     assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
                 })
                 .build()));
@@ -111,7 +111,7 @@ public class CrossOriginTest {
                 (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
                     .assertResponse(response -> {
-                        assertCorsHeaders(response, "https://www.google.com", HttpMethod.GET);
+                        assertCorsHeaders(response, "https://www.google.com", HttpMethod.GET, false);
                         assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
                     })
                     .build())),
@@ -120,7 +120,7 @@ public class CrossOriginTest {
                 (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
                     .assertResponse(response -> {
-                        assertCorsHeaders(response, "https://www.google.com", HttpMethod.POST);
+                        assertCorsHeaders(response, "https://www.google.com", HttpMethod.POST, false);
                         assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
                     })
                     .build())),
@@ -157,7 +157,7 @@ public class CrossOriginTest {
         return (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
             .status(HttpStatus.OK)
             .assertResponse(response -> {
-                assertCorsHeaders(response, origin, HttpMethod.GET);
+                assertCorsHeaders(response, origin, HttpMethod.GET, false);
                 assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
             })
             .build());
@@ -181,7 +181,7 @@ public class CrossOriginTest {
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
-                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false);
                     assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
                 })
                 .build()));
@@ -213,7 +213,7 @@ public class CrossOriginTest {
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
-                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false);
                     assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS));
                 })
                 .build()));
@@ -232,7 +232,7 @@ public class CrossOriginTest {
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
-                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false);
                     assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS));
                     assertEquals("Content-Encoding,Kuma-Revision", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS));
                 })
@@ -261,15 +261,14 @@ public class CrossOriginTest {
      * @see <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Credentials">Access-Control-Allow-Credentials</a>
      */
     @Test
-    void defaultAccessControlAllowCredentialsValueIsSet() throws IOException {
+    void defaultAccessControlAllowCredentialsValueIsNotSetByDefault() throws IOException {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/credentials").path("bar"), "https://foo.com", HttpMethod.GET),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
-                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
-                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
-                    assertEquals("true", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false);
+                    assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
                 })
                 .build()));
     }
@@ -320,7 +319,7 @@ public class CrossOriginTest {
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
-                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false);
                     assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
                     assertEquals("1800", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
                 })
@@ -338,8 +337,14 @@ public class CrossOriginTest {
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .assertResponse(response -> {
-                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, "1000");
+                    assertTrue(response.getHeaders().names().contains(HttpHeaders.VARY));
+                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS));
+                    assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
                     assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
+                    assertEquals("Origin", response.getHeaders().get(HttpHeaders.VARY));
+                    assertEquals("https://foo.com", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+                    assertEquals("GET", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS));
                     assertEquals("1000", response.getHeaders().get(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
                 })
                 .build()));

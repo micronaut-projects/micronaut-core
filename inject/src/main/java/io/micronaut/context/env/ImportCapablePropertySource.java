@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.writer;
+package io.micronaut.context.env;
 
 /**
- * Extended version of {@link ClassWriterOutputVisitor} for types that write beans.
+ * Marker interface for property sources that support {@code micronaut.config.import}
+ * declaration discovery by iterating their keys.
  *
- * @since 3.5.2
+ * @since 5.0
  */
-public interface BeanClassWriter extends ClassOutputWriter {
-    /**
-     * @return The bean definition visitor
-     */
-    BeanDefinitionVisitor getBeanDefinitionVisitor();
+public interface ImportCapablePropertySource extends PropertySource {
 }

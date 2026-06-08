@@ -204,6 +204,22 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * @return Whether this element is sealed.
+     * @since 5.1.0
+     */
+    default boolean isSealed() {
+        return false;
+    }
+
+    /**
+     * @return The permitted subclasses for this sealed element.
+     * @since 5.1.0
+     */
+    default Collection<ClassElement> getPermittedSubclasses() {
+        return Collections.emptyList();
+    }
+
+    /**
      * Is this type an inner class.
      *
      * @return True if it is an inner class
@@ -901,6 +917,27 @@ public interface ClassElement extends TypedElement {
      */
     @Internal
     static ClassElement of(String typeName, boolean isInterface, @Nullable AnnotationMetadata annotationMetadata, Map<String, ClassElement> typeArguments) {
-        return new SimpleClassElement(typeName, isInterface, annotationMetadata);
+        return new SimpleClassElement(typeName, isInterface, annotationMetadata, typeArguments, List.of(), null);
+    }
+
+    /**
+     * Create a class element for the given simple type.
+     *
+     * @param typeName           The type
+     * @param isInterface        Is the type an interface
+     * @param annotationMetadata The annotation metadata
+     * @param typeArguments      The type arguments
+     * @param superType          The superType
+     * @param interfaces         The interfaces
+     * @return The class element
+     */
+    @Internal
+    static ClassElement of(String typeName, boolean isInterface,
+                           @Nullable AnnotationMetadata annotationMetadata,
+                           Map<String, ClassElement> typeArguments,
+                           @Nullable
+                           ClassElement superType,
+                           List<ClassElement> interfaces) {
+        return new SimpleClassElement(typeName, isInterface, annotationMetadata, typeArguments, interfaces, superType);
     }
 }

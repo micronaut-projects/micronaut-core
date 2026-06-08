@@ -116,7 +116,7 @@ class QuicTokenHandlerImpl implements QuicTokenHandler {
         // constant-time comparison
         boolean equalNow = MessageDigest.isEqual(expectedHashNow, actual);
         boolean equalPrev = MessageDigest.isEqual(expectedHashPrev, actual);
-        if (equalNow | equalPrev) {
+        if (equalNow || equalPrev) {
             return MAC_LENGTH;
         } else {
             return -1;

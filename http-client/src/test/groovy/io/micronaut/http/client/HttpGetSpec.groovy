@@ -631,6 +631,16 @@ class HttpGetSpec extends Specification {
         Mono.from(publisher).block() == null
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10810")
+    void "test a declarative client that returns Mono<Void> for no content response"() {
+        when:
+        def mono = myGetClient.noContentMonoVoid()
+
+        then:
+        mono != null
+        mono.block() == null
+    }
+
     @Requires(property = 'spec.name', value = 'HttpGetSpec')
     @Controller("/get")
     static class GetController {
@@ -956,6 +966,9 @@ class HttpGetSpec extends Specification {
 
         @Get(value = "/noContentPublisher")
         Publisher<String> noContentPublisher()
+
+        @Get(value = "/noContentPublisher")
+        Mono<Void> noContentMonoVoid()
     }
 
     @Requires(property = 'spec.name', value = 'HttpGetSpec')

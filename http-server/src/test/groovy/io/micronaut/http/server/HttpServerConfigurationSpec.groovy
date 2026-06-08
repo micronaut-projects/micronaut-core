@@ -31,4 +31,30 @@ class HttpServerConfigurationSpec extends Specification {
         cleanup:
         applicationContext.close()
     }
+
+    void redispatchNonBlockingOnlyDefaultsToTrue() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run()
+        HttpServerConfiguration httpServerConfiguration = applicationContext.getBean(HttpServerConfiguration)
+
+        expect:
+        httpServerConfiguration.redispatchNonBlockingOnly
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void redispatchNonBlockingOnlyCanBeSetViaConfiguration() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run([
+            'micronaut.server.redispatch-non-blocking-only': StringUtils.FALSE
+        ])
+        HttpServerConfiguration httpServerConfiguration = applicationContext.getBean(HttpServerConfiguration)
+
+        expect:
+        !httpServerConfiguration.redispatchNonBlockingOnly
+
+        cleanup:
+        applicationContext.close()
+    }
 }

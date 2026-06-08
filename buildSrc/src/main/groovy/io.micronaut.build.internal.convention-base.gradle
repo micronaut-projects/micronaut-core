@@ -8,6 +8,7 @@ plugins {
 micronautBuild {
     enableBom = false
     enableProcessing = false
+    javaVersion.set(25)
 }
 
 repositories {
@@ -30,6 +31,11 @@ tasks.withType(Test).configureEach {
     jvmArgs '-Xmx2048m'
     systemProperty "micronaut.cloud.platform", "OTHER"
     jvmArgs "--enable-preview"
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 tasks.withType(JavaCompile).configureEach {

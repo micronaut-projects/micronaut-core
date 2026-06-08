@@ -17,6 +17,7 @@ package io.micronaut.docs.i18n;
 
 import io.micronaut.context.MessageSource;
 import io.micronaut.context.MessageSource.MessageContext;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import java.util.Locale;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Property(name = "spec.name", value = "I18nSpec")
 @MicronautTest(startApplication = false)
 class I18nSpec {
 

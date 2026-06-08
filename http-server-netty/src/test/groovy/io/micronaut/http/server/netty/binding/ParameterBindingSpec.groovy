@@ -70,6 +70,8 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/set?values=10,20'                   | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/list?values=10,20'                  | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/list?values=10&values=20'           | "Parameter Value: [10, 20]" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/string-list?values='                | "Parameter Value: ['']"     | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/string-list?values=,'               | "Parameter Value: ['', '']" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/set?values=10&values=20'            | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/optional-list?values=10&values=20'  | "Parameter Value: [10, 20]" | HttpStatus.OK
         HttpMethod.GET  | '/parameter/optional-date?date=1941-01-05'      | "Parameter Value: 1941"     | HttpStatus.OK
@@ -86,6 +88,8 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/arrayStyle?param[]=a&param[]=b&param[]=c' | "Parameter Value: [a, b, c]"    | HttpStatus.OK
 
         HttpMethod.GET  | '/parameter/query-object?age=30&title=JavaBook&author=JavaAuthor' | "Parameter Value: 30 JavaBook" | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/query-object?age=30'                | "Parameter Value: 30 null"  | HttpStatus.OK
+        HttpMethod.GET  | '/parameter/query-object-nullable'              | "null"                      | HttpStatus.OK
         HttpMethod.GET  | '/parameter/query-record?page=1&size=123' | "Parameter Value: 1 123" | HttpStatus.OK
     }
 
@@ -167,6 +171,22 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         expect:
         response.status() == HttpStatus.BAD_REQUEST
         response.body().contains("Required QueryValue [max] not specified")
+    }
+
+    void "test object binding without argument specified"() {
+        given:
+        HttpRequest req = HttpRequest.GET('/parameter/query-object')
+        Flux exchange = Flux.from(httpClient.exchange(req, String))
+        HttpResponse response = exchange.onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.status() == HttpStatus.BAD_REQUEST
+        response.body().contains("Required QueryValue [book] not specified")
     }
 
     void "test named binding without argument specified"() {
@@ -254,6 +274,12 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
             "Parameter Value: ${values.inspect()}"
         }
 
+        @Get("/string-list")
+        String stringList(List<String> values) {
+            assert values.every() { it instanceof String }
+            "Parameter Value: ${values.inspect()}"
+        }
+
         @Get("/set")
         String set(Set<Integer> values) {
             assert values.every() { it instanceof Integer }
@@ -309,6 +335,11 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         @Get('/query-object')
         String queryObject(@QueryValue Book book) {
             "Parameter Value: $book.age $book.title"
+        }
+
+        @Get("/query-object-nullable")
+        String queryObjectNull(@QueryValue @Nullable Book book) {
+            return book == null ? "null" : "not-null"
         }
 
         @Get('/query-record')

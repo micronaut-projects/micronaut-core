@@ -43,6 +43,9 @@ import java.util.List;
 @Internal
 @Experimental
 public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements BlockingHttpClient {
+    JdkBlockingHttpClient(AbstractJdkHttpClient prototype) {
+        super(prototype);
+    }
 
     public JdkBlockingHttpClient(
         @Nullable

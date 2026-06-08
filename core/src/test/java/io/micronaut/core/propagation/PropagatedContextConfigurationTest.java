@@ -14,10 +14,10 @@ class PropagatedContextConfigurationTest {
     }
 
     @Test
-    void defaultsToScopedValue() {
+    void defaultsToThreadLocal() {
         PropagatedContextConfiguration.reset();
         Mode mode = PropagatedContextConfiguration.get();
-        assertEquals(Mode.SCOPED_VALUE, mode);
+        assertEquals(Mode.THREAD_LOCAL, mode);
     }
 
     @Test

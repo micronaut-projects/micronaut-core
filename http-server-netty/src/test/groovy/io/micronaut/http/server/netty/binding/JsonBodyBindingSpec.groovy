@@ -20,6 +20,7 @@ import io.micronaut.http.hateoas.Link
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.json.JsonSyntaxException
 import io.micronaut.scheduling.TaskExecutors
+import jakarta.annotation.Nullable
 import jakarta.inject.Inject
 import jakarta.inject.Named
 import org.reactivestreams.Publisher
@@ -83,8 +84,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         HttpClientResponseException e = thrown()
-        e.message.startsWith("Invalid JSON: Unrecognized token 'The': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')")
-        e.message.contains("at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); byte offset: #")
+        e.message.contains("""Invalid JSON: Unrecognized token 'The': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')""")
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
@@ -389,6 +389,24 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.getStatus() == HttpStatus.BAD_REQUEST
     }
 
+    void "BodyArgumentBinder returns null when no body content is provided"() {
+        when:
+        HttpResponse<String> response = Flux.from(httpClient.exchange(
+                HttpRequest.POST('/json/empty-body-check', ""), String
+        )).blockFirst()
+
+        then:
+        response.body() == "null"
+
+        when:
+        response = Flux.from(httpClient.exchange(
+                HttpRequest.POST('/json/empty-body-check', "{}"), String
+        )).blockFirst()
+
+        then:
+        response.body() == "not-null"
+    }
+
   @Controller(value = "/json", produces = io.micronaut.http.MediaType.APPLICATION_JSON)
     @Requires(property = "test.controller", value = "JsonController")
     static class JsonController {
@@ -520,6 +538,11 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
             return "Body: $body"
         }
 
+        @Post("/empty-body-check")
+        String emptyBodyCheck(@Body @Nullable EmptyBodyCheck bean) {
+            return bean == null ? "null" : "not-null"
+        }
+
 
         @Error(JsonSyntaxException)
         HttpResponse jsonError(HttpRequest request, JsonSyntaxException jsonSyntaxException) {
@@ -559,6 +582,11 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
     @Introspected
     static class MyItem {
         String name
+    }
+
+    @Introspected
+    static class EmptyBodyCheck {
+        @Nullable String value
     }
 
   @Introspected

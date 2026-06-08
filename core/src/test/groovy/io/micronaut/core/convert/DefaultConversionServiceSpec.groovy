@@ -138,4 +138,26 @@ class DefaultConversionServiceSpec extends Specification {
         new ArrayList<>(sequencedCollection.get()) == [1, 2, 3]
     }
 
+    void "test conversion service preserves empty string elements for string iterables"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        expect:
+        conversionService.convert(sourceObject, List, ConversionContext.of([E: Argument.of(String, 'E')])).get() == result
+
+        where:
+        sourceObject | result
+        ""           | [""]
+        ","          | ["", ""]
+        "a,,b"       | ["a", "", "b"]
+    }
+
+    void "test conversion service converts char sequence to string"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        expect:
+        conversionService.convert(new StringBuilder("value"), String).get() == "value"
+        conversionService.convert(new StringBuilder(""), String).get() == ""
+    }
 }
