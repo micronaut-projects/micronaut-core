@@ -32,7 +32,7 @@ class MDCSpec2 extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'mdc.test2.enabled': true
+            'mdc.test2.enabled': true, "micronaut.propagation": "thread-local"
     ])
 
     @Shared

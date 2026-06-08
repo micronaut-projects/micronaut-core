@@ -39,10 +39,14 @@ import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.InternalByteBody;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 
 import java.lang.annotation.Annotation;
 import java.nio.charset.StandardCharsets;
@@ -67,10 +71,16 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
     private final BeanContext beanContext;
     private final Class<A> filterAnnotation;
     private final RequestBinderRegistry argumentBinderRegistry;
+    @Nullable
+    private final ThreadSelectionConfiguration threadSelectionConfiguration;
+    @Nullable
+    private final ExecutorSelector executorSelector;
 
     public BaseFilterProcessor(@Nullable BeanContext beanContext, Class<A> filterAnnotation) {
         this.beanContext = beanContext;
         this.filterAnnotation = filterAnnotation;
+        this.threadSelectionConfiguration = beanContext != null && filterAnnotation == ServerFilter.class ? beanContext.findBean(ThreadSelectionConfiguration.class).orElse(null) : null;
+        this.executorSelector = beanContext != null && filterAnnotation == ServerFilter.class ? beanContext.findBean(ExecutorSelector.class).orElse(null) : null;
         Optional<RequestBinderRegistry> requestBinderRegistry = beanContext != null ? beanContext.findBean(RequestBinderRegistry.class) : Optional.empty();
         this.argumentBinderRegistry = new RequestBinderRegistry() {
             @Override
@@ -124,23 +134,30 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
             if (method.isAnnotationPresent(RequestFilter.class)) {
                 FilterMetadata methodLevel = metadata(method, RequestFilter.class);
                 FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-                addFilter(() -> MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, false, combined.order, argumentBinderRegistry, getExecutor(combined)), method, combined);
+                @Nullable Executor executor = getExecutor(method, combined);
+                addFilter(() -> MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, false, combined.order, argumentBinderRegistry, executor), method, combined);
             }
             if (method.isAnnotationPresent(ResponseFilter.class)) {
                 FilterMetadata methodLevel = metadata(method, ResponseFilter.class);
                 FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-                addFilter(() -> MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, true, combined.order, argumentBinderRegistry, getExecutor(combined)), method, combined);
+                @Nullable Executor executor = getExecutor(method, combined);
+                addFilter(() -> MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, true, combined.order, argumentBinderRegistry, executor), method, combined);
             }
         }
     }
 
     @Nullable
-    private Executor getExecutor(FilterMetadata metadata) {
-        if (beanContext != null && metadata.executeOn != null) {
-            return beanContext.getBean(Executor.class, Qualifiers.byName(metadata.executeOn));
-        } else {
+    private Executor getExecutor(MethodReference<?, ?> methodReference, FilterMetadata metadata) {
+        if (beanContext == null) {
             return null;
         }
+        if (metadata.executeOn != null) {
+            return beanContext.getBean(Executor.class, Qualifiers.byName(metadata.executeOn));
+        }
+        if (threadSelectionConfiguration == null || executorSelector == null) {
+            return null;
+        }
+        return executorSelector.selectExecutor(methodReference, threadSelectionConfiguration);
     }
 
     private FilterMetadata combineMetadata(FilterMetadata beanLevel, FilterMetadata methodLevel) {

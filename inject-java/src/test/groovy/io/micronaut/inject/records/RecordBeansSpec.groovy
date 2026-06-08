@@ -3,6 +3,7 @@ package io.micronaut.inject.records
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.DependencyInjectionException
 import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.inject.BeanDefinition
@@ -53,10 +54,24 @@ class RecordBeansSpec extends AbstractTypeElementSpec {
         BeanDefinition<?> definition = context.getBeanDefinition(Test2)
 
         then:
-        !(definition instanceof ValidatedBeanDefinition)
         !ClassUtils.isPresent('io.micronaut.inject.records.$Test2$Introspection', context.getClassLoader())
         ClassUtils.isPresent('io.micronaut.inject.records.$Test2$Definition', context.getClassLoader())
         !ClassUtils.isPresent('io.micronaut.inject.records.$Test2$Definition$Intercepted', context.getClassLoader())
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test record bean with nullable annotations should fail'() {
+        given:
+        ApplicationContext context = ApplicationContext.run(['spec.name': getClass().getSimpleName()])
+
+        when:
+        context.getBean(Test3)
+
+        then:
+        def e = thrown(BeanInstantiationException)
+        e.message.contains("missingBean - must not be null")
 
         cleanup:
         context.close()

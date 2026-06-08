@@ -285,9 +285,6 @@ public final class AnnotationMetadataGenUtils {
                                              AnnotationMetadata annotationMetadata,
                                              Function<String, ExpressionDef> loadClassValueExpressionFn) {
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
-        if (annotationMetadata.isEmpty()) {
-            return;
-        }
         if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
             annotationMetadata = annotationMetadataHierarchy.merge();
         }
@@ -297,8 +294,10 @@ public final class AnnotationMetadataGenUtils {
                 mutableAnnotationMetadata,
                 loadClassValueExpressionFn
             );
-        } else {
+        } else if (!annotationMetadata.isEmpty()) {
             throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
+        } else {
+            return;
         }
     }
 

@@ -86,6 +86,36 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     BeanResolutionContext copy();
 
     /**
+     * Copy current context to be used later when resolving a lazy proxy target.
+     *
+     * @param proxyBeanDefinition The proxy bean definition
+     * @return The bean resolution context
+     * @since 5.1.0
+     */
+    @UsedByGeneratedCode
+    default BeanResolutionContext copyForLazyProxyTarget(BeanDefinition<?> proxyBeanDefinition) {
+        return copy();
+    }
+
+    /**
+     * Returns whether a newly constructed bean instance should receive field/method injection and initialization
+     * callbacks.
+     *
+     * @param beanDefinition The bean definition
+     * @param bean The newly constructed bean instance
+     * @return True if the bean instance should be injected and initialized
+     * @since 5.1.0
+     */
+    @UsedByGeneratedCode
+    default boolean shouldInitializeBean(BeanDefinition<?> beanDefinition, Object bean) {
+        BeanContext context = getContext();
+        if (context instanceof DefaultBeanContext defaultBeanContext) {
+            return defaultBeanContext.getBeanResolutionCustomizer().shouldInitializeBean(this, beanDefinition, bean);
+        }
+        return true;
+    }
+
+    /**
      * @return The context
      */
     BeanContext getContext();
@@ -210,6 +240,15 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      */
     default @Nullable List<BeanRegistration<?>> popDependentBeans() {
         return null;
+    }
+
+    /**
+     * @return The current dependent beans that must be destroyed by an upstream bean.
+     *
+     * @since 5.1.0
+     */
+    default List<BeanRegistration<?>> getDependentBeans() {
+        return Collections.emptyList();
     }
 
     /**

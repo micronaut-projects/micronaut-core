@@ -10,6 +10,42 @@ import java.time.Duration
 
 class DefaultHttpClientConfigurationSpec extends Specification {
 
+    void "redirect allows filtered headers"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        HttpClientConfiguration config = ctx.getBean(HttpClientConfiguration)
+
+        expect:
+        (["Host", "Connection"] as Set<String>) == config.redirectAlwaysFilteredHeaders
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "redirect additional non preserve body filtered headers"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        HttpClientConfiguration config = ctx.getBean(HttpClientConfiguration)
+
+        expect:
+        (["Content-Length", "Content-Type", "Transfer-Encoding"] as Set<String>) == config.redirectAdditionalNonPreserveBodyFilteredHeaders
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "redirect cross origin filtered headers"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        HttpClientConfiguration config = ctx.getBean(HttpClientConfiguration)
+
+        expect:
+        (["Authorization", "Proxy-Authorization", "Cookie"] as Set<String>) == config.redirectCrossOriginFilteredHeaders
+
+        cleanup:
+        ctx.close()
+    }
+
     void "test config for #key"() {
         given:
         def ctx = ApplicationContext.run(
@@ -37,7 +73,10 @@ class DefaultHttpClientConfigurationSpec extends Specification {
         'shutdown-timeout'          | 'shutdownTimeout'        | '100ms' | Optional.of(Duration.ofMillis(100))
         'shutdown-timeout'          | 'shutdownTimeout'        | '15s'   | Optional.of(Duration.ofSeconds(15))
         'follow-redirects'          | 'followRedirects'        | 'false' | false
+        'max-redirects'             | 'maxRedirects'           | '7'     | 7
         'max-header-size'           | 'maxHeaderSize'          | '16384' | 16384
+        'max-initial-line-length'   | 'maxInitialLineLength'   | '8192'  | 8192
+        'max-chunk-size'            | 'maxChunkSize'           | '16384' | 16384
     }
 
     void "test pool config"() {

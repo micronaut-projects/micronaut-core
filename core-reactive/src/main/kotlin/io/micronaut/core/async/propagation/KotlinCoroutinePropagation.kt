@@ -17,6 +17,7 @@ package io.micronaut.core.async.propagation
 
 import io.micronaut.core.annotation.Experimental
 import io.micronaut.core.propagation.PropagatedContext
+import kotlinx.coroutines.currentCoroutineContext
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -36,6 +37,10 @@ class KotlinCoroutinePropagation private constructor() {
 
         fun findPropagatedContext(context: CoroutineContext): PropagatedContext? {
             return context[MicronautPropagatedContext.Key]?.propagatedContext
+        }
+
+        suspend fun findPropagatedContext(): PropagatedContext? {
+            return findPropagatedContext(currentCoroutineContext())
         }
 
         fun updatePropagatedContext(context: CoroutineContext, propagatedContext: PropagatedContext): CoroutineContext {

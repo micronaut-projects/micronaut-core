@@ -403,7 +403,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             final JsonFeatures jsonFeatures = clientKey.jsonFeatures;
             if (jsonFeatures != null) {
                 List<MediaTypeCodec> codecs = new ArrayList<>(2);
-                MediaTypeCodecRegistry codecRegistry = Objects.requireNonNull(builder.codecRegistry);
+                MediaTypeCodecRegistry codecRegistry = Objects.requireNonNull(builder.nettyBuilder().codecRegistry);
                 for (MediaTypeCodec codec : codecRegistry.getCodecs()) {
                     if (codec instanceof MapperMediaTypeCodec typeCodec) {
                         codecs.add(typeCodec.cloneWithFeatures(jsonFeatures));
@@ -416,7 +416,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 }
                 builder.codecRegistry(MediaTypeCodecRegistry.of(codecs));
                 builder.handlerRegistry(new MessageBodyHandlerRegistry() {
-                    final MessageBodyHandlerRegistry delegate = Objects.requireNonNull(builder.handlerRegistry);
+                    final MessageBodyHandlerRegistry delegate = Objects.requireNonNull(builder.nettyBuilder().handlerRegistry);
 
                     @SuppressWarnings("unchecked")
                     private <T> T customize(T handler) {
@@ -555,10 +555,10 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     @Override
     public void onApplicationEvent(RefreshEvent event) {
         for (DefaultHttpClient client : unbalancedClients.values()) {
-            client.connectionManager.refresh();
+            client.connectionManager().refresh();
         }
         for (DefaultHttpClient client : balancedClients) {
-            client.connectionManager.refresh();
+            client.connectionManager().refresh();
         }
     }
 

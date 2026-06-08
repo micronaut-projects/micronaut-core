@@ -65,7 +65,7 @@ class CrossOriginUtilSpec extends Specification {
         config.allowedHeaders == CorsOriginConfiguration.ANY
         CollectionUtils.isEmpty(config.exposedHeaders)
         config.allowedMethods == CorsOriginConfiguration.ANY_METHOD
-        config.allowCredentials
+        !config.allowCredentials
         config.allowPrivateNetwork
         config.maxAge == 1800L
 
@@ -105,7 +105,7 @@ class CrossOriginUtilSpec extends Specification {
         config.allowedHeaders == CorsOriginConfiguration.ANY
         CollectionUtils.isEmpty(config.exposedHeaders)
         config.allowedMethods == CorsOriginConfiguration.ANY_METHOD
-        config.allowCredentials
+        !config.allowCredentials
         config.allowPrivateNetwork
         config.maxAge == 1800L
 
@@ -126,7 +126,7 @@ class CrossOriginUtilSpec extends Specification {
         config.allowedHeaders == CorsOriginConfiguration.ANY
         CollectionUtils.isEmpty(config.exposedHeaders)
         config.allowedMethods == CorsOriginConfiguration.ANY_METHOD
-        config.allowCredentials
+        !config.allowCredentials
         config.allowPrivateNetwork
         config.maxAge == 1800L
 

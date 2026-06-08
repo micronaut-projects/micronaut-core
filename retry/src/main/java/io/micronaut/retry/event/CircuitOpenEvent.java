@@ -28,10 +28,19 @@ import io.micronaut.retry.RetryState;
  */
 public class CircuitOpenEvent extends ApplicationEvent {
 
+    /**
+     * The retry state at the time the circuit was opened.
+     */
     private final RetryState retryState;
+
+    /**
+     * The triggering throwable.
+     */
     private final Throwable throwable;
 
     /**
+     * Creates a circuit open event.
+     *
      * @param source A compile time produced invocation of a method call
      * @param retryState Encapsulate the current state of {@link io.micronaut.retry.annotation.Retryable} operation.
      * @param throwable The cause
@@ -47,6 +56,8 @@ public class CircuitOpenEvent extends ApplicationEvent {
     }
 
     /**
+     * Returns the retry context.
+     *
      * @return The retry context
      */
     public RetryState getRetryState() {
@@ -54,6 +65,8 @@ public class CircuitOpenEvent extends ApplicationEvent {
     }
 
     /**
+     * Returns the original exception that will be rethrown to the user.
+     *
      * @return The original exception that will be rethrown to the user
      */
     public Throwable getThrowable() {

@@ -355,6 +355,19 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     @Override
+    public boolean isSealed() {
+        return !classElement.getPermittedSubclasses().isEmpty();
+    }
+
+    @Override
+    public Collection<ClassElement> getPermittedSubclasses() {
+        return classElement.getPermittedSubclasses()
+            .stream()
+            .map(typeMirror -> newClassElement(typeMirror, getTypeArguments()))
+            .toList();
+    }
+
+    @Override
     public boolean isPrimitive() {
         return ClassUtils.getPrimitiveType(getName()).isPresent();
     }
@@ -505,7 +518,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
              try {
                  String docComment = visitorContext.getElements().getDocComment(getNativeType().element());
                  if (docComment != null) {
-                     Javadoc javadoc = StaticJavaParser.parseJavadoc(docComment);
+                     Javadoc javadoc = StaticJavaParser.parseJavadoc(docComment, false);
                      for (JavadocBlockTag t : javadoc.getBlockTags()) {
                          if (t.getType() == JavadocBlockTag.Type.PARAM && t.getName().map(n -> n.equals(value.propertyName)).orElse(false)) {
                              return t.getContent().toText();
@@ -784,6 +797,13 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         return typeArguments.stream()
             .map(tm -> newClassElement(tm, getTypeArguments()))
             .toList();
+    }
+
+    @Override
+    public boolean isRawType() {
+        return typeArguments != null
+            && typeArguments.isEmpty()
+            && !classElement.getTypeParameters().isEmpty();
     }
 
     @Override

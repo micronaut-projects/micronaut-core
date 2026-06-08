@@ -74,6 +74,29 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
         json.title == 'The title'
     }
 
+    void 'test HttpStatusException from void method'() {
+        when:
+        HttpResponse response = Flux.from(httpClient
+            .exchange(HttpRequest.GET('/errors/void')))
+            .onErrorResume(t -> {
+                if (t instanceof HttpClientResponseException) {
+                    return Flux.just(((HttpClientResponseException) t).response)
+                }
+                throw t
+            }).blockFirst()
+
+        then:
+        response.code() == HttpStatus.NOT_FOUND.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+
+        when:
+        def json = new JsonSlurper().parseText(response.getBody(String).orElse(null))
+
+        then:
+        json._embedded.errors[0].message == 'Test1 not found!'
+        json._links.self.href == '/errors/void'
+    }
+
     @Requires(property = "spec.name", value = "HttpStatusExceptionSpec")
     @Controller('/errors')
     static class BookController {
@@ -85,6 +108,11 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
         @Get('/book')
         String book() {
             throw new HttpStatusException(HttpStatus.ACCEPTED, new Book(title: 'The title'))
+        }
+
+        @Get('/void')
+        void voidError() {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, 'Test1 not found!')
         }
     }
 

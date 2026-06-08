@@ -488,7 +488,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
         Argument<?>[] arguments = constructor.getArguments();
         if (constructor instanceof MethodInjectionPoint<?,?> methodInjectionPoint) {
             // factory bean with method
-            Class<?> declaringType = methodInjectionPoint.getDeclaringType();
+            Class<?> declaringType = methodInjectionPoint.getDeclaringBean().getBeanType();
             Class<T> declaringBeanType = constructor.getDeclaringBeanType();
             String factoryType = TypeFormat.getTypeString(
                 typeFormat,

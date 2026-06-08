@@ -17,10 +17,7 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.BeanCreationException;
-import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
-import io.micronaut.context.propagation.instrument.execution.ContextPropagatingScheduledExecutorService;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.async.publisher.Publishers;
@@ -53,6 +50,8 @@ import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodReference;
+import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
+import io.micronaut.context.propagation.instrument.execution.ContextPropagatingScheduledExecutorService;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.MethodBasedRouteInfo;
@@ -63,6 +62,7 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -466,7 +466,7 @@ public final class RouteExecutor {
                                                                       boolean isKotlinCoroutine,
                                                                       @Nullable ContextView contextView) {
         PropagatedContext routePropagatedContext = propagatedContext.plus(new ServerHttpRequestContext(httpRequest));
-        try (PropagatedContext.Scope ignore = routePropagatedContext.propagate()) {
+        return routePropagatedContext.propagate(() -> {
             try {
                 if (isKotlinCoroutine && contextView != null) {
                     coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext));
@@ -480,7 +480,7 @@ public final class RouteExecutor {
             } catch (Throwable e) {
                 return ExecutionFlow.error(e);
             }
-        }
+        });
     }
 
     ExecutionFlow<HttpResponse<?>> createResponseForBody(PropagatedContext propagatedContext,

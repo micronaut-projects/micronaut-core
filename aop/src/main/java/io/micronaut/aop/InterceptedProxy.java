@@ -45,4 +45,13 @@ public interface InterceptedProxy<T> extends Intercepted, Qualified<T>, Intercep
     default boolean hasCachedInterceptedTarget() {
         return false;
     }
+
+    /**
+     * Clear the cached target if this proxy caches one.
+     *
+     * @since 5.1.0
+     */
+    @Override
+    default void clearCachedInterceptedTarget() {
+    }
 }

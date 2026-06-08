@@ -21,8 +21,8 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.http.HttpMethod;
@@ -43,7 +43,9 @@ import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.exceptions.RoutingException;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +61,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -968,7 +971,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         private final class RouteExecutorSelector implements ExecutorSelector {
             @Override
-            public Optional<ExecutorService> select(MethodReference<?, ?> method, ThreadSelection threadSelection) {
+            public Optional<ExecutorService> select(@Nullable MethodReference<?, ?> method, ThreadSelection threadSelection) {
                 if (DefaultRouteBuilder.this.executorSelector != null) {
                     return DefaultRouteBuilder.this.executorSelector.select(targetMethod.getExecutableMethod(), threadSelection);
                 } else {
@@ -982,6 +985,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                     return DefaultRouteBuilder.this.executorSelector.select(name);
                 } else {
                     return Optional.empty();
+                }
+            }
+
+            @Override
+            public Executor selectExecutor(@Nullable MethodReference<?, ?> method, ThreadSelectionConfiguration configuration) {
+                if (DefaultRouteBuilder.this.executorSelector != null) {
+                    return DefaultRouteBuilder.this.executorSelector.selectExecutor(method, configuration);
+                } else {
+                    return ImmediateExecutor.INSTANCE;
                 }
             }
         }

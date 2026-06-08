@@ -17,6 +17,8 @@ Note that the IoC part of the Micronaut framework can be used completely indepen
 
 To do so, configure your build to include the `micronaut-inject-java` dependency as an annotation processor.
 
+If you are creating custom compile-time annotations or annotation mappers, see <<annotationMetadata, Annotation Metadata>> for additional requirements around `AnnotationMapper`, `NamedAnnotationMapper`, and `TypedAnnotationMapper`.
+
 The easiest way to do this is with Micronaut's Gradle or Maven plugins. For example with Gradle:
 
 .Configuring Gradle

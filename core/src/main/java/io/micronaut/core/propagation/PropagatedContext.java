@@ -131,6 +131,21 @@ public interface PropagatedContext {
     }
 
     /**
+     * Is this propagated context bound? If yes the propagation is not needed.
+     * @return true if bound
+     * @since 5.0
+     */
+    boolean isBound();
+
+    /**
+     * Checks whether the context is empty.
+     *
+     * @return true if the context contains no elements, otherwise false
+     * @since 5.0
+     */
+    boolean isEmpty();
+
+    /**
      * Returns a new context extended with the given element. This doesn't add anything
      * to the existing in-scope context (if any), so you will need to propagate it
      * yourself. You can add multiple elements of the same type.
@@ -159,8 +174,7 @@ public interface PropagatedContext {
      * @param newElement the element that will replace it
      * @return the new context
      */
-    PropagatedContext replace(PropagatedContextElement oldElement,
- PropagatedContextElement newElement);
+    PropagatedContext replace(PropagatedContextElement oldElement, PropagatedContextElement newElement);
 
     /**
      * Finds the first element of the given type, if any exist.
@@ -202,7 +216,9 @@ public interface PropagatedContext {
      * object must be closed to undo the propagation.
      *
      * @return auto-closeable block to be used in try-resource block.
+     * @deprecated The method is only allowed for thread-local propagation.
      */
+    @Deprecated(since = "5.0")
     Scope propagate();
 
     /**
@@ -211,14 +227,7 @@ public interface PropagatedContext {
      * @param runnable The runnable that will execute with this context in scope.
      * @return new runnable
      */
-    default Runnable wrap(Runnable runnable) {
-        PropagatedContext propagatedContext = this;
-        return () -> {
-            try (Scope ignore = propagatedContext.propagate()) {
-                runnable.run();
-            }
-        };
-    }
+    Runnable wrap(Runnable runnable);
 
     /**
      * Returns a new callable that runs the given callable with this context in scope.
@@ -227,14 +236,7 @@ public interface PropagatedContext {
      * @param <V>      The callable return type
      * @return new callable
      */
-    default <V> Callable<V> wrap(Callable<V> callable) {
-        PropagatedContext propagatedContext = this;
-        return () -> {
-            try (Scope ignore = propagatedContext.propagate()) {
-                return callable.call();
-            }
-        };
-    }
+    <V> Callable<V> wrap(Callable<V> callable);
 
     /**
      * Returns a new supplier that runs the given supplier with this context in scope.
@@ -243,14 +245,7 @@ public interface PropagatedContext {
      * @param <V>      The supplier return type
      * @return new supplier
      */
-    default <V> Supplier<V> wrap(Supplier<V> supplier) {
-        PropagatedContext propagatedContext = this;
-        return () -> {
-            try (Scope ignore = propagatedContext.propagate()) {
-                return supplier.get();
-            }
-        };
-    }
+    <V> Supplier<V> wrap(Supplier<V> supplier);
 
     /**
      * Executes the given supplier with this context in scope, restoring the previous context when execution completes.
@@ -259,11 +254,26 @@ public interface PropagatedContext {
      * @param <V>      The supplier return type
      * @return the result of calling {@link Supplier#get()}.
      */
-    default <V> V propagate(Supplier<V> supplier) {
-        try (Scope ignore = propagate()) {
-            return supplier.get();
-        }
-    }
+    <V> V propagate(Supplier<V> supplier);
+
+    /**
+     * Executes the given supplier with this context in scope, restoring the previous context when execution completes.
+     *
+     * @param callable The supplier
+     * @param <V>      The supplier return type
+     * @return the result of calling {@link Callable#call()}.
+     * @throws Exception if an exception occurs
+     * @since 5.0
+     */
+    <V> V propagateCall(Callable<V> callable) throws Exception;
+
+    /**
+     * Executes the given runnable with this context in scope, restoring the previous context when execution completes.
+     *
+     * @param runnable The runnable
+     * @since 5.0
+     */
+    void propagate(Runnable runnable);
 
     /**
      * Closing this object undoes the effect of calling {@link #propagate()} on a context. Intended to be used in a

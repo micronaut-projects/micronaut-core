@@ -395,13 +395,21 @@ internal class KotlinAnnotationMetadataBuilder(
         annotationName: String,
         annotationType: KSAnnotated
     ): MutableMap<out KSDeclaration, *> {
+        return readAnnotationDefaultValues(annotationName, annotationType, false)
+    }
+
+    override fun readAnnotationDefaultValues(
+        annotationName: String,
+        annotationType: KSAnnotated,
+        includeEmptyValues: Boolean
+    ): MutableMap<out KSDeclaration, *> {
         return if (annotationType is KotlinAnnotationType) {
             val map = mutableMapOf<KSDeclaration, Any>()
             annotationType.type.getAllProperties().forEach { prop ->
                 val argument = annotationType.mirror.defaultArguments.find { it.name == prop.simpleName }
                 if (argument?.value != null && argument.isDefault()) {
                     val value = argument.value!!
-                    if (value !is String || !StringUtils.isEmpty(value)) {
+                    if (value !is String || includeEmptyValues || !StringUtils.isEmpty(value)) {
                         map[prop] = value
                     }
                 }

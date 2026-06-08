@@ -19,7 +19,6 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -49,9 +48,10 @@ import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
-import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
+import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.util.HttpHeadersUtil;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -434,9 +434,7 @@ abstract class AbstractJdkHttpClient {
             @Override
             protected ExecutionFlow<HttpResponse<?>> provideResponse(io.micronaut.http.HttpRequest<?> request, PropagatedContext propagatedContext) {
                 try {
-                    try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                        return ReactiveExecutionFlow.fromPublisher((Publisher<HttpResponse<?>>) responsePublisher);
-                    }
+                    return propagatedContext.propagate(() -> ReactiveExecutionFlow.fromPublisher((Publisher<HttpResponse<?>>) responsePublisher));
                 } catch (Throwable e) {
                     return ExecutionFlow.error(e);
                 }

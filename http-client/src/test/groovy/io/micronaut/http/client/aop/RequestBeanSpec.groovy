@@ -6,6 +6,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.*
@@ -130,6 +131,16 @@ class RequestBeanSpec extends Specification {
         client.getExtendingBeanValues("I am not super!", "I am super!") == "Extending: 'I am not super!', Super: 'I am super!'"
     }
 
+    void "test request bean is null when no input is provided"() {
+        expect:
+        client.requestBeanNull(null) == "null"
+    }
+
+    void "test nullable request bean with only context properties returns null"() {
+        expect:
+        client.contextOnlyBean() == null
+    }
+
     /**
      * Example of such case: Authentication type, where value must be resolved after filters
      */
@@ -226,6 +237,15 @@ class RequestBeanSpec extends Specification {
             return bean.value
         }
 
+        @Get("/request-bean-nullable")
+        String requestBeanNull(@RequestBean @Nullable EmptyBean bean) {
+            return bean == null ? "null" : "not-null"
+        }
+
+        @Get("/context-only")
+        ContextOnlyBean contextOnly(@Nullable @RequestBean ContextOnlyBean bean) {
+            return bean
+        }
     }
 
     @Client('/request/bean')
@@ -276,6 +296,12 @@ class RequestBeanSpec extends Specification {
 
         @Get("/unsatisfied/value")
         String getUnsatisfiedValue()
+
+        @Get("/request-bean-nullable")
+        String requestBeanNull(@RequestBean @Nullable EmptyBean bean)
+
+        @Get("/context-only")
+        ContextOnlyBean contextOnlyBean()
     }
 
     @Introspected
@@ -378,6 +404,18 @@ class RequestBeanSpec extends Specification {
 
         @QueryValue
         String value
+    }
+
+    @Introspected
+    static class EmptyBean {
+        @Nullable String value
+    }
+
+    @Introspected
+    static class ContextOnlyBean {
+
+        HttpRequest<?> request
+        HttpHeaders headers
     }
 
     static class TestTypeValue {

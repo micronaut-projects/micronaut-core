@@ -1575,6 +1575,45 @@ class Lst<E>
         }
     }
 
+    void "test wildcard explicit bounds use type argument variance"() {
+        expect:
+        buildClassElement('test.Test', '''
+package test
+
+class Test {
+    fun upper(): Lst<out Number>? {
+        return null
+    }
+
+    fun lower(): Lst<in String>? {
+        return null
+    }
+
+    fun star(): Lst<*>? {
+        return null
+    }
+}
+
+class Lst<E>
+
+''') { ce ->
+            def upperMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("upper")).get()
+            def upperWildcard = upperMethod.getGenericReturnType().getTypeArguments()["E"] as WildcardElement
+            assert upperWildcard.hasExplicitUpperBound()
+            assert !upperWildcard.hasExplicitLowerBound()
+
+            def lowerMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("lower")).get()
+            def lowerWildcard = lowerMethod.getGenericReturnType().getTypeArguments()["E"] as WildcardElement
+            assert !lowerWildcard.hasExplicitUpperBound()
+            assert lowerWildcard.hasExplicitLowerBound()
+
+            def starMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("star")).get()
+            def starWildcard = starMethod.getGenericReturnType().getTypeArguments()["E"] as WildcardElement
+            assert !starWildcard.hasExplicitUpperBound()
+            assert !starWildcard.hasExplicitLowerBound()
+        }
+    }
+
     void "test generics model for placeholder"() {
         expect:
         buildClassElement('test.Test', '''

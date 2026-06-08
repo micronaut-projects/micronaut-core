@@ -356,6 +356,28 @@ public interface ApplicationContextBuilder {
     }
 
     /**
+     * Override the bean resolution customizer.
+     *
+     * @param customizer The bean resolution customizer, or null to use the default
+     * @return This builder
+     * @since 5.1.0
+     */
+    default ApplicationContextBuilder beanResolutionCustomizer(@Nullable BeanResolutionCustomizer customizer) {
+        return this;
+    }
+
+    /**
+     * Override the custom scope registry factory.
+     *
+     * @param factory The custom scope registry factory, or null to use the default
+     * @return This builder
+     * @since 5.1.0
+     */
+    default ApplicationContextBuilder customScopeRegistry(@Nullable CustomScopeRegistryFactory factory) {
+        return this;
+    }
+
+    /**
      * Disable eager beans functionality.
      *
      * @param enabled True to enable eager beans; false to disable
@@ -408,6 +430,15 @@ public interface ApplicationContextBuilder {
      * @since 5.0
      */
     ApplicationContextBuilder propertySourcesLocator(PropertySourcesLocator propertySourcesLocator);
+
+    /**
+     * Enable or disable the config import 'micronaut.config.import' processing. Enabled by default.
+     *
+     * @param enabled a boolean to modify the enabled status
+     * @return This builder
+     * @since 5.0
+     */
+    ApplicationContextBuilder configImport(boolean enabled);
 
     /**
      * Starts the {@link ApplicationContext}.

@@ -27,6 +27,7 @@ import io.micronaut.http.server.cors.CorsOriginConfiguration;
 import io.micronaut.http.server.util.locale.HttpLocaleResolutionConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import jakarta.inject.Inject;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -53,7 +54,7 @@ import java.util.regex.Pattern;
  * @since 1.0
  */
 @ConfigurationProperties(value = HttpServerConfiguration.PREFIX, cliPrefix = "")
-public class HttpServerConfiguration implements ServerContextPathProvider {
+public class HttpServerConfiguration implements ServerContextPathProvider, ThreadSelectionConfiguration {
 
     /**
      * The default port value.
@@ -178,6 +179,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     @Nullable
     private Charset defaultCharset;
     private ThreadSelection threadSelection = ThreadSelection.MANUAL;
+    private boolean redispatchNonBlockingOnly = true;
     private boolean validateUrl = true;
     private boolean escapeHtmlUrl = false;
     private boolean notFoundOnMissingBody = true;
@@ -224,8 +226,20 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     /**
      * @return The {@link ThreadSelection} model to use for the server.
      */
+    @Override
     public ThreadSelection getThreadSelection() {
         return threadSelection;
+    }
+
+    /**
+     * @return Whether executor redispatch should only happen on non-blocking threads.
+     * Requests begin on a non-blocking event-loop thread and are redispatched when the configured
+     * executor requires moving to a blocking-capable thread. When enabled, Micronaut skips further
+     * redispatch once execution is already on a blocking-capable thread.
+     */
+    @Override
+    public boolean isRedispatchNonBlockingOnly() {
+        return redispatchNonBlockingOnly;
     }
 
     /**
@@ -236,6 +250,28 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         if (threadSelection != null) {
             this.threadSelection = threadSelection;
         }
+    }
+
+    /**
+     * Sets whether configured executors are used only for calls from non-blocking threads.
+     *
+     * Requests begin on a non-blocking event-loop thread and are redispatched when the configured
+     * executor needs blocking-capable execution.
+     *
+     * If this is {@code true}, Micronaut skips repeated redispatch once request processing is
+     * already running on a blocking-capable thread such as a blocking pool or virtual thread.
+     * Filters, event listeners, and route code can then continue on that current blocking thread
+     * instead of hopping again for each stage.
+     *
+     * If this is {@code false}, Micronaut applies the configured executor at each stage even when
+     * execution is already on a blocking-capable thread. This more closely matches the older
+     * behavior, but can introduce additional executor hops and, with virtual threads, more virtual
+     * thread creation during a single request.
+     *
+     * @param redispatchNonBlockingOnly {@code true} to redispatch only from non-blocking threads
+     */
+    public void setRedispatchNonBlockingOnly(boolean redispatchNonBlockingOnly) {
+        this.redispatchNonBlockingOnly = redispatchNonBlockingOnly;
     }
 
     /**

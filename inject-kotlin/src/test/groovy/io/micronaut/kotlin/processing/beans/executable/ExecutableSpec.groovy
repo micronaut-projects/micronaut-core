@@ -21,6 +21,7 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.ExecutionHandle
 import io.micronaut.inject.MethodExecutionHandle
+import spock.lang.Issue
 import spock.lang.Specification
 
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
@@ -104,5 +105,38 @@ class MyBean {
         "showPrimitiveArray"  | [long[].class]   | [[1L] as long[]] | "1 - The Stand"
         "showVoidReturn"      | [Iterable.class] | [['test']]       | null
         "showPrimitiveReturn" | [int[].class]    | [[1] as int[]]   | 1
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12666")
+    void "test executable method overriding interface with default parameter"() {
+        given:
+        ApplicationContext context = buildContext('''
+package test
+
+import io.micronaut.context.annotation.Executable
+import jakarta.inject.Singleton
+
+interface Api {
+    fun send(name: String? = "default"): String
+}
+
+@Singleton
+open class Controller : Api {
+    @Executable
+    override fun send(name: String?): String {
+        return name ?: "missing"
+    }
+}
+''')
+
+        when:
+        ExecutionHandle method = context.findExecutionHandle(context.classLoader.loadClass('test.Controller'), "send", String).get()
+
+        then:
+        method.invoke("test") == "test"
+        method.invoke([null] as Object[]) == "default"
+
+        cleanup:
+        context.close()
     }
 }

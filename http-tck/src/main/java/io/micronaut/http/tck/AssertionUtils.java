@@ -18,7 +18,10 @@ package io.micronaut.http.tck;
 import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import org.junit.jupiter.api.Assertions;
@@ -30,7 +33,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Utility class used to perform assertions.

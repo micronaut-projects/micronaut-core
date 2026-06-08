@@ -16,12 +16,14 @@
 package io.micronaut.context;
 
 import io.micronaut.context.env.CommandLinePropertySource;
+import io.micronaut.context.env.ConfigImportPropertySourcesLocator;
 import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
@@ -95,6 +97,10 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Predicate<QualifiedBeanType<?>> beansPredicate;
     @Nullable
     private Predicate<BeanConfiguration> beanConfigurationsPredicate;
+    @Nullable
+    private CustomScopeRegistryFactory customScopeRegistryFactory;
+    private BeanResolutionCustomizer beanResolutionCustomizer = BeanResolutionCustomizer.DEFAULT;
+    private boolean configImportEnabled = true;
 
     /**
      * Default constructor.
@@ -225,6 +231,17 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Nullable
     public Predicate<BeanConfiguration> beanConfiguraionsPredicate() {
         return beanConfigurationsPredicate;
+    }
+
+    @Override
+    @Nullable
+    public CustomScopeRegistryFactory customScopeRegistryFactory() {
+        return customScopeRegistryFactory;
+    }
+
+    @Override
+    public BeanResolutionCustomizer beanResolutionCustomizer() {
+        return beanResolutionCustomizer;
     }
 
     @Override
@@ -386,6 +403,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public boolean isConfigImportEnabled() {
+        return configImportEnabled;
+    }
+
+    @Override
     public @Nullable List<String> getEnvironmentVariableIncludes() {
         return envVarIncludes.isEmpty() ? null : envVarIncludes;
     }
@@ -438,6 +460,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public ApplicationContextBuilder beanResolutionCustomizer(@Nullable BeanResolutionCustomizer customizer) {
+        this.beanResolutionCustomizer = customizer == null ? BeanResolutionCustomizer.DEFAULT : customizer;
+        return this;
+    }
+
+    @Override
     public ApplicationContextBuilder eagerBeansEnabled(boolean enabled) {
         this.eagerBeansEnabled = enabled;
         return this;
@@ -462,6 +490,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public ApplicationContextBuilder customScopeRegistry(@Nullable CustomScopeRegistryFactory factory) {
+        this.customScopeRegistryFactory = factory;
+        return this;
+    }
+
+    @Override
     public ApplicationContextBuilder resourceResolver(@Nullable ClassPathResourceLoader resourceResolver) {
         this.classPathResourceLoader = resourceResolver;
         return this;
@@ -475,6 +509,9 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     @SuppressWarnings("MagicNumber")
     public ApplicationContext build() {
+        if (isConfigImportEnabled()) {
+            propertySourcesLocator(new ConfigImportPropertySourcesLocator());
+        }
         ApplicationContext applicationContext = newApplicationContext();
         Environment environment = applicationContext.getEnvironment();
         if (!packages.isEmpty()) {
@@ -573,6 +610,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         return this;
     }
 
+    @Override
+    public ApplicationContextBuilder configImport(boolean enabled) {
+        this.configImportEnabled = enabled;
+        return this;
+    }
+
     /**
      * Returns a customizer which is the aggregation of all
      * customizers found on classpath via service loading.
@@ -587,7 +630,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
             return ApplicationContextConfigurer.NO_OP;
         }
         if (configurers.size() == 1) {
-            return configurers.get(0);
+            return configurers.getFirst();
         }
         OrderUtil.sortOrdered(configurers);
         return new ApplicationContextConfigurer() {

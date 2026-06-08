@@ -129,9 +129,9 @@ class FiltersPropagatedContextSpec6 extends Specification {
         @RequestFilter
         @ExecuteOn(TaskExecutors.BLOCKING)
         MutableHttpResponse<?> myFilter(HttpRequest<?> request, FilterContinuation<MutableHttpResponse<?>> continuation) {
-            try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new MyContext()).propagate()) {
-                return continuation.request(request).proceed()
-            }
+            return PropagatedContext.getOrEmpty()
+                .plus(new MyContext())
+                .propagateCall(() -> continuation.request(request).proceed())
         }
 
         @Override

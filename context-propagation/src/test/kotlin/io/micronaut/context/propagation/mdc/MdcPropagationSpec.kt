@@ -42,7 +42,7 @@ class MdcPropagationSpec {
     fun testKotlinPropagation() {
         val embeddedServer = ApplicationContext.run(
             EmbeddedServer::class.java,
-            mapOf("mdc.reactortest.enabled" to "true" as Any)
+            mapOf("mdc.reactortest.enabled" to "true" as Any, "micronaut.propagation" to "thread-local")
         )
         val client = embeddedServer.applicationContext.getBean(HttpClient::class.java)
 

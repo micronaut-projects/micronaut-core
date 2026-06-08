@@ -47,8 +47,18 @@ public record ServerHttpRequestContext(HttpRequest<?> httpRequest) implements Pr
      * @return an optional {@link HttpRequest}
      */
     public static <T> Optional<HttpRequest<T>> find() {
-        return PropagatedContext.find()
-            .flatMap(ctx -> ctx.find(ServerHttpRequestContext.class))
+        return PropagatedContext.find().flatMap(ServerHttpRequestContext::find);
+    }
+
+    /**
+     * Finds an {@link HttpRequest} within the provided {@link PropagatedContext}.
+     *
+     * @param <T> The type of the request body.
+     * @param context The propagated context to search within.
+     * @return An {@link Optional} containing the {@link HttpRequest} if found; otherwise, an empty {@link Optional}.
+     */
+    public static <T> Optional<HttpRequest<T>> find(PropagatedContext context) {
+        return context.find(ServerHttpRequestContext.class)
             .map(e -> (HttpRequest<T>) e.httpRequest);
     }
 

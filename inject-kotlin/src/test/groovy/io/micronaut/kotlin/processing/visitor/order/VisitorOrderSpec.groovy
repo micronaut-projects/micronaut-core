@@ -27,4 +27,23 @@ class MyBean3
                                  "MyVisitor1 vis.MyBean1", "MyVisitor1 vis.MyBean2", "MyVisitor1 vis.MyBean3"]
     }
 
+    void 'test annotated nested class in unannotated outer is visited'() {
+        when:
+            buildClassLoader('vis.Outer', '''
+package vis
+
+import io.micronaut.kotlin.processing.visitor.order.VisitMyAnnotation
+
+class Outer {
+    @VisitMyAnnotation
+    class Nested
+}
+
+''')
+        then:
+            MyVisitor1.ORDER == ["MyVisitor3 vis.Outer\$Nested",
+                                 "MyVisitor2 vis.Outer\$Nested",
+                                 "MyVisitor1 vis.Outer\$Nested"]
+    }
+
 }

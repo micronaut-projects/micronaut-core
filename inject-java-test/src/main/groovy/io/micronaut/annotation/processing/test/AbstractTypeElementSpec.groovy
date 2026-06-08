@@ -681,7 +681,7 @@ class Test {
             def typeArguments = classElement.getTypeArguments().values()
             if (typeArguments.isEmpty()) {
                 return classElement.getSimpleName()
-            } else if (typeArguments.stream().allMatch { it.isRawType() }) {
+            } else if (typeArguments.stream().allMatch { it.isRawType() && it.isGenericPlaceholder() }) {
                 return classElement.getSimpleName()
             } else {
                 return classElement.getSimpleName() + typeArguments.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))

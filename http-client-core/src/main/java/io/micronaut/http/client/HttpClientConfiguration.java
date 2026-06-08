@@ -18,6 +18,7 @@ package io.micronaut.http.client;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
+import io.micronaut.http.HttpHeaders;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.ArgumentUtils;
@@ -39,11 +40,13 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -115,6 +118,12 @@ public abstract class HttpClientConfiguration {
     public static final boolean DEFAULT_FOLLOW_REDIRECTS = true;
 
     /**
+     * The default maximum number of redirects to follow.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_REDIRECTS = 5;
+
+    /**
      * The default value.
      */
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
@@ -170,6 +179,10 @@ public abstract class HttpClientConfiguration {
 
     private int maxHeaderSize = DEFAULT_MAX_HEADER_SIZE;
 
+    private int maxInitialLineLength = DEFAULT_MAX_INITIAL_LINE_LENGTH;
+
+    private int maxChunkSize = DEFAULT_MAX_CHUNK_SIZE;
+
     private Proxy.Type proxyType = Proxy.Type.DIRECT;
 
     @Nullable
@@ -187,6 +200,25 @@ public abstract class HttpClientConfiguration {
     private Charset defaultCharset = StandardCharsets.UTF_8;
 
     private boolean followRedirects = DEFAULT_FOLLOW_REDIRECTS;
+
+    private Set<String> redirectAlwaysFilteredHeaders = new LinkedHashSet<>(Set.of(
+        HttpHeaders.HOST,
+        HttpHeaders.CONNECTION
+    ));
+
+    private Set<String> redirectAdditionalNonPreserveBodyFilteredHeaders = new LinkedHashSet<>(Set.of(
+        HttpHeaders.CONTENT_LENGTH,
+        HttpHeaders.CONTENT_TYPE,
+        HttpHeaders.TRANSFER_ENCODING
+    ));
+
+    private Set<String> redirectCrossOriginFilteredHeaders = new LinkedHashSet<>(Set.of(
+        HttpHeaders.AUTHORIZATION,
+        HttpHeaders.PROXY_AUTHORIZATION,
+        HttpHeaders.COOKIE
+    ));
+
+    private int maxRedirects = DEFAULT_MAX_REDIRECTS;
 
     private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
     private boolean decompressionEnabled = true;
@@ -252,10 +284,16 @@ public abstract class HttpClientConfiguration {
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
             this.eventLoopGroup = copy.eventLoopGroup;
             this.followRedirects = copy.followRedirects;
+            this.redirectAlwaysFilteredHeaders = copy.redirectAlwaysFilteredHeaders;
+            this.redirectAdditionalNonPreserveBodyFilteredHeaders = copy.redirectAdditionalNonPreserveBodyFilteredHeaders;
+            this.redirectCrossOriginFilteredHeaders = copy.redirectCrossOriginFilteredHeaders;
+            this.maxRedirects = copy.maxRedirects;
             this.logLevel = copy.logLevel;
             this.loggerName = copy.loggerName;
             this.maxContentLength = copy.maxContentLength;
             this.maxHeaderSize = copy.maxHeaderSize;
+            this.maxInitialLineLength = copy.maxInitialLineLength;
+            this.maxChunkSize = copy.maxChunkSize;
             this.proxyAddress = copy.proxyAddress;
             this.proxyPassword = copy.proxyPassword;
             this.proxySelector = copy.proxySelector;
@@ -437,6 +475,76 @@ public abstract class HttpClientConfiguration {
      */
     public void setFollowRedirects(boolean followRedirects) {
         this.followRedirects = followRedirects;
+    }
+
+    /**
+     * @return Header names that are always filtered for redirects.
+     * By default this includes {@code Host} and {@code Connection}.
+     */
+    public Set<String> getRedirectAlwaysFilteredHeaders() {
+        return Collections.unmodifiableSet(redirectAlwaysFilteredHeaders);
+    }
+
+    /**
+     * Sets the header names that are always filtered for redirects.
+     *
+     * @param redirectAlwaysFilteredHeaders The always-filtered redirect header list
+     */
+    public void setRedirectAlwaysFilteredHeaders(Set<String> redirectAlwaysFilteredHeaders) {
+        this.redirectAlwaysFilteredHeaders = redirectAlwaysFilteredHeaders == null ? new LinkedHashSet<>() : new LinkedHashSet<>(redirectAlwaysFilteredHeaders);
+    }
+
+    /**
+     * @return Additional header names filtered for redirects that do not preserve the request body.
+     * These headers are filtered in addition to {@link #getRedirectAlwaysFilteredHeaders()}.
+     */
+    public Set<String> getRedirectAdditionalNonPreserveBodyFilteredHeaders() {
+        return Collections.unmodifiableSet(redirectAdditionalNonPreserveBodyFilteredHeaders);
+    }
+
+    /**
+     * Sets the additional header names filtered for redirects that do not preserve the request body.
+     * These headers are filtered in addition to {@link #getRedirectAlwaysFilteredHeaders()}.
+     *
+     * @param redirectAdditionalNonPreserveBodyFilteredHeaders The additional non-preserve-body redirect header filter list
+     */
+    public void setRedirectAdditionalNonPreserveBodyFilteredHeaders(Set<String> redirectAdditionalNonPreserveBodyFilteredHeaders) {
+        this.redirectAdditionalNonPreserveBodyFilteredHeaders = redirectAdditionalNonPreserveBodyFilteredHeaders == null ? new LinkedHashSet<>() : new LinkedHashSet<>(redirectAdditionalNonPreserveBodyFilteredHeaders);
+    }
+
+    /**
+     * @return Header names that are additionally filtered for cross-origin redirects.
+     * By default this includes {@code Authorization}, {@code Proxy-Authorization}, and {@code Cookie}.
+     */
+    public Set<String> getRedirectCrossOriginFilteredHeaders() {
+        return Collections.unmodifiableSet(redirectCrossOriginFilteredHeaders);
+    }
+
+    /**
+     * Sets the header names that are additionally filtered for cross-origin redirects.
+     *
+     * @param redirectCrossOriginFilteredHeaders The cross-origin redirect header filter list
+     */
+    public void setRedirectCrossOriginFilteredHeaders(Set<String> redirectCrossOriginFilteredHeaders) {
+        this.redirectCrossOriginFilteredHeaders = redirectCrossOriginFilteredHeaders == null ? new LinkedHashSet<>() : new LinkedHashSet<>(redirectCrossOriginFilteredHeaders);
+    }
+
+    /**
+     * The maximum number of redirects to follow.
+     *
+     * @return The maximum number of redirects
+     */
+    public int getMaxRedirects() {
+        return maxRedirects;
+    }
+
+    /**
+     * Sets the maximum number of redirects to follow. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_REDIRECTS}).
+     *
+     * @param maxRedirects The maximum number of redirects
+     */
+    public void setMaxRedirects(int maxRedirects) {
+        this.maxRedirects = maxRedirects;
     }
 
     /**
@@ -690,12 +798,52 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * [available in the Netty HTTP client].
+     *
+     * @return The maximum initial line length the client can handle
+     * @since 5.0.0
+     */
+    public int getMaxInitialLineLength() {
+        return maxInitialLineLength;
+    }
+
+    /**
+     * [available in the Netty HTTP client].
+     *
+     * @return The maximum chunk size the client can handle
+     * @since 5.0.0
+     */
+    public int getMaxChunkSize() {
+        return maxChunkSize;
+    }
+
+    /**
      * Sets the maximum header size the client can handle. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_HEADER_SIZE}).
      *
      * @param maxHeaderSize The maximum header size the client can handle
      */
     public void setMaxHeaderSize(@ReadableBytes int maxHeaderSize) {
         this.maxHeaderSize = maxHeaderSize;
+    }
+
+    /**
+     * Sets the maximum initial line length the client can handle. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_INITIAL_LINE_LENGTH}).
+     *
+     * @param maxInitialLineLength The maximum initial line length the client can handle
+     * @since 5.0.0
+     */
+    public void setMaxInitialLineLength(@ReadableBytes int maxInitialLineLength) {
+        this.maxInitialLineLength = maxInitialLineLength;
+    }
+
+    /**
+     * Sets the maximum chunk size the client can handle. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_CHUNK_SIZE}).
+     *
+     * @param maxChunkSize The maximum chunk size the client can handle
+     * @since 5.0.0
+     */
+    public void setMaxChunkSize(@ReadableBytes int maxChunkSize) {
+        this.maxChunkSize = maxChunkSize;
     }
 
     /**

@@ -194,7 +194,6 @@ public final class FormRouteCompleter {
                             }
                         }
                         String text = immediate.toString(charset);
-
                         Object existing = map.get(entry.getKey());
                         if (existing == null) {
                             map.put(entry.getKey(), text);

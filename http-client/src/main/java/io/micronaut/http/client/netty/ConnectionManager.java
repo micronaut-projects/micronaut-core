@@ -18,7 +18,6 @@ package io.micronaut.http.client.netty;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.naming.NameUtils;
@@ -125,6 +124,7 @@ import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.ScheduledFuture;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -168,7 +168,7 @@ public class ConnectionManager {
 
     private final HttpVersionSelection httpVersion;
     private final Logger log;
-    private final Map<DefaultHttpClient.RequestKey, PoolHolder> pools = new ConcurrentHashMap<>();
+    private final Map<NettyHttpClient.RequestKey, PoolHolder> pools = new ConcurrentHashMap<>();
     private final ClientSslBuilder nettyClientSslBuilder;
     private final NettyClientSslFactory sslFactory;
     private final BeanProvider<CertificateProvider> certificateProviders;
@@ -223,7 +223,7 @@ public class ConnectionManager {
     ConnectionManager(
         Logger log,
         HttpClientConfiguration configuration,
-        DefaultHttpClientBuilder builder) {
+        NettyHttpClientBuilder builder) {
 
         this.httpVersion = builder.explicitHttpVersion == null ? HttpVersionSelection.forClientConfiguration(configuration) : builder.explicitHttpVersion;
         this.log = log;
@@ -456,7 +456,7 @@ public class ConnectionManager {
      * @param eventLoop          Event loop this connection should be created on
      * @return Future that terminates when the TCP connection is established.
      */
-    ChannelFuture doConnect(DefaultHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer, EventLoopGroup eventLoop) {
+    ChannelFuture doConnect(NettyHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer, EventLoopGroup eventLoop) {
         String host = requestKey.getHost();
         int port = requestKey.getPort();
         Bootstrap localBootstrap = Objects.requireNonNull(bootstrap).clone();
@@ -477,7 +477,7 @@ public class ConnectionManager {
      * @return The {@link SslContext} instance
      */
     @Nullable
-    private SslContext buildSslContext(DefaultHttpClient.RequestKey requestKey) {
+    private SslContext buildSslContext(NettyHttpClient.RequestKey requestKey) {
         final SslContext sslCtx;
         if (requestKey.isSecure()) {
             SslContextHolder holder = sslContextWrapper.takeRetained();
@@ -500,7 +500,7 @@ public class ConnectionManager {
      *                   request
      * @return A mono that will complete once the channel is ready for transmission
      */
-    public final ExecutionFlow<PoolHandle> connect(DefaultHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint) {
+    public final ExecutionFlow<PoolHandle> connect(NettyHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint) {
         return connect(requestKey, blockHint, null);
     }
 
@@ -514,7 +514,7 @@ public class ConnectionManager {
      *                           as it becomes available
      * @return A mono that will complete once the channel is ready for transmission
      */
-    public final ExecutionFlow<PoolHandle> connect(DefaultHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
+    public final ExecutionFlow<PoolHandle> connect(NettyHttpClient.RequestKey requestKey, @Nullable BlockHint blockHint, @Nullable AtomicReference<ScheduledExecutorService> preferredScheduler) {
         return pools.computeIfAbsent(requestKey, rk -> createPool(rk, group)).acquire(blockHint, preferredScheduler);
     }
 
@@ -524,7 +524,7 @@ public class ConnectionManager {
      * @return The {@link SslContext} instance
      */
     @Nullable
-    private SslContext buildWebsocketSslContext(DefaultHttpClient.RequestKey requestKey) {
+    private SslContext buildWebsocketSslContext(NettyHttpClient.RequestKey requestKey) {
         if (requestKey.isSecure()) {
             if (configuration.getSslConfiguration().isEnabled()) {
                 if (!wsContextLoaded) {
@@ -548,7 +548,7 @@ public class ConnectionManager {
      * @param handler The websocket message handler
      * @return A mono that will complete when the handshakes complete
      */
-    final Mono<?> connectForWebsocket(DefaultHttpClient.RequestKey requestKey, ChannelHandler handler) {
+    final Mono<?> connectForWebsocket(NettyHttpClient.RequestKey requestKey, ChannelHandler handler) {
         Sinks.Empty<Object> initial = new CancellableMonoSink<>(null);
 
         ChannelFuture connectFuture = doConnect(requestKey, new CustomizerAwareInitializer() {
@@ -567,9 +567,9 @@ public class ConnectionManager {
 
                 ch.pipeline()
                     .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec(
-                        HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
+                        configuration.getMaxInitialLineLength(),
                         configuration.getMaxHeaderSize(),
-                        HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE))
+                        configuration.getMaxChunkSize()))
                     .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()));
 
                 Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
@@ -650,9 +650,15 @@ public class ConnectionManager {
     final <V, C extends Future<V>> void withPropagation(Future<? extends V> channelFuture, GenericFutureListener<C> listener) {
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         channelFuture.addListener(f -> {
-            try (PropagatedContext.Scope ignored = propagatedContext.propagate()) {
+            if (propagatedContext.isBound()) {
                 //noinspection unchecked
                 listener.operationComplete((C) f);
+            } else {
+                propagatedContext.propagateCall(() -> {
+                    //noinspection unchecked
+                    listener.operationComplete((C) f);
+                    return null;
+                });
             }
         });
     }
@@ -669,7 +675,7 @@ public class ConnectionManager {
             try {
                 final LogLevel nettyLevel =
                     LogLevel.valueOf(logLevel.name());
-                builder.frameLogger(new Http2FrameLogger(nettyLevel, DefaultHttpClient.class));
+                builder.frameLogger(new Http2FrameLogger(nettyLevel, NettyHttpClient.class));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
             }
@@ -696,9 +702,9 @@ public class ConnectionManager {
 
         ChannelPipeline pipeline = ch.pipeline();
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec(
-            HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
+            configuration.getMaxInitialLineLength(),
             configuration.getMaxHeaderSize(),
-            HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE));
+            configuration.getMaxChunkSize()));
         if (configuration.isDecompressionEnabled()) {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
         }
@@ -709,7 +715,7 @@ public class ConnectionManager {
             try {
                 final LogLevel nettyLevel =
                     LogLevel.valueOf(logLevel.name());
-                ch.pipeline().addLast(new LoggingHandler(DefaultHttpClient.class, nettyLevel));
+                ch.pipeline().addLast(new LoggingHandler(NettyHttpClient.class, nettyLevel));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
             }
@@ -808,7 +814,7 @@ public class ConnectionManager {
      * @param ch The plaintext channel
      * @param connectionCustomizer Customizer for the connection
      */
-    private void initHttp2(PoolHolder pool, Channel ch, NettyClientCustomizer connectionCustomizer) {
+    private void initHttp2(PoolHolder pool, Channel ch, NettyClientCustomizer connectionCustomizer, boolean priorKnowledge) {
         Http2MultiplexHandler multiplexHandler = new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
             @Override
             protected void initChannel(Http2StreamChannel ch) throws Exception {
@@ -824,21 +830,32 @@ public class ConnectionManager {
         });
         PoolHolder.Http2ConnectionHolder connectionHolder = pool.new Http2ConnectionHolder(ch, connectionCustomizer);
         ch.pipeline().addLast(multiplexHandler);
-        ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new ChannelInboundHandlerAdapter() {
-            @Override
-            public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                if (msg instanceof Http2SettingsFrame) {
-                    ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
+        if (priorKnowledge) {
+            ch.pipeline().addLast(new ActivityHandler() {
+                @Override
+                public void channelActive0(ChannelHandlerContext ctx) {
                     ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
                     connectionHolder.init();
-                    return;
-                } else {
-                    log.warn("Premature frame: {}", msg.getClass());
+                    ctx.pipeline().remove(ctx.name());
                 }
+            });
+        } else {
+            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new ChannelInboundHandlerAdapter() {
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                    if (msg instanceof Http2SettingsFrame) {
+                        ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
+                        ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
+                        connectionHolder.init();
+                        return;
+                    } else {
+                        log.warn("Premature frame: {}", msg.getClass());
+                    }
 
-                super.channelRead(ctx, msg);
-            }
-        });
+                    super.channelRead(ctx, msg);
+                }
+            });
+        }
         // stream frames should be handled by the multiplexer
         ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
             @Override
@@ -882,7 +899,7 @@ public class ConnectionManager {
      * @param group
      * @return The pool
      */
-    PoolHolder createPool(DefaultHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
+    PoolHolder createPool(NettyHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
         return new PoolHolder(requestKey, group);
     }
 
@@ -893,7 +910,7 @@ public class ConnectionManager {
 
     /**
      * Initializer for TLS channels. After ALPN we will proceed either with
-     * {@link #initHttp1(Channel)} or {@link #initHttp2(PoolHolder, Channel, NettyClientCustomizer)}.
+     * {@link #initHttp1(Channel)} or {@link #initHttp2}.
      */
     private final class AdaptiveAlpnChannelInitializer extends CustomizerAwareInitializer {
         private final PoolHolder pool;
@@ -943,7 +960,8 @@ public class ConnectionManager {
                         protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
                             if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                                 ctx.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, makeFrameCodec());
-                                initHttp2(pool, ctx.channel(), channelCustomizer);
+                                Channel ch1 = ctx.channel();
+                                initHttp2(pool, ch1, channelCustomizer, false);
                             } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
                                 initHttp1(ctx.channel());
                                 pool.new Http1ConnectionHolder(ch, channelCustomizer).init(false);
@@ -982,7 +1000,7 @@ public class ConnectionManager {
 
     /**
      * Initializer for H2C connections. Will proceed with
-     * {@link #initHttp2(PoolHolder, Channel, NettyClientCustomizer)} when the upgrade is done.
+     * {@link #initHttp2} when the upgrade is done.
      */
     private final class Http2UpgradeInitializer extends CustomizerAwareInitializer {
         private final PoolHolder pool;
@@ -1000,15 +1018,15 @@ public class ConnectionManager {
             Http2FrameCodec frameCodec = makeFrameCodec();
 
             HttpClientCodec sourceCodec = new HttpClientCodec(
-                HttpClientConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH,
+                configuration.getMaxInitialLineLength(),
                 configuration.getMaxHeaderSize(),
-                HttpClientConfiguration.DEFAULT_MAX_CHUNK_SIZE);
+                configuration.getMaxChunkSize());
             Http2ClientUpgradeCodec upgradeCodec = new Http2ClientUpgradeCodec(frameCodec,
                 new ChannelInitializer<Channel>() {
                     @Override
                     protected void initChannel(Channel ch) throws Exception {
                         ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, frameCodec);
-                        initHttp2(pool, ch, connectionCustomizer);
+                        initHttp2(pool, ch, connectionCustomizer, false);
                     }
                 });
             HttpClientUpgradeHandler upgradeHandler = new HttpClientUpgradeHandler(sourceCodec, upgradeCodec, 65536);
@@ -1031,6 +1049,33 @@ public class ConnectionManager {
                 }
             });
             ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
+
+            connectionCustomizer.onInitialPipelineBuilt();
+        }
+    }
+
+
+    /**
+     * Initializer for H2C prior-knowledge connections. Will proceed with
+     * {@link #initHttp2} immediately.
+     */
+    private final class Http2PriorKnowledgeInitializer extends CustomizerAwareInitializer {
+        private final PoolHolder pool;
+
+        Http2PriorKnowledgeInitializer(PoolHolder pool) {
+            this.pool = pool;
+        }
+
+        @Override
+        protected void initChannel(Channel ch) throws Exception {
+            NettyClientCustomizer connectionCustomizer = Objects.requireNonNull(bootstrappedCustomizer).specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+
+            insertPcapLoggingHandlerLazy(ch, "outer");
+
+            configureProxy(ch.pipeline(), false, pool.requestKey.getHost(), pool.requestKey.getPort());
+            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, makeFrameCodec());
+            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
+            initHttp2(pool, ch, connectionCustomizer, true);
 
             connectionCustomizer.onInitialPipelineBuilt();
         }
@@ -1205,7 +1250,7 @@ public class ConnectionManager {
 
     /**
      * This class represents one pool, and matches to exactly one
-     * {@link DefaultHttpClient.RequestKey} (i.e. host, port and
+     * {@link NettyHttpClient.RequestKey} (i.e. host, port and
      * protocol are the same for one pool).
      * <p>
      * The superclass {@link Pool49} handles pool size management, this class just implements
@@ -1214,7 +1259,7 @@ public class ConnectionManager {
     final class PoolHolder implements Pool.Listener {
         final Pool pool;
 
-        private final DefaultHttpClient.RequestKey requestKey;
+        private final NettyHttpClient.RequestKey requestKey;
 
         /**
          * {@link ChannelHandler} that is added to a connection to report failures during
@@ -1227,7 +1272,7 @@ public class ConnectionManager {
             }
         };
 
-        PoolHolder(DefaultHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
+        PoolHolder(NettyHttpClient.RequestKey requestKey, Iterable<? extends EventExecutor> group) {
             this.requestKey = requestKey;
             this.pool = switch (configuration.getConnectionPoolConfiguration().getVersion()) {
                 case V4_0 -> new Pool40(this, log, configuration.getConnectionPoolConfiguration(), (EventLoopGroup) group);
@@ -1317,6 +1362,7 @@ public class ConnectionManager {
                         }
                     };
                     case H2C -> new Http2UpgradeInitializer(this);
+                    case H2C_PRIOR_KNOWLEDGE -> new Http2PriorKnowledgeInitializer(this);
                 };
             }
             return doConnect(requestKey, initializer, eventLoop);
