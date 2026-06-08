@@ -752,6 +752,11 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         if (dispatchOneMethod != null) {
             classDefBuilder.addMethod(dispatchOneMethod);
         }
+        MethodDef dispatchOneVoidMethod = dispatchWriter.buildDispatchOneVoidMethod();
+        if (dispatchOneVoidMethod != null) {
+            classDefBuilder.addMethod(dispatchOneVoidMethod);
+        }
+        addPrimitiveDispatchMethods(classDefBuilder);
         MethodDef dispatchMethod = dispatchWriter.buildDispatchMethod();
         if (dispatchMethod != null) {
             classDefBuilder.addMethod(dispatchMethod);
@@ -826,6 +831,34 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
         return classDefBuilder.build();
+    }
+
+    private void addPrimitiveDispatchMethods(ClassDef.ClassDefBuilder classDefBuilder) {
+        addPrimitiveDispatchMethods(classDefBuilder, "Boolean", TypeDef.Primitive.BOOLEAN);
+        addPrimitiveDispatchMethods(classDefBuilder, "Byte", TypeDef.Primitive.BYTE);
+        addPrimitiveDispatchMethods(classDefBuilder, "Short", TypeDef.Primitive.SHORT);
+        addPrimitiveDispatchMethods(classDefBuilder, "Char", TypeDef.Primitive.CHAR);
+        addPrimitiveDispatchMethods(classDefBuilder, "Int", TypeDef.Primitive.INT);
+        addPrimitiveDispatchMethods(classDefBuilder, "Long", TypeDef.Primitive.LONG);
+        addPrimitiveDispatchMethods(classDefBuilder, "Float", TypeDef.Primitive.FLOAT);
+        addPrimitiveDispatchMethods(classDefBuilder, "Double", TypeDef.Primitive.DOUBLE);
+    }
+
+    private void addPrimitiveDispatchMethods(ClassDef.ClassDefBuilder classDefBuilder,
+                                             String suffix,
+                                             TypeDef.Primitive primitiveType) {
+        MethodDef getMethod = dispatchWriter.buildPrimitiveGetMethod("dispatchGet" + suffix, primitiveType);
+        if (getMethod != null) {
+            classDefBuilder.addMethod(getMethod);
+        }
+        MethodDef setMethod = dispatchWriter.buildPrimitiveSetMethod("dispatchSet" + suffix, primitiveType);
+        if (setMethod != null) {
+            classDefBuilder.addMethod(setMethod);
+        }
+        MethodDef setVoidMethod = dispatchWriter.buildPrimitiveSetVoidMethod("dispatchSet" + suffix + "Void", primitiveType);
+        if (setVoidMethod != null) {
+            classDefBuilder.addMethod(setVoidMethod);
+        }
     }
 
     private MethodDef getBooleanMethod(Method method, boolean state) {

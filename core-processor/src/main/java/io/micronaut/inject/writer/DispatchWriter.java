@@ -25,6 +25,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.sourcegen.model.ClassTypeDef;
@@ -68,6 +69,16 @@ public final class DispatchWriter implements ClassOutputWriter {
     private static final MethodDef UNKNOWN_DISPATCH_AT_INDEX = MethodDef.builder("unknownDispatchAtIndexException")
         .addParameter("index", int.class)
         .returns(RuntimeException.class)
+        .build();
+
+    private static final MethodDef DISPATCH_ONE_METHOD = MethodDef.builder("dispatchOne")
+        .addParameters(int.class, Object.class, Object.class)
+        .returns(Object.class)
+        .build();
+
+    private static final MethodDef DISPATCH_ONE_VOID_METHOD = MethodDef.builder("dispatchOneVoid")
+        .addParameters(int.class, Object.class, Object.class)
+        .returns(TypeDef.VOID)
         .build();
 
     private static final Method GET_TARGET_METHOD = ReflectionUtils.getRequiredInternalMethod(
@@ -364,6 +375,252 @@ public final class DispatchWriter implements ClassOutputWriter {
     }
 
     @Nullable
+    public MethodDef buildDispatchOneVoidMethod() {
+        List<Map.Entry<DispatchTarget, Integer>> dispatchers = getDispatchers(dispatchTarget -> dispatchTarget.supportsDispatchOne() && writeType(dispatchTarget) != null);
+        if (dispatchers.isEmpty()) {
+            return null;
+        }
+
+        return MethodDef.builder("dispatchOneVoid")
+            .addModifiers(Modifier.PROTECTED, Modifier.FINAL)
+            .addParameters(int.class, Object.class, Object.class)
+            .returns(TypeDef.VOID)
+            .build((aThis, methodParameters) -> {
+
+                VariableDef.MethodParameter methodIndex = methodParameters.get(0);
+                VariableDef.MethodParameter target = methodParameters.get(1);
+                VariableDef.MethodParameter value = methodParameters.get(2);
+
+                Map<ExpressionDef.Constant, StatementDef> switchCases = CollectionUtils.newHashMap(dispatchers.size());
+                for (Map.Entry<DispatchTarget, Integer> e : dispatchers) {
+                    int caseIndex = e.getValue();
+                    DispatchTarget dispatchTarget = e.getKey();
+                    StatementDef statementDef = dispatchTarget.dispatchOneVoid(caseIndex, methodIndex, target, value);
+                    switchCases.put(ExpressionDef.constant(caseIndex), statementDef);
+                }
+
+                return methodParameters.get(0).asStatementSwitch(
+                    TypeDef.VOID,
+                    switchCases,
+                    aThis.invoke(UNKNOWN_DISPATCH_AT_INDEX, methodIndex).doThrow()
+                );
+            });
+    }
+
+    @Nullable
+    public MethodDef buildPrimitiveGetMethod(String methodName, TypeDef.Primitive primitiveType) {
+        String primitiveName = primitiveName(primitiveType);
+        List<Map.Entry<DispatchTarget, Integer>> dispatchers = getDispatchers(dispatchTarget -> isPrimitiveReadTarget(dispatchTarget, primitiveName));
+        if (dispatchers.isEmpty()) {
+            return null;
+        }
+
+        return MethodDef.builder(methodName)
+            .addModifiers(Modifier.PROTECTED, Modifier.FINAL)
+            .addParameters(int.class, Object.class)
+            .returns(primitiveType)
+            .build((aThis, methodParameters) -> {
+                VariableDef.MethodParameter methodIndex = methodParameters.get(0);
+                VariableDef.MethodParameter target = methodParameters.get(1);
+
+                Map<ExpressionDef.Constant, StatementDef> switchCases = CollectionUtils.newHashMap(dispatchers.size());
+                for (Map.Entry<DispatchTarget, Integer> e : dispatchers) {
+                    int caseIndex = e.getValue();
+                    DispatchTarget dispatchTarget = e.getKey();
+                    ExpressionDef expression = ((AbstractDispatchTarget) dispatchTarget)
+                        .dispatchOneExpression(target, ExpressionDef.nullValue())
+                        .cast(primitiveType);
+                    switchCases.put(ExpressionDef.constant(caseIndex), expression.returning());
+                }
+
+                return StatementDef.multi(
+                    methodIndex.asStatementSwitch(
+                        primitiveType,
+                        switchCases,
+                        aThis.invoke(UNKNOWN_DISPATCH_AT_INDEX, methodIndex).doThrow()
+                    ),
+                    defaultPrimitiveValue(primitiveType).returning()
+                );
+            });
+    }
+
+    @Nullable
+    public MethodDef buildPrimitiveSetMethod(String methodName, TypeDef.Primitive primitiveType) {
+        String primitiveName = primitiveName(primitiveType);
+        List<Map.Entry<DispatchTarget, Integer>> dispatchers = getDispatchers(dispatchTarget -> isPrimitiveWriteTarget(dispatchTarget, primitiveName));
+        if (dispatchers.isEmpty()) {
+            return null;
+        }
+
+        return MethodDef.builder(methodName)
+            .addModifiers(Modifier.PROTECTED, Modifier.FINAL)
+            .addParameters(TypeDef.Primitive.INT, TypeDef.OBJECT, primitiveType)
+            .returns(TypeDef.OBJECT)
+            .build((aThis, methodParameters) -> {
+                VariableDef.MethodParameter methodIndex = methodParameters.get(0);
+                VariableDef.MethodParameter target = methodParameters.get(1);
+                VariableDef.MethodParameter value = methodParameters.get(2);
+
+                Map<ExpressionDef.Constant, StatementDef> switchCases = CollectionUtils.newHashMap(dispatchers.size());
+                for (Map.Entry<DispatchTarget, Integer> e : dispatchers) {
+                    int caseIndex = e.getValue();
+                    DispatchTarget dispatchTarget = e.getKey();
+                    switchCases.put(ExpressionDef.constant(caseIndex), dispatchTarget.dispatchOne(caseIndex, methodIndex, target, value));
+                }
+
+                return StatementDef.multi(
+                    methodIndex.asStatementSwitch(
+                        TypeDef.OBJECT,
+                        switchCases,
+                        aThis.invoke(DISPATCH_ONE_METHOD, methodIndex, target, value).returning()
+                    ),
+                    ExpressionDef.nullValue().returning()
+                );
+            });
+    }
+
+    @Nullable
+    public MethodDef buildPrimitiveSetVoidMethod(String methodName, TypeDef.Primitive primitiveType) {
+        String primitiveName = primitiveName(primitiveType);
+        List<Map.Entry<DispatchTarget, Integer>> dispatchers = getDispatchers(dispatchTarget -> isPrimitiveWriteTarget(dispatchTarget, primitiveName));
+        if (dispatchers.isEmpty()) {
+            return null;
+        }
+
+        return MethodDef.builder(methodName)
+            .addModifiers(Modifier.PROTECTED, Modifier.FINAL)
+            .addParameters(TypeDef.Primitive.INT, TypeDef.OBJECT, primitiveType)
+            .returns(TypeDef.VOID)
+            .build((aThis, methodParameters) -> {
+                VariableDef.MethodParameter methodIndex = methodParameters.get(0);
+                VariableDef.MethodParameter target = methodParameters.get(1);
+                VariableDef.MethodParameter value = methodParameters.get(2);
+
+                Map<ExpressionDef.Constant, StatementDef> switchCases = CollectionUtils.newHashMap(dispatchers.size());
+                for (Map.Entry<DispatchTarget, Integer> e : dispatchers) {
+                    int caseIndex = e.getValue();
+                    DispatchTarget dispatchTarget = e.getKey();
+                    switchCases.put(ExpressionDef.constant(caseIndex), dispatchTarget.dispatchOneVoid(caseIndex, methodIndex, target, value));
+                }
+
+                return methodIndex.asStatementSwitch(
+                    TypeDef.VOID,
+                    switchCases,
+                    aThis.invoke(DISPATCH_ONE_VOID_METHOD, methodIndex, target, value)
+                );
+            });
+    }
+
+    private static boolean isPrimitiveReadTarget(DispatchTarget dispatchTarget, String primitiveName) {
+        ClassElement type = readType(dispatchTarget);
+        return type != null && type.isPrimitive() && type.getName().equals(primitiveName) && dispatchTarget instanceof AbstractDispatchTarget;
+    }
+
+    private static boolean isPrimitiveWriteTarget(DispatchTarget dispatchTarget, String primitiveName) {
+        ClassElement type = writeType(dispatchTarget);
+        return type != null && type.isPrimitive() && type.getName().equals(primitiveName);
+    }
+
+    @Nullable
+    private static ClassElement readType(DispatchTarget dispatchTarget) {
+        if (dispatchTarget instanceof FieldGetDispatchTarget fieldGetDispatchTarget) {
+            return fieldGetDispatchTarget.beanField.getType();
+        }
+        if (dispatchTarget instanceof FieldGetReflectionDispatchTarget fieldGetDispatchTarget) {
+            return fieldGetDispatchTarget.beanField.getType();
+        }
+        if (dispatchTarget instanceof MethodDispatchTarget methodDispatchTarget) {
+            return methodDispatchTarget.methodElement.getGenericReturnType();
+        }
+        if (dispatchTarget instanceof MethodReflectionDispatchTarget methodDispatchTarget) {
+            return methodDispatchTarget.methodElement.getGenericReturnType();
+        }
+        return null;
+    }
+
+    @Nullable
+    private static ClassElement writeType(DispatchTarget dispatchTarget) {
+        if (dispatchTarget instanceof FieldSetDispatchTarget fieldSetDispatchTarget) {
+            return fieldSetDispatchTarget.beanField.getType();
+        }
+        if (dispatchTarget instanceof FieldSetReflectionDispatchTarget fieldSetDispatchTarget) {
+            return fieldSetDispatchTarget.beanField.getType();
+        }
+        if (dispatchTarget instanceof MethodDispatchTarget methodDispatchTarget) {
+            return firstParameterType(methodDispatchTarget.methodElement);
+        }
+        if (dispatchTarget instanceof MethodReflectionDispatchTarget methodDispatchTarget) {
+            return firstParameterType(methodDispatchTarget.methodElement);
+        }
+        if (dispatchTarget instanceof KotlinMethodWithDefaultsDispatchTarget methodDispatchTarget) {
+            return firstParameterType(methodDispatchTarget.methodElement);
+        }
+        return null;
+    }
+
+    @Nullable
+    private static ClassElement firstParameterType(MethodElement methodElement) {
+        ParameterElement[] parameters = methodElement.getParameters();
+        return parameters.length == 1 ? parameters[0].getGenericType() : null;
+    }
+
+    private static String primitiveName(TypeDef.Primitive primitiveType) {
+        if (primitiveType.equals(TypeDef.Primitive.BOOLEAN)) {
+            return "boolean";
+        }
+        if (primitiveType.equals(TypeDef.Primitive.BYTE)) {
+            return "byte";
+        }
+        if (primitiveType.equals(TypeDef.Primitive.SHORT)) {
+            return "short";
+        }
+        if (primitiveType.equals(TypeDef.Primitive.CHAR)) {
+            return "char";
+        }
+        if (primitiveType.equals(TypeDef.Primitive.INT)) {
+            return "int";
+        }
+        if (primitiveType.equals(TypeDef.Primitive.LONG)) {
+            return "long";
+        }
+        if (primitiveType.equals(TypeDef.Primitive.FLOAT)) {
+            return "float";
+        }
+        if (primitiveType.equals(TypeDef.Primitive.DOUBLE)) {
+            return "double";
+        }
+        throw new IllegalStateException("Unsupported primitive dispatch type: " + primitiveType);
+    }
+
+    private static ExpressionDef defaultPrimitiveValue(TypeDef.Primitive primitiveType) {
+        if (primitiveType.equals(TypeDef.Primitive.BOOLEAN)) {
+            return TypeDef.Primitive.BOOLEAN.constant(false);
+        }
+        if (primitiveType.equals(TypeDef.Primitive.BYTE)) {
+            return TypeDef.Primitive.BYTE.constant((byte) 0);
+        }
+        if (primitiveType.equals(TypeDef.Primitive.SHORT)) {
+            return TypeDef.Primitive.SHORT.constant((short) 0);
+        }
+        if (primitiveType.equals(TypeDef.Primitive.CHAR)) {
+            return TypeDef.Primitive.CHAR.constant('\0');
+        }
+        if (primitiveType.equals(TypeDef.Primitive.INT)) {
+            return TypeDef.Primitive.INT.constant(0);
+        }
+        if (primitiveType.equals(TypeDef.Primitive.LONG)) {
+            return TypeDef.Primitive.LONG.constant(0L);
+        }
+        if (primitiveType.equals(TypeDef.Primitive.FLOAT)) {
+            return TypeDef.Primitive.FLOAT.constant(0F);
+        }
+        if (primitiveType.equals(TypeDef.Primitive.DOUBLE)) {
+            return TypeDef.Primitive.DOUBLE.constant(0D);
+        }
+        throw new IllegalStateException("Unsupported primitive dispatch type: " + primitiveType);
+    }
+
+    @Nullable
     public MethodDef buildGetTargetMethodByIndex() {
         // Should we include methods that don't require reflection???
         List<Map.Entry<DispatchTarget, Integer>> dispatchers = getDispatchers(dispatchTarget -> dispatchTarget.getMethodElement() != null);
@@ -499,6 +756,10 @@ public final class DispatchWriter implements ClassOutputWriter {
             throw new IllegalStateException("Not supported");
         }
 
+        default StatementDef dispatchOneVoid(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
+            throw new IllegalStateException("Not supported");
+        }
+
         StatementDef dispatch(ExpressionDef target, ExpressionDef valuesArray);
 
         MethodElement getMethodElement();
@@ -539,6 +800,11 @@ public final class DispatchWriter implements ClassOutputWriter {
         public StatementDef dispatchOne(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
             ExpressionDef expression = dispatchOneExpression(target, value);
             return expressionReturning(expression);
+        }
+
+        @Override
+        public StatementDef dispatchOneVoid(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
+            return (StatementDef) dispatchOneExpression(target, value);
         }
 
         private StatementDef expressionReturning(ExpressionDef expression) {
@@ -731,6 +997,13 @@ public final class DispatchWriter implements ClassOutputWriter {
                 .after(ExpressionDef.nullValue().returning());
         }
 
+        @Override
+        public StatementDef dispatchOneVoid(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
+            return target.cast(ClassTypeDef.of(beanField.getOwningType()))
+                .field(beanField)
+                .put(value.cast(TypeDef.of(beanField.getType())));
+        }
+
         public FieldElement getField() {
             return beanField;
         }
@@ -775,6 +1048,16 @@ public final class DispatchWriter implements ClassOutputWriter {
                 target, // Target instance
                 value // Field value
             ).after(ExpressionDef.nullValue().returning());
+        }
+
+        @Override
+        public StatementDef dispatchOneVoid(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
+            return TYPE_REFLECTION_UTILS.invokeStatic(METHOD_SET_FIELD_VALUE,
+                ExpressionDef.constant(ClassTypeDef.of(beanField.getOwningType())), // Target class
+                ExpressionDef.constant(beanField.getName()), // Field name
+                target, // Target instance
+                value // Field value
+            );
         }
 
         public FieldElement getField() {
