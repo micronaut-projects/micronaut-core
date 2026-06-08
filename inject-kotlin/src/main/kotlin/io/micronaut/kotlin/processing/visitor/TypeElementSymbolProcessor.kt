@@ -219,7 +219,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
         }
     }
 
-    private fun findTypeElementVisitors(): Collection<TypeElementVisitor<*, *>> {
+    protected open fun findTypeElementVisitors(): Collection<TypeElementVisitor<*, *>> {
         val typeElementVisitors: MutableMap<String, TypeElementVisitor<*, *>> = HashMap(10)
         for (definition in SERVICE_LOADER) {
             if (definition.isPresent) {
