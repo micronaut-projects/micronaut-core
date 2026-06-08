@@ -2274,11 +2274,20 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return null;
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private <K, R extends Collection<K>> R resolveBeansOfType(BeanResolutionContext resolutionContext, BeanContext context, Argument<R> returnType, @Nullable Argument<K> beanType, @Nullable Qualifier<K> qualifier) {
         if (beanType == null) {
             throw noGenericsError(resolutionContext, returnType);
         }
         qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
+        if (returnType.isArray()
+                && context instanceof DefaultBeanContext defaultBeanContext
+                && defaultBeanContext.getBeanResolutionCustomizer().shouldResolveArrayAsBean(returnType)) {
+            Optional<K[]> arrayBean = resolutionContext.findBean((Argument) returnType, (Qualifier) qualifier);
+            if (arrayBean.isPresent()) {
+                return coerceCollectionToCorrectType(returnType.getType(), Arrays.asList(arrayBean.get()), resolutionContext, returnType);
+            }
+        }
         Collection<K> beansOfType = resolutionContext.getBeansOfType(resolveArgument(context, beanType), qualifier);
         return coerceCollectionToCorrectType(returnType.getType(), beansOfType, resolutionContext, returnType);
     }

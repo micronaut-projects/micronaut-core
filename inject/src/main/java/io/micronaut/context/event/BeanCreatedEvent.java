@@ -16,9 +16,13 @@
 package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
+import org.jspecify.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * <p>An event fired when a bean is created and fully initialized.</p>
@@ -33,12 +37,15 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
     private final BeanIdentifier beanIdentifier;
 
     private final Argument<T> beanType;
+    @Nullable
+    private final transient BeanDefinition<?> rootBeanDefinition;
+    private final transient List<BeanRegistration<?>> dependentBeans;
 
     public BeanCreatedEvent(BeanContext beanContext,
                             BeanDefinition<T> beanDefinition,
                             BeanIdentifier beanIdentifier,
                             T bean) {
-        this(beanContext, beanDefinition, beanIdentifier, beanDefinition.asArgument(), bean);
+        this(beanContext, beanDefinition, beanIdentifier, beanDefinition.asArgument(), bean, null, List.of());
     }
 
     /**
@@ -53,9 +60,31 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
                             BeanIdentifier beanIdentifier,
                             Argument<T> beanType,
                             T bean) {
+        this(beanContext, beanDefinition, beanIdentifier, beanType, bean, null, List.of());
+    }
+
+    /**
+     * @param beanContext        The bean context
+     * @param beanDefinition     The bean definition
+     * @param beanIdentifier     The bean identifier
+     * @param beanType           The {@link Argument} used to create the bean
+     * @param bean               The bean
+     * @param rootBeanDefinition The root bean definition for the current resolution
+     * @param dependentBeans     The direct dependent beans created for this bean
+     * @since 5.1.0
+     */
+    public BeanCreatedEvent(BeanContext beanContext,
+                            BeanDefinition<T> beanDefinition,
+                            BeanIdentifier beanIdentifier,
+                            Argument<T> beanType,
+                            T bean,
+                            @Nullable BeanDefinition<?> rootBeanDefinition,
+                            @Nullable List<BeanRegistration<?>> dependentBeans) {
         super(beanContext, beanDefinition, bean);
         this.beanIdentifier = beanIdentifier;
         this.beanType = beanType;
+        this.rootBeanDefinition = rootBeanDefinition;
+        this.dependentBeans = dependentBeans == null ? List.of() : List.copyOf(dependentBeans);
     }
 
     /**
@@ -71,5 +100,21 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
      */
     public Argument<T> getBeanType() {
         return beanType;
+    }
+
+    /**
+     * @return The root bean definition for the current resolution, if available
+     * @since 5.1.0
+     */
+    public @Nullable BeanDefinition<?> getRootBeanDefinition() {
+        return rootBeanDefinition;
+    }
+
+    /**
+     * @return The direct dependent beans created for this bean
+     * @since 5.1.0
+     */
+    public List<BeanRegistration<?>> getDependentBeans() {
+        return dependentBeans;
     }
 }

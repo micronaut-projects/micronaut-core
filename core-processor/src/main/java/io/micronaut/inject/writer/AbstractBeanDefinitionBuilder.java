@@ -367,7 +367,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     public BeanElementBuilder withMethods(ElementQuery<MethodElement> methods, Consumer<BeanMethodElement> beanMethods) {
         //noinspection ConstantConditions
         if (methods != null && beanMethods != null) {
-            final ElementQuery<MethodElement> baseQuery = methods.onlyInstance();
+            final ElementQuery<MethodElement> baseQuery = methods.result().isOnlyStatic() ? methods : methods.onlyInstance();
             this.beanType.getEnclosedElements(baseQuery.modifiers(m -> m.contains(ElementModifier.PUBLIC)))
                 .forEach(methodElement ->
                     beanMethods.accept(new InternalBeanElementMethod(methodElement, false))
@@ -526,7 +526,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             beanClass.getEnclosedElements(
                 ElementQuery.ALL_METHODS
                     .onlyInstance()
-                    .modifiers(mods -> !mods.contains(ElementModifier.FINAL) && mods.contains(ElementModifier.PUBLIC))
+                    .modifiers(mods -> !mods.contains(ElementModifier.FINAL) && !mods.contains(ElementModifier.PRIVATE))
             ).forEach(method -> {
                 InternalBeanElementMethod ibem = new InternalBeanElementMethod(
                     method,

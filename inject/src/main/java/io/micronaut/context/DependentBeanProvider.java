@@ -13,37 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.ast;
+package io.micronaut.context;
 
-import java.util.Locale;
+import io.micronaut.core.annotation.Internal;
+
+import java.util.List;
 
 /**
- * An enum of modifier names now tied to the reflection API.
+ * Internal interface implemented by bean registrations that keep dependent bean registrations.
  *
- * @author graemerocher
- * @since 1.0.3
+ * @since 5.1.0
  */
-public enum ElementModifier {
-    PUBLIC,
-    PROTECTED,
-    PRIVATE,
-    ABSTRACT,
-    DEFAULT,
-    STATIC,
-    FINAL,
-    TRANSIENT,
-    VOLATILE,
-    SYNCHRONIZED,
-    NATIVE,
-    STRICTFP,
-    SEALED;
+@Internal
+public interface DependentBeanProvider {
 
     /**
-     * @return The name of the modifier as presented in source code.
-     * @since 3.0.0
+     * Returns an immutable snapshot of the dependent bean registrations.
+     *
+     * @return The dependent bean registrations
      */
-    @Override
-    public String toString() {
-        return name().toLowerCase(Locale.ENGLISH);
-    }
+    List<BeanRegistration<?>> dependentBeans();
 }

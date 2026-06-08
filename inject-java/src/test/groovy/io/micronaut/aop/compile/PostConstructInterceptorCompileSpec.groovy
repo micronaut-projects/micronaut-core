@@ -89,6 +89,17 @@ class PreDestroyTestInterceptor implements MethodInterceptor {
 }    
 
 @Singleton
+@TestAnn
+class BindingPreDestroyInterceptor implements MethodInterceptor {
+    int invoked;
+    @Override
+    public Object intercept(MethodInvocationContext context) {
+        invoked++;
+        return context.proceed();
+    }
+}
+
+@Singleton
 class AnotherInterceptor implements Interceptor {
     int invoked;
     @Override
@@ -102,6 +113,7 @@ class AnotherInterceptor implements Interceptor {
         def interceptor = getBean(context, 'annbinding1.TestInterceptor')
         def constructorInterceptor = getBean(context, 'annbinding1.PostConstructTestInterceptor')
         def destroyInterceptor = getBean(context, 'annbinding1.PreDestroyTestInterceptor')
+        def bindingDestroyInterceptor = getBean(context, 'annbinding1.BindingPreDestroyInterceptor')
         def anotherInterceptor = getBean(context, 'annbinding1.AnotherInterceptor')
 
         then:
@@ -109,6 +121,7 @@ class AnotherInterceptor implements Interceptor {
         !anotherInterceptor.invoked
         !constructorInterceptor.invoked
 
+        bindingDestroyInterceptor.invoked == 0
         when:"A bean that featuring post construct injection is instantiated"
         def instance = getBean(context, 'annbinding1.MyBean')
 
@@ -148,6 +161,7 @@ class AnotherInterceptor implements Interceptor {
         anotherInterceptor.invoked == 0
         // TODO: Discuss why we are invoking destroy hooks for proxies
         destroyInterceptor.invoked == proxyTarget ? 3 : 2
+        bindingDestroyInterceptor.invoked == proxyTarget ? 3 : 2
 
 
         where:

@@ -68,6 +68,10 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Nullable
     private List<BeanRegistration<?>> dependentBeans;
     @Nullable
+    private List<BeanRegistration<?>> dependentBeansToDestroyAfterResolution;
+    @Nullable
+    private Deque<List<BeanRegistration<?>>> dependentBeansToDestroyAfterResolutionStack;
+    @Nullable
     private BeanRegistration<?> dependentFactory;
     @Nullable
     private final PropertyResolver propertyResolver;
@@ -395,9 +399,25 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    public BeanResolutionContext copyForLazyProxyTarget(BeanDefinition<?> proxyBeanDefinition) {
+        BeanResolutionContext copy = copy();
+        if (!context.getBeanResolutionCustomizer().shouldPreserveLazyProxyTargetResolutionPath(this, proxyBeanDefinition)) {
+            copy.getPath().clear();
+        }
+        return copy;
+    }
+
+    @Override
     public <T> void addDependentBean(BeanRegistration<T> beanRegistration) {
         if (beanRegistration.getBeanDefinition() == rootDefinition) {
             // Don't add self
+            return;
+        }
+        if (context.getBeanResolutionCustomizer().shouldDestroyDependentBeanAfterResolution(this, beanRegistration.getBeanDefinition())) {
+            if (dependentBeansToDestroyAfterResolution == null) {
+                dependentBeansToDestroyAfterResolution = new ArrayList<>(3);
+            }
+            dependentBeansToDestroyAfterResolution.add(beanRegistration);
             return;
         }
         if (dependentBeans == null) {
@@ -418,6 +438,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public List<BeanRegistration<?>> getAndResetDependentBeans() {
+        destroyDependentBeansAfterResolution();
         if (dependentBeans == null) {
             return Collections.emptyList();
         }
@@ -427,13 +448,27 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    public List<BeanRegistration<?>> getDependentBeans() {
+        if (dependentBeans == null) {
+            return Collections.emptyList();
+        }
+        return Collections.unmodifiableList(dependentBeans);
+    }
+
+    private void destroyDependentBeansAfterResolution() {
+        if (dependentBeansToDestroyAfterResolution != null) {
+            for (BeanRegistration<?> beanRegistration : dependentBeansToDestroyAfterResolution) {
+                context.destroyBean(beanRegistration);
+            }
+            dependentBeansToDestroyAfterResolution = null;
+        }
+    }
+
+    @Override
     public void markDependentAsFactory() {
         if (dependentBeans != null) {
             if (dependentBeans.isEmpty()) {
                 return;
-            }
-            if (dependentBeans.size() != 1) {
-                throw new IllegalStateException("Expected only one bean dependent!");
             }
             dependentFactory = dependentBeans.removeFirst();
         }
@@ -452,6 +487,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     public List<BeanRegistration<?>> popDependentBeans() {
         List<BeanRegistration<?>> result = this.dependentBeans;
         this.dependentBeans = null;
+        if (dependentBeansToDestroyAfterResolutionStack == null) {
+            dependentBeansToDestroyAfterResolutionStack = new ArrayDeque<>(3);
+        }
+        dependentBeansToDestroyAfterResolutionStack.push(
+            dependentBeansToDestroyAfterResolution == null ? Collections.emptyList() : dependentBeansToDestroyAfterResolution
+        );
+        dependentBeansToDestroyAfterResolution = null;
         return result;
     }
 
@@ -461,6 +503,10 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             throw new IllegalStateException("Found existing dependent beans!");
         }
         this.dependentBeans = dependentBeans;
+        if (dependentBeansToDestroyAfterResolutionStack != null && !dependentBeansToDestroyAfterResolutionStack.isEmpty()) {
+            List<BeanRegistration<?>> beansToDestroyAfterResolution = dependentBeansToDestroyAfterResolutionStack.pop();
+            dependentBeansToDestroyAfterResolution = beansToDestroyAfterResolution.isEmpty() ? null : beansToDestroyAfterResolution;
+        }
     }
 
     @Override
@@ -650,10 +696,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 ++index;
             }
 
-            String dashes = String.join("", Collections.nCopies(spaces.length() - spaces.indexOf("|") - 1, "-"));
+            int cyclePointerIndex = spaces.indexOf("|");
+            if (cyclePointerIndex < 0) {
+                return toString();
+            }
+            String dashes = String.join("", Collections.nCopies(spaces.length() - cyclePointerIndex - 1, "-"));
             pathString
                 .append(ls).append(spaces).append("|")
-                .append(ls).append(spaces, 0, spaces.indexOf("|"))
+                .append(ls).append(spaces, 0, cyclePointerIndex)
                 .append("+").append(dashes).append("+");
 
             return pathString.toString();
@@ -1359,12 +1409,16 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
             AbstractSegment that = (AbstractSegment) o;
 
-            return declaringComponent.equals(that.declaringComponent) && name.equals(that.name) && argument.equals(that.argument);
+            return declaringComponent.equals(that.declaringComponent)
+                && Objects.equals(getDeclaringTypeQualifier(), that.getDeclaringTypeQualifier())
+                && name.equals(that.name)
+                && argument.equals(that.argument)
+                && Objects.equals(argument.getAnnotationMetadata().getAnnotationNames(), that.argument.getAnnotationMetadata().getAnnotationNames());
         }
 
         @Override
         public int hashCode() {
-            return ObjectUtils.hash(declaringComponent, name, argument);
+            return Objects.hash(declaringComponent, getDeclaringTypeQualifier(), name, argument, argument.getAnnotationMetadata().getAnnotationNames());
         }
 
         /**

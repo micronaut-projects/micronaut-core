@@ -189,4 +189,15 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     public @Nullable Predicate<BeanConfiguration> beanConfiguraionsPredicate() {
         return delegate.beanConfiguraionsPredicate();
     }
+
+    @Override
+    public BeanResolutionCustomizer beanResolutionCustomizer() {
+        return delegate.beanResolutionCustomizer();
+    }
+
+    @Override
+    @Nullable
+    public CustomScopeRegistryFactory customScopeRegistryFactory() {
+        return delegate.customScopeRegistryFactory();
+    }
 }

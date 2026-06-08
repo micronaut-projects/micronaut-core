@@ -380,7 +380,7 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     }
 
     private boolean visitAopAndExecutableMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
-        if (methodElement.isStatic() && isExplicitlyAnnotatedAsExecutable(methodElement)) {
+        if (methodElement.isStatic() && !isExplicitlyAnnotatedAsExecutable(methodElement)) {
             // Only allow static executable methods when it's explicitly annotated with Executable.class
             return false;
         }
@@ -403,7 +403,9 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
      * @return true if processed
      */
     protected boolean visitAopMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
-        boolean aopDefinedOnClassAndPublicMethod = isAopProxy && (methodElement.isPublic() || methodElement.isPackagePrivate());
+        boolean aopDefinedOnClassAndPublicMethod = isAopProxy
+            && !methodElement.isStatic()
+            && (methodElement.isPublic() || methodElement.isPackagePrivate());
         AnnotationMetadata methodAnnotationMetadata = methodElement.getMethodAnnotationMetadata();
         if (aopDefinedOnClassAndPublicMethod ||
             !isAopProxy && InterceptedMethodUtil.hasAroundStereotype(methodAnnotationMetadata) ||
@@ -457,7 +459,7 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     }
 
     private static boolean isExplicitlyAnnotatedAsExecutable(MethodElement methodElement) {
-        return !methodElement.getMethodAnnotationMetadata().hasDeclaredAnnotation(Executable.class);
+        return methodElement.getMethodAnnotationMetadata().hasDeclaredAnnotation(Executable.class);
     }
 
     /**

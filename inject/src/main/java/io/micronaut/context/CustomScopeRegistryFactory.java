@@ -13,37 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.ast;
+package io.micronaut.context;
 
-import java.util.Locale;
+import io.micronaut.context.scope.CustomScopeRegistry;
+import org.jspecify.annotations.NonNull;
 
 /**
- * An enum of modifier names now tied to the reflection API.
+ * Factory used to create a custom scope registry for a bean context.
  *
- * @author graemerocher
- * @since 1.0.3
+ * @since 5.1.0
  */
-public enum ElementModifier {
-    PUBLIC,
-    PROTECTED,
-    PRIVATE,
-    ABSTRACT,
-    DEFAULT,
-    STATIC,
-    FINAL,
-    TRANSIENT,
-    VOLATILE,
-    SYNCHRONIZED,
-    NATIVE,
-    STRICTFP,
-    SEALED;
+@FunctionalInterface
+public interface CustomScopeRegistryFactory {
 
     /**
-     * @return The name of the modifier as presented in source code.
-     * @since 3.0.0
+     * Create the custom scope registry.
+     *
+     * @param beanContext The bean context
+     * @return The custom scope registry
      */
-    @Override
-    public String toString() {
-        return name().toLowerCase(Locale.ENGLISH);
-    }
+    @NonNull
+    CustomScopeRegistry create(@NonNull BeanContext beanContext);
 }

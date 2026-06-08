@@ -119,9 +119,19 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         "interceptedTarget"
     );
 
+    private static final Method METHOD_OBJECT_TO_STRING = ReflectionUtils.getRequiredMethod(
+        Object.class,
+        "toString"
+    );
+
     private static final Method METHOD_HAS_CACHED_INTERCEPTED_METHOD = ReflectionUtils.getRequiredInternalMethod(
         InterceptedProxy.class,
         "hasCachedInterceptedTarget"
+    );
+
+    private static final Method METHOD_CLEAR_CACHED_INTERCEPTED_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        InterceptedProxy.class,
+        "clearCachedInterceptedTarget"
     );
 
     private static final Method METHOD_BEAN_DEFINITION_GET_REQUIRED_METHOD = ReflectionUtils.getRequiredInternalMethod(
@@ -188,7 +198,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
     private static final Method METHOD_PROCEED = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "proceed");
 
-    private static final Method COPY_BEAN_CONTEXT_METHOD = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "copy");
+    private static final Method COPY_BEAN_CONTEXT_FOR_LAZY_PROXY_TARGET_METHOD = ReflectionUtils.getRequiredMethod(
+        BeanResolutionContext.class,
+        "copyForLazyProxyTarget",
+        BeanDefinition.class
+    );
 
     private static final String FIELD_INTERCEPTORS = "$interceptors";
     private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
@@ -200,6 +214,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private final boolean hotswap;
     private final boolean lazy;
     private final boolean cacheLazyTarget;
+    private final MethodElement targetConstructor;
 
     private final Map<MethodElement, MethodElement> overriddenMethods = new LinkedHashMap<>();
     private final List<MethodElement> aroundMethods = new ArrayList<>();
@@ -221,7 +236,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                           VisitorContext visitorContext,
                           AnnotationValue<?>... interceptorBinding) {
         super(
-            createProxyConstructor(targetType, createProxyType(parent), visitorContext),
+            createProxyConstructor(targetType, createProxyType(parent), settings, visitorContext),
 //            null,
             createProxyType(parent),
             targetType,
@@ -233,6 +248,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         this.hotswap = isProxyTarget && settings.get(Interceptor.HOTSWAP).orElse(false);
         this.lazy = isProxyTarget && settings.get(Interceptor.LAZY).orElse(false);
         this.cacheLazyTarget = lazy && settings.get(Interceptor.CACHEABLE_LAZY_TARGET).orElse(false);
+        this.targetConstructor = selectProxyConstructor(targetType, settings);
     }
 
     /**
@@ -259,6 +275,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         this.hotswap = false;
         this.lazy = false;
         this.cacheLazyTarget = false;
+        this.targetConstructor = getConstructor(targetType);
     }
 
     private static ClassElement createProxyType(BeanDefinitionWriter parent) {
@@ -279,7 +296,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     }
 
     private static MethodElement createProxyConstructor(ClassElement target, ClassElement proxyClass, VisitorContext visitorContext) {
-        MethodElement constructor = getConstructor(target);
+        return createProxyConstructor(target, proxyClass, OptionalValues.empty(), visitorContext);
+    }
+
+    private static MethodElement createProxyConstructor(ClassElement target, ClassElement proxyClass, OptionalValues<Boolean> settings, VisitorContext visitorContext) {
+        MethodElement constructor = selectProxyConstructor(target, settings);
 
         final ClassElement interceptorList = ClassElement.of(List.class, AnnotationMetadata.EMPTY_METADATA, Collections.singletonMap(
             "E", ClassElement.of(BeanRegistration.class, AnnotationMetadata.EMPTY_METADATA, Collections.singletonMap(
@@ -310,6 +331,18 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             "<init>",
             newConstructorParameters.toArray(ParameterElement.ZERO_PARAMETER_ELEMENTS)
         );
+    }
+
+    private static MethodElement selectProxyConstructor(ClassElement target, OptionalValues<Boolean> settings) {
+        MethodElement constructor = getConstructor(target);
+        if (constructor.hasParameters()
+            && settings.get(Interceptor.PROXY_TARGET).orElse(false)
+            && settings.get(Interceptor.LAZY).orElse(false)) {
+            return target.getDefaultConstructor()
+                .filter(defaultConstructor -> !defaultConstructor.isStatic())
+                .orElse(constructor);
+        }
+        return constructor;
     }
 
     /**
@@ -513,6 +546,15 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 buildMethodIntercept(method, index++, targetField, interceptorsField, proxyMethodsField)
             );
         }
+        if (!interceptedMethods.isEmpty()) {
+            proxyBuilder.addMethod(MethodDef.builder("interceptedMethods")
+                .addModifiers(Modifier.PUBLIC)
+                .returns(ClassTypeDef.of(ExecutableMethod.class).array())
+                .build((aThis, methodParameters) -> aThis.field(proxyMethodsField)
+                    .invoke("clone", TypeDef.OBJECT)
+                    .cast(ClassTypeDef.of(ExecutableMethod.class).array())
+                    .returning()));
+        }
 
         constructor.getParameter(INTERCEPTORS_PARAMETER).annotate(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
             builder.values(interceptorBinding.toArray(ZERO_ANNOTATION_VALUES));
@@ -560,7 +602,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             bodyBuilders.add((aThis, methodParameters) -> aThis.field(proxyBeanDefinitionField).assign(
                 methodParameters.get(beanContextArgumentIndex).invoke(
                     METHOD_GET_PROXY_BEAN_DEFINITION,
-
                     // 1nd argument: the type
                     pushTargetArgument(targetType),
                     // 2rd argument: the qualifier
@@ -602,6 +643,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     proxyBuilder.addMethod(
                         getHasCachedInterceptedTargetMethod(targetField)
                     );
+                    proxyBuilder.addMethod(getClearCachedInterceptedTargetMethod(targetField));
                 } else {
                     interceptedTargetMethod = getLazyInterceptedTargetMethod(
                         beanResolutionContextField,
@@ -614,9 +656,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     aThis.field(beanLocatorField).assign(methodParameters.get(beanContextArgumentIndex)),
                     aThis.field(beanResolutionContextField).assign(
                         methodParameters.get(beanResolutionContextArgumentIndex)
-                            .invoke(COPY_BEAN_CONTEXT_METHOD)
+                            .invoke(COPY_BEAN_CONTEXT_FOR_LAZY_PROXY_TARGET_METHOD, aThis.field(proxyBeanDefinitionField))
                     )
                 ));
+                proxyBuilder.addMethod(getLazyProxyTargetToStringMethod());
             } else {
                 if (hotswap) {
                     proxyBuilder.addSuperinterface(TypeDef.parameterized(HotSwappableInterceptedProxy.class, targetType));
@@ -789,8 +832,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         if (targetType.isInterface()) {
             return aThis.superRef().invokeConstructor();
         }
-        MethodElement targetConstructor = getConstructor(targetType);
-
         List<ExpressionDef> values = new ArrayList<>();
         Iterator<VariableDef.MethodParameter> iterator = methodParameters.iterator();
         for (ParameterElement ignored : targetConstructor.getParameters()) {
@@ -869,6 +910,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 proxyBeanDefinitionField,
                 beanQualifierField
             ).returning());
+    }
+
+    private MethodDef getLazyProxyTargetToStringMethod() {
+        return MethodDef.override(METHOD_OBJECT_TO_STRING)
+            .build((aThis, methodParameters) -> aThis.invoke(METHOD_INTERCEPTED_TARGET).invoke(METHOD_OBJECT_TO_STRING).returning());
     }
 
     private MethodDef getCacheLazyTargetInterceptedTargetMethod(FieldDef targetField,
@@ -954,6 +1000,14 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             .addModifiers(Modifier.PUBLIC)
             .addParameters(METHOD_HAS_CACHED_INTERCEPTED_METHOD.getParameterTypes())
             .build((aThis, methodParameters) -> aThis.field(targetField).isNonNull().returning());
+    }
+
+    private MethodDef getClearCachedInterceptedTargetMethod(FieldDef targetField) {
+        Objects.requireNonNull(targetField);
+        return MethodDef.builder(METHOD_CLEAR_CACHED_INTERCEPTED_METHOD.getName())
+            .addModifiers(Modifier.PUBLIC)
+            .addParameters(METHOD_CLEAR_CACHED_INTERCEPTED_METHOD.getParameterTypes())
+            .build((aThis, methodParameters) -> aThis.field(targetField).assign(ExpressionDef.nullValue()));
     }
 
     /**
