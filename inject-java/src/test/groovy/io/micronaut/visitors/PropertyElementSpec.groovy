@@ -546,4 +546,175 @@ class MethodIgnoresOtherAccessors {
         beanProperty.type.name == String.name
         beanProperty.readMethod.get().name == 'name'
     }
+
+    void "test json auto detect default visibility resolves to jackson defaults"() {
+        given:
+        ClassElement classElement = buildClassElement('''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+@JsonAutoDetect(
+    fieldVisibility = JsonAutoDetect.Visibility.DEFAULT,
+    getterVisibility = JsonAutoDetect.Visibility.DEFAULT,
+    isGetterVisibility = JsonAutoDetect.Visibility.DEFAULT,
+    setterVisibility = JsonAutoDetect.Visibility.DEFAULT
+)
+class DefaultJsonAutoDetectBean {
+    private String privateField;
+    public String publicField;
+    private String name;
+    private boolean active;
+    private String writeOnly;
+    private String protectedSetter;
+
+    public String getName() {
+        return name;
+    }
+
+    protected String getProtectedGetter() {
+        return "protected";
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setWriteOnly(String writeOnly) {
+        this.writeOnly = writeOnly;
+    }
+
+    protected void setProtectedSetter(String protectedSetter) {
+        this.protectedSetter = protectedSetter;
+    }
+}
+''')
+        def properties = classElement.beanProperties
+        def propertyNames = properties*.name as Set
+
+        expect:
+        propertyNames == ['publicField', 'name', 'active', 'writeOnly', 'protectedSetter'] as Set
+        !properties.find { it.name == 'publicField' }.isReadOnly()
+        !properties.find { it.name == 'publicField' }.isWriteOnly()
+        properties.find { it.name == 'name' }.isReadOnly()
+        properties.find { it.name == 'active' }.isReadOnly()
+        properties.find { it.name == 'writeOnly' }.isWriteOnly()
+        properties.find { it.name == 'protectedSetter' }.isWriteOnly()
+    }
+
+    void "test json auto detect non private and protected public visibility"() {
+        given:
+        ClassElement classElement = buildClassElement('''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+@JsonAutoDetect(
+    fieldVisibility = JsonAutoDetect.Visibility.NON_PRIVATE,
+    getterVisibility = JsonAutoDetect.Visibility.PROTECTED_AND_PUBLIC,
+    isGetterVisibility = JsonAutoDetect.Visibility.PROTECTED_AND_PUBLIC,
+    setterVisibility = JsonAutoDetect.Visibility.NONE
+)
+class RestrictedJsonAutoDetectBean {
+    private String privateField;
+    String packageField;
+    protected String protectedField;
+    public String publicField;
+    private String protectedGetter;
+    private boolean active;
+    private String writeOnly;
+
+    protected String getProtectedGetter() {
+        return protectedGetter;
+    }
+
+    String getPackageGetter() {
+        return "package";
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setWriteOnly(String writeOnly) {
+        this.writeOnly = writeOnly;
+    }
+}
+''')
+        def properties = classElement.beanProperties
+        def propertyNames = properties*.name as Set
+
+        expect:
+        propertyNames == ['packageField', 'protectedField', 'publicField', 'protectedGetter', 'active'] as Set
+        !properties.find { it.name == 'packageField' }.isReadOnly()
+        !properties.find { it.name == 'packageField' }.isWriteOnly()
+        !properties.find { it.name == 'protectedField' }.isReadOnly()
+        !properties.find { it.name == 'protectedField' }.isWriteOnly()
+        !properties.find { it.name == 'publicField' }.isReadOnly()
+        !properties.find { it.name == 'publicField' }.isWriteOnly()
+        properties.find { it.name == 'protectedGetter' }.isReadOnly()
+        properties.find { it.name == 'active' }.isReadOnly()
+    }
+
+    void "test jackson property annotations define explicit property access"() {
+        given:
+        def introspection = buildBeanIntrospection('test.JacksonPropertyAccessBean', '''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class JacksonPropertyAccessBean {
+    private String renamed;
+    private String readOnly;
+    private String writeOnly;
+    private String setterOnly;
+
+    @JsonProperty("renamed_value")
+    public String getRenamed() {
+        return renamed;
+    }
+
+    @JsonProperty("renamed_value")
+    public void setRenamed(String renamed) {
+        this.renamed = renamed;
+    }
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    public String getReadOnly() {
+        return readOnly;
+    }
+
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    public void setWriteOnly(String writeOnly) {
+        this.writeOnly = writeOnly;
+    }
+
+    @JsonSetter("setter_only")
+    public void applySetterOnly(String setterOnly) {
+        this.setterOnly = setterOnly;
+    }
+}
+''')
+
+        def properties = introspection.beanProperties
+        def renamed = properties.find { it.name == 'renamed' }
+        def readOnly = properties.find { it.name == 'readOnly' }
+        def writeOnly = properties.find { it.name == 'writeOnly' }
+        def setterOnly = properties.find { it.name == 'applySetterOnly' }
+
+        expect:
+        properties*.name as Set == ['renamed', 'readOnly', 'writeOnly', 'applySetterOnly'] as Set
+        !renamed.isReadOnly()
+        !renamed.isWriteOnly()
+        readOnly.isReadOnly()
+        writeOnly.isWriteOnly()
+        setterOnly.isWriteOnly()
+    }
 }
