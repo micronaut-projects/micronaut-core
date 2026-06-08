@@ -20,7 +20,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
-import io.micronaut.inject.proxy.InterceptedMethodProvider
+import io.micronaut.inject.proxy.InterceptedBean
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 /**
  * @author graemerocher
@@ -220,7 +220,7 @@ interface SpecificInterface {
         //I ended up going this route because actually calling the methods here would be relying on
         //having the target interface in the bytecode of the test
         instance.$proxyMethods.length == 2
-        instance instanceof InterceptedMethodProvider
+        instance instanceof InterceptedBean
         def interceptedMethods = instance.interceptedMethods()
         interceptedMethods.length == 2
 

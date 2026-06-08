@@ -130,7 +130,10 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         this.beansPredicate = contextConfiguration.beansPredicate();
         this.beanConfigurationsPredicate = contextConfiguration.beanConfiguraionsPredicate();
         this.beanDefinitionReferencesProvider = contextConfiguration.getBeanDefinitionsProvider();
-        this.beanResolutionCustomizer = contextConfiguration.beanResolutionCustomizer();
+        this.beanResolutionCustomizer = Objects.requireNonNull(
+            contextConfiguration.beanResolutionCustomizer(),
+            "Bean resolution customizer cannot be null"
+        );
         this.classLoader = contextConfiguration.getClassLoader();
         if (beans == null) {
             beans = createBeans(resolveBeanDefinitionReferences(), List.of());

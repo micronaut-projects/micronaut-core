@@ -48,7 +48,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.qualifiers.Qualified;
-import io.micronaut.inject.proxy.InterceptedMethodProvider;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
@@ -548,7 +547,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             );
         }
         if (!interceptedMethods.isEmpty()) {
-            proxyBuilder.addSuperinterface(TypeDef.of(InterceptedMethodProvider.class));
             proxyBuilder.addMethod(MethodDef.builder("interceptedMethods")
                 .addModifiers(Modifier.PUBLIC)
                 .returns(ClassTypeDef.of(ExecutableMethod.class).array())

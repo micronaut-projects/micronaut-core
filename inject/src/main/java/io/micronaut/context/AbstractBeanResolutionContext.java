@@ -470,9 +470,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             if (dependentBeans.isEmpty()) {
                 return;
             }
-            if (dependentBeans.size() != 1) {
-                throw new IllegalStateException("Expected only one bean dependent!");
-            }
             dependentFactory = dependentBeans.removeFirst();
         }
     }
@@ -699,10 +696,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 ++index;
             }
 
-            String dashes = String.join("", Collections.nCopies(spaces.length() - spaces.indexOf("|") - 1, "-"));
+            int cyclePointerIndex = spaces.indexOf("|");
+            if (cyclePointerIndex < 0) {
+                return toString();
+            }
+            String dashes = String.join("", Collections.nCopies(spaces.length() - cyclePointerIndex - 1, "-"));
             pathString
                 .append(ls).append(spaces).append("|")
-                .append(ls).append(spaces, 0, spaces.indexOf("|"))
+                .append(ls).append(spaces, 0, cyclePointerIndex)
                 .append("+").append(dashes).append("+");
 
             return pathString.toString();
@@ -746,27 +747,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
         @Override
         public Path pushBeanCreate(BeanDefinition<?> declaringType, Argument<?> beanType) {
-            try {
-                if (tracer != null) {
-                    tracer.traceBeanCreation(
-                        AbstractBeanResolutionContext.this,
-                        declaringType,
-                        beanType
-                    );
-                }
-                BeanDefinition<Object> beanDefinition = (BeanDefinition<Object>) declaringType;
-                ConstructorSegment constructorSegment = new ConstructorArgumentSegment(
-                    beanDefinition,
-                    (Qualifier<Object>) getCurrentQualifier(),
-                    CONSTRUCTOR_METHOD_NAME,
-                    (Argument<Object>) beanType,
-                    (Argument<Object>[]) beanDefinition.getConstructor().getArguments()
+            if (tracer != null) {
+                tracer.traceBeanCreation(
+                    AbstractBeanResolutionContext.this,
+                    declaringType,
+                    beanType
                 );
-                detectCircularDependency(declaringType, beanType, constructorSegment);
-            } finally {
-                traceResolution();
             }
-            return this;
+            return pushConstructorResolve(declaringType, beanType);
         }
 
         private void traceResolution() {
@@ -1421,12 +1409,16 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
             AbstractSegment that = (AbstractSegment) o;
 
-            return declaringComponent.equals(that.declaringComponent) && name.equals(that.name) && argument.equals(that.argument);
+            return declaringComponent.equals(that.declaringComponent)
+                && Objects.equals(getDeclaringTypeQualifier(), that.getDeclaringTypeQualifier())
+                && name.equals(that.name)
+                && argument.equals(that.argument)
+                && Objects.equals(argument.getAnnotationMetadata().getAnnotationNames(), that.argument.getAnnotationMetadata().getAnnotationNames());
         }
 
         @Override
         public int hashCode() {
-            return ObjectUtils.hash(declaringComponent, name, argument);
+            return Objects.hash(declaringComponent, getDeclaringTypeQualifier(), name, argument, argument.getAnnotationMetadata().getAnnotationNames());
         }
 
         /**
