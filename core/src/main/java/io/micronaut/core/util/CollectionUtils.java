@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.SequencedCollection;
+import java.util.SequencedSet;
 import java.util.Set;
 
 /**
@@ -233,10 +235,16 @@ public class CollectionUtils {
         if (iterableType.equals(Set.class)) {
             return Optional.of(new HashSet<>(collection));
         }
+        if (iterableType.equals(SequencedSet.class)) {
+            return Optional.of(new LinkedHashSet<>(collection));
+        }
         if (iterableType.equals(Queue.class)) {
             return Optional.of(new LinkedList<>(collection));
         }
         if (iterableType.equals(List.class)) {
+            return Optional.of(new ArrayList<>(collection));
+        }
+        if (iterableType.equals(SequencedCollection.class)) {
             return Optional.of(new ArrayList<>(collection));
         }
         if (!iterableType.isInterface()) {
