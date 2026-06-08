@@ -112,7 +112,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * @param connectionPoolConfiguration The connection pool configuration
      * @param sslConfiguration The SSL configuration
      * @param defaultHttpClientConfiguration The default HTTP client configuration
-     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration , ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
+     * @deprecated Use {@link #ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration, ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
      */
     @Deprecated(since = "4.3.0")
     public ServiceHttpClientConfiguration(
@@ -131,7 +131,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * @param webSocketCompressionConfiguration The WebSocket compression configuration
      * @param sslConfiguration The SSL configuration
      * @param defaultHttpClientConfiguration The default HTTP client configuration
-     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration , ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
+     * @deprecated Use {@link #ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration, ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
      */
     @Deprecated(since = "4.6.0")
     public ServiceHttpClientConfiguration(

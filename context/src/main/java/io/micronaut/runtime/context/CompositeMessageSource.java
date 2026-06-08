@@ -43,7 +43,7 @@ public final class CompositeMessageSource extends AbstractMessageSource {
      * The other messages sources.
      *
      * @param messageSources The message sources.
-     * @deprecated Use {@link CompositeMessageSource(List)} instead.
+     * @deprecated Use {@link #CompositeMessageSource(List)} instead.
      */
     @Deprecated
     public CompositeMessageSource(@Nullable Collection<MessageSource> messageSources) {
