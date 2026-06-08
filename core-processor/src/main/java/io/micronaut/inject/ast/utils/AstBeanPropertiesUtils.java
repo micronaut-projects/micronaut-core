@@ -19,10 +19,12 @@ import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -84,6 +86,11 @@ public final class AstBeanPropertiesUtils {
                                                               Function<BeanPropertyData, @Nullable PropertyElement> propertyCreator) {
         BeanProperties.Visibility visibility = configuration.getVisibility();
         Set<BeanProperties.AccessKind> accessKinds = configuration.getAccessKinds();
+
+        if (ignoresOtherAccessors(classElement)) {
+            visibility = BeanProperties.Visibility.ANY;
+            accessKinds.add(BeanProperties.AccessKind.FIELD);
+        }
 
         Set<String> includes = configuration.getIncludes();
         Set<String> excludes = configuration.getExcludes();
@@ -346,9 +353,9 @@ public final class AstBeanPropertiesUtils {
         return methodElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY) && isAccessible(methodElement, visibility);
     }
 
-    private static boolean ignoresOtherAccessors(MemberElement memberElement) {
-        return memberElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY) &&
-            memberElement.booleanValue(ANN_INTROSPECTED_PROPERTY, MEMBER_IGNORE_OTHER_ACCESSORS).orElse(false);
+    private static boolean ignoresOtherAccessors(Element element) {
+        return element.hasAnnotation(ANN_INTROSPECTED_PROPERTY) &&
+            element.booleanValue(ANN_INTROSPECTED_PROPERTY, MEMBER_IGNORE_OTHER_ACCESSORS).orElse(false);
     }
 
     private static void registerIntrospectedPropertyAccess(BeanPropertyData beanPropertyData, MemberElement memberElement) {
@@ -648,8 +655,8 @@ public final class AstBeanPropertiesUtils {
             hasIntrospectedPropertyAccess(beanPropertyData.field);
     }
 
-    private static boolean hasIntrospectedPropertyAccess(@Nullable MemberElement memberElement) {
-        return memberElement != null && memberElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY);
+    private static boolean hasIntrospectedPropertyAccess(@Nullable Element element) {
+        return element != null && element.hasAnnotation(ANN_INTROSPECTED_PROPERTY);
     }
 
     private static ClassElement unwrapType(ClassElement type) {

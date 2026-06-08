@@ -15,14 +15,19 @@
  */
 package io.micronaut.inject.beans.visitor.persistence;
 
+import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.inject.annotation.NamedAnnotationMapper;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.lang.annotation.Annotation;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Makes each use of Jakarta Persistence's Access annotation also represent an {@link Introspected.Property}.
@@ -40,8 +45,9 @@ public final class JakartaAccessAnnotationMapper implements NamedAnnotationMappe
 
     @Override
     public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
+        List<BeanProperties.AccessKind> accessKinds = List.of(annotation.enumValues(BeanProperties.AccessKind.class));
         return List.of(AnnotationValue.builder(Introspected.Property.class)
-            .member("ignoreOtherAccessors", true)
+            .member("ignoreOtherAccessors", accessKinds.contains(BeanProperties.AccessKind.FIELD))
             .build());
     }
 }

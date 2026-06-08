@@ -34,32 +34,46 @@ class JakartaAccessTest {
     void testJakartaPersistenceFieldAccessAttributeIsRecognizedAsBeanProperty() {
         BeanIntrospection<JpaPropertyAccessEntity> introspection = BeanIntrospection.getIntrospection(JpaPropertyAccessEntity.class);
         BeanProperty<JpaPropertyAccessEntity, String> property = introspection.getRequiredProperty("fieldAccess", String.class);
+        BeanProperty<JpaPropertyAccessEntity, Long> idProp = introspection.getRequiredProperty("id", Long.class);
+
         JpaPropertyAccessEntity entity = new JpaPropertyAccessEntity();
 
         assertMappedAccess(property, AccessType.FIELD);
 
         property.set(entity, "field");
+        idProp.set(entity, 1L);
+
         assertEquals("field", entity.fieldAccess);
         assertEquals("field", property.get(entity));
+
+        assertEquals(1001, entity.id);
+        assertEquals(1001, idProp.get(entity));
     }
 
     @Test
     void testJakartaPersistencePropertyAccessAttributeIsRecognizedAsBeanProperty() {
         BeanIntrospection<JpaFieldAccessEntity> introspection = BeanIntrospection.getIntrospection(JpaFieldAccessEntity.class);
         BeanProperty<JpaFieldAccessEntity, String> property = introspection.getRequiredProperty("propertyAccess", String.class);
+        BeanProperty<JpaFieldAccessEntity, Long> idProp = introspection.getRequiredProperty("id", Long.class);
+
         JpaFieldAccessEntity entity = new JpaFieldAccessEntity();
 
         assertMappedAccess(property, AccessType.PROPERTY);
 
         property.set(entity, "property");
+        idProp.set(entity, 1L);
+
         assertEquals("property-setter", entity.propertyAccess);
         assertEquals("property-setter-getter", property.get(entity));
+
+        assertEquals(1, entity.id);
+        assertEquals(1, idProp.get(entity));
     }
 
     private static void assertMappedAccess(BeanProperty<?, ?> property, AccessType accessType) {
         assertEquals(accessType, property.enumValue(Access.class, AccessType.class).orElseThrow());
         assertTrue(property.hasAnnotation(Introspected.Property.class));
-        assertTrue(property.booleanValue(Introspected.Property.class, "ignoreOtherAccessors").orElseThrow());
+        assertEquals(property.booleanValue(Introspected.Property.class, "ignoreOtherAccessors").orElseThrow(), accessType == AccessType.FIELD);
     }
 
     @Entity
@@ -76,7 +90,7 @@ class JakartaAccessTest {
         }
 
         public void setId(Long id) {
-            this.id = id;
+            this.id = id + 1000;
         }
 
         public String getFieldAccess() {
