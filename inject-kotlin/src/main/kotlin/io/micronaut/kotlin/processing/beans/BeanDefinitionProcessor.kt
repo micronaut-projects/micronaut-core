@@ -85,7 +85,7 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
                                 isVetoed(ksAnnotation)
                             }
                         }
-                        .filter { !it.modifiers.contains(Modifier.INNER) }
+                        .filter { declaration -> declaration.classKind == ClassKind.INTERFACE || !declaration.modifiers.contains(Modifier.INNER) || declaration.annotations.any { annotation -> annotation.annotationType.resolve().declaration.qualifiedName?.asString() == "org.junit.jupiter.api.Nested" } }
                         .toList()
                 if (innerClasses.isNotEmpty()) {
                     processClassDeclarations(innerClasses, visitorContext)

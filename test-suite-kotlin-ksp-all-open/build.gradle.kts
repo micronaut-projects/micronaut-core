@@ -39,6 +39,7 @@ dependencies {
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation(libs.junit.jupiter.api)
+    testImplementation(projects.micronautJacksonDatabind)
 
     kspTest(projects.micronautInjectKotlin)
 }
