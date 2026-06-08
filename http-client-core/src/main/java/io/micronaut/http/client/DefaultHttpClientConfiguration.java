@@ -54,7 +54,7 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     /**
      * @param connectionPoolConfiguration The connection pool configuration
      * @param applicationConfiguration The application configuration
-     * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2ClientConfiguration , ApplicationConfiguration)} instead.
+     * @deprecated Use {@link #DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2ClientConfiguration, ApplicationConfiguration)} instead.
      */
     @Deprecated(since = "4.3.0")
     public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
@@ -65,7 +65,7 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
      * @param connectionPoolConfiguration The connection pool configuration
      * @param webSocketCompressionConfiguration The WebSocket compression configuration
      * @param applicationConfiguration The application configuration
-     * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2ClientConfiguration , ApplicationConfiguration)} instead.
+     * @deprecated Use {@link #DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2ClientConfiguration, ApplicationConfiguration)} instead.
      */
     @Deprecated(since = "4.6.0")
     public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration,
