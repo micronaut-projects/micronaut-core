@@ -1353,21 +1353,6 @@
     "reason": "New major-version config import SPI provider/map redesign"
   },
   {
-    "type": "io.micronaut.inject.writer.BeanClassWriter",
-    "member": "Implemented interface io.micronaut.inject.writer.ClassOutputWriter",
-    "reason": "Compiler writer internals changed by the sourcegen-backed bean definition writer refactor"
-  },
-  {
-    "type": "io.micronaut.inject.writer.BeanDefinitionVisitor",
-    "member": "Implemented interface io.micronaut.inject.writer.OriginatingElements",
-    "reason": "Compiler writer internals changed by the sourcegen-backed bean definition writer refactor"
-  },
-  {
-    "type": "io.micronaut.inject.writer.BeanDefinitionVisitor",
-    "member": "Implemented interface io.micronaut.core.util.Toggleable",
-    "reason": "Compiler writer internals changed by the sourcegen-backed bean definition writer refactor"
-  },
-  {
     "type": "io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor",
     "member": "Implemented interface io.micronaut.inject.writer.OriginatingElements",
     "reason": "Compiler writer internals changed by the sourcegen-backed bean definition writer refactor"

@@ -61,7 +61,6 @@ tasks.withType(JapicmpTask).configureEach {
     inputs.file(acceptedApiChanges)
         .withPropertyName("accepted-api-changes-root")
         .withPathSensitivity(PathSensitivity.NONE)
-        .optional(true)
     richReport {
         addViolationTransformer(
             AcceptedApiChangesRule.class,
