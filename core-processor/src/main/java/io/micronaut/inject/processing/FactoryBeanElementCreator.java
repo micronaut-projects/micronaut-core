@@ -198,14 +198,19 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
             }
 
             MethodElement constructorElement = producedType.getPrimaryConstructor().orElse(null);
-            if (!producedType.isInterface() && constructorElement != null && constructorElement.getParameters().length > 0) {
+            MethodElement defaultConstructor = producedType.getDefaultConstructor().orElse(null);
+            if (!producedType.isInterface() && defaultConstructor == null) {
                 final String proxyTargetMode = producedAnnotationMetadata.stringValue(AnnotationUtil.ANN_AROUND, "proxyTargetMode").orElse("ERROR");
                 switch (proxyTargetMode) {
                     case "ALLOW":
-                        allowProxyConstruction(constructorElement);
+                        if (constructorElement != null) {
+                            allowProxyConstruction(constructorElement);
+                        }
                         break;
                     case "WARN":
-                        allowProxyConstruction(constructorElement);
+                        if (constructorElement != null) {
+                            allowProxyConstruction(constructorElement);
+                        }
                         visitorContext.warn("The produced type of a @Factory method has constructor arguments and is proxied. " +
                             "This can lead to unexpected behaviour. See the javadoc for Around.ProxyTargetConstructorMode for more information: " + producingElement.getName(), producingElement);
                         break;
