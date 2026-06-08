@@ -1351,5 +1351,20 @@
     "type": "io.micronaut.context.env.ClasspathWildcardPropertySourceImporter",
     "member": "Method io.micronaut.context.env.ClasspathWildcardPropertySourceImporter.newImportDeclaration(io.micronaut.core.convert.value.ConvertibleValues)",
     "reason": "New major-version config import SPI provider/map redesign"
+  },
+  {
+    "type": "io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor",
+    "member": "Implemented interface io.micronaut.inject.writer.OriginatingElements",
+    "reason": "Compiler writer internals changed by the sourcegen-backed bean definition writer refactor"
+  },
+  {
+    "type": "io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor",
+    "member": "Implemented interface io.micronaut.inject.writer.BeanDefinitionVisitor",
+    "reason": "Compiler writer internals changed by the sourcegen-backed bean definition writer refactor"
+  },
+  {
+    "type": "io.micronaut.inject.writer.ProxyingBeanDefinitionVisitor",
+    "member": "Implemented interface io.micronaut.core.util.Toggleable",
+    "reason": "Compiler writer internals changed by the sourcegen-backed bean definition writer refactor"
   }
 ]
