@@ -853,8 +853,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         for (io.micronaut.core.annotation.AnnotationValue<Requires> annotation : annotationMetadata.getAnnotationValuesByType(Requires.class)) {
             annotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY)
                 .ifPresent(beanProperty -> {
-                    annotation.stringValue(RequiresCondition.MEMBER_BEAN)
-                        .flatMap(className -> visitorContext.getClassElement(className, visitorContext.getElementAnnotationMetadataFactory().readOnly()))
+                    annotation.annotationClassValue(RequiresCondition.MEMBER_BEAN)
+                        .flatMap(classValue -> visitorContext.getClassElement(classValue.getName(), visitorContext.getElementAnnotationMetadataFactory().readOnly()))
                         .ifPresent(classElement -> {
                             String requiredValue = annotation.stringValue().orElse(null);
                             String notEqualsValue = annotation.stringValue(RequiresCondition.MEMBER_NOT_EQUALS).orElse(null);
@@ -3398,12 +3398,11 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     private StatementDef invokeCheckIfShouldLoadIfNecessary(VariableDef.This aThis, List<VariableDef.MethodParameter> parameters) {
-        AnnotationValue<Requires> requiresAnnotation = annotationMetadata.getAnnotation(Requires.class);
-        if (requiresAnnotation != null
-            && requiresAnnotation.stringValue(RequiresCondition.MEMBER_BEAN).isPresent()
-            && requiresAnnotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY).isPresent()) {
-
-
+        boolean hasBeanPropertyRequires = annotationMetadata.getAnnotationValuesByType(Requires.class)
+            .stream()
+            .anyMatch(requiresAnnotation -> requiresAnnotation.annotationClassValue(RequiresCondition.MEMBER_BEAN).isPresent()
+                && requiresAnnotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY).isPresent());
+        if (hasBeanPropertyRequires) {
             MethodDef checkIfShouldLoad = buildCheckIfShouldLoadMethod();
 
             classDefBuilder.addMethod(
@@ -4168,12 +4167,16 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             .instantiate(
                 ANNOTATION_REFERENCE_CONSTRUCTOR,
 
-                ClassTypeDef.of(Argument.class)
-                    .invokeStatic(
-                        ARGUMENT_OF_METHOD,
-
-                        ExpressionDef.constant(TypeDef.erasure(referencedType))
-                    )
+                ArgumentExpUtils.pushCreateArgument(
+                    referencedType.getAnnotationMetadata(),
+                    ClassElement.of(beanFullClassName),
+                    beanDefinitionTypeDef,
+                    referencedType.getName(),
+                    referencedType.getType(),
+                    referencedType.getAnnotationMetadata(),
+                    referencedType.getType().getTypeArguments(),
+                    loadClassValueExpressionFn
+                )
             );
     }
 
