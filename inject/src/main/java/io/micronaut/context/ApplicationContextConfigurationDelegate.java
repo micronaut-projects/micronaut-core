@@ -18,10 +18,8 @@ package io.micronaut.context;
 import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
 import io.micronaut.context.env.PropertySourcesLocator;
-import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanConfiguration;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
@@ -32,7 +30,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -200,7 +197,7 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
 
     @Override
     @Nullable
-    public Function<@NonNull BeanContext, @NonNull CustomScopeRegistry> customScopeRegistryFactory() {
+    public CustomScopeRegistryFactory customScopeRegistryFactory() {
         return delegate.customScopeRegistryFactory();
     }
 }

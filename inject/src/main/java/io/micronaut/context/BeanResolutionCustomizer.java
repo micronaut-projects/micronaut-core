@@ -107,11 +107,11 @@ public interface BeanResolutionCustomizer {
      * completes instead of being tracked as a dependent of the resolved bean.
      *
      * @param resolutionContext The current resolution context
-     * @param beanRegistration The dependent bean registration
+     * @param beanDefinition The dependent bean definition
      * @return True if the dependent bean should be destroyed after the current resolution completes
      * @since 5.1.0
      */
-    default boolean shouldDestroyDependentBeanAfterResolution(BeanResolutionContext resolutionContext, BeanRegistration<?> beanRegistration) {
+    default boolean shouldDestroyDependentBeanAfterResolution(BeanResolutionContext resolutionContext, BeanDefinition<?> beanDefinition) {
         return false;
     }
 

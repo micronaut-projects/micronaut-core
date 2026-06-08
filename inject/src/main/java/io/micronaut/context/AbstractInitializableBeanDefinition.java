@@ -603,24 +603,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return bean;
     }
 
-    /**
-     * Hook used by generated code to determine whether a newly constructed bean instance
-     * should receive field/method injection and initialization callbacks.
-     *
-     * @param resolutionContext The resolution context
-     * @param context The bean context
-     * @param bean The bean instance
-     * @return True if the bean should be initialized
-     */
-    @Internal
-    @UsedByGeneratedCode
-    protected final boolean shouldInitializeBean(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
-        if (context instanceof DefaultBeanContext defaultBeanContext) {
-            return defaultBeanContext.getBeanResolutionCustomizer().shouldInitializeBean(resolutionContext, this, bean);
-        }
-        return true;
-    }
-
     @Override
     public final List<ExecutableMethod<T, ?>> getExecutableMethods() {
         if (executableMethodsDefinition == null) {

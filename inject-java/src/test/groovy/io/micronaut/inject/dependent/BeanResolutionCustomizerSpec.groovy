@@ -2,10 +2,10 @@ package io.micronaut.inject.dependent
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContextBuilder
-import io.micronaut.context.BeanRegistration
 import io.micronaut.context.BeanResolutionContext
 import io.micronaut.context.BeanResolutionCustomizer
 import io.micronaut.core.type.Argument
+import io.micronaut.inject.BeanDefinition
 
 class BeanResolutionCustomizerSpec extends AbstractTypeElementSpec {
 
@@ -181,7 +181,7 @@ class ArrayConsumer {
             }
 
             @Override
-            boolean shouldDestroyDependentBeanAfterResolution(BeanResolutionContext resolutionContext, BeanRegistration<?> beanRegistration) {
+            boolean shouldDestroyDependentBeanAfterResolution(BeanResolutionContext resolutionContext, BeanDefinition<?> beanDefinition) {
                 return resolutionContext.path.currentSegment()
                     .map(segment -> segment.argument.annotationMetadata.hasAnnotation('test.DestroyAfterResolution'))
                     .orElse(false)

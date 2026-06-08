@@ -7,8 +7,6 @@ import io.micronaut.context.scope.CustomScopeRegistry
 import io.micronaut.runtime.ApplicationConfiguration
 import spock.lang.Specification
 
-import java.util.function.Function
-
 class ApplicationContextBuilderSpec extends Specification {
 
     void "test start tracing"() {
@@ -98,7 +96,7 @@ class ApplicationContextBuilderSpec extends Specification {
         ApplicationContextBuilder builder = ApplicationContext.builder()
         ApplicationContextConfiguration config = (ApplicationContextConfiguration) builder
         BeanResolutionCustomizer customizer = new BeanResolutionCustomizer() {}
-        Function<BeanContext, CustomScopeRegistry> scopeRegistryFactory = { BeanContext ignored -> null } as Function<BeanContext, CustomScopeRegistry>
+        CustomScopeRegistryFactory scopeRegistryFactory = { BeanContext ignored -> null } as CustomScopeRegistryFactory
 
         expect:
         config.beanResolutionCustomizer().is(BeanResolutionCustomizer.DEFAULT)
@@ -129,7 +127,7 @@ class ApplicationContextBuilderSpec extends Specification {
             .customScopeRegistry({ BeanContext beanContext ->
                 registry = new DefaultCustomScopeRegistry(beanContext)
                 registry
-            } as Function<BeanContext, CustomScopeRegistry>)
+            } as CustomScopeRegistryFactory)
             .build()
 
         when:

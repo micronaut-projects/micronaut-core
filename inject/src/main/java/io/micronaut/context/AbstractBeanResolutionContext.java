@@ -413,7 +413,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             // Don't add self
             return;
         }
-        if (context.getBeanResolutionCustomizer().shouldDestroyDependentBeanAfterResolution(this, beanRegistration)) {
+        if (context.getBeanResolutionCustomizer().shouldDestroyDependentBeanAfterResolution(this, beanRegistration.getBeanDefinition())) {
             if (dependentBeansToDestroyAfterResolution == null) {
                 dependentBeansToDestroyAfterResolution = new ArrayList<>(3);
             }

@@ -22,7 +22,6 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
-import io.micronaut.context.scope.CustomScopeRegistry;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -46,7 +45,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.function.Predicate;
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
@@ -100,7 +98,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Nullable
     private Predicate<BeanConfiguration> beanConfigurationsPredicate;
     @Nullable
-    private Function<BeanContext, CustomScopeRegistry> customScopeRegistryFactory;
+    private CustomScopeRegistryFactory customScopeRegistryFactory;
     private BeanResolutionCustomizer beanResolutionCustomizer = BeanResolutionCustomizer.DEFAULT;
     private boolean configImportEnabled = true;
 
@@ -237,7 +235,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
 
     @Override
     @Nullable
-    public Function<@NonNull BeanContext, @NonNull CustomScopeRegistry> customScopeRegistryFactory() {
+    public CustomScopeRegistryFactory customScopeRegistryFactory() {
         return customScopeRegistryFactory;
     }
 
@@ -492,7 +490,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    public ApplicationContextBuilder customScopeRegistry(@Nullable Function<BeanContext, CustomScopeRegistry> factory) {
+    public ApplicationContextBuilder customScopeRegistry(@Nullable CustomScopeRegistryFactory factory) {
         this.customScopeRegistryFactory = factory;
         return this;
     }

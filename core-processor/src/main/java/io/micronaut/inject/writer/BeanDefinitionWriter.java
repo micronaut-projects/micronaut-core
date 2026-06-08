@@ -244,7 +244,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final Method INJECT_BEAN_METHOD =
         ReflectionUtils.getRequiredInternalMethod(InjectableBeanDefinition.class, "inject", BeanResolutionContext.class, BeanContext.class, Object.class);
 
-    private static final Method SHOULD_INITIALIZE_BEAN_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "shouldInitializeBean", BeanResolutionContext.class, BeanContext.class, Object.class);
+    private static final Method SHOULD_INITIALIZE_BEAN_METHOD = ReflectionUtils.getRequiredInternalMethod(BeanResolutionContext.class, "shouldInitializeBean", BeanDefinition.class, Object.class);
 
     private static final Method PRE_DESTROY_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "preDestroy", BeanResolutionContext.class, BeanContext.class, Object.class);
 
@@ -1650,7 +1650,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             }
             StatementDef initializeBean = StatementDef.multi(statements);
             if (needsInjectMethod || needsPostConstruct) {
-                return aThis.invoke(SHOULD_INITIALIZE_BEAN_METHOD, methodParameters.get(0), methodParameters.get(1), instanceVar)
+                return methodParameters.get(0).invoke(SHOULD_INITIALIZE_BEAN_METHOD, aThis, instanceVar)
                     .ifTrue(initializeBean, instanceVar.returning());
             }
             return initializeBean;

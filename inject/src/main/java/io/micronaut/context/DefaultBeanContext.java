@@ -136,7 +136,6 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -302,9 +301,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @since 3.0.0
      */
     protected CustomScopeRegistry createCustomScopeRegistry() {
-        Function<BeanContext, CustomScopeRegistry> factory = beanContextConfiguration.customScopeRegistryFactory();
+        CustomScopeRegistryFactory factory = beanContextConfiguration.customScopeRegistryFactory();
         if (factory != null) {
-            return Objects.requireNonNull(factory.apply(this), "Custom scope registry cannot be null");
+            return Objects.requireNonNull(factory.create(this), "Custom scope registry cannot be null");
         }
         return new DefaultCustomScopeRegistry(this);
     }

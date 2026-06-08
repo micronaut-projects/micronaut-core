@@ -98,6 +98,24 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
+     * Returns whether a newly constructed bean instance should receive field/method injection and initialization
+     * callbacks.
+     *
+     * @param beanDefinition The bean definition
+     * @param bean The newly constructed bean instance
+     * @return True if the bean instance should be injected and initialized
+     * @since 5.1.0
+     */
+    @UsedByGeneratedCode
+    default boolean shouldInitializeBean(BeanDefinition<?> beanDefinition, Object bean) {
+        BeanContext context = getContext();
+        if (context instanceof DefaultBeanContext defaultBeanContext) {
+            return defaultBeanContext.getBeanResolutionCustomizer().shouldInitializeBean(this, beanDefinition, bean);
+        }
+        return true;
+    }
+
+    /**
      * @return The context
      */
     BeanContext getContext();
