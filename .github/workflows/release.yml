@@ -51,7 +51,7 @@ jobs:
             .github/scripts/vulnerability-audit.sh
           fi
       - name: Run pre-release
-        uses: micronaut-projects/github-actions/pre-release@e8cc2858e07f25cd86910b691ad09eb0d7f07f56 # master
+        uses: micronaut-projects/github-actions/pre-release@9fefbe9a777a84ac4211027f613521ed22f4cd93 # master
         env:
           MICRONAUT_BUILD_EMAIL: ${{ secrets.MICRONAUT_BUILD_EMAIL }}
         with:
@@ -116,7 +116,7 @@ jobs:
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
       - name: Export Gradle Properties
-        uses: micronaut-projects/github-actions/export-gradle-properties@e8cc2858e07f25cd86910b691ad09eb0d7f07f56 # master
+        uses: micronaut-projects/github-actions/export-gradle-properties@9fefbe9a777a84ac4211027f613521ed22f4cd93 # master
       - name: LATEST_TAG
         run: |
           echo "LATEST_TAG=$(curl -s -L -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name')" >> $GITHUB_ENV
@@ -135,7 +135,7 @@ jobs:
           DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
       - name: Run post-release
         if: success()
-        uses: micronaut-projects/github-actions/post-release@e8cc2858e07f25cd86910b691ad09eb0d7f07f56 # master
+        uses: micronaut-projects/github-actions/post-release@9fefbe9a777a84ac4211027f613521ed22f4cd93 # master
         env:
           MICRONAUT_BUILD_EMAIL: ${{ secrets.MICRONAUT_BUILD_EMAIL }}
         with:
