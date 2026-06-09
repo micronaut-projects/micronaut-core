@@ -112,6 +112,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
         this.interceptorBinding = toInterceptorBindingMap(interceptorBinding);
         this.visitorContext = visitorContext;
         this.proxyBeanDefinitionWriter = createAdviceProxyBeanDefinitionWriter(suffix);
+        proxyBeanDefinitionWriter.visitTypeArguments(targetType.getAllTypeArguments());
         proxyBeanDefinitionWriter.setRequiresMethodProcessing(parent.requiresMethodProcessing());
         proxyBeanDefinitionWriter.setInterceptedType(targetType.getName());
     }
@@ -167,6 +168,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ProxyingBeanDefini
         this.isIntroduction = true;
         this.visitorContext = visitorContext;
         this.proxyBeanDefinitionWriter = createIntroductionProxyBeanDefinitionWriter(suffix);
+        proxyBeanDefinitionWriter.visitTypeArguments(targetType.getAllTypeArguments());
         if (targetType.isInterface()) {
             if (implementInterface) {
                 proxyBeanDefinitionWriter.setInterceptedType(targetType.getName());
