@@ -25,6 +25,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.version.resolution.HeaderVersionResolverConfiguration;
 import io.micronaut.web.router.version.resolution.RequestVersionResolver;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,6 +79,7 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
      * @param routesVersioningConfiguration Configuration for routes versioning
      * @param headerVersionResolverConfiguration Configuration for Header Version resolution
      */
+    @Inject
     public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies,
                                          @Nullable DefaultVersionProvider defaultVersionProvider,
                                          @Nullable RoutesVersioningConfiguration routesVersioningConfiguration,
