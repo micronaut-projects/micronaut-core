@@ -452,6 +452,34 @@ interface SomeInt {
         itfeMethod.invoke(bean) == true
     }
 
+    void "test generate bean method for kotlin extension function"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.ExtensionMethodTest', '''
+package test
+
+import io.micronaut.context.annotation.Executable
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class ExtensionMethodTest {
+    @Executable
+    fun Int.addOne(): Int {
+        return this + 1
+    }
+}
+''')
+
+        when:
+        Collection<BeanMethod> beanMethods = introspection.getBeanMethods()
+        def addOne = beanMethods.find { it.name == 'addOne' }
+        def bean = introspection.instantiate()
+
+        then:
+        beanMethods*.name.contains('addOne')
+        addOne instanceof ExecutableMethod
+        addOne.invoke(bean, 1) == 2
+    }
+
     void "test custom with prefix"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('customwith.CopyMe', '''\

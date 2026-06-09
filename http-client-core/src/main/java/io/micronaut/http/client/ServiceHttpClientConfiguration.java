@@ -321,7 +321,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     /**
      * The service HTTP/2 configuration.
      */
-    @ConfigurationProperties(WebSocketCompressionConfiguration.PREFIX)
+    @ConfigurationProperties(Http2ClientConfiguration.PREFIX)
     public static class ServiceHttp2ClientConfiguration extends Http2ClientConfiguration {
     }
 
