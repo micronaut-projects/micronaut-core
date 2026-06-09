@@ -62,19 +62,6 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
      *
      * @param resolvingStrategies A list of {@link RequestVersionResolver} beans to extract version from HTTP request
      * @param defaultVersionProvider The Default Version Provider
-     * @deprecated Use {@link #RouteVersionFilter(List, DefaultVersionProvider, RoutesVersioningConfiguration, HeaderVersionResolverConfiguration)} instead.
-     */
-    @Deprecated
-    public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies,
-                              @Nullable DefaultVersionProvider defaultVersionProvider) {
-        this(resolvingStrategies, defaultVersionProvider, null, null);
-    }
-
-    /**
-     * Creates a {@link RouteVersionFilter} with a collection of {@link RequestVersionResolver}.
-     *
-     * @param resolvingStrategies A list of {@link RequestVersionResolver} beans to extract version from HTTP request
-     * @param defaultVersionProvider The Default Version Provider
      * @param routesVersioningConfiguration Configuration for routes versioning
      * @param headerVersionResolverConfiguration Configuration for Header Version resolution
      */
