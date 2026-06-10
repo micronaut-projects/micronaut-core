@@ -36,9 +36,11 @@ import org.jspecify.annotations.NonNull;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
@@ -169,11 +171,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
              .engine(engine)
              .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
              .allowHostClassLookup(name -> true);
-        var pyEnv = System.getenv("PYENV_VERSION");
-        var venv = System.getenv("VIRTUAL_ENV");
-        if (pyEnv != null && venv != null && pyEnv.startsWith("graalpy")) {
-            builder.option("python.Executable", Path.of(venv).resolve("bin/python").toString());
-        }
+        resolveVirtualEnvExecutable(System.getenv())
+            .ifPresent(executable -> builder.option("python.Executable", executable.toString()));
         options.forEach(builder::option);
 
         var context = builder.build();
@@ -186,6 +185,23 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         evaluateMain(classLoader, INTERNAL_MAIN, context);
         evaluateMain(classLoader, applicationMain, context);
         return context;
+    }
+
+    static Optional<Path> resolveVirtualEnvExecutable(Map<String, String> environment) {
+        String virtualEnv = environment.get("VIRTUAL_ENV");
+        if (virtualEnv == null || virtualEnv.isBlank()) {
+            return Optional.empty();
+        }
+        Path venv = Path.of(virtualEnv);
+        for (Path executable : List.of(
+            venv.resolve("bin/python"),
+            venv.resolve("Scripts/python.exe")
+        )) {
+            if (Files.isRegularFile(executable)) {
+                return Optional.of(executable);
+            }
+        }
+        return Optional.empty();
     }
 
     private static void evaluateMain(ClassLoader classLoader, String mainPy, Context context) throws IOException {
