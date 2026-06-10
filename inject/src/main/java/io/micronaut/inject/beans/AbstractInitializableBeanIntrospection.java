@@ -1609,7 +1609,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             ArgumentUtils.requireNonNull("bean", bean);
 
             if (!beanType.isInstance(bean)) {
-                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + bean);
+                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
             }
             if (value != null && !typeOrWrapperType.isInstance(value)) {
                 throw new IllegalArgumentException("Specified value [" + value + "] is not of the correct type: " + getType());
