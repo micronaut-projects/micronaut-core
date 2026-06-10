@@ -1,0 +1,11 @@
+The following APIs are not implemented by the current Micronaut asyncio bridge and fail deterministically:
+
+* `loop.run_forever()` and `loop.run_until_complete(...)` on Micronaut-managed loops
+* Custom executors in `loop.run_in_executor(executor, ...)`
+* Eager task execution with `loop.create_task(..., eager_start=...)` or `asyncio.TaskGroup.create_task(..., eager_start=...)`
+* Python `ssl.SSLContext` objects
+* `sendfile` and `start_tls`
+* Selector registration APIs: `add_reader`, `remove_reader`, `add_writer`, and `remove_writer`
+* Subprocess APIs: `subprocess_exec` and `subprocess_shell`
+
+When an unsupported socket option, address family, or supplied socket prevents the Netty path, Micronaut uses the generic socket coroutine implementation from `micronaut-context-python`. That fallback exists for compatibility; HTTP request coroutine execution remains bound to the current Netty event loop while `micronaut-context-python-netty` is active.

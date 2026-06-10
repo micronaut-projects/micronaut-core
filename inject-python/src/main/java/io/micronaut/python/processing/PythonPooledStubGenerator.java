@@ -42,14 +42,17 @@ import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionStage;
 
 import static io.micronaut.python.processing.PythonStubGenerator.AS_POLYGLOT_VALUE;
 import static io.micronaut.python.processing.PythonStubGenerator.CONTEXT_HOLDER;
 import static io.micronaut.python.processing.PythonStubGenerator.FROM_POLYGLOT_VALUE;
 import static io.micronaut.python.processing.PythonStubGenerator.POLYGLOT_VALUE;
+import static io.micronaut.python.processing.PythonStubGenerator.PYTHON_ASYNCIO_RUNTIME;
 import static io.micronaut.python.processing.PythonStubGenerator.coerceParameterToPolyglotValue;
 import static io.micronaut.python.processing.PythonStubGenerator.erasedType;
 import static io.micronaut.python.processing.PythonStubGenerator.handleReturnType;
+import static io.micronaut.python.processing.PythonStubGenerator.isAsyncPythonMethod;
 import static io.micronaut.python.processing.PythonStubGenerator.propertyType;
 
 final class PythonPooledStubGenerator {
@@ -179,6 +182,7 @@ final class PythonPooledStubGenerator {
                     || isDeclaredBeanMethod(ann)
                     || ann.hasStereotype("io.micronaut.context.annotation.Executable"))
         );
+        boolean hasAsyncBridgeMethod = methodsToBridge.stream().anyMatch(PythonStubGenerator::isAsyncPythonMethod);
 
         for (MethodElement methodElement : methodsToBridge) {
             addBridgeMethodPooledScript(methodElement, builder, pkg, script, allClasses);
@@ -187,7 +191,7 @@ final class PythonPooledStubGenerator {
         List<PropertyElement> beanProperties = scriptElement.getBeanProperties();
         for (PropertyElement beanProperty : beanProperties) {
             if (beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
-                addSetterScriptPooled(beanProperty, builder, pkg, script);
+                addSetterScriptPooled(beanProperty, builder, pkg, script, hasAsyncBridgeMethod);
             }
             if (beanProperty.hasStereotype(Bean.class)) {
                 addGetterScriptPooled(beanProperty, builder, pkg, script, allClasses);
@@ -268,6 +272,15 @@ final class PythonPooledStubGenerator {
         if (methodElement.getReturnType().isVoid()) {
             return invoked;
         }
+        if (isAsyncPythonMethod(methodElement)) {
+            return invoked.newLocal("pythonCoroutine", pythonCoroutine ->
+                PYTHON_ASYNCIO_RUNTIME.invokeStatic(
+                    "toCompletionStage",
+                    TypeDef.of(CompletionStage.class),
+                    pythonCoroutine
+                ).cast(TypeDef.of(CompletionStage.class)).cast(TypeDef.of(methodElement.getGenericReturnType())).returning()
+            );
+        }
         return handleReturnType(allClasses, methodElement.getGenericReturnType(), invoked).returning();
     }
 
@@ -293,7 +306,8 @@ final class PythonPooledStubGenerator {
     private static void addSetterScriptPooled(PropertyElement beanProperty,
                                               ClassDef.ClassDefBuilder builder,
                                               String pkg,
-                                              String script) {
+                                              String script,
+                                              boolean adaptAsyncMembers) {
         TypeDef returnType = beanProperty.getWriteMethod().map(MethodElement::getReturnType).map(TypeDef::of).orElse(TypeDef.VOID);
         String setterName = beanProperty.getWriteMethod().map(MethodElement::getName).orElse(beanProperty.getName());
         MethodDef.MethodDefBuilder propertySetter = MethodDef
@@ -309,7 +323,7 @@ final class PythonPooledStubGenerator {
             parameters.add(ExpressionDef.constant(script));
             parameters.add(ExpressionDef.constant(beanProperty.getName()));
             coerceParameterToPolyglotValue(beanProperty, parameters, methodParameters.getFirst());
-            var result = CONTEXT_HOLDER.invokeStatic("injectPooledScript", TypeDef.VOID, parameters);
+            var result = CONTEXT_HOLDER.invokeStatic(adaptAsyncMembers ? "injectPooledScriptAsync" : "injectPooledScript", TypeDef.VOID, parameters);
             if (returnType.equals(TypeDef.VOID)) {
                 return result;
             } else {

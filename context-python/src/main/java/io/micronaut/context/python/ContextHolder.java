@@ -19,13 +19,23 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
@@ -38,20 +48,91 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  * @since 5.0.0
  */
 public final class ContextHolder {
+    private static final Logger LOG = LoggerFactory.getLogger(ContextHolder.class);
 
     private static final String NEW_UNINITIALIZED_INSTANCE = "__micronaut_new_uninitialized_instance";
     private static final String SET_INSTANCE_PROPERTY = "__micronaut_set_instance_property";
+    private static final Source NEW_UNINITIALIZED_INSTANCE_SOURCE = Source.newBuilder(PYTHON, """
+        def __micronaut_new_uninitialized_instance(cls):
+            return object.__new__(cls)
+        """, "micronaut-new-uninitialized-instance.py").cached(true).buildLiteral();
+    private static final Source SET_INSTANCE_PROPERTY_SOURCE = Source.newBuilder(PYTHON, """
+        def __micronaut_set_instance_property(instance, name, value):
+            object.__setattr__(instance, name, value)
+            return instance
+        """, "micronaut-set-instance-property.py").cached(true).buildLiteral();
+    private static final Source FIND_CLASS_IN_PACKAGE_MODULES_SOURCE = Source.newBuilder(PYTHON, """
+        import importlib
+        import inspect
+        import pkgutil
+
+        def __micronaut_find_class_in_package_modules(package_name, class_name):
+            package = importlib.import_module(package_name)
+            package_path = getattr(package, "__path__", None)
+            if package_path is None:
+                return None
+            for module_info in pkgutil.iter_modules(package_path):
+                try:
+                    module = importlib.import_module(package_name + "." + module_info.name)
+                except Exception:
+                    continue
+                member = getattr(module, class_name, None)
+                if inspect.isclass(member):
+                    return member
+            return None
+        """, "micronaut-find-class-in-package-modules.py").cached(true).buildLiteral();
+    private static final Source INSPECT_IS_CLASS_SOURCE = Source.newBuilder(PYTHON, """
+        import inspect
+        __micronaut_inspect_isclass = inspect.isclass
+        """, "micronaut-inspect-is-class.py").cached(true).buildLiteral();
+    private static final Source IMPORT_MODULE_SOURCE = Source.newBuilder(PYTHON, """
+        import importlib
+        __micronaut_import_module = importlib.import_module
+        """, "micronaut-import-module.py").cached(true).buildLiteral();
+    private static final Source RELOAD_MODULES_SOURCE = Source.newBuilder(PYTHON, """
+        import importlib
+        import sys
+        for module in sys.modules.values():
+            try:
+                importlib.reload(module)
+            except:
+                pass
+        """, "micronaut-reload-modules.py").cached(true).buildLiteral();
 
     private static final AtomicBoolean REUSE_CONTEXT = new AtomicBoolean();
     private static volatile @Nullable Context context;
     private static volatile @Nullable ClassLoader contextClassLoader;
     private static volatile @Nullable PythonPool pythonPool;
+    private static final AtomicInteger ACTIVE_EXECUTIONS = new AtomicInteger();
+    private static final Object ACTIVE_EXECUTIONS_LOCK = new Object();
+    private static final List<Runnable> NO_ACTIVE_EXECUTIONS_LISTENERS = new ArrayList<>();
+    private static final IdentityHashMap<Context, ContextState> CONTEXT_STATES = new IdentityHashMap<>();
+    private static final IdentityHashMap<Engine, EngineState> ENGINE_STATES = new IdentityHashMap<>();
+    private static final ThreadLocal<List<Context>> CURRENT_EXECUTION_CONTEXTS = ThreadLocal.withInitial(ArrayList::new);
+    private static final ThreadLocal<List<Runnable>> CURRENT_EXECUTION_EXIT_LISTENERS = ThreadLocal.withInitial(ArrayList::new);
 
     private ContextHolder() {
     }
 
+    private static ContextState contextState(Context context) {
+        synchronized (ACTIVE_EXECUTIONS_LOCK) {
+            return CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
+        }
+    }
+
+    private static @Nullable ContextState existingContextState(Context context) {
+        synchronized (ACTIVE_EXECUTIONS_LOCK) {
+            return CONTEXT_STATES.get(context);
+        }
+    }
+
+    private static EngineState engineState(Engine engine) {
+        return ENGINE_STATES.computeIfAbsent(engine, ignored -> new EngineState());
+    }
+
     /**
      * Internal hook to register the PythonPool once initialized.
+     *
      * @param pool The Python pool
      */
     public static void setPythonPool(@Nullable PythonPool pool) {
@@ -59,6 +140,63 @@ public final class ContextHolder {
     }
 
     /**
+     * Resolve a Python instance for the current asyncio event loop when one is active.
+     *
+     * @param fallback The startup-context instance.
+     * @param packageName The Python package.
+     * @param simpleName The class simple name.
+     * @return An event-loop-local instance, or the fallback when no event-loop context is active.
+     */
+    @UsedByGeneratedCode
+    public static Value asyncInstance(Value fallback, @Nullable String packageName, String simpleName) {
+        PythonPool pool = pythonPool;
+        if (pool == null || isReuseContext()) {
+            return fallback;
+        }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop == null) {
+            return fallback;
+        }
+        Value target = pool.getEventLoopClass(eventLoop, packageName, simpleName);
+        GraalPyRuntimeUtil.copyTransferableMembers(fallback, target);
+        copyRememberedAsyncMembers(fallback, target);
+        return target;
+    }
+
+    /**
+     * Remember a host-side member assigned to a Python object so async event-loop contexts can mirror it.
+     *
+     * @param source The startup-context Python object.
+     * @param name The member name.
+     * @param value The host value.
+     */
+    @UsedByGeneratedCode
+    public static void rememberAsyncMember(Value source, String name, @Nullable Object value) {
+        ContextState state = contextState(source.getContext());
+        synchronized (state) {
+            state.asyncMembers.computeIfAbsent(source, ignored -> new HashMap<>()).put(name, value);
+        }
+    }
+
+    private static void copyRememberedAsyncMembers(Value source, Value target) {
+        Map<String, Object> members;
+        ContextState state = existingContextState(source.getContext());
+        if (state == null) {
+            return;
+        }
+        synchronized (state) {
+            members = state.asyncMembers.get(source);
+            if (members == null || members.isEmpty()) {
+                return;
+            }
+            members = Map.copyOf(members);
+        }
+        members.forEach((name, value) -> GraalPyRuntimeUtil.putMember(target, name, GraalPyRuntimeUtil.asyncMemberValue(target, value)));
+    }
+
+    /**
+     * Returns the configured Python pool.
+     *
      * @return The configured PythonPool. Throws if not initialized.
      */
     public static PythonPool getPythonPool() {
@@ -69,8 +207,273 @@ public final class ContextHolder {
         return pool;
     }
 
+    static void registerContextEngine(Context context, Engine engine) {
+        synchronized (ACTIVE_EXECUTIONS_LOCK) {
+            ContextState contextState = CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
+            Engine previousEngine = contextState.engine;
+            if (previousEngine == engine) {
+                return;
+            }
+            if (previousEngine != null) {
+                EngineState previousState = ENGINE_STATES.get(previousEngine);
+                if (previousState != null && --previousState.contexts <= 0) {
+                    ENGINE_STATES.remove(previousEngine);
+                }
+            }
+            contextState.engine = engine;
+            engineState(engine).contexts++;
+        }
+    }
+
+    static void unregisterContextEngine(Context context) {
+        List<Runnable> listeners = List.of();
+        synchronized (ACTIVE_EXECUTIONS_LOCK) {
+            ContextState contextState = CONTEXT_STATES.remove(context);
+            if (contextState != null) {
+                contextState.clear();
+                Engine engine = contextState.engine;
+                if (engine != null) {
+                    EngineState engineState = ENGINE_STATES.get(engine);
+                    if (engineState != null && --engineState.contexts <= 0) {
+                        ENGINE_STATES.remove(engine);
+                        listeners = engineState.noContextsListeners;
+                    }
+                }
+            }
+        }
+        runNoActiveExecutionsListeners(listeners);
+    }
+
+    static void enterExecution(Context context) {
+        synchronized (ACTIVE_EXECUTIONS_LOCK) {
+            ContextState state = CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
+            state.activeExecutions++;
+            if (state.engine != null) {
+                engineState(state.engine).activeExecutions++;
+            }
+            ACTIVE_EXECUTIONS.incrementAndGet();
+        }
+    }
+
+    static void enterExecution() {
+        Context ctx = getContext();
+        enterExecutionFrame(ctx);
+    }
+
+    static void enterExecutionFrame(Context ctx) {
+        CURRENT_EXECUTION_CONTEXTS.get().add(ctx);
+        enterExecution(ctx);
+    }
+
+    static void exitExecution(Context context) {
+        List<Runnable> listeners = new ArrayList<>();
+        synchronized (ACTIVE_EXECUTIONS_LOCK) {
+            ContextState state = CONTEXT_STATES.get(context);
+            if (state != null) {
+                state.activeExecutions = Math.max(0, state.activeExecutions - 1);
+                if (state.activeExecutions == 0 && !state.noActiveExecutionsListeners.isEmpty()) {
+                    listeners.addAll(state.noActiveExecutionsListeners);
+                    state.noActiveExecutionsListeners.clear();
+                }
+                if (state.engine != null) {
+                    EngineState engineState = ENGINE_STATES.get(state.engine);
+                    if (engineState != null) {
+                        engineState.activeExecutions = Math.max(0, engineState.activeExecutions - 1);
+                        if (engineState.activeExecutions == 0 && !engineState.noActiveExecutionsListeners.isEmpty()) {
+                            listeners.addAll(engineState.noActiveExecutionsListeners);
+                            engineState.noActiveExecutionsListeners.clear();
+                        }
+                    }
+                }
+            }
+            if (ACTIVE_EXECUTIONS.updateAndGet(value -> Math.max(0, value - 1)) == 0 && !NO_ACTIVE_EXECUTIONS_LISTENERS.isEmpty()) {
+                listeners.addAll(NO_ACTIVE_EXECUTIONS_LISTENERS);
+                NO_ACTIVE_EXECUTIONS_LISTENERS.clear();
+            }
+        }
+        runNoActiveExecutionsListeners(listeners);
+    }
+
+    static void exitExecution() {
+        List<Context> contexts = CURRENT_EXECUTION_CONTEXTS.get();
+        if (contexts.isEmpty()) {
+            return;
+        }
+        Context ctx = contexts.remove(contexts.size() - 1);
+        if (contexts.isEmpty()) {
+            CURRENT_EXECUTION_CONTEXTS.remove();
+        }
+        exitExecution(ctx);
+        if (contexts.isEmpty()) {
+            runCurrentExecutionExitListeners();
+        }
+    }
+
+    @SuppressWarnings("ReferenceEquality")
+    static void exitExecutionFrame(Context ctx) {
+        List<Context> contexts = CURRENT_EXECUTION_CONTEXTS.get();
+        if (contexts.isEmpty()) {
+            exitExecution(ctx);
+            return;
+        }
+        Context removed = contexts.remove(contexts.size() - 1);
+        if (removed != ctx) {
+            contexts.remove(ctx);
+        }
+        if (contexts.isEmpty()) {
+            CURRENT_EXECUTION_CONTEXTS.remove();
+        }
+        exitExecution(ctx);
+        if (contexts.isEmpty()) {
+            runCurrentExecutionExitListeners();
+        }
+    }
+
+    private static void runCurrentExecutionExitListeners() {
+        List<Runnable> listeners = CURRENT_EXECUTION_EXIT_LISTENERS.get();
+        if (listeners.isEmpty()) {
+            CURRENT_EXECUTION_EXIT_LISTENERS.remove();
+            return;
+        }
+        List<Runnable> snapshot = List.copyOf(listeners);
+        listeners.clear();
+        CURRENT_EXECUTION_EXIT_LISTENERS.remove();
+        runNoActiveExecutionsListeners(snapshot);
+    }
+
+    static int activeExecutions() {
+        return ACTIVE_EXECUTIONS.get();
+    }
+
+    static boolean hasActiveExecutions(Context context) {
+        synchronized (ACTIVE_EXECUTIONS_LOCK) {
+            ContextState state = CONTEXT_STATES.get(context);
+            return state != null && state.activeExecutions > 0;
+        }
+    }
+
+    static void onNoActiveExecutions(Runnable listener) {
+        boolean runNow;
+        synchronized (ACTIVE_EXECUTIONS_LOCK) {
+            runNow = ACTIVE_EXECUTIONS.get() == 0;
+            if (!runNow) {
+                NO_ACTIVE_EXECUTIONS_LISTENERS.add(listener);
+            }
+        }
+        if (runNow) {
+            listener.run();
+        }
+    }
+
+    static void onNoActiveExecutions(Context context, Runnable listener) {
+        boolean runNow;
+        synchronized (ACTIVE_EXECUTIONS_LOCK) {
+            ContextState state = CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
+            runNow = state.activeExecutions == 0;
+            if (!runNow) {
+                state.noActiveExecutionsListeners.add(listener);
+            }
+        }
+        if (runNow) {
+            listener.run();
+        }
+    }
+
+    static void onNoActiveExecutionsAfterCurrentFrame(Context context, Runnable listener) {
+        if (!CURRENT_EXECUTION_CONTEXTS.get().isEmpty()) {
+            CURRENT_EXECUTION_EXIT_LISTENERS.get().add(() -> onNoActiveExecutions(context, listener));
+            return;
+        }
+        onNoActiveExecutions(context, listener);
+    }
+
+    static void onNoActiveExecutions(Collection<Context> contexts, Runnable listener) {
+        List<Context> activeContexts;
+        synchronized (ACTIVE_EXECUTIONS_LOCK) {
+            IdentityHashMap<Context, Boolean> seen = new IdentityHashMap<>();
+            activeContexts = contexts.stream()
+                .filter(ctx -> seen.put(ctx, Boolean.TRUE) == null)
+                .filter(ctx -> {
+                    ContextState state = CONTEXT_STATES.get(ctx);
+                    return state != null && state.activeExecutions > 0;
+                })
+                .toList();
+            if (activeContexts.isEmpty()) {
+                activeContexts = List.of();
+            } else {
+                AtomicInteger remaining = new AtomicInteger(activeContexts.size());
+                Runnable gate = () -> {
+                    if (remaining.decrementAndGet() == 0) {
+                        listener.run();
+                    }
+                };
+                for (Context activeContext : activeContexts) {
+                    CONTEXT_STATES.computeIfAbsent(activeContext, ignored -> new ContextState()).noActiveExecutionsListeners.add(gate);
+                }
+            }
+        }
+        if (activeContexts.isEmpty()) {
+            listener.run();
+        }
+    }
+
+    static void onNoActiveExecutions(Engine engine, Runnable listener) {
+        boolean runNow;
+        synchronized (ACTIVE_EXECUTIONS_LOCK) {
+            EngineState state = ENGINE_STATES.get(engine);
+            runNow = state == null || state.activeExecutions == 0;
+            if (state != null && !runNow) {
+                state.noActiveExecutionsListeners.add(listener);
+            }
+        }
+        if (runNow) {
+            listener.run();
+        }
+    }
+
+    static void onNoContexts(Engine engine, Runnable listener) {
+        boolean runNow;
+        synchronized (ACTIVE_EXECUTIONS_LOCK) {
+            EngineState state = ENGINE_STATES.get(engine);
+            runNow = state == null || state.contexts == 0;
+            if (state != null && !runNow) {
+                state.noContextsListeners.add(listener);
+            }
+        }
+        if (runNow) {
+            listener.run();
+        }
+    }
+
+    private static void runNoActiveExecutionsListeners(List<Runnable> listeners) {
+        if (listeners.isEmpty()) {
+            return;
+        }
+        deferNoActiveExecutionListener(() -> {
+            for (Runnable listener : listeners) {
+                try {
+                    listener.run();
+                } catch (Throwable e) {
+                    LOG.warn("Python no-active-executions listener failed", e);
+                    if (e instanceof RuntimeException runtimeException) {
+                        throw runtimeException;
+                    }
+                    if (e instanceof Error error) {
+                        throw error;
+                    }
+                    throw new IllegalStateException(e);
+                }
+            }
+        });
+    }
+
+    static void deferNoActiveExecutionListener(Runnable listener) {
+        listener.run();
+    }
+
     /**
      * Obtain a pooled Python class instance (per-context cached).
+     *
      * @param packageName The Python package (or null/python for top-level)
      * @param simpleName The class simple name
      * @return The pooled class instance (Value) from some context
@@ -80,11 +483,16 @@ public final class ContextHolder {
         if (isReuseContext() || pythonPool == null) {
             return findClass(packageName, simpleName);
         }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop != null) {
+            return getPythonPool().getEventLoopClass(eventLoop, packageName, simpleName);
+        }
         return getPythonPool().getAnyClass(packageName, simpleName);
     }
 
     /**
      * Obtain a pooled Python class instance from a specific context.
+     *
      * @param packageName The Python package (or null/python for top-level)
      * @param simpleName The class simple name
      * @param context The context
@@ -100,6 +508,7 @@ public final class ContextHolder {
 
     /**
      * Execute a function with a borrowed pooled class instance.
+     *
      * @param packageName The Python package
      * @param simpleName The class name
      * @param fn Function receiving the pooled Value
@@ -111,11 +520,16 @@ public final class ContextHolder {
         if (isReuseContext() || pythonPool == null) {
             return fn.apply(findClass(packageName, simpleName));
         }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop != null) {
+            return fn.apply(getPythonPool().getEventLoopClass(eventLoop, packageName, simpleName));
+        }
         return getPythonPool().withClass(packageName, simpleName, fn);
     }
 
     /**
      * Obtain a pooled Python script/module object.
+     *
      * @param packageName The Python package
      * @param scriptName The script/module name
      * @return A pooled script Value
@@ -125,11 +539,16 @@ public final class ContextHolder {
         if (isReuseContext() || pythonPool == null) {
             return findScript(packageName, scriptName);
         }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop != null) {
+            return getPythonPool().getEventLoopScript(eventLoop, packageName, scriptName);
+        }
         return getPythonPool().getAnyScript(packageName, scriptName);
     }
 
     /**
      * Obtain a pooled Python script/module object from a specific context.
+     *
      * @param packageName The Python package
      * @param scriptName The script/module name
      * @param context The context
@@ -145,6 +564,7 @@ public final class ContextHolder {
 
     /**
      * Execute a function with a borrowed pooled script/module object.
+     *
      * @param packageName The package
      * @param scriptName The script name
      * @param fn Function receiving the script Value
@@ -156,10 +576,16 @@ public final class ContextHolder {
         if (isReuseContext() || pythonPool == null) {
             return fn.apply(findScript(packageName, scriptName));
         }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop != null) {
+            return fn.apply(getPythonPool().getEventLoopScript(eventLoop, packageName, scriptName));
+        }
         return getPythonPool().withScript(packageName, scriptName, fn);
     }
 
     /**
+     * Inject an attribute into all pooled script contexts.
+     *
      * @param packageName The package
      * @param scriptName The script name
      * @param attribute The attribute name
@@ -176,7 +602,26 @@ public final class ContextHolder {
     }
 
     /**
+     * Inject an async-adapted attribute into all pooled script contexts.
+     *
+     * @param packageName The package
+     * @param scriptName The script name
+     * @param attribute The attribute name
+     * @param value The value to inject
+     */
+    @UsedByGeneratedCode
+    public static void injectPooledScriptAsync(String packageName, String scriptName, String attribute, Object value) {
+        if (isReuseContext() || pythonPool == null) {
+            Value script = findScript(packageName, scriptName);
+            script.putMember(attribute, GraalPyRuntimeUtil.asyncMemberValue(script, value));
+            return;
+        }
+        getPythonPool().injectScriptAsync(packageName, scriptName, attribute, value);
+    }
+
+    /**
      * Invoke a method on a pooled class instance.
+     *
      * @param packageName The package
      * @param simpleName The class name
      * @param methodName The method name
@@ -194,6 +639,7 @@ public final class ContextHolder {
 
     /**
      * Invoke a method on a pooled script instance.
+     *
      * @param packageName The package
      * @param scriptName The script name
      * @param methodName The method name
@@ -402,36 +848,11 @@ public final class ContextHolder {
     }
 
     private static Value uninitializedInstanceFactory(Context context) {
-        Value bindings = context.getBindings(PYTHON);
-        Value factory = bindings.getMember(NEW_UNINITIALIZED_INSTANCE);
-        if (factory == null || GraalPyRuntimeUtil.isNone(factory)) {
-            context.eval(
-                PYTHON,
-                """
-                def __micronaut_new_uninitialized_instance(cls):
-                    return object.__new__(cls)
-                """
-            );
-            factory = bindings.getMember(NEW_UNINITIALIZED_INSTANCE);
-        }
-        return factory;
+        return helper(context, NEW_UNINITIALIZED_INSTANCE, NEW_UNINITIALIZED_INSTANCE_SOURCE);
     }
 
     private static Value propertySetter(Context context) {
-        Value bindings = context.getBindings(PYTHON);
-        Value setter = bindings.getMember(SET_INSTANCE_PROPERTY);
-        if (setter == null || GraalPyRuntimeUtil.isNone(setter)) {
-            context.eval(
-                PYTHON,
-                """
-                def __micronaut_set_instance_property(instance, name, value):
-                    object.__setattr__(instance, name, value)
-                    return instance
-                """
-            );
-            setter = bindings.getMember(SET_INSTANCE_PROPERTY);
-        }
-        return setter;
+        return helper(context, SET_INSTANCE_PROPERTY, SET_INSTANCE_PROPERTY_SOURCE);
     }
 
     private static Value instantiate(@Nullable String packageName, String simpleName, Object[] args, Value pythonClass) {
@@ -575,7 +996,12 @@ public final class ContextHolder {
             return invokeStaticMethod(simpleName, methodName, args);
         } else {
             Context ctx = getContext();
-            return findClass(packageName, simpleName, ctx).invokeMember(methodName, args);
+            enterExecution(ctx);
+            try {
+                return findClass(packageName, simpleName, ctx).invokeMember(methodName, args);
+            } finally {
+                exitExecution(ctx);
+            }
         }
     }
 
@@ -589,17 +1015,22 @@ public final class ContextHolder {
      */
     public static Value invokeStaticMethod(String simpleName, String methodName, Object... args) {
         Context ctx = getContext();
-        String importName = rootName(simpleName);
-        Value v = ctx.getBindings(PYTHON).getMember(importName);
-        if (v != null) {
-            return nestedMember(v, simpleName).invokeMember(methodName, args);
-        } else {
-            Value member = importModule(ctx, importName).getMember(importName);
-            if (member == null) {
-                throw new InstantiationException("Cannot find Python class: " + simpleName);
+        enterExecution(ctx);
+        try {
+            String importName = rootName(simpleName);
+            Value v = ctx.getBindings(PYTHON).getMember(importName);
+            if (v != null) {
+                return nestedMember(v, simpleName).invokeMember(methodName, args);
+            } else {
+                Value member = importModule(ctx, importName).getMember(importName);
+                if (member == null) {
+                    throw new InstantiationException("Cannot find Python class: " + simpleName);
+                }
+                return nestedMember(member, simpleName)
+                    .invokeMember(methodName, args);
             }
-            return nestedMember(member, simpleName)
-                .invokeMember(methodName, args);
+        } finally {
+            exitExecution(ctx);
         }
     }
 
@@ -643,31 +1074,7 @@ public final class ContextHolder {
     }
 
     private static @Nullable Value findClassInPackageModules(Context ctx, String packageName, String importName) {
-        Value bindings = ctx.getBindings(PYTHON);
-        Value findClass = bindings.getMember("__micronaut_find_class_in_package_modules");
-        if (findClass == null) {
-            ctx.eval(PYTHON, """
-                import importlib
-                import inspect
-                import pkgutil
-
-                def __micronaut_find_class_in_package_modules(package_name, class_name):
-                    package = importlib.import_module(package_name)
-                    package_path = getattr(package, "__path__", None)
-                    if package_path is None:
-                        return None
-                    for module_info in pkgutil.iter_modules(package_path):
-                        try:
-                            module = importlib.import_module(package_name + "." + module_info.name)
-                        except Exception:
-                            continue
-                        member = getattr(module, class_name, None)
-                        if inspect.isclass(member):
-                            return member
-                    return None
-                """);
-            findClass = bindings.getMember("__micronaut_find_class_in_package_modules");
-        }
+        Value findClass = helper(ctx, "__micronaut_find_class_in_package_modules", FIND_CLASS_IN_PACKAGE_MODULES_SOURCE);
         return findClass.execute(packageName, importName);
     }
 
@@ -675,24 +1082,44 @@ public final class ContextHolder {
         if (value == null || GraalPyRuntimeUtil.isNone(value)) {
             return false;
         }
-        Value bindings = ctx.getBindings(PYTHON);
-        Value isClass = bindings.getMember("__micronaut_inspect_isclass");
-        if (isClass == null) {
-            ctx.eval(PYTHON, "import inspect\n__micronaut_inspect_isclass = inspect.isclass");
-            isClass = bindings.getMember("__micronaut_inspect_isclass");
-        }
+        Value isClass = helper(ctx, "__micronaut_inspect_isclass", INSPECT_IS_CLASS_SOURCE);
         return isClass.execute(value).asBoolean();
     }
 
     private static Value importModule(Context ctx, String moduleName) {
         return withContextClassLoader(() -> {
-            Value bindings = ctx.getBindings(PYTHON);
-            Value importModule = bindings.getMember("__micronaut_import_module");
-            if (importModule == null) {
-                ctx.eval(PYTHON, "import importlib\n__micronaut_import_module = importlib.import_module");
-                importModule = bindings.getMember("__micronaut_import_module");
-            }
+            Value importModule = helper(ctx, "__micronaut_import_module", IMPORT_MODULE_SOURCE);
             return importModule.execute(moduleName);
+        });
+    }
+
+    static Value helper(Context context, String name, Source source) {
+        return withContextLock(context, () -> {
+            ContextState state = contextState(context);
+            Value helper = state.helpers.get(name);
+            if (helper == null || GraalPyRuntimeUtil.isNone(helper)) {
+                Value bindings = context.getBindings(PYTHON);
+                helper = bindings.getMember(name);
+                if (helper == null || GraalPyRuntimeUtil.isNone(helper)) {
+                    context.eval(source);
+                    helper = bindings.getMember(name);
+                }
+                state.helpers.put(name, helper);
+            }
+            return helper;
+        });
+    }
+
+    static <T> T withContextLock(Context context, Supplier<T> action) {
+        synchronized (contextState(context).lock) {
+            return action.get();
+        }
+    }
+
+    static void withContextLock(Context context, Runnable action) {
+        withContextLock(context, () -> {
+            action.run();
+            return null;
         });
     }
 
@@ -737,6 +1164,11 @@ public final class ContextHolder {
         return context != null;
     }
 
+    @SuppressWarnings("ReferenceEquality")
+    static boolean isCurrentContext(Context context) {
+        return ContextHolder.context == context;
+    }
+
     /**
      * Reset the context to null. This method is called during application shutdown
      * to ensure proper cleanup and prevent memory leaks.
@@ -747,19 +1179,19 @@ public final class ContextHolder {
             if (ctx == null) {
                 return;
             }
-            ctx.eval(Source.create("python", """
-                import importlib
-                import sys
-                for module in sys.modules.values():
-                    try:
-                        importlib.reload(module)
-                    except:
-                        pass
-                """));
+            ctx.eval(RELOAD_MODULES_SOURCE);
             return;
         }
         context = null;
         contextClassLoader = null;
+        pythonPool = null;
+        synchronized (ACTIVE_EXECUTIONS_LOCK) {
+            CONTEXT_STATES.values().forEach(ContextState::clear);
+            CONTEXT_STATES.clear();
+            ENGINE_STATES.clear();
+            NO_ACTIVE_EXECUTIONS_LISTENERS.clear();
+            ACTIVE_EXECUTIONS.set(0);
+        }
     }
 
     private static <T> T withContextClassLoader(Supplier<T> action) {
@@ -794,5 +1226,29 @@ public final class ContextHolder {
      */
     public static boolean isReuseContext() {
         return REUSE_CONTEXT.get();
+    }
+
+    private static final class ContextState {
+        private final Object lock = new Object();
+        private final IdentityHashMap<Value, Map<String, Object>> asyncMembers = new IdentityHashMap<>();
+        private final Map<String, Value> helpers = new HashMap<>();
+        private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
+        private int activeExecutions;
+        private @Nullable Engine engine;
+
+        private void clear() {
+            asyncMembers.clear();
+            helpers.clear();
+            noActiveExecutionsListeners.clear();
+            activeExecutions = 0;
+            engine = null;
+        }
+    }
+
+    private static final class EngineState {
+        private final List<Runnable> noContextsListeners = new ArrayList<>();
+        private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
+        private int contexts;
+        private int activeExecutions;
     }
 }

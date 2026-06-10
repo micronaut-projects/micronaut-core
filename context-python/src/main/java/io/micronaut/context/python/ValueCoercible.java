@@ -28,6 +28,7 @@ import java.beans.Transient;
 /**
  * A type that is coercible to a Truffle Value.
  */
+@SuppressWarnings({"checkstyle:InnerTypeLast", "checkstyle:MissingJavadocType"})
 public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     String HOST_OBJECT_MEMBER = "__micronaut_value_coercible_host__";
     String AS_POLYGLOT_VALUE_MEMBER = "asPolyglotValue";
@@ -91,6 +92,31 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
                     generatedMembers.micronautValueCoercibleSetterPropertyName(key) != null));
     }
 
+    /**
+     * Build-time generated JavaBean accessor aliases for Python wrappers.
+     * <p>
+     * Only generated classes that need property aliases implement this contract. That keeps
+     * the generic {@link ValueCoercible} path free of Java method/field reflection while still
+     * preserving Python-side calls such as {@code getName()} for generated bean wrappers.
+     */
+    interface GeneratedPropertyMembers {
+        @Transient
+        @Nullable String micronautValueCoercibleGetterPropertyName(String key);
+
+        @Transient
+        @Nullable String micronautValueCoercibleSetterPropertyName(String key);
+
+        @Transient
+        default boolean micronautValueCoercibleSetMember(String key, Value value) {
+            return false;
+        }
+
+        @Transient
+        default boolean micronautValueCoerciblePutMember(String key, Value value) {
+            return false;
+        }
+    }
+
     private @Nullable Object generatedGetter(String key) {
         if (!(this instanceof GeneratedPropertyMembers generatedMembers)) {
             return null;
@@ -123,14 +149,16 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             if (arguments.length != 1) {
                 throw new IllegalArgumentException("Setter [" + key + "] expects one argument");
             }
+            Value target = asPolyglotValue();
             Value value = arguments[0];
             if (!generatedMembers.micronautValueCoercibleSetMember(key, value)) {
                 if (GraalPyRuntimeUtil.isNone(value)) {
-                    asPolyglotValue().putMember(propertyName, null);
+                    target.putMember(propertyName, null);
                 } else {
-                    asPolyglotValue().putMember(propertyName, value);
+                    target.putMember(propertyName, value);
                 }
             }
+            generatedMembers.micronautValueCoerciblePutMember(propertyName, target.getMember(propertyName));
             return null;
         };
     }
@@ -154,6 +182,70 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             }
         }
         target.putMember(key, member);
+        if (this instanceof GeneratedPropertyMembers generatedMembers && target.hasMember(key)) {
+            generatedMembers.micronautValueCoerciblePutMember(key, target.getMember(key));
+        }
+    }
+
+    record HostObjectReference(ValueCoercible value) {
+    }
+
+    static @Nullable ValueCoercible hostObject(@Nullable Value value) {
+        Object hostObject = rawHostObject(value);
+        return hostObject instanceof ValueCoercible valueCoercible ? valueCoercible : null;
+    }
+
+    static @Nullable ValueCoercible hostObject(@Nullable ProxyObject value) {
+        Object hostObject = rawHostObject(value);
+        return hostObject instanceof ValueCoercible valueCoercible ? valueCoercible : null;
+    }
+
+    static @Nullable Object hostObject(@Nullable Value value, Class<?> targetType) {
+        Object hostObject = rawHostObject(value);
+        return targetType.isInstance(hostObject) ? hostObject : null;
+    }
+
+    static @Nullable Object hostObject(@Nullable ProxyObject value, Class<?> targetType) {
+        Object hostObject = rawHostObject(value);
+        return targetType.isInstance(hostObject) ? hostObject : null;
+    }
+
+    private static @Nullable Object rawHostObject(@Nullable Value value) {
+        try {
+            if (value == null || value.isNull()) {
+                return null;
+            }
+            if (value.isHostObject()) {
+                Object hostObject = value.asHostObject();
+                if (hostObject instanceof HostObjectReference reference) {
+                    return reference.value();
+                }
+                return hostObject;
+            }
+            if (!value.hasMembers() || !value.hasMember(HOST_OBJECT_MEMBER)) {
+                return null;
+            }
+            Value hostReferenceValue = value.getMember(HOST_OBJECT_MEMBER);
+            if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
+                return null;
+            }
+            Object hostReference = hostReferenceValue.asHostObject();
+            return hostReference instanceof HostObjectReference reference ? reference.value() : null;
+        } catch (UnsupportedOperationException e) {
+            return null;
+        }
+    }
+
+    private static @Nullable Object rawHostObject(@Nullable ProxyObject value) {
+        try {
+            if (value == null || !value.hasMember(HOST_OBJECT_MEMBER)) {
+                return null;
+            }
+            Object hostReference = value.getMember(HOST_OBJECT_MEMBER);
+            return hostReference instanceof HostObjectReference reference ? reference.value() : null;
+        } catch (UnsupportedOperationException e) {
+            return null;
+        }
     }
 
     /**
@@ -177,9 +269,9 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         if (boxedType == Object.class || boxedType == Value.class) {
             return true;
         }
-        Object hostObject = hostObject(value);
+        Object hostObject = ValueCoercible.hostObject(value, boxedType);
         if (hostObject != null) {
-            return boxedType.isInstance(hostObject);
+            return true;
         }
         if (boxedType == String.class) {
             return value.isString();
@@ -187,8 +279,23 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         if (boxedType == Boolean.class) {
             return value.isBoolean();
         }
-        if (Number.class.isAssignableFrom(boxedType)) {
-            return value.isNumber();
+        if (boxedType == Byte.class) {
+            return value.fitsInByte();
+        }
+        if (boxedType == Short.class) {
+            return value.fitsInShort();
+        }
+        if (boxedType == Integer.class) {
+            return value.fitsInInt();
+        }
+        if (boxedType == Long.class) {
+            return value.fitsInLong();
+        }
+        if (boxedType == Float.class) {
+            return value.fitsInFloat();
+        }
+        if (boxedType == Double.class) {
+            return value.fitsInDouble();
         }
         if (boxedType == Character.class) {
             return value.isString() && value.asString().length() == 1;
@@ -196,49 +303,4 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         return false;
     }
 
-    private static @Nullable Object hostObject(Value value) {
-        if (value.isHostObject()) {
-            return value.asHostObject();
-        }
-        if (!value.hasMembers() || !value.hasMember(HOST_OBJECT_MEMBER)) {
-            return null;
-        }
-        Value hostReferenceValue = value.getMember(HOST_OBJECT_MEMBER);
-        if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
-            return null;
-        }
-        Object hostReference = hostReferenceValue.asHostObject();
-        if (hostReference instanceof HostObjectReference reference) {
-            return reference.value();
-        }
-        return null;
-    }
-
-    /**
-     * Build-time generated JavaBean accessor aliases for Python wrappers.
-     * <p>
-     * Only generated classes that need property aliases implement this contract. That keeps
-     * the generic {@link ValueCoercible} path free of Java method/field reflection while still
-     * preserving Python-side calls such as {@code getName()} for generated bean wrappers.
-     */
-    interface GeneratedPropertyMembers {
-        @Transient
-        @Nullable String micronautValueCoercibleGetterPropertyName(String key);
-
-        @Transient
-        @Nullable String micronautValueCoercibleSetterPropertyName(String key);
-
-        @Transient
-        default boolean micronautValueCoercibleSetMember(String key, Value value) {
-            return false;
-        }
-    }
-
-    /**
-     * Reference to the source host object exposed through a polyglot value.
-     *
-     * @param value The host value
-     */
-    record HostObjectReference(ValueCoercible value) {
-    }
 }

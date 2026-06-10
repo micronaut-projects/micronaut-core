@@ -23,15 +23,20 @@ import io.micronaut.core.annotation.Order;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
+import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
+import org.graalvm.polyglot.PolyglotAccess;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,6 +44,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
@@ -51,15 +59,17 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  * @since 5.0.0
  */
 @Factory
-public class GraalPyContextFactory implements BeanDestroyedEventListener<org.graalvm.polyglot.Context>, Ordered {
+public class GraalPyContextFactory implements BeanDestroyedEventListener<org.graalvm.polyglot.Context>, GracefulShutdownCapable, Ordered {
     public static final String APPLICATION_PATH = "META-INF/GRAALPY-VFS/micronaut-application";
     public static final String APPLICATION_SRC_PATH = APPLICATION_PATH + "/src/";
     public static final String INTERNAL_MAIN = "__main__.py";
     public static final String APPLICATION_MAIN = "main.py";
     public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
+    private static final Logger LOG = LoggerFactory.getLogger(GraalPyContextFactory.class);
 
     private final ApplicationContext applicationContext;
     private boolean providedContext = false;
+    private final CompletableFuture<Void> gracefulShutdown = new CompletableFuture<>();
 
     public GraalPyContextFactory(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
@@ -162,6 +172,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             .allowExperimentalOptions(true)
             .allowCreateProcess(true)
             .allowValueSharing(true)
+            .allowPolyglotAccess(PolyglotAccess.ALL)
             .option("python.WarnExperimentalFeatures", "false")
              // Allow access to host classes
              .allowHostAccess(hostAccess)
@@ -177,6 +188,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         options.forEach(builder::option);
 
         var context = builder.build();
+        ContextHolder.registerContextEngine(context, engine);
         context.initialize(PYTHON);
         // set a per-context unique id for tests and tracing via builtins
         String id = java.util.UUID.randomUUID().toString();
@@ -217,14 +229,63 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     @Override
     public void onDestroyed(@NonNull BeanDestroyedEvent<Context> event) {
         if (!ContextHolder.isReuseContext()) {
-            var ctx = ContextHolder.isInitialized() ? ContextHolder.getContext() : null;
+            var ctx = event.getBean();
             if (ctx != null) {
-                ctx.close(false);
+                ContextHolder.onNoActiveExecutionsAfterCurrentFrame(ctx, () -> {
+                    closeContext(ctx, true);
+                    if (!providedContext && ContextHolder.isCurrentContext(ctx)) {
+                        ContextHolder.resetContext();
+                    }
+                });
+                return;
             }
-            if (!providedContext) {
+            if (!providedContext && ContextHolder.isCurrentContext(ctx)) {
                 ContextHolder.resetContext();
             }
         }
+    }
+
+    static void closeContext(Context ctx, boolean cancelIfExecuting) {
+        boolean closed = false;
+        try {
+            ctx.close(cancelIfExecuting);
+            closed = true;
+        } catch (IllegalStateException e) {
+            LOG.warn("Unexpected failure while closing Python context", e);
+            throw e;
+        } catch (PolyglotException e) {
+            if (!e.isCancelled()) {
+                LOG.warn("Unexpected polyglot failure while closing Python context", e);
+                throw e;
+            }
+            closed = true;
+        } catch (AssertionError e) {
+            LOG.warn("Unexpected assertion while closing Python context", e);
+            throw e;
+        } finally {
+            if (closed) {
+                ContextHolder.unregisterContextEngine(ctx);
+            }
+        }
+    }
+
+    @Override
+    public CompletionStage<?> shutdownGracefully() {
+        Context ctx = ContextHolder.isInitialized() ? ContextHolder.getContext() : null;
+        if (ctx == null || ContextHolder.isReuseContext()) {
+            gracefulShutdown.complete(null);
+            return gracefulShutdown;
+        }
+        if (gracefulShutdown.isDone()) {
+            return gracefulShutdown;
+        }
+        ContextHolder.onNoActiveExecutions(ctx, () -> gracefulShutdown.complete(null));
+        return gracefulShutdown;
+    }
+
+    @Override
+    public OptionalLong reportActiveTasks() {
+        return OptionalLong.of(ContextHolder.activeExecutions());
     }
 
     @Override

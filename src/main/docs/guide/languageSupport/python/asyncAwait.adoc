@@ -1,0 +1,51 @@
+Python controllers, clients, and classless routes may use normal `async def` functions. Micronaut models an `async def` return annotation as the awaited result type and generates the Java bridge method as a `CompletionStage<T>`.
+
+The following controller method sleeps without blocking the Netty event-loop thread:
+
+snippet::micronaut.docs.asyncio.AsyncBackendController[tags="backend", indent=0, title="Async controller method"]
+
+Python HTTP clients may also declare `async def` methods:
+
+snippet::micronaut.docs.asyncio.BackendClient[tags="asyncClient", indent=0, title="Async Python HTTP client"]
+
+An async controller can then await the injected client:
+
+snippet::micronaut.docs.asyncio.AsyncDemoController[tags="awaitClient", indent=0, title="Awaiting an async Python client"]
+
+Async Python code can also await Micronaut's concrete `HttpClient` API directly. For example, a controller can inject an `HttpClient` qualified with `@Client("/")`, call `exchange(...)`, and await the `HttpResponse`:
+
+snippet::micronaut.docs.asyncio.AsyncDemoController[tags="httpClientInjection", indent=0, title="Injecting the concrete HttpClient"]
+
+snippet::micronaut.docs.asyncio.AsyncDemoController[tags="awaitHttpClientExchange", indent=0, title="Awaiting HttpClient.exchange"]
+
+Classless routes support the same coroutine bridge:
+
+snippet::micronaut.docs.asyncio.async_routes[tags="classless", indent=0, title="Classless async route"]
+
+Async Python code can also await Java async values returned by injected services and clients. `CompletionStage<T>` awaits to `T`. Reactive `Publisher<T>` and Reactor `Mono<T>` values are treated as scalar awaitables:
+
+snippet::micronaut.docs.asyncio.AsyncBackendController[tags="publisherBackend", indent=0, title="Publisher backend"]
+
+snippet::micronaut.docs.asyncio.BackendClient[tags="publisherClient", indent=0, title="Publisher client"]
+
+snippet::micronaut.docs.asyncio.AsyncDemoController[tags="awaitPublisher", indent=0, title="Awaiting a scalar Publisher"]
+
+For a `Publisher`, Micronaut requests one item, completes the await with the first item, and cancels the subscription. If the publisher completes empty, the awaited value is `None`; if it signals an error, the await fails. Multi-item `Flux` values are not collected into a list implicitly. Use reactive operators such as `collectList()` when all emitted items are required.
+
+Classless async routes can await the same scalar reactive client result:
+
+snippet::micronaut.docs.asyncio.async_routes[tags="classlessPublisher", indent=0, title="Classless async route awaiting a Publisher"]
+
+Structured concurrency with `asyncio.TaskGroup` is supported for normal task creation, completion, and cancellation. Tasks created by the group run on the Micronaut-managed Netty-backed event loop:
+
+snippet::micronaut.docs.asyncio.AsyncDemoController[tags="taskGroup", indent=0, title="TaskGroup on the Micronaut event loop"]
+
+Asyncio bridge support is enabled by default. Disable it with:
+
+[configuration]
+----
+micronaut:
+  python:
+    asyncio:
+      enabled: false
+----

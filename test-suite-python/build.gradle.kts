@@ -9,6 +9,7 @@ dependencies {
     implementation(projects.micronautCoreProcessor)
     implementation(projects.micronautRuntime)
     implementation(projects.micronautContextPython)
+    testImplementation(projects.micronautContextPythonNetty)
     testImplementation(projects.micronautInjectPython)
     testImplementation(projects.micronautInjectPythonTest)
     testImplementation(projects.micronautHttpServerNetty)
@@ -33,6 +34,7 @@ dependencies {
     }
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
+    testRuntimeOnly(libs.apiguardian)
 
     testImplementation(platform(libs.test.boms.micronaut.data))
     testImplementation(platform(libs.test.boms.micronaut.sql))

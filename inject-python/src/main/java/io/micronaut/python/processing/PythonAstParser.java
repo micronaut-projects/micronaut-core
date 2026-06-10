@@ -274,6 +274,7 @@ public final class PythonAstParser {
                 map.containsKey("javaClassImports") ? (Map<String, java.util.List<Map<String, String>>>) map.get("javaClassImports") : null;
             java.util.List<String> exportedTypes = map.containsKey("exportedTypes") ? (java.util.List<String>) map.get("exportedTypes") : new ArrayList<>();
             java.util.List<String> allClassNames = map.containsKey("allClassNames") ? (java.util.List<String>) map.get("allClassNames") : new ArrayList<>();
+            java.util.List<String> validationErrors = map.containsKey("validationErrors") ? (java.util.List<String>) map.get("validationErrors") : new ArrayList<>();
             results.add(new TransformResult(
                 source,
                 code,
@@ -281,7 +282,8 @@ public final class PythonAstParser {
                 decorators,
                 javaClassImports,
                 exportedTypes,
-                allClassNames
+                allClassNames,
+                validationErrors
             ));
         }
         return results;
@@ -341,7 +343,8 @@ public final class PythonAstParser {
                 "decorators": transformer.get_generated_decorator_code(),
                 "javaClassImports": transformer.java_class_imports,
                 "exportedTypes": transformer.get_exported_types(),
-                "allClassNames": transformer.all_class_names
+                "allClassNames": transformer.all_class_names,
+                "validationErrors": transformer.validation_errors
             }
             """;
     }
@@ -360,6 +363,7 @@ public final class PythonAstParser {
      * @param javaClassImports The Java class imports
      * @param exportedTypes    The types that have Micronaut decorators
      * @param allClassNames    All class names defined in the source
+     * @param validationErrors Validation errors found while transforming the source
      */
     public record TransformResult(
         Source originalSource,
@@ -368,7 +372,8 @@ public final class PythonAstParser {
         Map<String, String> decorators,
         Map<String, java.util.List<Map<String, String>>> javaClassImports,
         java.util.List<String> exportedTypes,
-        java.util.List<String> allClassNames) {
+        java.util.List<String> allClassNames,
+        java.util.List<String> validationErrors) {
 
         public Source transformedSource() {
             return sourceWithContent(code);

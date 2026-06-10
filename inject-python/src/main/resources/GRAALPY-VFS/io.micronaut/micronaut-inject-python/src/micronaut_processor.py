@@ -264,15 +264,18 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 if self.in_function:
                     return node
                 return self._visit_class_def(node)
-            case ast.FunctionDef():
+            case ast.FunctionDef() | ast.AsyncFunctionDef():
                 # Track function nesting to avoid processing nested functions as micronaut decorators
                 was_in_function = self.in_function
                 self.in_function = True
                 try:
+                    is_async = isinstance(node, ast.AsyncFunctionDef)
                     # Handle property decorators
                     if self.current_class is not None:
                         property_info = self._parse_property_decorators(node)
                         if property_info:
+                            if is_async:
+                                raise ValueError(f"Async property [{node.name}] is not supported")
                             property_name, property_type = property_info
                             self._handle_property_function(property_name, property_type, node)
                             return node
@@ -340,9 +343,11 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         )
                         is_static = is_static_method(node)
 
-                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static, has_return_value(node))
+                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static, is_async, has_return_value(node))
                         if self.current_class is not None:
                             if node.name == "__init__":
+                                if is_async:
+                                    raise ValueError("Async constructors are not supported")
                                 self._handle_constructor_instance_attributes(node, arguments)
                                 # Set as constructor
                                 self.current_class = self.current_class.withConstructor(func_def)
@@ -1403,7 +1408,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         is_abstract = is_abstract_method(func_node)
         is_static = is_static_method(func_node)
 
-        func_def = JavaFuncDef(func_node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract, is_static, has_return_value(func_node))
+        func_def = JavaFuncDef(func_node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract, is_static, False, has_return_value(func_node))
 
         # Update the property based on type
         if property_type == "getter":

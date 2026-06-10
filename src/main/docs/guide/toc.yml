@@ -334,7 +334,15 @@ languageSupport:
     ide: Configuring an IDE
     retainparameternames: Retaining Parameter Names
   groovy: Micronaut for Groovy
-  python: Micronaut for Python
+  python:
+    title: Micronaut for Python
+    typeOrdering: Type Ordering and Forward References
+    keywords: Python Keywords in Java APIs
+    asyncAwait:
+      title: Async/Await
+      asyncioRuntime: Netty-Backed Asyncio Runtime
+      asyncioNetworking: Asyncio Networking and TLS
+      asyncioUnsupported: Unsupported Asyncio APIs
   kotlin:
     title: Micronaut for Kotlin
     kaptOrKsp: Kotlin support via KAPT or KSP

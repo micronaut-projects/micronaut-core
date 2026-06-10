@@ -155,6 +155,12 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             if (transformedList.isEmpty()) {
                 return;
             }
+            transformedList.stream()
+                .flatMap(transformResult -> transformResult.validationErrors().stream())
+                .findFirst()
+                .ifPresent(message -> {
+                    throw new ProcessingException(originatingElement, message);
+                });
 
             // Then parse the transformed code
             String[] srcDirs = values.src();
