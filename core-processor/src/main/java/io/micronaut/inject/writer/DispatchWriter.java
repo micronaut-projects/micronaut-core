@@ -108,14 +108,14 @@ public final class DispatchWriter implements ClassOutputWriter {
     private static final Method METHOD_SET_FIELD_VALUE = ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "setField", Class.class, String.class, Object.class, Object.class);
 
     private static final Map<TypeDef.Primitive, PrimitiveDispatchData> PRIMITIVE_DISPATCH_DATA = Map.of(
-        TypeDef.Primitive.BOOLEAN, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_BOOLEAN, TypeDef.Primitive.BOOLEAN.constant(false)),
-        TypeDef.Primitive.BYTE, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_BYTE, TypeDef.Primitive.BYTE.constant((byte) 0)),
-        TypeDef.Primitive.SHORT, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_SHORT, TypeDef.Primitive.SHORT.constant((short) 0)),
-        TypeDef.Primitive.CHAR, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_CHAR, TypeDef.Primitive.CHAR.constant('\0')),
-        TypeDef.Primitive.INT, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_INT, TypeDef.Primitive.INT.constant(0)),
-        TypeDef.Primitive.LONG, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_LONG, TypeDef.Primitive.LONG.constant(0L)),
-        TypeDef.Primitive.FLOAT, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_FLOAT, TypeDef.Primitive.FLOAT.constant(0F)),
-        TypeDef.Primitive.DOUBLE, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_DOUBLE, TypeDef.Primitive.DOUBLE.constant(0D))
+        TypeDef.Primitive.BOOLEAN, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_BOOLEAN),
+        TypeDef.Primitive.BYTE, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_BYTE),
+        TypeDef.Primitive.SHORT, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_SHORT),
+        TypeDef.Primitive.CHAR, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_CHAR),
+        TypeDef.Primitive.INT, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_INT),
+        TypeDef.Primitive.LONG, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_LONG),
+        TypeDef.Primitive.FLOAT, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_FLOAT),
+        TypeDef.Primitive.DOUBLE, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_DOUBLE)
     );
 
     private final List<DispatchTarget> dispatchTargets = new ArrayList<>();
@@ -589,16 +589,12 @@ public final class DispatchWriter implements ClassOutputWriter {
         return primitiveDispatchData(primitiveType).name();
     }
 
-
     private static PrimitiveDispatchData primitiveDispatchData(TypeDef.Primitive primitiveType) {
         PrimitiveDispatchData primitiveDispatchData = PRIMITIVE_DISPATCH_DATA.get(primitiveType);
         if (primitiveDispatchData != null) {
             return primitiveDispatchData;
         }
         throw new IllegalStateException("Unsupported primitive dispatch type: " + primitiveType);
-    }
-
-    private record PrimitiveDispatchData(String name, ExpressionDef defaultValue) {
     }
 
     @Nullable
@@ -711,6 +707,9 @@ public final class DispatchWriter implements ClassOutputWriter {
      */
     public boolean isHasInterceptedMethod() {
         return hasInterceptedMethod;
+    }
+
+    private record PrimitiveDispatchData(String name) {
     }
 
     /**
