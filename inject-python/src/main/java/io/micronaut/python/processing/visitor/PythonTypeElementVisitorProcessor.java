@@ -24,6 +24,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -41,12 +42,18 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory;
+import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
+import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.sourcegen.model.ObjectDef;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -230,7 +237,9 @@ public final class PythonTypeElementVisitorProcessor {
     }
 
     private boolean shouldCopyMixinAnnotation(String annotationName, AnnotationValue<Mixin> mixinAnnotation) {
-        if (Mixin.Filter.class.getName().equals(annotationName) || Mixin.class.getName().equals(annotationName)) {
+        if (Mixin.Filter.class.getName().equals(annotationName)
+            || Mixin.class.getName().equals(annotationName)
+            || Introspected.Property.class.getName().equals(annotationName)) {
             return false;
         }
         String[] includedAnnotations = mixinAnnotation.stringValues("includeAnnotations");
@@ -273,10 +282,25 @@ public final class PythonTypeElementVisitorProcessor {
             return;
         }
         try {
-            AbstractBeanDefinitionBuilder.writeBeanDefinitionBuilders(pythonVisitorContext, beanElementBuilders);
+            DefaultElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory = new DefaultElementBeanDefinitionBuilderFactory(pythonVisitorContext);
+            for (OutputObjectDef outputObjectDef : AbstractBeanDefinitionBuilder.build(beanElementBuilders, beanDefinitionBuilderFactory)) {
+                write(outputObjectDef, pythonVisitorContext);
+            }
         } catch (IOException e) {
             String message = e.getMessage();
             pythonVisitorContext.fail("Unexpected error: " + (message != null ? message : e.getClass().getSimpleName()), null);
+        }
+    }
+
+    private void write(OutputObjectDef outputObjectDef, PythonVisitorContext pythonVisitorContext) throws IOException {
+        ObjectDef objectDef = outputObjectDef.objectDef();
+        Class<?> serviceClass = outputObjectDef.serviceClass();
+        OriginatingElements originatingElements = outputObjectDef.originatingElements();
+        if (serviceClass != null) {
+            pythonVisitorContext.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
+        }
+        try (OutputStream outputStream = pythonVisitorContext.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
+            outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, pythonVisitorContext));
         }
     }
 

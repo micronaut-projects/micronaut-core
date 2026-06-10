@@ -109,6 +109,11 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
     }
 
     @Override
+    public boolean isRawType() {
+        return false;
+    }
+
+    @Override
     public List<? extends ClassElement> getUpperBounds() {
         return upperBounds;
     }
@@ -116,6 +121,16 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
     @Override
     public List<? extends ClassElement> getLowerBounds() {
         return lowerBounds;
+    }
+
+    @Override
+    public boolean hasExplicitUpperBound() {
+        return wildcardType.getExtendsBound() != null;
+    }
+
+    @Override
+    public boolean hasExplicitLowerBound() {
+        return wildcardType.getSuperBound() != null;
     }
 
     @Override

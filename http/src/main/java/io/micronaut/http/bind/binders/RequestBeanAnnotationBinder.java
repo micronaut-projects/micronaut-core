@@ -26,10 +26,15 @@ import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.cookie.Cookies;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -69,6 +74,8 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
         boolean hasAnnotation = annotationMetadata.hasAnnotation(RequestBean.class);
 
         if (hasAnnotation) {
+            boolean bindingFound = false;
+
             BeanIntrospection<T> introspection = BeanIntrospection.getIntrospection(context.getArgument().getType());
             Map<String, BeanProperty<T, Object>> beanProperties = introspection.getBeanProperties().stream()
                     .collect(Collectors.toMap(Named::getName, p -> p));
@@ -88,18 +95,37 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
                         argumentToBind = constructorArgument;
                     }
                     Optional<Object> bindableResult = getBindableResult(source, argumentToBind);
+                    if (bindableResult.isPresent() && !isContextType(argumentToBind.getType())) {
+                        bindingFound = true;
+                    }
                     argumentValues[i] = constructorArgument.isOptional() ? bindableResult : bindableResult.orElse(null);
+                }
+                if (!bindingFound) {
+                    return BindingResult.empty();
                 }
                 return () -> Optional.of(introspection.instantiate(false, argumentValues));
             } else {
                 // Handle injection with setters, we checked that all values are writable at compile time
-                T bean = introspection.instantiate();
+                Map<BeanProperty<T, Object>, Optional<Object>> bindableResults = new LinkedHashMap<>();
                 for (BeanProperty<T, Object> property : beanProperties.values()) {
                     Argument<Object> propertyArgument = property.asArgument();
                     Optional<Object> bindableResult = getBindableResult(source, propertyArgument);
-                    property.set(bean, propertyArgument.isOptional()
-                            ? bindableResult
-                            : bindableResult.orElse(null));
+                    bindableResults.put(property, bindableResult);
+                    if (bindableResult.isPresent() && !isContextType(propertyArgument.getType())) {
+                        bindingFound = true;
+                    }
+                }
+                if (!bindingFound) {
+                    return BindingResult.empty();
+                }
+
+                T bean = introspection.instantiate();
+                for (BeanProperty<T, Object> property: bindableResults.keySet()) {
+                    Optional<Object> bindableResult = bindableResults.get(property);
+                    property.set(bean, property.asArgument().isOptional()
+                        ? bindableResult
+                        : bindableResult.orElse(null)
+                    );
                 }
                 return () -> Optional.of(bean);
             }
@@ -135,6 +161,16 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
             throw new UnsatisfiedArgumentException(argument);
         }
         return result.getValue();
+    }
+
+    private boolean isContextType(Class<?> type) {
+        // Using the classes added in byType map in DefaultRequestBinderRegistry
+        return HttpHeaders.class.isAssignableFrom(type) ||
+            HttpRequest.class.isAssignableFrom(type)    ||
+            HttpParameters.class.isAssignableFrom(type) ||
+            Cookies.class.isAssignableFrom(type)        ||
+            Cookie.class.isAssignableFrom(type);
+
     }
 
 }

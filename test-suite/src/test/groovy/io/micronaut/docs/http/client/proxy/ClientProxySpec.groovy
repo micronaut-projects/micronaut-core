@@ -26,7 +26,7 @@ class ClientProxySpec extends Specification {
 
     @AutoCleanup
     GenericContainer proxyContainer =
-            new GenericContainer('sameersbn/squid:latest')
+            new GenericContainer('ubuntu/squid:6.6-24.04_beta')
                     .withCopyFileToContainer(MountableFile.forClasspathResource('/squid.conf'), '/etc/squid/squid.conf')
                     .withExposedPorts(PROXY_PORT)
                     .waitingFor(new HostPortWaitStrategy())

@@ -219,7 +219,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
         }
     }
 
-    private fun findTypeElementVisitors(): Collection<TypeElementVisitor<*, *>> {
+    protected open fun findTypeElementVisitors(): Collection<TypeElementVisitor<*, *>> {
         val typeElementVisitors: MutableMap<String, TypeElementVisitor<*, *>> = HashMap(10)
         for (definition in SERVICE_LOADER) {
             if (definition.isPresent) {
@@ -287,7 +287,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
         }
 
         private fun visitInnerClasses(classElement: ClassElement, processed: MutableSet<String> = HashSet()) {
-            val innerClassQuery = ElementQuery.ALL_INNER_CLASSES.onlyStatic().modifiers { it.contains(ElementModifier.PUBLIC) }
+            val innerClassQuery = ElementQuery.ALL_INNER_CLASSES.modifiers { it.contains(ElementModifier.PUBLIC) }
             classElement.getEnclosedElements(innerClassQuery).forEach {
                 val visitor = loadedVisitor.visitor
                 val kspClassElement: KotlinClassElement = it as KotlinClassElement

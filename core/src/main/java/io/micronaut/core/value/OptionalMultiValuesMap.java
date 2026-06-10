@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.value;
 
+import io.micronaut.core.annotation.Internal;
+
 import java.util.List;
 import java.util.Map;
 
@@ -25,7 +27,8 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-class OptionalMultiValuesMap<V> extends OptionalValuesMap<List<V>> implements OptionalMultiValues<V> {
+@Internal
+final class OptionalMultiValuesMap<V> extends OptionalValuesMap<List<V>> implements OptionalMultiValues<V> {
 
     /**
      * @param type   The type

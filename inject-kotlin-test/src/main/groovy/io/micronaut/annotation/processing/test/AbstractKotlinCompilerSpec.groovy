@@ -15,6 +15,8 @@
  */
 package io.micronaut.annotation.processing.test
 
+import com.google.devtools.ksp.processing.SymbolProcessorProvider
+
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.Qualifier
 import io.micronaut.core.annotation.Experimental
@@ -172,6 +174,10 @@ class AbstractKotlinCompilerSpec extends Specification {
 
     protected BeanDefinition buildBeanDefinition(String className, @Language("kotlin") String cls) {
         KotlinCompiler.buildBeanDefinition(className, cls)
+    }
+
+    protected BeanDefinition buildBeanDefinition(String className, @Language("kotlin") String cls, List<SymbolProcessorProvider> extraSymbolProcessorProviders) {
+        KotlinCompiler.buildBeanDefinition(className, cls, extraSymbolProcessorProviders)
     }
 
     /**

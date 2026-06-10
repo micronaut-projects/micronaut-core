@@ -338,7 +338,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
         final BeanWriteProperty<T, ?> prop = getWriteProperty(name).orElse(null);
         if (prop != null && ReflectionUtils.getWrapperType(type).isAssignableFrom(ReflectionUtils.getWrapperType(prop.getType()))) {
             //noinspection unchecked
-            return Optional.of((BeanProperty<T, P>) prop);
+            return Optional.of((BeanWriteProperty<T, P>) prop);
         }
         return Optional.empty();
     }

@@ -1095,11 +1095,13 @@ def {decorator_name}({param_signature}):
             if self._is_annotation_class(nested_element):
                 repeatable_name = self._get_repeatable_name(nested_element.getAnnotationMetadata(), nested_element)
                 repeatable_info = f', repeated="{repeatable_name}"' if repeatable_name else ''
-                self.generated_decorators.add(simple_name)
+                nested_decorator_name = f"_{parent_name}_{simple_name}"
+                nested_member_names.add(nested_decorator_name)
+                self.generated_decorators.add(nested_decorator_name)
                 prelude_lines.append(f'''
 
 @micronaut_annotation("{nested_name}"{repeatable_info})
-def {simple_name}(*args, **kwargs):
+def {nested_decorator_name}(*args, **kwargs):
     """
     Micronaut annotation decorator for {nested_name}.
     """
@@ -1115,7 +1117,7 @@ def {simple_name}(*args, **kwargs):
 ''')
                 lines.append(f'''
 
-{parent_name}.{simple_name} = {simple_name}
+{parent_name}.{simple_name} = {nested_decorator_name}
 ''')
             else:
                 binary_name = self._to_binary_nested_name(class_element.getName(), nested_name)
@@ -1134,7 +1136,7 @@ except Exception:
 
     def _meta_decorator_name(self, meta_annotation_name: str, annotation_name: str, meta_class_element) -> str:
         if meta_annotation_name.startswith(annotation_name + '$'):
-            return meta_annotation_name.split('$')[-1]
+            return f"_{annotation_name.split('.')[-1]}_{meta_annotation_name.split('$')[-1]}"
         if '$' in meta_annotation_name:
             return meta_annotation_name.split('$')[-1]
         return meta_class_element.getSimpleName()

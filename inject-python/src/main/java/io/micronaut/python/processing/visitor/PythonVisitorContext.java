@@ -209,11 +209,15 @@ public final class PythonVisitorContext implements VisitorContext {
 
     @Override
     public Optional<ClassElement> getClassElement(String name, ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        return getClassElement(name);
+        return getClassElement(name, true);
     }
 
     @Override
     public Optional<io.micronaut.inject.ast.ClassElement> getClassElement(String name) {
+        return getClassElement(name, false);
+    }
+
+    private Optional<io.micronaut.inject.ast.ClassElement> getClassElement(String name, boolean useAnnotationMetadataFactory) {
         // First try to find in Python environment
         if (!name.startsWith("java.") && !name.startsWith("javax.")) {
             Map<String, ClassElement> classes = processingEnvironment.classes();
@@ -239,7 +243,9 @@ public final class PythonVisitorContext implements VisitorContext {
         }
         // Fallback to Java visitor context
         if (javaVisitorContext != null) {
-            Optional<ClassElement> javaClass = javaVisitorContext.getClassElement(name);
+            Optional<ClassElement> javaClass = useAnnotationMetadataFactory
+                ? javaVisitorContext.getClassElement(name, javaVisitorContext.getElementAnnotationMetadataFactory().readOnly())
+                : javaVisitorContext.getClassElement(name);
             if (javaClass.isPresent()) {
                 return javaClass;
             }

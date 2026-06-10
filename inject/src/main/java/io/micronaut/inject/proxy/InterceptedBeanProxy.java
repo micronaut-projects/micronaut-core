@@ -46,4 +46,12 @@ public interface InterceptedBeanProxy<T> extends InterceptedBean, Qualified<T> {
         return false;
     }
 
+    /**
+     * Clear the cached target if this proxy caches one.
+     *
+     * @since 5.1.0
+     */
+    default void clearCachedInterceptedTarget() {
+    }
+
 }

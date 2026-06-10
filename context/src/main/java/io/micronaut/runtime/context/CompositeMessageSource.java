@@ -20,6 +20,10 @@ import io.micronaut.context.MessageSource;
 import io.micronaut.context.annotation.Primary;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
+import jakarta.inject.Inject;
+
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -39,7 +43,19 @@ public final class CompositeMessageSource extends AbstractMessageSource {
      * The other messages sources.
      *
      * @param messageSources The message sources.
+     * @deprecated Use {@link #CompositeMessageSource(List)} instead.
      */
+    @Deprecated
+    public CompositeMessageSource(@Nullable Collection<MessageSource> messageSources) {
+        this(messageSources == null ? Collections.emptyList() : new ArrayList<>(messageSources));
+    }
+
+    /**
+     * The other messages sources.
+     *
+     * @param messageSources The message sources.
+     */
+    @Inject
     public CompositeMessageSource(@Nullable List<MessageSource> messageSources) {
         this.messageSources = messageSources != null ? messageSources : Collections.emptyList();
     }

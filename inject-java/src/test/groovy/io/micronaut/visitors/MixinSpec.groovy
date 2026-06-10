@@ -103,6 +103,7 @@ class MyBeanMixin {
             metadata.annotationNames.sort() == [
                     "com.fasterxml.jackson.annotation.JsonProperty",
                     "io.micronaut.context.annotation.Executable",
+                    "io.micronaut.core.annotation.Introspected\$Property",
                     'jakarta.validation.constraints.NotNull$List'
             ]
     }
@@ -146,7 +147,8 @@ class MyBeanMixin {
             metadata.getAnnotationNameByStereotype(JacksonAnnotation.name).get() == JsonProperty.name
             metadata.annotationNames.sort() == [
                     "com.fasterxml.jackson.annotation.JsonProperty",
-                    "io.micronaut.context.annotation.Executable"
+                    "io.micronaut.context.annotation.Executable",
+                    "io.micronaut.core.annotation.Introspected\$Property"
             ]
     }
 
@@ -191,7 +193,8 @@ class MyBeanMixin {
             metadata.getAnnotationNameByStereotype(JacksonAnnotation.name).get() == JsonProperty.name
             metadata.annotationNames.sort() == [
                     "com.fasterxml.jackson.annotation.JsonProperty",
-                    "io.micronaut.context.annotation.Executable"
+                    "io.micronaut.context.annotation.Executable",
+                    "io.micronaut.core.annotation.Introspected\$Property"
             ]
     }
 
@@ -235,7 +238,8 @@ class MyBeanMixin {
             metadata.getAnnotationNameByStereotype(JacksonAnnotation.name).get() == JsonProperty.name
             metadata.annotationNames.sort() == [
                     "com.fasterxml.jackson.annotation.JsonProperty",
-                    "io.micronaut.context.annotation.Executable"
+                    "io.micronaut.context.annotation.Executable",
+                    "io.micronaut.core.annotation.Introspected\$Property"
             ]
     }
 
@@ -279,7 +283,8 @@ class MyBeanMixin {
             metadata.getAnnotationNameByStereotype(JacksonAnnotation.name).get() == JsonProperty.name
             metadata.annotationNames.sort() == [
                     "com.fasterxml.jackson.annotation.JsonProperty",
-                    "io.micronaut.context.annotation.Executable"
+                    "io.micronaut.context.annotation.Executable",
+                    "io.micronaut.core.annotation.Introspected\$Property"
             ]
     }
 

@@ -159,6 +159,23 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         ctx.close()
     }
 
+    void 'test HTTP/2 configuration binds under the http2 prefix'() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'micronaut.http.services.foo.http2.max-header-list-size': 16384,
+                'micronaut.http.services.foo.http2.ping-interval-read': '30s',
+        )
+
+        ServiceHttpClientConfiguration clientConfiguration = ctx.getBean(ServiceHttpClientConfiguration, Qualifiers.byName("foo"))
+
+        expect:
+        clientConfiguration.http2Configuration.maxHeaderListSize == 16384
+        clientConfiguration.http2Configuration.pingIntervalRead == Duration.ofSeconds(30)
+
+        cleanup:
+        ctx.close()
+    }
+
     void "test that manually defining an HTTP client without URL doesn't create bean"() {
         given:
         ApplicationContext clientApp = ApplicationContext.run(

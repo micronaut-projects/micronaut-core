@@ -15,6 +15,7 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import com.google.devtools.ksp.symbol.Variance
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.ArrayableClassElement
@@ -63,6 +64,8 @@ internal class KotlinWildcardElement(
     private val resolvedGenericTypeAnnotationMetadata: ElementAnnotationMetadata by lazy {
         elementAnnotationMetadataFactory.buildGenericTypeAnnotations(this)
     }
+
+    private val typeArgumentVariance: Variance = internalGenericNativeType.declaration.variance
 
     override fun getResolved(): Optional<ClassElement> = Optional.of(upper)
 
@@ -116,6 +119,10 @@ internal class KotlinWildcardElement(
         list.addAll(lowerBounds)
         return list
     }
+
+    override fun hasExplicitUpperBound() = typeArgumentVariance == Variance.COVARIANT
+
+    override fun hasExplicitLowerBound() = typeArgumentVariance == Variance.CONTRAVARIANT
 
     private fun toKotlinClassElement(element: ClassElement?): KotlinClassElement? {
         return when {

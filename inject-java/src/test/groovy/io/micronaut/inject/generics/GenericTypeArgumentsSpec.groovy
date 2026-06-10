@@ -79,6 +79,43 @@ class Dao<T> {
         definition.injectedFields.first().asArgument().typeParameters[0].type.simpleName == "User"
     }
 
+    void "test type arguments with proxied inherited fields"() {
+        given:
+        BeanDefinition definition = buildInterceptedBeanDefinition('inheritedproxiedfields.UserDaoClient', '''
+package inheritedproxiedfields;
+
+import io.micronaut.aop.simple.Mutating;
+import jakarta.inject.*;
+
+@Singleton
+@Mutating("test")
+class UserDaoClient extends DaoClient<User> {
+    void test() {
+    }
+}
+
+@Singleton
+class UserDao extends Dao<User> {
+}
+
+class User {
+}
+
+class DaoClient<T> {
+
+    @Inject
+    Dao<T> dao;
+}
+
+class Dao<T> {
+}
+''')
+
+        expect:
+        definition.injectedFields.first().asArgument().typeParameters.length == 1
+        definition.injectedFields.first().asArgument().typeParameters[0].type.simpleName == "User"
+    }
+
     void "test type arguments for exception handler"() {
         given:
         BeanDefinition definition = buildBeanDefinition('exceptionhandler.Test', '''\

@@ -108,7 +108,7 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
                             "Error starting type visitor [$loadedVisitor.visitor]: $e.message")
                 }
             }
-
+            visitorContext.finish()
             TypeElementVisitorTransform.loadedVisitors.set(loadedVisitors)
         }
 

@@ -451,6 +451,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected Map<? extends Element, ?> readAnnotationDefaultValues(String annotationTypeName, Element element) {
+        return readAnnotationDefaultValues(annotationTypeName, element, false);
+    }
+
+    @Override
+    protected Map<? extends Element, ?> readAnnotationDefaultValues(String annotationTypeName, Element element, boolean includeEmptyValues) {
         var defaultValues = new LinkedHashMap<Element, AnnotationValue>();
         if (element instanceof TypeElement annotationElement) {
             final List<? extends Element> allMembers = elementUtils.getAllMembers(annotationElement);
@@ -459,7 +464,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                 .filter(member -> member.getEnclosingElement().equals(annotationElement))
                 .filter(ExecutableElement.class::isInstance)
                 .map(ExecutableElement.class::cast)
-                .filter(this::isValidDefaultValue)
+                .filter(executableElement -> isValidDefaultValue(executableElement, includeEmptyValues))
                 .forEach(executableElement -> {
                         final AnnotationValue defaultValue = executableElement.getDefaultValue();
                         defaultValues.put(executableElement, defaultValue);
@@ -469,7 +474,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         return defaultValues;
     }
 
-    private boolean isValidDefaultValue(ExecutableElement executableElement) {
+    private boolean isValidDefaultValue(ExecutableElement executableElement, boolean includeEmptyValues) {
         AnnotationValue defaultValue = executableElement.getDefaultValue();
         if (defaultValue != null) {
             Object v;
@@ -481,7 +486,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             }
             if (v != null) {
                 if (v instanceof String string) {
-                    return StringUtils.isNotEmpty(string);
+                    return includeEmptyValues || StringUtils.isNotEmpty(string);
                 } else {
                     return true;
                 }

@@ -44,4 +44,20 @@ class InjectCollectionBeanSpec extends Specification {
         cleanup:
         ctx.close()
     }
+
+    void "test resolve sequenced set bean"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+
+        when:
+        def bean = ctx.getBean(ThingThatNeedsSequencedSet)
+
+        then:
+        bean.beans != null
+        bean.beanNames == ["A", "B"]
+
+        cleanup:
+        ctx.close()
+    }
+
 }

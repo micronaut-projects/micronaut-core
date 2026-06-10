@@ -58,7 +58,7 @@ class VisibilityIssuesSpec extends AbstractTypeElementSpec {
         beanDefinition.injectedMethods[1].name == "setAge"
         beanDefinition.injectedFields.size() == 1
         beanDefinition.injectedFields[0].name == "nationality"
-        instance.getName() == null //methods that require reflection are not injected
+        instance.getName() == 'Sally'
         instance.getAge() == 22
         instance.getBuilder().build().getManufacturer() == 'Chevy'
 

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.context;
+
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -25,11 +26,10 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
-
 import org.jspecify.annotations.Nullable;
+
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 
@@ -38,14 +38,18 @@ import java.util.Objects;
  * implement the {@link ExecutableMethod#invoke(Object, Object...)} method at compile time providing direct dispatch
  * of the target method</p>
  *
+ * @param <T> The declaring type
+ * @param <R> The result of the method call
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated No longer needed
  */
+@Deprecated(since = "5.0", forRemoval = true)
 @Internal
-public abstract class AbstractExecutableMethod extends AbstractExecutable implements UnsafeExecutable, ExecutableMethod, EnvironmentConfigurable {
+public abstract class AbstractExecutableMethod<T, R> extends AbstractExecutable<T, R> implements UnsafeExecutable<T, R>, ExecutableMethod<T, R>, EnvironmentConfigurable {
 
-    private final ReturnType returnType;
-    private final Argument<?> genericReturnType;
+    private final ReturnType<R> returnType;
+    private final Argument<R> genericReturnType;
     private final int hashCode;
     @Nullable
     private Environment environment;
@@ -59,10 +63,10 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
      * @param arguments         The arguments
      */
     @SuppressWarnings("WeakerAccess")
-    protected AbstractExecutableMethod(Class<?> declaringType,
+    protected AbstractExecutableMethod(Class<T> declaringType,
                                        String methodName,
-                                       Argument genericReturnType,
-                                       Argument... arguments) {
+                                       Argument<R> genericReturnType,
+                                       Argument<?>... arguments) {
         super(declaringType, methodName, arguments);
         this.genericReturnType = genericReturnType;
         this.returnType = new ReturnTypeImpl();
@@ -77,9 +81,9 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
      * @param genericReturnType The generic return type
      */
     @SuppressWarnings("WeakerAccess")
-    protected AbstractExecutableMethod(Class<?> declaringType,
+    protected AbstractExecutableMethod(Class<T> declaringType,
                                        String methodName,
-                                       Argument genericReturnType) {
+                                       Argument<R> genericReturnType) {
         this(declaringType, methodName, genericReturnType, Argument.ZERO_ARGUMENTS);
     }
 
@@ -89,9 +93,9 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
      */
     @SuppressWarnings("WeakerAccess")
     @UsedByGeneratedCode
-    protected AbstractExecutableMethod(Class<?> declaringType,
+    protected AbstractExecutableMethod(Class<T> declaringType,
                                        String methodName) {
-        this(declaringType, methodName, Argument.OBJECT_ARGUMENT, Argument.ZERO_ARGUMENTS);
+        this(declaringType, methodName, (Argument<R>) Argument.VOID, Argument.ZERO_ARGUMENTS);
     }
 
     @Override
@@ -121,7 +125,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        AbstractExecutableMethod that = (AbstractExecutableMethod) o;
+        AbstractExecutableMethod<T, R> that = (AbstractExecutableMethod<T, R>) o;
         return Objects.equals(declaringType, that.declaringType) &&
             Objects.equals(methodName, that.methodName) &&
             Arrays.equals(argTypes, that.argTypes);
@@ -139,7 +143,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     }
 
     @Override
-    public ReturnType getReturnType() {
+    public ReturnType<R> getReturnType() {
         return returnType;
     }
 
@@ -149,7 +153,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     }
 
     @Override
-    public Class<?> getDeclaringType() {
+    public Class<T> getDeclaringType() {
         return declaringType;
     }
 
@@ -160,7 +164,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
     @Override
     @Nullable
-    public final Object invoke(Object instance, @Nullable Object... arguments) {
+    public final R invoke(T instance, @Nullable Object... arguments) {
         if (arguments.length > 0) {
             ArgumentUtils.validateArguments(this, getArguments(), arguments);
         }
@@ -169,7 +173,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
 
     @Override
     @Nullable
-    public Object invokeUnsafe(Object instance, @Nullable Object... arguments) {
+    public R invokeUnsafe(T instance, @Nullable Object... arguments) {
         return invokeInternal(instance, arguments);
     }
 
@@ -181,7 +185,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     @SuppressWarnings("WeakerAccess")
     @UsedByGeneratedCode
     @Nullable
-    protected abstract Object invokeInternal(Object instance, @Nullable Object[] arguments);
+    protected abstract R invokeInternal(T instance, @Nullable Object[] arguments);
 
     /**
      * Resolves the annotation metadata for this method. Subclasses
@@ -210,15 +214,11 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     /**
      * A {@link ReturnType} implementation.
      */
-    class ReturnTypeImpl implements ReturnType {
+    private final class ReturnTypeImpl implements ReturnType<R> {
 
         @Override
-        public Class<?> getType() {
-            if (genericReturnType != null) {
-                return genericReturnType.getType();
-            } else {
-                return void.class;
-            }
+        public Class<R> getType() {
+            return genericReturnType.getType();
         }
 
         @Override
@@ -232,23 +232,17 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         }
 
         @Override
-        public Argument[] getTypeParameters() {
-            if (genericReturnType != null) {
-                return genericReturnType.getTypeParameters();
-            }
-            return Argument.ZERO_ARGUMENTS;
+        public Argument<?>[] getTypeParameters() {
+            return genericReturnType.getTypeParameters();
         }
 
         @Override
         public Map<String, Argument<?>> getTypeVariables() {
-            if (genericReturnType != null) {
-                return genericReturnType.getTypeVariables();
-            }
-            return Collections.emptyMap();
+            return genericReturnType.getTypeVariables();
         }
 
         @Override
-        public Argument asArgument() {
+        public Argument<R> asArgument() {
             Map<String, Argument<?>> typeVariables = getTypeVariables();
             Collection<Argument<?>> values = typeVariables.values();
             final AnnotationMetadata annotationMetadata = getAnnotationMetadata();
