@@ -140,7 +140,11 @@ final class NettyReadBuffer extends ReadBuffer {
         ByteBuf b = getBuf();
         if (b.hasArray()) {
             buf = null;
-            return function.apply(java.nio.ByteBuffer.wrap(b.array(), b.arrayOffset() + b.readerIndex(), b.readableBytes()));
+            try {
+                return function.apply(java.nio.ByteBuffer.wrap(b.array(), b.arrayOffset() + b.readerIndex(), b.readableBytes()));
+            } finally {
+                b.release();
+            }
         } else {
             return super.useFastHeapBuffer(function);
         }

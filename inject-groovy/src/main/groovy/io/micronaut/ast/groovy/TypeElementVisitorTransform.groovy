@@ -69,8 +69,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         Map<String, LoadedVisitor> visitors = loadedVisitors.get()
         if (visitors == null) return
 
-        var visitorContext = new GroovyVisitorContext(source, compilationUnit)
-
+        GroovyVisitorContext visitorContext = new GroovyVisitorContext(source, compilationUnit)
         List<LoadedVisitor> sortedVisitors = new ArrayList<>(visitors.values())
         OrderUtil.reverseSort(sortedVisitors)
 
@@ -106,6 +105,8 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
 
         loadedVisitors.set(visitors)
         beanDefinitionBuilders.get().addAll(visitorContext.getBeanElementBuilders())
+
+        visitorContext.finish()
     }
 
     @Override

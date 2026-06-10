@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing.test;
 
 import com.google.devtools.ksp.processing.SymbolProcessor;
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment;
+import com.google.devtools.ksp.processing.SymbolProcessorProvider;
 import com.google.devtools.ksp.symbol.KSClassDeclaration;
 import com.tschuchort.compiletesting.JvmCompilationResult;
 import com.tschuchort.compiletesting.KotlinCompilation;
@@ -89,8 +90,12 @@ public class KotlinCompiler {
     }
 
     public static URLClassLoader buildClassLoader(String name, @Language("kotlin") String clazz) {
+        return buildClassLoader(name, clazz, Collections.emptyList());
+    }
+
+    public static URLClassLoader buildClassLoader(String name, @Language("kotlin") String clazz, List<SymbolProcessorProvider> extraSymbolProcessorProviders) {
         Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> resultPair = compile(name, clazz, classElement -> {
-        });
+        }, extraSymbolProcessorProviders);
         return toClassLoader(resultPair);
     }
 
@@ -130,6 +135,10 @@ public class KotlinCompiler {
     }
 
     public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compile(String name, @Language("kotlin") String clazz, Consumer<ClassElement> classElements) {
+        return compile(name, clazz, classElements, Collections.emptyList());
+    }
+
+    public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compile(String name, @Language("kotlin") String clazz, Consumer<ClassElement> classElements, List<SymbolProcessorProvider> extraSymbolProcessorProviders) {
         try {
             Files.deleteIfExists(KOTLIN_COMPILATION.getWorkingDir().toPath());
         } catch (IOException e) {
@@ -143,7 +152,11 @@ public class KotlinCompiler {
 
         KSP_COMPILATION.setSources(KOTLIN_COMPILATION.getSources());
         ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider(classElements);
-        KspKt.setSymbolProcessorProviders(KSP_COMPILATION, Arrays.asList(classElementTypeElementSymbolProcessorProvider, new BeanDefinitionProcessorProvider()));
+        List<SymbolProcessorProvider> symbolProcessorProviders = new ArrayList<>();
+        symbolProcessorProviders.add(classElementTypeElementSymbolProcessorProvider);
+        symbolProcessorProviders.add(new BeanDefinitionProcessorProvider());
+        symbolProcessorProviders.addAll(extraSymbolProcessorProviders);
+        KspKt.setSymbolProcessorProviders(KSP_COMPILATION, symbolProcessorProviders);
         JvmCompilationResult kspResult = KSP_COMPILATION.compile();
         if (kspResult.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(kspResult.getMessages());
@@ -153,6 +166,10 @@ public class KotlinCompiler {
     }
 
     public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compileJava(String name, @Language("java") String clazz, Consumer<ClassElement> classElements) {
+        return compileJava(name, clazz, classElements, Collections.emptyList());
+    }
+
+    public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compileJava(String name, @Language("java") String clazz, Consumer<ClassElement> classElements, List<SymbolProcessorProvider> extraSymbolProcessorProviders) {
         try {
             Files.deleteIfExists(KOTLIN_COMPILATION.getWorkingDir().toPath());
         } catch (IOException e) {
@@ -166,7 +183,11 @@ public class KotlinCompiler {
 
         KSP_COMPILATION.setSources(KOTLIN_COMPILATION.getSources());
         ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider(classElements);
-        KspKt.setSymbolProcessorProviders(KSP_COMPILATION, Arrays.asList(classElementTypeElementSymbolProcessorProvider, new BeanDefinitionProcessorProvider()));
+        List<SymbolProcessorProvider> symbolProcessorProviders = new ArrayList<>();
+        symbolProcessorProviders.add(classElementTypeElementSymbolProcessorProvider);
+        symbolProcessorProviders.add(new BeanDefinitionProcessorProvider());
+        symbolProcessorProviders.addAll(extraSymbolProcessorProviders);
+        KspKt.setSymbolProcessorProviders(KSP_COMPILATION, symbolProcessorProviders);
         JvmCompilationResult kspResult = KSP_COMPILATION.compile();
         if (kspResult.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(kspResult.getMessages());
@@ -185,13 +206,22 @@ public class KotlinCompiler {
     }
 
     public static BeanDefinition<?> buildBeanDefinition(String name, @Language("kotlin") String clazz) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        return buildBeanDefinition(name, clazz, Collections.emptyList());
+    }
+
+    public static BeanDefinition<?> buildBeanDefinition(String name, @Language("kotlin") String clazz, List<SymbolProcessorProvider> extraSymbolProcessorProviders) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         return buildBeanDefinition(NameUtils.getPackageName(name),
                 NameUtils.getSimpleName(name),
-                clazz);
+                clazz,
+                extraSymbolProcessorProviders);
     }
 
     public static BeanDefinition<?> buildBeanDefinition(String packageName, String simpleName, @Language("kotlin") String clazz) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
-        final URLClassLoader classLoader = buildClassLoader(packageName + "." + simpleName, clazz);
+        return buildBeanDefinition(packageName, simpleName, clazz, Collections.emptyList());
+    }
+
+    public static BeanDefinition<?> buildBeanDefinition(String packageName, String simpleName, @Language("kotlin") String clazz, List<SymbolProcessorProvider> extraSymbolProcessorProviders) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        final URLClassLoader classLoader = buildClassLoader(packageName + "." + simpleName, clazz, extraSymbolProcessorProviders);
         String beanDefName = (simpleName.startsWith("$") ? "" : '$') + simpleName + BeanDefinitionWriter.CLASS_SUFFIX;
         String beanFullName = packageName + "." + beanDefName;
         return (BeanDefinition<?>) loadDefinition(classLoader, beanFullName);

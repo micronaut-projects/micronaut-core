@@ -46,6 +46,9 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
 import org.graalvm.polyglot.Value;
 
+/**
+ * Class element implementation for Python classes.
+ */
 public final class PythonClassElement extends AbstractPythonClassElement {
     private static final String MEMBER_KEYS_PROPERTY = "memberKeys";
     private static final String INTRODUCTION_INTERFACE_MARKER = "java.io.Serializable";

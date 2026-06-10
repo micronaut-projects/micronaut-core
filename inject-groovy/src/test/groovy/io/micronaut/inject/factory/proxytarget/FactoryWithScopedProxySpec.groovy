@@ -117,4 +117,30 @@ class Test {
         def e = thrown(RuntimeException)
         e.message.contains("The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor")
     }
+
+    void "test that a factory that returns a class with reordered constructors and an accessible no args constructor compiles"() {
+        expect:
+        buildBeanDefinition('factproxyreordered.TestFactory', '''
+package factproxyreordered;
+
+import io.micronaut.context.annotation.*;
+
+@Factory
+class TestFactory {
+
+    @Bean
+    @io.micronaut.runtime.context.scope.ThreadLocal
+    Test test() {
+        return new Test();
+    }
+}
+
+class Test {
+    Test(String name) {}
+    Test() {
+        this("foo")
+    }
+}
+''')
+    }
 }

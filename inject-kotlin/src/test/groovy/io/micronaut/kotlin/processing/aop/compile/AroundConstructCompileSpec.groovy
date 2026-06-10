@@ -285,6 +285,231 @@ class Interceptor2: ConstructorInterceptor<Any> {
         context.close()
     }
 
+    void 'test around construct proxy with multiple constructor arguments'() {
+        given:
+        ApplicationContext context = buildContext("""
+package kotlinproxytargetconstructargs
+
+import io.micronaut.aop.*
+import io.micronaut.context.annotation.Parameter
+import io.micronaut.context.annotation.Prototype
+import jakarta.inject.Singleton
+
+@TestAnn
+@Singleton
+open class MyBean(
+    private val dependency: Dependency,
+    private val helper: Helper,
+    private val other: Other
+) {
+    open fun test(): String {
+        return dependency.name() + "-" + helper.name() + "-" + other.name()
+    }
+}
+
+@TestAnn
+@Prototype
+open class MyParametrizedBean(
+    private val dependency: Dependency,
+    private val helper: Helper,
+    private val other: Other,
+    @Parameter private val name: String
+) {
+    open fun test(): String {
+        return name + "-" + dependency.name() + "-" + helper.name() + "-" + other.name()
+    }
+}
+
+@Singleton
+class Dependency {
+    fun name(): String {
+        return "dependency"
+    }
+}
+
+@Singleton
+class Helper {
+    fun name(): String {
+        return "helper"
+    }
+}
+
+@Singleton
+class Other {
+    fun name(): String {
+        return "other"
+    }
+}
+
+@Retention
+@Target(AnnotationTarget.CLASS)
+@Around
+@AroundConstruct
+annotation class TestAnn
+
+@Singleton
+@InterceptorBean(TestAnn::class)
+class TestConstructInterceptor: ConstructorInterceptor<Any> {
+    var invoked = 0
+    val invocations = java.util.ArrayList<Array<Any?>>()
+
+    override fun intercept(context: ConstructorInvocationContext<Any>): Any {
+        invoked++
+        invocations.add(context.parameterValues)
+        return context.proceed()
+    }
+}
+
+@Singleton
+@InterceptorBinding(TestAnn::class)
+class TestMethodInterceptor: MethodInterceptor<Any, Any> {
+    var invoked = 0
+
+    override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
+        invoked++
+        return context.proceed()
+    }
+}
+""")
+
+        when:
+        def constructorInterceptor = getBean(context, 'kotlinproxytargetconstructargs.TestConstructInterceptor')
+        def methodInterceptor = getBean(context, 'kotlinproxytargetconstructargs.TestMethodInterceptor')
+        def bean = getBean(context, 'kotlinproxytargetconstructargs.MyBean')
+
+        then:
+        bean instanceof Intercepted
+        bean.test() == 'dependency-helper-other'
+        constructorInterceptor.invocations.any { parameters ->
+            parameters.size() == 3 &&
+                    parameters[0].class.name == 'kotlinproxytargetconstructargs.Dependency' &&
+                    parameters[1].class.name == 'kotlinproxytargetconstructargs.Helper' &&
+                    parameters[2].class.name == 'kotlinproxytargetconstructargs.Other'
+        }
+        methodInterceptor.invoked == 1
+
+        when:
+        constructorInterceptor.invoked = 0
+        constructorInterceptor.invocations.clear()
+        methodInterceptor.invoked = 0
+        def parametrizedBeanClass = context.classLoader.loadClass('kotlinproxytargetconstructargs.MyParametrizedBean')
+        def parametrizedBean = context.createBean(parametrizedBeanClass, Collections.singletonMap('name', 'value'))
+
+        then:
+        parametrizedBean instanceof Intercepted
+        parametrizedBean.test() == 'value-dependency-helper-other'
+        constructorInterceptor.invocations.any { parameters ->
+            parameters.size() == 4 &&
+                    parameters[0].class.name == 'kotlinproxytargetconstructargs.Dependency' &&
+                    parameters[1].class.name == 'kotlinproxytargetconstructargs.Helper' &&
+                    parameters[2].class.name == 'kotlinproxytargetconstructargs.Other' &&
+                    parameters[3] == 'value'
+        }
+        methodInterceptor.invoked == 1
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test around construct proxy with Kotlin default constructor arguments'() {
+        given:
+        ApplicationContext context = buildContext("""
+package kotlinproxytargetdefaultconstructargs
+
+import io.micronaut.aop.*
+import io.micronaut.context.annotation.Parameter
+import io.micronaut.context.annotation.Prototype
+import jakarta.inject.Singleton
+
+@TestAnn
+@Singleton
+open class MyBean(
+    private val dependency: String = "dependency",
+    private val helper: String = "helper",
+    private val other: String = "other"
+) {
+    open fun test(): String {
+        return dependency + "-" + helper + "-" + other
+    }
+}
+
+@TestAnn
+@Prototype
+open class MyParametrizedBean(
+    private val dependency: String = "dependency",
+    private val helper: String = "helper",
+    private val other: String = "other",
+    @Parameter private val name: String = "default"
+) {
+    open fun test(): String {
+        return name + "-" + dependency + "-" + helper + "-" + other
+    }
+}
+
+@Retention
+@Target(AnnotationTarget.CLASS)
+@Around
+@AroundConstruct
+annotation class TestAnn
+
+@Singleton
+@InterceptorBean(TestAnn::class)
+class TestConstructInterceptor: ConstructorInterceptor<Any> {
+    var invoked = 0
+    val invocations = java.util.ArrayList<Array<Any?>>()
+
+    override fun intercept(context: ConstructorInvocationContext<Any>): Any {
+        invoked++
+        invocations.add(context.parameterValues)
+        return context.proceed()
+    }
+}
+
+@Singleton
+@InterceptorBinding(TestAnn::class)
+class TestMethodInterceptor: MethodInterceptor<Any, Any> {
+    var invoked = 0
+
+    override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
+        invoked++
+        return context.proceed()
+    }
+}
+""")
+
+        when:
+        def constructorInterceptor = getBean(context, 'kotlinproxytargetdefaultconstructargs.TestConstructInterceptor')
+        def methodInterceptor = getBean(context, 'kotlinproxytargetdefaultconstructargs.TestMethodInterceptor')
+        def bean = getBean(context, 'kotlinproxytargetdefaultconstructargs.MyBean')
+
+        then:
+        bean instanceof Intercepted
+        bean.test() == 'dependency-helper-other'
+        constructorInterceptor.invocations.any { parameters ->
+            parameters.size() == 3
+        }
+        methodInterceptor.invoked == 1
+
+        when:
+        constructorInterceptor.invoked = 0
+        constructorInterceptor.invocations.clear()
+        methodInterceptor.invoked = 0
+        def parametrizedBeanClass = context.classLoader.loadClass('kotlinproxytargetdefaultconstructargs.MyParametrizedBean')
+        def parametrizedBean = context.createBean(parametrizedBeanClass, Collections.singletonMap('name', 'value'))
+
+        then:
+        parametrizedBean instanceof Intercepted
+        parametrizedBean.test() == 'value-dependency-helper-other'
+        constructorInterceptor.invocations.any { parameters ->
+            parameters.size() == 4 &&
+                    parameters[3] == 'value'
+        }
+        methodInterceptor.invoked == 1
+
+        cleanup:
+        context.close()
+    }
+
     @Unroll
     void 'test around construct with around interception - proxyTarget = #proxyTarget'() {
         given:
@@ -743,4 +968,3 @@ class AnotherInterceptor: Interceptor<Any, Any> {
     }
 
 }
-

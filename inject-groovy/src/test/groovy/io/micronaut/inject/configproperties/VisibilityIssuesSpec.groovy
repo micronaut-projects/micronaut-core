@@ -45,7 +45,7 @@ class VisibilityIssuesSpec extends AbstractBeanDefinitionSpec {
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
-            instance.getName() == null //methods that require reflection are not injected
+        instance.getName() == "Sally"
         instance.getAge() == 22
         instance.getBuilder().build().getManufacturer() == 'Chevy'
 

@@ -33,11 +33,13 @@ import java.util.Objects;
  *
  * @author graemerocher
  * @since 1.0
+ * @deprecated No longer needed
  */
+@Deprecated(since = "5.0", forRemoval = true)
 @Internal
-abstract class AbstractExecutable implements Executable {
+abstract class AbstractExecutable<T, R> implements Executable<T, R> {
 
-    protected final Class<?> declaringType;
+    protected final Class<T> declaringType;
     protected final String methodName;
     protected final Class<?>[] argTypes;
 
@@ -50,7 +52,7 @@ abstract class AbstractExecutable implements Executable {
      * @param methodName    The method name
      * @param arguments     The arguments
      */
-    AbstractExecutable(Class declaringType, String methodName, Argument<?> @Nullable [] arguments) {
+    AbstractExecutable(Class<T> declaringType, String methodName, Argument<?> @Nullable [] arguments) {
         Objects.requireNonNull(declaringType, "Declaring type cannot be null");
         Objects.requireNonNull(methodName, "Method name cannot be null");
 

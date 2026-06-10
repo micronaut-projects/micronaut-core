@@ -508,13 +508,13 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     packageName = lastDotIndex > 0 ? transformedDecoratorName.substring(0, lastDotIndex) : "";
                 }
 
-                String simpleName = transformedDecoratorName.substring(lastDotIndex + 1);
+                String simpleName = simpleTypeName(transformedDecoratorName);
 
                 // Add to package map
                 decoratorsByPackage.computeIfAbsent(packageName, k -> new java.util.ArrayList<>()).add(simpleName);
 
                 // Determine file path
-                String packagePath = transformedDecoratorName.replace('.', '/');
+                String packagePath = packageName.isEmpty() ? simpleName : packageName.replace('.', '/') + "/" + simpleName;
                 String filePath = APPLICATION_SRC_PATH + packagePath + ".py";
 
                 // Write decorator file
@@ -632,6 +632,13 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
     private static @NotNull String toListOfString(List<String> allNames) {
         return "[" + String.join(",", allNames.stream().map(n -> "\"" + n + "\"").toList()) + "]";
+    }
+
+    private static String simpleTypeName(String typeName) {
+        int lastDotIndex = typeName.lastIndexOf('.');
+        int lastDollarIndex = typeName.lastIndexOf('$');
+        int lastSeparator = Math.max(lastDotIndex, lastDollarIndex);
+        return lastSeparator > -1 ? typeName.substring(lastSeparator + 1) : typeName;
     }
 
     private static String toPythonImportName(String qualifiedName) {

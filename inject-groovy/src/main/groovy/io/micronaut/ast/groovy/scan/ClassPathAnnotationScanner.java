@@ -148,7 +148,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
                         if (LOG.isDebugEnabled()) {
                             LOG.debug("Ignoring JAR URI entry [{}]. No JarURLConnection found.", url);
                         }
-                        // TODO: future support for servlet containers
+                        // Future support for servlet containers can add a fallback here.
                     }
 
                 }

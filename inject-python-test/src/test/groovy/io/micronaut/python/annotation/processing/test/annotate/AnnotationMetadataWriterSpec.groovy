@@ -384,6 +384,26 @@ class Test:
         metadata.stringValues(TypeHint)[1] == 'java.util.UUID'
     }
 
+    void "test single Python annotation value is normalized for Java string array member"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('python', 'Test', """
+from micronaut.core.annotation import TypeHint
+from jakarta.inject import Singleton
+
+@TypeHint("java.util.UUID")
+@Singleton
+class Test:
+    pass
+""")
+
+        when:
+        AnnotationMetadata metadata = definition.getAnnotationMetadata()
+
+        then:
+        metadata.getValue(TypeHint, String[].class).get() == ["java.util.UUID"] as String[]
+        metadata.stringValues(TypeHint) == ["java.util.UUID"] as String[]
+    }
+
     void "test @Nullable on parameter is captured in method parameter metadata"() {
         given:
         BeanDefinition definition = buildBeanDefinition('python', 'Test', '''

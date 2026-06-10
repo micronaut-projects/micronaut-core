@@ -202,6 +202,33 @@ class EmailController:
         context?.close()
     }
 
+    void "test python bean can replace unrelated concrete java bean by class value"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable, Replaces
+from io.micronaut.python.annotation.processing.test.replaces import DefaultEmailSender
+
+@Singleton
+@Replaces(DefaultEmailSender)
+class ReplacementController:
+    @Executable
+    def name(self) -> str:
+        return "replacement"
+''', true)
+
+        when:
+        def replacedType = context.classLoader.loadClass("io.micronaut.python.annotation.processing.test.replaces.DefaultEmailSender")
+        def replacement = getBean(context, "python.ReplacementController").asPolyglotValue()
+
+        then:
+        context.getBeansOfType(replacedType).isEmpty()
+        replacement.invokeMember("name").asString() == "replacement"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test factory can replace another factory"() {
         given:
         def context = buildContext('''

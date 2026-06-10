@@ -21,7 +21,10 @@ import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
 import io.micronaut.ast.groovy.annotation.GroovyElementAnnotationMetadataFactory;
 import io.micronaut.ast.groovy.scan.ClassPathAnnotationScanner;
 import io.micronaut.ast.groovy.utils.AstMessageUtils;
+import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader;
+import io.micronaut.ast.groovy.utils.InMemoryClassWriterOutputVisitor;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -48,6 +51,7 @@ import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URL;
@@ -89,7 +93,7 @@ public class GroovyVisitorContext implements VisitorContext {
      * @param compilationUnit The compilation unit
      */
     public GroovyVisitorContext(SourceUnit sourceUnit, @Nullable CompilationUnit compilationUnit) {
-        this(sourceUnit, compilationUnit, new GroovyClassWriterOutputVisitor(compilationUnit));
+        this(sourceUnit, compilationUnit, createOutputWriter(sourceUnit, compilationUnit));
     }
 
     /**
@@ -107,6 +111,21 @@ public class GroovyVisitorContext implements VisitorContext {
         this.annotationMetadataBuilder = new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit, nativeElementHelper, this);
         this.elementAnnotationMetadataFactory = new GroovyElementAnnotationMetadataFactory(false, annotationMetadataBuilder);
         this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
+    }
+
+    private static ClassWriterOutputVisitor createOutputWriter(SourceUnit sourceUnit, @Nullable CompilationUnit compilationUnit) {
+        if (sourceUnit != null) {
+            if (sourceUnit.getClassLoader() instanceof InMemoryByteCodeGroovyClassLoader inMemoryByteCodeGroovyClassLoader) {
+                return new InMemoryClassWriterOutputVisitor(inMemoryByteCodeGroovyClassLoader);
+            }
+            if (sourceUnit.getConfiguration() != null) {
+                File classesDir = sourceUnit.getConfiguration().getTargetDirectory();
+                if (classesDir != null) {
+                    return new DirectoryClassWriterOutputVisitor(classesDir);
+                }
+            }
+        }
+        return new GroovyClassWriterOutputVisitor(compilationUnit);
     }
 
     @Override

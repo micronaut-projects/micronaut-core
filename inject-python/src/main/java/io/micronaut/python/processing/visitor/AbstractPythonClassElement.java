@@ -70,6 +70,9 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.util.GraalPyUtil;
 import org.jspecify.annotations.NonNull;
 
+/**
+ * Base class element implementation shared by Python class-like elements.
+ */
 @SuppressWarnings({"checkstyle:DeclarationOrder", "checkstyle:InnerTypeLast"})
 public abstract sealed class AbstractPythonClassElement extends AbstractPythonElement
     implements ArrayableClassElement, ElementProvider permits PythonClassElement, PythonEnumElement, PythonGenericPlaceholderElement {
@@ -315,6 +318,9 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             int representedMethodIndex = representedInterfaceMethodIndex(allElements, inheritedMethod);
             if (representedMethodIndex == -1) {
                 allElements.add((T) decorateInheritedInterfaceMethod(inheritedMethod));
+            } else if (allElements.get(representedMethodIndex) instanceof PythonMethodElement representedMethod
+                && inheritedMethod.isAbstract()) {
+                allElements.set(representedMethodIndex, (T) representedMethod.withParameters(inheritedMethod.getParameters()));
             } else if (allElements.get(representedMethodIndex) instanceof MethodElement representedMethod
                 && !representedMethod.getDeclaringType().equals(this)
                 && representedMethod.isAbstract()) {

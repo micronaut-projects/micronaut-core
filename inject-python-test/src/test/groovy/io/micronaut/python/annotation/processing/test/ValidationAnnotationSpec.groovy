@@ -109,6 +109,93 @@ class PetController(PetOperations):
         context?.close()
     }
 
+    def "validated Python proxy returns generated dataclass host object"() {
+        given:
+        @Language("python") def pythonCode = '''
+from dataclasses import dataclass
+from typing import Annotated
+
+from jakarta.inject import Singleton
+from jakarta.validation.constraints import Pattern
+from micronaut.context.annotation import Executable
+from micronaut.core.annotation import Introspected
+from micronaut.validation import Validated
+
+
+@Introspected
+@dataclass(frozen=True)
+class Greeting:
+    id: int
+    content: str
+
+
+@Singleton
+@Validated
+class GreetingService:
+    def __init__(self):
+        self.counter = 0
+
+    def greeting(self, name: Annotated[str, Pattern(regexp="\\\\D+")]) -> Greeting:
+        self.counter += 1
+        return Greeting(self.counter, f"Hola, {name}!")
+
+
+@Singleton
+class GreetingCaller:
+    def __init__(self, greetingService: GreetingService):
+        self.greetingService = greetingService
+
+    @Executable
+    def call(self, name: str) -> Greeting:
+        return self.greetingService.greeting(name)
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def caller = getBean(context, "python.GreetingCaller")
+        def greetingClass = context.classLoader.loadClass("python.Greeting")
+        def result = caller.call("John")
+
+        then:
+        greetingClass.isInstance(result)
+        result.id == 1
+        result.content == "Hola, John!"
+
+        cleanup:
+        context?.close()
+    }
+
+    def "Python bridge preserves map host object declared as non map type"() {
+        given:
+        @Language("python") def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+import java
+
+HostModelOperations = java.type("io.micronaut.python.annotation.processing.test.HostModelOperations")
+
+
+@Singleton
+class HostModelCaller:
+    @Executable
+    def add_message(self, model: HostModelOperations) -> None:
+        model.addAttribute("message", "Welcome")
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def caller = getBean(context, "python.HostModelCaller")
+        def modelClass = context.classLoader.loadClass("io.micronaut.python.annotation.processing.test.HostModel")
+        def model = modelClass.getDeclaredConstructor().newInstance()
+        caller.add_message(model)
+
+        then:
+        model.get("message") == "Welcome"
+
+        cleanup:
+        context?.close()
+    }
+
     def "test inherited route validation metadata can be mutated by validation visitor"() {
         given:
         @Language("python") def pythonCode = '''

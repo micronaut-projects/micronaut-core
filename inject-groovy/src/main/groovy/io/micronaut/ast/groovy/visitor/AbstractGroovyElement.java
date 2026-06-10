@@ -370,7 +370,7 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
             }
         }
         if (upperType.isPrimitive()) {
-            // TODO: Support primitives for wildcards (? extends byte[])
+            // Primitive wildcard bounds are not represented as wildcard elements.
             return upperType;
         }
         GroovyNativeElement wildcardNativeElement = new GroovyNativeElement.ClassWithOwner(genericsType.getType(), declaredElement);
@@ -530,4 +530,3 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
     record PlaceholderEntry(AnnotatedNode owner, String placeholderName) {
     }
 }
-

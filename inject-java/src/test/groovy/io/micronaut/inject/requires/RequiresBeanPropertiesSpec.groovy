@@ -3,6 +3,8 @@ package io.micronaut.inject.requires
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.annotation.Requires
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.context.exceptions.NoSuchBeanException
 import spock.lang.IgnoreIf
 
@@ -664,6 +666,130 @@ class AccessorStyleBean {
 
         cleanup:
         context.close()
+    }
+
+    void "test requires bean property on factory method works regardless of annotation order"() {
+        given:
+        ApplicationContext context = buildContext('test.SomeFactory', '''
+package test;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@ConfigurationProperties("config")
+class Config {
+    private boolean enabled;
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+}
+
+@Factory
+class SomeFactory {
+    @Singleton
+    @Requires(bean = Config.class, beanProperty = "enabled", value = "true")
+    @Requires(bean = Config.class, beanProperty = "enabled", notEquals = "false")
+    Object eventLoops() {
+        return new Object();
+    }
+}
+''')
+        def type = context.classLoader.loadClass('java.lang.Object')
+
+        when:
+        context.environment.addPropertySource(PropertySource.of("test", ['config.enabled': 'true']))
+        def beanDefinition = context.getBeanDefinitions(type).find { it.name.contains('SomeFactory') }
+
+        then:
+        beanDefinition != null
+        beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test requires bean property on factory method works regardless of annotation order - reverse"() {
+        given:
+        ApplicationContext context = buildContext('test.SomeFactory', '''
+package test;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@ConfigurationProperties("config")
+class Config {
+    private boolean enabled;
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+}
+
+@Factory
+class SomeFactory {
+    @Requires(bean = Config.class, beanProperty = "enabled", value = "true")
+    @Requires(bean = Config.class, beanProperty = "enabled", notEquals = "false")
+    Object eventLoops() {
+        return new Object();
+    }
+}
+''')
+        def type = context.classLoader.loadClass('java.lang.Object')
+
+        when:
+        context.environment.addPropertySource(PropertySource.of("test", ['config.enabled': 'true']))
+        def beanDefinition = context.getBeanDefinitions(type).find { it.name.contains('SomeFactory') }
+
+        then:
+        beanDefinition != null
+        beanDefinition.isEnabled(context)
+
+        cleanup:
+        context.close()
+    }
+
+    void "test factory method produced bean definition retains repeated requires bean property metadata"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test', 'SomeFactory$EventLoops0', '''
+package test;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+
+@ConfigurationProperties("config")
+class Config {
+    private boolean enabled;
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+}
+
+@Factory
+class SomeFactory {
+    @Singleton
+    @Requires(bean = Config.class, beanProperty = "enabled", value = "true")
+    @Requires(bean = Config.class, beanProperty = "enabled", notEquals = "false")
+    Object eventLoops() {
+        return new Object();
+    }
+}
+''')
+
+        then:
+        beanDefinition != null
+        beanDefinition.annotationMetadata.getAnnotationValuesByType(Requires).size() == 2
+        beanDefinition.annotationMetadata.getAnnotationValuesByType(Requires)*.stringValue('beanProperty') == [Optional.of('enabled'), Optional.of('enabled')]
     }
 
     void "test requires record properties"() {

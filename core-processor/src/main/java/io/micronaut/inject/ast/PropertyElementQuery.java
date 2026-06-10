@@ -19,9 +19,10 @@ import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
-import org.jspecify.annotations.Nullable;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -42,6 +43,10 @@ public final class PropertyElementQuery {
     private static final String[] DEFAULT_READ_PREFIXES = { AccessorsStyle.DEFAULT_READ_PREFIX };
     private static final String[] DEFAULT_WRITE_PREFIXES = { AccessorsStyle.DEFAULT_WRITE_PREFIX };
     private static final EnumSet<BeanProperties.AccessKind> DEFAULT_ACCESS_KINDS = EnumSet.of(BeanProperties.AccessKind.METHOD);
+    private static final JsonAutoDetectConfiguration.Visibility DEFAULT_JSON_FIELD_VISIBILITY = JsonAutoDetectConfiguration.Visibility.PUBLIC_ONLY;
+    private static final JsonAutoDetectConfiguration.Visibility DEFAULT_JSON_GETTER_VISIBILITY = JsonAutoDetectConfiguration.Visibility.PUBLIC_ONLY;
+    private static final JsonAutoDetectConfiguration.Visibility DEFAULT_JSON_IS_GETTER_VISIBILITY = JsonAutoDetectConfiguration.Visibility.PUBLIC_ONLY;
+    private static final JsonAutoDetectConfiguration.Visibility DEFAULT_JSON_SETTER_VISIBILITY = JsonAutoDetectConfiguration.Visibility.ANY;
     private BeanProperties.Visibility visibility = BeanProperties.Visibility.DEFAULT;
     private Set<BeanProperties.AccessKind> accessKinds = DEFAULT_ACCESS_KINDS;
     private Set<String> includes = Collections.emptySet();
@@ -54,6 +59,11 @@ public final class PropertyElementQuery {
 
     private boolean ignoreSettersWithDifferingType;
     private Set<String> excludedAnnotations = Collections.emptySet();
+    private boolean jsonAutoDetectConfigured;
+    private JsonAutoDetectConfiguration.Visibility jsonFieldVisibility = DEFAULT_JSON_FIELD_VISIBILITY;
+    private JsonAutoDetectConfiguration.Visibility jsonGetterVisibility = DEFAULT_JSON_GETTER_VISIBILITY;
+    private JsonAutoDetectConfiguration.Visibility jsonIsGetterVisibility = DEFAULT_JSON_IS_GETTER_VISIBILITY;
+    private JsonAutoDetectConfiguration.Visibility jsonSetterVisibility = DEFAULT_JSON_SETTER_VISIBILITY;
 
     /**
      * Creates a query for the given metadata.
@@ -91,7 +101,41 @@ public final class PropertyElementQuery {
         if (ArrayUtils.isNotEmpty(writerPrefixes)) {
             conf.writePrefixes(writerPrefixes);
         }
+
+        AnnotationValue<JsonAutoDetectConfiguration> jsonAutoDetect = annotationMetadata.getAnnotation(JsonAutoDetectConfiguration.class);
+        if (jsonAutoDetect != null) {
+            conf.jsonAutoDetect(
+                resolveJsonVisibility(
+                    jsonAutoDetect,
+                    JsonAutoDetectConfiguration.MEMBER_FIELD_VISIBILITY,
+                    DEFAULT_JSON_FIELD_VISIBILITY
+                ),
+                resolveJsonVisibility(
+                    jsonAutoDetect,
+                    JsonAutoDetectConfiguration.MEMBER_GETTER_VISIBILITY,
+                    DEFAULT_JSON_GETTER_VISIBILITY
+                ),
+                resolveJsonVisibility(
+                    jsonAutoDetect,
+                    JsonAutoDetectConfiguration.MEMBER_IS_GETTER_VISIBILITY,
+                    DEFAULT_JSON_IS_GETTER_VISIBILITY
+                ),
+                resolveJsonVisibility(
+                    jsonAutoDetect,
+                    JsonAutoDetectConfiguration.MEMBER_SETTER_VISIBILITY,
+                    DEFAULT_JSON_SETTER_VISIBILITY
+                )
+            );
+        }
         return conf;
+    }
+
+    private static JsonAutoDetectConfiguration.Visibility resolveJsonVisibility(AnnotationValue<JsonAutoDetectConfiguration> annotation,
+                                                                               String member,
+                                                                               JsonAutoDetectConfiguration.Visibility defaultVisibility) {
+        JsonAutoDetectConfiguration.Visibility visibility = annotation.enumValue(member, JsonAutoDetectConfiguration.Visibility.class)
+            .orElse(JsonAutoDetectConfiguration.Visibility.DEFAULT);
+        return visibility == JsonAutoDetectConfiguration.Visibility.DEFAULT ? defaultVisibility : visibility;
     }
 
     /**
@@ -137,6 +181,109 @@ public final class PropertyElementQuery {
      */
     public Set<BeanProperties.AccessKind> getAccessKinds() {
         return accessKinds;
+    }
+
+    /**
+     * Returns whether Jackson auto-detect visibility metadata is configured.
+     *
+     * @return Whether Jackson auto-detect visibility metadata is configured.
+     */
+    public boolean isJsonAutoDetectConfigured() {
+        return jsonAutoDetectConfigured;
+    }
+
+    /**
+     * Tests field visibility using mapped Jackson auto-detect metadata.
+     *
+     * @param fieldElement The field
+     * @return True if the field is visible.
+     */
+    public boolean isJsonAutoDetectFieldVisible(FieldElement fieldElement) {
+        return isJsonVisible(fieldElement, jsonFieldVisibility);
+    }
+
+    /**
+     * Tests getter visibility using mapped Jackson auto-detect metadata.
+     *
+     * @param methodElement The method
+     * @param methodName The method name
+     * @return True if the getter is visible.
+     */
+    public boolean isJsonAutoDetectGetterVisible(MethodElement methodElement, String methodName) {
+        if (isJsonIsGetterName(methodName)) {
+            return isJsonIsGetter(methodElement, methodName) && isJsonVisible(methodElement, jsonIsGetterVisibility);
+        }
+        return isJsonVisible(methodElement, jsonGetterVisibility);
+    }
+
+    /**
+     * Tests setter visibility using mapped Jackson auto-detect metadata.
+     *
+     * @param methodElement The method
+     * @return True if the setter is visible.
+     */
+    public boolean isJsonAutoDetectSetterVisible(MethodElement methodElement) {
+        return isJsonVisible(methodElement, jsonSetterVisibility);
+    }
+
+    /**
+     * Tests whether the method name is a Jackson auto-detect reader name.
+     *
+     * @param methodElement The method
+     * @param methodName The method name
+     * @return True if the method can be a Jackson auto-detect reader.
+     */
+    public boolean isJsonAutoDetectReaderName(MethodElement methodElement, String methodName) {
+        return (jsonGetterVisibility != JsonAutoDetectConfiguration.Visibility.NONE
+            && NameUtils.isReaderName(methodName, AccessorsStyle.DEFAULT_READ_PREFIX)
+            && !isJsonIsGetterName(methodName))
+            || (jsonIsGetterVisibility != JsonAutoDetectConfiguration.Visibility.NONE
+                && isJsonIsGetter(methodElement, methodName));
+    }
+
+    /**
+     * Tests whether the method name is a Jackson auto-detect writer name.
+     *
+     * @param methodName The method name
+     * @return True if the method can be a Jackson auto-detect writer.
+     */
+    public boolean isJsonAutoDetectWriterName(String methodName) {
+        return jsonSetterVisibility != JsonAutoDetectConfiguration.Visibility.NONE &&
+            NameUtils.isWriterName(methodName, AccessorsStyle.DEFAULT_WRITE_PREFIX);
+    }
+
+    private PropertyElementQuery jsonAutoDetect(JsonAutoDetectConfiguration.Visibility fieldVisibility,
+                                                JsonAutoDetectConfiguration.Visibility getterVisibility,
+                                                JsonAutoDetectConfiguration.Visibility isGetterVisibility,
+                                                JsonAutoDetectConfiguration.Visibility setterVisibility) {
+        jsonAutoDetectConfigured = true;
+        jsonFieldVisibility = fieldVisibility;
+        jsonGetterVisibility = getterVisibility;
+        jsonIsGetterVisibility = isGetterVisibility;
+        jsonSetterVisibility = setterVisibility;
+        return this;
+    }
+
+    private static boolean isJsonVisible(MemberElement memberElement, JsonAutoDetectConfiguration.Visibility visibility) {
+        return switch (visibility) {
+            case ANY -> true;
+            case NON_PRIVATE -> !memberElement.isPrivate();
+            case PROTECTED_AND_PUBLIC -> memberElement.isProtected() || memberElement.isPublic();
+            case PUBLIC_ONLY -> memberElement.isPublic();
+            case NONE, DEFAULT -> false;
+        };
+    }
+
+    private static boolean isJsonIsGetterName(String methodName) {
+        return NameUtils.isReaderName(methodName, "is") && methodName.startsWith("is");
+    }
+
+    private static boolean isJsonIsGetter(MethodElement methodElement, String methodName) {
+        return isJsonIsGetterName(methodName) && isBoolean(methodElement.getReturnType());
+    }
+
+    private static boolean isBoolean(ClassElement type) {
+        return type.getName().equals(PrimitiveElement.BOOLEAN.getName()) || type.getName().equals(Boolean.class.getName());
     }
 
     /**

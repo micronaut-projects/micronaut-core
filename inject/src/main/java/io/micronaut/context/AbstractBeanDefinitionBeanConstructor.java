@@ -28,7 +28,9 @@ import java.util.Objects;
  * @param <T> The bean type
  * @author graemerocher
  * @since 3.0.0
+ * @deprecated No longer needed, user should have a custom implementation of {@link io.micronaut.core.beans.BeanConstructor} if needed
  */
+@Deprecated(since = "5.0", forRemoval = true)
 @UsedByGeneratedCode
 public abstract class AbstractBeanDefinitionBeanConstructor<T> extends AbstractBeanConstructor<T> {
 

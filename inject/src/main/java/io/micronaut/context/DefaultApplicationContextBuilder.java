@@ -23,6 +23,7 @@ import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
@@ -96,6 +97,9 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private Predicate<QualifiedBeanType<?>> beansPredicate;
     @Nullable
     private Predicate<BeanConfiguration> beanConfigurationsPredicate;
+    @Nullable
+    private CustomScopeRegistryFactory customScopeRegistryFactory;
+    private BeanResolutionCustomizer beanResolutionCustomizer = BeanResolutionCustomizer.DEFAULT;
     private boolean configImportEnabled = true;
 
     /**
@@ -227,6 +231,17 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Nullable
     public Predicate<BeanConfiguration> beanConfiguraionsPredicate() {
         return beanConfigurationsPredicate;
+    }
+
+    @Override
+    @Nullable
+    public CustomScopeRegistryFactory customScopeRegistryFactory() {
+        return customScopeRegistryFactory;
+    }
+
+    @Override
+    public BeanResolutionCustomizer beanResolutionCustomizer() {
+        return beanResolutionCustomizer;
     }
 
     @Override
@@ -445,6 +460,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public ApplicationContextBuilder beanResolutionCustomizer(@Nullable BeanResolutionCustomizer customizer) {
+        this.beanResolutionCustomizer = customizer == null ? BeanResolutionCustomizer.DEFAULT : customizer;
+        return this;
+    }
+
+    @Override
     public ApplicationContextBuilder eagerBeansEnabled(boolean enabled) {
         this.eagerBeansEnabled = enabled;
         return this;
@@ -465,6 +486,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public ApplicationContextBuilder beanConfigurationsPredicate(@Nullable Predicate<BeanConfiguration> predicate) {
         this.beanConfigurationsPredicate = predicate;
+        return this;
+    }
+
+    @Override
+    public ApplicationContextBuilder customScopeRegistry(@Nullable CustomScopeRegistryFactory factory) {
+        this.customScopeRegistryFactory = factory;
         return this;
     }
 

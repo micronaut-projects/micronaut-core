@@ -44,6 +44,12 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+/**
+ * Class element wrapper that applies additional type-use annotation metadata.
+ *
+ * @param delegate The wrapped class element
+ * @param typeAnnotationMetadata The type-use annotation metadata
+ */
 @Internal
 public record TypeAnnotatedClassElement(
     ClassElement delegate,

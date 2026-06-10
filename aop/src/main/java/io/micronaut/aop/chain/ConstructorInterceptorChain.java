@@ -151,14 +151,13 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      */
     @Internal
     @UsedByGeneratedCode
-    @Deprecated
     public static <T1> T1 instantiate(
         BeanResolutionContext resolutionContext,
         BeanContext beanContext,
         @Nullable List<BeanRegistration<Interceptor<T1, T1>>> interceptors,
         BeanDefinition<T1> definition,
         BeanConstructor<T1> constructor,
-        Object... parameters) {
+        @Nullable Object... parameters) {
         int micronaut3additionalProxyConstructorParametersCount = 3;
         return instantiate(resolutionContext, beanContext, interceptors, definition, constructor, micronaut3additionalProxyConstructorParametersCount, parameters);
     }

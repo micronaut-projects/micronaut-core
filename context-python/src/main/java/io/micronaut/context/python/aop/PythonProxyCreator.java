@@ -65,6 +65,9 @@ import java.util.stream.Stream;
 import static io.micronaut.aop.Adapter.InternalAttributes.ADAPTED_BEAN;
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
+/**
+ * Creates Micronaut runtime proxies backed by GraalPy values.
+ */
 @Internal
 @Singleton
 @NullMarked
@@ -574,81 +577,6 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         return new OverloadedMethodSelector<>(methodName, methods, overloadedMethodsByArity);
     }
 
-    private interface MethodSelector<T> {
-        RuntimeProxyDefinition.InterceptedMethod<T> find(Value[] args);
-    }
-
-    private static final class SimpleMethodSelector<T> implements MethodSelector<T> {
-        private final String methodName;
-        private final List<RuntimeProxyDefinition.InterceptedMethod<T>> methods;
-
-        SimpleMethodSelector(String methodName, List<RuntimeProxyDefinition.InterceptedMethod<T>> methods) {
-            this.methodName = methodName;
-            this.methods = methods;
-        }
-
-        @Override
-        public RuntimeProxyDefinition.InterceptedMethod<T> find(Value[] args) {
-            for (RuntimeProxyDefinition.InterceptedMethod<T> method : methods) {
-                if (method.executableMethod().getArguments().length == args.length) {
-                    return method;
-                }
-            }
-            throw new IllegalArgumentException("No overload found for method " + methodName + " with " + args.length + " arguments");
-        }
-    }
-
-    private static final class OverloadedMethodSelector<T> implements MethodSelector<T> {
-        private final String methodName;
-        private final List<RuntimeProxyDefinition.InterceptedMethod<T>> methods;
-        private final Map<Integer, List<RuntimeProxyDefinition.InterceptedMethod<T>>> overloadedMethodsByArity;
-
-        OverloadedMethodSelector(
-            String methodName,
-            List<RuntimeProxyDefinition.InterceptedMethod<T>> methods,
-            Map<Integer, List<RuntimeProxyDefinition.InterceptedMethod<T>>> overloadedMethodsByArity
-        ) {
-            this.methodName = methodName;
-            this.methods = methods;
-            this.overloadedMethodsByArity = overloadedMethodsByArity;
-        }
-
-        @Override
-        public RuntimeProxyDefinition.InterceptedMethod<T> find(Value[] args) {
-            int arity = args.length;
-            List<RuntimeProxyDefinition.InterceptedMethod<T>> arityMatches = overloadedMethodsByArity.get(arity);
-            if (arityMatches == null) {
-                for (RuntimeProxyDefinition.InterceptedMethod<T> method : methods) {
-                    if (method.executableMethod().getArguments().length == arity) {
-                        return method;
-                    }
-                }
-                throw new IllegalArgumentException("No overload found for method " + methodName + " with " + arity + " arguments");
-            }
-
-            // Only duplicate-arity overload groups need argument-aware selection. Other method
-            // groups use SimpleMethodSelector and keep the old declaration-order arity scan.
-            RuntimeProxyDefinition.InterceptedMethod<T> bestMatch = null;
-            for (RuntimeProxyDefinition.InterceptedMethod<T> method : arityMatches) {
-                Argument<?>[] arguments = method.executableMethod().getArguments();
-                if (!argumentsMatch(arguments, args)) {
-                    continue;
-                }
-                if (bestMatch == null) {
-                    bestMatch = method;
-                    continue;
-                }
-                if (isMoreSpecific(method.executableMethod(), bestMatch.executableMethod())) {
-                    bestMatch = method;
-                }
-            }
-            if (bestMatch != null) {
-                return bestMatch;
-            }
-            return arityMatches.get(0);
-        }
-    }
-
     @Nullable
     private Object unbox(Context context, @Nullable Object result) {
         return switch (result) {
@@ -716,6 +644,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         }
         if (CompletionStage.class.isAssignableFrom(type)) {
             return type.cast(PythonAsyncioRuntime.toCompletionStage(value));
+        }
+        Object hostObject = GraalPyRuntimeUtil.unwrapHostObject(value, type);
+        if (hostObject != null) {
+            return type.cast(hostObject);
         }
         T mappedValue = mapTargetType(type, value);
         if (mappedValue != null) {
@@ -827,5 +759,80 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             out[i] = box(argType, arg);
         }
         return out;
+    }
+
+    private interface MethodSelector<T> {
+        RuntimeProxyDefinition.InterceptedMethod<T> find(Value[] args);
+    }
+
+    private static final class SimpleMethodSelector<T> implements MethodSelector<T> {
+        private final String methodName;
+        private final List<RuntimeProxyDefinition.InterceptedMethod<T>> methods;
+
+        SimpleMethodSelector(String methodName, List<RuntimeProxyDefinition.InterceptedMethod<T>> methods) {
+            this.methodName = methodName;
+            this.methods = methods;
+        }
+
+        @Override
+        public RuntimeProxyDefinition.InterceptedMethod<T> find(Value[] args) {
+            for (RuntimeProxyDefinition.InterceptedMethod<T> method : methods) {
+                if (method.executableMethod().getArguments().length == args.length) {
+                    return method;
+                }
+            }
+            throw new IllegalArgumentException("No overload found for method " + methodName + " with " + args.length + " arguments");
+        }
+    }
+
+    private static final class OverloadedMethodSelector<T> implements MethodSelector<T> {
+        private final String methodName;
+        private final List<RuntimeProxyDefinition.InterceptedMethod<T>> methods;
+        private final Map<Integer, List<RuntimeProxyDefinition.InterceptedMethod<T>>> overloadedMethodsByArity;
+
+        OverloadedMethodSelector(
+            String methodName,
+            List<RuntimeProxyDefinition.InterceptedMethod<T>> methods,
+            Map<Integer, List<RuntimeProxyDefinition.InterceptedMethod<T>>> overloadedMethodsByArity
+        ) {
+            this.methodName = methodName;
+            this.methods = methods;
+            this.overloadedMethodsByArity = overloadedMethodsByArity;
+        }
+
+        @Override
+        public RuntimeProxyDefinition.InterceptedMethod<T> find(Value[] args) {
+            int arity = args.length;
+            List<RuntimeProxyDefinition.InterceptedMethod<T>> arityMatches = overloadedMethodsByArity.get(arity);
+            if (arityMatches == null) {
+                for (RuntimeProxyDefinition.InterceptedMethod<T> method : methods) {
+                    if (method.executableMethod().getArguments().length == arity) {
+                        return method;
+                    }
+                }
+                throw new IllegalArgumentException("No overload found for method " + methodName + " with " + arity + " arguments");
+            }
+
+            // Only duplicate-arity overload groups need argument-aware selection. Other method
+            // groups use SimpleMethodSelector and keep the old declaration-order arity scan.
+            RuntimeProxyDefinition.InterceptedMethod<T> bestMatch = null;
+            for (RuntimeProxyDefinition.InterceptedMethod<T> method : arityMatches) {
+                Argument<?>[] arguments = method.executableMethod().getArguments();
+                if (!argumentsMatch(arguments, args)) {
+                    continue;
+                }
+                if (bestMatch == null) {
+                    bestMatch = method;
+                    continue;
+                }
+                if (isMoreSpecific(method.executableMethod(), bestMatch.executableMethod())) {
+                    bestMatch = method;
+                }
+            }
+            if (bestMatch != null) {
+                return bestMatch;
+            }
+            return arityMatches.get(0);
+        }
     }
 }

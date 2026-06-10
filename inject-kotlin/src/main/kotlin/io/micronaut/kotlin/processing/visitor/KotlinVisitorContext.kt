@@ -72,26 +72,6 @@ internal class KotlinVisitorContext(
         allOpenAnnotations.split(",", "|").toTypedArray()
     }
 
-    init {
-        try {
-            // Workaround for bug in KSP https://github.com/google/ksp/issues/1493
-            val resolverImplClass = ClassUtils.forName("com.google.devtools.ksp.processing.impl.ResolverImpl", javaClass.classLoader).orElseThrow()
-            val kotlinTypeMapperClass = ClassUtils.forName("org.jetbrains.kotlin.codegen.state.KotlinTypeMapper", javaClass.classLoader).orElseThrow()
-            val kotlinTypeMapperInstance = ReflectionUtils.getFieldValue(resolverImplClass, "typeMapper", resolver).orElseThrow()
-            try {
-                // Pre-2.1.20 field name
-                ReflectionUtils.setField(kotlinTypeMapperClass, "useOldManglingRulesForFunctionAcceptingInlineClass", kotlinTypeMapperInstance, false)
-            } catch (e: Exception) {
-                // Ignore
-            }
-            // 2.1.20+ field name
-            ReflectionUtils.setField(kotlinTypeMapperClass, "useOldInlineClassesManglingScheme", kotlinTypeMapperInstance, false)
-        } catch (e: Exception) {
-            // Ignore
-        }
-
-    }
-
     fun updateResolver(resolver: Resolver) {
         this.resolver = resolver
         annotationMetadataBuilder.resolver = resolver

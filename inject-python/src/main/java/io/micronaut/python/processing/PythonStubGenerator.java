@@ -97,6 +97,9 @@ import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
 import io.micronaut.python.processing.util.ObjectHelper;
 
+/**
+ * Generates Java stubs for Python classes, scripts, enums, interfaces, and annotations.
+ */
 @SuppressWarnings({"FileLength", "checkstyle:DeclarationOrder"})
 public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
@@ -111,6 +114,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final ClassTypeDef POLYGLOT_VALUE_CONVERTER = ClassTypeDef.of("io.micronaut.context.python.PolyglotValueConverter");
     public static final String GENERATOR_NAME = "python";
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
+    private static final String PUBLISHER = "org.reactivestreams.Publisher";
     private static final String ANN_CONFIGURATION_BUILDER = "io.micronaut.context.annotation.ConfigurationBuilder";
     private static final String ANN_CONFIGURATION_INJECT = "io.micronaut.context.annotation.ConfigurationInject";
     private static final String ANN_CONFIGURATION_READER = "io.micronaut.context.annotation.ConfigurationReader";
@@ -137,6 +141,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
     public static final String ANN_JSON_PROPERTY = "com.fasterxml.jackson.annotation.JsonProperty";
     public static final String ANN_JSON_CREATOR = "com.fasterxml.jackson.annotation.JsonCreator";
+
     @Override
     public TypeElementQuery query() {
         return TypeElementQuery.onlyClass();
@@ -153,6 +158,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 }
                 for (EnumEntry entry : enumDefs.values()) {
                     sourceGenerator.write(entry.enumDef, visitorContext, entry.originatingElement);
+                    sourceGenerator.write(entry.converterDef, visitorContext, entry.originatingElement);
                 }
                 for (InterfaceEntry entry : interfaceDefs.values()) {
                     sourceGenerator.write(entry.interfaceDef, visitorContext, entry.originatingElement);
@@ -226,7 +232,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     if (enumDefs.containsKey(classElement.getName())) {
                         return;
                     }
-                    enumDefs.put(classElement.getName(), new EnumEntry(buildEnumDef(classElement, context), classElement));
+                    enumDefs.put(
+                        classElement.getName(),
+                        new EnumEntry(buildEnumDef(classElement, context), buildEnumConverterDef(classElement), classElement)
+                    );
                     return;
                 }
 
@@ -1986,18 +1995,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return false;
     }
 
-    private static final class EmptyAnnotationArray {
-        private static final EmptyAnnotationArray INSTANCE = new EmptyAnnotationArray();
-
-        private EmptyAnnotationArray() {
-        }
-
-        @Override
-        public String toString() {
-            return "{}";
-        }
-    }
-
     private static boolean requiresLiteralAnnotationValue(Object value) {
         return containsSourcegenAnnotationValue(value) || isEmptyArrayOrCollection(value);
     }
@@ -2612,7 +2609,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             parameter = methodParam;
         }
         if (targetContext != null) {
-            parameter = RUNTIME_UTIL.invokeStatic("coerceToContext", TypeDef.OBJECT, parameter, targetContext);
+            parameter = RUNTIME_UTIL.invokeStatic("coerceToContext", TypeDef.OBJECT, parameter, targetContext, classLiteral(param.getGenericType()));
         }
         parameters.add(parameter);
     }
@@ -2643,6 +2640,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
+    /**
+     * Builds the generated Java enum definition for a Python enum.
+     *
+     * @param classElement The Python enum element
+     * @param context The visitor context
+     * @return The generated enum definition
+     */
     EnumDef buildEnumDef(AbstractPythonClassElement classElement, VisitorContext context) {
         ClassTypeDef thisType = ClassTypeDef.of(classElement.getName());
         EnumDef.EnumDefBuilder enumBuilder = EnumDef.builder(classElement.getName())
@@ -2702,6 +2706,57 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .returning()));
         }
         return enumBuilder.build();
+    }
+
+    private static ClassDef buildEnumConverterDef(AbstractPythonClassElement classElement) {
+        ClassTypeDef thisType = ClassTypeDef.of(classElement.getName());
+        TypeDef typeConverterType = TypeDef.parameterized(
+            ClassTypeDef.of("io.micronaut.core.convert.TypeConverter"),
+            ClassTypeDef.of(CharSequence.class),
+            thisType
+        );
+        ClassDef.ClassDefBuilder builder = ClassDef.builder(classElement.getName() + "TypeConverter")
+            .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+            .addAnnotation(ClassTypeDef.of("jakarta.inject.Singleton"))
+            .addSuperinterface(typeConverterType);
+        builder.addMethod(MethodDef.builder("convert")
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .addParameter("object", ClassTypeDef.of(CharSequence.class))
+            .addParameter("targetType", TypeDef.parameterized(Class.class, thisType))
+            .addParameter("context", ClassTypeDef.of("io.micronaut.core.convert.ConversionContext"))
+            .returns(TypeDef.parameterized(Optional.class, thisType))
+            .build((aThis, methodParameters) -> enumConverterBody(classElement, thisType, methodParameters.getFirst())));
+        return builder.build();
+    }
+
+    private static StatementDef enumConverterBody(AbstractPythonClassElement classElement, ClassTypeDef thisType, VariableDef.MethodParameter object) {
+        List<StatementDef> statements = new ArrayList<>();
+        List<String> enumConstants = classElement instanceof EnumElement enumElement ? enumElement.values() : List.of();
+        for (String enumConstant : enumConstants) {
+            ExpressionDef enumName = ExpressionDef.constant(enumConstant);
+            ExpressionDef enumValue = RUNTIME_UTIL.invokeStatic(
+                "enumStringValue",
+                TypeDef.STRING,
+                CONTEXT_HOLDER.invokeStatic(
+                    "enumValue",
+                    POLYGLOT_VALUE,
+                    ExpressionDef.constant(classElement.getPackageName()),
+                    ExpressionDef.constant(pythonSimpleName(classElement)),
+                    enumName
+                )
+            );
+            ExpressionDef enumField = thisType.getStaticField(enumConstant, thisType);
+            StatementDef returnMatch = ClassTypeDef.of(Optional.class)
+                .invokeStatic("of", TypeDef.parameterized(Optional.class, thisType), enumField)
+                .returning();
+            statements.add(enumName.invoke("contentEquals", TypeDef.Primitive.BOOLEAN, object).isTrue().doIf(returnMatch));
+            statements.add(enumValue.invoke("contentEquals", TypeDef.Primitive.BOOLEAN, object).isTrue().doIf(returnMatch));
+        }
+        statements.add(ClassTypeDef.of(Optional.class)
+            .invokeStatic("empty", TypeDef.parameterized(Optional.class, thisType))
+            .returning());
+        return StatementDef.multi(statements);
     }
 
     private static @Nullable MethodElement enumJsonValueMethod(ClassElement classElement) {
@@ -2774,6 +2829,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 throw new ProcessingException(methodElement, "Factory methods declared with @Bean cannot be async.");
             }
             // verify return type exists
+            if (methodElement instanceof PythonMethodElement pythonMethodElement
+                && pythonMethodElement.getNativeType().returnType().typeAnnotation() == null) {
+                throw new ProcessingException(methodElement, "Factory methods declared with @Bean must specify a return type. For example: @Bean\n" +
+                    "    def foo(self) -> Foo:");
+            }
             ClassElement genericReturnType = methodElement.getGenericReturnType();
             if (genericReturnType.isVoid()) {
                 throw new ProcessingException(methodElement, "Factory methods declared with @Bean must specify a return type. For example: @Bean\n" +
@@ -3607,6 +3667,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case "java.lang.String" ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING));
+                case "java.lang.Object" ->
+                    RUNTIME_UTIL.invokeStatic("convertObject", ClassTypeDef.OBJECT, invokedValue);
                 default -> {
                     // Check for collection types
                     if (returnType.isAssignable(List.class)) {
@@ -3645,6 +3707,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         yield uncheckedCast(RUNTIME_UTIL
                             .invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class),
                                 invokedValue, genericType), returnType);
+                    } else if (returnType.isAssignable(PUBLISHER)) {
+                        ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+                        yield uncheckedCast(RUNTIME_UTIL
+                            .invokeStatic("convertPublisher", ClassTypeDef.of(PUBLISHER),
+                                invokedValue, toClassExpression(componentType)), returnType);
                     } else if (returnType.isAssignable(HTTP_RESPONSE)) {
                         ClassElement bodyType = returnType.getFirstTypeArgument().orElse(null);
                         if (bodyType == null || Object.class.getName().equals(bodyType.getName())) {
@@ -3680,6 +3747,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ExpressionDef invokedValue,
         @Nullable TypeDef castType
     ) {
+        if (returnType.isVoid() || TypeDef.VOID.equals(castType) || TypeDef.Primitive.VOID.equals(castType)) {
+            return (StatementDef) invokedValue;
+        }
         return invokedValue.newLocal("pythonResult", result ->
             castReturnValue(handleReturnType(allClasses, returnType, result), castType).returning()
         );
@@ -3943,11 +4013,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     record EnumEntry(
         EnumDef enumDef,
+        ClassDef converterDef,
         Element originatingElement) {
     }
 
     record InterfaceEntry(
         InterfaceDef interfaceDef,
         Element originatingElement) {
+    }
+
+    private static final class EmptyAnnotationArray {
+        private static final EmptyAnnotationArray INSTANCE = new EmptyAnnotationArray();
+
+        private EmptyAnnotationArray() {
+        }
+
+        @Override
+        public String toString() {
+            return "{}";
+        }
     }
 }

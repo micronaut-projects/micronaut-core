@@ -177,6 +177,9 @@ class MicronautTransformer(ast.NodeTransformer):
         # First visit all nodes to collect imports
         self.generic_visit(node)
 
+        if self.strip_java_interface_bases:
+            self._ensure_future_annotations(node)
+
         # Add generated code at the beginning
         if self.transformed_code or self.java_type_assignments or self.has_java_import:
             # Create AST nodes for the generated code
@@ -238,6 +241,30 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         while insert_at < len(node.body) and self._is_future_import(node.body[insert_at]):
             insert_at += 1
         return insert_at
+
+    def _ensure_future_annotations(self, node: ast.Module) -> None:
+        if self._has_future_annotations(node):
+            return
+
+        future_import = ast.ImportFrom(
+            module='__future__',
+            names=[ast.alias(name='annotations', asname=None)],
+            level=0
+        )
+        ast.fix_missing_locations(future_import)
+
+        insert_at = 0
+        if node.body and self._is_module_docstring(node.body[0]):
+            insert_at = 1
+        while insert_at < len(node.body) and self._is_future_import(node.body[insert_at]):
+            insert_at += 1
+        node.body.insert(insert_at, future_import)
+
+    def _has_future_annotations(self, node: ast.Module) -> bool:
+        return any(
+            self._is_future_import(statement) and any(alias.name == 'annotations' for alias in statement.names)
+            for statement in node.body
+        )
 
     def _is_module_docstring(self, node: ast.AST) -> bool:
         if not isinstance(node, ast.Expr):
@@ -780,7 +807,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         # Collect meta-annotations to include as decorators
         decorator_lines = [f'@micronaut_annotation("{annotation_name}"{repeatable_info}{annotation_target_info})']
 
-        nested_members_prelude, nested_members_code = self._generate_nested_members_sections(class_element, decorator_name)
+        nested_members_prelude, nested_members_code, nested_member_names = self._generate_nested_members_sections(class_element, decorator_name)
 
         # Get all annotations on this annotation class (meta-annotations).
         # Some Java annotations reference optional/provided meta-annotation types.
@@ -788,6 +815,8 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         meta_annotations = []
         annotation_names = annotation_metadata.getAnnotationNames()
         for meta_annotation_name in annotation_names:
+            if repeatable_name and self._same_annotation_name(meta_annotation_name, repeatable_name):
+                continue
             # Skip retention and other built-in annotations that aren't user-facing
             if not self._skip_meta_annotation_in_source(meta_annotation_name):
                 meta_class_element = self.callback_get_class_element(meta_annotation_name)
@@ -795,6 +824,8 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                     continue
                 meta_decorator_name = self._meta_decorator_name(meta_annotation_name, annotation_name, meta_class_element)
                 if meta_decorator_name == decorator_name and meta_annotation_name != annotation_name:
+                    continue
+                if '$' in meta_annotation_name and meta_decorator_name not in nested_member_names:
                     continue
 
                 meta_annotations.append((meta_annotation_name, meta_class_element, meta_decorator_name))
@@ -875,6 +906,9 @@ def {decorator_name}({param_signature}):
             or meta_annotation_name.startswith(META_ANNOTATION_PACKAGES_TO_SKIP_IN_SOURCE)
         )
 
+    def _same_annotation_name(self, left: str, right: str) -> bool:
+        return left == right or left.replace('$', '.') == right.replace('$', '.')
+
     def _generate_decorator_from_class_element_with_name(self, class_element, import_name: str, custom_annotation_name: str) -> Optional[str]:
         """
         Generate Python decorator code from a ClassElement with a custom annotation name.
@@ -901,7 +935,7 @@ def {decorator_name}({param_signature}):
         param_handling = param_info['handling']
 
         # Generate the decorator function with custom annotation name and micronaut_annotation
-        nested_members_prelude, nested_members_code = self._generate_nested_members_sections(class_element, decorator_name)
+        nested_members_prelude, nested_members_code, _ = self._generate_nested_members_sections(class_element, decorator_name)
         decorator_code = f'''
 def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     """
@@ -1042,7 +1076,7 @@ def {decorator_name}({param_signature}):
         """
         Generate Python attributes for Java nested types exposed through an annotation.
         """
-        prelude, body = self._generate_nested_members_sections(class_element, parent_name)
+        prelude, body, _ = self._generate_nested_members_sections(class_element, parent_name)
         return prelude + body
 
     def _generate_nested_members_sections(self, class_element, parent_name: str):
@@ -1052,18 +1086,22 @@ def {decorator_name}({param_signature}):
         """
         prelude_lines = []
         lines = []
+        nested_member_names = set()
         needs_java = False
         for nested_element in self._get_nested_class_elements(class_element):
             nested_name = nested_element.getName()
             simple_name = nested_name.split('$')[-1].split('.')[-1]
+            nested_member_names.add(simple_name)
             if self._is_annotation_class(nested_element):
                 repeatable_name = self._get_repeatable_name(nested_element.getAnnotationMetadata(), nested_element)
                 repeatable_info = f', repeated="{repeatable_name}"' if repeatable_name else ''
-                self.generated_decorators.add(simple_name)
+                nested_decorator_name = f"_{parent_name}_{simple_name}"
+                nested_member_names.add(nested_decorator_name)
+                self.generated_decorators.add(nested_decorator_name)
                 prelude_lines.append(f'''
 
 @micronaut_annotation("{nested_name}"{repeatable_info})
-def {simple_name}(*args, **kwargs):
+def {nested_decorator_name}(*args, **kwargs):
     """
     Micronaut annotation decorator for {nested_name}.
     """
@@ -1079,23 +1117,26 @@ def {simple_name}(*args, **kwargs):
 ''')
                 lines.append(f'''
 
-{parent_name}.{simple_name} = {simple_name}
+{parent_name}.{simple_name} = {nested_decorator_name}
 ''')
             else:
                 binary_name = self._to_binary_nested_name(class_element.getName(), nested_name)
                 needs_java = True
                 lines.append(f'''
-{simple_name} = java.type("{binary_name}")
+try:
+    {simple_name} = java.type("{binary_name}")
+except Exception:
+    {simple_name} = None
 {parent_name}.{simple_name} = {simple_name}
 ''')
 
         if needs_java:
             lines.insert(0, "\nimport java\n")
-        return ''.join(prelude_lines), ''.join(lines)
+        return ''.join(prelude_lines), ''.join(lines), nested_member_names
 
     def _meta_decorator_name(self, meta_annotation_name: str, annotation_name: str, meta_class_element) -> str:
         if meta_annotation_name.startswith(annotation_name + '$'):
-            return meta_annotation_name.split('$')[-1]
+            return f"_{annotation_name.split('.')[-1]}_{meta_annotation_name.split('$')[-1]}"
         if '$' in meta_annotation_name:
             return meta_annotation_name.split('$')[-1]
         return meta_class_element.getSimpleName()

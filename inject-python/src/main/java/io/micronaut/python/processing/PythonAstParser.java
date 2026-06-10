@@ -40,6 +40,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
+/**
+ * Parses Python source files into the internal Python processing model.
+ */
 public final class PythonAstParser {
 
     public static final String PYTHON = "python";
@@ -61,7 +64,7 @@ public final class PythonAstParser {
                 .resourceDirectory(INJECT_RESOURCES)
                 .resourceLoadingClass(PythonAstParser.class)
                 .build())
-            // TODO: constrain this in future
+            // Future hardening should constrain host access to the required Micronaut API surface.
             .allowHostAccess(HostAccess.ALL)
             .hostClassLoader(classLoader)
             .allowHostClassLookup(name -> name.startsWith("io.micronaut"))

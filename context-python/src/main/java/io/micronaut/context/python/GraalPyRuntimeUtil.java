@@ -207,6 +207,12 @@ public final class GraalPyRuntimeUtil {
      */
     @UsedByGeneratedCode
     public static @Nullable Object coerceValue(@Nullable Object value) {
+        if (value instanceof Throwable) {
+            return value;
+        }
+        if (value instanceof ValueCoercible.GeneratedPropertyMembers) {
+            return value;
+        }
         if (value instanceof ValueCoercible valueCoercible && !(value instanceof PooledValueCoercible)) {
             return valueCoercible.asPolyglotValue();
         }
@@ -254,6 +260,42 @@ public final class GraalPyRuntimeUtil {
                 result[i] = coerceToContext(array[i], context);
             }
             return result;
+        }
+        return value;
+    }
+
+    /**
+     * Coerce a value using the generated Java bridge's declared parameter type.
+     * Some host objects implement collection interfaces as an implementation
+     * detail and should stay host objects unless the Python method declares the
+     * plain collection contract.
+     *
+     * @param value The value to coerce
+     * @param context The target context
+     * @param declaredType The declared Java bridge parameter type
+     * @return The coerced value
+     */
+    public static @Nullable Object coerceToContext(@Nullable Object value, Context context, Class<?> declaredType) {
+        if (value == null) {
+            return null;
+        }
+        if (declaredType == null) {
+            return coerceToContext(value, context);
+        }
+        if (value instanceof PooledValueCoercible pooledValueCoercible) {
+            return pooledValueCoercible.asPolyglotValue(context);
+        }
+        if (value instanceof List<?> && List.class.equals(declaredType)) {
+            return coerceToContext(value, context);
+        }
+        if (value instanceof Map<?, ?> && Map.class.equals(declaredType)) {
+            return coerceToContext(value, context);
+        }
+        if (value instanceof Set<?> && Set.class.equals(declaredType)) {
+            return coerceToContext(value, context);
+        }
+        if (value instanceof Object[] && declaredType.isArray()) {
+            return coerceToContext(value, context);
         }
         return value;
     }
@@ -581,12 +623,23 @@ public final class GraalPyRuntimeUtil {
     /**
      * Return a value as {@link Object} so generated code can perform unchecked generic casts.
      *
+     * @param <T> The target object type
      * @param value The value
      * @return The value as an object
      */
     @SuppressWarnings("unchecked")
     public static <T> @Nullable T asObject(@Nullable Object value) {
         return (T) value;
+    }
+
+    /**
+     * Convert a GraalPy value to a general Java object while preserving host objects.
+     *
+     * @param value The source polyglot value
+     * @return The converted object
+     */
+    public static @Nullable Object convertObject(@Nullable Value value) {
+        return convertObjectResponseBody(value);
     }
 
     /**
@@ -809,7 +862,7 @@ public final class GraalPyRuntimeUtil {
      * @return a Java Set with converted elements
      */
     public static <T> @Nullable Set<T> convertSet(Value graalValue, Class<T> elementType) {
-        // TODO: Ideally a custom Set implementation that doesn't create a new map would be better here
+        // A custom Set implementation that doesn't create a new map would be better here.
         if (isNone(graalValue)) {
             return null;
         }
@@ -913,6 +966,35 @@ public final class GraalPyRuntimeUtil {
     }
 
     /**
+     * Convert each item emitted by a Python-returned publisher to the declared Java item type.
+     *
+     * @param publisher The source publisher
+     * @param itemType The declared publisher item type
+     * @param <T> The item type
+     * @return The converted publisher
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Publisher<T> convertPublisher(Publisher<?> publisher, Class<T> itemType) {
+        return Publishers.map((Publisher<Object>) publisher, item -> convertPublishedValue(item, itemType));
+    }
+
+    /**
+     * Convert a GraalPy Value representing a publisher to a typed Java publisher.
+     *
+     * @param value The source polyglot publisher
+     * @param itemType The declared publisher item type
+     * @param <T> The item type
+     * @return The converted publisher
+     */
+    public static <T> @Nullable Publisher<T> convertPublisher(Value value, Class<T> itemType) {
+        Publisher<?> publisher = convertValue(value, Publisher.class);
+        if (publisher == null) {
+            return null;
+        }
+        return convertPublisher(publisher, itemType);
+    }
+
+    /**
      * Convert a response body to the declared Java body type.
      *
      * @param response The source response
@@ -938,6 +1020,23 @@ public final class GraalPyRuntimeUtil {
             return ((MutableHttpResponse<T>) mutableResponse).body(convertedBody);
         }
         return (HttpResponse<T>) response;
+    }
+
+    private static <T> @Nullable T convertPublishedValue(@Nullable Object item, Class<T> itemType) {
+        if (item == null || itemType.isInstance(item)) {
+            return itemType.cast(item);
+        }
+        if (item instanceof HttpResponse<?> response && HttpResponse.class.isAssignableFrom(itemType)) {
+            return itemType.cast(convertHttpResponse(response, Object.class));
+        }
+        if (item instanceof Value value) {
+            return convertValue(value, itemType);
+        }
+        try {
+            return convertValue(Value.asValue(item), itemType);
+        } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
+            return itemType.cast(item);
+        }
     }
 
     private static <T> @Nullable T convertResponseBody(Object rawBody, Class<T> bodyType) {
@@ -1024,6 +1123,26 @@ public final class GraalPyRuntimeUtil {
         return convertValue(host.asPolyglotValue(), targetType);
     }
 
+    /**
+     * Convert a Python enum value to the string representation exposed by Python.
+     *
+     * @param value The Python enum value
+     * @return The enum string value
+     */
+    public static String enumStringValue(Value value) {
+        Value target = value;
+        if (value != null && value.hasMembers() && value.hasMember("value")) {
+            target = value.getMember("value");
+        }
+        if (isNone(target)) {
+            return "null";
+        }
+        if (target.isString()) {
+            return target.asString();
+        }
+        return target.toString();
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <T> @Nullable T convertEnumValue(Value value, Class<T> targetType) {
         if (!targetType.isEnum()) {
@@ -1036,6 +1155,11 @@ public final class GraalPyRuntimeUtil {
         try {
             return (T) Enum.valueOf((Class) targetType.asSubclass(Enum.class), enumName);
         } catch (IllegalArgumentException e) {
+            for (Enum<?> enumConstant : targetType.asSubclass(Enum.class).getEnumConstants()) {
+                if (enumName.equals(enumConstant.toString())) {
+                    return (T) enumConstant;
+                }
+            }
             return null;
         }
     }

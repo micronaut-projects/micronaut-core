@@ -116,6 +116,43 @@ class Http2ServerPushSpec extends Specification {
         runner.responses.forEach(FullHttpResponse::release)
     }
 
+    def 'push promise path includes query string'() {
+        given:
+        def runner = new Runner()
+        runner.run(true, '/serverPush/query', new DefaultHttpHeaders(), 2)
+
+        expect:
+        runner.responses.size() == 2
+
+        runner.pushPromiseHeaders.any {
+            it.scheme() == 'https' &&
+                    it.path() == '/serverPush/resource1?foo=bar&baz=qux'
+        }
+        runner.responses.any { it.content().toString(StandardCharsets.UTF_8) == 'bar' }
+
+        cleanup:
+        runner.responses.forEach(FullHttpResponse::release)
+    }
+
+    def 'push promise authority strips userinfo'() {
+        given:
+        def runner = new Runner()
+        runner.run(true, '/serverPush/userinfoAuthority', new DefaultHttpHeaders(), 2)
+
+        expect:
+        runner.responses.size() == 2
+
+        runner.pushPromiseHeaders.any {
+            it.scheme() == 'https' &&
+                    it.authority() == "${embeddedServer.host}:${embeddedServer.port}" &&
+                    it.path() == '/serverPush/resource1'
+        }
+        runner.responses.any { it.content().toString(StandardCharsets.UTF_8) == 'bar' }
+
+        cleanup:
+        runner.responses.forEach(FullHttpResponse::release)
+    }
+
     def 'with push disabled'() {
         given:
         def runner = new Runner()
@@ -135,8 +172,8 @@ class Http2ServerPushSpec extends Specification {
         def pushPromiseHeaders = new ArrayList<Http2Headers>()
         int expectedResponses
 
-        def run(boolean pushEnabled, String path, HttpHeaders headers = new DefaultHttpHeaders()) {
-            expectedResponses = pushEnabled ? 3 : 1
+        def run(boolean pushEnabled, String path, HttpHeaders headers = new DefaultHttpHeaders(), int expectedResponses = pushEnabled ? 3 : 1) {
+            this.expectedResponses = expectedResponses
             def sslContext = SslContextBuilder.forClient()
                     .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
                     .trustManager(InsecureTrustManagerFactory.INSTANCE)
@@ -241,6 +278,22 @@ class Http2ServerPushSpec extends Specification {
             if (request.isServerPushSupported()) {
                 request.serverPush(HttpRequest.GET('/serverPush/resource1').header("Referer", "abc").header("Authorization", "bla"))
                 request.serverPush(HttpRequest.GET('/serverPush/resource2'))
+            }
+            return HttpResponse.ok('push supported: ' + request.isServerPushSupported())
+        }
+
+        @Get("/query")
+        HttpResponse<String> query(PushCapableHttpRequest<?> request) {
+            if (request.isServerPushSupported()) {
+                request.serverPush(HttpRequest.GET('/serverPush/resource1?foo=bar&baz=qux'))
+            }
+            return HttpResponse.ok('push supported: ' + request.isServerPushSupported())
+        }
+
+        @Get("/userinfoAuthority")
+        HttpResponse<String> userinfoAuthority(PushCapableHttpRequest<?> request) {
+            if (request.isServerPushSupported()) {
+                request.serverPush(HttpRequest.GET("https://user:pass@${embeddedServer.host}:${embeddedServer.port}/serverPush/resource1"))
             }
             return HttpResponse.ok('push supported: ' + request.isServerPushSupported())
         }

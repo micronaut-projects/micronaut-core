@@ -115,6 +115,12 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
     }
 
     @Override
+    @SuppressWarnings("unchecked")
+    public Class<B> getDeclaringType() {
+        return (Class<B>) declaringType;
+    }
+
+    @Override
     public Argument<?>[] getArguments() {
         return arguments;
     }

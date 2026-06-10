@@ -33,7 +33,6 @@ import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -55,6 +54,7 @@ import io.micronaut.inject.InjectableBeanDefinition;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.MethodInjectionPoint;
+import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
@@ -62,6 +62,7 @@ import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.qualifiers.TypeAnnotationQualifier;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -767,19 +768,12 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
      * @return The arguments required to construct parametrized bean
      */
     public final Argument<?>[] getRequiredArguments() {
-        if (requiredParametrizedArguments != null) {
-            return requiredParametrizedArguments;
-        }
-        ConstructorInjectionPoint<T> ctor = getConstructor();
-        if (ctor != null) {
-            requiredParametrizedArguments = Arrays.stream(ctor.getArguments())
-                .filter(arg -> {
-                    Optional<String> qualifierType = AnnotationUtil.findQualifierAnnotation(arg.getAnnotationMetadata());
-                    return qualifierType.isPresent() && qualifierType.get().equals(Parameter.class.getName());
-                })
-                .toArray(Argument[]::new);
-        } else {
-            requiredParametrizedArguments = Argument.ZERO_ARGUMENTS;
+        if (requiredParametrizedArguments == null) {
+            if (this instanceof ParametrizedInstantiatableBeanDefinition<?> parametrizedInstantiatableBeanDefinition) {
+                requiredParametrizedArguments = ParametrizedInstantiatableBeanDefinition.resolveRequiredArguments(parametrizedInstantiatableBeanDefinition);
+            } else {
+                requiredParametrizedArguments = Argument.ZERO_ARGUMENTS;
+            }
         }
         return requiredParametrizedArguments;
     }
@@ -793,37 +787,24 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
      *                               returned by {@link #getRequiredArguments()}
      * @return The instantiated bean
      * @throws BeanInstantiationException If the bean cannot be instantiated for the arguments supplied
+     * @deprecated The method moved to {@link ParametrizedInstantiatableBeanDefinition}
      */
-    @SuppressWarnings({"java:S2789", "OptionalAssignedToNull"}) // performance optimization
-    public final T instantiate(BeanResolutionContext resolutionContext,
+    @Deprecated(forRemoval = true, since = "5.0")
+    public T instantiate(BeanResolutionContext resolutionContext,
                                BeanContext context,
-                               Map<String, Object> requiredArgumentValues) throws BeanInstantiationException {
-
-        requiredArgumentValues = requiredArgumentValues != null ? new LinkedHashMap<>(requiredArgumentValues) : Collections.emptyMap();
-        Optional<Class> eachBeanType = null;
-        for (Argument<?> requiredArgument : getRequiredArguments()) {
-            try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, requiredArgument)) {
-                String argumentName = requiredArgument.getName();
-                Object value = requiredArgumentValues.get(argumentName);
-                if (value == null && !requiredArgument.isNullable()) {
-                    if (eachBeanType == null) {
-                        eachBeanType = classValue(EachBean.class);
-                    }
-                    if (eachBeanType.filter(type -> type == requiredArgument.getType()).isPresent()) {
-                        throw new DisabledBeanException("@EachBean parameter disabled for argument: " + requiredArgument.getName());
-                    }
-                    throw new BeanInstantiationException(resolutionContext, "Missing bean argument value: " + argumentName);
-                }
-                boolean requiresConversion = value != null && !requiredArgument.getType().isInstance(value);
-                if (requiresConversion) {
-                    Optional<?> converted = context.getConversionService().convert(value, requiredArgument.getType(), ConversionContext.of(requiredArgument));
-                    Object finalValue = value;
-                    value = converted.orElseThrow(() -> new BeanInstantiationException(resolutionContext, "Invalid value [" + finalValue + "] for argument: " + argumentName));
-                    requiredArgumentValues.put(argumentName, value);
-                }
-            }
+                               @Nullable Map<String, Object> requiredArgumentValues) throws BeanInstantiationException {
+        if (this instanceof ParametrizedInstantiatableBeanDefinition<?> parametrizedInstantiatableBeanDefinition) {
+            return doInstantiate(
+                resolutionContext,
+                context,
+                ParametrizedInstantiatableBeanDefinition.resolveParameterizedArgumentValues(resolutionContext, parametrizedInstantiatableBeanDefinition, requiredArgumentValues)
+            );
         }
-        return doInstantiate(resolutionContext, context, requiredArgumentValues);
+        return doInstantiate(
+            resolutionContext,
+            context,
+            requiredArgumentValues == null ? Collections.emptyMap() : new LinkedHashMap<>(requiredArgumentValues)
+        );
     }
 
     /**
@@ -833,9 +814,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
      * @param context                The bean context
      * @param requiredArgumentValues The required arguments
      * @return The built instance
+     * @deprecated The method moved to {@link ParametrizedInstantiatableBeanDefinition}
      */
     @Internal
     @UsedByGeneratedCode
+    @Deprecated(forRemoval = true, since = "5.0")
     protected T doInstantiate(BeanResolutionContext resolutionContext, BeanContext context, Map<String, Object> requiredArgumentValues) {
         throw new IllegalStateException("Method must be implemented for 'ParametrizedInstantiatableBeanDefinition' instance!");
     }
@@ -2291,11 +2274,20 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return null;
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private <K, R extends Collection<K>> R resolveBeansOfType(BeanResolutionContext resolutionContext, BeanContext context, Argument<R> returnType, @Nullable Argument<K> beanType, @Nullable Qualifier<K> qualifier) {
         if (beanType == null) {
             throw noGenericsError(resolutionContext, returnType);
         }
         qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
+        if (returnType.isArray()
+                && context instanceof DefaultBeanContext defaultBeanContext
+                && defaultBeanContext.getBeanResolutionCustomizer().shouldResolveArrayAsBean(returnType)) {
+            Optional<K[]> arrayBean = resolutionContext.findBean((Argument) returnType, (Qualifier) qualifier);
+            if (arrayBean.isPresent()) {
+                return coerceCollectionToCorrectType(returnType.getType(), Arrays.asList(arrayBean.get()), resolutionContext, returnType);
+            }
+        }
         Collection<K> beansOfType = resolutionContext.getBeansOfType(resolveArgument(context, beanType), qualifier);
         return coerceCollectionToCorrectType(returnType.getType(), beansOfType, resolutionContext, returnType);
     }
