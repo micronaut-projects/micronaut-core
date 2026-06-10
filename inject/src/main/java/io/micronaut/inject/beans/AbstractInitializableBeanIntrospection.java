@@ -271,9 +271,9 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     }
 
     /**
-     * Triggers the invocation of the method at index for a single argument call.
-     * Allowing to not wrap a single argument in an object array.
+     * Triggers the invocation of the method at index for a single-argument call, avoiding wrapping the value in an {@code Object[]} array.
      * <p>
+     * For no-argument calls (for example, property getters), generated code passes {@code null} as {@code arg}.
      * This is the boxed single-argument dispatch path used by unsafe bean property
      * implementations. Primitive property access uses the type-specific dispatch methods
      * below when generated introspections provide them, so serializers and other hot paths
