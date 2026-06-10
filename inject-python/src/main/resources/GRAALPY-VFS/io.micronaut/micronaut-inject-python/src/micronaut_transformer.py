@@ -84,6 +84,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.java_class_imports = {}
         self.java_interface_names = set()
         self.java_keyword_method_aliases = {}
+        self.validation_errors = []
         self.has_java_import = False
         self.exported_types = []
         self.all_class_names = []
@@ -327,6 +328,11 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             self.function_depth -= 1
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AsyncFunctionDef:
+        if self.class_depth > 0 and self.function_depth == 0:
+            if node.name == "__init__":
+                self.validation_errors.append("Async constructors are not supported")
+            if self._is_python_property_decorator(node):
+                self.validation_errors.append(f"Async property [{node.name}] is not supported")
         node.decorator_list = [
             self._normalize_decorator(decorator)
             for decorator in node.decorator_list
@@ -337,6 +343,19 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             return node
         finally:
             self.function_depth -= 1
+
+    def _is_python_property_decorator(self, node) -> bool:
+        for decorator in node.decorator_list:
+            if isinstance(decorator, ast.Name) and decorator.id == "property":
+                return True
+            if (
+                isinstance(decorator, ast.Attribute)
+                and decorator.attr in ("setter", "deleter")
+                and isinstance(decorator.value, ast.Name)
+                and decorator.value.id == node.name
+            ):
+                return True
+        return False
 
     def visit_Assign(self, node: ast.Assign):
         """
