@@ -76,6 +76,31 @@ class PyronautCompilerErrorHandlingTest {
     }
 
     @Test
+    void compileReportsConciseCustomInitPyError() throws IOException {
+        Path sourceDirectory = temporaryDirectory.resolve("src");
+        Path packageDirectory = sourceDirectory.resolve("simple_python");
+        Files.createDirectories(packageDirectory);
+        Files.writeString(packageDirectory.resolve("__init__.py"), "");
+        Files.writeString(packageDirectory.resolve("Controller.py"), "class Controller: pass");
+        File dumpDirectory = temporaryDirectory.resolve("dumps").toFile();
+        File targetDirectory = temporaryDirectory.resolve("classes").toFile();
+        Files.createDirectories(targetDirectory.toPath());
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> PyronautCompiler.builder()
+            .pythonSrc(sourceDirectory.toString())
+            .targetDir(targetDirectory)
+            .errorDumpDirectory(dumpDirectory)
+            .build()
+            .compile());
+
+        String message = exception.getMessage();
+        assertTrue(message.contains("Custom __init__.py files are not supported in Pyronaut applications"), message);
+        assertTrue(message.contains("simple_python/__init__.py"), message);
+        assertFalse(message.contains("Output stream or writer has already been opened"), message);
+        assertEquals(1, countDumpFiles(dumpDirectory));
+    }
+
+    @Test
     void verboseErrorsIncludeFullDiagnosticsAndStillWriteDump() throws IOException {
         File dumpDirectory = temporaryDirectory.resolve("dumps").toFile();
 

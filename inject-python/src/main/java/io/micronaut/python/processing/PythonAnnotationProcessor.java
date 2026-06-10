@@ -405,10 +405,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                                                           @NotNull BasicFileAttributes attrs)
                                     throws IOException {
                                     if (file.toString().endsWith(".py")) {
-                                        var relative = directory.relativize(file).toString();
+                                        var relative = directory.relativize(file).toString().replace(file.getFileSystem().getSeparator(), "/");
                                         if (relative.equals("setup.py")) {
                                             // temporary workaround
                                             return FileVisitResult.CONTINUE;
+                                        }
+                                        if ("__init__.py".equals(file.getFileName().toString())) {
+                                            throw new ProcessingException(
+                                                originatingElement,
+                                                "Custom __init__.py files are not supported in Pyronaut applications. " +
+                                                    "Micronaut generates package __init__.py files for the GraalPy VFS; remove [" + relative + "] from the project source."
+                                            );
                                         }
                                         sources.add(Source.newBuilder("python", file.toFile()).build());
                                     }
