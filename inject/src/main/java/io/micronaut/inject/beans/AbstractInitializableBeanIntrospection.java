@@ -312,9 +312,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     /**
      * Triggers the primitive boolean getter invocation at index.
      * <p>
-     * Generated introspections override this method with a primitive switch dispatch.
+     * The base implementation preserves compatibility by boxing through
+     * {@link #dispatchOne(int, Object, Object)}. Generated introspections override
+     * this method with a primitive switch dispatch to avoid boxing in hot paths.
      * It backs {@link UnsafeBeanReadProperty#getBooleanUnsafe(Object)} for generated
-     * bean properties and avoids the boxed {@link #dispatchOne(int, Object, Object)} path.
+     * bean properties.
      *
      * @param index The method index
      * @param target The target
@@ -323,15 +325,17 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @UsedByGeneratedCode
     protected boolean dispatchGetBoolean(int index, Object target) {
-        throw unknownDispatchAtIndexException(index);
+        return (Boolean) Objects.requireNonNull(dispatchOne(index, target, null));
     }
 
     /**
      * Triggers the primitive byte getter invocation at index.
      * <p>
-     * Generated introspections override this method with a primitive switch dispatch.
+     * The base implementation preserves compatibility by boxing through
+     * {@link #dispatchOne(int, Object, Object)}. Generated introspections override
+     * this method with a primitive switch dispatch to avoid boxing in hot paths.
      * It backs {@link UnsafeBeanReadProperty#getByteUnsafe(Object)} for generated
-     * bean properties and avoids the boxed {@link #dispatchOne(int, Object, Object)} path.
+     * bean properties.
      *
      * @param index The method index
      * @param target The target
@@ -340,15 +344,17 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @UsedByGeneratedCode
     protected byte dispatchGetByte(int index, Object target) {
-        throw unknownDispatchAtIndexException(index);
+        return (Byte) Objects.requireNonNull(dispatchOne(index, target, null));
     }
 
     /**
      * Triggers the primitive short getter invocation at index.
      * <p>
-     * Generated introspections override this method with a primitive switch dispatch.
+     * The base implementation preserves compatibility by boxing through
+     * {@link #dispatchOne(int, Object, Object)}. Generated introspections override
+     * this method with a primitive switch dispatch to avoid boxing in hot paths.
      * It backs {@link UnsafeBeanReadProperty#getShortUnsafe(Object)} for generated
-     * bean properties and avoids the boxed {@link #dispatchOne(int, Object, Object)} path.
+     * bean properties.
      *
      * @param index The method index
      * @param target The target
@@ -357,15 +363,17 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @UsedByGeneratedCode
     protected short dispatchGetShort(int index, Object target) {
-        throw unknownDispatchAtIndexException(index);
+        return (Short) Objects.requireNonNull(dispatchOne(index, target, null));
     }
 
     /**
      * Triggers the primitive char getter invocation at index.
      * <p>
-     * Generated introspections override this method with a primitive switch dispatch.
+     * The base implementation preserves compatibility by boxing through
+     * {@link #dispatchOne(int, Object, Object)}. Generated introspections override
+     * this method with a primitive switch dispatch to avoid boxing in hot paths.
      * It backs {@link UnsafeBeanReadProperty#getCharUnsafe(Object)} for generated
-     * bean properties and avoids the boxed {@link #dispatchOne(int, Object, Object)} path.
+     * bean properties.
      *
      * @param index The method index
      * @param target The target
@@ -374,15 +382,17 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @UsedByGeneratedCode
     protected char dispatchGetChar(int index, Object target) {
-        throw unknownDispatchAtIndexException(index);
+        return (Character) Objects.requireNonNull(dispatchOne(index, target, null));
     }
 
     /**
      * Triggers the primitive int getter invocation at index.
      * <p>
-     * Generated introspections override this method with a primitive switch dispatch.
+     * The base implementation preserves compatibility by boxing through
+     * {@link #dispatchOne(int, Object, Object)}. Generated introspections override
+     * this method with a primitive switch dispatch to avoid boxing in hot paths.
      * It backs {@link UnsafeBeanReadProperty#getIntUnsafe(Object)} for generated
-     * bean properties and avoids the boxed {@link #dispatchOne(int, Object, Object)} path.
+     * bean properties.
      *
      * @param index The method index
      * @param target The target
@@ -391,15 +401,17 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @UsedByGeneratedCode
     protected int dispatchGetInt(int index, Object target) {
-        throw unknownDispatchAtIndexException(index);
+        return (Integer) Objects.requireNonNull(dispatchOne(index, target, null));
     }
 
     /**
      * Triggers the primitive long getter invocation at index.
      * <p>
-     * Generated introspections override this method with a primitive switch dispatch.
+     * The base implementation preserves compatibility by boxing through
+     * {@link #dispatchOne(int, Object, Object)}. Generated introspections override
+     * this method with a primitive switch dispatch to avoid boxing in hot paths.
      * It backs {@link UnsafeBeanReadProperty#getLongUnsafe(Object)} for generated
-     * bean properties and avoids the boxed {@link #dispatchOne(int, Object, Object)} path.
+     * bean properties.
      *
      * @param index The method index
      * @param target The target
@@ -408,15 +420,17 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @UsedByGeneratedCode
     protected long dispatchGetLong(int index, Object target) {
-        throw unknownDispatchAtIndexException(index);
+        return (Long) Objects.requireNonNull(dispatchOne(index, target, null));
     }
 
     /**
      * Triggers the primitive float getter invocation at index.
      * <p>
-     * Generated introspections override this method with a primitive switch dispatch.
+     * The base implementation preserves compatibility by boxing through
+     * {@link #dispatchOne(int, Object, Object)}. Generated introspections override
+     * this method with a primitive switch dispatch to avoid boxing in hot paths.
      * It backs {@link UnsafeBeanReadProperty#getFloatUnsafe(Object)} for generated
-     * bean properties and avoids the boxed {@link #dispatchOne(int, Object, Object)} path.
+     * bean properties.
      *
      * @param index The method index
      * @param target The target
@@ -425,15 +439,17 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @UsedByGeneratedCode
     protected float dispatchGetFloat(int index, Object target) {
-        throw unknownDispatchAtIndexException(index);
+        return (Float) Objects.requireNonNull(dispatchOne(index, target, null));
     }
 
     /**
      * Triggers the primitive double getter invocation at index.
      * <p>
-     * Generated introspections override this method with a primitive switch dispatch.
+     * The base implementation preserves compatibility by boxing through
+     * {@link #dispatchOne(int, Object, Object)}. Generated introspections override
+     * this method with a primitive switch dispatch to avoid boxing in hot paths.
      * It backs {@link UnsafeBeanReadProperty#getDoubleUnsafe(Object)} for generated
-     * bean properties and avoids the boxed {@link #dispatchOne(int, Object, Object)} path.
+     * bean properties.
      *
      * @param index The method index
      * @param target The target
@@ -442,7 +458,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @UsedByGeneratedCode
     protected double dispatchGetDouble(int index, Object target) {
-        throw unknownDispatchAtIndexException(index);
+        return (Double) Objects.requireNonNull(dispatchOne(index, target, null));
     }
 
     /**

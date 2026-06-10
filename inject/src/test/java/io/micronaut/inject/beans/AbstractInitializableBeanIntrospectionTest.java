@@ -79,6 +79,18 @@ class AbstractInitializableBeanIntrospectionTest {
         assertEquals(Integer.valueOf(100), introspection.lastValue);
     }
 
+    @Test
+    void primitiveBeanReadPropertyFallsBackToBoxedDispatch() {
+        PrimitiveTestBean bean = new PrimitiveTestBean();
+        bean.value = 123;
+        BoxedPrimitiveFallbackIntrospection introspection = new BoxedPrimitiveFallbackIntrospection();
+        UnsafeBeanReadProperty<PrimitiveTestBean, Object> readProperty = (UnsafeBeanReadProperty<PrimitiveTestBean, Object>) introspection.getReadProperty("value").orElseThrow();
+
+        assertEquals(123, readProperty.getIntUnsafe(bean));
+        assertTrue(introspection.objectGetterUsed);
+        assertFalse(introspection.objectSetterUsed);
+    }
+
     private static final class TestBean {
     }
 
@@ -189,6 +201,7 @@ class AbstractInitializableBeanIntrospectionTest {
     }
 
     private static final class BoxedPrimitiveFallbackIntrospection extends AbstractInitializableBeanIntrospection<PrimitiveTestBean> {
+        private boolean objectGetterUsed;
         private boolean voidSetterUsed;
         private boolean objectSetterUsed;
         private Object lastValue;
@@ -207,6 +220,10 @@ class AbstractInitializableBeanIntrospectionTest {
         @Override
         @SuppressWarnings({"unchecked", "TypeParameterUnusedInFormals"})
         protected <V> V dispatchOne(int index, Object target, Object arg) {
+            if (index == 0) {
+                objectGetterUsed = true;
+                return (V) Integer.valueOf(((PrimitiveTestBean) target).value);
+            }
             objectSetterUsed = true;
             setValue(index, target, arg);
             return null;

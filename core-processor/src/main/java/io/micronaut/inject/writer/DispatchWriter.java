@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.context.AbstractExecutableMethodsDefinition;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.sourcegen.model.FieldDef;
 import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
@@ -105,6 +106,17 @@ public final class DispatchWriter implements ClassOutputWriter {
         ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getField", Class.class, String.class, Object.class);
 
     private static final Method METHOD_SET_FIELD_VALUE = ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "setField", Class.class, String.class, Object.class, Object.class);
+
+    private static final Map<TypeDef.Primitive, PrimitiveDispatchData> PRIMITIVE_DISPATCH_DATA = Map.of(
+        TypeDef.Primitive.BOOLEAN, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_BOOLEAN, TypeDef.Primitive.BOOLEAN.constant(false)),
+        TypeDef.Primitive.BYTE, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_BYTE, TypeDef.Primitive.BYTE.constant((byte) 0)),
+        TypeDef.Primitive.SHORT, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_SHORT, TypeDef.Primitive.SHORT.constant((short) 0)),
+        TypeDef.Primitive.CHAR, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_CHAR, TypeDef.Primitive.CHAR.constant('\0')),
+        TypeDef.Primitive.INT, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_INT, TypeDef.Primitive.INT.constant(0)),
+        TypeDef.Primitive.LONG, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_LONG, TypeDef.Primitive.LONG.constant(0L)),
+        TypeDef.Primitive.FLOAT, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_FLOAT, TypeDef.Primitive.FLOAT.constant(0F)),
+        TypeDef.Primitive.DOUBLE, new PrimitiveDispatchData(ClassUtils.PRIMITIVE_TYPE_NAME_DOUBLE, TypeDef.Primitive.DOUBLE.constant(0D))
+    );
 
     private final List<DispatchTarget> dispatchTargets = new ArrayList<>();
 
@@ -513,7 +525,19 @@ public final class DispatchWriter implements ClassOutputWriter {
 
     private static boolean isPrimitiveReadTarget(DispatchTarget dispatchTarget, String primitiveName) {
         ClassElement type = readType(dispatchTarget);
-        return type != null && type.isPrimitive() && type.getName().equals(primitiveName) && dispatchTarget instanceof AbstractDispatchTarget;
+        return dispatchTarget.supportsDispatchOne()
+            && supportsPrimitiveReadDispatch(dispatchTarget)
+            && type != null
+            && type.isPrimitive()
+            && type.getName().equals(primitiveName);
+    }
+
+    private static boolean supportsPrimitiveReadDispatch(DispatchTarget dispatchTarget) {
+        if (dispatchTarget instanceof FieldGetDispatchTarget || dispatchTarget instanceof FieldGetReflectionDispatchTarget) {
+            return true;
+        }
+        MethodElement methodElement = dispatchTarget.getMethodElement();
+        return methodElement != null && methodElement.getSuspendParameters().length == 0;
     }
 
     private static boolean isPrimitiveWriteTarget(DispatchTarget dispatchTarget, String primitiveName) {
@@ -565,59 +589,22 @@ public final class DispatchWriter implements ClassOutputWriter {
     }
 
     private static String primitiveName(TypeDef.Primitive primitiveType) {
-        if (primitiveType.equals(TypeDef.Primitive.BOOLEAN)) {
-            return "boolean";
-        }
-        if (primitiveType.equals(TypeDef.Primitive.BYTE)) {
-            return "byte";
-        }
-        if (primitiveType.equals(TypeDef.Primitive.SHORT)) {
-            return "short";
-        }
-        if (primitiveType.equals(TypeDef.Primitive.CHAR)) {
-            return "char";
-        }
-        if (primitiveType.equals(TypeDef.Primitive.INT)) {
-            return "int";
-        }
-        if (primitiveType.equals(TypeDef.Primitive.LONG)) {
-            return "long";
-        }
-        if (primitiveType.equals(TypeDef.Primitive.FLOAT)) {
-            return "float";
-        }
-        if (primitiveType.equals(TypeDef.Primitive.DOUBLE)) {
-            return "double";
+        return primitiveDispatchData(primitiveType).name();
+    }
+
+    private static ExpressionDef defaultPrimitiveValue(TypeDef.Primitive primitiveType) {
+        return primitiveDispatchData(primitiveType).defaultValue();
+    }
+
+    private static PrimitiveDispatchData primitiveDispatchData(TypeDef.Primitive primitiveType) {
+        PrimitiveDispatchData primitiveDispatchData = PRIMITIVE_DISPATCH_DATA.get(primitiveType);
+        if (primitiveDispatchData != null) {
+            return primitiveDispatchData;
         }
         throw new IllegalStateException("Unsupported primitive dispatch type: " + primitiveType);
     }
 
-    private static ExpressionDef defaultPrimitiveValue(TypeDef.Primitive primitiveType) {
-        if (primitiveType.equals(TypeDef.Primitive.BOOLEAN)) {
-            return TypeDef.Primitive.BOOLEAN.constant(false);
-        }
-        if (primitiveType.equals(TypeDef.Primitive.BYTE)) {
-            return TypeDef.Primitive.BYTE.constant((byte) 0);
-        }
-        if (primitiveType.equals(TypeDef.Primitive.SHORT)) {
-            return TypeDef.Primitive.SHORT.constant((short) 0);
-        }
-        if (primitiveType.equals(TypeDef.Primitive.CHAR)) {
-            return TypeDef.Primitive.CHAR.constant('\0');
-        }
-        if (primitiveType.equals(TypeDef.Primitive.INT)) {
-            return TypeDef.Primitive.INT.constant(0);
-        }
-        if (primitiveType.equals(TypeDef.Primitive.LONG)) {
-            return TypeDef.Primitive.LONG.constant(0L);
-        }
-        if (primitiveType.equals(TypeDef.Primitive.FLOAT)) {
-            return TypeDef.Primitive.FLOAT.constant(0F);
-        }
-        if (primitiveType.equals(TypeDef.Primitive.DOUBLE)) {
-            return TypeDef.Primitive.DOUBLE.constant(0D);
-        }
-        throw new IllegalStateException("Unsupported primitive dispatch type: " + primitiveType);
+    private record PrimitiveDispatchData(String name, ExpressionDef defaultValue) {
     }
 
     @Nullable

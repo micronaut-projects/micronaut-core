@@ -22,6 +22,7 @@ import io.micronaut.core.beans.BeanReadProperty;
 import io.micronaut.core.beans.BeanWriteProperty;
 import io.micronaut.core.beans.UnsafeBeanReadProperty;
 import io.micronaut.core.beans.UnsafeBeanWriteProperty;
+import io.micronaut.context.annotation.Executable;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -168,6 +169,11 @@ class PrimitiveBeanPropertyAccessTest {
 
         public void setStringValue(String stringValue) {
             this.stringValue = stringValue;
+        }
+
+        @Executable
+        public int add(int left, int right) {
+            return intValue + left + right;
         }
     }
 }
