@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import java
 
 from micronaut.context.annotation import Requires
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.http.annotation import Get
 from micronaut.http.client.annotation import Client
 
@@ -27,6 +28,7 @@ class BackendClient(ABC):
 
     # tag::publisherClient[]
     @Get("/publisher-message")
+    @SingleResult
     @abstractmethod
     def publisher_message(self) -> Publisher[str]:
         ...

@@ -2,6 +2,7 @@ import asyncio
 import java
 
 from micronaut.context.annotation import Requires
+from micronaut.core.async_.annotation import SingleResult
 from micronaut.http.annotation import Controller, Get
 
 Mono = java.type("reactor.core.publisher.Mono")
@@ -31,6 +32,7 @@ class AsyncBackendController:
 
     # tag::publisherBackend[]
     @Get("/publisher-message")
+    @SingleResult
     def publisher_message(self) -> Publisher[str]:
         return Mono.just("publisher-backend")
     # end::publisherBackend[]
