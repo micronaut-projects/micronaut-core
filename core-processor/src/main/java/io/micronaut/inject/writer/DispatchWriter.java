@@ -445,13 +445,10 @@ public final class DispatchWriter implements ClassOutputWriter {
                     switchCases.put(ExpressionDef.constant(caseIndex), expression.returning());
                 }
 
-                return StatementDef.multi(
-                    methodIndex.asStatementSwitch(
-                        primitiveType,
-                        switchCases,
-                        aThis.invoke(UNKNOWN_DISPATCH_AT_INDEX, methodIndex).doThrow()
-                    ),
-                    defaultPrimitiveValue(primitiveType).returning()
+                return methodIndex.asStatementSwitch(
+                    primitiveType,
+                    switchCases,
+                    aThis.invoke(DISPATCH_ONE_METHOD, methodIndex, target, ExpressionDef.nullValue()).cast(primitiveType).returning()
                 );
             });
     }
