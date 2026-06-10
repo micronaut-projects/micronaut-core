@@ -589,9 +589,6 @@ public final class DispatchWriter implements ClassOutputWriter {
         return primitiveDispatchData(primitiveType).name();
     }
 
-    private static ExpressionDef defaultPrimitiveValue(TypeDef.Primitive primitiveType) {
-        return primitiveDispatchData(primitiveType).defaultValue();
-    }
 
     private static PrimitiveDispatchData primitiveDispatchData(TypeDef.Primitive primitiveType) {
         PrimitiveDispatchData primitiveDispatchData = PRIMITIVE_DISPATCH_DATA.get(primitiveType);
