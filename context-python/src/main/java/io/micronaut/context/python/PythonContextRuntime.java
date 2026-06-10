@@ -42,15 +42,19 @@ import java.util.function.Supplier;
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
 /**
- * Static holder for the GraalPy context used by Python bridge classes.
- * Provides thread-safe access to the shared Python execution context.
+ * Runtime coordination point for generated Python bridge classes.
+ * <p>
+ * This type owns access to the primary GraalPy context, resolves classes and scripts from the
+ * primary context or a {@link PythonPool}, mirrors host members into event-loop contexts, executes
+ * shared Python helper functions, and tracks active executions so contexts and engines can be
+ * closed safely.
  *
  * @author Micronaut Team
  * @since 5.0.0
  */
 @Experimental
-public final class ContextHolder {
-    private static final Logger LOG = LoggerFactory.getLogger(ContextHolder.class);
+public final class PythonContextRuntime {
+    private static final Logger LOG = LoggerFactory.getLogger(PythonContextRuntime.class);
 
     private static final String NEW_UNINITIALIZED_INSTANCE = "__micronaut_new_uninitialized_instance";
     private static final String SET_INSTANCE_PROPERTY = "__micronaut_set_instance_property";
@@ -113,7 +117,7 @@ public final class ContextHolder {
     private static final ThreadLocal<List<Context>> CURRENT_EXECUTION_CONTEXTS = ThreadLocal.withInitial(ArrayList::new);
     private static final ThreadLocal<List<Runnable>> CURRENT_EXECUTION_EXIT_LISTENERS = ThreadLocal.withInitial(ArrayList::new);
 
-    private ContextHolder() {
+    private PythonContextRuntime() {
     }
 
     private static ContextState contextState(Context context) {
@@ -138,7 +142,7 @@ public final class ContextHolder {
      * @param pool The Python pool
      */
     public static void setPythonPool(@Nullable PythonPool pool) {
-        ContextHolder.pythonPool = pool;
+        PythonContextRuntime.pythonPool = pool;
     }
 
     /**
@@ -1132,8 +1136,8 @@ public final class ContextHolder {
      * @param context The GraalPy context to set
      */
     public static void setContext(Context context) {
-        ContextHolder.context = context;
-        ContextHolder.contextClassLoader = Thread.currentThread().getContextClassLoader();
+        PythonContextRuntime.context = context;
+        PythonContextRuntime.contextClassLoader = Thread.currentThread().getContextClassLoader();
     }
 
     /**
@@ -1144,8 +1148,8 @@ public final class ContextHolder {
      * @param classLoader The application class loader used to build the context
      */
     public static void setContext(Context context, @Nullable ClassLoader classLoader) {
-        ContextHolder.context = context;
-        ContextHolder.contextClassLoader = classLoader;
+        PythonContextRuntime.context = context;
+        PythonContextRuntime.contextClassLoader = classLoader;
     }
 
     /**
@@ -1168,7 +1172,7 @@ public final class ContextHolder {
 
     @SuppressWarnings("ReferenceEquality")
     static boolean isCurrentContext(Context context) {
-        return ContextHolder.context == context;
+        return PythonContextRuntime.context == context;
     }
 
     /**

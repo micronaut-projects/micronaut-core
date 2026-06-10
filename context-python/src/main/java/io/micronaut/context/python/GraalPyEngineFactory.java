@@ -51,8 +51,8 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
     @Override
     public void onDestroyed(@NonNull BeanDestroyedEvent<Engine> event) {
         Engine engine = event.getBean();
-        ContextHolder.onNoContexts(engine, () ->
-            ContextHolder.onNoActiveExecutions(engine, () -> closeEngine(engine))
+        PythonContextRuntime.onNoContexts(engine, () ->
+            PythonContextRuntime.onNoActiveExecutions(engine, () -> closeEngine(engine))
         );
     }
 

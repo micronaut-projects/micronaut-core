@@ -24,7 +24,7 @@ import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.aop.runtime.RuntimeProxyCreator;
 import io.micronaut.aop.runtime.RuntimeProxyDefinition;
-import io.micronaut.context.python.ContextHolder;
+import io.micronaut.context.python.PythonContextRuntime;
 import io.micronaut.context.python.GraalPyRuntimeUtil;
 import io.micronaut.context.python.PythonAsyncioRuntime;
 import io.micronaut.context.python.TargetTypeMapping;
@@ -101,7 +101,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private <T> T createIntroductionProxy(RuntimeProxyDefinition<T> proxyDefinition) {
         Class<?> pythonBeanType = resolvePythonBeanType(proxyDefinition);
-        Value value = ContextHolder.findClass(pythonBeanType.getPackageName(), pythonBeanType.getSimpleName());
+        Value value = PythonContextRuntime.findClass(pythonBeanType.getPackageName(), pythonBeanType.getSimpleName());
         AtomicReference<Object> targetBeanRef = new AtomicReference<>();
         Map<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> interceptedMethodsByName = new LinkedHashMap<>();
         for (RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod : proxyDefinition.interceptedMethods()) {
@@ -235,7 +235,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private <T> T createProxyTargetProxy(RuntimeProxyDefinition<T> proxyDefinition) {
         Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
-        Value pythonClass = ContextHolder.findClass(type.getPackageName(), type.getSimpleName());
+        Value pythonClass = PythonContextRuntime.findClass(type.getPackageName(), type.getSimpleName());
         Value proxyValue = createScopedProxyValue(pythonClass, () -> asValue(proxyDefinition.targetBean()));
         if (hasAroundConstructAdvice(proxyDefinition)) {
             // Python proxy-target AOP normally instantiates the target lazily through the scoped proxy.

@@ -182,7 +182,7 @@ final class PythonAsyncioRuntimeTest {
                 RecordingEventLoop first = new RecordingEventLoop();
                 currentEventLoop.set(first);
                 Future<String> firstContext = executorService.submit(() -> {
-                    Value script = ContextHolder.findPooledScript(PYTHON, "Unnamed");
+                    Value script = PythonContextRuntime.findPooledScript(PYTHON, "Unnamed");
                     script.putMember("event_loop_marker", "first");
                     return script.getMember("event_loop_marker").asString();
                 });
@@ -190,12 +190,12 @@ final class PythonAsyncioRuntimeTest {
 
                 RecordingEventLoop second = new RecordingEventLoop();
                 currentEventLoop.set(second);
-                Value secondScript = ContextHolder.findPooledScript(PYTHON, "Unnamed");
+                Value secondScript = PythonContextRuntime.findPooledScript(PYTHON, "Unnamed");
                 assertFalse(secondScript.hasMember("event_loop_marker"));
                 secondScript.putMember("event_loop_marker", "second");
 
                 currentEventLoop.set(first);
-                Value firstScript = ContextHolder.findPooledScript(PYTHON, "Unnamed");
+                Value firstScript = PythonContextRuntime.findPooledScript(PYTHON, "Unnamed");
                 assertEquals("first", firstScript.getMember("event_loop_marker").asString());
             } finally {
                 currentEventLoop.set(null);
@@ -219,7 +219,7 @@ final class PythonAsyncioRuntimeTest {
         ))) {
             PythonPool pool = applicationContext.getBean(PythonPool.class);
 
-            ContextHolder.findPooledScript(PYTHON, "Unnamed");
+            PythonContextRuntime.findPooledScript(PYTHON, "Unnamed");
 
             Future<Boolean> borrowed = executorService.submit(() -> {
                 Context context = pool.borrow();
@@ -1015,10 +1015,10 @@ final class PythonAsyncioRuntimeTest {
 
             CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
 
-            assertEquals(1, ContextHolder.activeExecutions());
+            assertEquals(1, PythonContextRuntime.activeExecutions());
             eventLoop.runUntilComplete(stage);
             assertEquals("ok", stage.toCompletableFuture().get(1, TimeUnit.SECONDS));
-            assertEquals(0, ContextHolder.activeExecutions());
+            assertEquals(0, PythonContextRuntime.activeExecutions());
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
         }
@@ -1031,14 +1031,14 @@ final class PythonAsyncioRuntimeTest {
             "micronaut.python.pool.enabled", false
         ))) {
             GracefulShutdownManager manager = applicationContext.getBean(GracefulShutdownManager.class);
-            ContextHolder.enterExecution();
+            PythonContextRuntime.enterExecution();
             CompletionStage<?> shutdown;
             try {
                 assertEquals(1, manager.reportActiveTasks().orElseThrow());
                 shutdown = manager.shutdownGracefully();
                 assertFalse(shutdown.toCompletableFuture().isDone());
             } finally {
-                ContextHolder.exitExecution();
+                PythonContextRuntime.exitExecution();
             }
 
             shutdown.toCompletableFuture().get(1, TimeUnit.SECONDS);

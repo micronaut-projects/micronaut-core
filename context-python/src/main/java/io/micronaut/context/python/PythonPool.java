@@ -56,7 +56,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  * Provides a pool of GraalPy {@link Context} instances built on a shared {@link Engine}.
  * <p>
  * The first context (primary) is created synchronously and is not part of the pool. It is exposed
- * via {@link ContextHolder#getContext()} and used for non-pooled operations. Remaining pooled
+ * via {@link PythonContextRuntime#getContext()} and used for non-pooled operations. Remaining pooled
  * contexts are created on a background thread to avoid blocking startup.
  */
 @Singleton
@@ -110,25 +110,25 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
 
     /**
      * Initializes the pool and primary context.
-     * The first (primary) context is created synchronously and exposed to {@link ContextHolder}.
+     * The first (primary) context is created synchronously and exposed to {@link PythonContextRuntime}.
      * Pooled contexts are created synchronously when 'micronaut.python.pool.sync-init' is true,
      * otherwise they are created asynchronously on a background thread.
      */
     @PostConstruct
     void init() {
         // If reuseContext is enabled, skip pool initialization entirely
-        if (ContextHolder.isReuseContext()) {
+        if (PythonContextRuntime.isReuseContext()) {
             LOG.debug("Context reuse enabled; skipping Python context pool initialization");
-            ContextHolder.setPythonPool(null);
+            PythonContextRuntime.setPythonPool(null);
             return;
         }
         // Register pool and prepare caches if enabled
         if (targetSize <= 0) {
             LOG.debug("Python context pool disabled via configuration; skipping initialization");
-            ContextHolder.setPythonPool(null);
+            PythonContextRuntime.setPythonPool(null);
             return;
         }
-        ContextHolder.setPythonPool(this);
+        PythonContextRuntime.setPythonPool(this);
         cache.put(primaryContext, new ConcurrentHashMap<>());
         final int toCreate = targetSize;
         if (syncInit) {
@@ -409,23 +409,23 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
     }
 
     private static Value loadClass(Context ctx, @Nullable String packageName, String simpleName) {
-        return ContextHolder.findClass(packageName, simpleName, ctx);
+        return PythonContextRuntime.findClass(packageName, simpleName, ctx);
     }
 
     private static Value loadScript(Context ctx, String packageName, String scriptName) {
-        return ContextHolder.findScript(packageName, scriptName, ctx);
+        return PythonContextRuntime.findScript(packageName, scriptName, ctx);
     }
 
     @Override
     public void onDestroyed(@NonNull BeanDestroyedEvent<Context> event) {
-        ContextHolder.onNoActiveExecutionsAfterCurrentFrame(event.getBean(), () -> closePool(true));
+        PythonContextRuntime.onNoActiveExecutionsAfterCurrentFrame(event.getBean(), () -> closePool(true));
     }
 
     @Override
     public CompletionStage<?> shutdownGracefully() {
         if (gracefulShutdownStarted.compareAndSet(false, true)) {
             stopWarmup();
-            ContextHolder.onNoActiveExecutions(snapshotIncludingPrimary(), () -> gracefulShutdown.complete(null));
+            PythonContextRuntime.onNoActiveExecutions(snapshotIncludingPrimary(), () -> gracefulShutdown.complete(null));
         }
         return gracefulShutdown;
     }

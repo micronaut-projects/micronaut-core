@@ -375,11 +375,11 @@ public final class GraalPyRuntimeUtil {
     }
 
     private static Value memberSetter(Context context) {
-        return ContextHolder.helper(context, PUT_MEMBER, PUT_MEMBER_SOURCE);
+        return PythonContextRuntime.helper(context, PUT_MEMBER, PUT_MEMBER_SOURCE);
     }
 
     private static Value asyncMemberFactory(Context context) {
-        return ContextHolder.helper(context, ASYNC_MEMBER_VALUE, ASYNC_MEMBER_VALUE_SOURCE);
+        return PythonContextRuntime.helper(context, ASYNC_MEMBER_VALUE, ASYNC_MEMBER_VALUE_SOURCE);
     }
 
     /**
@@ -531,7 +531,7 @@ public final class GraalPyRuntimeUtil {
     }
 
     private static List<String> transferableMemberNames(Value source) {
-        Value names = ContextHolder.helper(source.getContext(), TRANSFERABLE_MEMBER_NAMES, TRANSFERABLE_MEMBER_NAMES_SOURCE);
+        Value names = PythonContextRuntime.helper(source.getContext(), TRANSFERABLE_MEMBER_NAMES, TRANSFERABLE_MEMBER_NAMES_SOURCE);
         Value result = names.execute(source);
         List<String> keys = new ArrayList<>();
         if (result.hasArrayElements()) {
@@ -571,15 +571,15 @@ public final class GraalPyRuntimeUtil {
      */
     public static Value invokePythonMethod(Value receiver, String name, Object[] arguments) {
         Context context = receiver.getContext();
-        ContextHolder.enterExecutionFrame(context);
+        PythonContextRuntime.enterExecutionFrame(context);
         try {
             Value member = receiver.getMember(name);
             if (member == null) {
                 throw new IllegalArgumentException("No Python member [" + name + "] found");
             }
-            return ContextHolder.helper(context, INVOKE_METHOD, INVOKE_METHOD_SOURCE).execute(receiver, name, arguments);
+            return PythonContextRuntime.helper(context, INVOKE_METHOD, INVOKE_METHOD_SOURCE).execute(receiver, name, arguments);
         } finally {
-            ContextHolder.exitExecutionFrame(context);
+            PythonContextRuntime.exitExecutionFrame(context);
         }
     }
 
@@ -620,7 +620,7 @@ public final class GraalPyRuntimeUtil {
     }
 
     private static Value getRawClassMemberFunction(Context context) {
-        return ContextHolder.helper(context, RAW_CLASS_MEMBER, RAW_CLASS_MEMBER_SOURCE);
+        return PythonContextRuntime.helper(context, RAW_CLASS_MEMBER, RAW_CLASS_MEMBER_SOURCE);
     }
 
     /**

@@ -45,7 +45,7 @@ import java.util.Map;
 import java.util.concurrent.CompletionStage;
 
 import static io.micronaut.python.processing.PythonStubGenerator.AS_POLYGLOT_VALUE;
-import static io.micronaut.python.processing.PythonStubGenerator.CONTEXT_HOLDER;
+import static io.micronaut.python.processing.PythonStubGenerator.PYTHON_CONTEXT_RUNTIME;
 import static io.micronaut.python.processing.PythonStubGenerator.FROM_POLYGLOT_VALUE;
 import static io.micronaut.python.processing.PythonStubGenerator.POLYGLOT_VALUE;
 import static io.micronaut.python.processing.PythonStubGenerator.PYTHON_ASYNCIO_RUNTIME;
@@ -86,7 +86,7 @@ final class PythonPooledStubGenerator {
         builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
             .addModifiers(Modifier.PUBLIC)
             .returns(POLYGLOT_VALUE)
-            .build(((aThis, params) -> CONTEXT_HOLDER
+            .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
                 .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(
                     ExpressionDef.constant(element.getPackageName()),
                     ExpressionDef.constant(element.getSimpleName())
@@ -96,7 +96,7 @@ final class PythonPooledStubGenerator {
             .addModifiers(Modifier.PUBLIC)
             .addParameter(POLYGLOT_CONTEXT)
             .returns(POLYGLOT_VALUE)
-            .build(((aThis, params) -> CONTEXT_HOLDER
+            .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
                 .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(
                     ExpressionDef.constant(element.getPackageName()),
                     ExpressionDef.constant(element.getSimpleName()),
@@ -152,7 +152,7 @@ final class PythonPooledStubGenerator {
         builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
             .addModifiers(Modifier.PUBLIC)
             .returns(POLYGLOT_VALUE)
-            .build(((aThis, params) -> CONTEXT_HOLDER
+            .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
                 .invokeStatic("findPooledScript", POLYGLOT_VALUE,
                     List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script)))
                 .returning())));
@@ -161,7 +161,7 @@ final class PythonPooledStubGenerator {
             .addModifiers(Modifier.PUBLIC)
             .addParameter(POLYGLOT_CONTEXT)
             .returns(POLYGLOT_VALUE)
-            .build(((aThis, params) -> CONTEXT_HOLDER
+            .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
                 .invokeStatic("findPooledScript", POLYGLOT_VALUE,
                     List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script), params.getFirst()))
                 .returning())));
@@ -227,7 +227,7 @@ final class PythonPooledStubGenerator {
             args.add(ExpressionDef.constant(element.getSimpleName()));
             args.add(ExpressionDef.constant(pythonFunctionName));
             args.addAll(parameterExpressions);
-            var invoked = CONTEXT_HOLDER.invokeStatic("invokePooled", POLYGLOT_VALUE, args);
+            var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooled", POLYGLOT_VALUE, args);
             return bridgeReturnValue(allClasses, methodElement, invoked);
         })));
 
@@ -260,7 +260,7 @@ final class PythonPooledStubGenerator {
             args.add(ExpressionDef.constant(script));
             args.add(ExpressionDef.constant(pythonFunctionName));
             args.addAll(parameterExpressions);
-            var invoked = CONTEXT_HOLDER.invokeStatic("invokePooledScript", POLYGLOT_VALUE, args);
+            var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledScript", POLYGLOT_VALUE, args);
             return bridgeReturnValue(allClasses, methodElement, invoked);
         })));
 
@@ -297,7 +297,7 @@ final class PythonPooledStubGenerator {
             .returns(propertyType);
 
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> {
-            var invoked = CONTEXT_HOLDER.invokeStatic("invokePooledScript", POLYGLOT_VALUE,
+            var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledScript", POLYGLOT_VALUE,
                 List.of(ExpressionDef.constant(pkg), ExpressionDef.constant(script), ExpressionDef.constant(beanProperty.getName())));
             return handleReturnType(allClasses, beanProperty.getGenericType(), invoked).returning();
         })));
@@ -323,7 +323,7 @@ final class PythonPooledStubGenerator {
             parameters.add(ExpressionDef.constant(script));
             parameters.add(ExpressionDef.constant(beanProperty.getName()));
             coerceParameterToPolyglotValue(beanProperty, parameters, methodParameters.getFirst());
-            var result = CONTEXT_HOLDER.invokeStatic(adaptAsyncMembers ? "injectPooledScriptAsync" : "injectPooledScript", TypeDef.VOID, parameters);
+            var result = PYTHON_CONTEXT_RUNTIME.invokeStatic(adaptAsyncMembers ? "injectPooledScriptAsync" : "injectPooledScript", TypeDef.VOID, parameters);
             if (returnType.equals(TypeDef.VOID)) {
                 return result;
             } else {

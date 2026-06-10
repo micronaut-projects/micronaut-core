@@ -54,7 +54,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 /**
  * Factory bean that creates and initializes the GraalPy context.
  * Loads the generated Python application script and makes the context
- * available via ContextHolder for bridge classes to use.
+ * available via PythonContextRuntime for bridge classes to use.
  *
  * @author Micronaut Team
  * @since 5.0.0
@@ -92,10 +92,10 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     public org.graalvm.polyglot.Context graalPyContext(
         @Named(PYTHON) HostAccess hostAccess,
         @Named(PYTHON) Engine engine) {
-        if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
+        if (PythonContextRuntime.isInitialized() && PythonContextRuntime.isReuseContext()) {
             providedContext = true;
             // Reuse context: this is an optimization for reloading
-            return ContextHolder.getContext();
+            return PythonContextRuntime.getContext();
         }
 
         try {
@@ -103,7 +103,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             var context = buildContext(hostAccess, engine, classLoader);
 
             // Make context available to bridge classes
-            ContextHolder.setContext(context, classLoader);
+            PythonContextRuntime.setContext(context, classLoader);
 
             return context;
 
@@ -134,12 +134,12 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     public static @NonNull Context bootstrapReusableContext(@NonNull ClassLoader classLoader,
                                                             @NonNull Map<String, String> options,
                                                             @NonNull String applicationMain) throws IOException {
-        if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
-            return ContextHolder.getContext();
+        if (PythonContextRuntime.isInitialized() && PythonContextRuntime.isReuseContext()) {
+            return PythonContextRuntime.getContext();
         }
         var context = buildContext(bootstrapHostAccess(classLoader), GraalPyEngineFactory.buildPythonEngine(), classLoader, options, applicationMain);
-        ContextHolder.setReuseContext(true);
-        ContextHolder.setContext(context, classLoader);
+        PythonContextRuntime.setReuseContext(true);
+        PythonContextRuntime.setContext(context, classLoader);
         return context;
     }
 
@@ -190,7 +190,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         options.forEach(builder::option);
 
         var context = builder.build();
-        ContextHolder.registerContextEngine(context, engine);
+        PythonContextRuntime.registerContextEngine(context, engine);
         context.initialize(PYTHON);
         // set a per-context unique id for tests and tracing via builtins
         String id = java.util.UUID.randomUUID().toString();
@@ -226,23 +226,23 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
     /**
      * Cleanup method called during application shutdown.
-     * Resets the context in ContextHolder to prevent memory leaks.
+     * Resets the context in PythonContextRuntime to prevent memory leaks.
      */
     @Override
     public void onDestroyed(@NonNull BeanDestroyedEvent<Context> event) {
-        if (!ContextHolder.isReuseContext()) {
+        if (!PythonContextRuntime.isReuseContext()) {
             var ctx = event.getBean();
             if (ctx != null) {
-                ContextHolder.onNoActiveExecutionsAfterCurrentFrame(ctx, () -> {
+                PythonContextRuntime.onNoActiveExecutionsAfterCurrentFrame(ctx, () -> {
                     closeContext(ctx, true);
-                    if (!providedContext && ContextHolder.isCurrentContext(ctx)) {
-                        ContextHolder.resetContext();
+                    if (!providedContext && PythonContextRuntime.isCurrentContext(ctx)) {
+                        PythonContextRuntime.resetContext();
                     }
                 });
                 return;
             }
-            if (!providedContext && ContextHolder.isCurrentContext(ctx)) {
-                ContextHolder.resetContext();
+            if (!providedContext && PythonContextRuntime.isCurrentContext(ctx)) {
+                PythonContextRuntime.resetContext();
             }
         }
     }
@@ -266,28 +266,28 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             throw e;
         } finally {
             if (closed) {
-                ContextHolder.unregisterContextEngine(ctx);
+                PythonContextRuntime.unregisterContextEngine(ctx);
             }
         }
     }
 
     @Override
     public CompletionStage<?> shutdownGracefully() {
-        Context ctx = ContextHolder.isInitialized() ? ContextHolder.getContext() : null;
-        if (ctx == null || ContextHolder.isReuseContext()) {
+        Context ctx = PythonContextRuntime.isInitialized() ? PythonContextRuntime.getContext() : null;
+        if (ctx == null || PythonContextRuntime.isReuseContext()) {
             gracefulShutdown.complete(null);
             return gracefulShutdown;
         }
         if (gracefulShutdown.isDone()) {
             return gracefulShutdown;
         }
-        ContextHolder.onNoActiveExecutions(ctx, () -> gracefulShutdown.complete(null));
+        PythonContextRuntime.onNoActiveExecutions(ctx, () -> gracefulShutdown.complete(null));
         return gracefulShutdown;
     }
 
     @Override
     public OptionalLong reportActiveTasks() {
-        return OptionalLong.of(ContextHolder.activeExecutions());
+        return OptionalLong.of(PythonContextRuntime.activeExecutions());
     }
 
     @Override

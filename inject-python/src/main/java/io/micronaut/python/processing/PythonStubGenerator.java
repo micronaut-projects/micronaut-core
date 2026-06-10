@@ -112,7 +112,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
     public static final ClassTypeDef RUNTIME_UTIL = ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil");
     public static final ClassTypeDef PYTHON_ASYNCIO_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonAsyncioRuntime");
-    public static final ClassTypeDef CONTEXT_HOLDER = ClassTypeDef.of("io.micronaut.context.python.ContextHolder");
+    public static final ClassTypeDef PYTHON_CONTEXT_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime");
     public static final ClassTypeDef POLYGLOT_VALUE_CONVERTER = ClassTypeDef.of("io.micronaut.context.python.PolyglotValueConverter");
     public static final String GENERATOR_NAME = "python";
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
@@ -506,7 +506,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     }
                                     if (beanProperties.isEmpty() && pythonValueFinal != null) {
                                         ExpressionDef storedValue = aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field"));
-                                        ExpressionDef newValue = CONTEXT_HOLDER.invokeStatic(
+                                        ExpressionDef newValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                                             isAbstractIntro ? "newIntroduction" : "newInstance",
                                             POLYGLOT_VALUE,
                                             List.of(
@@ -539,7 +539,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 arguments.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT));
                                             }
                                         }
-                                        reconstructedValue = CONTEXT_HOLDER.invokeStatic(
+                                        reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                                             "newIntroduction",
                                             POLYGLOT_VALUE,
                                             arguments
@@ -557,7 +557,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         }
                                         ExpressionDef propsMap = ClassTypeDef.of(AnnotationUtil.class)
                                             .invokeStatic("mapOf", TypeDef.of(Map.class), mapEntries);
-                                        reconstructedValue = CONTEXT_HOLDER.invokeStatic(
+                                        reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                                             "newFrozenDataclassInstance",
                                             POLYGLOT_VALUE,
                                             List.of(
@@ -567,7 +567,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             )
                                         );
                                     } else {
-                                        reconstructedValue = CONTEXT_HOLDER.invokeStatic(
+                                        reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                                             "newUninitializedInstance",
                                             POLYGLOT_VALUE,
                                             List.of(
@@ -628,7 +628,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> {
                                 if (isJunit5Test) {
                                     ExpressionDef storedValue = aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field"));
-                                    ExpressionDef newValue = CONTEXT_HOLDER.invokeStatic(
+                                    ExpressionDef newValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                                         "newInstance",
                                         POLYGLOT_VALUE,
                                         List.of(
@@ -712,7 +712,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
                                         }
                                         assignments.add(aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(
-                                            CONTEXT_HOLDER.invokeStatic(
+                                            PYTHON_CONTEXT_RUNTIME.invokeStatic(
                                                 isAbstractIntroCtor ? "newIntroduction" : "newInstance",
                                                 POLYGLOT_VALUE,
                                                 arguments
@@ -753,7 +753,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         int lastArgIndex = arguments.size() - 1;
                                         arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
                                     }
-                                    ExpressionDef pythonInstance = CONTEXT_HOLDER.invokeStatic(
+                                    ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                                         constructorFactoryMethod(isAbstractIntroCtor, hasDefaultedConstructorParameters),
                                         POLYGLOT_VALUE,
                                         arguments
@@ -791,7 +791,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             if (isJunit5Test || isIntrospectedBean) {
                                 return StatementDef.multi();
                             } else {
-                                ExpressionDef pythonInstance = CONTEXT_HOLDER
+                                ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME
                                     .invokeStatic(isAbstractIntroNoArg ? "newIntroduction" : "newInstance", POLYGLOT_VALUE,
                                         List.of(
                                             ExpressionDef.constant(element.getPackageName()),
@@ -2316,7 +2316,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     if (name.endsWith(".py")) {
                         name = name.substring(0, name.length() - 3);
                     }
-                    ExpressionDef pythonInstance = CONTEXT_HOLDER
+                    ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME
                         .invokeStatic("findScript", POLYGLOT_VALUE,
                             List.of(
                                 ExpressionDef.constant(scriptElement.getPackageName()),
@@ -2664,7 +2664,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
             .returns(POLYGLOT_VALUE)
-            .build((aThis, parameters) -> CONTEXT_HOLDER.invokeStatic(
+            .build((aThis, parameters) -> PYTHON_CONTEXT_RUNTIME.invokeStatic(
                 "enumValue",
                 POLYGLOT_VALUE,
                 ExpressionDef.constant(classElement.getPackageName()),
@@ -2740,7 +2740,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             ExpressionDef enumValue = RUNTIME_UTIL.invokeStatic(
                 "enumStringValue",
                 TypeDef.STRING,
-                CONTEXT_HOLDER.invokeStatic(
+                PYTHON_CONTEXT_RUNTIME.invokeStatic(
                     "enumValue",
                     POLYGLOT_VALUE,
                     ExpressionDef.constant(classElement.getPackageName()),
@@ -2901,7 +2901,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     arguments.add(ExpressionDef.constant(pythonSimpleName(declaringType)));
                     arguments.add(ExpressionDef.constant(pythonFunctionName));
                     arguments.addAll(methodParameters);
-                    invokedValue = CONTEXT_HOLDER.invokeStatic(
+                    invokedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                         "invokeStaticMethod",
                         POLYGLOT_VALUE,
                         arguments
@@ -2910,7 +2910,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     ExpressionDef targetValueExpression = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
                     ClassElement declaringType = methodElement.getDeclaringType();
                     if (isAsyncPythonMethod(methodElement) && !declaringType.isAbstract()) {
-                        targetValueExpression = CONTEXT_HOLDER.invokeStatic(
+                        targetValueExpression = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                             "asyncInstance",
                             POLYGLOT_VALUE,
                             targetValueExpression,
@@ -3522,7 +3522,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         methodParameters.getFirst().cast(TypeDef.OBJECT)
                     )
                 ),
-                (StatementDef) CONTEXT_HOLDER.invokeStatic(
+                (StatementDef) PYTHON_CONTEXT_RUNTIME.invokeStatic(
                     "rememberAsyncMember",
                     TypeDef.VOID,
                     targetValue,
@@ -3568,7 +3568,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         methodParameters.getFirst().cast(TypeDef.OBJECT)
                     )
                 ),
-                (StatementDef) CONTEXT_HOLDER.invokeStatic(
+                (StatementDef) PYTHON_CONTEXT_RUNTIME.invokeStatic(
                     "rememberAsyncMember",
                     TypeDef.VOID,
                     targetValue,
@@ -3832,7 +3832,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         builder.addMethod(factoryMethodBuilder
             .build(((aThis, methodParameters) -> {
-                // Call the Python static method via CONTEXT_HOLDER
+                // Call the Python static method via PYTHON_CONTEXT_RUNTIME
                 List<ExpressionDef> arguments = new ArrayList<>();
                 arguments.add(ExpressionDef.constant(element.getPackageName()));
                 arguments.add(ExpressionDef.constant(pythonSimpleName(element)));
@@ -3844,7 +3844,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 }
 
                 // Call invokeStaticMethod and convert the result
-                ExpressionDef pythonResult = CONTEXT_HOLDER.invokeStatic(
+                ExpressionDef pythonResult = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                     "invokeStaticMethod",
                     POLYGLOT_VALUE,
                     arguments

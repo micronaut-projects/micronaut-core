@@ -341,9 +341,9 @@ class MultipleTestSpec:
         generated.exists()
         def javaCode = generated.text
         javaCode.contains('MultipleTestSpec() {\n  }')
-        javaCode.contains('this.graalpyInternalValue = ContextHolder.newInstance("python", "MultipleTestSpec");')
+        javaCode.contains('this.graalpyInternalValue = PythonContextRuntime.newInstance("python", "MultipleTestSpec");')
         javaCode.contains('return this.graalpyInternalValue;')
-        !javaCode.contains('MultipleTestSpec() {\n    this.graalpyInternalValue = ContextHolder.newInstance')
+        !javaCode.contains('MultipleTestSpec() {\n    this.graalpyInternalValue = PythonContextRuntime.newInstance')
 
         cleanup:
         tempDir.deleteDir()

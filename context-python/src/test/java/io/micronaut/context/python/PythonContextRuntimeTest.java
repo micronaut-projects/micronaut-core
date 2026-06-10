@@ -28,7 +28,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-final class ContextHolderTest {
+final class PythonContextRuntimeTest {
 
     @TempDir
     Path temporaryDirectory;
@@ -50,8 +50,8 @@ final class ContextHolderTest {
             context.getBindings(PYTHON).putMember("root", temporaryDirectory.toString());
             context.eval(PYTHON, "import sys\nsys.path.insert(0, root)");
 
-            Value sample = ContextHolder.findClass("keywordpkg.async", "Sample", context);
-            Value script = ContextHolder.findScript("keywordpkg.async", "script", context);
+            Value sample = PythonContextRuntime.findClass("keywordpkg.async", "Sample", context);
+            Value script = PythonContextRuntime.findScript("keywordpkg.async", "script", context);
 
             assertEquals("class", sample.getMember("value").asString());
             assertEquals("script", script.getMember("value").asString());
@@ -76,7 +76,7 @@ final class ContextHolderTest {
             context.getBindings(PYTHON).putMember("root", temporaryDirectory.toString());
             context.eval(PYTHON, "import sys\nsys.path.insert(0, root)");
 
-            Value testWeatherApi = ContextHolder.findClass("example.micronaut", "TestWeatherApi", context);
+            Value testWeatherApi = PythonContextRuntime.findClass("example.micronaut", "TestWeatherApi", context);
 
             assertTrue(testWeatherApi.canInstantiate());
             assertEquals("fixture", testWeatherApi.getMember("value").asString());
@@ -100,7 +100,7 @@ final class ContextHolderTest {
             context.getBindings(PYTHON).putMember("root", temporaryDirectory.toString());
             context.eval(PYTHON, "import sys\nsys.path.insert(0, root)");
 
-            Value forecastService = ContextHolder.findClass("example.micronaut", "ForecastService", context);
+            Value forecastService = PythonContextRuntime.findClass("example.micronaut", "ForecastService", context);
 
             assertTrue(forecastService.canInstantiate());
             assertEquals("forecast", forecastService.getMember("value").asString());
@@ -109,7 +109,7 @@ final class ContextHolderTest {
 
     @Test
     void usesContextClassLoaderWhenInstantiatingPythonFromRuntimeThreads() {
-        ClassLoader hostClassLoader = ContextHolderTest.class.getClassLoader();
+        ClassLoader hostClassLoader = PythonContextRuntimeTest.class.getClassLoader();
         ClassLoader previousClassLoader = Thread.currentThread().getContextClassLoader();
         try (Context context = Context.newBuilder(PYTHON)
             .allowAllAccess(true)
@@ -120,18 +120,18 @@ final class ContextHolderTest {
                 class NeedsHost:
                     def __init__(self):
                         import java
-                        self.loaded = java.type("io.micronaut.context.python.ContextHolder") is not None
+                        self.loaded = java.type("io.micronaut.context.python.PythonContextRuntime") is not None
                 """);
-            ContextHolder.setContext(context, hostClassLoader);
+            PythonContextRuntime.setContext(context, hostClassLoader);
 
             Thread.currentThread().setContextClassLoader(new ClassLoader(null) {
             });
-            Value value = ContextHolder.newInstance("NeedsHost");
+            Value value = PythonContextRuntime.newInstance("NeedsHost");
 
             assertTrue(value.getMember("loaded").asBoolean());
         } finally {
             Thread.currentThread().setContextClassLoader(previousClassLoader);
-            ContextHolder.resetContext();
+            PythonContextRuntime.resetContext();
         }
     }
 }

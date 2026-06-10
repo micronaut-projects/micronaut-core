@@ -96,8 +96,8 @@ public final class PythonAsyncioRuntime {
             return future;
         }
         Context context = value.getContext();
-        ContextHolder.enterExecution(context);
-        future.whenComplete((ignored, ignoredThrowable) -> ContextHolder.exitExecution(context));
+        PythonContextRuntime.enterExecution(context);
+        future.whenComplete((ignored, ignoredThrowable) -> PythonContextRuntime.exitExecution(context));
         PythonEventLoop eventLoop = currentEventLoop(runtimeState);
         Runnable scheduler = () -> schedule(context, value, future, eventLoop);
         if (eventLoop != null) {
@@ -130,7 +130,7 @@ public final class PythonAsyncioRuntime {
         }
         Value future;
         PythonEventLoop eventLoop = currentEventLoop(runtimeState);
-        future = ContextHolder.withContextLock(context, () -> {
+        future = PythonContextRuntime.withContextLock(context, () -> {
             scheduler(context);
             return awaitableFactory(context).execute(eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER, stage.toCompletableFuture());
         });
@@ -190,7 +190,7 @@ public final class PythonAsyncioRuntime {
 
     private static void schedule(Context context, Value value, PythonCompletableFuture future, @Nullable PythonEventLoop eventLoop) {
         try {
-            ContextHolder.withContextLock(context, () -> {
+            PythonContextRuntime.withContextLock(context, () -> {
                 Value scheduler = scheduler(context);
                 scheduler.executeVoid(value, future, EXCEPTION_COMPLETER, eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER);
             });
@@ -245,7 +245,7 @@ public final class PythonAsyncioRuntime {
                     source = created;
                 }
             }
-            Value module = ContextHolder.helper(context, ASYNCIO_FALLBACK_LOADER_NAME, ASYNCIO_FALLBACK_LOADER_SOURCE).execute(source);
+            Value module = PythonContextRuntime.helper(context, ASYNCIO_FALLBACK_LOADER_NAME, ASYNCIO_FALLBACK_LOADER_SOURCE).execute(source);
             bindings.putMember(ASYNCIO_MODULE_BINDING, module);
         } catch (IOException e) {
             throw new IllegalStateException("Cannot load Micronaut asyncio Python runtime resource: " + ASYNCIO_MODULE_SOURCE, e);
@@ -253,7 +253,7 @@ public final class PythonAsyncioRuntime {
     }
 
     private static void completeAwaitable(Context context, Value future, @Nullable Object result, @Nullable Throwable throwable) {
-        ContextHolder.withContextLock(context, () -> {
+        PythonContextRuntime.withContextLock(context, () -> {
             awaitableCompleter(context).executeVoid(future, result, throwable);
         });
     }
@@ -305,7 +305,7 @@ public final class PythonAsyncioRuntime {
                     @Nullable Object result = null;
                     @Nullable Throwable failure = null;
                     try {
-                        result = ContextHolder.withContextLock(context, () -> executorResult(callback.execute()));
+                        result = PythonContextRuntime.withContextLock(context, () -> executorResult(callback.execute()));
                     } catch (Throwable e) {
                         failure = e;
                     }
