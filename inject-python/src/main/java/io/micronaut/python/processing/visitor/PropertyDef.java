@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.List;
 import java.util.Objects;
 
@@ -33,6 +34,7 @@ import java.util.Objects;
  * @param declaringClass The class that declares this property.
  * @see <a href="https://docs.python.org/3/library/functions.html#property">Python Property</a>
  */
+@Experimental
 public record PropertyDef(
     String name,
     FunctionDef getter,

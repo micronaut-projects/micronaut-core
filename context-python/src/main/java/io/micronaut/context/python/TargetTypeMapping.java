@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Experimental;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.NonNull;
 
@@ -26,6 +27,7 @@ import org.jspecify.annotations.NonNull;
  * @param <T> The target type
  * @since 5.0.0
  */
+@Experimental
 public interface TargetTypeMapping<T> {
     /**
      * @return The exact target class this mapping supports

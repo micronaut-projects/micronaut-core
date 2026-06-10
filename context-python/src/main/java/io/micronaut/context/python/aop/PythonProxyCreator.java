@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python.aop;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.AroundConstruct;
 import io.micronaut.aop.Interceptor;
@@ -23,8 +24,9 @@ import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.aop.runtime.RuntimeProxyCreator;
 import io.micronaut.aop.runtime.RuntimeProxyDefinition;
-import io.micronaut.context.python.ContextHolder;
+import io.micronaut.context.python.PythonContextRuntime;
 import io.micronaut.context.python.GraalPyRuntimeUtil;
+import io.micronaut.context.python.PythonAsyncioRuntime;
 import io.micronaut.context.python.TargetTypeMapping;
 import io.micronaut.context.python.ValueCoercible;
 import io.micronaut.core.async.publisher.Publishers;
@@ -70,6 +72,8 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 @Internal
 @Singleton
 @NullMarked
+@SuppressWarnings({"checkstyle:InnerTypeLast", "checkstyle:MissingJavadocType"})
+@Experimental
 public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private static final String SCOPED_PROXY_FACTORY = "__micronaut_create_scoped_proxy";
@@ -97,7 +101,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private <T> T createIntroductionProxy(RuntimeProxyDefinition<T> proxyDefinition) {
         Class<?> pythonBeanType = resolvePythonBeanType(proxyDefinition);
-        Value value = ContextHolder.findClass(pythonBeanType.getPackageName(), pythonBeanType.getSimpleName());
+        Value value = PythonContextRuntime.findClass(pythonBeanType.getPackageName(), pythonBeanType.getSimpleName());
         AtomicReference<Object> targetBeanRef = new AtomicReference<>();
         Map<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> interceptedMethodsByName = new LinkedHashMap<>();
         for (RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod : proxyDefinition.interceptedMethods()) {
@@ -231,7 +235,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private <T> T createProxyTargetProxy(RuntimeProxyDefinition<T> proxyDefinition) {
         Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
-        Value pythonClass = ContextHolder.findClass(type.getPackageName(), type.getSimpleName());
+        Value pythonClass = PythonContextRuntime.findClass(type.getPackageName(), type.getSimpleName());
         Value proxyValue = createScopedProxyValue(pythonClass, () -> asValue(proxyDefinition.targetBean()));
         if (hasAroundConstructAdvice(proxyDefinition)) {
             // Python proxy-target AOP normally instantiates the target lazily through the scoped proxy.
@@ -389,7 +393,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 };
             }
             Object result = new MethodInterceptorChain(finalInterceptors, tb, executableMethod, javaArgs).proceed();
-            return unbox(result);
+            return unbox(owner.getContext(), result);
         };
     }
 
@@ -415,7 +419,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 return null;
             };
             Object result = new MethodInterceptorChain(finalInterceptors, targetBean, executableMethod, javaArgs).proceed();
-            return unbox(result);
+            return unbox(asValue(targetBean).getContext(), result);
         };
     }
 
@@ -576,7 +580,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     }
 
     @Nullable
-    private Object unbox(@Nullable Object result) {
+    private Object unbox(Context context, @Nullable Object result) {
         return switch (result) {
             case null -> null;
             case Value value -> value;
@@ -584,42 +588,42 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             case List<?> list -> {
                 List<Object> newList = new ArrayList<>(list.size());
                 for (Object o : list) {
-                    newList.add(unbox(o));
+                    newList.add(unbox(context, o));
                 }
                 yield newList;
             }
             case Set<?> set -> {
                 Set<Object> newSet = new LinkedHashSet<>(set.size());
                 for (Object o : set) {
-                    newSet.add(unbox(o));
+                    newSet.add(unbox(context, o));
                 }
                 yield newSet;
             }
             case Map<?, ?> map -> {
                 Map<Object, Object> newMap = new java.util.HashMap<>(map.size());
                 for (Map.Entry<?, ?> entry : map.entrySet()) {
-                    newMap.put(unbox(entry.getKey()), unbox(entry.getValue()));
+                    newMap.put(unbox(context, entry.getKey()), unbox(context, entry.getValue()));
                 }
                 yield newMap;
             }
             case Object[] array -> {
                 Object[] newArray = new Object[array.length];
                 for (int i = 0; i < array.length; i++) {
-                    newArray[i] = unbox(array[i]);
+                    newArray[i] = unbox(context, array[i]);
                 }
                 yield newArray;
             }
             case Collection<?> collection -> {
                 List<Object> newList = new ArrayList<>(collection.size());
                 for (Object o : collection) {
-                    newList.add(unbox(o));
+                    newList.add(unbox(context, o));
                 }
                 yield newList;
             }
-            case Stream<?> stream -> stream.map(this::unbox);
-            case Optional<?> optional -> optional.map(this::unbox);
-            case CompletionStage<?> completionStage -> completionStage.thenApply(this::unbox);
-            case Publisher<?> publisher -> Publishers.map(publisher, this::unbox);
+            case Stream<?> stream -> stream.map(value -> unbox(context, value));
+            case Optional<?> optional -> optional.map(value -> unbox(context, value));
+            case CompletionStage<?> completionStage -> completionStage;
+            case Publisher<?> publisher -> Publishers.map(publisher, value -> unbox(context, value));
             default -> result;
         };
     }
@@ -639,6 +643,9 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         }
         if (type.isPrimitive()) {
             return value.as(type);
+        }
+        if (CompletionStage.class.isAssignableFrom(type)) {
+            return type.cast(PythonAsyncioRuntime.toCompletionStage(value));
         }
         Object hostObject = GraalPyRuntimeUtil.unwrapHostObject(value, type);
         if (hostObject != null) {

@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.List;
 import java.util.Objects;
 
@@ -27,6 +28,7 @@ import java.util.Objects;
  * @param typeUseDecorators The decorators applied through typing.Annotated when this type is used.
  * @see ClassDef
  */
+@Experimental
 public record TypeRef(
     String name,
     List<TypeRef> typeArguments,

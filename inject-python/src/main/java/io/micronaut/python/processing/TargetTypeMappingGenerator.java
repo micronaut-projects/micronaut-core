@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.visitor.TypeElementQuery;
@@ -39,6 +40,7 @@ import java.util.Map;
  * Generates a simple TargetTypeMapping bean for each Python stub that delegates
  * to the statically generated fromPolyglotValue(Value) method.
  */
+@Experimental
 public final class TargetTypeMappingGenerator implements TypeElementVisitor<Object, Object> {
 
     private static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";

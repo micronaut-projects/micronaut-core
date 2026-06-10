@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.graal.Boxed;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -26,23 +27,56 @@ import org.jspecify.annotations.Nullable;
 import java.beans.Transient;
 
 /**
- * A type that is coercible to a Truffle Value.
+ * Generated Java wrapper for a Python object that can expose its underlying polyglot value.
+ * <p>
+ * Micronaut Python bridge classes implement this interface so Java code can keep a strongly typed
+ * wrapper while GraalPy can still interact with the original Python object through
+ * {@link ProxyObject}. The interface also defines Micronaut-specific proxy members used to recover
+ * the generated host wrapper and to bridge generated JavaBean-style accessors back to Python
+ * attributes.
  */
+@SuppressWarnings({"checkstyle:InnerTypeLast", "checkstyle:MissingJavadocType"})
+@Experimental
 public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     String HOST_OBJECT_MEMBER = "__micronaut_value_coercible_host__";
     String AS_POLYGLOT_VALUE_MEMBER = "asPolyglotValue";
 
     /**
-     * Converts the type to a Truffle value.
-     * @return The value
+     * Returns the wrapped Python value.
+     * <p>
+     * The returned value belongs to the runtime context that created this wrapper, except for
+     * pooled wrappers where {@link PooledValueCoercible#asPolyglotValue(org.graalvm.polyglot.Context)}
+     * can resolve an equivalent value for a specific event-loop context.
+     *
+     * @return The wrapped Python polyglot value.
      */
     @NonNull Value asPolyglotValue();
 
+    /**
+     * Unboxes this wrapper for Micronaut conversion infrastructure.
+     *
+     * @return The wrapped Python polyglot value.
+     */
     @Override
     default Value $unbox() {
         return asPolyglotValue();
     }
 
+    /**
+     * Exposes the wrapped Python value as a polyglot proxy member.
+     * <p>
+     * Generated Python bridge classes implement {@link ProxyObject} through this interface so
+     * GraalPy can read members from the underlying Python object. Two Micronaut-specific members
+     * are handled before delegating to Python:
+     * {@link #HOST_OBJECT_MEMBER} exposes a private host reference used to recover the generated
+     * Java wrapper, and {@link #AS_POLYGLOT_VALUE_MEMBER} exposes a zero-argument callable that
+     * returns the wrapped {@link Value}. JavaBean-style generated accessor aliases are resolved
+     * after direct Python members.
+     *
+     * @param key The requested member name.
+     * @return The member value, a generated accessor callable, or {@code null} when the Python
+     * member is {@code None} or no member is available.
+     */
     @Override
     default @Nullable Object getMember(String key) {
         if (HOST_OBJECT_MEMBER.equals(key)) {
@@ -71,6 +105,15 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         return generatedSetter(key);
     }
 
+    /**
+     * Returns member keys exposed by the wrapped Python object.
+     * <p>
+     * Micronaut-specific synthetic members are intentionally omitted from the returned key set so
+     * Python-side enumeration reflects the user object's members.
+     *
+     * @return The wrapped Python member names as a {@code String[]}, or an empty array when the
+     * wrapped value has no members.
+     */
     @Override
     @Transient
     default Object getMemberKeys() {
@@ -81,6 +124,16 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         return new String[0];
     }
 
+    /**
+     * Tests whether a member is available through this proxy.
+     * <p>
+     * The check includes Micronaut's synthetic bridge members, direct members of the wrapped
+     * Python object, and generated JavaBean accessor aliases for bridge classes that implement
+     * {@link GeneratedPropertyMembers}.
+     *
+     * @param key The member name to test.
+     * @return {@code true} when the member can be resolved.
+     */
     @Override
     default boolean hasMember(String key) {
         return HOST_OBJECT_MEMBER.equals(key) ||
@@ -89,6 +142,71 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             (this instanceof GeneratedPropertyMembers generatedMembers &&
                 (generatedMembers.micronautValueCoercibleGetterPropertyName(key) != null ||
                     generatedMembers.micronautValueCoercibleSetterPropertyName(key) != null));
+    }
+
+    /**
+     * Build-time generated JavaBean accessor aliases for Python wrappers.
+     * <p>
+     * Only generated classes that need property aliases implement this contract. That keeps
+     * the generic {@link ValueCoercible} path free of Java method/field reflection while still
+     * preserving Python-side calls such as {@code getName()} for generated bean wrappers.
+     */
+    interface GeneratedPropertyMembers {
+        /**
+         * Resolves a generated JavaBean getter method name to the Python property it should read.
+         * <p>
+         * Generated wrappers use this for aliases such as {@code getName()} when the underlying
+         * Python object only has a {@code name} attribute.
+         *
+         * @param key The requested proxy member name.
+         * @return The Python property name, or {@code null} when the member is not a generated
+         * getter alias.
+         */
+        @Transient
+        @Nullable String micronautValueCoercibleGetterPropertyName(String key);
+
+        /**
+         * Resolves a generated JavaBean setter method name to the Python property it should write.
+         * <p>
+         * Generated wrappers use this for aliases such as {@code setName(value)} when the
+         * underlying Python object only has a {@code name} attribute.
+         *
+         * @param key The requested proxy member name.
+         * @return The Python property name, or {@code null} when the member is not a generated
+         * setter alias.
+         */
+        @Transient
+        @Nullable String micronautValueCoercibleSetterPropertyName(String key);
+
+        /**
+         * Gives generated wrappers a chance to handle an incoming member assignment directly.
+         * <p>
+         * Returning {@code true} means the assignment has been fully handled and the generic
+         * {@link ValueCoercible#putMember(String, Value)} path must not write the member again.
+         *
+         * @param key The member being assigned.
+         * @param value The incoming polyglot value.
+         * @return {@code true} when the generated wrapper consumed the assignment.
+         */
+        @Transient
+        default boolean micronautValueCoercibleSetMember(String key, Value value) {
+            return false;
+        }
+
+        /**
+         * Receives the value that was written to the wrapped Python object.
+         * <p>
+         * Generated wrappers use this hook to keep Java-side fields and remembered async members in
+         * sync with Python-side property writes.
+         *
+         * @param key The Python property or member name that was written.
+         * @param value The value now stored on the wrapped Python object.
+         * @return {@code true} when the generated wrapper consumed the notification.
+         */
+        @Transient
+        default boolean micronautValueCoerciblePutMember(String key, Value value) {
+            return false;
+        }
     }
 
     private @Nullable Object generatedGetter(String key) {
@@ -123,18 +241,31 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             if (arguments.length != 1) {
                 throw new IllegalArgumentException("Setter [" + key + "] expects one argument");
             }
+            Value target = asPolyglotValue();
             Value value = arguments[0];
             if (!generatedMembers.micronautValueCoercibleSetMember(key, value)) {
                 if (GraalPyRuntimeUtil.isNone(value)) {
-                    asPolyglotValue().putMember(propertyName, null);
+                    target.putMember(propertyName, null);
                 } else {
-                    asPolyglotValue().putMember(propertyName, value);
+                    target.putMember(propertyName, value);
                 }
             }
+            generatedMembers.micronautValueCoerciblePutMember(propertyName, target.getMember(propertyName));
             return null;
         };
     }
 
+    /**
+     * Writes a member to the wrapped Python object.
+     * <p>
+     * Python {@code None} is converted to Java {@code null}. Host objects that are themselves
+     * {@link ValueCoercible} instances are unwrapped to their Python value before assignment, and
+     * {@link PooledValueCoercible} instances are resolved in the target Python context so pooled
+     * event-loop objects are not mixed between contexts.
+     *
+     * @param key The Python member name to write.
+     * @param value The incoming polyglot value.
+     */
     @Override
     default void putMember(String key, Value value) {
         if (this instanceof GeneratedPropertyMembers generatedMembers
@@ -154,6 +285,118 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             }
         }
         target.putMember(key, member);
+        if (this instanceof GeneratedPropertyMembers generatedMembers && target.hasMember(key)) {
+            generatedMembers.micronautValueCoerciblePutMember(key, target.getMember(key));
+        }
+    }
+
+    /**
+     * Private host reference exposed through {@link #HOST_OBJECT_MEMBER}.
+     * <p>
+     * GraalPy can box proxy members as host objects, and this record gives Micronaut a stable
+     * marker that distinguishes an intentional bridge back-reference from ordinary user members.
+     *
+     * @param value The generated Java wrapper behind the Python proxy.
+     */
+    record HostObjectReference(ValueCoercible value) {
+    }
+
+    /**
+     * Extracts a generated Java wrapper from a polyglot value when one is available.
+     * <p>
+     * This method recognizes both direct host objects and Micronaut's synthetic
+     * {@link #HOST_OBJECT_MEMBER} back-reference.
+     *
+     * @param value The polyglot value to inspect.
+     * @return The generated wrapper, or {@code null} when the value is not backed by a
+     * {@link ValueCoercible}.
+     */
+    static @Nullable ValueCoercible hostObject(@Nullable Value value) {
+        Object hostObject = rawHostObject(value);
+        return hostObject instanceof ValueCoercible valueCoercible ? valueCoercible : null;
+    }
+
+    /**
+     * Extracts a generated Java wrapper from a proxy object when one is available.
+     * <p>
+     * This overload is used when code already has a {@link ProxyObject} view and needs to inspect
+     * Micronaut's synthetic {@link #HOST_OBJECT_MEMBER} without first wrapping it as a
+     * {@link Value}.
+     *
+     * @param value The proxy object to inspect.
+     * @return The generated wrapper, or {@code null} when the proxy does not expose one.
+     */
+    static @Nullable ValueCoercible hostObject(@Nullable ProxyObject value) {
+        Object hostObject = rawHostObject(value);
+        return hostObject instanceof ValueCoercible valueCoercible ? valueCoercible : null;
+    }
+
+    /**
+     * Extracts a host object of the requested type from a polyglot value.
+     * <p>
+     * The returned object may be a direct GraalPy host object or the generated Java wrapper
+     * recovered through {@link #HOST_OBJECT_MEMBER}.
+     *
+     * @param value The polyglot value to inspect.
+     * @param targetType The required host object type.
+     * @return The host object when it is assignable to {@code targetType}; otherwise {@code null}.
+     */
+    static @Nullable Object hostObject(@Nullable Value value, Class<?> targetType) {
+        Object hostObject = rawHostObject(value);
+        return targetType.isInstance(hostObject) ? hostObject : null;
+    }
+
+    /**
+     * Extracts a host object of the requested type from a proxy object.
+     * <p>
+     * This method checks Micronaut's synthetic {@link #HOST_OBJECT_MEMBER} and verifies the
+     * recovered host object before returning it.
+     *
+     * @param value The proxy object to inspect.
+     * @param targetType The required host object type.
+     * @return The host object when it is assignable to {@code targetType}; otherwise {@code null}.
+     */
+    static @Nullable Object hostObject(@Nullable ProxyObject value, Class<?> targetType) {
+        Object hostObject = rawHostObject(value);
+        return targetType.isInstance(hostObject) ? hostObject : null;
+    }
+
+    private static @Nullable Object rawHostObject(@Nullable Value value) {
+        try {
+            if (value == null || value.isNull()) {
+                return null;
+            }
+            if (value.isHostObject()) {
+                Object hostObject = value.asHostObject();
+                if (hostObject instanceof HostObjectReference reference) {
+                    return reference.value();
+                }
+                return hostObject;
+            }
+            if (!value.hasMembers() || !value.hasMember(HOST_OBJECT_MEMBER)) {
+                return null;
+            }
+            Value hostReferenceValue = value.getMember(HOST_OBJECT_MEMBER);
+            if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
+                return null;
+            }
+            Object hostReference = hostReferenceValue.asHostObject();
+            return hostReference instanceof HostObjectReference reference ? reference.value() : null;
+        } catch (UnsupportedOperationException e) {
+            return null;
+        }
+    }
+
+    private static @Nullable Object rawHostObject(@Nullable ProxyObject value) {
+        try {
+            if (value == null || !value.hasMember(HOST_OBJECT_MEMBER)) {
+                return null;
+            }
+            Object hostReference = value.getMember(HOST_OBJECT_MEMBER);
+            return hostReference instanceof HostObjectReference reference ? reference.value() : null;
+        } catch (UnsupportedOperationException e) {
+            return null;
+        }
     }
 
     /**
@@ -177,9 +420,9 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         if (boxedType == Object.class || boxedType == Value.class) {
             return true;
         }
-        Object hostObject = hostObject(value);
+        Object hostObject = ValueCoercible.hostObject(value, boxedType);
         if (hostObject != null) {
-            return boxedType.isInstance(hostObject);
+            return true;
         }
         if (boxedType == String.class) {
             return value.isString();
@@ -187,8 +430,23 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         if (boxedType == Boolean.class) {
             return value.isBoolean();
         }
-        if (Number.class.isAssignableFrom(boxedType)) {
-            return value.isNumber();
+        if (boxedType == Byte.class) {
+            return value.fitsInByte();
+        }
+        if (boxedType == Short.class) {
+            return value.fitsInShort();
+        }
+        if (boxedType == Integer.class) {
+            return value.fitsInInt();
+        }
+        if (boxedType == Long.class) {
+            return value.fitsInLong();
+        }
+        if (boxedType == Float.class) {
+            return value.fitsInFloat();
+        }
+        if (boxedType == Double.class) {
+            return value.fitsInDouble();
         }
         if (boxedType == Character.class) {
             return value.isString() && value.asString().length() == 1;
@@ -196,49 +454,4 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         return false;
     }
 
-    private static @Nullable Object hostObject(Value value) {
-        if (value.isHostObject()) {
-            return value.asHostObject();
-        }
-        if (!value.hasMembers() || !value.hasMember(HOST_OBJECT_MEMBER)) {
-            return null;
-        }
-        Value hostReferenceValue = value.getMember(HOST_OBJECT_MEMBER);
-        if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
-            return null;
-        }
-        Object hostReference = hostReferenceValue.asHostObject();
-        if (hostReference instanceof HostObjectReference reference) {
-            return reference.value();
-        }
-        return null;
-    }
-
-    /**
-     * Build-time generated JavaBean accessor aliases for Python wrappers.
-     * <p>
-     * Only generated classes that need property aliases implement this contract. That keeps
-     * the generic {@link ValueCoercible} path free of Java method/field reflection while still
-     * preserving Python-side calls such as {@code getName()} for generated bean wrappers.
-     */
-    interface GeneratedPropertyMembers {
-        @Transient
-        @Nullable String micronautValueCoercibleGetterPropertyName(String key);
-
-        @Transient
-        @Nullable String micronautValueCoercibleSetterPropertyName(String key);
-
-        @Transient
-        default boolean micronautValueCoercibleSetMember(String key, Value value) {
-            return false;
-        }
-    }
-
-    /**
-     * Reference to the source host object exposed through a polyglot value.
-     *
-     * @param value The host value
-     */
-    record HostObjectReference(ValueCoercible value) {
-    }
 }

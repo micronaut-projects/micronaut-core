@@ -15,7 +15,9 @@
  */
 package io.micronaut.python.processing.beans;
 
+import io.micronaut.core.annotation.Experimental;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Set;
 
 import io.micronaut.core.annotation.Generated;
@@ -23,9 +25,13 @@ import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.ProcessingException;
-import io.micronaut.inject.writer.BeanDefinitionVisitor;
+import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory;
+import io.micronaut.inject.processing.definition.OutputObjectDef;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
+import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
+import io.micronaut.sourcegen.model.ObjectDef;
 
 /**
  * Processor for creating bean definitions from Python classes.
@@ -33,6 +39,7 @@ import io.micronaut.python.processing.visitor.PythonVisitorContext;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class PythonBeanDefinitionProcessor {
 
     private final Set<String> processed = new java.util.HashSet<>();
@@ -56,12 +63,10 @@ public final class PythonBeanDefinitionProcessor {
                 return;
             }
 
-            // Use BeanDefinitionCreatorFactory to create bean definitions
-            var produce = BeanDefinitionCreatorFactory.produce(classElement, visitorContext);
-            for (BeanDefinitionVisitor writer : produce.build()) {
-                if (processed.add(writer.getBeanDefinitionName())) {
-                    writer.visitBeanDefinitionEnd();
-                    processBeanDefinition(writer, visitorContext);
+            DefaultElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory = new DefaultElementBeanDefinitionBuilderFactory(visitorContext);
+            for (OutputObjectDef outputObjectDef : BeanDefinitionCreatorFactory.produce(classElement, beanDefinitionBuilderFactory, visitorContext)) {
+                if (processed.add(outputObjectDef.objectDef().getName())) {
+                    processBeanDefinition(outputObjectDef, visitorContext);
                 }
             }
         } catch (ProcessingException e) {
@@ -78,12 +83,18 @@ public final class PythonBeanDefinitionProcessor {
     }
 
     private void processBeanDefinition(
-        BeanDefinitionVisitor beanDefinitionWriter,
+        OutputObjectDef outputObjectDef,
         PythonVisitorContext outputVisitor
     ) {
         try {
-            if (beanDefinitionWriter.isEnabled()) {
-                beanDefinitionWriter.accept(outputVisitor);
+            ObjectDef objectDef = outputObjectDef.objectDef();
+            Class<?> serviceClass = outputObjectDef.serviceClass();
+            OriginatingElements originatingElements = outputObjectDef.originatingElements();
+            if (serviceClass != null) {
+                outputVisitor.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
+            }
+            try (OutputStream outputStream = outputVisitor.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
+                outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, outputVisitor));
             }
         } catch (IOException e) {
             // Raise a compile error

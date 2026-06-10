@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
@@ -47,6 +48,7 @@ import javax.lang.model.element.Element;
  * @since 4.8.0
  * @author Micronaut
  */
+@Experimental
 public record PythonProcessingEnvironment(
     PythonEnvironment environment,
     PythonAnnotationMetadataBuilder annotationMetadataBuilder,

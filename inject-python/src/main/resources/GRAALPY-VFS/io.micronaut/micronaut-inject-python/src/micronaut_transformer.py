@@ -84,6 +84,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.java_class_imports = {}
         self.java_interface_names = set()
         self.java_keyword_method_aliases = {}
+        self.validation_errors = []
         self.has_java_import = False
         self.exported_types = []
         self.all_class_names = []
@@ -327,6 +328,11 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             self.function_depth -= 1
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AsyncFunctionDef:
+        if self.class_depth > 0 and self.function_depth == 0:
+            if node.name == "__init__":
+                self.validation_errors.append("Async constructors are not supported")
+            if self._is_python_property_decorator(node):
+                self.validation_errors.append(f"Async property [{node.name}] is not supported")
         node.decorator_list = [
             self._normalize_decorator(decorator)
             for decorator in node.decorator_list
@@ -337,6 +343,19 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             return node
         finally:
             self.function_depth -= 1
+
+    def _is_python_property_decorator(self, node) -> bool:
+        for decorator in node.decorator_list:
+            if isinstance(decorator, ast.Name) and decorator.id == "property":
+                return True
+            if (
+                isinstance(decorator, ast.Attribute)
+                and decorator.attr in ("setter", "deleter")
+                and isinstance(decorator.value, ast.Name)
+                and decorator.value.id == node.name
+            ):
+                return True
+        return False
 
     def visit_Assign(self, node: ast.Assign):
         """
@@ -1095,11 +1114,13 @@ def {decorator_name}({param_signature}):
             if self._is_annotation_class(nested_element):
                 repeatable_name = self._get_repeatable_name(nested_element.getAnnotationMetadata(), nested_element)
                 repeatable_info = f', repeated="{repeatable_name}"' if repeatable_name else ''
-                self.generated_decorators.add(simple_name)
+                nested_decorator_name = f"_{parent_name}_{simple_name}"
+                nested_member_names.add(nested_decorator_name)
+                self.generated_decorators.add(nested_decorator_name)
                 prelude_lines.append(f'''
 
 @micronaut_annotation("{nested_name}"{repeatable_info})
-def {simple_name}(*args, **kwargs):
+def {nested_decorator_name}(*args, **kwargs):
     """
     Micronaut annotation decorator for {nested_name}.
     """
@@ -1115,7 +1136,7 @@ def {simple_name}(*args, **kwargs):
 ''')
                 lines.append(f'''
 
-{parent_name}.{simple_name} = {simple_name}
+{parent_name}.{simple_name} = {nested_decorator_name}
 ''')
             else:
                 binary_name = self._to_binary_nested_name(class_element.getName(), nested_name)
@@ -1134,7 +1155,7 @@ except Exception:
 
     def _meta_decorator_name(self, meta_annotation_name: str, annotation_name: str, meta_class_element) -> str:
         if meta_annotation_name.startswith(annotation_name + '$'):
-            return meta_annotation_name.split('$')[-1]
+            return f"_{annotation_name.split('.')[-1]}_{meta_annotation_name.split('$')[-1]}"
         if '$' in meta_annotation_name:
             return meta_annotation_name.split('$')[-1]
         return meta_class_element.getSimpleName()

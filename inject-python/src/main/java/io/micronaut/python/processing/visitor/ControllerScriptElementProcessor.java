@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MemberElement;
 
@@ -22,6 +23,7 @@ import io.micronaut.inject.ast.MemberElement;
  * Default processor that applies the Controller annotation when a method
  * with the HttpMethodMapping stereotype is found.
  */
+@Experimental
 public class ControllerScriptElementProcessor implements PythonScriptElementProcessor {
 
     @Override

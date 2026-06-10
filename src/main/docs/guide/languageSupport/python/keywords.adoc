@@ -1,0 +1,29 @@
+Some Java APIs use method or annotation member names that are reserved keywords in Python. Python code should use the same name with a trailing underscore. The Python compiler support rewrites these aliases during processing, so Micronaut metadata and runtime calls still target the original Java name.
+
+For annotation members, use the trailing underscore form:
+
+[source,python]
+----
+from micronaut.http.annotation import Controller, Error
+
+@Controller("/errors")
+class ErrorController:
+    @Error(global_=True)
+    def error(self):
+        pass
+----
+
+The `global_` member is recorded as the Java annotation member `global`.
+
+For Java methods, use the same convention:
+
+[source,python]
+----
+import java
+
+Flux = java.type("reactor.core.publisher.Flux")
+
+publisher = Flux.from_(source)
+----
+
+The `from_` call is rewritten during processing to call the Java `from` method.

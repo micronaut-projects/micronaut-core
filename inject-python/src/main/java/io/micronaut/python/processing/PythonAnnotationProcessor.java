@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.annotation.processing.AbstractInjectAnnotationProcessor;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.core.naming.NameUtils;
@@ -63,6 +64,7 @@ import java.util.stream.Collectors;
  * @since 4.8.0
  */
 @SupportedAnnotationTypes(PythonAnnotationProcessor.PYTHON_APPLICATION_ANNOTATION)
+@Experimental
 public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor implements AutoCloseable {
     public static final String APPLICATION_PATH = "GRAALPY-VFS/micronaut-application/";
     public static final String APPLICATION_SRC_PATH = "GRAALPY-VFS/micronaut-application/src/";
@@ -155,6 +157,12 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             if (transformedList.isEmpty()) {
                 return;
             }
+            transformedList.stream()
+                .flatMap(transformResult -> transformResult.validationErrors().stream())
+                .findFirst()
+                .ifPresent(message -> {
+                    throw new ProcessingException(originatingElement, message);
+                });
 
             // Then parse the transformed code
             String[] srcDirs = values.src();
@@ -397,10 +405,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                                                           @NotNull BasicFileAttributes attrs)
                                     throws IOException {
                                     if (file.toString().endsWith(".py")) {
-                                        var relative = directory.relativize(file).toString();
+                                        var relative = directory.relativize(file).toString().replace(file.getFileSystem().getSeparator(), "/");
                                         if (relative.equals("setup.py")) {
                                             // temporary workaround
                                             return FileVisitResult.CONTINUE;
+                                        }
+                                        if ("__init__.py".equals(file.getFileName().toString())) {
+                                            throw new ProcessingException(
+                                                originatingElement,
+                                                "Custom __init__.py files are not supported in Pyronaut applications. " +
+                                                    "Micronaut generates package __init__.py files for the GraalPy VFS; remove [" + relative + "] from the project source."
+                                            );
                                         }
                                         sources.add(Source.newBuilder("python", file.toFile()).build());
                                     }

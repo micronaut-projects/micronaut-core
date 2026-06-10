@@ -7,6 +7,8 @@ import spock.lang.Specification
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.time.DayOfWeek
+import java.util.SequencedCollection
+import java.util.SequencedSet
 /**
  * Created by graemerocher on 12/06/2017.
  */
@@ -118,6 +120,22 @@ class DefaultConversionServiceSpec extends Specification {
         "1,2"        | Iterable   | [T: Argument.of(Long, 'T')]    | [1l, 2l]
         "1"          | Optional   | [T: Argument.of(Long, 'T')]    | Optional.of(1L)
 
+    }
+
+
+    void "test sequenced collection conversion service with type arguments"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        when:
+        def sequencedSet = conversionService.convert("b,a,b", SequencedSet, ConversionContext.of([E: Argument.of(String, 'E')]))
+        def sequencedCollection = conversionService.convert("1,2,3", SequencedCollection, ConversionContext.of([E: Argument.of(Integer, 'E')]))
+
+        then:
+        sequencedSet.present
+        new ArrayList<>(sequencedSet.get()) == ["b", "a"]
+        sequencedCollection.present
+        new ArrayList<>(sequencedCollection.get()) == [1, 2, 3]
     }
 
     void "test conversion service preserves empty string elements for string iterables"() {

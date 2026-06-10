@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.event.BeanDestroyedEvent;
@@ -23,15 +24,20 @@ import io.micronaut.core.annotation.Order;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
+import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
+import org.graalvm.polyglot.PolyglotAccess;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,27 +47,33 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
 /**
  * Factory bean that creates and initializes the GraalPy context.
  * Loads the generated Python application script and makes the context
- * available via ContextHolder for bridge classes to use.
+ * available via PythonContextRuntime for bridge classes to use.
  *
  * @author Micronaut Team
  * @since 5.0.0
  */
 @Factory
-public class GraalPyContextFactory implements BeanDestroyedEventListener<org.graalvm.polyglot.Context>, Ordered {
+@Experimental
+public class GraalPyContextFactory implements BeanDestroyedEventListener<org.graalvm.polyglot.Context>, GracefulShutdownCapable, Ordered {
     public static final String APPLICATION_PATH = "META-INF/GRAALPY-VFS/micronaut-application";
     public static final String APPLICATION_SRC_PATH = APPLICATION_PATH + "/src/";
     public static final String INTERNAL_MAIN = "__main__.py";
     public static final String APPLICATION_MAIN = "main.py";
     public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
+    private static final Logger LOG = LoggerFactory.getLogger(GraalPyContextFactory.class);
 
     private final ApplicationContext applicationContext;
     private boolean providedContext = false;
+    private final CompletableFuture<Void> gracefulShutdown = new CompletableFuture<>();
 
     public GraalPyContextFactory(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
@@ -82,10 +94,10 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     public org.graalvm.polyglot.Context graalPyContext(
         @Named(PYTHON) HostAccess hostAccess,
         @Named(PYTHON) Engine engine) {
-        if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
+        if (PythonContextRuntime.isInitialized() && PythonContextRuntime.isReuseContext()) {
             providedContext = true;
             // Reuse context: this is an optimization for reloading
-            return ContextHolder.getContext();
+            return PythonContextRuntime.getContext();
         }
 
         try {
@@ -93,7 +105,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             var context = buildContext(hostAccess, engine, classLoader);
 
             // Make context available to bridge classes
-            ContextHolder.setContext(context, classLoader);
+            PythonContextRuntime.setContext(context, classLoader);
 
             return context;
 
@@ -124,12 +136,12 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     public static @NonNull Context bootstrapReusableContext(@NonNull ClassLoader classLoader,
                                                             @NonNull Map<String, String> options,
                                                             @NonNull String applicationMain) throws IOException {
-        if (ContextHolder.isInitialized() && ContextHolder.isReuseContext()) {
-            return ContextHolder.getContext();
+        if (PythonContextRuntime.isInitialized() && PythonContextRuntime.isReuseContext()) {
+            return PythonContextRuntime.getContext();
         }
         var context = buildContext(bootstrapHostAccess(classLoader), GraalPyEngineFactory.buildPythonEngine(), classLoader, options, applicationMain);
-        ContextHolder.setReuseContext(true);
-        ContextHolder.setContext(context, classLoader);
+        PythonContextRuntime.setReuseContext(true);
+        PythonContextRuntime.setContext(context, classLoader);
         return context;
     }
 
@@ -164,6 +176,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             .allowExperimentalOptions(true)
             .allowCreateProcess(true)
             .allowValueSharing(true)
+            .allowPolyglotAccess(PolyglotAccess.ALL)
             .option("python.WarnExperimentalFeatures", "false")
              // Allow access to host classes
              .allowHostAccess(hostAccess)
@@ -176,6 +189,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         options.forEach(builder::option);
 
         var context = builder.build();
+        PythonContextRuntime.registerContextEngine(context, engine);
         context.initialize(PYTHON);
         // set a per-context unique id for tests and tracing via builtins
         String id = java.util.UUID.randomUUID().toString();
@@ -228,19 +242,68 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
     /**
      * Cleanup method called during application shutdown.
-     * Resets the context in ContextHolder to prevent memory leaks.
+     * Resets the context in PythonContextRuntime to prevent memory leaks.
      */
     @Override
     public void onDestroyed(@NonNull BeanDestroyedEvent<Context> event) {
-        if (!ContextHolder.isReuseContext()) {
-            var ctx = ContextHolder.isInitialized() ? ContextHolder.getContext() : null;
+        if (!PythonContextRuntime.isReuseContext()) {
+            var ctx = event.getBean();
             if (ctx != null) {
-                ctx.close(false);
+                PythonContextRuntime.onNoActiveExecutionsAfterCurrentFrame(ctx, () -> {
+                    closeContext(ctx, true);
+                    if (!providedContext && PythonContextRuntime.isCurrentContext(ctx)) {
+                        PythonContextRuntime.resetContext();
+                    }
+                });
+                return;
             }
-            if (!providedContext) {
-                ContextHolder.resetContext();
+            if (!providedContext && PythonContextRuntime.isCurrentContext(ctx)) {
+                PythonContextRuntime.resetContext();
             }
         }
+    }
+
+    static void closeContext(Context ctx, boolean cancelIfExecuting) {
+        boolean closed = false;
+        try {
+            ctx.close(cancelIfExecuting);
+            closed = true;
+        } catch (IllegalStateException e) {
+            LOG.warn("Unexpected failure while closing Python context", e);
+            throw e;
+        } catch (PolyglotException e) {
+            if (!e.isCancelled()) {
+                LOG.warn("Unexpected polyglot failure while closing Python context", e);
+                throw e;
+            }
+            closed = true;
+        } catch (AssertionError e) {
+            LOG.warn("Unexpected assertion while closing Python context", e);
+            throw e;
+        } finally {
+            if (closed) {
+                PythonContextRuntime.unregisterContextEngine(ctx);
+            }
+        }
+    }
+
+    @Override
+    public CompletionStage<?> shutdownGracefully() {
+        Context ctx = PythonContextRuntime.isInitialized() ? PythonContextRuntime.getContext() : null;
+        if (ctx == null || PythonContextRuntime.isReuseContext()) {
+            gracefulShutdown.complete(null);
+            return gracefulShutdown;
+        }
+        if (gracefulShutdown.isDone()) {
+            return gracefulShutdown;
+        }
+        PythonContextRuntime.onNoActiveExecutions(ctx, () -> gracefulShutdown.complete(null));
+        return gracefulShutdown;
+    }
+
+    @Override
+    public OptionalLong reportActiveTasks() {
+        return OptionalLong.of(PythonContextRuntime.activeExecutions());
     }
 
     @Override

@@ -1,5 +1,6 @@
 [versions]
 awaitility = "4.3.0"
+apiguardian = "1.1.2"
 bcpkix = "1.84"
 blaze = "1.6.18"
 brotli4j = "1.18.0"
@@ -32,19 +33,19 @@ jazzer = "0.24.0"
 jcache = "1.1.1"
 junit5 = "5.12.2"
 junit-platform="1.12.2"
-logback = "1.5.32"
+logback = "1.5.33"
 lombok = "1.18.46"
 logbook-netty = "3.12.3"
 log4j = "2.25.4"
 micronaut-aws = "5.0.0-RC1"
 micronaut-build-plugins="8.0.0-RC1"
 micronaut-groovy = "4.7.0"
-micronaut-session = "4.6.0"
-micronaut-sql = "7.0.0-RC1"
-micronaut-test = "5.0.0-RC1"
-micronaut-validation = "5.0.0-RC2"
-micronaut-rxjava3 = "4.0.0-RC1"
-micronaut-reactor = "4.0.0-RC1"
+micronaut-session = "4.8.0"
+micronaut-sql = "7.0.1"
+micronaut-test = "5.0.1"
+micronaut-validation = "5.0.0"
+micronaut-rxjava3 = "4.0.0"
+micronaut-reactor = "4.0.0"
 micronaut-kotlin = "5.0.0-RC1"
 micronaut-data = "5.0.0-M6"
 micronaut-serde = "3.0.0-RC3"
@@ -62,7 +63,7 @@ tomlj="1.1.1"
 vertx = "4.5.26"
 wiremock = "2.33.2"
 mimepull = "1.10.0"
-micronaut-sourcegen = "2.0.0-RC4"
+micronaut-sourcegen = "2.0.0"
 icu4j = "76.1"
 jfrunit = "1.0.0.Alpha2"
 junit4 = "4.13.2"
@@ -86,7 +87,7 @@ managed-kotlin = "2.3.21"
 managed-kotlin-coroutines = "1.10.2"
 managed-graalpy = "25.1.0-SNAPSHOT"
 managed-methvin-directory-watcher = "0.19.1"
-managed-netty = "4.2.13.Final"
+managed-netty = "4.2.15.Final"
 managed-netty-tcnative = "2.0.77.Final"
 managed-netty-contrib-multipart = "1.0.0.Final"
 managed-reactive-streams = "1.0.4"
@@ -168,6 +169,7 @@ managed-netty-codec-native-quic = { module = "io.netty:netty-codec-native-quic",
 managed-netty-common = { module = "io.netty:netty-common", version.ref = "managed-netty" }
 managed-netty-handler = { module = "io.netty:netty-handler", version.ref = "managed-netty" }
 managed-netty-handler-proxy = { module = "io.netty:netty-handler-proxy", version.ref = "managed-netty" }
+managed-netty-resolver-dns = { module = "io.netty:netty-resolver-dns", version.ref = "managed-netty" }
 managed-netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "managed-netty" }
 managed-netty-transport-native-kqueue = { module = "io.netty:netty-transport-native-kqueue", version.ref = "managed-netty" }
 managed-netty-transport-native-iouring = { module = "io.netty:netty-transport-native-io_uring", version.ref = "managed-netty" }
@@ -190,6 +192,7 @@ sonatype-scan = { module = "org.sonatype.gradle.plugins:scan-gradle-plugin", ver
 #
 
 awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
+apiguardian = { module = "org.apiguardian:apiguardian-api", version.ref = "apiguardian" }
 
 aws-java-sdk-lambda = { module = "com.amazonaws:aws-java-sdk-lambda" }
 

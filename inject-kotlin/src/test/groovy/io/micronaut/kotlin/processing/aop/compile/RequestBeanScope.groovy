@@ -30,7 +30,10 @@ open class RequestScopeClass (
 ''')
         def beanDefinition = getBeanDefinition(applicationContext, 'test.$RequestScopeClass$Definition' + BeanDefinitionVisitor.PROXY_SUFFIX)
         def bean = ((InstantiatableBeanDefinition) beanDefinition).instantiate(applicationContext)
-        def methods = bean.class.declaredMethods.toList().findAll { !it.isSynthetic() }.collect { it.getName() }.sort()
+        def methods = bean.class.declaredMethods.toList()
+                .findAll { !it.isSynthetic() && it.name != "interceptedMethods" && it.name != "toString" }
+                .collect { it.getName() }
+                .sort()
 
         then:
         methods == ["\$withBeanQualifier", "getList", "getText", "interceptedTarget", "setText"] as List

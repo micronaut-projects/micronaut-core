@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -47,6 +48,7 @@ import org.jetbrains.annotations.Nullable;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class PythonPropertyElement extends AbstractPythonElement implements PropertyElement, ElementProvider {
     private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
     private static final String ANN_VALID = "jakarta.validation.Valid";

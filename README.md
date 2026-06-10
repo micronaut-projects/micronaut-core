@@ -36,7 +36,7 @@ For more information on using Micronaut Framework see the documentation at [micr
 
 ## Example Applications
 
-Example Micronaut Framework applications can be found in the [Examples repository](https://github.com/micronaut-projects/micronaut-examples)
+Example Micronaut applications can be found in [guides.micronaut.io](https://guides.micronaut.io)
 
 ## Building From Source
 

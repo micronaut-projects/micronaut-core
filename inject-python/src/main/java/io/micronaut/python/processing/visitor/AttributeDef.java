@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.List;
 import java.util.Objects;
 
@@ -39,6 +40,7 @@ import org.graalvm.polyglot.Value;
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.Assign">Python AST Assign</a>
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.AnnAssign">Python AST AnnAssign</a>
  */
+@Experimental
 public record AttributeDef(
     String name,
     String annotation,

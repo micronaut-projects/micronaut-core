@@ -341,9 +341,9 @@ class MultipleTestSpec:
         generated.exists()
         def javaCode = generated.text
         javaCode.contains('MultipleTestSpec() {\n  }')
-        javaCode.contains('this.graalpyInternalValue = ContextHolder.newInstance("python", "MultipleTestSpec");')
+        javaCode.contains('this.graalpyInternalValue = PythonContextRuntime.newInstance("python", "MultipleTestSpec");')
         javaCode.contains('return this.graalpyInternalValue;')
-        !javaCode.contains('MultipleTestSpec() {\n    this.graalpyInternalValue = ContextHolder.newInstance')
+        !javaCode.contains('MultipleTestSpec() {\n    this.graalpyInternalValue = PythonContextRuntime.newInstance')
 
         cleanup:
         tempDir.deleteDir()
@@ -647,8 +647,9 @@ class MyMergeStrategy(Mapper.MergeStrategy):
         then:
         def mapperFile = new File(tempDir, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/context/annotation/Mapper.py")
         mapperFile.exists()
-        mapperFile.text.contains("def Mapping(")
-        mapperFile.text.contains("Mapper.Mapping = Mapping")
+        mapperFile.text.contains("def _Mapper_Mapping(")
+        !mapperFile.text.contains("def Mapping(")
+        mapperFile.text.contains("Mapper.Mapping = _Mapper_Mapping")
         mapperFile.text.contains("Mapper.MergeStrategy = MergeStrategy")
 
         cleanup:
@@ -680,14 +681,16 @@ class Message:
         def serdeableFile = new File(tempDir, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler/Serdeable.py")
         serdeableFile.exists()
         def transformedContent = serdeableFile.text
-        transformedContent.indexOf("def Serializable(") < transformedContent.indexOf("@Serializable()")
-        transformedContent.indexOf("def Deserializable(") < transformedContent.indexOf("@Deserializable()")
-        transformedContent.indexOf("@Serializable()") < transformedContent.indexOf("def Serdeable(")
-        transformedContent.indexOf("@Deserializable()") < transformedContent.indexOf("def Serdeable(")
+        transformedContent.indexOf("def _Serdeable_Serializable(") < transformedContent.indexOf("@_Serdeable_Serializable()")
+        transformedContent.indexOf("def _Serdeable_Deserializable(") < transformedContent.indexOf("@_Serdeable_Deserializable()")
+        transformedContent.indexOf("@_Serdeable_Serializable()") < transformedContent.indexOf("def Serdeable(")
+        transformedContent.indexOf("@_Serdeable_Deserializable()") < transformedContent.indexOf("def Serdeable(")
         transformedContent.contains("@micronaut_annotation(\"io.micronaut.python.compiler.Serdeable\$Serializable\")")
         transformedContent.contains("@micronaut_annotation(\"io.micronaut.python.compiler.Serdeable\$Deserializable\")")
-        transformedContent.contains("Serdeable.Serializable = Serializable")
-        transformedContent.contains("Serdeable.Deserializable = Deserializable")
+        !transformedContent.contains("def Serializable(")
+        !transformedContent.contains("def Deserializable(")
+        transformedContent.contains("Serdeable.Serializable = _Serdeable_Serializable")
+        transformedContent.contains("Serdeable.Deserializable = _Serdeable_Deserializable")
 
         cleanup:
         tempDir.deleteDir()

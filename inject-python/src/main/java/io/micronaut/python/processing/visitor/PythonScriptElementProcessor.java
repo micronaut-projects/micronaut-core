@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MemberElement;
 
@@ -22,6 +23,7 @@ import io.micronaut.inject.ast.MemberElement;
  * Processor for Python script elements that can apply type-level default annotations
  * based on member element stereotypes.
  */
+@Experimental
 public interface PythonScriptElementProcessor {
 
     /**

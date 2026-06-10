@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -31,6 +32,7 @@ import java.util.Optional;
  * @author Micronaut
  * @since 4.8.0
  */
+@Experimental
 public final class PythonGenericPlaceholderElement extends AbstractPythonClassElement implements GenericPlaceholderElement {
 
     private final TypeVar typeVar;

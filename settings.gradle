@@ -6,7 +6,7 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '8.0.0-RC1'
+    id 'io.micronaut.build.shared.settings' version '8.0.0'
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
@@ -361,6 +361,7 @@ include "core-reactive"
 include "core-processor"
 include "context"
 include 'context-python'
+include 'context-python-netty'
 include "context-propagation"
 include "discovery-core"
 include "function"

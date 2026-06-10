@@ -16,6 +16,7 @@
 package io.micronaut.inject.proxy;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.ExecutableMethod;
 
 /**
  * An internal interface implemented by generated proxy classes.
@@ -26,4 +27,14 @@ import io.micronaut.core.annotation.Internal;
  */
 @Internal
 public interface InterceptedBean {
+
+    /**
+     * Returns a defensive copy of the generated executable methods used by the proxy invocation chain.
+     *
+     * @return The generated executable methods copy
+     * @since 5.1.0
+     */
+    default ExecutableMethod<?, ?>[] interceptedMethods() {
+        return new ExecutableMethod[0];
+    }
 }

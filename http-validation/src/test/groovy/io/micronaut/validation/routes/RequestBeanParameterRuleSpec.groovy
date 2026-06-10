@@ -208,6 +208,48 @@ class Foo {
             noExceptionThrown()
     }
 
+    void "test RequestBean compiles with computed getter property"() {
+        when:
+            buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.core.annotation.*;
+import org.jspecify.annotations.Nullable;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/abc")
+    String abc(@RequestBean Bean bean) {
+        return "";
+    }
+
+    @Introspected
+    private static final class Bean {
+
+        @Nullable
+        @QueryValue
+        private final String abc;
+
+        public Bean(String abc) {
+            this.abc = abc;
+        }
+
+        public String getAbc() { return abc; }
+
+        public boolean isCheckEquality() { return true; }
+
+    }
+
+}
+
+""")
+        then:
+            noExceptionThrown()
+    }
+
     void "test RequestBean fails when read only property not settable"() {
         when:
             buildTypeElement("""

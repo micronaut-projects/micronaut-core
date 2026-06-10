@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.List;
 
 /**
@@ -31,6 +32,7 @@ import java.util.List;
  * @param typeParams The type parameters.
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.AsyncFunctionDef">Python AST AsyncFunctionDef</a>
  */
+@Experimental
 public record AsyncFunctionDef(
     String name,
     Object args,

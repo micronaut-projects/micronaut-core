@@ -15,6 +15,9 @@
  */
 package io.micronaut.python.processing.visitor;
 
+
+import io.micronaut.core.annotation.Experimental;
+
 /**
  * A ReturnDef represents the return type annotation of a function.
  * <p>
@@ -27,6 +30,7 @@ package io.micronaut.python.processing.visitor;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public record ReturnDef(
     TypeRef typeAnnotation,
     java.util.List<DecoratorDef> decorators

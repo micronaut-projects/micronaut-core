@@ -1276,10 +1276,10 @@ annotation class NotNull
 
         when:
             def doWorkMethod = Arrays.stream(definition.getBeanType().getDeclaredMethods())
-                    .filter {f -> !f.isSynthetic()}
+                    .filter { f -> !f.isSynthetic() && f.name.contains("doWork") }
                     .findFirst().orElseThrow()
             def supertypeMethods = definition.getBeanType().getSuperclass().getDeclaredMethods()
-                    .findAll { !it.name.contains('$jacoco')}
+                    .findAll { !it.name.contains('$jacoco') && it.name != "interceptedMethods" }
         then:
             supertypeMethods.every {doWorkMethod.name.contains(it.name)}
     }

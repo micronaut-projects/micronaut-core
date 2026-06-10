@@ -15,7 +15,7 @@
  */
 package io.micronaut.python.annotation.processing.test
 
-import io.micronaut.context.python.ContextHolder
+import io.micronaut.context.python.PythonContextRuntime
 import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.InterceptorKind
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil
@@ -322,16 +322,16 @@ class SimpleService:
         javaStub != null
         context.getBean(javaStub).greet("John") == "Hello, John!"
 
-        ContextHolder.isInitialized()
-        ContextHolder.getContext() != null
-        ContextHolder.context.getBindings("python").getMember("SimpleService") != null
+        PythonContextRuntime.isInitialized()
+        PythonContextRuntime.getContext() != null
+        PythonContextRuntime.context.getBindings("python").getMember("SimpleService") != null
 
 
         cleanup: "Ensure context is properly closed"
         context?.close()
     }
 
-    def "test ApplicationContext cleanup resets ContextHolder"() {
+    def "test ApplicationContext cleanup resets PythonContextRuntime"() {
         given:
         def pythonCode = '''
 class TestService:
@@ -343,12 +343,12 @@ class TestService:
         def context = buildContext(pythonCode)
         context.close()
 
-        then: "ContextHolder should be reset"
-        !ContextHolder.isInitialized()
+        then: "PythonContextRuntime should be reset"
+        !PythonContextRuntime.isInitialized()
 
         and: "Accessing context after cleanup should throw exception"
         when:
-        ContextHolder.getContext()
+        PythonContextRuntime.getContext()
         then:
         thrown(IllegalStateException)
     }
@@ -1675,7 +1675,7 @@ class Room:
         def context = buildContext(pythonCode)
         def roomClass = context.classLoader.loadClass("python.Room")
         def messageClass = context.classLoader.loadClass("python.Message")
-        def messageValue = ContextHolder.newInstance("python", "Message", "hello", 1)
+        def messageValue = PythonContextRuntime.newInstance("python", "Message", "hello", 1)
         def room = roomClass.getConstructor(String, List, Integer.TYPE).newInstance("room", [], 1)
         room.setMessages([messageValue])
         def messages = room.getMessages()

@@ -93,7 +93,7 @@ final class GraalPyHostAccessFactory {
             Value.class,
             target,
             v -> {
-                ValueCoercible host = valueCoercibleHost(v);
+                ValueCoercible host = ValueCoercible.hostObject(v);
                 if (host != null && target.isInstance(host)) {
                     return true;
                 }
@@ -110,7 +110,7 @@ final class GraalPyHostAccessFactory {
                 return target.equals(findPythonClass(cls, mappings));
             },
             v -> {
-                ValueCoercible host = valueCoercibleHost(v);
+                ValueCoercible host = ValueCoercible.hostObject(v);
                 if (host != null && target.isInstance(host)) {
                     return target.cast(host);
                 }
@@ -128,14 +128,14 @@ final class GraalPyHostAccessFactory {
             Value.class,
             (Class) target,
             v -> {
-                ValueCoercible host = valueCoercibleHost(v);
+                ValueCoercible host = ValueCoercible.hostObject(v);
                 if (host != null && target.isInstance(host)) {
                     return true;
                 }
                 return findAssignableMapping(v, targetMappings, allMappings) != null;
             },
             v -> {
-                ValueCoercible host = valueCoercibleHost(v);
+                ValueCoercible host = ValueCoercible.hostObject(v);
                 if (host != null && target.isInstance(host)) {
                     return target.cast(host);
                 }
@@ -154,9 +154,9 @@ final class GraalPyHostAccessFactory {
         builder.<Value, Object>targetTypeMapping(
             Value.class,
             Object.class,
-            v -> valueCoercibleHost(v) != null || findMapping(v, mappings) != null,
+            v -> ValueCoercible.hostObject(v) != null || findMapping(v, mappings) != null,
             v -> {
-                ValueCoercible host = valueCoercibleHost(v);
+                ValueCoercible host = ValueCoercible.hostObject(v);
                 if (host != null) {
                     return host;
                 }
@@ -171,10 +171,10 @@ final class GraalPyHostAccessFactory {
             Value.class,
             target,
             v -> {
-                ValueCoercible host = valueCoercibleHost(v);
+                ValueCoercible host = ValueCoercible.hostObject(v);
                 return host != null && target.isInstance(host);
             },
-            v -> target.cast(valueCoercibleHost(v))
+            v -> target.cast(ValueCoercible.hostObject(v))
         );
     }
 
@@ -193,8 +193,8 @@ final class GraalPyHostAccessFactory {
         builder.targetTypeMapping(
             ProxyObject.class,
             (Class) target,
-            value -> valueCoercibleHost(value, target) != null,
-            value -> target.cast(valueCoercibleHost(value, target))
+            value -> ValueCoercible.hostObject(value, target) != null,
+            value -> target.cast(ValueCoercible.hostObject(value, target))
         );
     }
 
@@ -320,37 +320,4 @@ final class GraalPyHostAccessFactory {
         return member.asString();
     }
 
-    private static @Nullable ValueCoercible valueCoercibleHost(@Nullable Value value) {
-        if (value == null || value.isNull() || value.isHostObject() || !value.hasMembers() || !value.hasMember(ValueCoercible.HOST_OBJECT_MEMBER)) {
-            return null;
-        }
-        Value hostReferenceValue = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
-        if (hostReferenceValue == null || !hostReferenceValue.isHostObject()) {
-            return null;
-        }
-        Object hostReference = hostReferenceValue.asHostObject();
-        if (hostReference instanceof ValueCoercible.HostObjectReference reference) {
-            return reference.value();
-        }
-        return null;
-    }
-
-    private static @Nullable ValueCoercible valueCoercibleHost(@Nullable ProxyObject value, Class<?> target) {
-        if (value == null || !hasProxyMember(value, ValueCoercible.HOST_OBJECT_MEMBER)) {
-            return null;
-        }
-        Object hostReference = value.getMember(ValueCoercible.HOST_OBJECT_MEMBER);
-        if (hostReference instanceof ValueCoercible.HostObjectReference reference && target.isInstance(reference.value())) {
-            return reference.value();
-        }
-        return null;
-    }
-
-    private static boolean hasProxyMember(ProxyObject value, String memberName) {
-        try {
-            return value.hasMember(memberName);
-        } catch (UnsupportedOperationException e) {
-            return false;
-        }
-    }
 }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
@@ -51,6 +52,7 @@ import java.util.function.Predicate;
  * @param typeAnnotationMetadata The type-use annotation metadata
  */
 @Internal
+@Experimental
 public record TypeAnnotatedClassElement(
     ClassElement delegate,
     ElementAnnotationMetadata typeAnnotationMetadata

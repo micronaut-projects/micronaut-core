@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -28,11 +29,12 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.processing.ProcessingException;
 import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +52,10 @@ import java.util.function.Supplier;
 @NullUnmarked
 @Internal
 public final class AstBeanPropertiesUtils {
+
+    private static final String ANN_INTROSPECTED_PROPERTY = Introspected.Property.class.getName();
+    private static final String ANN_JAKARTA_ACCESS = "jakarta.persistence.Access";
+    private static final String MEMBER_IGNORE_OTHER_ACCESSORS = "ignoreOtherAccessors";
 
     private AstBeanPropertiesUtils() {
     }
@@ -78,67 +84,137 @@ public final class AstBeanPropertiesUtils {
                                                               Function<MethodElement, Optional<String>> customWriterPropertyNameResolver,
                                                               Function<BeanPropertyData, @Nullable PropertyElement> propertyCreator) {
         BeanProperties.Visibility visibility = configuration.getVisibility();
-        Set<BeanProperties.AccessKind> accessKinds = configuration.getAccessKinds();
 
         Set<String> includes = configuration.getIncludes();
         Set<String> excludes = configuration.getExcludes();
         String[] readPrefixes = configuration.getReadPrefixes();
         String[] writePrefixes = configuration.getWritePrefixes();
         var isRecord = classElement.isRecord();
+        Set<BeanProperties.AccessKind> effectiveAccessKinds = resolveAccessKinds(configuration, classElement);
 
         var props = new LinkedHashMap<String, BeanPropertyData>();
         for (MethodElement methodElement : methodsSupplier.get()) {
             // Records include everything
-            if (methodElement.isStatic() && !configuration.isAllowStaticProperties() || !excludeElementsInRole && isMethodInRole(methodElement)) {
+            boolean isIntrospectedPropertyMethod = isIntrospectedPropertyMethod(methodElement);
+            boolean isExcludedMethod = (methodElement.isStatic() && !configuration.isAllowStaticProperties()) ||
+                (!excludeElementsInRole && isMethodInRole(methodElement));
+            if (isExcludedMethod) {
+                if (isIntrospectedPropertyMethod) {
+                    failInvalidIntrospectedProperty(
+                        methodElement,
+                        "the method is excluded from bean property resolution"
+                    );
+                }
                 continue;
+            }
+            if (isIntrospectedPropertyMethod) {
+                validateIntrospectedPropertyMethod(methodElement, visibility);
             }
             String methodName = methodElement.getName();
             if (methodName.equals("getMetaClass")) {
                 continue;
             }
-            boolean isAccessor = canMethodBeUsedForAccess(methodElement, accessKinds, visibility);
             if (isRecord) {
+                boolean isAccessor = canMethodBeUsedForAccess(methodElement, effectiveAccessKinds, visibility) ||
+                    isIntrospectedPropertyMethod;
                 if (!isAccessor) {
                     continue;
                 }
                 String propertyName = methodElement.getSimpleName();
                 processRecord(props, methodElement, propertyName);
-            } else if (NameUtils.isReaderName(methodName, readPrefixes) && methodElement.getParameters().length == 0) {
+            } else if (isReaderName(configuration, methodElement, methodName, readPrefixes)
+                && methodElement.getParameters().length == 0) {
                 String propertyName = customReaderPropertyNameResolver.apply(methodElement)
-                    .orElseGet(() -> NameUtils.getPropertyNameForGetter(methodName, readPrefixes));
-                processGetter(props, methodElement, propertyName, isAccessor, configuration);
-            } else if (NameUtils.isWriterName(methodName, writePrefixes)
-                && (methodElement.getParameters().length == 1
-                || configuration.isAllowSetterWithZeroArgs() && methodElement.getParameters().length == 0
-                || configuration.isAllowSetterWithMultipleArgs() && methodElement.getParameters().length > 1)) {
+                    .orElseGet(() -> getPropertyNameForGetter(methodName, readPrefixes));
+                boolean isAccessor = canMethodBeUsedForRead(methodElement, methodName, effectiveAccessKinds, visibility, configuration) ||
+                    isIntrospectedPropertyMethod;
+                processGetter(
+                    props,
+                    methodElement,
+                    propertyName,
+                    isAccessor,
+                    configuration,
+                    ignoresOtherAccessors(methodElement)
+                );
+            } else if (isWriterName(configuration, methodName, writePrefixes)
+                && canMethodBeUsedForWrite(methodElement, configuration, visibility)) {
                 String propertyName = customWriterPropertyNameResolver.apply(methodElement)
-                    .orElseGet(() -> NameUtils.getPropertyNameForSetter(methodName, writePrefixes));
-                processSetter(classElement, props, methodElement, propertyName, isAccessor, configuration);
+                    .orElseGet(() -> getPropertyNameForSetter(methodName, writePrefixes));
+                boolean isAccessor = canMethodBeUsedForWriteAccess(methodElement, effectiveAccessKinds, visibility, configuration) ||
+                    isIntrospectedPropertyMethod;
+                processSetter(
+                    classElement,
+                    props,
+                    methodElement,
+                    propertyName,
+                    isAccessor,
+                    configuration,
+                    ignoresOtherAccessors(methodElement)
+                );
+            } else if (isIntrospectedPropertyReader(methodElement, visibility)) {
+                processGetter(
+                    props,
+                    methodElement,
+                    methodName,
+                    isIntrospectedPropertyMethod,
+                    configuration,
+                    ignoresOtherAccessors(methodElement)
+                );
+            } else if (isIntrospectedPropertyWriter(methodElement, visibility)) {
+                processSetter(
+                    classElement,
+                    props,
+                    methodElement,
+                    methodName,
+                    isIntrospectedPropertyMethod,
+                    configuration,
+                    ignoresOtherAccessors(methodElement)
+                );
             }
         }
         for (FieldElement fieldElement : fieldSupplier.get()) {
-            if (fieldElement.isStatic() && !configuration.isAllowStaticProperties() || !excludeElementsInRole && isFieldInRole(fieldElement)) {
+            boolean isIntrospectedPropertyField = isIntrospectedPropertyField(fieldElement);
+            boolean isExcludedField = (fieldElement.isStatic() && !configuration.isAllowStaticProperties()) ||
+                (!excludeElementsInRole && isFieldInRole(fieldElement));
+            if (isExcludedField) {
+                if (isIntrospectedPropertyField) {
+                    failInvalidIntrospectedProperty(
+                        fieldElement,
+                        "the field is excluded from bean property resolution"
+                    );
+                }
                 continue;
             }
             String propertyName = fieldElement.getSimpleName();
-            boolean isAccessor = propertyFields.contains(propertyName) || canFieldBeUsedForAccess(fieldElement, accessKinds, visibility);
+            boolean isAccessor = propertyFields.contains(propertyName) ||
+                isIntrospectedPropertyField ||
+                canFieldBeUsedForAccess(fieldElement, effectiveAccessKinds, visibility, configuration);
             if (!isAccessor && !props.containsKey(propertyName)) {
+                if (isIntrospectedPropertyField) {
+                    validateIntrospectedPropertyField(fieldElement, visibility, null);
+                }
                 continue;
             }
             BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-            resolveReadAccessForField(fieldElement, isAccessor, beanPropertyData);
-            resolveWriteAccessForField(fieldElement, isAccessor, beanPropertyData);
+            boolean ignoreOtherAccessors = ignoresOtherAccessors(fieldElement);
+            resolveReadAccessForField(fieldElement, isAccessor, beanPropertyData, ignoreOtherAccessors);
+            resolveWriteAccessForField(fieldElement, isAccessor, beanPropertyData, ignoreOtherAccessors);
+            if (isIntrospectedPropertyField) {
+                validateIntrospectedPropertyField(fieldElement, visibility, beanPropertyData);
+            }
+            registerIntrospectedPropertyAccess(beanPropertyData, fieldElement);
         }
 
         if (props.isEmpty()) {
-            return Collections.emptyList();
+            return List.of();
         }
 
         var beanProperties = new ArrayList<PropertyElement>(props.size());
         for (Map.Entry<String, BeanPropertyData> entry : props.entrySet()) {
             String propertyName = entry.getKey();
             BeanPropertyData value = entry.getValue();
-            if (configuration.isIgnoreSettersWithDifferingType() && value.setter != null && value.getter != null) {
+            applyIntrospectedPropertyAccess(value);
+            if (shouldCheckSetterTypeCompatibility(configuration, value) && value.setter != null && value.getter != null) {
                 // ensure types match
                 ClassElement getterType = value.getter.getGenericReturnType();
                 ClassElement setterType = value.setter.getParameters()[0].getGenericType();
@@ -155,6 +231,14 @@ public final class AstBeanPropertiesUtils {
                 && value.setter != null
                 && value.setter.getParameters().length > 0) {
                 value.type = value.setter.getParameters()[0].getGenericType();
+            } else if (value.readAccessKind == BeanProperties.AccessKind.FIELD && !value.field.getType().equals(value.type)) {
+                value.type = value.field.getGenericType();
+            }
+            if (value.readAccessKind == BeanProperties.AccessKind.METHOD
+                && value.getter != null
+                && !value.getter.getGenericReturnType().equals(value.type)
+                && value.writeAccessKind == null) {
+                value.type = value.getter.getGenericReturnType();
             }
             // In a case when the field's type is the same as the selected property type,
             // and it has more type arguments annotations - use it as the property type
@@ -182,6 +266,240 @@ public final class AstBeanPropertiesUtils {
             }
         }
         return beanProperties;
+    }
+
+    private static Set<BeanProperties.AccessKind> resolveAccessKinds(PropertyElementQuery configuration,
+                                                                     ClassElement classElement) {
+        Optional<String> accessType = classElement.stringValue(ANN_JAKARTA_ACCESS);
+        if (accessType.isEmpty()) {
+            return configuration.getAccessKinds();
+        }
+        return switch (accessType.get()) {
+            case "FIELD" -> EnumSet.of(BeanProperties.AccessKind.FIELD);
+            case "PROPERTY" -> EnumSet.of(BeanProperties.AccessKind.METHOD);
+            default -> configuration.getAccessKinds();
+        };
+    }
+
+    private static boolean isIntrospectedPropertyReader(MethodElement methodElement, BeanProperties.Visibility visibility) {
+        return methodElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY) &&
+            isAccessible(methodElement, visibility) &&
+            canMethodProvideReadAccess(methodElement);
+    }
+
+    private static boolean isIntrospectedPropertyWriter(MethodElement methodElement, BeanProperties.Visibility visibility) {
+        return methodElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY) &&
+            isAccessible(methodElement, visibility) &&
+            canMethodProvideWriteAccess(methodElement);
+    }
+
+    private static boolean isReaderName(PropertyElementQuery configuration,
+                                        MethodElement methodElement,
+                                        String methodName,
+                                        String[] readPrefixes) {
+        return NameUtils.isReaderName(methodName, readPrefixes) ||
+            (configuration.isJsonAutoDetectConfigured() && configuration.isJsonAutoDetectReaderName(methodElement, methodName));
+    }
+
+    private static String getPropertyNameForGetter(String methodName, String[] readPrefixes) {
+        if (NameUtils.isReaderName(methodName, readPrefixes)) {
+            return NameUtils.getPropertyNameForGetter(methodName, readPrefixes);
+        }
+        return NameUtils.getPropertyNameForGetter(methodName);
+    }
+
+    private static boolean isWriterName(PropertyElementQuery configuration, String methodName, String[] writePrefixes) {
+        return NameUtils.isWriterName(methodName, writePrefixes) ||
+            (configuration.isJsonAutoDetectConfigured() && configuration.isJsonAutoDetectWriterName(methodName));
+    }
+
+    private static String getPropertyNameForSetter(String methodName, String[] writePrefixes) {
+        if (NameUtils.isWriterName(methodName, writePrefixes)) {
+            return NameUtils.getPropertyNameForSetter(methodName, writePrefixes);
+        }
+        return NameUtils.getPropertyNameForSetter(methodName);
+    }
+
+    private static boolean canMethodBeUsedForRead(MethodElement methodElement,
+                                                  String methodName,
+                                                  Set<BeanProperties.AccessKind> accessKinds,
+                                                  BeanProperties.Visibility visibility,
+                                                  PropertyElementQuery configuration) {
+        if (configuration.isJsonAutoDetectConfigured()) {
+            return configuration.isJsonAutoDetectGetterVisible(methodElement, methodName);
+        }
+        return canMethodBeUsedForAccess(methodElement, accessKinds, visibility);
+    }
+
+    private static boolean canMethodBeUsedForWriteAccess(MethodElement methodElement,
+                                                         Set<BeanProperties.AccessKind> accessKinds,
+                                                         BeanProperties.Visibility visibility,
+                                                         PropertyElementQuery configuration) {
+        if (configuration.isJsonAutoDetectConfigured()) {
+            return configuration.isJsonAutoDetectSetterVisible(methodElement);
+        }
+        return canMethodBeUsedForAccess(methodElement, accessKinds, visibility);
+    }
+
+    private static boolean canMethodBeUsedForWrite(MethodElement methodElement,
+                                                   PropertyElementQuery configuration,
+                                                   BeanProperties.Visibility visibility) {
+        int parameterCount = methodElement.getParameters().length;
+        return parameterCount == 1 ||
+            (configuration.isAllowSetterWithZeroArgs() && parameterCount == 0) ||
+            (configuration.isAllowSetterWithMultipleArgs() && parameterCount > 1) ||
+            isIntrospectedPropertyWriter(methodElement, visibility);
+    }
+
+    private static boolean isIntrospectedPropertyField(FieldElement fieldElement) {
+        return fieldElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY);
+    }
+
+    private static boolean isIntrospectedPropertyMethod(MethodElement methodElement) {
+        return methodElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY);
+    }
+
+    private static boolean ignoresOtherAccessors(MemberElement memberElement) {
+        return memberElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY) &&
+            memberElement.booleanValue(ANN_INTROSPECTED_PROPERTY, MEMBER_IGNORE_OTHER_ACCESSORS).orElse(false);
+    }
+
+    private static void registerIntrospectedPropertyAccess(BeanPropertyData beanPropertyData, MemberElement memberElement) {
+        if (memberElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY)) {
+            EnumSet<Introspected.Property.Access> accessKinds = resolveIntrospectedPropertyAccess(memberElement);
+            if (beanPropertyData.propertyAccessKinds == null) {
+                beanPropertyData.propertyAccessKinds = accessKinds;
+                beanPropertyData.propertyAccessMember = memberElement;
+            } else if (!beanPropertyData.propertyAccessKinds.equals(accessKinds)) {
+                throw new ProcessingException(
+                    memberElement,
+                    "Conflicting @Introspected.Property accessKind declarations for property ["
+                        + beanPropertyData.propertyName + "]: "
+                        + beanPropertyData.propertyAccessKinds + " declared by ["
+                        + beanPropertyData.propertyAccessMember.getDescription()
+                        + "] and " + accessKinds + " declared by ["
+                        + memberElement.getDescription() + "]"
+                );
+            }
+        }
+    }
+
+    private static EnumSet<Introspected.Property.Access> resolveIntrospectedPropertyAccess(MemberElement memberElement) {
+        Introspected.Property.Access[] accessKinds = memberElement.enumValues(
+            ANN_INTROSPECTED_PROPERTY,
+            "accessKind",
+            Introspected.Property.Access.class
+        );
+        if (accessKinds.length == 0) {
+            return EnumSet.of(Introspected.Property.Access.READ, Introspected.Property.Access.WRITE);
+        }
+        EnumSet<Introspected.Property.Access> access = EnumSet.noneOf(Introspected.Property.Access.class);
+        for (Introspected.Property.Access accessKind : accessKinds) {
+            access.add(accessKind);
+        }
+        return access;
+    }
+
+    private static void validateIntrospectedPropertyField(FieldElement fieldElement,
+                                                          BeanProperties.Visibility visibility,
+                                                          @Nullable BeanPropertyData beanPropertyData) {
+        EnumSet<Introspected.Property.Access> accessKinds = resolveIntrospectedPropertyAccess(fieldElement);
+        boolean canReadField = isAccessible(fieldElement, visibility) && !fieldElement.getOwningType().isRecord();
+        boolean canWriteField = canReadField && !fieldElement.isFinal();
+        boolean canRead = canReadField || hasMethodReadAccess(beanPropertyData);
+        boolean canWrite = canWriteField || hasMethodWriteAccess(beanPropertyData);
+        boolean hasReadAccess = accessKinds.contains(Introspected.Property.Access.READ);
+        boolean hasWriteAccess = accessKinds.contains(Introspected.Property.Access.WRITE);
+        if ((hasReadAccess && canRead) || (hasWriteAccess && canWrite)) {
+            return;
+        }
+        if (!canReadField && !canWriteField) {
+            failInvalidIntrospectedProperty(
+                fieldElement,
+                "the field is not accessible for visibility [" + visibility + "]"
+            );
+        }
+        if (hasWriteAccess && fieldElement.isFinal()) {
+            failInvalidIntrospectedProperty(fieldElement, "write access requires a non-final field");
+        }
+        failInvalidIntrospectedProperty(
+            fieldElement,
+            "the field does not provide any of the declared access kinds " + accessKinds
+        );
+    }
+
+    private static boolean hasMethodReadAccess(@Nullable BeanPropertyData beanPropertyData) {
+        return beanPropertyData != null &&
+            beanPropertyData.getter != null &&
+            beanPropertyData.readAccessKind == BeanProperties.AccessKind.METHOD;
+    }
+
+    private static boolean hasMethodWriteAccess(@Nullable BeanPropertyData beanPropertyData) {
+        return beanPropertyData != null &&
+            beanPropertyData.setter != null &&
+            beanPropertyData.writeAccessKind == BeanProperties.AccessKind.METHOD;
+    }
+
+    private static void validateIntrospectedPropertyMethod(MethodElement methodElement,
+                                                           BeanProperties.Visibility visibility) {
+        if (!isAccessible(methodElement, visibility)) {
+            failInvalidIntrospectedProperty(
+                methodElement,
+                "the method is not accessible for visibility [" + visibility + "]"
+            );
+        }
+        EnumSet<Introspected.Property.Access> accessKinds = resolveIntrospectedPropertyAccess(methodElement);
+        boolean canRead = canMethodProvideReadAccess(methodElement);
+        boolean canWrite = canMethodProvideWriteAccess(methodElement);
+        boolean hasReadAccess = accessKinds.contains(Introspected.Property.Access.READ);
+        boolean hasWriteAccess = accessKinds.contains(Introspected.Property.Access.WRITE);
+        if ((hasReadAccess && canRead) || (hasWriteAccess && canWrite)) {
+            return;
+        }
+        if (hasReadAccess && !hasWriteAccess) {
+            failInvalidIntrospectedProperty(
+                methodElement,
+                "read access requires a zero-argument method with a non-void return type"
+            );
+        }
+        if (hasWriteAccess && !hasReadAccess) {
+            failInvalidIntrospectedProperty(
+                methodElement,
+                "write access requires a one-argument method or a zero-argument void method"
+            );
+        }
+        failInvalidIntrospectedProperty(methodElement, "the method must be a readable or writable property accessor");
+    }
+
+    private static boolean canMethodProvideReadAccess(MethodElement methodElement) {
+        return methodElement.getParameters().length == 0 && !methodElement.getReturnType().isVoid();
+    }
+
+    private static boolean canMethodProvideWriteAccess(MethodElement methodElement) {
+        return methodElement.getParameters().length == 1 ||
+            (methodElement.getParameters().length == 0 && methodElement.getReturnType().isVoid());
+    }
+
+    private static void failInvalidIntrospectedProperty(MemberElement memberElement, String reason) {
+        throw new ProcessingException(
+            memberElement,
+            "Element annotated with @Introspected.Property cannot be used as an introspected property: " +
+                reason
+        );
+    }
+
+    private static void applyIntrospectedPropertyAccess(BeanPropertyData beanPropertyData) {
+        if (beanPropertyData.propertyAccessKinds == null) {
+            return;
+        }
+        if (!beanPropertyData.propertyAccessKinds.contains(Introspected.Property.Access.READ)) {
+            beanPropertyData.getter = null;
+            beanPropertyData.readAccessKind = null;
+        }
+        if (!beanPropertyData.propertyAccessKinds.contains(Introspected.Property.Access.WRITE)) {
+            beanPropertyData.setter = null;
+            beanPropertyData.writeAccessKind = null;
+        }
     }
 
     private static boolean hasMoreAnnotations(ClassElement c1, ClassElement c2) {
@@ -240,15 +558,30 @@ public final class AstBeanPropertiesUtils {
         beanPropertyData.type = beanPropertyData.getter.getGenericReturnType();
     }
 
-    private static void processGetter(Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName, boolean isAccessor, PropertyElementQuery configuration) {
+    private static void processGetter(Map<String, BeanPropertyData> props,
+                                      MethodElement methodElement,
+                                      String propertyName,
+                                      boolean isAccessor,
+                                      PropertyElementQuery configuration,
+                                      boolean ignoreOtherAccessors) {
         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+        if (beanPropertyData.ignoreReadAccessors && !ignoreOtherAccessors) {
+            registerIntrospectedPropertyAccess(beanPropertyData, methodElement);
+            return;
+        }
         beanPropertyData.getter = methodElement;
         if (isAccessor) {
             beanPropertyData.readAccessKind = BeanProperties.AccessKind.METHOD;
         }
         ClassElement genericReturnType = beanPropertyData.getter.getGenericReturnType();
+        if (ignoreOtherAccessors) {
+            beanPropertyData.type = genericReturnType;
+            beanPropertyData.ignoreReadAccessors = true;
+            registerIntrospectedPropertyAccess(beanPropertyData, methodElement);
+            return;
+        }
         ClassElement getterType = unwrapType(genericReturnType);
-        if (configuration.isIgnoreSettersWithDifferingType() && beanPropertyData.type != null) {
+        if (shouldCheckSetterTypeCompatibility(configuration, beanPropertyData) && beanPropertyData.type != null) {
             if (!getterType.isAssignable(unwrapType(beanPropertyData.type))) {
                 beanPropertyData.getter = null; // not a compatible getter
                 beanPropertyData.readAccessKind = null;
@@ -256,11 +589,33 @@ public final class AstBeanPropertiesUtils {
         } else {
             beanPropertyData.type = genericReturnType;
         }
+        registerIntrospectedPropertyAccess(beanPropertyData, methodElement);
     }
 
-    private static void processSetter(ClassElement classElement, Map<String, BeanPropertyData> props, MethodElement methodElement, String propertyName, boolean isAccessor, PropertyElementQuery configuration) {
+    private static void processSetter(ClassElement classElement,
+                                      Map<String, BeanPropertyData> props,
+                                      MethodElement methodElement,
+                                      String propertyName,
+                                      boolean isAccessor,
+                                      PropertyElementQuery configuration,
+                                      boolean ignoreOtherAccessors) {
         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
-        ClassElement paramType = methodElement.getParameters().length == 0 ? PrimitiveElement.BOOLEAN : methodElement.getParameters()[0].getGenericType();
+        registerIntrospectedPropertyAccess(beanPropertyData, methodElement);
+        ClassElement paramType = methodElement.getParameters().length == 0
+            ? PrimitiveElement.BOOLEAN
+            : methodElement.getParameters()[0].getGenericType();
+        if (beanPropertyData.ignoreWriteAccessors && !ignoreOtherAccessors) {
+            return;
+        }
+        if (ignoreOtherAccessors) {
+            beanPropertyData.setter = methodElement;
+            if (isAccessor) {
+                beanPropertyData.writeAccessKind = BeanProperties.AccessKind.METHOD;
+            }
+            beanPropertyData.type = paramType;
+            beanPropertyData.ignoreWriteAccessors = true;
+            return;
+        }
         ClassElement setterType = unwrapType(paramType);
         ClassElement existingType = beanPropertyData.type != null ? unwrapType(beanPropertyData.type) : null;
         if (setterType != null && beanPropertyData.setter != null) {
@@ -282,7 +637,7 @@ public final class AstBeanPropertiesUtils {
         if (isAccessor) {
             beanPropertyData.writeAccessKind = BeanProperties.AccessKind.METHOD;
         }
-        if (configuration.isIgnoreSettersWithDifferingType() && beanPropertyData.type != null) {
+        if (shouldCheckSetterTypeCompatibility(configuration, beanPropertyData) && beanPropertyData.type != null) {
             if (existingType != null && isIncompatibleSetterType(setterType, existingType)) {
                 beanPropertyData.setter = null; // not a compatible setter
                 beanPropertyData.writeAccessKind = null;
@@ -296,15 +651,38 @@ public final class AstBeanPropertiesUtils {
         return setterType != null && !existingType.isAssignable(setterType) && !setterType.getName().equals(existingType.getName());
     }
 
-   private static ClassElement unwrapType(ClassElement type) {
+    private static boolean shouldCheckSetterTypeCompatibility(PropertyElementQuery configuration, BeanPropertyData beanPropertyData) {
+        return configuration.isIgnoreSettersWithDifferingType() && !hasIntrospectedPropertyAccess(beanPropertyData);
+    }
+
+    private static boolean hasIntrospectedPropertyAccess(BeanPropertyData beanPropertyData) {
+        return hasIntrospectedPropertyAccess(beanPropertyData.getter) ||
+            hasIntrospectedPropertyAccess(beanPropertyData.setter) ||
+            hasIntrospectedPropertyAccess(beanPropertyData.field);
+    }
+
+    private static boolean hasIntrospectedPropertyAccess(@Nullable MemberElement memberElement) {
+        return memberElement != null && memberElement.hasAnnotation(ANN_INTROSPECTED_PROPERTY);
+    }
+
+    private static ClassElement unwrapType(ClassElement type) {
         if (type.isOptional()) {
             return type.getOptionalValueType().orElse(type);
         }
         return type;
     }
 
-    private static void resolveWriteAccessForField(FieldElement fieldElement, boolean isAccessor, BeanPropertyData beanPropertyData) {
+    private static void resolveWriteAccessForField(FieldElement fieldElement,
+                                                   boolean isAccessor,
+                                                   BeanPropertyData beanPropertyData,
+                                                   boolean ignoreOtherAccessors) {
         if (fieldElement.isFinal()) {
+            return;
+        }
+        if (ignoreOtherAccessors) {
+            beanPropertyData.field = fieldElement;
+            beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
+            beanPropertyData.type = fieldElement.getGenericType();
             return;
         }
         ClassElement fieldType = unwrapType(fieldElement.getGenericType());
@@ -313,8 +691,8 @@ public final class AstBeanPropertiesUtils {
         } else {
             isAccessor = false; // not compatible field or setter is present
         }
-        if (beanPropertyData.setter == null && isAccessor) {
-            // Use the field for read
+        if (beanPropertyData.writeAccessKind == null && isAccessor) {
+            // Use the field for write
             beanPropertyData.writeAccessKind = BeanProperties.AccessKind.FIELD;
         }
         if (beanPropertyData.type == null) {
@@ -322,15 +700,24 @@ public final class AstBeanPropertiesUtils {
         }
     }
 
-    private static void resolveReadAccessForField(FieldElement fieldElement, boolean isAccessor, BeanPropertyData beanPropertyData) {
+    private static void resolveReadAccessForField(FieldElement fieldElement,
+                                                  boolean isAccessor,
+                                                  BeanPropertyData beanPropertyData,
+                                                  boolean ignoreOtherAccessors) {
+        if (ignoreOtherAccessors) {
+            beanPropertyData.field = fieldElement;
+            beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
+            beanPropertyData.type = fieldElement.getGenericType();
+            return;
+        }
         ClassElement fieldType = unwrapType(fieldElement.getGenericType());
         if (beanPropertyData.type == null || fieldType.isAssignable(unwrapType(beanPropertyData.type))) {
             beanPropertyData.field = fieldElement;
         }  else {
             isAccessor = false; // not compatible field or getter is present
         }
-        if (beanPropertyData.getter == null && isAccessor) {
-            // Use the field for write
+        if (beanPropertyData.readAccessKind == null && isAccessor) {
+            // Use the field for read
             beanPropertyData.readAccessKind = BeanProperties.AccessKind.FIELD;
         }
         if (beanPropertyData.type == null) {
@@ -340,9 +727,13 @@ public final class AstBeanPropertiesUtils {
 
     private static boolean canFieldBeUsedForAccess(FieldElement fieldElement,
                                                    Set<BeanProperties.AccessKind> accessKinds,
-                                                   BeanProperties.Visibility visibility) {
+                                                   BeanProperties.Visibility visibility,
+                                                   PropertyElementQuery configuration) {
         if (fieldElement.getOwningType().isRecord()) {
             return false;
+        }
+        if (configuration.isJsonAutoDetectConfigured()) {
+            return configuration.isJsonAutoDetectFieldVisible(fieldElement);
         }
         if (accessKinds.contains(BeanProperties.AccessKind.FIELD)) {
             return isAccessible(fieldElement, visibility);
@@ -385,6 +776,10 @@ public final class AstBeanPropertiesUtils {
         public BeanProperties.AccessKind writeAccessKind;
         public final String propertyName;
         public boolean isExcluded;
+        public EnumSet<Introspected.Property.Access> propertyAccessKinds;
+        public MemberElement propertyAccessMember;
+        public boolean ignoreReadAccessors;
+        public boolean ignoreWriteAccessors;
 
         public BeanPropertyData(String propertyName) {
             this.propertyName = propertyName;

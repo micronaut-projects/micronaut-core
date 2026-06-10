@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -43,6 +44,7 @@ import org.jspecify.annotations.NonNull;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class PythonPropertyGetterMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider {
 
     private final PythonProcessingEnvironment environment;

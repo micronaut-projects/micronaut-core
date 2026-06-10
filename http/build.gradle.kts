@@ -34,6 +34,13 @@ dependencies {
     }
 }
 
+tasks.withType<Test>().configureEach {
+    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_25)) {
+        // Jazzer 0.24.0 cannot instrument JDK 25 class files (major version 69).
+        exclude("**/MediaTypeFuzzTest.class")
+    }
+}
+
 //compileJava.options.fork = true
 //compileJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 

@@ -15,11 +15,13 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
 
 /**
  * Represents a member of a {@link ClassDef}.
  */
+@Experimental
 public sealed interface MemberDef permits AttributeDef, FunctionDef {
     /**
      * The declaring class.

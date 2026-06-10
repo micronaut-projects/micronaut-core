@@ -51,7 +51,16 @@ abstract class GeneratedJavaSourceSpec extends Specification {
         }
     }
 
-    private static Iterable<JavaFileObject> compile(String pythonCode) {
+    protected static void assertCompilationFailsContaining(String pythonCode, String expectedMessage) {
+        try {
+            compile(pythonCode)
+            assert false : "Compilation succeeded, but expected failure containing: ${expectedMessage}"
+        } catch (RuntimeException e) {
+            assert e.message.contains(expectedMessage)
+        }
+    }
+
+    protected static Iterable<JavaFileObject> compile(String pythonCode) {
         String source = """
 package pyronaut_application;
 import io.micronaut.context.python.annotation.PythonApplication;

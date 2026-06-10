@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -41,6 +42,7 @@ import java.util.Objects;
  * @param documentation The class documentation string.
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.ClassDef">Python AST ClassDef</a>
  */
+@Experimental
 public record ClassDef(
     String name,
     String packageName,

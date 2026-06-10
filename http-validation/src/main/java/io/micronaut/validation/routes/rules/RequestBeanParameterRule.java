@@ -66,6 +66,7 @@ public class RequestBeanParameterRule implements RouteValidationRule {
 
             // Check readonly bindable properties can be set via constructor
             beanProperties.stream()
+                    .filter(RequestBeanParameterRule::isBindable)
                     .filter(PropertyElement::isReadOnly)
                     .filter(p -> constructorParameters.stream().noneMatch(constructorProperty -> constructorProperty.getName().equals(p.getName())))
                     .forEach(p -> errors.add(
@@ -77,12 +78,17 @@ public class RequestBeanParameterRule implements RouteValidationRule {
         } else {
             // Check readonly bindable properties
             beanProperties.stream()
+                    .filter(RequestBeanParameterRule::isBindable)
                     .filter(PropertyElement::isReadOnly)
                     .forEach(p -> errors.add("Bindable property [" + p.getName()  + "] for type [" + parameterElement.getType().getName() + "]"
                             + " is Read only and cannot be set during initialization.\n"
                             + "Add property setter or add @Creator constructor/method."));
         }
         return errors;
+    }
+
+    private static boolean isBindable(PropertyElement propertyElement) {
+        return propertyElement.hasStereotype(Bindable.class);
     }
 
 }

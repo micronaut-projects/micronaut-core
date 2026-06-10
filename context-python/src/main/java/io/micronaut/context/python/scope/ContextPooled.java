@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python.scope;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Prototype;
 
@@ -35,5 +36,6 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Executable
 @Prototype
+@Experimental
 public @interface ContextPooled {
 }

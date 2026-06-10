@@ -1,0 +1,35 @@
+Supported networking APIs include:
+
+* `loop.create_connection(...)`
+* `loop.create_server(...)`
+* `loop.connect_accepted_socket(...)`
+* `asyncio.open_connection(...)`
+* `asyncio.start_server(...)`
+* `loop.create_unix_connection(...)`
+* `loop.create_unix_server(...)`
+* `loop.create_datagram_endpoint(...)`
+* Socket coroutine helpers such as `sock_recv`, `sock_recv_into`, `sock_recvfrom`, `sock_recvfrom_into`, `sock_sendall`, `sock_sendto`, `sock_connect`, and `sock_accept`
+
+For ordinary TCP, UDP, and Unix-domain socket usage without a supplied Python socket, `create_connection`, `create_server`, `open_connection`, `start_server`, `create_unix_connection`, `create_unix_server`, and `create_datagram_endpoint` are backed by Netty channels. Servers returned from `asyncio.start_server(...)`, `loop.create_server(...)`, or `loop.create_unix_server(...)` are Netty-backed servers; their accepted connections use Netty-backed transports. TCP and Unix-domain socket transports support the common `asyncio.Transport` methods such as `write`, `writelines`, `write_eof`, `pause_reading`, `resume_reading`, `close`, `abort`, `is_closing`, and `get_extra_info`. Datagram transports support `sendto`, `close`, `abort`, `is_closing`, and `get_extra_info`.
+
+Hostname connections created by the Netty-backed TCP path use Netty DNS resolver APIs and unresolved remote addresses, so name resolution and connect processing stay on Netty futures instead of blocking the event-loop thread. The generic socket fallback still uses `loop.getaddrinfo(...)` on Micronaut's blocking executor.
+
+TLS is supported for `loop.create_connection(...)`, `asyncio.open_connection(...)`, `loop.create_server(...)`, `asyncio.start_server(...)`, `loop.connect_accepted_socket(...)`, and the Unix-domain socket client/server APIs. Client TLS accepts `ssl=True`, `server_hostname`, `ssl_handshake_timeout`, and `ssl_shutdown_timeout`. Client and server TLS also accept an explicit Micronaut mapping:
+
+[source,python]
+----
+ssl_options = {
+    "certfile": "/path/to/certificate.pem",
+    "keyfile": "/path/to/private-key.pem",
+    "key_password": "optional-password",
+    "cafile": "/path/to/ca.pem",
+    "trust_all": False,
+    "client_auth": "none", # one of none, optional, required
+    "protocols": ["TLSv1.3", "TLSv1.2"],
+    "ciphers": ["TLS_AES_128_GCM_SHA256"],
+}
+----
+
+Server TLS requires `certfile` and `keyfile`. `trust_all` is intended for tests and controlled internal environments. Full Python `ssl.SSLContext` objects are not inspected and fail with `NotImplementedError`; use `ssl=True` for default client TLS or the explicit mapping shown above. TLS transports report `can_write_eof() == False`.
+
+Transport extras expose socket-like information instead of raw Netty channels. Use `transport.get_extra_info("sockname")`, `transport.get_extra_info("peername")`, or `server.sockets[0].getsockname()` for addresses. The raw Netty `Channel` is intentionally not a Python application API.

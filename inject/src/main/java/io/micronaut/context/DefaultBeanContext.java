@@ -210,6 +210,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     );
 
     private final CustomScopeRegistry customScopeRegistry;
+    private final BeanResolutionCustomizer beanResolutionCustomizer;
 
     private @Nullable BeanDefinitionValidator beanValidator;
     private @Nullable List<BeanConfiguration> beanConfigurationsList;
@@ -275,13 +276,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         // enable classloader logging
         System.setProperty(ClassUtils.PROPERTY_MICRONAUT_CLASSLOADER_LOGGING, "true");
         this.classLoader = contextConfiguration.getClassLoader();
+        this.beanContextConfiguration = contextConfiguration;
+        this.beanResolutionCustomizer = Objects.requireNonNull(contextConfiguration.beanResolutionCustomizer(), "Bean resolution customizer cannot be null");
         this.customScopeRegistry = Objects.requireNonNull(createCustomScopeRegistry(), "Scope registry cannot be null");
         Set<Class<? extends Annotation>> eagerInitAnnotated = contextConfiguration.getEagerInitAnnotated();
         List<String> configuredEagerSingletonAnnotations = new ArrayList<>(eagerInitAnnotated.size());
         for (Class<? extends Annotation> ann : eagerInitAnnotated) {
             configuredEagerSingletonAnnotations.add(ann.getName());
         }
-        this.beanContextConfiguration = contextConfiguration;
         BeanResolutionTraceConfiguration traceConfiguration = beanContextConfiguration
             .getTraceConfiguration();
         this.traceMode = traceConfiguration.mode();
@@ -299,6 +301,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @since 3.0.0
      */
     protected CustomScopeRegistry createCustomScopeRegistry() {
+        CustomScopeRegistryFactory factory = beanContextConfiguration.customScopeRegistryFactory();
+        if (factory != null) {
+            return Objects.requireNonNull(factory.create(this), "Custom scope registry cannot be null");
+        }
         return new DefaultCustomScopeRegistry(this);
     }
 
@@ -308,6 +314,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @Internal
     CustomScopeRegistry getCustomScopeRegistry() {
         return customScopeRegistry;
+    }
+
+    BeanResolutionCustomizer getBeanResolutionCustomizer() {
+        return beanResolutionCustomizer;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> Argument<T> resolveBeanLookupArgument(Argument<T> beanType) {
+        Argument<?> resolvedBeanType = beanResolutionCustomizer.resolveBeanLookupArgument(beanType);
+        return (Argument<T>) Objects.requireNonNull(resolvedBeanType, "Resolved bean lookup argument cannot be null");
     }
 
     @Override
@@ -775,8 +791,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (result != null) {
             return result;
         }
+        Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
         result = singletonScope.containsBean(beanType, qualifier) ||
-            isCandidatePresent(beanKey.beanType, qualifier);
+            singletonScope.containsBean(lookupBeanType, qualifier) ||
+            isCandidatePresent(beanKey.beanType, qualifier) ||
+            (!lookupBeanType.equals(beanType) && isCandidatePresent(lookupBeanType, qualifier));
 
         containsBeanCache.put(beanKey, result);
         return result;
@@ -1268,6 +1287,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         interceptedTarget,
                         registration instanceof BeanDisposingRegistration ? ((BeanDisposingRegistration<T>) registration).getDependents() : null
                     ));
+                    interceptedProxy.clearCachedInterceptedTarget();
                 }
             }
             return;
@@ -1280,6 +1300,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (targetBeanRegistration.isPresent()) {
             BeanRegistration<T> targetRegistration = targetBeanRegistration.get();
             customScope.remove(targetRegistration.identifier);
+            if (registration.bean instanceof InterceptedBeanProxy<?> interceptedProxy) {
+                interceptedProxy.clearCachedInterceptedTarget();
+            }
         }
     }
 
@@ -2093,7 +2116,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             } else {
                 throw new BeanInstantiationException(resolutionContext, "Expected InstantiatableBeanDefinition [" + beanDefinition + "]");
             }
-            if (bean == null) {
+            if (bean == null && !isNullableBeanDefinition(beanDefinition)) {
                 throw new BeanInstantiationException(resolutionContext, "InstantiatableBeanDefinition [" + beanDefinition + "] returned null");
             }
             if (bean instanceof Qualified qualified && declaredQualifier != null) {
@@ -2136,7 +2159,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                   T bean,
                                                   Argument<T> beanType,
                                                   @Nullable Qualifier<T> finalQualifier) {
-        if (!(beanDefinition instanceof AbstractProviderDefinition<?>)) {
+        if (bean != null && !(beanDefinition instanceof AbstractProviderDefinition<?>)) {
             if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
                 Class<T> beanClass = beanDefinition.getBeanType();
                 List<ListenersSupplier.ListenerAndOrder<BeanCreatedEventListener>> listeners = new ArrayList<>();
@@ -2152,7 +2175,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
                 BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
                 for (ListenersSupplier.ListenerAndOrder<BeanCreatedEventListener> listener : listeners) {
-                    bean = (T) listener.bean.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, beanType, bean));
+                    bean = (T) listener.bean.onCreated(new BeanCreatedEvent<T>(
+                        this,
+                        beanDefinition,
+                        beanKey,
+                        beanType,
+                        bean,
+                        resolutionContext.getRootDefinition(),
+                        resolutionContext.getDependentBeans()
+                    ));
                     if (bean == null) {
                         throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
                     }
@@ -2403,18 +2434,51 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
         if (concreteCandidate.isPresent()) {
             BeanDefinition<T> definition = concreteCandidate.get();
+            Argument<T> resolvedBeanType = resolveCandidateBeanType(beanType, definition);
 
             if (definition.isContainerType() && beanClass != definition.getBeanType()) {
                 throw new NonUniqueBeanException(beanClass, Collections.singletonList(definition).iterator());
             }
-            registration = resolveBeanRegistration(resolutionContext, definition, beanType, qualifier);
+            registration = resolveBeanRegistration(resolutionContext, definition, resolvedBeanType, qualifier);
+            if (registration.bean == null) {
+                registration = resolveNullBeanRegistration(beanType, resolvedBeanType, registration);
+            }
         } else {
             registration = null;
         }
-        if ((registration == null || registration.bean == null) && throwNoSuchBean) {
+        if (registration == null && throwNoSuchBean) {
+            throw newNoSuchBeanException(resolutionContext, beanType, qualifier, null);
+        }
+        if (registration != null && registration.bean == null && throwNoSuchBean && !isNullableBeanDefinition(registration.beanDefinition)) {
             throw newNoSuchBeanException(resolutionContext, beanType, qualifier, null);
         }
         return registration;
+    }
+
+    private <T> Argument<T> resolveCandidateBeanType(Argument<T> requestedBeanType, BeanDefinition<T> beanDefinition) {
+        if (beanResolutionCustomizer.isCandidateBean(requestedBeanType, beanDefinition)) {
+            return requestedBeanType;
+        }
+        Argument<T> lookupBeanType = resolveBeanLookupArgument(requestedBeanType);
+        if (!lookupBeanType.equals(requestedBeanType) && beanResolutionCustomizer.isCandidateBean(lookupBeanType, beanDefinition)) {
+            return lookupBeanType;
+        }
+        return requestedBeanType;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> BeanRegistration<T> resolveNullBeanRegistration(Argument<T> beanType,
+                                                                Argument<T> resolvedBeanType,
+                                                                BeanRegistration<T> registration) {
+        Optional<?> resolvedNullBean = beanResolutionCustomizer.resolveNullBean(beanType, resolvedBeanType, registration.beanDefinition);
+        if (resolvedNullBean.isPresent()) {
+            return BeanRegistration.of(this, registration.identifier, registration.beanDefinition, (T) resolvedNullBean.get());
+        }
+        return registration;
+    }
+
+    private static boolean isNullableBeanDefinition(BeanDefinition<?> beanDefinition) {
+        return beanDefinition.getAnnotationMetadata().hasStereotype(io.micronaut.core.annotation.AnnotationUtil.NULLABLE);
     }
 
     private void assertContextState() {
@@ -2516,7 +2580,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             beanType,
             false,
             beanDefinitionProvider.getDisabledBeans(this).stream().<BeanDefinition<T>>mapMulti((disabledBean, consumer) -> {
-                if (disabledBean.isCandidateBean(beanType)) {
+                if (beanResolutionCustomizer.isCandidateBean(beanType, disabledBean)) {
                     consumer.accept((BeanDefinition<T>) disabledBean);
                 }
             }).toList()
@@ -2867,7 +2931,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
         Predicate<BeanDefinition<T>> predicate = candidate -> !candidate.isAbstract();
         Collection<BeanDefinition<T>> candidates = findBeanCandidates(resolutionContext, beanType, true, predicate);
-        return pickOneBean(beanType, qualifier, throwNonUnique, candidates);
+        Optional<BeanDefinition<T>> beanDefinition = pickOneBean(beanType, qualifier, throwNonUnique, candidates);
+        if (beanDefinition.isPresent()) {
+            return beanDefinition;
+        }
+        Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
+        if (!lookupBeanType.equals(beanType)) {
+            candidates = findBeanCandidates(resolutionContext, lookupBeanType, true, predicate);
+            return pickOneBean(lookupBeanType, qualifier, throwNonUnique, candidates);
+        }
+        return Optional.empty();
     }
 
     private <T> Optional<BeanDefinition<T>> findProxyTargetNoCache(@Nullable BeanResolutionContext resolutionContext,
@@ -2881,7 +2954,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             beanType,
             true,
             targetProxyBeans.stream().<BeanDefinition<T>>mapMulti((beanDefinition, consumer) -> {
-                if (beanDefinition.isCandidateBean(beanType)) {
+                if (beanResolutionCustomizer.isCandidateBean(beanType, beanDefinition)) {
                     consumer.accept((BeanDefinition<T>) beanDefinition);
                 }
             }).toList()
@@ -2942,6 +3015,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         if (candidates.size() == 1) {
             return candidates.iterator().next();
+        }
+        Optional<BeanDefinition<T>> customResolved = beanResolutionCustomizer.resolveNonUniqueBean(beanType, qualifier, candidates);
+        if (customResolved.isPresent()) {
+            return customResolved.get();
         }
         Collection<BeanDefinition<T>> originalCandidates = candidates;
         candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredStereotype(Secondary.class)).toList();
@@ -3016,6 +3093,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     @SuppressWarnings("unchecked")
     private <T> Collection<BeanDefinition<T>> findBeanCandidatesInternal(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType) {
+        Collection<BeanDefinition<T>> beanDefinitions = findBeanCandidatesCached(resolutionContext, beanType);
+        Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
+        if (!lookupBeanType.equals(beanType)) {
+            Collection<BeanDefinition<T>> lookupBeanDefinitions = findBeanCandidatesCached(resolutionContext, lookupBeanType);
+            if (!lookupBeanDefinitions.isEmpty()) {
+                Set<BeanDefinition<T>> merged = new LinkedHashSet<>(beanDefinitions);
+                merged.addAll(lookupBeanDefinitions);
+                return merged;
+            }
+        }
+        return beanDefinitions;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> Collection<BeanDefinition<T>> findBeanCandidatesCached(@Nullable BeanResolutionContext resolutionContext, Argument<T> beanType) {
         @SuppressWarnings("rawtypes")
         Collection beanDefinitions = beanCandidateCache.get(beanType);
         if (beanDefinitions == null) {

@@ -135,4 +135,21 @@ public interface BeanContextConfiguration {
     default BeanDefinitionsProvider getBeanDefinitionsProvider() {
         return new DefaultBeanDefinitionsProvider();
     }
+
+    /**
+     * @return The bean resolution customizer.
+     * @since 5.1.0
+     */
+    default BeanResolutionCustomizer beanResolutionCustomizer() {
+        return BeanResolutionCustomizer.DEFAULT;
+    }
+
+    /**
+     * @return The custom scope registry factory.
+     * @since 5.1.0
+     */
+    @Nullable
+    default CustomScopeRegistryFactory customScopeRegistryFactory() {
+        return null;
+    }
 }

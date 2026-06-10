@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
-import io.micronaut.context.python.ContextHolder
+import io.micronaut.context.python.PythonContextRuntime
 
 class ReuseControllerSpec extends AbstractPythonTypeElementSpec {
 
@@ -35,7 +35,7 @@ def hello(name: str) -> str:
         Map<String, Object> props = ["micronaut.python.pool.size": 4, "micronaut.python.pool.sync-init": true]
         ApplicationContext context = buildContext(python, true, props)
         // Enable reuse AFTER context is initialized so resetContext() does not NPE
-        ContextHolder.setReuseContext(true)
+        PythonContextRuntime.setReuseContext(true)
         def server = context.getBean(EmbeddedServer)
         server.start()
         def client = context.createBean(HttpClient, server.URL)
@@ -55,6 +55,6 @@ def hello(name: str) -> str:
         cleanup:
         client?.close()
         context?.close()
-        ContextHolder.setReuseContext(false)
+        PythonContextRuntime.setReuseContext(false)
     }
 }

@@ -264,15 +264,18 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 if self.in_function:
                     return node
                 return self._visit_class_def(node)
-            case ast.FunctionDef():
+            case ast.FunctionDef() | ast.AsyncFunctionDef():
                 # Track function nesting to avoid processing nested functions as micronaut decorators
                 was_in_function = self.in_function
                 self.in_function = True
                 try:
+                    is_async = isinstance(node, ast.AsyncFunctionDef)
                     # Handle property decorators
                     if self.current_class is not None:
                         property_info = self._parse_property_decorators(node)
                         if property_info:
+                            if is_async:
+                                raise ValueError(f"Async property [{node.name}] is not supported")
                             property_name, property_type = property_info
                             self._handle_property_function(property_name, property_type, node)
                             return node
@@ -340,9 +343,11 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         )
                         is_static = is_static_method(node)
 
-                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static, has_return_value(node))
+                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static, is_async, has_return_value(node))
                         if self.current_class is not None:
                             if node.name == "__init__":
+                                if is_async:
+                                    raise ValueError("Async constructors are not supported")
                                 self._handle_constructor_instance_attributes(node, arguments)
                                 # Set as constructor
                                 self.current_class = self.current_class.withConstructor(func_def)
@@ -396,16 +401,30 @@ class MicronautAstVisitor(ast.NodeVisitor):
                                 base_pkg = self._to_java_import_module(base_pkg)
                                 if not node.module.startswith('io.') and base_pkg.startswith('micronaut.'):
                                     base_pkg = f"io.{base_pkg}"
-                                full_name = f"{base_pkg}.{alias.name}"
+                                if base_pkg.split('.')[-1] == alias.name:
+                                    full_name = base_pkg
+                                else:
+                                    full_name = f"{base_pkg}.{alias.name}"
 
                         if alias.asname:
                             self.imported_types[alias.asname] = full_name
                             self._track_java_keyword_method_aliases(alias.asname, full_name)
                             self._track_imported_constant_assignment(alias.asname, node.level, node.module, alias.name)
                         else:
-                            self.imported_types[alias.name] = full_name
-                            self._track_java_keyword_method_aliases(alias.name, full_name)
-                            self._track_imported_constant_assignment(alias.name, node.level, node.module, alias.name)
+                            existing = self.imported_types.get(alias.name)
+                            if existing is not None:
+                                existing_nested_annotation_member = is_nested_annotation_member_import(self, existing)
+                                new_nested_annotation_member = is_nested_annotation_member_import(self, full_name)
+                                if new_nested_annotation_member and not existing_nested_annotation_member:
+                                    continue
+                                if existing_nested_annotation_member and not new_nested_annotation_member:
+                                    pass
+                                else:
+                                    continue
+                            if existing is None or full_name != f"{existing}.{alias.name}":
+                                self.imported_types[alias.name] = full_name
+                                self._track_java_keyword_method_aliases(alias.name, full_name)
+                                self._track_imported_constant_assignment(alias.name, node.level, node.module, alias.name)
 
                 return super().visit(node)
             case ast.Import():
@@ -1072,8 +1091,17 @@ class MicronautAstVisitor(ast.NodeVisitor):
         return self.to_decorator_from_reference_with_members(decorator_reference, {})
 
     def to_decorator_from_reference_with_members(self, decorator_reference, members):
+        imported_name = self.imported_types.get(decorator_reference)
         known_decorator = self.known_decorators.get(decorator_reference)
-        if known_decorator:
+        if imported_name and (known_decorator is None or known_decorator.annotationName() != imported_name):
+            matching_decorator = find_known_decorator_by_annotation_name(self, imported_name)
+            if matching_decorator is not None:
+                decorator = DecoratorDef(decorator_reference, imported_name, matching_decorator.repeatedName(), members,
+                                         matching_decorator.stereotypes())
+            else:
+                # Use the fully qualified name from the import
+                decorator = DecoratorDef(decorator_reference, imported_name, None, members, [])
+        elif known_decorator:
             # Use the fully qualified annotation name from the known decorator
             annotation_name = known_decorator.annotationName()
             repeated_name = known_decorator.repeatedName()
@@ -1081,7 +1109,6 @@ class MicronautAstVisitor(ast.NodeVisitor):
                                      known_decorator.stereotypes())
         else:
             # Check if this is an imported type
-            imported_name = self.imported_types.get(decorator_reference)
             if imported_name:
                 # Use the fully qualified name from the import
                 decorator = DecoratorDef(decorator_reference, imported_name, None, members, [])
@@ -1381,7 +1408,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         is_abstract = is_abstract_method(func_node)
         is_static = is_static_method(func_node)
 
-        func_def = JavaFuncDef(func_node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract, is_static, has_return_value(func_node))
+        func_def = JavaFuncDef(func_node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract, is_static, False, has_return_value(func_node))
 
         # Update the property based on type
         if property_type == "getter":
@@ -1855,18 +1882,53 @@ def is_property_decorator(funcdef):
             return True
     return False
 
+def find_known_decorator_by_annotation_name(visitor, annotation_name):
+    nested_annotation_name = to_nested_annotation_name(annotation_name)
+    for decorator in visitor.known_decorators.values():
+        if decorator.annotationName() == annotation_name or decorator.annotationName() == nested_annotation_name:
+            return decorator
+    return None
+
+def to_nested_annotation_name(annotation_name):
+    if annotation_name is None or "$" in annotation_name:
+        return annotation_name
+    last_dot = annotation_name.rfind(".")
+    if last_dot < 0:
+        return annotation_name
+    return annotation_name[:last_dot] + "$" + annotation_name[last_dot + 1:]
+
+def is_nested_annotation_member_import(visitor, annotation_name):
+    if visitor is None or annotation_name is None:
+        return False
+    parent_name = annotation_name.rsplit('.', 1)[0] if '.' in annotation_name else None
+    if not parent_name:
+        return False
+    visitor_context = getattr(visitor, 'visitor_context', None)
+    if visitor_context is None:
+        return False
+    try:
+        class_element = visitor_context.getClassElement(parent_name).orElse(None)
+        return class_element is not None and class_element_is_annotation_type(class_element)
+    except Exception:
+        return False
+
 def decorator_to_function(visitor, node):
     DecoratorDef = java.type("io.micronaut.python.processing.visitor.DecoratorDef")
 
     match node:
         # when only a decorator is specified it is represented as ast.Name with an ID
         case ast.Name():
+            imported_name = visitor.imported_types.get(node.id)
             decorator_declaration = visitor.known_decorators.get(node.id)
-            if decorator_declaration is not None:
+            if imported_name and (decorator_declaration is None or decorator_declaration.annotationName() != imported_name):
+                matching_decorator = find_known_decorator_by_annotation_name(visitor, imported_name)
+                if matching_decorator is not None:
+                    return matching_decorator
+                return DecoratorDef(node.id, imported_name, None, {}, [])
+            elif decorator_declaration is not None:
                 return decorator_declaration
             else:
                 # Check if this is an imported Micronaut/jakarta.inject annotation
-                imported_name = visitor.imported_types.get(node.id)
                 if imported_name:
                     # Create a DecoratorDef for the Micronaut/jakarta.inject annotation
                     return DecoratorDef(node.id, imported_name, None, {}, [])
@@ -1894,13 +1956,15 @@ def decorator_to_function(visitor, node):
         case ast.Call():
             # Support both simple names and qualified attributes as decorator functions
             # Determine decorator simple name and resolved annotation name
+            imported_name = None
             if isinstance(node.func, ast.Name):
                 decorator_name = node.func.id
                 decorator_declaration = visitor.known_decorators.get(decorator_name)
                 resolved_decorator_fqn = None
                 if visitor is not None:
                     # Try imported types first, then java.type assignments
-                    resolved_decorator_fqn = visitor.imported_types.get(decorator_name) or visitor.java_type_assignments.get(decorator_name, decorator_name)
+                    imported_name = visitor.imported_types.get(decorator_name)
+                    resolved_decorator_fqn = imported_name or visitor.java_type_assignments.get(decorator_name, decorator_name)
             elif isinstance(node.func, ast.Attribute):
                 # Build qualified name parts for alias resolution
                 names = []
@@ -1915,11 +1979,16 @@ def decorator_to_function(visitor, node):
                 resolved_decorator_fqn = '.'.join(names)
                 if visitor is not None and hasattr(visitor, '_resolve_dotted_name'):
                     resolved_decorator_fqn = visitor._resolve_dotted_name(names)
+                if decorator_declaration is None:
+                    decorator_declaration = find_known_decorator_by_annotation_name(visitor, resolved_decorator_fqn)
             else:
                 # Unknown node.func form; fallback
                 decorator_name = getattr(getattr(node.func, 'id', None), '__str__', lambda: '')() or 'unknown'
                 decorator_declaration = visitor.known_decorators.get(decorator_name)
                 resolved_decorator_fqn = decorator_name
+
+            if imported_name and (decorator_declaration is None or decorator_declaration.annotationName() != imported_name):
+                decorator_declaration = find_known_decorator_by_annotation_name(visitor, imported_name)
 
             if decorator_declaration is not None:
                 members = extract_call_arguments_with_defaults(decorator_declaration, node, visitor, decorator_declaration.annotationName())
@@ -2089,10 +2158,14 @@ def convert_ast_call_to_decorator(node, visitor=None):
     if decorator_reference is None:
         return None
     simple_name = decorator_reference.split(".")[-1]
+    resolved_reference = decorator_reference
+    if "." in decorator_reference and hasattr(visitor, '_resolve_dotted_name'):
+        resolved_reference = visitor._resolve_dotted_name(decorator_reference.split("."))
     if (
         simple_name in visitor.known_decorators
         or simple_name in visitor.imported_types
         or decorator_reference in visitor.imported_types
+        or find_known_decorator_by_annotation_name(visitor, resolved_reference) is not None
     ):
         return decorator_to_function(visitor, node)
     return None

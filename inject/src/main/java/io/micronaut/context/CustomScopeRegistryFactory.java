@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2020 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.writer;
+package io.micronaut.context;
+
+import io.micronaut.context.scope.CustomScopeRegistry;
+import org.jspecify.annotations.NonNull;
 
 /**
- * Extended version of {@link ClassWriterOutputVisitor} for types that write beans.
+ * Factory used to create a custom scope registry for a bean context.
  *
- * @since 3.5.2
+ * @since 5.1.0
  */
-public interface BeanClassWriter extends ClassOutputWriter {
+@FunctionalInterface
+public interface CustomScopeRegistryFactory {
+
     /**
-     * @return The bean definition visitor
+     * Create the custom scope registry.
+     *
+     * @param beanContext The bean context
+     * @return The custom scope registry
      */
-    BeanDefinitionVisitor getBeanDefinitionVisitor();
+    @NonNull
+    CustomScopeRegistry create(@NonNull BeanContext beanContext);
 }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Executable;
@@ -46,6 +47,7 @@ import java.util.ServiceLoader;
  * become injectable fields and module-level functions become methods.
  */
 @SuppressWarnings("checkstyle:DeclarationOrder")
+@Experimental
 public final class PythonScriptElement extends AbstractPythonElement implements ClassElement, ElementProvider {
 
     private final ScriptDef scriptDef;

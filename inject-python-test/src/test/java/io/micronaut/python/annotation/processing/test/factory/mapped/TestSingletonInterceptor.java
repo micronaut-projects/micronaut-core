@@ -18,7 +18,6 @@ package io.micronaut.python.annotation.processing.test.factory.mapped;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.exceptions.BeanContextException;
-import io.micronaut.inject.ExecutableMethod;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
@@ -28,20 +27,20 @@ import java.util.concurrent.ConcurrentHashMap;
 @Singleton
 public class TestSingletonInterceptor implements MethodInterceptor<Object, Object> {
 
-    private final Map<ExecutableMethod<?, ?>, Object> computedSingletons = new ConcurrentHashMap<>(30);
+    private final Map<String, Object> computedSingletons = new ConcurrentHashMap<>(30);
 
     @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        final ExecutableMethod<Object, Object> method = context.getExecutableMethod();
+        String methodKey = context.getExecutableMethod().getDeclaringType().getName() + "." + context.getExecutableMethod().getMethodName();
         synchronized (computedSingletons) {
-            Object result = computedSingletons.get(method);
+            Object result = computedSingletons.get(methodKey);
             if (result == null) {
                 result = context.proceed();
                 if (result == null) {
-                    throw new BeanContextException("Bean factory method [" + method + "] returned null");
+                    throw new BeanContextException("Bean factory method [" + context.getExecutableMethod() + "] returned null");
                 }
-                computedSingletons.put(method, result);
+                computedSingletons.put(methodKey, result);
             }
             return result;
         }

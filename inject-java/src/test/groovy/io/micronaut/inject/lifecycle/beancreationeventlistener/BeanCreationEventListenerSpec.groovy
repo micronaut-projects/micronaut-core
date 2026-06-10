@@ -17,8 +17,10 @@ package io.micronaut.inject.lifecycle.beancreationeventlistener
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
+import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.exceptions.CircularDependencyException
 import io.micronaut.core.type.Argument
+import io.micronaut.inject.BeanIdentifier
 import io.micronaut.inject.lifecycle.beancreationeventlistener.circular.Bar
 import io.micronaut.inject.lifecycle.beancreationeventlistener.circular.Foo
 import spock.lang.Specification
@@ -176,5 +178,93 @@ class BeanCreationEventListenerSpec extends Specification {
         Argument<J> jBeanType = jListener.beanType
         jBeanType.getType() == J.class
         jBeanType.getName() == "someParamName"
+    }
+
+    void "test created event exposes root definition and dependent beans"() {
+        given:
+        EventMetadataListener.reset()
+        ApplicationContext context = ApplicationContext.run(["spec.name": "BeanCreatedEventMetadata"])
+
+        when:
+        EventRoot root = context.getBean(EventRoot)
+
+        then:
+        root.dependency != null
+        EventMetadataListener.rootDefinition.beanType == EventRoot
+        EventMetadataListener.dependentTypes == [EventDependency]
+
+        cleanup:
+        context.close()
+    }
+
+    void "test created event accepts absent root definition and dependent beans"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(["spec.name": "BeanCreatedEventMetadata"])
+        def definition = context.getBeanDefinition(EventRoot)
+        EventRoot root = context.getBean(EventRoot)
+
+        when:
+        def event = new BeanCreatedEvent(
+            context,
+            definition,
+            BeanIdentifier.of("eventRoot"),
+            definition.asArgument(),
+            root,
+            null,
+            null
+        )
+
+        then:
+        event.rootBeanDefinition == null
+        event.dependentBeans.isEmpty()
+
+        cleanup:
+        context.close()
+    }
+
+    void "test legacy created event constructors expose default metadata"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(["spec.name": "BeanCreatedEventMetadata"])
+        def definition = context.getBeanDefinition(EventRoot)
+        EventRoot root = context.getBean(EventRoot)
+        BeanIdentifier identifier = BeanIdentifier.of("eventRoot")
+        Argument<EventRoot> beanType = definition.asArgument()
+
+        when:
+        def event = new BeanCreatedEvent(context, definition, identifier, root)
+
+        then:
+        event.beanIdentifier.is(identifier)
+        event.beanType == beanType
+        event.rootBeanDefinition == null
+        event.dependentBeans.isEmpty()
+
+        when:
+        event = new BeanCreatedEvent(context, definition, identifier, beanType, root)
+
+        then:
+        event.beanIdentifier.is(identifier)
+        event.beanType.is(beanType)
+        event.rootBeanDefinition == null
+        event.dependentBeans.isEmpty()
+
+        cleanup:
+        context.close()
+    }
+
+    void "test null beans are not sent to created event listeners"() {
+        given:
+        NullEventListener.reset()
+        ApplicationContext context = ApplicationContext.run(["spec.name": "BeanCreatedEventNull"])
+
+        when:
+        NullEventProduct product = context.getBean(NullEventProduct)
+
+        then:
+        product == null
+        !NullEventListener.sawNullBean
+
+        cleanup:
+        context.close()
     }
 }

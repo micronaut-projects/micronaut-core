@@ -1,6 +1,13 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== HTTP client redirect forwarding no longer retains authorization headers cross-origin by default
+
+The Netty HTTP client no longer forwards `Authorization`, `Proxy-Authorization`, or `Cookie` headers on cross-origin redirects by default.
+This applies to both normal redirects and preserve-body redirects (`307` and `308`).
+
+If needed, this behavior can be customized through `HttpClientConfiguration`.
+
 == 5.0
 
 === Core Changes

@@ -44,7 +44,7 @@ class Person:
         return this.graalpyInternalValue;
       }
     } else {
-      this.graalpyInternalValue = ContextHolder.newUninitializedInstance("python", "Person");
+      this.graalpyInternalValue = PythonContextRuntime.newUninitializedInstance("python", "Person");
       this.graalpyInternalValueSyncing = true;
       GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "name", (Object) this.name);
       GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "age", (Object) this.age);
@@ -57,10 +57,6 @@ class Person:
   public static Person fromPolyglotValue(Value arg1) {
     if (GraalPyRuntimeUtil.isNone(arg1)) {
       return null;
-    }
-    Object hostObject = GraalPyRuntimeUtil.unwrapHostObject(arg1, Person.class);
-    if (hostObject != null) {
-      return (Person) hostObject;
     }
     return new python.Person(arg1);
   }

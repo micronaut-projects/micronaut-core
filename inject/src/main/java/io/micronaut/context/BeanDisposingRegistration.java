@@ -30,7 +30,7 @@ import java.util.List;
  * @since 3.5.0
  */
 @Internal
-final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> {
+final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implements DependentBeanProvider {
     private final BeanContext beanContext;
     @Nullable
     private final List<BeanRegistration<?>> dependents;
@@ -62,5 +62,10 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> {
     @Nullable
     public List<BeanRegistration<?>> getDependents() {
         return dependents;
+    }
+
+    @Override
+    public List<BeanRegistration<?>> dependentBeans() {
+        return dependents == null ? List.of() : List.copyOf(dependents);
     }
 }

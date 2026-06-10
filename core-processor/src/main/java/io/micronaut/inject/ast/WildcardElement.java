@@ -44,6 +44,28 @@ public interface WildcardElement extends GenericElement {
     List<? extends ClassElement> getLowerBounds();
 
     /**
+     * Checks whether this wildcard has an explicitly declared upper bound.
+     *
+     * @return Whether this wildcard has an explicitly declared upper bound.
+     * @since 5.1.0
+     */
+    @Experimental
+    default boolean hasExplicitUpperBound() {
+        return isBounded() && getLowerBounds().isEmpty();
+    }
+
+    /**
+     * Checks whether this wildcard has an explicitly declared lower bound.
+     *
+     * @return Whether this wildcard has an explicitly declared lower bound.
+     * @since 5.1.0
+     */
+    @Experimental
+    default boolean hasExplicitLowerBound() {
+        return !getLowerBounds().isEmpty();
+    }
+
+    /**
      * Is bounded wildcard - not "{@code < ? >}".
      * @return true if the wildcard is bounded, false otherwise
      * @since 4.0.0

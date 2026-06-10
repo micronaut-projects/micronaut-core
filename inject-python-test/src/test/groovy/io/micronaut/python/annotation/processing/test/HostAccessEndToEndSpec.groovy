@@ -1,7 +1,7 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.python.ContextHolder
+import io.micronaut.context.python.PythonContextRuntime
 import io.micronaut.context.python.GraalPyContextFactory
 import io.micronaut.context.python.GraalPyRuntimeUtil
 import io.micronaut.context.python.ValueCoercible
@@ -217,8 +217,8 @@ class Forecast:
         ApplicationContext ctx = buildContext(py, true)
         ClassLoader classLoader = ctx.classLoader
         ctx.close()
-        ContextHolder.setReuseContext(false)
-        ContextHolder.resetContext()
+        PythonContextRuntime.setReuseContext(false)
+        PythonContextRuntime.resetContext()
 
         when:
         Context polyglot = GraalPyContextFactory.bootstrapReusableContext(classLoader, Map.of(), "pyronaut_application.py")
@@ -240,8 +240,8 @@ class Forecast:
         periodClass.getField('summary').get(convertedPeriods[0]) == 'Clear'
 
         cleanup:
-        ContextHolder.setReuseContext(false)
-        ContextHolder.resetContext()
+        PythonContextRuntime.setReuseContext(false)
+        PythonContextRuntime.resetContext()
     }
 
     void "reusable context loads generated target mappings for overloaded static Java methods"() {
@@ -265,8 +265,8 @@ class PythonTokenReader(TokenReaderLike):
         ApplicationContext ctx = buildContext(py, true)
         ClassLoader classLoader = ctx.classLoader
         ctx.close()
-        ContextHolder.setReuseContext(false)
-        ContextHolder.resetContext()
+        PythonContextRuntime.setReuseContext(false)
+        PythonContextRuntime.resetContext()
 
         when:
         Context polyglot = GraalPyContextFactory.bootstrapReusableContext(classLoader, Map.of(), "pyronaut_application.py")
@@ -283,8 +283,8 @@ Factory.create(PythonTokenReaderHost.fromPolyglotValue(PythonTokenReader()))
         result.asString() == 'value-test'
 
         cleanup:
-        ContextHolder.setReuseContext(false)
-        ContextHolder.resetContext()
+        PythonContextRuntime.setReuseContext(false)
+        PythonContextRuntime.resetContext()
     }
 
     void "HostAccess exposes non-introspected dataclass properties on generated stub"() {

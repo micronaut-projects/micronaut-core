@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -30,6 +31,7 @@ import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class PythonPropertyParameterElement extends AbstractPythonElement implements ParameterElement {
 
     private final ClassElement type;

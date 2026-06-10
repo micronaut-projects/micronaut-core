@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,7 @@ import org.jetbrains.annotations.Nullable;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class PythonFieldElement extends AbstractPythonElement implements FieldElement, ElementProvider {
     private final PythonProcessingEnvironment environment;
     private final ClassElement declaringType;

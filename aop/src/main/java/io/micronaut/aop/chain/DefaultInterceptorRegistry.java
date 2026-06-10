@@ -38,6 +38,7 @@ import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import org.jspecify.annotations.NullMarked;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -173,12 +174,17 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
         }
         // loop through the bindings on the interceptor and make sure that
         // the intercept point has the same once
+        boolean hasInterceptorBinding = false;
         for (AnnotationValue<?> interceptorAnnotationValue : interceptorValues) {
+            if (interceptorAnnotationValue.stringValue().isEmpty()) {
+                continue;
+            }
+            hasInterceptorBinding = true;
             if (!matches(interceptorAnnotationValue, interceptPointBindings)) {
                 return false;
             }
         }
-        return true;
+        return hasInterceptorBinding;
     }
 
     private boolean matches(AnnotationValue<?> interceptorAnnotationValue, Collection<AnnotationValue<?>> interceptPointBindings) {

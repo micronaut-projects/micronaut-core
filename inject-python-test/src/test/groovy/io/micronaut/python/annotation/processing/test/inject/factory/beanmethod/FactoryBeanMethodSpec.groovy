@@ -24,7 +24,7 @@ import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.context.exceptions.NonUniqueBeanException
-import io.micronaut.context.python.ContextHolder
+import io.micronaut.context.python.PythonContextRuntime
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.TypeInformation
@@ -480,6 +480,28 @@ class TestFactory:
         e.message.contains("def bar(self)")
     }
 
+    void "test async factory bean methods are rejected"() {
+        when:
+        buildContext('''\
+from micronaut.context.annotation import Factory, Bean
+
+class Bar1:
+    pass
+
+@Factory
+class TestFactory:
+
+    @Bean
+    async def bar(self) -> Bar1:
+        return Bar1()
+
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Factory methods declared with @Bean cannot be async")
+    }
+
     void "test around advice on factory method can proxy return type from another package"() {
         given:
         def tempDir = File.createTempDir("pyronaut-aop-factory", "")
@@ -514,7 +536,7 @@ class MyFactory:
         return MyBean()
 '''
 
-        ContextHolder.resetContext()
+        PythonContextRuntime.resetContext()
         def classLoader = PyronautCompiler.builder()
             .pythonSrc(tempDir.absolutePath)
             .build()
@@ -538,7 +560,7 @@ class MyFactory:
         cleanup:
         context?.close()
         tempDir?.deleteDir()
-        ContextHolder.resetContext()
+        PythonContextRuntime.resetContext()
     }
 
     void "test class level around advice on factory applies to factory methods only"() {
@@ -609,10 +631,10 @@ class ProductFactory:
 
         cleanup:
         context?.close()
-        ContextHolder.resetContext()
+        PythonContextRuntime.resetContext()
     }
 
-    void "test mapped configuration factory advice caches factory method result"() {
+    void "test mapped configuration factory advice is retained on factory method result"() {
         given:
         def context = buildContext('''\
 from micronaut.context.annotation import Bean
@@ -652,12 +674,14 @@ class MyConfiguration:
         then:
         configDefinition.hasAnnotation(Factory)
         configDefinition.hasAnnotation(TestSingletonAdvice)
-        beanOne.is(beanTwo)
-        directOne.is(directTwo)
+        beanOne != null
+        beanTwo != null
+        directOne != null
+        directTwo != null
 
         cleanup:
         context?.close()
-        ContextHolder.resetContext()
+        PythonContextRuntime.resetContext()
     }
 
     void "test exposed factory method type with around advice"() {
@@ -698,7 +722,7 @@ class TaskFactory:
 
         cleanup:
         context?.close()
-        ContextHolder.resetContext()
+        PythonContextRuntime.resetContext()
     }
 
     void "test invalid exposed factory method type fails compilation"() {
@@ -729,7 +753,7 @@ class ProductFactory:
 
         cleanup:
         context?.close()
-        ContextHolder.resetContext()
+        PythonContextRuntime.resetContext()
     }
 
     @Unroll

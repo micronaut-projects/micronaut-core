@@ -22,7 +22,7 @@ import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.DefaultBeanDefinitionsProvider
 import io.micronaut.context.Qualifier
 import io.micronaut.context.event.ApplicationEventPublisherFactory
-import io.micronaut.context.python.ContextHolder
+import io.micronaut.context.python.PythonContextRuntime
 import io.micronaut.core.io.IOUtils
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.core.beans.BeanIntrospection
@@ -204,9 +204,9 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
      * @return The context. Should be shutdown after use
      */
     ApplicationContext buildContext(@Language("python") String pythonCode, boolean includeAllBeans = false, Map properties = [:]) {
-        // Ensure ContextHolder is clean before starting
-        ContextHolder.resetContext()
-        assert !ContextHolder.isInitialized()
+        // Ensure PythonContextRuntime is clean before starting
+        PythonContextRuntime.resetContext()
+        assert !PythonContextRuntime.isInitialized()
 
         // Process Python code and generate Java classes
         List<ClassElement> capturedElements = []

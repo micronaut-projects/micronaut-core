@@ -234,6 +234,31 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
+     * Resolves the default values declared by the given annotation type.
+     *
+     * @param annotationName The annotation type name
+     * @return The default values, or an empty map if the annotation type cannot be resolved
+     * @since 5.1.0
+     */
+    public final Map<CharSequence, Object> getAnnotationDefaultValues(String annotationName) {
+        return getAnnotationMirror(annotationName)
+            .map(annotationType -> {
+                Map<? extends T, ?> annotationDefaultValues = readAnnotationDefaultValues(annotationName, annotationType, true);
+                Map<CharSequence, Object> defaultValues = getAnnotationDefaults(
+                    annotationType,
+                    annotationName,
+                    annotationDefaultValues,
+                    new HashMap<>()
+                );
+                if (defaultValues == null || defaultValues.isEmpty()) {
+                    return Collections.<CharSequence, Object>emptyMap();
+                }
+                return Collections.unmodifiableMap(defaultValues);
+            })
+            .orElse(Collections.emptyMap());
+    }
+
+    /**
      * Build only metadata for declared annotations.
      *
      * @param element The element
@@ -558,6 +583,19 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The values
      */
     protected abstract Map<? extends T, ?> readAnnotationDefaultValues(String annotationName, T annotationType);
+
+    /**
+     * Read the raw default annotation values from the given annotation.
+     *
+     * @param annotationName annotation name
+     * @param annotationType the type
+     * @param includeEmptyValues Whether empty values should be included
+     * @return The values
+     * @since 5.1.0
+     */
+    protected Map<? extends T, ?> readAnnotationDefaultValues(String annotationName, T annotationType, boolean includeEmptyValues) {
+        return readAnnotationDefaultValues(annotationName, annotationType);
+    }
 
     /**
      * Read the raw annotation values from the given annotation.

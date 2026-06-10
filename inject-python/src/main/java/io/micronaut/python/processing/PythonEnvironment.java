@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.ScriptDef;
@@ -35,6 +36,7 @@ import java.util.stream.Collectors;
  * @since 4.8.0
  * @author Micronaut
  */
+@Experimental
 public record PythonEnvironment(
     Map<String, ClassDef> classes,
     Map<String, ScriptDef> scripts,

@@ -16,12 +16,12 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
-
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
+import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import jakarta.annotation.PostConstruct;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
@@ -29,6 +29,7 @@ import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -41,8 +42,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -52,13 +56,13 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  * Provides a pool of GraalPy {@link Context} instances built on a shared {@link Engine}.
  * <p>
  * The first context (primary) is created synchronously and is not part of the pool. It is exposed
- * via {@link ContextHolder#getContext()} and used for non-pooled operations. Remaining pooled
+ * via {@link PythonContextRuntime#getContext()} and used for non-pooled operations. Remaining pooled
  * contexts are created on a background thread to avoid blocking startup.
  */
 @Singleton
 @io.micronaut.context.annotation.Context
 @Internal
-final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
+final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulShutdownCapable, Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(PythonPool.class);
     private final Engine engine;
     private final HostAccess hostAccess;
@@ -69,11 +73,15 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
     private final Context primaryContext;
     private final BlockingDeque<Context> pooledQueue = new LinkedBlockingDeque<>();
     private final List<Context> pooledContexts = new ArrayList<>();
+    private final Map<PythonEventLoop, Context> eventLoopContexts = new ConcurrentHashMap<>();
     private final Map<Context, Map<String, Value>> cache = new ConcurrentHashMap<>();
     private final Map<String, Map<String, Object>> scriptInjections = new ConcurrentHashMap<>();
+    private final Map<String, java.util.Set<String>> asyncScriptInjections = new ConcurrentHashMap<>();
 
     private final AtomicInteger size = new AtomicInteger(0);
     private final AtomicReference<Thread> warmupThread = new AtomicReference<>();
+    private final AtomicBoolean gracefulShutdownStarted = new AtomicBoolean();
+    private final CompletableFuture<Void> gracefulShutdown = new CompletableFuture<>();
     private final int targetSize;
     private volatile boolean closed;
 
@@ -102,25 +110,25 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
 
     /**
      * Initializes the pool and primary context.
-     * The first (primary) context is created synchronously and exposed to {@link ContextHolder}.
+     * The first (primary) context is created synchronously and exposed to {@link PythonContextRuntime}.
      * Pooled contexts are created synchronously when 'micronaut.python.pool.sync-init' is true,
      * otherwise they are created asynchronously on a background thread.
      */
     @PostConstruct
     void init() {
         // If reuseContext is enabled, skip pool initialization entirely
-        if (ContextHolder.isReuseContext()) {
+        if (PythonContextRuntime.isReuseContext()) {
             LOG.debug("Context reuse enabled; skipping Python context pool initialization");
-            ContextHolder.setPythonPool(null);
+            PythonContextRuntime.setPythonPool(null);
             return;
         }
         // Register pool and prepare caches if enabled
         if (targetSize <= 0) {
             LOG.debug("Python context pool disabled via configuration; skipping initialization");
-            ContextHolder.setPythonPool(null);
+            PythonContextRuntime.setPythonPool(null);
             return;
         }
-        ContextHolder.setPythonPool(this);
+        PythonContextRuntime.setPythonPool(this);
         cache.put(primaryContext, new ConcurrentHashMap<>());
         final int toCreate = targetSize;
         if (syncInit) {
@@ -139,8 +147,16 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
                         }
                         addPooledContext();
                     }
-                } catch (IllegalStateException ignored) {
-                    // ignore during shutdown
+                } catch (PolyglotException e) {
+                    if (e.isCancelled() && closed) {
+                        LOG.debug("Python pool warmup cancelled during shutdown", e);
+                    } else {
+                        LOG.warn("Unexpected Python pool warmup failure", e);
+                        throw e;
+                    }
+                } catch (RuntimeException e) {
+                    LOG.warn("Unexpected Python pool warmup failure", e);
+                    throw e;
                 }
             }, "python-pool-warmup");
             t.setDaemon(true);
@@ -220,9 +236,28 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         return getOrCreateScript(context, packageName, scriptName);
     }
 
+    Value getEventLoopClass(PythonEventLoop eventLoop, @Nullable String packageName, String simpleName) {
+        return getOrCreateClass(getOrCreateEventLoopContext(eventLoop), packageName, simpleName);
+    }
+
+    Value getEventLoopScript(PythonEventLoop eventLoop, String packageName, String scriptName) {
+        return getOrCreateScript(getOrCreateEventLoopContext(eventLoop), packageName, scriptName);
+    }
+
     void injectScript(String packageName, String scriptName, String attribute, Object value) {
+        injectScript(packageName, scriptName, attribute, value, false);
+    }
+
+    void injectScriptAsync(String packageName, String scriptName, String attribute, Object value) {
+        injectScript(packageName, scriptName, attribute, value, true);
+    }
+
+    private void injectScript(String packageName, String scriptName, String attribute, Object value, boolean async) {
         String key = scriptKey(packageName, scriptName);
         scriptInjections.computeIfAbsent(key, ignored -> new ConcurrentHashMap<>()).put(attribute, value);
+        if (async) {
+            asyncScriptInjections.computeIfAbsent(key, ignored -> ConcurrentHashMap.newKeySet()).add(attribute);
+        }
         for (Context context : snapshotIncludingPrimary()) {
             Map<String, Value> values = cache.get(context);
             if (values == null) {
@@ -230,8 +265,32 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
             }
             Value script = values.get(key);
             if (script != null) {
-                script.putMember(attribute, coerceInjectedValue(context, value));
+                script.putMember(attribute, coerceInjectedValue(script, value, async));
             }
+        }
+    }
+
+    private Context getOrCreateEventLoopContext(PythonEventLoop eventLoop) {
+        Context existing = eventLoopContexts.get(eventLoop);
+        if (existing != null) {
+            return existing;
+        }
+        synchronized (eventLoopContexts) {
+            existing = eventLoopContexts.get(eventLoop);
+            if (existing != null) {
+                return existing;
+            }
+            Context created = pooledQueue.pollFirst();
+            if (created != null) {
+                pooledContexts.remove(created);
+                size.decrementAndGet();
+                replenishPooledContextAsync();
+            } else {
+                created = createContext();
+            }
+            eventLoopContexts.put(eventLoop, created);
+            cache.put(created, new ConcurrentHashMap<>());
+            return created;
         }
     }
 
@@ -239,21 +298,20 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         if (closed || size.get() >= targetSize) {
             return;
         }
-        Context c;
-        try {
-            c = GraalPyContextFactory.buildContext(
-                hostAccess,
-                engine,
-                applicationContext.getClassLoader()
-            );
-        } catch (IOException e) {
-            throw new ApplicationStartupException("Failed to create Python context: " + e.getMessage(), e);
-        }
+        Context c = createContext();
         if (closed) {
             try {
-                c.close(false);
-            } catch (Exception e) {
-                LOG.warn("Error while closing context: " + e.getMessage(), e);
+                GraalPyContextFactory.closeContext(c, true);
+            } catch (PolyglotException e) {
+                if (e.isCancelled()) {
+                    LOG.debug("Python pool context close cancelled during shutdown", e);
+                } else {
+                    LOG.warn("Unexpected error while closing Python pool context", e);
+                    throw e;
+                }
+            } catch (RuntimeException | Error e) {
+                LOG.warn("Unexpected error while closing Python pool context", e);
+                throw e;
             }
             return;
         }
@@ -263,14 +321,50 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         size.incrementAndGet();
     }
 
+    private void replenishPooledContextAsync() {
+        if (closed || size.get() >= targetSize) {
+            return;
+        }
+        Thread t = new Thread(() -> {
+            try {
+                addPooledContext();
+            } catch (PolyglotException e) {
+                if (e.isCancelled() && closed) {
+                    LOG.debug("Python pool replenishment cancelled during shutdown", e);
+                } else {
+                    LOG.warn("Unexpected Python pool replenishment failure", e);
+                    throw e;
+                }
+            } catch (RuntimeException e) {
+                LOG.warn("Unexpected Python pool replenishment failure", e);
+                throw e;
+            }
+        }, "python-pool-replenish");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private Context createContext() {
+        try {
+            return GraalPyContextFactory.buildContext(
+                hostAccess,
+                engine,
+                applicationContext.getClassLoader()
+            );
+        } catch (IOException e) {
+            throw new ApplicationStartupException("Failed to create Python context: " + e.getMessage(), e);
+        }
+    }
+
     private List<Context> snapshot() {
         return new ArrayList<>(pooledContexts);
     }
 
     private List<Context> snapshotIncludingPrimary() {
-        List<Context> contexts = new ArrayList<>(pooledContexts.size() + 1);
+        List<Context> contexts = new ArrayList<>(pooledContexts.size() + eventLoopContexts.size() + 1);
         contexts.add(primaryContext);
         contexts.addAll(pooledContexts);
+        contexts.addAll(eventLoopContexts.values());
         return contexts;
     }
 
@@ -292,13 +386,18 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
         return m.computeIfAbsent(key, k -> {
             Value script = loadScript(c, packageName, scriptName);
             scriptInjections.getOrDefault(key, Map.of())
-                .forEach((attribute, value) -> script.putMember(attribute, coerceInjectedValue(c, value)));
+                .forEach((attribute, value) -> script.putMember(
+                    attribute,
+                    coerceInjectedValue(script, value, asyncScriptInjections.getOrDefault(key, java.util.Set.of()).contains(attribute))
+                ));
             return script;
         });
     }
 
-    private static @Nullable Object coerceInjectedValue(Context context, Object value) {
-        return GraalPyRuntimeUtil.coerceToContext(value, context);
+    private static @Nullable Object coerceInjectedValue(Value script, Object value, boolean async) {
+        return async
+            ? GraalPyRuntimeUtil.asyncMemberValue(script, value)
+            : GraalPyRuntimeUtil.coerceToContext(value, script.getContext());
     }
 
     private static String classInstanceKey(@Nullable String pkg, String simple) {
@@ -310,31 +409,50 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, Ordered {
     }
 
     private static Value loadClass(Context ctx, @Nullable String packageName, String simpleName) {
-        return ContextHolder.findClass(packageName, simpleName, ctx);
+        return PythonContextRuntime.findClass(packageName, simpleName, ctx);
     }
 
     private static Value loadScript(Context ctx, String packageName, String scriptName) {
-        return ContextHolder.findScript(packageName, scriptName, ctx);
+        return PythonContextRuntime.findScript(packageName, scriptName, ctx);
     }
 
     @Override
     public void onDestroyed(@NonNull BeanDestroyedEvent<Context> event) {
+        PythonContextRuntime.onNoActiveExecutionsAfterCurrentFrame(event.getBean(), () -> closePool(true));
+    }
+
+    @Override
+    public CompletionStage<?> shutdownGracefully() {
+        if (gracefulShutdownStarted.compareAndSet(false, true)) {
+            stopWarmup();
+            PythonContextRuntime.onNoActiveExecutions(snapshotIncludingPrimary(), () -> gracefulShutdown.complete(null));
+        }
+        return gracefulShutdown;
+    }
+
+    private void stopWarmup() {
         closed = true;
         Thread thread = warmupThread.getAndSet(null);
         if (thread != null) {
             thread.interrupt();
         }
+    }
+
+    private void closePool(boolean cancelIfExecuting) {
+        stopWarmup();
         List<Context> snapshot = snapshot();
         pooledContexts.removeAll(snapshot);
         pooledQueue.removeAll(snapshot);
+        List<Context> eventLoopSnapshot = new ArrayList<>(eventLoopContexts.values());
+        eventLoopContexts.clear();
         cache.clear();
         scriptInjections.clear();
-        for (Context context : snapshot) {
-            try {
-                context.close(false);
-            } catch (Exception e) {
-                LOG.warn("Error while closing context: " + e.getMessage(), e);
-            }
+        asyncScriptInjections.clear();
+        List<Context> contexts = new ArrayList<>(snapshot.size() + eventLoopSnapshot.size());
+        contexts.addAll(snapshot);
+        contexts.addAll(eventLoopSnapshot);
+        for (Context context : contexts) {
+            GraalPyContextFactory.closeContext(context, cancelIfExecuting);
         }
     }
 }
