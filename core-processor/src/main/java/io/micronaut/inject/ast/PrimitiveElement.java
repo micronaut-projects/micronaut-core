@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.inject.ast;
+
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.reflect.ClassUtils;
 import org.jspecify.annotations.Nullable;
