@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.List;
 
 /**
@@ -28,6 +29,7 @@ import java.util.List;
  * @param constraints The constraints of the type variable.
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.TypeVar">Python AST TypeVar</a>
  */
+@Experimental
 public record TypeVar(
     String name,
     Object bound,

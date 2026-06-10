@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.annotation.processing.AbstractInjectAnnotationProcessor;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.core.naming.NameUtils;
@@ -63,6 +64,7 @@ import java.util.stream.Collectors;
  * @since 4.8.0
  */
 @SupportedAnnotationTypes(PythonAnnotationProcessor.PYTHON_APPLICATION_ANNOTATION)
+@Experimental
 public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor implements AutoCloseable {
     public static final String APPLICATION_PATH = "GRAALPY-VFS/micronaut-application/";
     public static final String APPLICATION_SRC_PATH = "GRAALPY-VFS/micronaut-application/src/";

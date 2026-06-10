@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.beans;
 
+import io.micronaut.core.annotation.Experimental;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Set;
@@ -38,6 +39,7 @@ import io.micronaut.sourcegen.model.ObjectDef;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class PythonBeanDefinitionProcessor {
 
     private final Set<String> processed = new java.util.HashSet<>();

@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.List;
 import java.util.Objects;
 
@@ -36,6 +37,7 @@ import java.util.Objects;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public record ArgumentDef(
     String name,
     String annotation,

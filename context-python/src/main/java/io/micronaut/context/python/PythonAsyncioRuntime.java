@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -40,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * Runtime helpers for Python coroutine bridge methods.
  */
 @Internal
+@Experimental
 public final class PythonAsyncioRuntime {
     private static final String SCHEDULER_NAME = "__micronaut_asyncio_to_completion_stage";
     private static final String AWAITABLE_FACTORY_NAME = "__micronaut_completion_stage_awaitable";
@@ -259,6 +261,7 @@ public final class PythonAsyncioRuntime {
     /**
      * Completes futures with Java exceptions from Python exception data.
      */
+    @Experimental
     public static final class ExceptionCompleter {
         private ExceptionCompleter() {
         }
@@ -278,6 +281,7 @@ public final class PythonAsyncioRuntime {
     /**
      * Runs {@code asyncio.run_in_executor(None, ...)} callbacks on Micronaut's blocking executor.
      */
+    @Experimental
     public static final class ExecutorAdapter {
         private ExecutorAdapter() {
         }
@@ -354,6 +358,7 @@ public final class PythonAsyncioRuntime {
     /**
      * CompletableFuture variant that can propagate Java cancellation to a Python task.
      */
+    @Experimental
     public static final class PythonCompletableFuture extends CompletableFuture<Object> {
         private static final Runnable CANCELLED = new CancelledCallback();
         private final AtomicReference<@Nullable Runnable> cancelCallback = new AtomicReference<>();

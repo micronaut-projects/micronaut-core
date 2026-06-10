@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python.netty;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.python.PythonAsyncioConfiguration;
 import io.micronaut.context.python.PythonEventLoop;
@@ -34,6 +35,7 @@ import java.util.concurrent.CompletionStage;
 @Internal
 @Singleton
 @Requires(property = PythonAsyncioConfiguration.ENABLED, notEquals = "false")
+@Experimental
 public final class NettyPythonEventLoopProvider implements PythonEventLoopProvider, GracefulShutdownCapable {
     private static final ThreadLocal<NettyPythonEventLoop> CURRENT = new ThreadLocal<>();
     private static final NettyPythonEventLoopSupport SUPPORT = new NettyPythonEventLoopSupport();
@@ -75,6 +77,7 @@ public final class NettyPythonEventLoopProvider implements PythonEventLoopProvid
      * Scope for a bound Netty event loop.
      */
     @FunctionalInterface
+    @Experimental
     public interface Scope extends AutoCloseable {
         @Override
         void close();

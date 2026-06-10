@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 
 import java.util.concurrent.ScheduledFuture;
@@ -24,6 +25,7 @@ import java.util.concurrent.TimeUnit;
  * Event-loop operations required to drive Micronaut-managed Python asyncio tasks.
  */
 @Internal
+@Experimental
 public interface PythonEventLoop {
 
     /**

@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.Objects;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -33,6 +34,7 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class PythonEnumConstantElement extends AbstractPythonElement implements EnumConstantElement {
 
     private final PythonEnumElement declaringType;

@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Nullable;
@@ -35,6 +36,7 @@ import java.util.Objects;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public record AnnotationMemberDef(String name,
                                   @Nullable ClassElement memberType,
                                   @Nullable AnnotationMetadata annotationMetadata,

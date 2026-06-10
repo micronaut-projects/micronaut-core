@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.annotation;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
@@ -76,6 +77,7 @@ import java.util.Set;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<ElementDef, DecoratorDef> {
     private final Map<String, DecoratorDef> decorators;
     private final PythonVisitorContext visitorContext;

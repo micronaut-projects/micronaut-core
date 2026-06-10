@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.event.BeanDestroyedEvent;
@@ -59,6 +60,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  * @since 5.0.0
  */
 @Factory
+@Experimental
 public class GraalPyContextFactory implements BeanDestroyedEventListener<org.graalvm.polyglot.Context>, GracefulShutdownCapable, Ordered {
     public static final String APPLICATION_PATH = "META-INF/GRAALPY-VFS/micronaut-application";
     public static final String APPLICATION_SRC_PATH = APPLICATION_PATH + "/src/";

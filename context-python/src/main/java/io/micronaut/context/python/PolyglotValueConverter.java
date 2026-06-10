@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import org.graalvm.polyglot.Value;
 
@@ -25,6 +26,7 @@ import org.graalvm.polyglot.Value;
  */
 @Internal
 @FunctionalInterface
+@Experimental
 public interface PolyglotValueConverter<T> {
 
     /**

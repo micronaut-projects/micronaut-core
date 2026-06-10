@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing;
 
+import io.micronaut.core.annotation.Experimental;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -101,6 +102,7 @@ import io.micronaut.python.processing.util.ObjectHelper;
  * Generates Java stubs for Python classes, scripts, enums, interfaces, and annotations.
  */
 @SuppressWarnings({"FileLength", "checkstyle:DeclarationOrder"})
+@Experimental
 public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     public static final TypeDef POLYGLOT_VALUE = TypeDef.of(Value.class);

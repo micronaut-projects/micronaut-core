@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -49,6 +50,7 @@ import org.graalvm.polyglot.Value;
 /**
  * Class element implementation for Python classes.
  */
+@Experimental
 public final class PythonClassElement extends AbstractPythonClassElement {
     private static final String MEMBER_KEYS_PROPERTY = "memberKeys";
     private static final String INTRODUCTION_INTERFACE_MARKER = "java.io.Serializable";

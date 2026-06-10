@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,6 +51,7 @@ import org.reactivestreams.Subscription;
  */
 @Internal
 @SuppressWarnings({"checkstyle:InnerTypeLast", "checkstyle:JavadocMethod", "checkstyle:TodoComment"})
+@Experimental
 public final class GraalPyRuntimeUtil {
 
     public static final String PYTHON = "python";
@@ -383,6 +385,7 @@ public final class GraalPyRuntimeUtil {
     /**
      * Adapter invoked from Python async member facades.
      */
+    @Experimental
     public static final class AsyncMemberAdapter {
         private AsyncMemberAdapter() {
         }

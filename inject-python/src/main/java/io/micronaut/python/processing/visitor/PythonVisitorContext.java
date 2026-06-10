@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadata
 /**
  * Visitor context implementation backed by the Python processing environment.
  */
+@Experimental
 public final class PythonVisitorContext implements VisitorContext {
     private final MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
     private final Map<String, DecoratorDef> decorators;

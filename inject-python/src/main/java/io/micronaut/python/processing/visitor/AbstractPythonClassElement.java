@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -74,6 +75,7 @@ import org.jspecify.annotations.NonNull;
  * Base class element implementation shared by Python class-like elements.
  */
 @SuppressWarnings({"checkstyle:DeclarationOrder", "checkstyle:InnerTypeLast"})
+@Experimental
 public abstract sealed class AbstractPythonClassElement extends AbstractPythonElement
     implements ArrayableClassElement, ElementProvider permits PythonClassElement, PythonEnumElement, PythonGenericPlaceholderElement {
     public static final String PYTHON_DEFAULT_PACKAGE = "python";

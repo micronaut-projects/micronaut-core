@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python.netty;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.python.GraalPyRuntimeUtil;
 import io.micronaut.context.python.PythonEventLoop;
 import io.micronaut.core.annotation.Internal;
@@ -67,6 +68,7 @@ import java.util.function.Consumer;
  * Netty before touching channel state or invoking Python callbacks.</p>
  */
 @Internal
+@Experimental
 public final class NettyPythonEventLoop implements PythonEventLoop {
     private final EventLoop eventLoop;
     private final NettyPythonEventLoopSupport support;
@@ -780,6 +782,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * Python-facing contract.</p>
      */
     @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod", "checkstyle:MethodName"})
+    @Experimental
     public static final class NettySocketTransport {
         private final Channel channel;
         private final Value protocol;
@@ -970,6 +973,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * {@code serve_forever}, and {@code wait_closed} directly.</p>
      */
     @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod", "checkstyle:MethodName"})
+    @Experimental
     public static final class NettyServer {
         private final Channel channel;
         private final CompletableFuture<Void> closed = new CompletableFuture<>();
@@ -1045,6 +1049,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * bridge.</p>
      */
     @SuppressWarnings("UnusedMethod")
+    @Experimental
     public static final class NettyServerSocket {
         private final Channel channel;
 
@@ -1069,6 +1074,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * that expectation without exposing the Netty channel object.</p>
      */
     @SuppressWarnings("UnusedMethod")
+    @Experimental
     public static final class NettySocketFacade {
         private final Channel channel;
 
@@ -1093,6 +1099,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * underlying {@code SSLEngine} stay hidden.</p>
      */
     @SuppressWarnings("UnusedMethod")
+    @Experimental
     public static final class NettySslFacade {
         private final SslHandler sslHandler;
 
@@ -1129,6 +1136,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * event loop before flushing the packet.</p>
      */
     @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod", "checkstyle:MethodName"})
+    @Experimental
     public static final class NettyDatagramTransport {
         private final Channel channel;
         private final Value protocol;

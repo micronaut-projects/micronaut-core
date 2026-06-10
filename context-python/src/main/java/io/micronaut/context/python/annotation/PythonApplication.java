@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python.annotation;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 
 import java.lang.annotation.Documented;
@@ -36,6 +37,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.TYPE})
 @Internal
+@Experimental
 public @interface PythonApplication {
 
     /**

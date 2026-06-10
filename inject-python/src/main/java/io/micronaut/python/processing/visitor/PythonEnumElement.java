@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -36,6 +37,7 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class PythonEnumElement extends AbstractPythonClassElement implements EnumElement {
 
     /**

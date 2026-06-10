@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.compiler;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.ClassElement;
 
 import javax.tools.JavaFileObject;
@@ -45,6 +46,7 @@ import java.util.stream.Stream;
  * @author Micronaut
  * @since 4.8.0
  */
+@Experimental
 public final class PyronautCompiler {
 
     private static final Pattern JAVA_PACKAGE_PATTERN = Pattern.compile("^[a-z][a-zA-Z0-9_]*(\\.[a-z][a-zA-Z0-9_]*)*$");
@@ -316,6 +318,7 @@ public final class PyronautCompiler {
     /**
      * Builder for PyronautCompiler.
      */
+    @Experimental
     public static final class Builder {
         private String packageName;
         private String pythonSrc;

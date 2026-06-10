@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.naming.NameUtils;
 
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ import java.util.Objects;
  * @param attributes The attributes defined at module level.
  * @param documentation The script documentation string.
  */
+@Experimental
 public record ScriptDef(
     String name,
     String packageName,

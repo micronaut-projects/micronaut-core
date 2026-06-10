@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -37,6 +38,7 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class PythonElementFactory implements ElementFactory<ElementDef, ClassDef, FunctionDef, AttributeDef> {
 
     private final PythonProcessingEnvironment environment;

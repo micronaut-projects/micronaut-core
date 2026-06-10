@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import org.graalvm.polyglot.Context;
@@ -24,6 +25,7 @@ import org.graalvm.polyglot.Value;
  * A generated pooled Python stub that can resolve its Python value for a specific context.
  */
 @Internal
+@Experimental
 public interface PooledValueCoercible extends ValueCoercible {
 
     /**

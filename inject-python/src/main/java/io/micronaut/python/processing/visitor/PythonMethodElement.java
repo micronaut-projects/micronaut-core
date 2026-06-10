@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -77,6 +78,7 @@ import javax.lang.model.element.Element;
  * @since 5.0.0
  */
 @SuppressWarnings("checkstyle:InnerTypeLast")
+@Experimental
 public non-sealed class PythonMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider {
     private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
     private static final String ANN_VALID = "jakarta.validation.Valid";

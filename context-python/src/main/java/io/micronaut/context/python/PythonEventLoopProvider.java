@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 
@@ -24,6 +25,7 @@ import java.util.Optional;
  * Provides the active Python event loop for the current execution.
  */
 @Internal
+@Experimental
 public interface PythonEventLoopProvider {
 
     /**

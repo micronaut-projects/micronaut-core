@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.util;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.sourcegen.model.ClassDef;
@@ -43,6 +44,7 @@ import static io.micronaut.sourcegen.model.ExpressionDef.MathBinaryOperation.OpT
  * Generates Object method implementations (toString, equals, hashCode)
  * for generated POJOs that mirror Python introspected beans.
  */
+@Experimental
 public final class ObjectHelper {
 
     private static final ExpressionDef HASH_MULTIPLIER = ExpressionDef.primitiveConstant(31);

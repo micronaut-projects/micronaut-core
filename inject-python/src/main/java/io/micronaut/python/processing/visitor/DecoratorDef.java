@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
 import org.graalvm.polyglot.Value;
 
@@ -34,6 +35,7 @@ import java.util.Objects;
  * @param memberDecorators Decorators applied to annotation members
  * @param memberTypes Resolved annotation member types
  */
+@Experimental
 public record DecoratorDef(
     String name,
     String annotationName,

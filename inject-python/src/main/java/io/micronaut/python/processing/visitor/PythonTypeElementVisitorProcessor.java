@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
@@ -69,6 +70,7 @@ import java.util.stream.Collectors;
 /**
  * Runs Micronaut type element visitors against Python class elements.
  */
+@Experimental
 public final class PythonTypeElementVisitorProcessor {
     private final ClassLoader classLoader;
 

@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.util;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,6 +56,7 @@ import io.micronaut.python.processing.visitor.PythonVisitorContext;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class GraalPyUtil {
     private static final Set<String> JAVA_KEYWORDS = Set.of(
         "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const",

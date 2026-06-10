@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -43,6 +44,7 @@ import java.util.function.Function;
 /**
  * Parses Python source files into the internal Python processing model.
  */
+@Experimental
 public final class PythonAstParser {
 
     public static final String PYTHON = "python";
@@ -365,6 +367,7 @@ public final class PythonAstParser {
      * @param allClassNames    All class names defined in the source
      * @param validationErrors Validation errors found while transforming the source
      */
+    @Experimental
     public record TransformResult(
         Source originalSource,
         String code,

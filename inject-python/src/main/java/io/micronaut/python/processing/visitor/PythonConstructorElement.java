@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -36,6 +37,7 @@ import java.util.List;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class PythonConstructorElement extends PythonMethodElement implements ConstructorElement {
     private ParameterElement[] constructorParameters;
 

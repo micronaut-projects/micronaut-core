@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
@@ -47,6 +48,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class ContextHolder {
     private static final Logger LOG = LoggerFactory.getLogger(ContextHolder.class);
 

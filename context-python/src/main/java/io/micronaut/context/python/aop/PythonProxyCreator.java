@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python.aop;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.AroundConstruct;
 import io.micronaut.aop.Interceptor;
@@ -72,6 +73,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 @Singleton
 @NullMarked
 @SuppressWarnings({"checkstyle:InnerTypeLast", "checkstyle:MissingJavadocType"})
+@Experimental
 public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private static final String SCOPED_PROXY_FACTORY = "__micronaut_create_scoped_proxy";

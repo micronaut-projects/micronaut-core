@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.Map;
 import java.util.Objects;
 
@@ -35,6 +36,7 @@ import io.micronaut.python.processing.util.GraalPyUtil;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public final class PythonParameterElement extends AbstractPythonElement implements ParameterElement {
     private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
     private static final String ANN_VALID = "jakarta.validation.Valid";

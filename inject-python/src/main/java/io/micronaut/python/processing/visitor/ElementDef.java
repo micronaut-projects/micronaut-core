@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.visitor;
 
+import io.micronaut.core.annotation.Experimental;
 import java.util.List;
 
 /**
@@ -25,6 +26,7 @@ import java.util.List;
  * @author Micronaut Team
  * @since 5.0.0
  */
+@Experimental
 public sealed interface ElementDef permits AnnotationMemberDef, ArgumentDef, AttributeDef, ClassDef, FunctionDef, PropertyDef, ReturnDef, ScriptDef {
     default List<DecoratorDef> decorators() {
         return List.of();

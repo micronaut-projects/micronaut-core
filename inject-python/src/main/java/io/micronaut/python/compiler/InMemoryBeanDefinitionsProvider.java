@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.compiler;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.aop.internal.InterceptorRegistryBean;
 import io.micronaut.context.BeanDefinitionsProvider;
 import io.micronaut.context.DefaultBeanDefinitionsProvider;
@@ -33,6 +34,7 @@ import java.util.List;
 /**
  * An in-memory version of {@link BeanDefinitionsProvider} for use with a class loader produced by {@link PyronautCompiler#buildClassLoader()}.
  */
+@Experimental
 public final class InMemoryBeanDefinitionsProvider implements BeanDefinitionsProvider {
     private final boolean includeAllBeans;
 

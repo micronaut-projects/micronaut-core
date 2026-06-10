@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.bind.annotation.Bindable;
 
@@ -24,6 +25,7 @@ import io.micronaut.core.bind.annotation.Bindable;
  * @param enabled Whether asyncio integration is enabled.
  */
 @ConfigurationProperties(PythonAsyncioConfiguration.PREFIX)
+@Experimental
 public record PythonAsyncioConfiguration(
     @Bindable(defaultValue = "true") boolean enabled
 ) {

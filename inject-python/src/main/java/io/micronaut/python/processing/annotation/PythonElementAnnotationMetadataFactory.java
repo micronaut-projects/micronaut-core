@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.annotation;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -49,6 +50,7 @@ import io.micronaut.python.processing.visitor.PythonMethodElement;
  *
  * @since 5.0.0
  */
+@Experimental
 public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnotationMetadataFactory<ElementDef, DecoratorDef> {
 
     /**
