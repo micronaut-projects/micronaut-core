@@ -45,6 +45,7 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
     static Engine buildPythonEngine() {
         return Engine.newBuilder()
             .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+            .logHandler(new GraalPySlf4jLogHandler())
             .build();
     }
 
