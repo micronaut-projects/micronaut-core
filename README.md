@@ -55,3 +55,7 @@ If you wish to contribute to the development of Micronaut Framework please read 
 ## Versioning
 
 Micronaut Framework uses Semantic Versioning 2.0.0. To understand what that means, please see the specification [documentation](https://semver.org/). Exclusions to Micronaut Framework's public API include any classes annotated with `@Experimental` or `@Internal`, which reside in the `io.micronaut.core.annotation` package.
+
+## Fork publish
+
+./gradlew -PpistolMavenPublishing=true -PprojectVersion=5.1.0-aop-public-only-SNAPSHOT publishAllPublicationsToPistolRepository
