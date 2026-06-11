@@ -388,7 +388,7 @@ public final class DispatchWriter implements ClassOutputWriter {
 
     @Nullable
     public MethodDef buildDispatchOneVoidMethod() {
-        List<Map.Entry<DispatchTarget, Integer>> dispatchers = getDispatchers(dispatchTarget -> dispatchTarget.supportsDispatchOne() && writeType(dispatchTarget) != null);
+        List<Map.Entry<DispatchTarget, Integer>> dispatchers = getDispatchers(DispatchWriter::supportsDispatchOneVoid);
         if (dispatchers.isEmpty()) {
             return null;
         }
@@ -417,6 +417,11 @@ public final class DispatchWriter implements ClassOutputWriter {
                     aThis.invoke(UNKNOWN_DISPATCH_AT_INDEX, methodIndex).doThrow()
                 );
             });
+    }
+
+    private static boolean supportsDispatchOneVoid(DispatchTarget dispatchTarget) {
+        return dispatchTarget.supportsDispatchOne()
+            && (writeType(dispatchTarget) != null || isZeroArgumentVoidMethod(dispatchTarget));
     }
 
     @Nullable
@@ -535,6 +540,13 @@ public final class DispatchWriter implements ClassOutputWriter {
         }
         MethodElement methodElement = dispatchTarget.getMethodElement();
         return methodElement != null && methodElement.getSuspendParameters().length == 0;
+    }
+
+    private static boolean isZeroArgumentVoidMethod(DispatchTarget dispatchTarget) {
+        MethodElement methodElement = dispatchTarget.getMethodElement();
+        return methodElement != null
+            && methodElement.getSuspendParameters().length == 0
+            && methodElement.getGenericReturnType().isVoid();
     }
 
     private static boolean isPrimitiveWriteTarget(DispatchTarget dispatchTarget, String primitiveName) {
