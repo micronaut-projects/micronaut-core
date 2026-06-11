@@ -60,6 +60,9 @@ Maintainer guidance:
 
 - Use for examples that should stay aligned with source/test files.
 - Prefer tagged snippets for stable, focused excerpts.
+- Preserve `snippet::` macros even when a repository currently has only one language under `doc-examples/`. The macro is still the docs contract for language-aware rendering and lets the same guide continue to support future Java, Kotlin, or Groovy examples without rewriting the guide.
+- Preserve callouts attached to snippet excerpts. Callouts are part of the tutorial explanation, not disposable rendering decoration; remove them only when the referenced executable source behavior is removed or the callout is replaced with an equivalent source-backed explanation.
+- Do not convert snippet output to raw `[source,<language>]` blocks, `include::` of generated source, or pasted code as a cleanup shortcut.
 
 ## 5) `[configuration]` block processor
 
