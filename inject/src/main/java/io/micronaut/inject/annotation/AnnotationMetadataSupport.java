@@ -243,7 +243,7 @@ public final class AnnotationMetadataSupport {
         );
         coreAnnotationsDefaults.put(
             "io.micronaut.aop.Around",
-            Map.of("cacheableLazyTarget", false, "hotswap", false, "lazy", false, "proxyTarget", false, "proxyTargetMode", "ERROR")
+            Map.of("cacheableLazyTarget", false, "hotswap", false, "lazy", false, "methodVisibility", "DEFAULT", "proxyTarget", false, "proxyTargetMode", "ERROR")
         );
         coreAnnotationsDefaults.put(
             "io.micronaut.aop.Introduction",

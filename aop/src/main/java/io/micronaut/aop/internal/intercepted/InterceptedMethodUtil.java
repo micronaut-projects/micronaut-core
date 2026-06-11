@@ -42,6 +42,9 @@ import java.util.concurrent.Future;
  */
 @Internal
 public final class InterceptedMethodUtil {
+    private static final String METHOD_VISIBILITY = "methodVisibility";
+    private static final String METHOD_VISIBILITY_PUBLIC_ONLY = "PUBLIC_ONLY";
+
     private InterceptedMethodUtil() {
     }
 
@@ -141,6 +144,18 @@ public final class InterceptedMethodUtil {
             true,
             Around.class,
             InterceptorKind.AROUND);
+    }
+
+    /**
+     * Does the given around advice metadata request public methods only.
+     *
+     * @param annotationMetadata The annotation metadata
+     * @return True if type-level around advice should apply only to public methods
+     */
+    public static boolean hasPublicOnlyAroundMethodVisibility(@Nullable AnnotationMetadata annotationMetadata) {
+        return annotationMetadata != null && annotationMetadata.stringValue(AnnotationUtil.ANN_AROUND, METHOD_VISIBILITY)
+            .map(METHOD_VISIBILITY_PUBLIC_ONLY::equals)
+            .orElse(false);
     }
 
     private static boolean hasInterceptorBinding(AnnotationMetadata annotationMetadata,

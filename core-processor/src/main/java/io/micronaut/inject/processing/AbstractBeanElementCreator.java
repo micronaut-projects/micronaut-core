@@ -76,11 +76,13 @@ abstract class AbstractBeanElementCreator<R> implements BeanDefinitionCreator<R>
     protected boolean visitIntrospectedMethod(ElementProxyBuilder<R> proxyBuilder, MethodElement methodElement) {
 
         final AnnotationMetadata resolvedTypeMetadata = classElement.getAnnotationMetadata();
-        final boolean resolvedTypeMetadataIsAopProxyType = InterceptedMethodUtil.hasDeclaredAroundAdvice(resolvedTypeMetadata);
+        final boolean methodHasDeclaredAroundAdvice = InterceptedMethodUtil.hasDeclaredAroundAdvice(methodElement.getMethodAnnotationMetadata());
+        final boolean resolvedTypeMetadataIsAopProxyType = InterceptedMethodUtil.hasDeclaredAroundAdvice(resolvedTypeMetadata)
+            && (!InterceptedMethodUtil.hasPublicOnlyAroundMethodVisibility(resolvedTypeMetadata) || methodElement.isPublic());
 
         if (methodElement.isAbstract()
             || resolvedTypeMetadataIsAopProxyType
-            || InterceptedMethodUtil.hasDeclaredAroundAdvice(methodElement.getAnnotationMetadata())) {
+            || methodHasDeclaredAroundAdvice) {
             proxyBuilder.addProxyMethod(methodElement);
             return true;
         } else if (methodElement.hasDeclaredStereotype(Executable.class)) {

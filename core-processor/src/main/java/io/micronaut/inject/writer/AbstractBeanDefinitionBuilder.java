@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
@@ -523,6 +524,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
         }
 
         if (this.intercepted) {
+            boolean publicOnly = InterceptedMethodUtil.hasPublicOnlyAroundMethodVisibility(getAnnotationMetadata());
             beanClass.getEnclosedElements(
                 ElementQuery.ALL_METHODS
                     .onlyInstance()
@@ -532,7 +534,8 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
                     method,
                     true
                 );
-                if (!interceptedMethods.contains(ibem)) {
+                if (!interceptedMethods.contains(ibem)
+                    && (!publicOnly || method.isPublic() || InterceptedMethodUtil.hasDeclaredAroundAdvice(method.getMethodAnnotationMetadata()))) {
                     addProxyMethod(proxyBuilder, ibem);
                 }
             });

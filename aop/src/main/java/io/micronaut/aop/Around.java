@@ -91,6 +91,21 @@ public @interface Around {
     boolean cacheableLazyTarget() default false;
 
     /**
+     * Controls which methods inherit type-level around advice.
+     *
+     * <p>{@link MethodVisibility#DEFAULT} preserves the default method selection behavior. {@link MethodVisibility#PUBLIC_ONLY}
+     * applies type-level around advice only to public methods. Method-level around advice is still applied to methods that can
+     * be proxied.</p>
+     *
+     * <p>This selector does not change the existing method selection behavior for beans produced by
+     * {@link io.micronaut.context.annotation.Factory} methods.</p>
+     *
+     * @return The method visibility policy.
+     * @since 5.1.0
+     */
+    MethodVisibility methodVisibility() default MethodVisibility.DEFAULT;
+
+    /**
      * Sets the {@link io.micronaut.aop.Around.ProxyTargetConstructorMode}. See the
      * javadoc for {@link io.micronaut.aop.Around.ProxyTargetConstructorMode} for more information.
      *
@@ -99,6 +114,22 @@ public @interface Around {
      * @since 3.0.0
      */
     ProxyTargetConstructorMode proxyTargetMode() default ProxyTargetConstructorMode.ERROR;
+
+    /**
+     * The method visibility policy for type-level around advice.
+     *
+     * @since 5.1.0
+     */
+    enum MethodVisibility {
+        /**
+         * Use the default method selection behavior.
+         */
+        DEFAULT,
+        /**
+         * Apply type-level around advice only to public methods.
+         */
+        PUBLIC_ONLY
+    }
 
     /**
      * When using {@link #proxyTarget()} on a {@link io.micronaut.context.annotation.Factory} method if the
