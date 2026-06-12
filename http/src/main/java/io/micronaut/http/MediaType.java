@@ -1515,6 +1515,5 @@ public class MediaType implements CharSequence {
             }
         }
 
-
     }
 }
