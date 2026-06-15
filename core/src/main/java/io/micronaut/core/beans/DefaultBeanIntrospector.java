@@ -16,13 +16,11 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.beans.exceptions.IntrospectionException;
-import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -187,20 +185,10 @@ class DefaultBeanIntrospector implements BeanIntrospector {
 
     private Map<String, BeanIntrospectionReference<Object>> resolveIntrospections(ClassLoader classLoader) {
         Map<String, BeanIntrospectionReference<Object>> resolvedIntrospectionMap = new HashMap<>(30);
-        @SuppressWarnings("unchecked") final SoftServiceLoader<BeanIntrospectionReference<Object>> services = loadReferences(classLoader);
-        List<BeanIntrospectionReference<Object>> beanIntrospectionReferences = new ArrayList<>(300);
-        services.collectAll(
-                beanIntrospectionReferences,
-                BeanIntrospectionReference::isPresent
-        );
+        List<BeanIntrospectionReference<Object>> beanIntrospectionReferences = BeanIntrospectionProviders.get().provide(classLoader);
         for (BeanIntrospectionReference<Object> reference : beanIntrospectionReferences) {
             resolvedIntrospectionMap.put(reference.getName(), reference);
         }
         return resolvedIntrospectionMap;
-    }
-
-    @SuppressWarnings("java:S3740")
-    private SoftServiceLoader loadReferences(ClassLoader classLoader) {
-        return SoftServiceLoader.load(BeanIntrospectionReference.class, classLoader);
     }
 }
