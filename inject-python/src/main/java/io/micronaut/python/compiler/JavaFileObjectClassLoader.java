@@ -36,6 +36,8 @@ import javax.tools.JavaFileObject;
  */
 final class JavaFileObjectClassLoader extends ClassLoader {
 
+    private static final String GRAALPY_APPLICATION_FILESLIST = "GRAALPY-VFS/micronaut-application/fileslist.txt";
+
     private final Collection<JavaFileObject> files = new ArrayList<>();
 
     public JavaFileObjectClassLoader(Iterable<? extends JavaFileObject> files) {
@@ -83,11 +85,18 @@ final class JavaFileObjectClassLoader extends ClassLoader {
     @Override
     public Enumeration<URL> getResources(String name) throws IOException {
         Enumeration<URL> resources = findResources(name);
-        if (resources.hasMoreElements()) {
-            return resources;
-        } else {
+        List<URL> allResources = Collections.list(resources);
+        if (allResources.isEmpty()) {
             return super.getResources(name);
         }
+        if (isGraalPyApplicationFilesList(name)) {
+            allResources.addAll(Collections.list(super.getResources(name)));
+        }
+        return Collections.enumeration(allResources);
+    }
+
+    private static boolean isGraalPyApplicationFilesList(String name) {
+        return name.endsWith(GRAALPY_APPLICATION_FILESLIST);
     }
 
     @Override
