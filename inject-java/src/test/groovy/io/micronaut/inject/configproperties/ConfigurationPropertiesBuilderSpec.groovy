@@ -596,6 +596,9 @@ class Options {
 
         then:
         bean.options.build().getConnectionTimeout() == Duration.ofSeconds(6)
+
+        cleanup:
+        applicationContext?.close()
     }
 
     void "test using a builder that is marked final"() {
