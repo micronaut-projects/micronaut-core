@@ -1619,7 +1619,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         ParameterElement[] parameters = methodElement.getParameters();
         return parameters.length == 2
             && propertyType.getName().equals(Duration.class.getName())
-            && parameters[0].getType().getSimpleName().equals("long")
+            && parameters[0].getType().getSimpleName().equalsIgnoreCase("long")
             && parameters[1].getType().isAssignable(TimeUnit.class);
     }
 
