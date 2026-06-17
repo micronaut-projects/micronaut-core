@@ -84,7 +84,7 @@ class TestAA {
         bean.test.bar == null
 
         cleanup:
-        applicationContext.close()
+        applicationContext?.close()
     }
 
     void "test configuration builder with includes"() {
@@ -139,7 +139,7 @@ class TestA {
         bean.test.bar == null
 
         cleanup:
-        applicationContext.close()
+        applicationContext?.close()
     }
 
     void "test configuration builder with factory method and properties"() {
@@ -179,7 +179,7 @@ class TestB {
         bean.test.bar == 'good'
 
         cleanup:
-        applicationContext.close()
+        applicationContext?.close()
     }
 
     void "test catch and log NoSuchMethodError for when underlying builder changes"() {
@@ -212,7 +212,7 @@ class TestC {
         factory.instantiate(applicationContext)
 
         cleanup:
-        applicationContext.close()
+        applicationContext?.close()
     }
 
     void "test with groovy properties"() {
@@ -261,7 +261,7 @@ class TestD {
         test.baz == null //deprecated properties are ignored
 
         cleanup:
-        applicationContext.close()
+        applicationContext?.close()
     }
 
     void "test different inject types for config properties"() {
@@ -310,7 +310,7 @@ class Neo4jProperties {
         config.logLeakedSessions()
 
         cleanup:
-        applicationContext.close()
+        applicationContext?.close()
     }
 
     void "test specifying a configuration prefix"() {
@@ -361,7 +361,7 @@ class Neo4jProperties {
         config.logLeakedSessions()
 
         cleanup:
-        applicationContext.close()
+        applicationContext?.close()
     }
 
     void "test specifying a configuration prefix with value"() {
@@ -412,7 +412,7 @@ class Neo4jProperties {
         config.logLeakedSessions()
 
         cleanup:
-        applicationContext.close()
+        applicationContext?.close()
     }
 
     void "test builder method long and TimeUnit arguments"() {
@@ -457,7 +457,7 @@ class Neo4jProperties {
         config.idleTimeBeforeConnectionTest() == 6000
 
         cleanup:
-        applicationContext.close()
+        applicationContext?.close()
     }
 
     void "test using a builder that is marked final"() {
@@ -496,7 +496,7 @@ class Neo4jProperties {
         config.idleTimeBeforeConnectionTest() == 17000
 
         cleanup:
-        applicationContext.close()
+        applicationContext?.close()
     }
 
 
@@ -571,7 +571,7 @@ class DefaultConnectionPool implements ConnectionPool {
         testPropBean.builder.build().getMaxConcurrency() == 123
 
         cleanup:
-        ctx.close()
+        ctx?.close()
     }
 
     void "test configuration builder with both getters and setters and no prefixes"() {
@@ -651,6 +651,6 @@ class DefaultConnectionPool implements ConnectionPool {
         testPropBean.builder.build().getMaxConcurrency() == 123
 
         cleanup:
-        ctx.close()
+        ctx?.close()
     }
 }
