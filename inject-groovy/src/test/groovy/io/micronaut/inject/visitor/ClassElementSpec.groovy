@@ -1022,6 +1022,52 @@ class Pet {
             packPrvFields.stream().map(FieldElement::getName).toList() == ["packprivme", "PACK_PRV_CONST"]
     }
 
+    void "test groovy package scope field visibility selection"() {
+        given:
+            ClassElement classElement = buildClassElement('test.GroovyFieldVisibility', '''
+package test
+
+import groovy.transform.PackageScope
+
+class GroovyFieldVisibility {
+    String propertyField
+
+    @PackageScope
+    String packageField
+
+    @PackageScope
+    static String packageStaticField
+}
+
+''')
+
+        when:
+            List<FieldElement> fields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+            FieldElement propertyField = fields.find { it.name == 'propertyField' }
+            FieldElement packageField = fields.find { it.name == 'packageField' }
+            FieldElement packageStaticField = fields.find { it.name == 'packageStaticField' }
+
+        then:
+            propertyField.isPrivate()
+            !propertyField.isPackagePrivate()
+            packageField.isPackagePrivate()
+            !packageField.isPrivate()
+            packageStaticField.isPackagePrivate()
+            packageStaticField.isStatic()
+
+        when:
+            List<FieldElement> packagePrivateFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPackagePrivate()))
+
+        then:
+            packagePrivateFields*.name as Set == ['packageField', 'packageStaticField'] as Set
+
+        when:
+            List<FieldElement> accessibleFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyAccessible())
+
+        then:
+            accessibleFields*.name as Set == ['packageField', 'packageStaticField'] as Set
+    }
+
     void "test annotations on generic type"() {
         given:
             ClassElement classElement = buildClassElement('test.PetOperations', '''
