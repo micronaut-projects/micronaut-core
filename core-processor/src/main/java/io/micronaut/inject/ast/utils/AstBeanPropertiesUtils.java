@@ -54,7 +54,6 @@ import java.util.function.Supplier;
 public final class AstBeanPropertiesUtils {
 
     private static final String ANN_INTROSPECTED_PROPERTY = Introspected.Property.class.getName();
-    private static final String ANN_GROOVY_PACKAGE_SCOPE = "groovy.transform.PackageScope";
     private static final String MEMBER_IGNORE_OTHER_ACCESSORS = "ignoreOtherAccessors";
 
     private AstBeanPropertiesUtils() {
@@ -766,15 +765,11 @@ public final class AstBeanPropertiesUtils {
     private static boolean isAccessible(MemberElement memberElement, BeanProperties.Visibility visibility) {
         return switch (visibility) {
             case DEFAULT ->
-                isGroovyPackageScope(memberElement) ||
-                    (!memberElement.isPrivate() && (memberElement.isAccessible() || memberElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class)));
+                (!memberElement.isPrivate() || memberElement.isPackagePrivate()) &&
+                    (memberElement.isAccessible() || memberElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class));
             case PUBLIC -> memberElement.isPublic();
             case ANY -> true;
         };
-    }
-
-    private static boolean isGroovyPackageScope(MemberElement memberElement) {
-        return memberElement.hasAnnotation(ANN_GROOVY_PACKAGE_SCOPE);
     }
 
     private static boolean shouldExclude(Set<String> includes, Set<String> excludes, String propertyName) {
