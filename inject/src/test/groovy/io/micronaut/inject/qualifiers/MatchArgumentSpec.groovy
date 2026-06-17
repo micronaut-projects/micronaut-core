@@ -140,6 +140,39 @@ class MatchArgumentSpec extends Specification {
             beanDefinitions[0].getBeanType() == ListObjectNonGenericRawSerializer
     }
 
+    void "test match raw serialize argument prefers exact object candidate over generic iterable fallback"() {
+        when:
+            def beanDefinitions = context.getBeanDefinitions(MyPageSerializer,
+                    MatchArgumentQualifier.contravariant(MyPageSerializer, Argument.of(MyPage))
+            )
+
+        then:
+            beanDefinitions.size() == 1
+            beanDefinitions[0].getBeanType() == MyPageObjectSerializer
+    }
+
+    void "test match raw serialize implementation argument prefers exact object candidate over generic iterable fallback"() {
+        when:
+            def beanDefinitions = context.getBeanDefinitions(MyPageSerializer,
+                    MatchArgumentQualifier.contravariant(MyPageSerializer, Argument.of(DefaultMyPage))
+            )
+
+        then:
+            beanDefinitions.size() == 1
+            beanDefinitions[0].getBeanType() == DefaultMyPageObjectSerializer
+    }
+
+    void "test match raw serialize implementation argument prefers object supertype candidate over generic iterable fallback"() {
+        when:
+            def beanDefinitions = context.getBeanDefinitions(MyPageSupertypeSerializer,
+                    MatchArgumentQualifier.contravariant(MyPageSupertypeSerializer, Argument.of(DefaultMyPage))
+            )
+
+        then:
+            beanDefinitions.size() == 1
+            beanDefinitions[0].getBeanType() == MyPageSupertypeObjectSerializer
+    }
+
     void "test match serialize Collection String argument"() {
         when:
             def beanDefinitions = context.getBeanDefinitions(MySerializer,
@@ -290,6 +323,29 @@ class MatchArgumentSpec extends Specification {
 
     @Singleton
     static class ListObjectNonGenericRawSerializer implements MyNonGenericRawSerializer<List<Object>> {}
+
+    interface MyPage<E> extends Iterable<E> {}
+
+    static abstract class DefaultMyPage<E> implements MyPage<E> {}
+
+    interface MyPageSerializer<E> {}
+
+    @Singleton
+    static class MyPageObjectSerializer implements MyPageSerializer<MyPage<Object>> {}
+
+    @Singleton
+    static class DefaultMyPageObjectSerializer implements MyPageSerializer<DefaultMyPage<Object>> {}
+
+    @Singleton
+    static class MyPageIterableSerializer<T> implements MyPageSerializer<Iterable<T>> {}
+
+    interface MyPageSupertypeSerializer<E> {}
+
+    @Singleton
+    static class MyPageSupertypeObjectSerializer implements MyPageSupertypeSerializer<MyPage<Object>> {}
+
+    @Singleton
+    static class MyPageSupertypeIterableSerializer<T> implements MyPageSupertypeSerializer<Iterable<T>> {}
 
     interface MyDeserializer<E> {}
 

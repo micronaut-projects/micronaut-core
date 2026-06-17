@@ -284,19 +284,74 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
             return candidates;
         }
         Class<?> argumentTypeClass = argument.getType();
+        List<B> directGenericCandidates = null;
+        List<B> directCandidates = null;
         List<B> genericCandidates = null;
+        List<B> rawCompatibleCandidates = null;
         for (B candidate : candidates) {
             Argument<?> candidateArgument = typeArgumentExtractor.apply(candidate);
-            if (candidateArgument != null
-                && isUnboundedTypeVariableCandidate(candidateArgument)
+            if (candidateArgument == null) {
+                continue;
+            }
+            boolean directMatch = argumentTypeClass.equals(candidateArgument.getType());
+            if (directMatch && matchesArgumentTypeParameters(argument, candidateArgument)) {
+                if (isUnboundedTypeVariableCandidate(candidateArgument)) {
+                    if (directGenericCandidates == null) {
+                        directGenericCandidates = new ArrayList<>(candidates.size());
+                    }
+                    directGenericCandidates.add(candidate);
+                } else {
+                    if (directCandidates == null) {
+                        directCandidates = new ArrayList<>(candidates.size());
+                    }
+                    directCandidates.add(candidate);
+                }
+                continue;
+            }
+            if (isUnboundedTypeVariableCandidate(candidateArgument)
                 && matchesRawArgument(argument, argumentTypeClass, candidateArgument)) {
                 if (genericCandidates == null) {
                     genericCandidates = new ArrayList<>(candidates.size());
                 }
                 genericCandidates.add(candidate);
+            } else if (isRawCompatibleCandidate(argument, argumentTypeClass, candidateArgument)) {
+                if (rawCompatibleCandidates == null) {
+                    rawCompatibleCandidates = new ArrayList<>(candidates.size());
+                }
+                rawCompatibleCandidates.add(candidate);
             }
         }
+        if (directGenericCandidates != null) {
+            return directGenericCandidates;
+        }
+        if (directCandidates != null) {
+            return directCandidates;
+        }
+        if (genericCandidates != null && rawCompatibleCandidates != null) {
+            List<B> combinedCandidates = new ArrayList<>(genericCandidates.size() + rawCompatibleCandidates.size());
+            combinedCandidates.addAll(genericCandidates);
+            for (B rawCompatibleCandidate : rawCompatibleCandidates) {
+                Argument<?> rawCompatibleArgument = typeArgumentExtractor.apply(rawCompatibleCandidate);
+                if (rawCompatibleArgument != null
+                    && !hasCandidateWithType(genericCandidates, rawCompatibleArgument.getType(), typeArgumentExtractor)) {
+                    combinedCandidates.add(rawCompatibleCandidate);
+                }
+            }
+            return combinedCandidates;
+        }
         return genericCandidates == null ? candidates : genericCandidates;
+    }
+
+    private <B extends BeanType<T>> boolean hasCandidateWithType(Collection<B> candidates,
+                                                                 Class<?> type,
+                                                                 Function<B, @Nullable Argument<?>> typeArgumentExtractor) {
+        for (B candidate : candidates) {
+            Argument<?> candidateArgument = typeArgumentExtractor.apply(candidate);
+            if (candidateArgument != null && candidateArgument.getType().equals(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean matchesRawArgument(Argument<?> argument,
@@ -307,6 +362,14 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
             return matchesArgumentTypeParameters(argument, candidateArgument);
         }
         return doesMatch(candidateArgument, candidateType, argument, argumentTypeClass);
+    }
+
+    private boolean isRawCompatibleCandidate(Argument<?> argument,
+                                             Class<?> argumentTypeClass,
+                                             Argument<?> candidateArgument) {
+        return candidateArgument.getType().getTypeParameters().length > 0
+            && matchesArgumentTypeParameters(argument, candidateArgument)
+            && matchesRawArgument(argument, argumentTypeClass, candidateArgument);
     }
 
     private static boolean isRawGenericType(Argument<?> argument) {
