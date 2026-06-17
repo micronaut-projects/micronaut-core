@@ -173,6 +173,17 @@ class MatchArgumentSpec extends Specification {
             beanDefinitions[0].getBeanType() == MyPageSupertypeObjectSerializer
     }
 
+    void "test match raw serialize implementation argument filters raw compatible candidates without generic fallback"() {
+        when:
+            def beanDefinitions = context.getBeanDefinitions(MyPageRawCompatibleOnlySerializer,
+                    MatchArgumentQualifier.contravariant(MyPageRawCompatibleOnlySerializer, Argument.of(DefaultMyPage))
+            )
+
+        then:
+            beanDefinitions.size() == 1
+            beanDefinitions[0].getBeanType() == MyPageOnlyObjectSerializer
+    }
+
     void "test match serialize Collection String argument"() {
         when:
             def beanDefinitions = context.getBeanDefinitions(MySerializer,
@@ -346,6 +357,14 @@ class MatchArgumentSpec extends Specification {
 
     @Singleton
     static class MyPageSupertypeIterableSerializer<T> implements MyPageSupertypeSerializer<Iterable<T>> {}
+
+    interface MyPageRawCompatibleOnlySerializer<E> {}
+
+    @Singleton
+    static class MyPageOnlyObjectSerializer implements MyPageRawCompatibleOnlySerializer<MyPage<Object>> {}
+
+    @Singleton
+    static class MyPageOnlyStringSerializer implements MyPageRawCompatibleOnlySerializer<MyPage<String>> {}
 
     interface MyDeserializer<E> {}
 

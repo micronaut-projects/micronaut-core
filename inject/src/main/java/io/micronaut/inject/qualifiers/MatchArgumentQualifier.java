@@ -28,10 +28,12 @@ import org.slf4j.Logger;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -330,28 +332,26 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
         if (genericCandidates != null && rawCompatibleCandidates != null) {
             List<B> combinedCandidates = new ArrayList<>(genericCandidates.size() + rawCompatibleCandidates.size());
             combinedCandidates.addAll(genericCandidates);
+            Set<Class<?>> genericCandidateTypes = new HashSet<>(genericCandidates.size());
+            for (B genericCandidate : genericCandidates) {
+                Argument<?> genericArgument = typeArgumentExtractor.apply(genericCandidate);
+                if (genericArgument != null) {
+                    genericCandidateTypes.add(genericArgument.getType());
+                }
+            }
             for (B rawCompatibleCandidate : rawCompatibleCandidates) {
                 Argument<?> rawCompatibleArgument = typeArgumentExtractor.apply(rawCompatibleCandidate);
                 if (rawCompatibleArgument != null
-                    && !hasCandidateWithType(genericCandidates, rawCompatibleArgument.getType(), typeArgumentExtractor)) {
+                    && !genericCandidateTypes.contains(rawCompatibleArgument.getType())) {
                     combinedCandidates.add(rawCompatibleCandidate);
                 }
             }
             return combinedCandidates;
         }
-        return genericCandidates == null ? candidates : genericCandidates;
-    }
-
-    private <B extends BeanType<T>> boolean hasCandidateWithType(Collection<B> candidates,
-                                                                 Class<?> type,
-                                                                 Function<B, @Nullable Argument<?>> typeArgumentExtractor) {
-        for (B candidate : candidates) {
-            Argument<?> candidateArgument = typeArgumentExtractor.apply(candidate);
-            if (candidateArgument != null && candidateArgument.getType().equals(type)) {
-                return true;
-            }
+        if (rawCompatibleCandidates != null) {
+            return rawCompatibleCandidates;
         }
-        return false;
+        return genericCandidates == null ? candidates : genericCandidates;
     }
 
     private boolean matchesRawArgument(Argument<?> argument,
