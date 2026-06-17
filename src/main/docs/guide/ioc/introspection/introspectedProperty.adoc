@@ -50,9 +50,3 @@ For `JsonProperty`, Micronaut also maps Jackson's `access` member:
 * `JsonProperty.Access.AUTO` and `JsonProperty.Access.READ_WRITE` map to both read and write access.
 
 Because `accessKind` is property-level, multiple Jackson annotations that map to the same bean property must agree on the mapped access.
-
-== Jakarta Persistence
-
-Micronaut also maps `jakarta.persistence.Access` on a field or method to ann:core.annotation.Introspected.Property[] with `ignoreOtherAccessors` enabled.
-This allows explicit Jakarta Persistence field-access and property-access attributes to be treated as introspected bean properties.
-When `@Access(AccessType.FIELD)` is declared on a field that also has getter or setter methods, Micronaut uses the field directly for bean property reads and writes.
