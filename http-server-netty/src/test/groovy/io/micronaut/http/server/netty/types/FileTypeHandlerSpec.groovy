@@ -109,9 +109,15 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         "bytes=0-9000" | 200            | null                                                     | tempFileContents
         "bytes=abc-10" | 200            | null                                                     | tempFileContents
         "bytes=0-def"  | 200            | null                                                     | tempFileContents
+        "bytes=-0"     | 200            | null                                                     | tempFileContents
+        "bytes=2-1"    | 200            | null                                                     | tempFileContents
         "bytes=0-"     | 206            | "bytes 0-${tempFile.length() - 1}/${tempFile.length()}"  | tempFileContents
+        "bytes=0-0"    | 206            | "bytes 0-0/${tempFile.length()}"                         | tempFileContents.substring(0, 1)
         "bytes=10-"    | 206            | "bytes 10-${tempFile.length() - 1}/${tempFile.length()}" | tempFileContents.substring(10)
         "bytes=1-2"    | 206            | "bytes 1-2/${tempFile.length()}"                         | tempFileContents.substring(1, 3)
+        "bytes=-1"     | 206            | "bytes ${tempFile.length() - 1}-${tempFile.length() - 1}/${tempFile.length()}" | tempFileContents.substring(tempFileContents.length() - 1)
+        "bytes=-10"    | 206            | "bytes ${tempFile.length() - 10}-${tempFile.length() - 1}/${tempFile.length()}" | tempFileContents.substring(tempFileContents.length() - 10)
+        "bytes=-9000"  | 206            | "bytes 0-${tempFile.length() - 1}/${tempFile.length()}"  | tempFileContents
     }
 
     void "test cache control can be overridden"() {
