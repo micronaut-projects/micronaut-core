@@ -437,11 +437,13 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             value.readAccessKind == null ? null : value.getter,
             value.writeAccessKind == null ? null : value.setter,
             value.field,
+            value.propertyAccessMember,
             elementAnnotationMetadataFactory,
             value.propertyName,
-            value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
-            value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
-            value.isExcluded
+            value.readAccessKind == null ? null : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
+            value.writeAccessKind == null ? null : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
+            value.isExcluded,
+            value.constructorWriteAccess
         );
     }
 
@@ -561,11 +563,13 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             value.getter,
             value.setter,
             value.field,
+            value.propertyAccessMember,
             elementAnnotationMetadataFactory,
             value.propertyName,
-            value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
-            value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
-            value.isExcluded
+            value.readAccessKind == null ? null : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
+            value.writeAccessKind == null ? null : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
+            value.isExcluded,
+            value.constructorWriteAccess
         );
         ref.set(propertyElement);
         return propertyElement;

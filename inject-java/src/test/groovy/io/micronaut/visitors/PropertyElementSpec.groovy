@@ -717,4 +717,78 @@ class JacksonPropertyAccessBean {
         writeOnly.isWriteOnly()
         setterOnly.isWriteOnly()
     }
+
+    void "test jackson write only record component resolves as write only constructor property"() {
+        given:
+        def introspection = buildBeanIntrospection('test.JacksonWriteOnlyRecord', '''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+record JacksonWriteOnlyRecord(
+    @JsonProperty
+    String value,
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    String ignored
+) {
+}
+''')
+        def ignored = introspection.getRequiredProperty('ignored', String)
+        def writeProperty = introspection.getRequiredWriteProperty('ignored', String)
+        def bean = introspection.instantiate('value', 'ignored')
+        def updated = writeProperty.withValue(bean, 'updated')
+
+        expect:
+        ignored.isWriteOnly()
+        !ignored.isReadOnly()
+        introspection.getReadProperty('ignored').isEmpty()
+        introspection.getWriteProperty('ignored').isPresent()
+        updated.ignored() == 'updated'
+    }
+
+    void "test jackson write only constructor getter bean resolves as write only constructor property"() {
+        given:
+        def introspection = buildBeanIntrospection('test.JacksonWriteOnlyConstructorGetterBean', '''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class JacksonWriteOnlyConstructorGetterBean {
+    private final String value;
+
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private final String ignored;
+
+    @JsonCreator
+    JacksonWriteOnlyConstructorGetterBean(@JsonProperty("value") String value, @JsonProperty("ignored") String ignored) {
+        this.value = value;
+        this.ignored = ignored;
+    }
+
+    public String getValue() {
+        return value;
+    }
+
+    public String getIgnored() {
+        return ignored;
+    }
+}
+''')
+        def ignored = introspection.getRequiredProperty('ignored', String)
+        def writeProperty = introspection.getRequiredWriteProperty('ignored', String)
+        def bean = introspection.instantiate('value', 'ignored')
+        def updated = writeProperty.withValue(bean, 'updated')
+
+        expect:
+        ignored.isWriteOnly()
+        !ignored.isReadOnly()
+        introspection.getReadProperty('ignored').isEmpty()
+        introspection.getWriteProperty('ignored').isPresent()
+        updated.getIgnored() == 'updated'
+    }
 }
