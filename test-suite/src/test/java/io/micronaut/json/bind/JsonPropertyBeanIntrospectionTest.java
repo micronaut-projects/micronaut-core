@@ -15,6 +15,7 @@
  */
 package io.micronaut.json.bind;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
@@ -442,6 +443,43 @@ class JsonPropertyBeanIntrospectionTest {
         assertEquals("https://example.org/", property.get(bean));
         assertEquals(true, property.isReadOnly());
         assertThrows(UnsupportedOperationException.class, () -> property.set(bean, "https://micronaut.io/"));
+    }
+
+    @Test
+    void writeOnlyJsonPropertyRecordComponentIsAWritePropertyOnly() {
+        BeanIntrospection<JsonPropertyWriteOnlyRecord> introspection =
+            BeanIntrospection.getIntrospection(JsonPropertyWriteOnlyRecord.class);
+        BeanProperty<JsonPropertyWriteOnlyRecord, String> property =
+            introspection.getRequiredProperty("ignored", String.class);
+        BeanWriteProperty<JsonPropertyWriteOnlyRecord, String> writeProperty =
+            introspection.getRequiredWriteProperty("ignored", String.class);
+        JsonPropertyWriteOnlyRecord bean = new JsonPropertyWriteOnlyRecord("value", "ignored");
+        JsonPropertyWriteOnlyRecord updated = writeProperty.withValue(bean, "updated");
+
+        assertEquals(true, property.isWriteOnly());
+        assertEquals(false, property.isReadOnly());
+        assertFalse(introspection.getReadProperty("ignored").isPresent());
+        assertEquals("updated", updated.ignored());
+        assertThrows(UnsupportedOperationException.class, () -> property.get(bean));
+    }
+
+    @Test
+    void writeOnlyJsonPropertyConstructorGetterBeanIsAWritePropertyOnly() {
+        BeanIntrospection<JsonPropertyWriteOnlyConstructorGetterBean> introspection =
+            BeanIntrospection.getIntrospection(JsonPropertyWriteOnlyConstructorGetterBean.class);
+        BeanProperty<JsonPropertyWriteOnlyConstructorGetterBean, String> property =
+            introspection.getRequiredProperty("ignored", String.class);
+        BeanWriteProperty<JsonPropertyWriteOnlyConstructorGetterBean, String> writeProperty =
+            introspection.getRequiredWriteProperty("ignored", String.class);
+        JsonPropertyWriteOnlyConstructorGetterBean bean =
+            new JsonPropertyWriteOnlyConstructorGetterBean("value", "ignored");
+        JsonPropertyWriteOnlyConstructorGetterBean updated = writeProperty.withValue(bean, "updated");
+
+        assertEquals(true, property.isWriteOnly());
+        assertEquals(false, property.isReadOnly());
+        assertFalse(introspection.getReadProperty("ignored").isPresent());
+        assertEquals("updated", updated.getIgnored());
+        assertThrows(UnsupportedOperationException.class, () -> property.get(bean));
     }
 
     @Test
@@ -997,6 +1035,36 @@ class JsonPropertyBeanIntrospectionTest {
 
     @Introspected
     record JsonPropertyRecord(@JsonProperty("home_page_url") String homePageUrl) {
+    }
+
+    @Introspected
+    record JsonPropertyWriteOnlyRecord(
+        @JsonProperty String value,
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) String ignored
+    ) {
+    }
+
+    @Introspected
+    static final class JsonPropertyWriteOnlyConstructorGetterBean {
+        private final String value;
+
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+        private final String ignored;
+
+        @JsonCreator
+        JsonPropertyWriteOnlyConstructorGetterBean(@JsonProperty("value") String value,
+                                                   @JsonProperty("ignored") String ignored) {
+            this.value = value;
+            this.ignored = ignored;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public String getIgnored() {
+            return ignored;
+        }
     }
 
     @Introspected
