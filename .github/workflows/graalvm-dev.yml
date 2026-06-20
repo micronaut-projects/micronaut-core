@@ -18,9 +18,9 @@ jobs:
     outputs:
       matrix: ${{ steps.build-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Build Matrix
-        uses: micronaut-projects/github-actions/graalvm/build-matrix@e8cc2858e07f25cd86910b691ad09eb0d7f07f56 # master
+        uses: micronaut-projects/github-actions/graalvm/build-matrix@6f9eb3a2ab5fcd2dde3c39a9dc9a3a05076d22e5 # master
         id: build-matrix
         with:
           java-version: '25'
@@ -49,9 +49,9 @@ jobs:
           sudo rm -rf /usr/lib/jvm/*
           unset JAVA_HOME
           export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Pre-Build Steps
-        uses: micronaut-projects/github-actions/graalvm/pre-build@e8cc2858e07f25cd86910b691ad09eb0d7f07f56 # master
+        uses: micronaut-projects/github-actions/graalvm/pre-build@6f9eb3a2ab5fcd2dde3c39a9dc9a3a05076d22e5 # master
         id: pre-build
         with:
           java: ${{ matrix.java }}
@@ -59,7 +59,7 @@ jobs:
           nativeTestTask: ${{ matrix.native_test_task }}
           gradle-java: '25'
       - name: Build Steps
-        uses: micronaut-projects/github-actions/graalvm/build@e8cc2858e07f25cd86910b691ad09eb0d7f07f56 # master
+        uses: micronaut-projects/github-actions/graalvm/build@6f9eb3a2ab5fcd2dde3c39a9dc9a3a05076d22e5 # master
         id: build
         env:
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
@@ -69,7 +69,7 @@ jobs:
         with:
           nativeTestTask: ${{ matrix.native_test_task }}
       - name: Post-Build Steps
-        uses: micronaut-projects/github-actions/graalvm/post-build@e8cc2858e07f25cd86910b691ad09eb0d7f07f56 # master
+        uses: micronaut-projects/github-actions/graalvm/post-build@6f9eb3a2ab5fcd2dde3c39a9dc9a3a05076d22e5 # master
         id: post-build
         with:
           java: ${{ matrix.java }}
