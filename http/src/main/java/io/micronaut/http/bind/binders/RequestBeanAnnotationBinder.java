@@ -100,7 +100,7 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
                     }
                     argumentValues[i] = constructorArgument.isOptional() ? bindableResult : bindableResult.orElse(null);
                 }
-                if (!bindingFound) {
+                if (!bindingFound && argument.isNullable()) {
                     return BindingResult.empty();
                 }
                 return () -> Optional.of(introspection.instantiate(false, argumentValues));
@@ -115,7 +115,7 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
                         bindingFound = true;
                     }
                 }
-                if (!bindingFound) {
+                if (!bindingFound && argument.isNullable()) {
                     return BindingResult.empty();
                 }
 
