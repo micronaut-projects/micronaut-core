@@ -201,11 +201,12 @@ public final class AstBeanPropertiesUtils {
                 }
                 continue;
             }
-            String propertyName = fieldElement.getSimpleName();
-            boolean isPropertyField = propertyFields.contains(propertyName);
+            String fieldPropertyName = fieldElement.getSimpleName();
+            String propertyName = resolvePropertyNameForField(props, fieldPropertyName);
+            boolean isPropertyField = propertyFields.contains(fieldPropertyName);
             boolean hasConstructorWriteAccess = isIntrospectedPropertyField
                 && isWriteOnlyIntrospectedProperty(fieldElement)
-                && hasConstructorWriteAccess(classElement, propertyName, fieldElement.getGenericType());
+                && hasConstructorWriteAccess(classElement, propertyName, fieldPropertyName, fieldElement.getGenericType());
             boolean canUseFieldForAccess = canFieldBeUsedForAccess(fieldElement, effectiveAccessKinds, visibility, configuration) ||
                 canNativePropertyFieldBeUsedForAccess(isPropertyField, fieldElement, effectiveAccessKinds, visibility) ||
                 canIntrospectedPropertyFieldBeUsedForAccess(fieldElement, visibility);
@@ -291,6 +292,19 @@ public final class AstBeanPropertiesUtils {
             }
         }
         return beanProperties;
+    }
+
+    private static String resolvePropertyNameForField(Map<String, BeanPropertyData> props, String fieldPropertyName) {
+        if (props.containsKey(fieldPropertyName)) {
+            return fieldPropertyName;
+        }
+        if (fieldPropertyName.length() > 1 && fieldPropertyName.charAt(0) == '$') {
+            String accessorPropertyName = "$" + Character.toUpperCase(fieldPropertyName.charAt(1)) + fieldPropertyName.substring(2);
+            if (props.containsKey(accessorPropertyName)) {
+                return accessorPropertyName;
+            }
+        }
+        return fieldPropertyName;
     }
 
     private static boolean isIntrospectedPropertyReader(MethodElement methodElement, BeanProperties.Visibility visibility) {
@@ -473,6 +487,14 @@ public final class AstBeanPropertiesUtils {
             }
         }
         return false;
+    }
+
+    private static boolean hasConstructorWriteAccess(ClassElement classElement,
+                                                     String propertyName,
+                                                     String fieldPropertyName,
+                                                     @Nullable ClassElement type) {
+        return hasConstructorWriteAccess(classElement, propertyName, type) ||
+            (!fieldPropertyName.equals(propertyName) && hasConstructorWriteAccess(classElement, fieldPropertyName, type));
     }
 
     private static void validateIntrospectedPropertyField(FieldElement fieldElement,

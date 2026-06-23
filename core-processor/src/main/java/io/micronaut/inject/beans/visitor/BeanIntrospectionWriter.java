@@ -1142,12 +1142,13 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             for (int i = 0; i < parameters.length; i++) {
                 ParameterElement parameter = parameters[i];
                 String parameterName = parameter.getName();
+                String propertyName = resolvePropertyNameForConstructorArgument(parameterName);
 
                 BeanPropertyData prop = beanProperties.stream()
-                    .filter(bp -> bp.name.equals(parameterName))
+                    .filter(bp -> bp.name.equals(propertyName))
                     .findAny().orElse(null);
 
-                Integer propertyIndex = propertyNames.get(parameterName);
+                Integer propertyIndex = propertyNames.get(propertyName);
                 if (propertyIndex != null && propertyNames.size() == 1) {
                     newValueArguments[i] = true;
                     if (prop != null) {
@@ -1197,7 +1198,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                         ParameterElement parameter = parameters[i];
                         Object constructorArgument = constructorArguments[i];
 
-                        Integer propertyIndex = propertyNames.get(parameter.getName());
+                        Integer propertyIndex = propertyNames.get(resolvePropertyNameForConstructorArgument(parameter.getName()));
                         ExpressionDef paramExp;
                         if (newValueArguments[i]) {
                             paramExp = value.cast(TypeDef.erasure(parameter.getType()));
@@ -1311,6 +1312,24 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         @Override
         public TypedElement getDeclaringType() {
             return constructor.getDeclaringType();
+        }
+
+        private String resolvePropertyNameForConstructorArgument(String parameterName) {
+            if (hasBeanProperty(parameterName)) {
+                return parameterName;
+            }
+            if (parameterName.length() > 1 && parameterName.charAt(0) == '$') {
+                String accessorPropertyName = "$" + Character.toUpperCase(parameterName.charAt(1)) + parameterName.substring(2);
+                if (hasBeanProperty(accessorPropertyName)) {
+                    return accessorPropertyName;
+                }
+            }
+            return parameterName;
+        }
+
+        private boolean hasBeanProperty(String propertyName) {
+            return propertyNames.containsKey(propertyName) ||
+                beanProperties.stream().anyMatch(bp -> bp.name.equals(propertyName));
         }
 
     }
