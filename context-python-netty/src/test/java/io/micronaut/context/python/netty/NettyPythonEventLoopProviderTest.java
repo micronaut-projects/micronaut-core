@@ -47,11 +47,11 @@ final class NettyPythonEventLoopProviderTest {
             NettyPythonEventLoopProvider provider = new NettyPythonEventLoopProvider();
             assertFalse(provider.current().isPresent());
 
-            try (NettyPythonEventLoopProvider.Scope ignored = NettyPythonEventLoopProvider.bind(eventLoop)) {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
                 Optional<PythonEventLoop> current = provider.current();
                 assertTrue(current.isPresent());
                 assertFalse(current.get().inEventLoop());
-            }
+            });
 
             assertFalse(provider.current().isPresent());
         } finally {

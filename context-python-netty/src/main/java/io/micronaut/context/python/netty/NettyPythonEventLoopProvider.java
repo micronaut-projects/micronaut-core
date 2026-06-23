@@ -26,6 +26,7 @@ import io.netty.channel.EventLoop;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
+import java.lang.ScopedValue.CallableOp;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
@@ -37,7 +38,7 @@ import java.util.concurrent.CompletionStage;
 @Requires(property = PythonAsyncioConfiguration.ENABLED, notEquals = "false")
 @Experimental
 public final class NettyPythonEventLoopProvider implements PythonEventLoopProvider, GracefulShutdownCapable {
-    private static final ThreadLocal<NettyPythonEventLoop> CURRENT = new ThreadLocal<>();
+    private static final ScopedValue<NettyPythonEventLoop> CURRENT = ScopedValue.newInstance();
     private static final NettyPythonEventLoopSupport SUPPORT = new NettyPythonEventLoopSupport();
 
     @Override
@@ -47,7 +48,7 @@ public final class NettyPythonEventLoopProvider implements PythonEventLoopProvid
 
     @Override
     public @Nullable NettyPythonEventLoop currentLoop() {
-        return CURRENT.get();
+        return CURRENT.isBound() ? CURRENT.get() : null;
     }
 
     @Override
@@ -56,30 +57,26 @@ public final class NettyPythonEventLoopProvider implements PythonEventLoopProvid
     }
 
     /**
-     * Bind a Netty event loop as current for the calling thread.
+     * Run an operation with a Netty event loop bound as current.
      *
      * @param eventLoop The Netty event loop.
-     * @return A scope that restores the previous current event loop.
+     * @param operation The operation to run.
      */
-    public static Scope bind(EventLoop eventLoop) {
-        NettyPythonEventLoop previous = CURRENT.get();
-        CURRENT.set(new NettyPythonEventLoop(eventLoop, SUPPORT));
-        return () -> {
-            if (previous == null) {
-                CURRENT.remove();
-            } else {
-                CURRENT.set(previous);
-            }
-        };
+    public static void bind(EventLoop eventLoop, Runnable operation) {
+        ScopedValue.where(CURRENT, new NettyPythonEventLoop(eventLoop, SUPPORT)).run(operation);
     }
 
     /**
-     * Scope for a bound Netty event loop.
+     * Call an operation with a Netty event loop bound as current.
+     *
+     * @param eventLoop The Netty event loop.
+     * @param operation The operation to call.
+     * @param <T> The operation result type.
+     * @param <X> The operation exception type.
+     * @return The operation result.
+     * @throws X If the operation fails.
      */
-    @FunctionalInterface
-    @Experimental
-    public interface Scope extends AutoCloseable {
-        @Override
-        void close();
+    public static <T, X extends Throwable> T bind(EventLoop eventLoop, CallableOp<T, X> operation) throws X {
+        return ScopedValue.where(CURRENT, new NettyPythonEventLoop(eventLoop, SUPPORT)).call(operation);
     }
 }

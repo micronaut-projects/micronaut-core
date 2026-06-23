@@ -132,13 +132,12 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         cache.put(primaryContext, new ConcurrentHashMap<>());
         final int toCreate = targetSize;
         if (syncInit) {
+            LOG.debug("Creating {} Pooled Python contexts synchronously", toCreate);
             for (int i = 0; i < toCreate; i++) {
                 addPooledContext();
             }
         } else {
-            LOG.debug("Initial Python Context pool size is {}", toCreate);
-            addPooledContext();
-
+            LOG.debug("Creating {} Pooled Python contexts asynchronously", toCreate);
             Thread t = new Thread(() -> {
                 try {
                     for (int i = 1; i < toCreate; i++) {

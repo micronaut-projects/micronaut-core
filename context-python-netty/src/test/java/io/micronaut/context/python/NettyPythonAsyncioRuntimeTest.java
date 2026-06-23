@@ -57,7 +57,8 @@ final class NettyPythonAsyncioRuntimeTest {
         DefaultEventLoop eventLoop = new DefaultEventLoop();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
-        try (NettyPythonEventLoopProvider.Scope ignored = NettyPythonEventLoopProvider.bind(eventLoop)) {
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
             Value coroutine = context.eval(PYTHON, """
                 import asyncio
                 import java
@@ -85,6 +86,8 @@ final class NettyPythonAsyncioRuntimeTest {
             assertEquals(before, callback);
             assertEquals(before, after);
             assertTrue(before.contains("defaultEventLoop"), before);
+            return null;
+            });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
             context.close(true);
@@ -100,7 +103,8 @@ final class NettyPythonAsyncioRuntimeTest {
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
         PythonAsyncioRuntime.setExecutorService(executorService);
-        try (NettyPythonEventLoopProvider.Scope ignored = NettyPythonEventLoopProvider.bind(eventLoop)) {
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
             Value coroutine = context.eval(PYTHON, """
                 import asyncio
                 class Server(asyncio.DatagramProtocol):
@@ -133,6 +137,8 @@ final class NettyPythonAsyncioRuntimeTest {
             CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
 
             assertEquals("echo:ok", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+            return null;
+            });
         } finally {
             PythonAsyncioRuntime.setExecutorService(null);
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
@@ -148,7 +154,8 @@ final class NettyPythonAsyncioRuntimeTest {
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
-        try (NettyPythonEventLoopProvider.Scope ignored = NettyPythonEventLoopProvider.bind(eventLoop)) {
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
             Value coroutine = context.eval(PYTHON, """
                 import asyncio
                 class Echo(asyncio.Protocol):
@@ -186,6 +193,8 @@ final class NettyPythonAsyncioRuntimeTest {
             CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
 
             assertEquals("echo:ok", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+            return null;
+            });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
             context.close(true);
@@ -199,7 +208,8 @@ final class NettyPythonAsyncioRuntimeTest {
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
-        try (NettyPythonEventLoopProvider.Scope ignored = NettyPythonEventLoopProvider.bind(eventLoop)) {
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
             Value coroutine = context.eval(PYTHON, """
                 import asyncio
                 import ssl
@@ -212,6 +222,8 @@ final class NettyPythonAsyncioRuntimeTest {
 
             Exception exception = assertThrows(Exception.class, () -> stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
             assertTrue(exception.getCause().getMessage().contains("Python ssl.SSLContext is not supported"));
+            return null;
+            });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
             context.close(true);
@@ -226,7 +238,8 @@ final class NettyPythonAsyncioRuntimeTest {
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         NettyPythonEventLoopProvider provider = new NettyPythonEventLoopProvider();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(provider));
-        try (NettyPythonEventLoopProvider.Scope ignored = NettyPythonEventLoopProvider.bind(eventLoop)) {
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
             Value coroutine = context.eval(PYTHON, """
                 import asyncio
                 class Hold(asyncio.Protocol):
@@ -245,6 +258,8 @@ final class NettyPythonAsyncioRuntimeTest {
                     socket.getOutputStream().write(1);
                 }
             });
+            return null;
+            });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
             context.close(true);
@@ -258,12 +273,13 @@ final class NettyPythonAsyncioRuntimeTest {
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         CompletableFuture<Channel> acceptedChannel = new CompletableFuture<>();
-        Channel serverChannel = null;
-        Channel clientChannel = null;
-        Channel accepted = null;
+        Channel[] serverChannel = new Channel[1];
+        Channel[] clientChannel = new Channel[1];
+        Channel[] accepted = new Channel[1];
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
-        try (NettyPythonEventLoopProvider.Scope ignored = NettyPythonEventLoopProvider.bind(eventLoop)) {
-            serverChannel = new ServerBootstrap()
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
+            serverChannel[0] = new ServerBootstrap()
                 .group(eventLoop)
                 .channel(NioServerSocketChannel.class)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
@@ -275,7 +291,7 @@ final class NettyPythonAsyncioRuntimeTest {
                 .bind("127.0.0.1", 0)
                 .syncUninterruptibly()
                 .channel();
-            clientChannel = new Bootstrap()
+            clientChannel[0] = new Bootstrap()
                 .group(eventLoop)
                 .channel(NioSocketChannel.class)
                 .handler(new ChannelInitializer<SocketChannel>() {
@@ -283,12 +299,12 @@ final class NettyPythonAsyncioRuntimeTest {
                     protected void initChannel(SocketChannel channel) {
                     }
                 })
-                .connect((InetSocketAddress) serverChannel.localAddress())
+                .connect((InetSocketAddress) serverChannel[0].localAddress())
                 .syncUninterruptibly()
                 .channel();
-            accepted = acceptedChannel.get(5, TimeUnit.SECONDS);
+            accepted[0] = acceptedChannel.get(5, TimeUnit.SECONDS);
             CompletableFuture<Boolean> ready = new CompletableFuture<>();
-            Channel client = clientChannel;
+            Channel client = clientChannel[0];
             Value coroutine = context.eval(PYTHON, """
                 import asyncio
                 class Accepted(asyncio.Protocol):
@@ -309,7 +325,7 @@ final class NettyPythonAsyncioRuntimeTest {
                     finally:
                         transport.close()
                 run
-                """).execute(accepted, ready);
+                """).execute(accepted[0], ready);
 
             CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
             assertTrue(ready.get(5, TimeUnit.SECONDS));
@@ -317,11 +333,13 @@ final class NettyPythonAsyncioRuntimeTest {
                 .addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE));
 
             assertEquals("ok", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+            return null;
+            });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
-            close(clientChannel);
-            close(accepted);
-            close(serverChannel);
+            close(clientChannel[0]);
+            close(accepted[0]);
+            close(serverChannel[0]);
             context.close(true);
             eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
@@ -335,7 +353,8 @@ final class NettyPythonAsyncioRuntimeTest {
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
         PythonAsyncioRuntime.setExecutorService(executorService);
-        try (NettyPythonEventLoopProvider.Scope ignored = NettyPythonEventLoopProvider.bind(eventLoop)) {
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
             Value coroutine = context.eval(PYTHON, """
                 import asyncio
                 async def handle(reader, writer):
@@ -362,6 +381,8 @@ final class NettyPythonAsyncioRuntimeTest {
             CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
 
             assertEquals("hiok", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+            return null;
+            });
         } finally {
             PythonAsyncioRuntime.setExecutorService(null);
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
@@ -380,7 +401,8 @@ final class NettyPythonAsyncioRuntimeTest {
         SelfSignedCertificate certificate = new SelfSignedCertificate("localhost");
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
         PythonAsyncioRuntime.setExecutorService(executorService);
-        try (NettyPythonEventLoopProvider.Scope ignored = NettyPythonEventLoopProvider.bind(eventLoop)) {
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
             Value coroutine = context.eval(PYTHON, """
                 import asyncio
                 async def handle(reader, writer):
@@ -414,6 +436,8 @@ final class NettyPythonAsyncioRuntimeTest {
             CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
 
             assertEquals("tls:ok", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+            return null;
+            });
         } finally {
             PythonAsyncioRuntime.setExecutorService(null);
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
@@ -432,7 +456,8 @@ final class NettyPythonAsyncioRuntimeTest {
         Path socketPath = Files.createTempDirectory("mn-python-netty").resolve("asyncio.sock");
         Files.deleteIfExists(socketPath);
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
-        try (NettyPythonEventLoopProvider.Scope ignored = NettyPythonEventLoopProvider.bind(eventLoop)) {
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
             Value coroutine = context.eval(PYTHON, """
                 import asyncio
                 class Echo(asyncio.Protocol):
@@ -468,6 +493,8 @@ final class NettyPythonAsyncioRuntimeTest {
             CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
 
             assertEquals("uds:ok", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+            return null;
+            });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
             context.close(true);

@@ -90,12 +90,13 @@ public final class PythonAsyncioRuntime {
         if (!runtimeState.enabled()) {
             throw new IllegalStateException("Python asyncio support is disabled. Set micronaut.python.asyncio.enabled=true to enable async Python bridge methods.");
         }
-        PythonCompletableFuture future = new PythonCompletableFuture();
         if (value == null || value.isNull()) {
+            PythonCompletableFuture future = new PythonCompletableFuture();
             future.complete(null);
             return future;
         }
         Context context = value.getContext();
+        PythonCompletableFuture future = new PythonCompletableFuture();
         PythonContextRuntime.enterExecution(context);
         future.whenComplete((ignored, ignoredThrowable) -> PythonContextRuntime.exitExecution(context));
         PythonEventLoop eventLoop = currentEventLoop(runtimeState);

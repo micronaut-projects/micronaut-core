@@ -80,9 +80,10 @@ final class NettyPythonEventLoopServerCustomizer implements BeanCreatedEventList
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            try (NettyPythonEventLoopProvider.Scope ignored = NettyPythonEventLoopProvider.bind(ctx.channel().eventLoop())) {
+            NettyPythonEventLoopProvider.bind(ctx.channel().eventLoop(), () -> {
                 super.channelRead(ctx, msg);
-            }
+                return null;
+            });
         }
     }
 }

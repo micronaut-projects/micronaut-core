@@ -571,16 +571,13 @@ public final class GraalPyRuntimeUtil {
      */
     public static Value invokePythonMethod(Value receiver, String name, Object[] arguments) {
         Context context = receiver.getContext();
-        PythonContextRuntime.enterExecutionFrame(context);
-        try {
+        return PythonContextRuntime.withExecutionFrame(context, () -> {
             Value member = receiver.getMember(name);
             if (member == null) {
                 throw new IllegalArgumentException("No Python member [" + name + "] found");
             }
             return PythonContextRuntime.helper(context, INVOKE_METHOD, INVOKE_METHOD_SOURCE).execute(receiver, name, arguments);
-        } finally {
-            PythonContextRuntime.exitExecutionFrame(context);
-        }
+        });
     }
 
     /**

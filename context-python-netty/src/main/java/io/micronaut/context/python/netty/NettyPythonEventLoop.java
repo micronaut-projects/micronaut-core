@@ -572,11 +572,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
     }
 
     private Runnable bound(Runnable runnable) {
-        return () -> {
-            try (NettyPythonEventLoopProvider.Scope ignored = NettyPythonEventLoopProvider.bind(eventLoop)) {
-                runnable.run();
-            }
-        };
+        return () -> NettyPythonEventLoopProvider.bind(eventLoop, runnable);
     }
 
     /*

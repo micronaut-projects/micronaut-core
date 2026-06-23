@@ -28,6 +28,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.ScopedValue.CallableOp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -111,11 +112,9 @@ public final class PythonContextRuntime {
     private static volatile @Nullable PythonPool pythonPool;
     private static final AtomicInteger ACTIVE_EXECUTIONS = new AtomicInteger();
     private static final Object ACTIVE_EXECUTIONS_LOCK = new Object();
-    private static final List<Runnable> NO_ACTIVE_EXECUTIONS_LISTENERS = new ArrayList<>();
     private static final IdentityHashMap<Context, ContextState> CONTEXT_STATES = new IdentityHashMap<>();
     private static final IdentityHashMap<Engine, EngineState> ENGINE_STATES = new IdentityHashMap<>();
-    private static final ThreadLocal<List<Context>> CURRENT_EXECUTION_CONTEXTS = ThreadLocal.withInitial(ArrayList::new);
-    private static final ThreadLocal<List<Runnable>> CURRENT_EXECUTION_EXIT_LISTENERS = ThreadLocal.withInitial(ArrayList::new);
+    private static final ScopedValue<ExecutionFrame> CURRENT_EXECUTION = ScopedValue.newInstance();
 
     private PythonContextRuntime() {
     }
@@ -262,13 +261,24 @@ public final class PythonContextRuntime {
     }
 
     static void enterExecution() {
-        Context ctx = getContext();
-        enterExecutionFrame(ctx);
+        enterExecution(getContext());
     }
 
-    static void enterExecutionFrame(Context ctx) {
-        CURRENT_EXECUTION_CONTEXTS.get().add(ctx);
+    static <T, X extends Throwable> T withExecutionFrame(Context ctx, CallableOp<T, X> operation) throws X {
+        if (CURRENT_EXECUTION.isBound()) {
+            return runWithExecutionFrame(ctx, CURRENT_EXECUTION.get(), operation);
+        }
+        return ScopedValue.where(CURRENT_EXECUTION, new ExecutionFrame()).call(() -> runWithExecutionFrame(ctx, CURRENT_EXECUTION.get(), operation));
+    }
+
+    private static <T, X extends Throwable> T runWithExecutionFrame(Context ctx, ExecutionFrame frame, CallableOp<T, X> operation) throws X {
+        frame.contexts.add(ctx);
         enterExecution(ctx);
+        try {
+            return operation.call();
+        } finally {
+            exitExecutionFrame(ctx, frame);
+        }
     }
 
     static void exitExecution(Context context) {
@@ -292,32 +302,18 @@ public final class PythonContextRuntime {
                     }
                 }
             }
-            if (ACTIVE_EXECUTIONS.updateAndGet(value -> Math.max(0, value - 1)) == 0 && !NO_ACTIVE_EXECUTIONS_LISTENERS.isEmpty()) {
-                listeners.addAll(NO_ACTIVE_EXECUTIONS_LISTENERS);
-                NO_ACTIVE_EXECUTIONS_LISTENERS.clear();
-            }
+            ACTIVE_EXECUTIONS.updateAndGet(value -> Math.max(0, value - 1));
         }
         runNoActiveExecutionsListeners(listeners);
     }
 
     static void exitExecution() {
-        List<Context> contexts = CURRENT_EXECUTION_CONTEXTS.get();
-        if (contexts.isEmpty()) {
-            return;
-        }
-        Context ctx = contexts.remove(contexts.size() - 1);
-        if (contexts.isEmpty()) {
-            CURRENT_EXECUTION_CONTEXTS.remove();
-        }
-        exitExecution(ctx);
-        if (contexts.isEmpty()) {
-            runCurrentExecutionExitListeners();
-        }
+        exitExecution(getContext());
     }
 
     @SuppressWarnings("ReferenceEquality")
-    static void exitExecutionFrame(Context ctx) {
-        List<Context> contexts = CURRENT_EXECUTION_CONTEXTS.get();
+    private static void exitExecutionFrame(Context ctx, ExecutionFrame frame) {
+        List<Context> contexts = frame.contexts;
         if (contexts.isEmpty()) {
             exitExecution(ctx);
             return;
@@ -326,49 +322,24 @@ public final class PythonContextRuntime {
         if (removed != ctx) {
             contexts.remove(ctx);
         }
-        if (contexts.isEmpty()) {
-            CURRENT_EXECUTION_CONTEXTS.remove();
-        }
         exitExecution(ctx);
         if (contexts.isEmpty()) {
-            runCurrentExecutionExitListeners();
+            runExecutionExitListeners(frame);
         }
     }
 
-    private static void runCurrentExecutionExitListeners() {
-        List<Runnable> listeners = CURRENT_EXECUTION_EXIT_LISTENERS.get();
+    private static void runExecutionExitListeners(ExecutionFrame frame) {
+        List<Runnable> listeners = frame.exitListeners;
         if (listeners.isEmpty()) {
-            CURRENT_EXECUTION_EXIT_LISTENERS.remove();
             return;
         }
         List<Runnable> snapshot = List.copyOf(listeners);
         listeners.clear();
-        CURRENT_EXECUTION_EXIT_LISTENERS.remove();
         runNoActiveExecutionsListeners(snapshot);
     }
 
     static int activeExecutions() {
         return ACTIVE_EXECUTIONS.get();
-    }
-
-    static boolean hasActiveExecutions(Context context) {
-        synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            ContextState state = CONTEXT_STATES.get(context);
-            return state != null && state.activeExecutions > 0;
-        }
-    }
-
-    static void onNoActiveExecutions(Runnable listener) {
-        boolean runNow;
-        synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            runNow = ACTIVE_EXECUTIONS.get() == 0;
-            if (!runNow) {
-                NO_ACTIVE_EXECUTIONS_LISTENERS.add(listener);
-            }
-        }
-        if (runNow) {
-            listener.run();
-        }
     }
 
     static void onNoActiveExecutions(Context context, Runnable listener) {
@@ -386,8 +357,8 @@ public final class PythonContextRuntime {
     }
 
     static void onNoActiveExecutionsAfterCurrentFrame(Context context, Runnable listener) {
-        if (!CURRENT_EXECUTION_CONTEXTS.get().isEmpty()) {
-            CURRENT_EXECUTION_EXIT_LISTENERS.get().add(() -> onNoActiveExecutions(context, listener));
+        if (CURRENT_EXECUTION.isBound() && !CURRENT_EXECUTION.get().contexts.isEmpty()) {
+            CURRENT_EXECUTION.get().exitListeners.add(() -> onNoActiveExecutions(context, listener));
             return;
         }
         onNoActiveExecutions(context, listener);
@@ -686,7 +657,7 @@ public final class PythonContextRuntime {
                 Value iterator = abstractMethods.getIterator();
                 while (iterator.hasIteratorNextElement()) {
                     String methodName = iterator.getIteratorNextElement().asString();
-                    ProxyExecutable stub = (execArgs) -> null;
+                    ProxyExecutable stub = (_) -> null;
                     pythonClass.putMember(methodName, stub);
                 }
             }
@@ -1195,7 +1166,6 @@ public final class PythonContextRuntime {
             CONTEXT_STATES.values().forEach(ContextState::clear);
             CONTEXT_STATES.clear();
             ENGINE_STATES.clear();
-            NO_ACTIVE_EXECUTIONS_LISTENERS.clear();
             ACTIVE_EXECUTIONS.set(0);
         }
     }
@@ -1256,5 +1226,10 @@ public final class PythonContextRuntime {
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
         private int contexts;
         private int activeExecutions;
+    }
+
+    private static final class ExecutionFrame {
+        private final List<Context> contexts = new ArrayList<>();
+        private final List<Runnable> exitListeners = new ArrayList<>();
     }
 }
