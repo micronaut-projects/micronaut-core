@@ -1068,7 +1068,7 @@ class ProductMappers:
                 );
                 assertTrue(enumDef.getFields().isEmpty());
                 assertEquals(1, enumDef.getSuperinterfaces().size());
-                assertEquals(List.of("asPolyglotValue", "fromPolyglotValue"), enumDef.getMethods().stream().map(MethodDef::getName).toList());
+                assertEquals(List.of("asPolyglotValue", "fromPolyglotValue", "jsonValue", "toString"), enumDef.getMethods().stream().map(MethodDef::getName).toList());
             }
         }
     }

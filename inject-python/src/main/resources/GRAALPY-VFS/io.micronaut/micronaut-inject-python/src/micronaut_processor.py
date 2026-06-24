@@ -148,7 +148,6 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.imported_types = {}  # Track imported types: simple_name -> full_qualified_name
         self.local_classes = set()  # Track class names defined in this file
         self.local_constant_values = {}  # Track local class constants visible to annotation expressions
-        self.module_constant_names = set()  # Track module-level constants that should stay symbolic in metadata
         self.current_class_nested_types = {}  # Track nested classes visible in the current class body
         # Script handling
         self.current_script = None
@@ -778,7 +777,6 @@ class MicronautAstVisitor(ast.NodeVisitor):
         for target in targets:
             if isinstance(target, ast.Name):
                 if self.current_class is None:
-                    self.module_constant_names.add(target.id)
                     self.local_constant_values[target.id] = value
                 continue
             if not isinstance(target, ast.Attribute):
@@ -2053,11 +2051,7 @@ def resolve_annotation_member_constants(annotation_name, members, visitor=None):
     return resolved
 
 
-def preserve_symbolic_module_constant(annotation_name, member_name):
-    return annotation_name == "io.micronaut.context.annotation.Requires" and member_name == "property"
-
-
-def convert_ast_value(node, visitor=None, symbolic_module_constant=False):
+def convert_ast_value(node, visitor=None):
     """
     Convert an AST node to a Python value, handling complex expressions like lists.
     If visitor is provided, resolve Java type names to fully qualified names and Java constants to their values.
@@ -2067,8 +2061,6 @@ def convert_ast_value(node, visitor=None, symbolic_module_constant=False):
         # Class references - check if this is a type that should be resolved
         name = node.id
         if visitor is not None:
-            if symbolic_module_constant and hasattr(visitor, 'module_constant_names') and name in visitor.module_constant_names:
-                return name
             if hasattr(visitor, 'local_constant_values') and name in visitor.local_constant_values:
                 return visitor.local_constant_values[name]
             # Check imported types first
@@ -2171,11 +2163,7 @@ def convert_ast_call_to_decorator(node, visitor=None):
     return None
 
 def convert_annotation_member_value(annotation_name, member_name, node, visitor=None):
-    return convert_ast_value(
-        node,
-        visitor,
-        preserve_symbolic_module_constant(annotation_name, member_name)
-    )
+    return convert_ast_value(node, visitor)
 
 
 def merge_keyword_argument(result, kw, visitor=None, annotation_name=None):

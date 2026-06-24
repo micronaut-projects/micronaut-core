@@ -31,7 +31,6 @@ import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,12 +78,24 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
     private final Map<String, java.util.Set<String>> asyncScriptInjections = new ConcurrentHashMap<>();
 
     private final AtomicInteger size = new AtomicInteger(0);
-    private final AtomicReference<Thread> warmupThread = new AtomicReference<>();
+    private final AtomicReference<@Nullable Thread> warmupThread = new AtomicReference<>();
     private final AtomicBoolean gracefulShutdownStarted = new AtomicBoolean();
     private final CompletableFuture<Void> gracefulShutdown = new CompletableFuture<>();
     private final int targetSize;
     private volatile boolean closed;
 
+    /**
+     * Create the pool coordinator around the primary context and shared engine.
+     * <p>
+     * The primary context is supplied by the context factory and remains outside the borrow/release
+     * queue. Additional contexts created by this class share the engine and host access settings.
+     *
+     * @param engine The shared GraalPy engine
+     * @param hostAccess The host access policy used for newly created contexts
+     * @param primaryContext The primary context used by non-pooled runtime calls
+     * @param applicationContext The application context used to obtain the class loader
+     * @param configuration The Python pool configuration
+     */
     @Inject
     PythonPool(@Named(GraalPyRuntimeUtil.PYTHON) Engine engine,
                @Named(GraalPyRuntimeUtil.PYTHON) HostAccess hostAccess,
@@ -109,10 +120,12 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
     }
 
     /**
-     * Initializes the pool and primary context.
-     * The first (primary) context is created synchronously and exposed to {@link PythonContextRuntime}.
-     * Pooled contexts are created synchronously when 'micronaut.python.pool.sync-init' is true,
-     * otherwise they are created asynchronously on a background thread.
+     * Initialize the optional pool around the already-created primary context.
+     * <p>
+     * When pooling is disabled or context reuse is enabled this method deliberately unregisters
+     * the pool from {@link PythonContextRuntime}. Otherwise it exposes the pool immediately and
+     * warms additional contexts synchronously or on the background warmup thread according to
+     * configuration.
      */
     @PostConstruct
     void init() {
@@ -164,6 +177,14 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         }
     }
 
+    /**
+     * Borrow a pooled context, waiting until warmup or replenishment makes one available.
+     * <p>
+     * Borrowed contexts must be returned with {@link #release(Context)} so the bounded pool does
+     * not starve subsequent generated bridge calls.
+     *
+     * @return A pooled context ready for exclusive use by the caller
+     */
     Context borrow() {
         long waitedMs = 0L;
         try {
@@ -187,10 +208,25 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         }
     }
 
+    /**
+     * Return a borrowed context to the tail of the available queue.
+     *
+     * @param c The context previously obtained from {@link #borrow()}
+     */
     void release(Context c) {
         pooledQueue.addLast(c);
     }
 
+    /**
+     * Borrow a context, resolve a cached class instance in that context, and release the context
+     * after the callback completes.
+     *
+     * @param packageName The Python package, or {@code null}/{@code python} for top-level classes
+     * @param simpleName The simple or nested class name
+     * @param fn The callback that receives the context-local class value
+     * @param <T> The callback result type
+     * @return The callback result
+     */
     <T> T withClass(@Nullable String packageName, String simpleName, java.util.function.Function<Value, T> fn) {
         Context c = borrow();
         try {
@@ -201,6 +237,16 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         }
     }
 
+    /**
+     * Borrow a context, resolve a cached script/module value in that context, and release the
+     * context after the callback completes.
+     *
+     * @param packageName The Python package, or {@code python} for top-level scripts
+     * @param scriptName The script/module name
+     * @param fn The callback that receives the context-local script value
+     * @param <T> The callback result type
+     * @return The callback result
+     */
     <T> T withScript(String packageName, String scriptName, java.util.function.Function<Value, T> fn) {
         Context c = borrow();
         try {
@@ -211,6 +257,16 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         }
     }
 
+    /**
+     * Resolve a class instance from an available pooled context without borrowing it.
+     * <p>
+     * This is intended for callers that only need a cached class value and do not require exclusive
+     * context ownership. The primary context is used as a fallback when the pool has not warmed yet.
+     *
+     * @param packageName The Python package, or {@code null}/{@code python} for top-level classes
+     * @param simpleName The simple or nested class name
+     * @return A context-local class value
+     */
     Value getAnyClass(@Nullable String packageName, String simpleName) {
         Context c = pooledQueue.peekFirst();
         if (c == null) {
@@ -219,10 +275,27 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         return getOrCreateClass(c, packageName, simpleName);
     }
 
+    /**
+     * Resolve a cached class instance in a caller-selected context.
+     *
+     * @param context The context that should own the value
+     * @param packageName The Python package, or {@code null}/{@code python} for top-level classes
+     * @param simpleName The simple or nested class name
+     * @return The context-local class value
+     */
     Value getClass(Context context, @Nullable String packageName, String simpleName) {
         return getOrCreateClass(context, packageName, simpleName);
     }
 
+    /**
+     * Resolve a script/module from an available pooled context without borrowing it.
+     * <p>
+     * The primary context is used as a fallback when no pooled context is currently available.
+     *
+     * @param packageName The Python package, or {@code python} for top-level scripts
+     * @param scriptName The script/module name
+     * @return A context-local script value
+     */
     Value getAnyScript(String packageName, String scriptName) {
         Context c = pooledQueue.peekFirst();
         if (c == null) {
@@ -231,22 +304,64 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         return getOrCreateScript(c, packageName, scriptName);
     }
 
+    /**
+     * Resolve a cached script/module value in a caller-selected context.
+     *
+     * @param context The context that should own the value
+     * @param packageName The Python package, or {@code python} for top-level scripts
+     * @param scriptName The script/module name
+     * @return The context-local script value
+     */
     Value getScript(Context context, String packageName, String scriptName) {
         return getOrCreateScript(context, packageName, scriptName);
     }
 
+    /**
+     * Resolve a class instance in the dedicated context associated with an asyncio event loop.
+     *
+     * @param eventLoop The Python event loop that owns the context
+     * @param packageName The Python package, or {@code null}/{@code python} for top-level classes
+     * @param simpleName The simple or nested class name
+     * @return The event-loop-local class value
+     */
     Value getEventLoopClass(PythonEventLoop eventLoop, @Nullable String packageName, String simpleName) {
         return getOrCreateClass(getOrCreateEventLoopContext(eventLoop), packageName, simpleName);
     }
 
+    /**
+     * Resolve a script/module in the dedicated context associated with an asyncio event loop.
+     *
+     * @param eventLoop The Python event loop that owns the context
+     * @param packageName The Python package, or {@code python} for top-level scripts
+     * @param scriptName The script/module name
+     * @return The event-loop-local script value
+     */
     Value getEventLoopScript(PythonEventLoop eventLoop, String packageName, String scriptName) {
         return getOrCreateScript(getOrCreateEventLoopContext(eventLoop), packageName, scriptName);
     }
 
+    /**
+     * Record and apply a host value injection for a script/module across existing and future
+     * pooled contexts.
+     *
+     * @param packageName The Python package, or {@code python} for top-level scripts
+     * @param scriptName The script/module name
+     * @param attribute The script member to set
+     * @param value The host value to coerce into each target context
+     */
     void injectScript(String packageName, String scriptName, String attribute, Object value) {
         injectScript(packageName, scriptName, attribute, value, false);
     }
 
+    /**
+     * Record and apply an async-aware host value injection for a script/module across existing and
+     * future pooled contexts.
+     *
+     * @param packageName The Python package, or {@code python} for top-level scripts
+     * @param scriptName The script/module name
+     * @param attribute The script member to set
+     * @param value The host value to adapt for async/event-loop use
+     */
     void injectScriptAsync(String packageName, String scriptName, String attribute, Object value) {
         injectScript(packageName, scriptName, attribute, value, true);
     }
@@ -368,11 +483,11 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
     }
 
     private Value getOrCreateClass(Context c, @Nullable String packageName, String simpleName) {
-        Map<String, Value> m = cache.computeIfAbsent(c, k -> new ConcurrentHashMap<>());
+        Map<String, Value> m = cache.computeIfAbsent(c, _ -> new ConcurrentHashMap<>());
         String key = classInstanceKey(packageName, simpleName);
-        return m.computeIfAbsent(key, k -> {
+        return m.computeIfAbsent(key, _ -> {
             Value cls = loadClass(c, packageName, simpleName);
-            if (cls != null && cls.canInstantiate()) {
+            if (cls.canInstantiate()) {
                 return cls.newInstance();
             }
             return cls;
@@ -380,9 +495,9 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
     }
 
     private Value getOrCreateScript(Context c, String packageName, String scriptName) {
-        Map<String, Value> m = cache.computeIfAbsent(c, k -> new ConcurrentHashMap<>());
+        Map<String, Value> m = cache.computeIfAbsent(c, _ -> new ConcurrentHashMap<>());
         String key = scriptKey(packageName, scriptName);
-        return m.computeIfAbsent(key, k -> {
+        return m.computeIfAbsent(key, _ -> {
             Value script = loadScript(c, packageName, scriptName);
             scriptInjections.getOrDefault(key, Map.of())
                 .forEach((attribute, value) -> script.putMember(
@@ -416,8 +531,8 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
     }
 
     @Override
-    public void onDestroyed(@NonNull BeanDestroyedEvent<Context> event) {
-        PythonContextRuntime.onNoActiveExecutionsAfterCurrentFrame(event.getBean(), () -> closePool(true));
+    public void onDestroyed(BeanDestroyedEvent<Context> event) {
+        PythonContextRuntime.onNoActiveExecutionsAfterCurrentFrame(event.getBean(), this::closePool);
     }
 
     @Override
@@ -437,7 +552,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         }
     }
 
-    private void closePool(boolean cancelIfExecuting) {
+    private void closePool() {
         stopWarmup();
         List<Context> snapshot = snapshot();
         pooledContexts.removeAll(snapshot);
@@ -451,7 +566,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         contexts.addAll(snapshot);
         contexts.addAll(eventLoopSnapshot);
         for (Context context : contexts) {
-            GraalPyContextFactory.closeContext(context, cancelIfExecuting);
+            GraalPyContextFactory.closeContext(context, true);
         }
     }
 }

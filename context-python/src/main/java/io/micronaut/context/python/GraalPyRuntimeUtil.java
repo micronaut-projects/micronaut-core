@@ -209,16 +209,11 @@ public final class GraalPyRuntimeUtil {
      */
     @UsedByGeneratedCode
     public static @Nullable Object coerceValue(@Nullable Object value) {
-        if (value instanceof Throwable) {
-            return value;
-        }
-        if (value instanceof ValueCoercible.GeneratedPropertyMembers) {
-            return value;
-        }
-        if (value instanceof ValueCoercible valueCoercible && !(value instanceof PooledValueCoercible)) {
-            return valueCoercible.asPolyglotValue();
-        }
-        return value;
+        return switch (value) {
+            case ValueCoercible valueCoercible when !(value instanceof PooledValueCoercible) ->
+                valueCoercible.asPolyglotValue();
+            case null, default -> value;
+        };
     }
 
     /**
@@ -229,39 +224,43 @@ public final class GraalPyRuntimeUtil {
      * @return The coerced value
      */
     public static @Nullable Object coerceToContext(@Nullable Object value, Context context) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof PooledValueCoercible pooledValueCoercible) {
-            return pooledValueCoercible.asPolyglotValue(context);
-        }
-        if (value instanceof List<?> list) {
-            List<Object> result = new ArrayList<>(list.size());
-            for (Object element : list) {
-                result.add(coerceToContext(element, context));
+        switch (value) {
+            case null -> {
+                return null;
             }
-            return result;
-        }
-        if (value instanceof Map<?, ?> map) {
-            Map<Object, Object> result = new HashMap<>();
-            for (Map.Entry<?, ?> entry : map.entrySet()) {
-                result.put(coerceToContext(entry.getKey(), context), coerceToContext(entry.getValue(), context));
+            case PooledValueCoercible pooledValueCoercible -> {
+                return pooledValueCoercible.asPolyglotValue(context);
             }
-            return result;
-        }
-        if (value instanceof Set<?> set) {
-            java.util.Set<Object> result = new java.util.HashSet<>();
-            for (Object element : set) {
-                result.add(coerceToContext(element, context));
+            case List<?> list -> {
+                List<@Nullable Object> result = new ArrayList<>(list.size());
+                for (Object element : list) {
+                    result.add(coerceToContext(element, context));
+                }
+                return result;
             }
-            return result;
-        }
-        if (value instanceof Object[] array) {
-            Object[] result = new Object[array.length];
-            for (int i = 0; i < array.length; i++) {
-                result[i] = coerceToContext(array[i], context);
+            case Map<?, ?> map -> {
+                Map<Object, Object> result = new HashMap<>();
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    result.put(coerceToContext(entry.getKey(), context), coerceToContext(entry.getValue(), context));
+                }
+                return result;
             }
-            return result;
+            case Set<?> set -> {
+                Set<@Nullable Object> result = new java.util.HashSet<>();
+                for (Object element : set) {
+                    result.add(coerceToContext(element, context));
+                }
+                return result;
+            }
+            case Object[] array -> {
+                Object[] result = new Object[array.length];
+                for (int i = 0; i < array.length; i++) {
+                    result[i] = coerceToContext(array[i], context);
+                }
+                return result;
+            }
+            default -> {
+            }
         }
         return value;
     }
@@ -284,22 +283,18 @@ public final class GraalPyRuntimeUtil {
         if (declaredType == null) {
             return coerceToContext(value, context);
         }
-        if (value instanceof PooledValueCoercible pooledValueCoercible) {
-            return pooledValueCoercible.asPolyglotValue(context);
-        }
-        if (value instanceof List<?> && List.class.equals(declaredType)) {
-            return coerceToContext(value, context);
-        }
-        if (value instanceof Map<?, ?> && Map.class.equals(declaredType)) {
-            return coerceToContext(value, context);
-        }
-        if (value instanceof Set<?> && Set.class.equals(declaredType)) {
-            return coerceToContext(value, context);
-        }
-        if (value instanceof Object[] && declaredType.isArray()) {
-            return coerceToContext(value, context);
-        }
-        return value;
+        return switch (value) {
+            case PooledValueCoercible pooledValueCoercible ->
+                pooledValueCoercible.asPolyglotValue(context);
+            case List<?> _ when List.class.equals(declaredType) ->
+                coerceToContext(value, context);
+            case Map<?, ?> _ when Map.class.equals(declaredType) ->
+                coerceToContext(value, context);
+            case Set<?> _ when Set.class.equals(declaredType) ->
+                coerceToContext(value, context);
+            case Object[] _ when declaredType.isArray() -> coerceToContext(value, context);
+            default -> value;
+        };
     }
 
     /**
@@ -362,16 +357,15 @@ public final class GraalPyRuntimeUtil {
     }
 
     private static boolean isInteropPrimitiveNumber(Value value) {
-        try {
-            return value.fitsInByte()
-                || value.fitsInShort()
-                || value.fitsInInt()
-                || value.fitsInLong()
-                || value.fitsInFloat()
-                || value.fitsInDouble();
-        } catch (UnsupportedOperationException e) {
+        if (!value.isNumber()) {
             return false;
         }
+        return value.fitsInByte()
+            || value.fitsInShort()
+            || value.fitsInInt()
+            || value.fitsInLong()
+            || value.fitsInFloat()
+            || value.fitsInDouble();
     }
 
     private static Value memberSetter(Context context) {
@@ -461,7 +455,7 @@ public final class GraalPyRuntimeUtil {
      */
     private static final class ScalarPublisherSubscriber implements Subscriber<Object> {
         private final PythonAsyncioRuntime.PythonCompletableFuture future;
-        private final AtomicReference<Subscription> subscription = new AtomicReference<>();
+        private final AtomicReference<@Nullable Subscription> subscription = new AtomicReference<>();
         private final AtomicBoolean done = new AtomicBoolean();
 
         private ScalarPublisherSubscriber(PythonAsyncioRuntime.PythonCompletableFuture future) {

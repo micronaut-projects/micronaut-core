@@ -2894,6 +2894,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .build(((aThis, methodParameters) -> {
                 List<ExpressionDef> parameterExpressions = new ArrayList<>();
                 ExpressionDef invokedValue;
+                boolean isAsyncMethod = isAsyncPythonMethod(methodElement);
                 if (methodElement.isStatic()) {
                     List<ExpressionDef> arguments = new ArrayList<>();
                     ClassElement declaringType = methodElement.getDeclaringType();
@@ -2909,7 +2910,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 } else {
                     ExpressionDef targetValueExpression = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
                     ClassElement declaringType = methodElement.getDeclaringType();
-                    if (isAsyncPythonMethod(methodElement) && !declaringType.isAbstract()) {
+                    if (isAsyncMethod && !declaringType.isAbstract()) {
                         targetValueExpression = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                             "asyncInstance",
                             POLYGLOT_VALUE,
@@ -2939,7 +2940,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 } else {
                     if (effectiveReturnType.isVoid()) {
                         return (StatementDef) invokedValue;
-                    } else if (isAsyncPythonMethod(methodElement)) {
+                    } else if (isAsyncMethod) {
                         return invokedValue.newLocal("pythonCoroutine", pythonCoroutine ->
                             PYTHON_ASYNCIO_RUNTIME.invokeStatic(
                                 "toCompletionStage",

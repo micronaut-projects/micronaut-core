@@ -136,11 +136,13 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Internal hook to register the PythonPool once initialized.
+     * Register the active Python pool after the pool bean decides whether pooling is enabled.
+     * <p>
+     * A {@code null} pool intentionally routes generated bridge calls back to the primary context.
      *
      * @param pool The Python pool
      */
-    public static void setPythonPool(@Nullable PythonPool pool) {
+    static void setPythonPool(@Nullable PythonPool pool) {
         PythonContextRuntime.pythonPool = pool;
     }
 
@@ -200,11 +202,14 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Returns the configured Python pool.
+     * Return the configured Python pool for package-local runtime routing.
+     * <p>
+     * Callers should check the pooling configuration path before invoking this method; a missing
+     * pool means generated bridge calls must use the primary context instead.
      *
      * @return The configured PythonPool. Throws if not initialized.
      */
-    public static PythonPool getPythonPool() {
+    static PythonPool getPythonPool() {
         PythonPool pool = pythonPool;
         if (pool == null) {
             throw new IllegalStateException("PythonPool has not been initialized.");
@@ -212,6 +217,13 @@ public final class PythonContextRuntime {
         return pool;
     }
 
+    /**
+     * Associate a context with the shared engine that owns it so shutdown can wait for both
+     * context-local executions and engine-wide executions before closing resources.
+     *
+     * @param context The GraalPy context being tracked
+     * @param engine The engine backing the context
+     */
     static void registerContextEngine(Context context, Engine engine) {
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
             ContextState contextState = CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
@@ -230,6 +242,12 @@ public final class PythonContextRuntime {
         }
     }
 
+    /**
+     * Remove a context from execution tracking and notify any engine listeners when the removed
+     * context was the last context associated with that engine.
+     *
+     * @param context The GraalPy context being removed
+     */
     static void unregisterContextEngine(Context context) {
         List<Runnable> listeners = List.of();
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
@@ -249,6 +267,14 @@ public final class PythonContextRuntime {
         runNoActiveExecutionsListeners(listeners);
     }
 
+    /**
+     * Mark a context as actively executing host-initiated Python code.
+     * <p>
+     * Callers must pair this with {@link #exitExecution(Context)} unless they use
+     * {@link #withExecutionFrame(Context, CallableOp)}.
+     *
+     * @param context The context entering Python execution
+     */
     static void enterExecution(Context context) {
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
             ContextState state = CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
@@ -260,10 +286,26 @@ public final class PythonContextRuntime {
         }
     }
 
+    /**
+     * Mark the primary context as actively executing host-initiated Python code.
+     */
     static void enterExecution() {
         enterExecution(getContext());
     }
 
+    /**
+     * Run an operation inside the current lexical execution frame, creating one when needed.
+     * <p>
+     * The frame lets nested generated bridge calls defer shutdown listeners until the outermost
+     * Python execution has unwound, while still decrementing per-context counters for each entry.
+     *
+     * @param ctx The context used by this execution
+     * @param operation The operation to run
+     * @param <T> The operation result type
+     * @param <X> The checked exception type the operation may throw
+     * @return The operation result
+     * @throws X When the operation throws
+     */
     static <T, X extends Throwable> T withExecutionFrame(Context ctx, CallableOp<T, X> operation) throws X {
         if (CURRENT_EXECUTION.isBound()) {
             return runWithExecutionFrame(ctx, CURRENT_EXECUTION.get(), operation);
@@ -281,6 +323,12 @@ public final class PythonContextRuntime {
         }
     }
 
+    /**
+     * Mark a context execution as complete and run any listeners whose context or engine no
+     * longer has active executions.
+     *
+     * @param context The context leaving Python execution
+     */
     static void exitExecution(Context context) {
         List<Runnable> listeners = new ArrayList<>();
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
@@ -307,6 +355,9 @@ public final class PythonContextRuntime {
         runNoActiveExecutionsListeners(listeners);
     }
 
+    /**
+     * Mark an execution against the primary context as complete.
+     */
     static void exitExecution() {
         exitExecution(getContext());
     }
@@ -318,7 +369,7 @@ public final class PythonContextRuntime {
             exitExecution(ctx);
             return;
         }
-        Context removed = contexts.remove(contexts.size() - 1);
+        Context removed = contexts.removeLast();
         if (removed != ctx) {
             contexts.remove(ctx);
         }
@@ -338,10 +389,24 @@ public final class PythonContextRuntime {
         runNoActiveExecutionsListeners(snapshot);
     }
 
+    /**
+     * Read the aggregate active execution count used by shutdown diagnostics and tests.
+     *
+     * @return The number of active Python executions known to the runtime
+     */
     static int activeExecutions() {
         return ACTIVE_EXECUTIONS.get();
     }
 
+    /**
+     * Run a listener when the given context has no active executions.
+     * <p>
+     * The listener runs immediately when the context is idle; otherwise it is queued on the
+     * context state and executed by the final matching {@link #exitExecution(Context)}.
+     *
+     * @param context The context to observe
+     * @param listener The listener to run when the context is idle
+     */
     static void onNoActiveExecutions(Context context, Runnable listener) {
         boolean runNow;
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
@@ -356,6 +421,15 @@ public final class PythonContextRuntime {
         }
     }
 
+    /**
+     * Run a listener after the current execution frame exits and the context is idle.
+     * <p>
+     * This is used during bean/context destruction so cleanup cannot run in the middle of a nested
+     * generated bridge invocation that is still unwinding.
+     *
+     * @param context The context to observe
+     * @param listener The listener to run after the current frame and active executions complete
+     */
     static void onNoActiveExecutionsAfterCurrentFrame(Context context, Runnable listener) {
         if (CURRENT_EXECUTION.isBound() && !CURRENT_EXECUTION.get().contexts.isEmpty()) {
             CURRENT_EXECUTION.get().exitListeners.add(() -> onNoActiveExecutions(context, listener));
@@ -364,6 +438,15 @@ public final class PythonContextRuntime {
         onNoActiveExecutions(context, listener);
     }
 
+    /**
+     * Run a listener once all distinct contexts in the collection are idle.
+     * <p>
+     * Duplicate contexts are collapsed by identity so a pooled context cannot make the listener
+     * wait for the same active execution more than once.
+     *
+     * @param contexts The contexts to observe
+     * @param listener The listener to run when every observed context is idle
+     */
     static void onNoActiveExecutions(Collection<Context> contexts, Runnable listener) {
         List<Context> activeContexts;
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
@@ -394,6 +477,12 @@ public final class PythonContextRuntime {
         }
     }
 
+    /**
+     * Run a listener when the engine has no active executions across any registered context.
+     *
+     * @param engine The engine to observe
+     * @param listener The listener to run when the engine is idle
+     */
     static void onNoActiveExecutions(Engine engine, Runnable listener) {
         boolean runNow;
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
@@ -408,6 +497,12 @@ public final class PythonContextRuntime {
         }
     }
 
+    /**
+     * Run a listener when no registered contexts remain for the engine.
+     *
+     * @param engine The engine to observe
+     * @param listener The listener to run when the engine no longer owns contexts
+     */
     static void onNoContexts(Engine engine, Runnable listener) {
         boolean runNow;
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
@@ -444,6 +539,14 @@ public final class PythonContextRuntime {
         });
     }
 
+    /**
+     * Dispatch a no-active-executions listener.
+     * <p>
+     * The default implementation runs inline; tests can replace behavior through package access if
+     * the shutdown dispatch strategy changes.
+     *
+     * @param listener The listener to dispatch
+     */
     static void deferNoActiveExecutionListener(Runnable listener) {
         listener.run();
     }
@@ -867,6 +970,15 @@ public final class PythonContextRuntime {
         return findClass(packageName, simpleName, getContext());
     }
 
+    /**
+     * Resolve a Python class in a specific context without consulting the pooled-context routing
+     * logic used by generated public entry points.
+     *
+     * @param packageName The Python package, or {@code null}/{@code python} for top-level classes
+     * @param simpleName The simple or nested class name
+     * @param ctx The context that should perform imports and member lookups
+     * @return The resolved Python class value
+     */
     static Value findClass(@org.jspecify.annotations.Nullable String packageName, String simpleName, Context ctx) {
         if (packageName == null || PYTHON.equals(packageName)) {
             return findClass(simpleName, ctx);
@@ -890,6 +1002,13 @@ public final class PythonContextRuntime {
         return findClass(simpleName, getContext());
     }
 
+    /**
+     * Resolve a top-level or nested Python class from a specific context.
+     *
+     * @param simpleName The simple or nested class name
+     * @param ctx The context that should perform imports and member lookups
+     * @return The resolved Python class value
+     */
     static Value findClass(String simpleName, Context ctx) {
         String importName = rootName(simpleName);
         Value v = ctx.getBindings(PYTHON).getMember(importName);
@@ -942,6 +1061,14 @@ public final class PythonContextRuntime {
         return findScript(packageName, scriptName, ctx);
     }
 
+    /**
+     * Resolve a Python module from a specific context.
+     *
+     * @param packageName The Python package, or {@code python} for top-level scripts
+     * @param scriptName The script/module name
+     * @param ctx The context that should perform imports
+     * @return The resolved module value
+     */
     static Value findScript(String packageName, String scriptName, Context ctx) {
         Value v = ctx.getBindings(PYTHON);
         if (v != null) {
@@ -1070,6 +1197,17 @@ public final class PythonContextRuntime {
         });
     }
 
+    /**
+     * Resolve or initialize a cached helper function inside the given context.
+     * <p>
+     * Helpers are stored per-context because Graal values cannot be shared across contexts. The
+     * context lock serializes the eval/cache update path for generated bridge calls.
+     *
+     * @param context The context that owns the helper function
+     * @param name The binding name exposed by the helper source
+     * @param source The source that installs the helper when absent
+     * @return The helper function value for the context
+     */
     static Value helper(Context context, String name, Source source) {
         return withContextLock(context, () -> {
             ContextState state = contextState(context);
@@ -1087,12 +1225,27 @@ public final class PythonContextRuntime {
         });
     }
 
+    /**
+     * Run an action while holding the per-context monitor used for helper initialization and other
+     * context-local mutable runtime state.
+     *
+     * @param context The context whose state should be locked
+     * @param action The action to run while holding the lock
+     * @param <T> The action result type
+     * @return The action result
+     */
     static <T> T withContextLock(Context context, Supplier<T> action) {
         synchronized (contextState(context).lock) {
             return action.get();
         }
     }
 
+    /**
+     * Run a void action while holding the per-context monitor.
+     *
+     * @param context The context whose state should be locked
+     * @param action The action to run while holding the lock
+     */
     static void withContextLock(Context context, Runnable action) {
         withContextLock(context, () -> {
             action.run();
@@ -1141,6 +1294,12 @@ public final class PythonContextRuntime {
         return context != null;
     }
 
+    /**
+     * Check whether the supplied context is the primary runtime context by identity.
+     *
+     * @param context The context to compare
+     * @return {@code true} when the context is the primary runtime context
+     */
     @SuppressWarnings("ReferenceEquality")
     static boolean isCurrentContext(Context context) {
         return PythonContextRuntime.context == context;
