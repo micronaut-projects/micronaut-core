@@ -35,7 +35,6 @@ import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,12 +114,27 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         }
     }
 
-    public static @NonNull Context bootstrapReusableContext(@NonNull ClassLoader classLoader) throws IOException {
+    /**
+     * Create a reusable GraalPy context and evaluate the requested application bootstrap script.
+     *
+     * @param classLoader The application class loader
+     * @return The initialized GraalPy context
+     * @throws IOException If the context cannot load application resources
+     */
+    public static Context bootstrapReusableContext(ClassLoader classLoader) throws IOException {
         return bootstrapReusableContext(classLoader, Map.of());
     }
 
-    public static @NonNull Context bootstrapReusableContext(@NonNull ClassLoader classLoader,
-                                                            @NonNull Map<String, String> options) throws IOException {
+    /**
+     * Create a reusable GraalPy context and evaluate the requested application bootstrap script.
+     *
+     * @param classLoader The application class loader
+     * @param options Additional GraalPy context options
+     * @return The initialized GraalPy context
+     * @throws IOException If the context cannot load application resources
+     */
+    public static Context bootstrapReusableContext(ClassLoader classLoader,
+                                                   Map<String, String> options) throws IOException {
         return bootstrapReusableContext(classLoader, options, APPLICATION_MAIN);
     }
 
@@ -133,9 +147,9 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * @return The initialized GraalPy context
      * @throws IOException If the context cannot load application resources
      */
-    public static @NonNull Context bootstrapReusableContext(@NonNull ClassLoader classLoader,
-                                                            @NonNull Map<String, String> options,
-                                                            @NonNull String applicationMain) throws IOException {
+    public static Context bootstrapReusableContext(ClassLoader classLoader,
+                                                   Map<String, String> options,
+                                                   String applicationMain) throws IOException {
         if (PythonContextRuntime.isInitialized() && PythonContextRuntime.isReuseContext()) {
             return PythonContextRuntime.getContext();
         }
@@ -146,44 +160,44 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    static HostAccess bootstrapHostAccess(@NonNull ClassLoader classLoader) {
+    static HostAccess bootstrapHostAccess(ClassLoader classLoader) {
         List<TargetTypeMapping<?>> mappings = (List) SoftServiceLoader.load(TargetTypeMapping.class, classLoader).collectAll();
         return new GraalPyHostAccessFactory().hostAccess(mappings);
     }
 
-    static @NonNull Context buildContext(HostAccess hostAccess, Engine engine, ClassLoader classLoader) throws IOException {
+    static Context buildContext(HostAccess hostAccess, Engine engine, ClassLoader classLoader) throws IOException {
         return buildContext(hostAccess, engine, classLoader, Map.of());
     }
 
-    private static @NonNull Context buildContext(HostAccess hostAccess,
-                                                 Engine engine,
-                                                 ClassLoader classLoader,
-                                                 Map<String, String> options) throws IOException {
+    private static Context buildContext(HostAccess hostAccess,
+                                        Engine engine,
+                                        ClassLoader classLoader,
+                                        Map<String, String> options) throws IOException {
         return buildContext(hostAccess, engine, classLoader, options, APPLICATION_MAIN);
     }
 
-    private static @NonNull Context buildContext(HostAccess hostAccess,
-                                                 Engine engine,
-                                                 ClassLoader classLoader,
-                                                 Map<String, String> options,
-                                                 String applicationMain) throws IOException {
+    private static Context buildContext(HostAccess hostAccess,
+                                        Engine engine,
+                                        ClassLoader classLoader,
+                                        Map<String, String> options,
+                                        String applicationMain) throws IOException {
         var beacon = findBeacon(classLoader);
         System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
         System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
-        var builder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+        Context.Builder builder = Context.newBuilder().apply(GraalPyResources.forVirtualFileSystem(VirtualFileSystem.newBuilder()
                 .resourceDirectory(APPLICATION_PATH)
-                .resourceLoadingClass(beacon).build())
+                .resourceLoadingClass(beacon).build()))
             .allowExperimentalOptions(true)
             .allowCreateProcess(true)
             .allowValueSharing(true)
             .allowPolyglotAccess(PolyglotAccess.ALL)
             .option("python.WarnExperimentalFeatures", "false")
-             // Allow access to host classes
-             .allowHostAccess(hostAccess)
-             .hostClassLoader(classLoader)
-             .engine(engine)
-             .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
-             .allowHostClassLookup(name -> true);
+            // Allow access to host classes
+            .allowHostAccess(hostAccess)
+            .hostClassLoader(classLoader)
+            .engine(engine)
+            .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+            .allowHostClassLookup(_ -> true);
         resolveVirtualEnvExecutable(System.getenv())
             .ifPresent(executable -> builder.option("python.Executable", executable.toString()));
         options.forEach(builder::option);
@@ -245,12 +259,12 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * Resets the context in PythonContextRuntime to prevent memory leaks.
      */
     @Override
-    public void onDestroyed(@NonNull BeanDestroyedEvent<Context> event) {
+    public void onDestroyed(BeanDestroyedEvent<Context> event) {
         if (!PythonContextRuntime.isReuseContext()) {
             var ctx = event.getBean();
             if (ctx != null) {
                 PythonContextRuntime.onNoActiveExecutionsAfterCurrentFrame(ctx, () -> {
-                    closeContext(ctx, true);
+                    closeContext(ctx);
                     if (!providedContext && PythonContextRuntime.isCurrentContext(ctx)) {
                         PythonContextRuntime.resetContext();
                     }
@@ -263,10 +277,10 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         }
     }
 
-    static void closeContext(Context ctx, boolean cancelIfExecuting) {
+    static void closeContext(Context ctx) {
         boolean closed = false;
         try {
-            ctx.close(cancelIfExecuting);
+            ctx.close(true);
             closed = true;
         } catch (IllegalStateException e) {
             LOG.warn("Unexpected failure while closing Python context", e);

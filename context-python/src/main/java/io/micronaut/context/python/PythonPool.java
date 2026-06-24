@@ -415,7 +415,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         Context c = createContext();
         if (closed) {
             try {
-                GraalPyContextFactory.closeContext(c, true);
+                GraalPyContextFactory.closeContext(c);
             } catch (PolyglotException e) {
                 if (e.isCancelled()) {
                     LOG.debug("Python pool context close cancelled during shutdown", e);
@@ -566,7 +566,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         contexts.addAll(snapshot);
         contexts.addAll(eventLoopSnapshot);
         for (Context context : contexts) {
-            GraalPyContextFactory.closeContext(context, true);
+            GraalPyContextFactory.closeContext(context);
         }
     }
 }

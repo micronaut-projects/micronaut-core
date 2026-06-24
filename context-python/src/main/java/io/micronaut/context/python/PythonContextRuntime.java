@@ -934,7 +934,7 @@ public final class PythonContextRuntime {
      * @return The new instance with members populated.
      */
     @UsedByGeneratedCode
-    public static Value newInstance(@Nullable String packageName, String simpleName, java.util.Map<String, Object> props) {
+    public static Value newInstance(@Nullable String packageName, String simpleName, Map<String, Object> props) {
         Value pythonClass = findClass(packageName, simpleName);
         return withContextClassLoader(() -> {
             Value instance = instantiate(packageName, simpleName, new Object[0], pythonClass);
@@ -961,7 +961,7 @@ public final class PythonContextRuntime {
      * @return The new frozen dataclass instance with members populated.
      */
     @UsedByGeneratedCode
-    public static Value newFrozenDataclassInstance(@Nullable String packageName, String simpleName, java.util.Map<String, Object> props) {
+    public static Value newFrozenDataclassInstance(@Nullable String packageName, String simpleName, Map<String, Object> props) {
         Value pythonClass = findClass(packageName, simpleName);
         return withContextClassLoader(() -> {
             Value instance = uninitializedInstanceFactory(pythonClass.getContext()).execute(pythonClass);
