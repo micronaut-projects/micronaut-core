@@ -32,7 +32,7 @@ def ctx() -> str:
 def hello(name: str) -> str:
     return message_service.say_hello(name)
 '''
-        Map<String, Object> props = ["micronaut.python.pool.size": 4, "micronaut.python.pool.sync-init": true]
+        Map<String, Object> props = ["micronaut.python.pool.size": 4]
         ApplicationContext context = buildContext(python, true, props)
         // Enable reuse AFTER context is initialized so resetContext() does not NPE
         PythonContextRuntime.setReuseContext(true)

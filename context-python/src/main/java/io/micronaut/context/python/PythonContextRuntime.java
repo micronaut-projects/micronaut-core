@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -1203,8 +1204,10 @@ public final class PythonContextRuntime {
     /**
      * Resolve or initialize a cached helper function inside the given context.
      * <p>
-     * Helpers are stored per-context because Graal values cannot be shared across contexts. The
-     * context lock serializes the eval/cache update path for generated bridge calls.
+     * Helpers are stored per-context because Graal values cannot be shared across contexts. Helper
+     * initialization deliberately avoids {@link #withContextLock(Context, Supplier)} because GraalPy
+     * operations acquire the Python GIL; taking the context monitor first can deadlock with another
+     * thread that already owns the GIL and re-enters Micronaut runtime helper code.
      *
      * @param context The context that owns the helper function
      * @param name The binding name exposed by the helper source
@@ -1212,20 +1215,19 @@ public final class PythonContextRuntime {
      * @return The helper function value for the context
      */
     static Value helper(Context context, String name, Source source) {
-        return withContextLock(context, () -> {
-            ContextState state = contextState(context);
-            Value helper = state.helpers.get(name);
-            if (helper == null || GraalPyRuntimeUtil.isNone(helper)) {
-                Value bindings = context.getBindings(PYTHON);
-                helper = bindings.getMember(name);
-                if (helper == null || GraalPyRuntimeUtil.isNone(helper)) {
-                    context.eval(source);
-                    helper = bindings.getMember(name);
-                }
-                state.helpers.put(name, helper);
-            }
+        ContextState state = contextState(context);
+        Value helper = state.helpers.get(name);
+        if (helper != null) {
             return helper;
-        });
+        }
+        Value bindings = context.getBindings(PYTHON);
+        helper = bindings.getMember(name);
+        if (helper == null || GraalPyRuntimeUtil.isNone(helper)) {
+            context.eval(source);
+            helper = bindings.getMember(name);
+        }
+        Value existing = state.helpers.putIfAbsent(name, helper);
+        return existing == null ? helper : existing;
     }
 
     /**
@@ -1375,7 +1377,7 @@ public final class PythonContextRuntime {
     private static final class ContextState {
         private final Object lock = new Object();
         private final IdentityHashMap<Value, Map<String, Object>> asyncMembers = new IdentityHashMap<>();
-        private final Map<String, Value> helpers = new HashMap<>();
+        private final Map<String, Value> helpers = new ConcurrentHashMap<>();
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
         private int activeExecutions;
         private @Nullable Engine engine;

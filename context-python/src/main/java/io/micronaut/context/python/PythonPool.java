@@ -47,7 +47,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
@@ -56,7 +55,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  * <p>
  * The first context (primary) is created synchronously and is not part of the pool. It is exposed
  * via {@link PythonContextRuntime#getContext()} and used for non-pooled operations. Remaining pooled
- * contexts are created on a background thread to avoid blocking startup.
+ * contexts are created lazily by generated bridge calls that borrow from the pool.
  */
 @Singleton
 @io.micronaut.context.annotation.Context
@@ -66,7 +65,6 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
     private final Engine engine;
     private final HostAccess hostAccess;
     private final ApplicationContext applicationContext;
-    private final boolean syncInit;
     private final long warnThresholdMs;
 
     private final Context primaryContext;
@@ -78,7 +76,6 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
     private final Map<String, java.util.Set<String>> asyncScriptInjections = new ConcurrentHashMap<>();
 
     private final AtomicInteger size = new AtomicInteger(0);
-    private final AtomicReference<@Nullable Thread> warmupThread = new AtomicReference<>();
     private final AtomicBoolean gracefulShutdownStarted = new AtomicBoolean();
     private final CompletableFuture<Void> gracefulShutdown = new CompletableFuture<>();
     private final int targetSize;
@@ -107,7 +104,6 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         this.hostAccess = hostAccess;
         this.applicationContext = applicationContext;
         int configuredPoolSize = configuration.size();
-        this.syncInit = configuration.syncInit();
         this.warnThresholdMs = configuration.warnWaitMs();
         int processors = Runtime.getRuntime().availableProcessors();
         int defaultSize = Math.max(1, processors * 2);
@@ -124,8 +120,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
      * <p>
      * When pooling is disabled or context reuse is enabled this method deliberately unregisters
      * the pool from {@link PythonContextRuntime}. Otherwise it exposes the pool immediately and
-     * warms additional contexts synchronously or on the background warmup thread according to
-     * configuration.
+     * prepares the primary context cache. Pooled contexts are created lazily by {@link #borrow()}.
      */
     @PostConstruct
     void init() {
@@ -143,42 +138,10 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         }
         PythonContextRuntime.setPythonPool(this);
         cache.put(primaryContext, new ConcurrentHashMap<>());
-        final int toCreate = targetSize;
-        if (syncInit) {
-            LOG.debug("Creating {} Pooled Python contexts synchronously", toCreate);
-            for (int i = 0; i < toCreate; i++) {
-                addPooledContext();
-            }
-        } else {
-            LOG.debug("Creating {} Pooled Python contexts asynchronously", toCreate);
-            Thread t = new Thread(() -> {
-                try {
-                    for (int i = 1; i < toCreate; i++) {
-                        if (closed) {
-                            return;
-                        }
-                        addPooledContext();
-                    }
-                } catch (PolyglotException e) {
-                    if (e.isCancelled() && closed) {
-                        LOG.debug("Python pool warmup cancelled during shutdown", e);
-                    } else {
-                        LOG.warn("Unexpected Python pool warmup failure", e);
-                        throw e;
-                    }
-                } catch (RuntimeException e) {
-                    LOG.warn("Unexpected Python pool warmup failure", e);
-                    throw e;
-                }
-            }, "python-pool-warmup");
-            t.setDaemon(true);
-            warmupThread.set(t);
-            t.start();
-        }
     }
 
     /**
-     * Borrow a pooled context, waiting until warmup or replenishment makes one available.
+     * Borrow a pooled context, creating one lazily while the pool is below its target size.
      * <p>
      * Borrowed contexts must be returned with {@link #release(Context)} so the bounded pool does
      * not starve subsequent generated bridge calls.
@@ -194,6 +157,10 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
                     if (waitedMs >= warnThresholdMs && LOG.isWarnEnabled()) {
                         LOG.warn("Borrowed context after waiting {} ms (pool size: {}, queue: {})", waitedMs, size.get(), pooledQueue.size());
                     }
+                    return ctx;
+                }
+                ctx = createBorrowedPooledContext();
+                if (ctx != null) {
                     return ctx;
                 }
                 Thread.sleep(100);
@@ -214,7 +181,18 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
      * @param c The context previously obtained from {@link #borrow()}
      */
     void release(Context c) {
+        if (closed) {
+            return;
+        }
         pooledQueue.addLast(c);
+    }
+
+    int pooledContextCount() {
+        return size.get();
+    }
+
+    int availableContextCount() {
+        return pooledQueue.size();
     }
 
     /**
@@ -393,7 +371,6 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
             if (created != null) {
                 pooledContexts.remove(created);
                 size.decrementAndGet();
-                replenishPooledContextAsync();
             } else {
                 created = createContext();
             }
@@ -403,9 +380,9 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         }
     }
 
-    private synchronized void addPooledContext() {
+    private synchronized @Nullable Context createBorrowedPooledContext() {
         if (closed || size.get() >= targetSize) {
-            return;
+            return null;
         }
         Context c = createContext();
         if (closed) {
@@ -422,35 +399,12 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
                 LOG.warn("Unexpected error while closing Python pool context", e);
                 throw e;
             }
-            return;
+            return null;
         }
         pooledContexts.add(c);
         cache.put(c, new ConcurrentHashMap<>());
-        pooledQueue.addLast(c);
         size.incrementAndGet();
-    }
-
-    private void replenishPooledContextAsync() {
-        if (closed || size.get() >= targetSize) {
-            return;
-        }
-        Thread t = new Thread(() -> {
-            try {
-                addPooledContext();
-            } catch (PolyglotException e) {
-                if (e.isCancelled() && closed) {
-                    LOG.debug("Python pool replenishment cancelled during shutdown", e);
-                } else {
-                    LOG.warn("Unexpected Python pool replenishment failure", e);
-                    throw e;
-                }
-            } catch (RuntimeException e) {
-                LOG.warn("Unexpected Python pool replenishment failure", e);
-                throw e;
-            }
-        }, "python-pool-replenish");
-        t.setDaemon(true);
-        t.start();
+        return c;
     }
 
     private Context createContext() {
@@ -529,22 +483,14 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
     @Override
     public CompletionStage<?> shutdownGracefully() {
         if (gracefulShutdownStarted.compareAndSet(false, true)) {
-            stopWarmup();
+            closed = true;
             PythonContextRuntime.onNoActiveExecutions(snapshotIncludingPrimary(), () -> gracefulShutdown.complete(null));
         }
         return gracefulShutdown;
     }
 
-    private void stopWarmup() {
-        closed = true;
-        Thread thread = warmupThread.getAndSet(null);
-        if (thread != null) {
-            thread.interrupt();
-        }
-    }
-
     private void closePool() {
-        stopWarmup();
+        closed = true;
         List<Context> snapshot = snapshot();
         pooledContexts.removeAll(snapshot);
         pooledQueue.removeAll(snapshot);

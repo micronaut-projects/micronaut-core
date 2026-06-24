@@ -172,8 +172,7 @@ final class PythonAsyncioRuntimeTest {
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "micronaut.python.pool.enabled", true,
-            "micronaut.python.pool.size", 1,
-            "micronaut.python.pool.sync-init", true
+            "micronaut.python.pool.size", 1
         ))) {
             PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.ofNullable(currentEventLoop.get())));
             PythonPool pool = applicationContext.getBean(PythonPool.class);
@@ -208,14 +207,13 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
-    void eventLoopContextHandoffReplenishesBlockingPool() throws Exception {
+    void eventLoopContextAllocationDoesNotExhaustBlockingPool() throws Exception {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "micronaut.python.pool.enabled", true,
-            "micronaut.python.pool.size", 1,
-            "micronaut.python.pool.sync-init", true
+            "micronaut.python.pool.size", 1
         ))) {
             PythonPool pool = applicationContext.getBean(PythonPool.class);
 
@@ -233,6 +231,70 @@ final class PythonAsyncioRuntimeTest {
             assertTrue(borrowed.get(5, TimeUnit.SECONDS));
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            executorService.shutdownNow();
+        }
+    }
+
+    @Test
+    void poolStartupDoesNotCreatePooledContexts() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 2
+        ))) {
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+
+            assertEquals(0, pool.pooledContextCount());
+            assertEquals(0, pool.availableContextCount());
+        }
+    }
+
+    @Test
+    void firstBorrowCreatesOnePooledContext() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 2
+        ))) {
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+
+            Context borrowed = pool.borrow();
+            try {
+                assertEquals(1, pool.pooledContextCount());
+                assertEquals(0, pool.availableContextCount());
+            } finally {
+                pool.release(borrowed);
+            }
+
+            assertEquals(1, pool.pooledContextCount());
+            assertEquals(1, pool.availableContextCount());
+        }
+    }
+
+    @Test
+    void concurrentBorrowsGrowToConfiguredSizeAndThenWait() throws Exception {
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 2
+        ))) {
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            Context first = pool.borrow();
+            Context second = pool.borrow();
+            assertEquals(2, pool.pooledContextCount());
+
+            Future<Context> waitingBorrow = executorService.submit(pool::borrow);
+            Thread.sleep(200);
+            assertFalse(waitingBorrow.isDone());
+
+            pool.release(first);
+            Context third = waitingBorrow.get(5, TimeUnit.SECONDS);
+            try {
+                assertEquals(first, third);
+                assertEquals(2, pool.pooledContextCount());
+            } finally {
+                pool.release(second);
+                pool.release(third);
+            }
+        } finally {
             executorService.shutdownNow();
         }
     }

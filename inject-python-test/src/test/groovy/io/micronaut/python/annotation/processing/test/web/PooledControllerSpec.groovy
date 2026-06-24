@@ -5,6 +5,9 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+
 class PooledControllerSpec extends AbstractPythonTypeElementSpec {
 
     void "pooled controller uses multiple contexts and injection works"() {
@@ -29,6 +32,8 @@ message_service : Annotated[MessageService, Inject]
 
 @Get("/pool/ctx")
 def ctx() -> str:
+    import time
+    time.sleep(0.1)
     import builtins
     g = globals()
     return g.get("__MN_CTX_ID__") or builtins.__dict__.get("__MN_CTX_ID__") or "unknown"
@@ -42,14 +47,19 @@ def pair() -> str:
     own = ctx()
     return own + ":" + message_service.ctx_id()
 '''
-        Map<String, Object> props = ["micronaut.python.pool.size": 4, "micronaut.python.pool.sync-init":true]
+        Map<String, Object> props = ["micronaut.python.pool.size": 4]
         ApplicationContext context = buildContext(python, true, props)
         def server = context.getBean(EmbeddedServer)
         server.start()
         def client = context.createBean(HttpClient, server.URL)
+        def executor = Executors.newFixedThreadPool(4)
 
         when:
-        def ids = (1..12).collect { client.toBlocking().retrieve("/pool/ctx") }.toSet()
+        def ids = (1..4).collect {
+            executor.submit { client.toBlocking().retrieve("/pool/ctx") }
+        }.collect {
+            it.get(5, TimeUnit.SECONDS)
+        }.toSet()
 
         then:
         ids.size() >= 2
@@ -71,6 +81,7 @@ def pair() -> str:
         pairs.toSet().size() >= 2
 
         cleanup:
+        executor?.shutdownNow()
         client?.close()
         context?.close()
     }

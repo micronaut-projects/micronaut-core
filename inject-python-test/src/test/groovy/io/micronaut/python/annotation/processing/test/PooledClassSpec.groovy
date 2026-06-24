@@ -5,6 +5,9 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+
 class PooledClassSpec extends AbstractPythonTypeElementSpec {
 
     void "pooled class rotates directly and injects into target context"() {
@@ -19,6 +22,8 @@ from micronaut.context.python.scope import ContextPooled
 class CtxReader:
 
     def get_ctx_id(self) -> str:
+        import time
+        time.sleep(0.1)
         import builtins
         g = globals()
         return g.get("__MN_CTX_ID__") or builtins.__dict__.get("__MN_CTX_ID__") or "unknown"
@@ -44,17 +49,22 @@ class PoolController:
     def l(self) -> list[str]:
         return self.reader.get_list()
 '''
-        Map<String, Object> props = ["micronaut.python.pool.size": 4, "micronaut.python.pool.sync-init": true]
+        Map<String, Object> props = ["micronaut.python.pool.size": 4]
         ApplicationContext context = buildContext(python, true, props)
         def readerClass = context.classLoader.loadClass("python.CtxReader")
         def reader = context.getBean(readerClass)
         def server = context.getBean(EmbeddedServer)
         server.start()
         def client = context.createBean(HttpClient, server.URL)
+        def executor = Executors.newFixedThreadPool(4)
 
         when:
         def getCtxId = readerClass.getMethod("get_ctx_id")
-        def ids = (1..12).collect { getCtxId.invoke(reader) }.toSet()
+        def ids = (1..4).collect {
+            executor.submit { getCtxId.invoke(reader) }
+        }.collect {
+            it.get(5, TimeUnit.SECONDS)
+        }.toSet()
 
         then:
         ids.size() >= 2
@@ -74,6 +84,7 @@ class PoolController:
         listJson == '["a","b"]'
 
         cleanup:
+        executor?.shutdownNow()
         client?.close()
         context?.close()
     }
