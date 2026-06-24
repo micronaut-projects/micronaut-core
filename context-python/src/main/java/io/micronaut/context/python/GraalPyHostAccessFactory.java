@@ -21,14 +21,16 @@ import jakarta.inject.Singleton;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyObject;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Factory that creates the HostAccess bean used by the GraalPy Context.
@@ -50,12 +52,12 @@ final class GraalPyHostAccessFactory {
      */
     @Singleton
     @Named(GraalPyRuntimeUtil.PYTHON)
-    @NonNull
     HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings) {
         HostAccess.Builder builder = HostAccess.newBuilder(HostAccess.ALL);
+        PythonClassResolver pythonClassResolver = new PythonClassResolver(mappings);
         Map<Class<?>, List<TargetTypeMapping<?>>> assignableMappings = new LinkedHashMap<>();
         for (TargetTypeMapping<?> mapping : mappings) {
-            register(builder, mapping, mappings);
+            register(builder, mapping, pythonClassResolver);
             for (Class<?> assignableTargetType : mapping.assignableTargetTypes()) {
                 if (assignableTargetType == null || assignableTargetType.equals(mapping.targetType())) {
                     continue;
@@ -66,14 +68,14 @@ final class GraalPyHostAccessFactory {
             }
         }
         for (Map.Entry<Class<?>, List<TargetTypeMapping<?>>> entry : assignableMappings.entrySet()) {
-            registerAssignable(builder, entry.getKey(), entry.getValue(), mappings);
+            registerAssignable(builder, entry.getKey(), entry.getValue(), pythonClassResolver);
         }
         registerValueCoercibleHostMapping(builder, ValueCoercible.class);
         registerValueCoercibleHostMapping(builder, Throwable.class);
         registerValueCoercibleHostMapping(builder, Exception.class);
         registerValueCoercibleHostMapping(builder, RuntimeException.class);
-        registerPythonClassMapping(builder, mappings);
-        registerObjectMapping(builder, mappings);
+        registerPythonClassMapping(builder, pythonClassResolver);
+        registerObjectMapping(builder, pythonClassResolver);
         return builder.build();
     }
 
@@ -87,9 +89,9 @@ final class GraalPyHostAccessFactory {
      */
     private static <T> void register(HostAccess.Builder builder,
                                      TargetTypeMapping<T> mapping,
-                                     Collection<TargetTypeMapping<?>> mappings) {
+                                     PythonClassResolver pythonClassResolver) {
         Class<T> target = mapping.targetType();
-        builder.<Value, T>targetTypeMapping(
+        builder.targetTypeMapping(
             Value.class,
             target,
             v -> {
@@ -107,7 +109,7 @@ final class GraalPyHostAccessFactory {
                 if (cls == null) {
                     return false;
                 }
-                return target.equals(findPythonClass(cls, mappings));
+                return target.equals(pythonClassResolver.findPythonClass(cls));
             },
             v -> {
                 ValueCoercible host = ValueCoercible.hostObject(v);
@@ -123,7 +125,7 @@ final class GraalPyHostAccessFactory {
     private static void registerAssignable(HostAccess.Builder builder,
                                            Class<?> target,
                                            List<TargetTypeMapping<?>> targetMappings,
-                                           Collection<TargetTypeMapping<?>> allMappings) {
+                                           PythonClassResolver pythonClassResolver) {
         builder.targetTypeMapping(
             Value.class,
             (Class) target,
@@ -132,14 +134,14 @@ final class GraalPyHostAccessFactory {
                 if (host != null && target.isInstance(host)) {
                     return true;
                 }
-                return findAssignableMapping(v, targetMappings, allMappings) != null;
+                return findAssignableMapping(v, targetMappings, pythonClassResolver) != null;
             },
             v -> {
                 ValueCoercible host = ValueCoercible.hostObject(v);
                 if (host != null && target.isInstance(host)) {
                     return target.cast(host);
                 }
-                TargetTypeMapping<?> mapping = findAssignableMapping(v, targetMappings, allMappings);
+                TargetTypeMapping<?> mapping = findAssignableMapping(v, targetMappings, pythonClassResolver);
                 if (mapping == null) {
                     throw new IllegalArgumentException("Cannot resolve Python value to " + target.getName());
                 }
@@ -150,24 +152,24 @@ final class GraalPyHostAccessFactory {
         registerProxyHostMapping(builder, target);
     }
 
-    private static void registerObjectMapping(HostAccess.Builder builder, Collection<TargetTypeMapping<?>> mappings) {
-        builder.<Value, Object>targetTypeMapping(
+    private static void registerObjectMapping(HostAccess.Builder builder, PythonClassResolver pythonClassResolver) {
+        builder.targetTypeMapping(
             Value.class,
             Object.class,
-            v -> ValueCoercible.hostObject(v) != null || findMapping(v, mappings) != null,
+            v -> ValueCoercible.hostObject(v) != null || findMapping(v, pythonClassResolver) != null,
             v -> {
                 ValueCoercible host = ValueCoercible.hostObject(v);
                 if (host != null) {
                     return host;
                 }
-                TargetTypeMapping<?> mapping = findMapping(v, mappings);
+                TargetTypeMapping<?> mapping = findMapping(v, pythonClassResolver);
                 return mapping == null ? v : mapping.convert(v);
             }
         );
     }
 
     private static <T> void registerValueCoercibleHostMapping(HostAccess.Builder builder, Class<T> target) {
-        builder.<Value, T>targetTypeMapping(
+        builder.targetTypeMapping(
             Value.class,
             target,
             v -> {
@@ -198,14 +200,13 @@ final class GraalPyHostAccessFactory {
         );
     }
 
-    @SuppressWarnings("rawtypes")
-    private static void registerPythonClassMapping(HostAccess.Builder builder, Collection<TargetTypeMapping<?>> mappings) {
-        builder.<Value, Class>targetTypeMapping(
+    private static void registerPythonClassMapping(HostAccess.Builder builder, PythonClassResolver pythonClassResolver) {
+        builder.targetTypeMapping(
             Value.class,
             Class.class,
-            v -> findPythonClass(v, mappings) != null,
+            v -> pythonClassResolver.findPythonClass(v) != null,
             v -> {
-                Class<?> target = findPythonClass(v, mappings);
+                Class<?> target = pythonClassResolver.findPythonClass(v);
                 if (target == null) {
                     throw new IllegalArgumentException("Cannot resolve Python class to a generated Java stub");
                 }
@@ -214,7 +215,7 @@ final class GraalPyHostAccessFactory {
         );
     }
 
-    private static @Nullable TargetTypeMapping<?> findMapping(@Nullable Value value, Collection<TargetTypeMapping<?>> mappings) {
+    private static @Nullable TargetTypeMapping<?> findMapping(@Nullable Value value, PythonClassResolver pythonClassResolver) {
         if (value == null || value.isNull() || value.isHostObject() || !value.hasMembers()) {
             return null;
         }
@@ -222,21 +223,16 @@ final class GraalPyHostAccessFactory {
         if (cls == null) {
             return null;
         }
-        Class<?> pythonClass = findPythonClass(cls, mappings);
+        Class<?> pythonClass = pythonClassResolver.findPythonClass(cls);
         if (pythonClass == null) {
             return null;
         }
-        for (TargetTypeMapping<?> mapping : mappings) {
-            if (mapping.targetType().equals(pythonClass)) {
-                return mapping;
-            }
-        }
-        return null;
+        return pythonClassResolver.mappingForClass(pythonClass);
     }
 
     private static @Nullable TargetTypeMapping<?> findAssignableMapping(@Nullable Value value,
                                                                        List<TargetTypeMapping<?>> targetMappings,
-                                                                       Collection<TargetTypeMapping<?>> allMappings) {
+                                                                       PythonClassResolver pythonClassResolver) {
         if (value == null || value.isNull() || value.isHostObject() || !value.hasMembers()) {
             return null;
         }
@@ -244,7 +240,7 @@ final class GraalPyHostAccessFactory {
         if (cls == null) {
             return null;
         }
-        Class<?> pythonClass = findPythonClass(cls, allMappings);
+        Class<?> pythonClass = pythonClassResolver.findPythonClass(cls);
         if (pythonClass == null) {
             return null;
         }
@@ -256,7 +252,7 @@ final class GraalPyHostAccessFactory {
         return null;
     }
 
-    private static @Nullable Class<?> findPythonClass(@Nullable Value value, Collection<TargetTypeMapping<?>> mappings) {
+    private static @Nullable Class<?> findPythonClass(@Nullable Value value, PythonClassResolver pythonClassResolver) {
         if (value == null || value.isNull() || value.isHostObject() || !value.hasMembers() || !value.hasMember("__mro__")) {
             return null;
         }
@@ -267,13 +263,70 @@ final class GraalPyHostAccessFactory {
         if (simpleName == null || simpleName.isBlank() || simpleName.contains("<locals>")) {
             return null;
         }
-        if (moduleName != null && !moduleName.isBlank()) {
-            Class<?> exact = findMappingForClassName(toGeneratedClassName(moduleName, simpleName), mappings);
-            if (exact != null) {
-                return exact;
+        return pythonClassResolver.findClass(moduleName, simpleName);
+    }
+
+    private static final class PythonClassResolver {
+        private final Map<Class<?>, TargetTypeMapping<?>> mappingsByTargetType;
+        private final Map<String, Class<?>> mappingsByClassName;
+        private final Map<String, Optional<Class<?>>> uniqueMappingsBySimpleName;
+        private final Map<PythonClassLookupKey, Optional<Class<?>>> resolvedClasses = new ConcurrentHashMap<>();
+
+        private PythonClassResolver(Collection<TargetTypeMapping<?>> mappings) {
+            Map<Class<?>, TargetTypeMapping<?>> mappingsByTargetType = new HashMap<>(mappings.size());
+            Map<String, Class<?>> mappingsByClassName = new HashMap<>(mappings.size());
+            Map<String, Class<?>> mappingsBySimpleName = new HashMap<>(mappings.size());
+            Map<String, Boolean> ambiguousSimpleNames = new HashMap<>();
+            for (TargetTypeMapping<?> mapping : mappings) {
+                Class<?> targetType = mapping.targetType();
+                mappingsByTargetType.put(targetType, mapping);
+                mappingsByClassName.put(targetType.getName(), targetType);
+                String simpleName = targetType.getSimpleName();
+                Class<?> existing = mappingsBySimpleName.putIfAbsent(simpleName, targetType);
+                if (existing != null && existing != targetType) {
+                    ambiguousSimpleNames.put(simpleName, true);
+                }
             }
+            Map<String, Optional<Class<?>>> uniqueMappingsBySimpleName = new HashMap<>(mappingsBySimpleName.size());
+            for (Map.Entry<String, Class<?>> entry : mappingsBySimpleName.entrySet()) {
+                uniqueMappingsBySimpleName.put(
+                    entry.getKey(),
+                    ambiguousSimpleNames.containsKey(entry.getKey()) ? Optional.empty() : Optional.of(entry.getValue())
+                );
+            }
+            this.mappingsByTargetType = Map.copyOf(mappingsByTargetType);
+            this.mappingsByClassName = Map.copyOf(mappingsByClassName);
+            this.uniqueMappingsBySimpleName = Map.copyOf(uniqueMappingsBySimpleName);
         }
-        return findUniqueMappingForSimpleName(simpleName, mappings);
+
+        private @Nullable TargetTypeMapping<?> mappingForClass(Class<?> pythonClass) {
+            return mappingsByTargetType.get(pythonClass);
+        }
+
+        private @Nullable Class<?> findPythonClass(@Nullable Value value) {
+            return GraalPyHostAccessFactory.findPythonClass(value, this);
+        }
+
+        private @Nullable Class<?> findClass(@Nullable String moduleName, String simpleName) {
+            String normalizedModuleName = moduleName == null || moduleName.isBlank() ? null : moduleName;
+            return resolvedClasses.computeIfAbsent(
+                new PythonClassLookupKey(normalizedModuleName, simpleName),
+                key -> Optional.ofNullable(resolveClass(key))
+            ).orElse(null);
+        }
+
+        private @Nullable Class<?> resolveClass(PythonClassLookupKey key) {
+            if (key.moduleName() != null) {
+                Class<?> exact = mappingsByClassName.get(toGeneratedClassName(key.moduleName(), key.simpleName()));
+                if (exact != null) {
+                    return exact;
+                }
+            }
+            return uniqueMappingsBySimpleName.getOrDefault(key.simpleName(), Optional.empty()).orElse(null);
+        }
+    }
+
+    private record PythonClassLookupKey(@Nullable String moduleName, String simpleName) {
     }
 
     private static String toGeneratedClassName(String moduleName, String simpleName) {
@@ -282,31 +335,6 @@ final class GraalPyHostAccessFactory {
             return moduleName;
         }
         return moduleName + "." + generatedSimpleName;
-    }
-
-    private static @Nullable Class<?> findMappingForClassName(String className, Collection<TargetTypeMapping<?>> mappings) {
-        for (TargetTypeMapping<?> mapping : mappings) {
-            Class<?> targetType = mapping.targetType();
-            if (targetType.getName().equals(className)) {
-                return targetType;
-            }
-        }
-        return null;
-    }
-
-    private static @Nullable Class<?> findUniqueMappingForSimpleName(String simpleName, Collection<TargetTypeMapping<?>> mappings) {
-        Class<?> match = null;
-        for (TargetTypeMapping<?> mapping : mappings) {
-            Class<?> targetType = mapping.targetType();
-            if (!targetType.getSimpleName().equals(simpleName)) {
-                continue;
-            }
-            if (match != null && match != targetType) {
-                return null;
-            }
-            match = targetType;
-        }
-        return match;
     }
 
     private static @Nullable String stringMember(Value value, String memberName) {

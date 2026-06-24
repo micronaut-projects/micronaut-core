@@ -218,16 +218,6 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
     }
 
     /**
-     * Borrow a context, resolve a cached class instance in that context, and release the context
-     * after the callback completes.
-     *
-     * @param packageName The Python package, or {@code null}/{@code python} for top-level classes
-     * @param simpleName The simple or nested class name
-     * @param fn The callback that receives the context-local class value
-     * @param <T> The callback result type
-     * @return The callback result
-     */
-    /**
      * Borrow a context, resolve a cached class value in that context, and release the context after the callback completes.
      *
      * @param classReference The Python class reference
@@ -271,14 +261,7 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
      * This is intended for callers that only need a cached class value and do not require exclusive
      * context ownership. The primary context is used as a fallback when the pool has not warmed yet.
      *
-     * @param packageName The Python package, or {@code null}/{@code python} for top-level classes
-     * @param simpleName The simple or nested class name
-     * @return A context-local class value
-     */
-    /**
-     * Resolve a class instance from an available pooled context without borrowing it.
-     *
-     * @param classReference The Python class reference
+     * @param classReference The class reference
      * @return A context-local class value
      */
     Value getAnyClass(PythonContextRuntime.PythonClassReference classReference) {
@@ -289,14 +272,6 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         return getOrCreateClass(c, classReference);
     }
 
-    /**
-     * Resolve a cached class instance in a caller-selected context.
-     *
-     * @param context The context that should own the value
-     * @param packageName The Python package, or {@code null}/{@code python} for top-level classes
-     * @param simpleName The simple or nested class name
-     * @return The context-local class value
-     */
     /**
      * Resolve a cached class instance in a caller-selected context.
      *
@@ -337,14 +312,6 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         return getOrCreateScript(context, packageName, scriptName);
     }
 
-    /**
-     * Resolve a class instance in the dedicated context associated with an asyncio event loop.
-     *
-     * @param eventLoop The Python event loop that owns the context
-     * @param packageName The Python package, or {@code null}/{@code python} for top-level classes
-     * @param simpleName The simple or nested class name
-     * @return The event-loop-local class value
-     */
     /**
      * Resolve a class instance in the dedicated context associated with an asyncio event loop.
      *
