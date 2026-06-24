@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -50,7 +51,13 @@ final class PythonContextRuntimeTest {
             context.getBindings(PYTHON).putMember("root", temporaryDirectory.toString());
             context.eval(PYTHON, "import sys\nsys.path.insert(0, root)");
 
-            Value sample = PythonContextRuntime.findClass("keywordpkg.async", "Sample", context);
+            Value sample = PythonContextRuntime.findClass(new PythonContextRuntime.PythonClassReference(
+                "keywordpkg.async",
+                "Sample",
+                new String[] {},
+                "Sample",
+                "class-instance:keywordpkg.async.Sample"
+            ), context);
             Value script = PythonContextRuntime.findScript("keywordpkg.async", "script", context);
 
             assertEquals("class", sample.getMember("value").asString());
@@ -76,7 +83,13 @@ final class PythonContextRuntimeTest {
             context.getBindings(PYTHON).putMember("root", temporaryDirectory.toString());
             context.eval(PYTHON, "import sys\nsys.path.insert(0, root)");
 
-            Value testWeatherApi = PythonContextRuntime.findClass("example.micronaut", "TestWeatherApi", context);
+            Value testWeatherApi = PythonContextRuntime.findClass(new PythonContextRuntime.PythonClassReference(
+                "example.micronaut",
+                "TestWeatherApi",
+                new String[] {},
+                "TestWeatherApi",
+                "class-instance:example.micronaut.TestWeatherApi"
+            ), context);
 
             assertTrue(testWeatherApi.canInstantiate());
             assertEquals("fixture", testWeatherApi.getMember("value").asString());
@@ -100,11 +113,67 @@ final class PythonContextRuntimeTest {
             context.getBindings(PYTHON).putMember("root", temporaryDirectory.toString());
             context.eval(PYTHON, "import sys\nsys.path.insert(0, root)");
 
-            Value forecastService = PythonContextRuntime.findClass("example.micronaut", "ForecastService", context);
+            Value forecastService = PythonContextRuntime.findClass(new PythonContextRuntime.PythonClassReference(
+                "example.micronaut",
+                "ForecastService",
+                new String[] {},
+                "ForecastService",
+                "class-instance:example.micronaut.ForecastService"
+            ), context);
 
             assertTrue(forecastService.canInstantiate());
             assertEquals("forecast", forecastService.getMember("value").asString());
         }
+    }
+
+    @Test
+    void findsNestedClassFromPreSplitClassReference() throws IOException {
+        Path packagePath = temporaryDirectory.resolve("example").resolve("nested");
+        Files.createDirectories(packagePath);
+        Files.writeString(temporaryDirectory.resolve("example").resolve("__init__.py"), "");
+        Files.writeString(packagePath.resolve("__init__.py"), """
+            class Outer:
+                class Inner:
+                    value = "nested"
+            """);
+
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            context.getBindings(PYTHON).putMember("root", temporaryDirectory.toString());
+            context.eval(PYTHON, "import sys\nsys.path.insert(0, root)");
+            String[] nestedMembers = {"Inner"};
+            PythonContextRuntime.PythonClassReference classReference = new PythonContextRuntime.PythonClassReference(
+                "example.nested",
+                "Outer",
+                nestedMembers,
+                "Outer.Inner",
+                "class-instance:example.nested.Outer.Inner"
+            );
+            nestedMembers[0] = "Changed";
+
+            Value inner = PythonContextRuntime.findClass(classReference, context);
+
+            assertEquals("nested", inner.getMember("value").asString());
+            assertArrayEquals(new String[]{"Inner"}, classReference.nestedMemberNames());
+        }
+    }
+
+    @Test
+    void classReferenceDefensivelyCopiesNestedMemberNames() {
+        String[] nestedMemberNames = {"Inner"};
+        PythonContextRuntime.PythonClassReference classReference = new PythonContextRuntime.PythonClassReference(
+            "example.nested",
+            "Outer",
+            nestedMemberNames,
+            "Outer.Inner",
+            "class-instance:example.nested.Outer.Inner"
+        );
+        nestedMemberNames[0] = "Changed";
+
+        assertEquals("example.nested", classReference.packageName());
+        assertEquals("Outer", classReference.rootName());
+        assertArrayEquals(new String[]{"Inner"}, classReference.nestedMemberNames());
+        assertEquals("Outer.Inner", classReference.displayName());
+        assertEquals("class-instance:example.nested.Outer.Inner", classReference.cacheKey());
     }
 
     @Test
@@ -126,7 +195,13 @@ final class PythonContextRuntimeTest {
 
             Thread.currentThread().setContextClassLoader(new ClassLoader(null) {
             });
-            Value value = PythonContextRuntime.newInstance("NeedsHost");
+            Value value = PythonContextRuntime.newInstance(new PythonContextRuntime.PythonClassReference(
+                null,
+                "NeedsHost",
+                new String[0],
+                "NeedsHost",
+                "class-instance:python.NeedsHost"
+            ));
 
             assertTrue(value.getMember("loaded").asBoolean());
         } finally {

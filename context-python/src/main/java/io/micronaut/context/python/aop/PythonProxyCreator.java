@@ -29,6 +29,7 @@ import io.micronaut.context.python.GraalPyRuntimeUtil;
 import io.micronaut.context.python.PythonAsyncioRuntime;
 import io.micronaut.context.python.TargetTypeMapping;
 import io.micronaut.context.python.ValueCoercible;
+import io.micronaut.context.python.annotation.PythonClass;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -100,8 +101,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     }
 
     private <T> T createIntroductionProxy(RuntimeProxyDefinition<T> proxyDefinition) {
-        Class<?> pythonBeanType = resolvePythonBeanType(proxyDefinition);
-        Value value = PythonContextRuntime.findClass(pythonBeanType.getPackageName(), pythonBeanType.getSimpleName());
+        Value value = PythonContextRuntime.findClass(resolvePythonClassReference(proxyDefinition));
         AtomicReference<Object> targetBeanRef = new AtomicReference<>();
         Map<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> interceptedMethodsByName = new LinkedHashMap<>();
         for (RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod : proxyDefinition.interceptedMethods()) {
@@ -235,7 +235,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private <T> T createProxyTargetProxy(RuntimeProxyDefinition<T> proxyDefinition) {
         Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
-        Value pythonClass = PythonContextRuntime.findClass(type.getPackageName(), type.getSimpleName());
+        Value pythonClass = PythonContextRuntime.findClass(resolvePythonClassReference(proxyDefinition));
         Value proxyValue = createScopedProxyValue(pythonClass, () -> asValue(proxyDefinition.targetBean()));
         if (hasAroundConstructAdvice(proxyDefinition)) {
             // Python proxy-target AOP normally instantiates the target lazily through the scoped proxy.
@@ -326,14 +326,60 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         }
     }
 
-    private Class<?> resolvePythonBeanType(RuntimeProxyDefinition<?> proxyDefinition) {
+    private PythonContextRuntime.PythonClassReference resolvePythonClassReference(RuntimeProxyDefinition<?> proxyDefinition) {
         for (RuntimeProxyDefinition.InterceptedMethod<?> interceptedMethod : proxyDefinition.interceptedMethods()) {
             Optional<Class> adaptedBean = interceptedMethod.executableMethod().classValue(Adapter.class, ADAPTED_BEAN);
             if (adaptedBean.isPresent()) {
-                return adaptedBean.get();
+                Optional<? extends BeanDefinition<?>> beanDefinition = proxyDefinition.beanContext().findBeanDefinition(adaptedBean.get());
+                if (beanDefinition.isPresent()) {
+                    return classReference(beanDefinition.get());
+                }
             }
         }
-        return proxyDefinition.proxyBeanDefinition().getBeanType();
+        return classReference(proxyDefinition.proxyBeanDefinition());
+    }
+
+    private PythonContextRuntime.PythonClassReference classReference(BeanDefinition<?> beanDefinition) {
+        AnnotationMetadata annotationMetadata = beanDefinition.getAnnotationMetadata();
+        Optional<String> packageName = annotationMetadata.stringValue(PythonClass.class, "packageName");
+        if (packageName.isPresent()) {
+            return classReference(
+                packageName.get(),
+                annotationMetadata.stringValue(PythonClass.class, "rootName")
+                    .orElseThrow(() -> new IllegalStateException("Missing generated Python class root metadata")),
+                annotationMetadata.stringValues(PythonClass.class, "nestedMemberNames"),
+                annotationMetadata.stringValue(PythonClass.class, "displayName")
+                    .orElseThrow(() -> new IllegalStateException("Missing generated Python class display metadata")),
+                annotationMetadata.stringValue(PythonClass.class, "cacheKey")
+                    .orElseThrow(() -> new IllegalStateException("Missing generated Python class cache metadata"))
+            );
+        }
+        PythonClass annotation = beanDefinition.getBeanType().getAnnotation(PythonClass.class);
+        if (annotation == null) {
+            throw new IllegalStateException("Missing generated Python class package metadata");
+        }
+        return classReference(
+            annotation.packageName(),
+            annotation.rootName(),
+            annotation.nestedMemberNames(),
+            annotation.displayName(),
+            annotation.cacheKey()
+        );
+    }
+
+    private PythonContextRuntime.PythonClassReference classReference(
+        String packageName,
+        String rootName,
+        String[] nestedMemberNames,
+        String displayName,
+        String cacheKey) {
+        return new PythonContextRuntime.PythonClassReference(
+            packageName,
+            rootName,
+            nestedMemberNames,
+            displayName,
+            cacheKey
+        );
     }
 
     private <T> ProxyExecutable createProxiedFunction(

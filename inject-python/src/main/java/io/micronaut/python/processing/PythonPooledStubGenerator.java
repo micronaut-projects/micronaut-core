@@ -32,6 +32,7 @@ import io.micronaut.python.processing.visitor.PythonScriptElement;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.StatementDef;
@@ -49,10 +50,14 @@ import static io.micronaut.python.processing.PythonStubGenerator.PYTHON_CONTEXT_
 import static io.micronaut.python.processing.PythonStubGenerator.FROM_POLYGLOT_VALUE;
 import static io.micronaut.python.processing.PythonStubGenerator.POLYGLOT_VALUE;
 import static io.micronaut.python.processing.PythonStubGenerator.PYTHON_ASYNCIO_RUNTIME;
+import static io.micronaut.python.processing.PythonStubGenerator.addReferencedPythonClassReferenceFields;
 import static io.micronaut.python.processing.PythonStubGenerator.coerceParameterToPolyglotValue;
 import static io.micronaut.python.processing.PythonStubGenerator.erasedType;
 import static io.micronaut.python.processing.PythonStubGenerator.handleReturnType;
 import static io.micronaut.python.processing.PythonStubGenerator.isAsyncPythonMethod;
+import static io.micronaut.python.processing.PythonStubGenerator.pythonClassReference;
+import static io.micronaut.python.processing.PythonStubGenerator.pythonClassAnnotation;
+import static io.micronaut.python.processing.PythonStubGenerator.pythonClassReferenceField;
 import static io.micronaut.python.processing.PythonStubGenerator.propertyType;
 
 final class PythonPooledStubGenerator {
@@ -63,7 +68,10 @@ final class PythonPooledStubGenerator {
                                                         Map<String, ClassElement> allClasses) {
         String typeName = element.getName();
         var builder = ClassDef.builder(typeName).addModifiers(Modifier.PUBLIC);
+        FieldDef pythonClassReference = pythonClassReferenceField("__PYTHON_CLASS_REFERENCE", element);
+        builder.addField(pythonClassReference);
         builder.addAnnotation(Vetoed.class);
+        builder.addAnnotation(pythonClassAnnotation(element));
         builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
 
         ClassElement superType = element.getSuperType().orElse(null);
@@ -87,10 +95,7 @@ final class PythonPooledStubGenerator {
             .addModifiers(Modifier.PUBLIC)
             .returns(POLYGLOT_VALUE)
             .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
-                .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(
-                    ExpressionDef.constant(element.getPackageName()),
-                    ExpressionDef.constant(element.getSimpleName())
-                )).returning())));
+                .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(pythonClassReference(element, pythonClassReference))).returning())));
 
         builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
             .addModifiers(Modifier.PUBLIC)
@@ -98,8 +103,7 @@ final class PythonPooledStubGenerator {
             .returns(POLYGLOT_VALUE)
             .build(((aThis, params) -> PYTHON_CONTEXT_RUNTIME
                 .invokeStatic("findPooledClass", POLYGLOT_VALUE, List.of(
-                    ExpressionDef.constant(element.getPackageName()),
-                    ExpressionDef.constant(element.getSimpleName()),
+                    pythonClassReference(element, pythonClassReference),
                     params.getFirst()
                 )).returning())));
 
@@ -120,6 +124,7 @@ final class PythonPooledStubGenerator {
                     || isDeclaredBeanMethod(ann)
                     || ann.hasStereotype("io.micronaut.context.annotation.Executable"))
         );
+        addReferencedPythonClassReferenceFields(builder, element, methodsToBridge);
 
         for (MethodElement methodElement : methodsToBridge) {
             addBridgeMethodPooledClass(methodElement, builder, element, allClasses);
@@ -223,8 +228,7 @@ final class PythonPooledStubGenerator {
                 coerceParameterToPolyglotValue(parameter, parameterExpressions, mp);
             }
             List<ExpressionDef> args = new ArrayList<>();
-            args.add(ExpressionDef.constant(element.getPackageName()));
-            args.add(ExpressionDef.constant(element.getSimpleName()));
+            args.add(pythonClassReference(element, element));
             args.add(ExpressionDef.constant(pythonFunctionName));
             args.addAll(parameterExpressions);
             var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooled", POLYGLOT_VALUE, args);

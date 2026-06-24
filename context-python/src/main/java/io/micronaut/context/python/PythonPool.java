@@ -227,10 +227,18 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
      * @param <T> The callback result type
      * @return The callback result
      */
-    <T> T withClass(@Nullable String packageName, String simpleName, java.util.function.Function<Value, T> fn) {
+    /**
+     * Borrow a context, resolve a cached class value in that context, and release the context after the callback completes.
+     *
+     * @param classReference The Python class reference
+     * @param fn The callback that receives the context-local class value
+     * @param <T> The callback result type
+     * @return The callback result
+     */
+    <T> T withClass(PythonContextRuntime.PythonClassReference classReference, java.util.function.Function<Value, T> fn) {
         Context c = borrow();
         try {
-            Value v = getOrCreateClass(c, packageName, simpleName);
+            Value v = getOrCreateClass(c, classReference);
             return fn.apply(v);
         } finally {
             release(c);
@@ -267,12 +275,18 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
      * @param simpleName The simple or nested class name
      * @return A context-local class value
      */
-    Value getAnyClass(@Nullable String packageName, String simpleName) {
+    /**
+     * Resolve a class instance from an available pooled context without borrowing it.
+     *
+     * @param classReference The Python class reference
+     * @return A context-local class value
+     */
+    Value getAnyClass(PythonContextRuntime.PythonClassReference classReference) {
         Context c = pooledQueue.peekFirst();
         if (c == null) {
             c = primaryContext;
         }
-        return getOrCreateClass(c, packageName, simpleName);
+        return getOrCreateClass(c, classReference);
     }
 
     /**
@@ -283,8 +297,15 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
      * @param simpleName The simple or nested class name
      * @return The context-local class value
      */
-    Value getClass(Context context, @Nullable String packageName, String simpleName) {
-        return getOrCreateClass(context, packageName, simpleName);
+    /**
+     * Resolve a cached class instance in a caller-selected context.
+     *
+     * @param context The context that should own the value
+     * @param classReference The Python class reference
+     * @return The context-local class value
+     */
+    Value getClass(Context context, PythonContextRuntime.PythonClassReference classReference) {
+        return getOrCreateClass(context, classReference);
     }
 
     /**
@@ -324,8 +345,15 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
      * @param simpleName The simple or nested class name
      * @return The event-loop-local class value
      */
-    Value getEventLoopClass(PythonEventLoop eventLoop, @Nullable String packageName, String simpleName) {
-        return getOrCreateClass(getOrCreateEventLoopContext(eventLoop), packageName, simpleName);
+    /**
+     * Resolve a class instance in the dedicated context associated with an asyncio event loop.
+     *
+     * @param eventLoop The Python event loop that owns the context
+     * @param classReference The Python class reference
+     * @return The event-loop-local class value
+     */
+    Value getEventLoopClass(PythonEventLoop eventLoop, PythonContextRuntime.PythonClassReference classReference) {
+        return getOrCreateClass(getOrCreateEventLoopContext(eventLoop), classReference);
     }
 
     /**
@@ -482,11 +510,11 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         return contexts;
     }
 
-    private Value getOrCreateClass(Context c, @Nullable String packageName, String simpleName) {
+    private Value getOrCreateClass(Context c, PythonContextRuntime.PythonClassReference classReference) {
         Map<String, Value> m = cache.computeIfAbsent(c, _ -> new ConcurrentHashMap<>());
-        String key = classInstanceKey(packageName, simpleName);
+        String key = classReference.cacheKey();
         return m.computeIfAbsent(key, _ -> {
-            Value cls = loadClass(c, packageName, simpleName);
+            Value cls = loadClass(c, classReference);
             if (cls.canInstantiate()) {
                 return cls.newInstance();
             }
@@ -514,16 +542,12 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
             : GraalPyRuntimeUtil.coerceToContext(value, script.getContext());
     }
 
-    private static String classInstanceKey(@Nullable String pkg, String simple) {
-        return "class-instance:" + Objects.toString(pkg, PYTHON) + "." + simple;
-    }
-
     private static String scriptKey(String pkg, String script) {
         return "script:" + Objects.toString(pkg, PYTHON) + ":" + script;
     }
 
-    private static Value loadClass(Context ctx, @Nullable String packageName, String simpleName) {
-        return PythonContextRuntime.findClass(packageName, simpleName, ctx);
+    private static Value loadClass(Context ctx, PythonContextRuntime.PythonClassReference classReference) {
+        return PythonContextRuntime.findClass(classReference, ctx);
     }
 
     private static Value loadScript(Context ctx, String packageName, String scriptName) {

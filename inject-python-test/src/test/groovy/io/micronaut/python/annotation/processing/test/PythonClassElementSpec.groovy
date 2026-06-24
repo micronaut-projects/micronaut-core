@@ -1675,7 +1675,11 @@ class Room:
         def context = buildContext(pythonCode)
         def roomClass = context.classLoader.loadClass("python.Room")
         def messageClass = context.classLoader.loadClass("python.Message")
-        def messageValue = PythonContextRuntime.newInstance("python", "Message", "hello", 1)
+        def messageValue = PythonContextRuntime.newInstance(
+                new PythonContextRuntime.PythonClassReference("python", "Message", new String[0], "Message", "class-instance:python.Message"),
+                "hello",
+                1
+        )
         def room = roomClass.getConstructor(String, List, Integer.TYPE).newInstance("room", [], 1)
         room.setMessages([messageValue])
         def messages = room.getMessages()

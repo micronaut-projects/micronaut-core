@@ -341,7 +341,9 @@ class MultipleTestSpec:
         generated.exists()
         def javaCode = generated.text
         javaCode.contains('MultipleTestSpec() {\n  }')
-        javaCode.contains('this.graalpyInternalValue = PythonContextRuntime.newInstance("python", "MultipleTestSpec");')
+        javaCode.contains('static final PythonContextRuntime.PythonClassReference __PYTHON_CLASS_REFERENCE =')
+        javaCode.contains('"class-instance:python.MultipleTestSpec"')
+        javaCode.contains('this.graalpyInternalValue = PythonContextRuntime.newInstance(MultipleTestSpec.__PYTHON_CLASS_REFERENCE);')
         javaCode.contains('return this.graalpyInternalValue;')
         !javaCode.contains('MultipleTestSpec() {\n    this.graalpyInternalValue = PythonContextRuntime.newInstance')
 

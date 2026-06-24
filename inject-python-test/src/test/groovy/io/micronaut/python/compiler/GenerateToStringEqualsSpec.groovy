@@ -44,7 +44,7 @@ class Person:
         return this.graalpyInternalValue;
       }
     } else {
-      this.graalpyInternalValue = PythonContextRuntime.newUninitializedInstance("python", "Person");
+      this.graalpyInternalValue = PythonContextRuntime.newUninitializedInstance(Person.__PYTHON_CLASS_REFERENCE);
       this.graalpyInternalValueSyncing = true;
       GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "name", (Object) this.name);
       GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "age", (Object) this.age);

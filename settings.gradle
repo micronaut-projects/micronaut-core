@@ -129,15 +129,57 @@ String xmlEscape(String value) {
         .replace("'", "&apos;")
 }
 
+String userMavenSettingsBlock(String blockName) {
+    def configuredSettings = firstGradleProperty("micronaut.graalpy.maven.settings", "maven.settings")
+    def userSettings = configuredSettings == null ?
+        new File(System.getProperty("user.home"), ".m2/settings.xml") :
+        file(configuredSettings)
+    if (!userSettings.isFile()) {
+        return ""
+    }
+    def matcher = userSettings.getText("UTF-8") =~ "(?s)<${java.util.regex.Pattern.quote(blockName)}(?:\\s[^>]*)?>.*?</${java.util.regex.Pattern.quote(blockName)}>"
+    if (!matcher.find()) {
+        return ""
+    }
+    "\n" + matcher.group(0).readLines().collect { "  $it" }.join("\n") + "\n"
+}
+
+String userMavenSettingsChildren(String blockName, String childName) {
+    def configuredSettings = firstGradleProperty("micronaut.graalpy.maven.settings", "maven.settings")
+    def userSettings = configuredSettings == null ?
+        new File(System.getProperty("user.home"), ".m2/settings.xml") :
+        file(configuredSettings)
+    if (!userSettings.isFile()) {
+        return ""
+    }
+    def matcher = userSettings.getText("UTF-8") =~ "(?s)<${java.util.regex.Pattern.quote(blockName)}(?:\\s[^>]*)?>(.*?)</${java.util.regex.Pattern.quote(blockName)}>"
+    if (!matcher.find()) {
+        return ""
+    }
+    def childMatcher = matcher.group(1) =~ "(?s)<${java.util.regex.Pattern.quote(childName)}(?:\\s[^>]*)?>.*?</${java.util.regex.Pattern.quote(childName)}>"
+    def children = []
+    while (childMatcher.find()) {
+        children << childMatcher.group(0)
+    }
+    children.isEmpty() ? "" : children.collect { it.readLines().collect { line -> "    $line" }.join("\n") }.join("\n") + "\n"
+}
+
 File writeGraalPyBundleMavenSettings(File repoDir, String checkoutSha) {
     def settingsFile = file("checkouts/maven-bundles/graalpy/${checkoutSha}-settings.xml")
     settingsFile.parentFile.mkdirs()
     def repoUrl = xmlEscape(repoDir.toURI().toString())
+    def servers = userMavenSettingsBlock("servers")
+    def mirrors = userMavenSettingsBlock("mirrors")
+    def proxies = userMavenSettingsBlock("proxies")
+    def userProfiles = userMavenSettingsChildren("profiles", "profile")
+    def userActiveProfiles = userMavenSettingsChildren("activeProfiles", "activeProfile")
     settingsFile.text = """<?xml version="1.0" encoding="UTF-8"?>
 <settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
+${servers}${mirrors}${proxies}\
   <profiles>
+${userProfiles}\
     <profile>
       <id>micronaut-graalpy-bundle</id>
       <repositories>
@@ -167,6 +209,7 @@ File writeGraalPyBundleMavenSettings(File repoDir, String checkoutSha) {
     </profile>
   </profiles>
   <activeProfiles>
+${userActiveProfiles}\
     <activeProfile>micronaut-graalpy-bundle</activeProfile>
   </activeProfiles>
 </settings>

@@ -119,6 +119,37 @@ public final class PythonContextRuntime {
     private PythonContextRuntime() {
     }
 
+    /**
+     * Pre-split Python class identity for generated bridge code.
+     *
+     * @param packageName The Python package, or {@code null}/{@code python} for top-level classes
+     * @param rootName The top-level Python import/member name
+     * @param nestedMemberNames The nested member names below the root class
+     * @param displayName The class display name used in diagnostics
+     * @param cacheKey The stable class cache key used by pooled contexts
+     * @since 5.1.0
+     */
+    @UsedByGeneratedCode
+    public record PythonClassReference(
+        @Nullable String packageName,
+        String rootName,
+        String[] nestedMemberNames,
+        String displayName,
+        String cacheKey
+    ) {
+        /**
+         * Create a Python class reference.
+         */
+        public PythonClassReference {
+            nestedMemberNames = nestedMemberNames.clone();
+        }
+
+        @Override
+        public String[] nestedMemberNames() {
+            return nestedMemberNames.clone();
+        }
+    }
+
     private static ContextState contextState(Context context) {
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
             return CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
@@ -150,13 +181,13 @@ public final class PythonContextRuntime {
     /**
      * Resolve a Python instance for the current asyncio event loop when one is active.
      *
-     * @param fallback The startup-context instance.
-     * @param packageName The Python package.
-     * @param simpleName The class simple name.
-     * @return An event-loop-local instance, or the fallback when no event-loop context is active.
+     * @param fallback The startup-context instance
+     * @param classReference The Python class reference
+     * @return An event-loop-local instance, or the fallback when no event-loop context is active
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static Value asyncInstance(Value fallback, @Nullable String packageName, String simpleName) {
+    public static Value asyncInstance(Value fallback, PythonClassReference classReference) {
         PythonPool pool = pythonPool;
         if (pool == null || isReuseContext()) {
             return fallback;
@@ -165,7 +196,7 @@ public final class PythonContextRuntime {
         if (eventLoop == null) {
             return fallback;
         }
-        Value target = pool.getEventLoopClass(eventLoop, packageName, simpleName);
+        Value target = pool.getEventLoopClass(eventLoop, classReference);
         GraalPyRuntimeUtil.copyTransferableMembers(fallback, target);
         copyRememberedAsyncMembers(fallback, target);
         return target;
@@ -606,57 +637,57 @@ public final class PythonContextRuntime {
     /**
      * Obtain a pooled Python class instance (per-context cached).
      *
-     * @param packageName The Python package (or null/python for top-level)
-     * @param simpleName The class simple name
+     * @param classReference The Python class reference
      * @return The pooled class instance (Value) from some context
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static Value findPooledClass(@Nullable String packageName, String simpleName) {
+    public static Value findPooledClass(PythonClassReference classReference) {
         if (isReuseContext() || pythonPool == null) {
-            return findClass(packageName, simpleName);
+            return findClass(classReference);
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
-            return getPythonPool().getEventLoopClass(eventLoop, packageName, simpleName);
+            return getPythonPool().getEventLoopClass(eventLoop, classReference);
         }
-        return getPythonPool().getAnyClass(packageName, simpleName);
+        return getPythonPool().getAnyClass(classReference);
     }
 
     /**
      * Obtain a pooled Python class instance from a specific context.
      *
-     * @param packageName The Python package (or null/python for top-level)
-     * @param simpleName The class simple name
+     * @param classReference The Python class reference
      * @param context The context
      * @return The pooled class instance (Value)
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static Value findPooledClass(@Nullable String packageName, String simpleName, Context context) {
+    public static Value findPooledClass(PythonClassReference classReference, Context context) {
         if (isReuseContext() || pythonPool == null) {
-            return findClass(packageName, simpleName, context);
+            return findClass(classReference, context);
         }
-        return getPythonPool().getClass(context, packageName, simpleName);
+        return getPythonPool().getClass(context, classReference);
     }
 
     /**
      * Execute a function with a borrowed pooled class instance.
      *
-     * @param packageName The Python package
-     * @param simpleName The class name
+     * @param classReference The Python class reference
      * @param fn Function receiving the pooled Value
      * @param <T> Result type returned by the function
      * @return Result returned from the function
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static <T> T withPooled(@Nullable String packageName, String simpleName, java.util.function.Function<Value, T> fn) {
+    public static <T> T withPooled(PythonClassReference classReference, java.util.function.Function<Value, T> fn) {
         if (isReuseContext() || pythonPool == null) {
-            return fn.apply(findClass(packageName, simpleName));
+            return fn.apply(findClass(classReference));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
-            return fn.apply(getPythonPool().getEventLoopClass(eventLoop, packageName, simpleName));
+            return fn.apply(getPythonPool().getEventLoopClass(eventLoop, classReference));
         }
-        return getPythonPool().withClass(packageName, simpleName, fn);
+        return getPythonPool().withClass(classReference, fn);
     }
 
     /**
@@ -754,15 +785,15 @@ public final class PythonContextRuntime {
     /**
      * Invoke a method on a pooled class instance.
      *
-     * @param packageName The package
-     * @param simpleName The class name
+     * @param classReference The Python class reference
      * @param methodName The method name
      * @param args Arguments
      * @return The polyglot result
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static Value invokePooled(@Nullable String packageName, String simpleName, String methodName, Object... args) {
-        return withPooled(packageName, simpleName, v -> GraalPyRuntimeUtil.invokePythonMethod(
+    public static Value invokePooled(PythonClassReference classReference, String methodName, Object... args) {
+        return withPooled(classReference, v -> GraalPyRuntimeUtil.invokePythonMethod(
             v,
             methodName,
             GraalPyRuntimeUtil.coerceArgumentsToContext(v.getContext(), args)
@@ -797,14 +828,14 @@ public final class PythonContextRuntime {
     /**
      * Create an instance that is abstract and fill out the abstract methods with stubs to be later populated.
      *
-     * @param packageName The package name
-     * @param simpleName  The simple name
-     * @param args        The args
+     * @param classReference The Python class reference
+     * @param args The args
      * @return The new instance
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static Value newIntroduction(@Nullable String packageName, String simpleName, Object... args) {
-        Value pythonClass = findClass(packageName, simpleName);
+    public static Value newIntroduction(PythonClassReference classReference, Object... args) {
+        Value pythonClass = findClass(classReference);
         if (!pythonClass.hasMember("__micronaut_introduction__")) {
 
             Value abstractMethods = pythonClass.getMember("__abstractmethods__");
@@ -828,52 +859,51 @@ public final class PythonContextRuntime {
                 pythonClass.putMember("_is_protocol", false);
             }
         }
-        return instantiate(packageName, simpleName, args, pythonClass);
+        return instantiate(classReference, args, pythonClass);
     }
 
     /**
      * Create a new abstract introduction instance, omitting trailing null arguments that correspond
      * to Python constructor defaults.
      *
-     * @param packageName The package name
-     * @param simpleName The simple name
+     * @param classReference The Python class reference
      * @param requiredArgCount The number of non-defaulted positional constructor arguments
      * @param args The arguments
      * @return The new instance
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static Value newIntroductionWithDefaultedTrailingNulls(@Nullable String packageName,
-                                                                  String simpleName,
+    public static Value newIntroductionWithDefaultedTrailingNulls(PythonClassReference classReference,
                                                                   int requiredArgCount,
                                                                   Object... args) {
-        return newIntroduction(packageName, simpleName, trimDefaultedTrailingNulls(requiredArgCount, args));
+        return newIntroduction(classReference, trimDefaultedTrailingNulls(requiredArgCount, args));
     }
 
     /**
-     * Create a new instance for the given package name, simple name and args.
+     * Create a new instance for the given class reference and args.
      *
-     * @param packageName The package name
-     * @param simpleName  The simple name
-     * @param args        The args
+     * @param classReference The Python class reference
+     * @param args The args
      * @return The new instance
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static Value newInstance(@Nullable String packageName, String simpleName, Object... args) {
-        Value pythonClass = findClass(packageName, simpleName);
-        return instantiate(packageName, simpleName, args, pythonClass);
+    public static Value newInstance(PythonClassReference classReference, Object... args) {
+        Value pythonClass = findClass(classReference);
+        return instantiate(classReference, args, pythonClass);
     }
 
     /**
      * Resolve a Python enum constant by its Java enum name.
      *
-     * @param packageName The package name
-     * @param simpleName  The simple name
-     * @param name        The enum constant name
+     * @param classReference The Python class reference
+     * @param name The enum constant name
      * @return The Python enum constant
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static Value enumValue(@Nullable String packageName, String simpleName, String name) {
-        Value pythonClass = findClass(packageName, simpleName);
+    public static Value enumValue(PythonClassReference classReference, String name) {
+        Value pythonClass = findClass(classReference);
         return withContextClassLoader(() -> {
             Value enumValue = pythonClass.getMember(name);
             if (enumValue != null && !GraalPyRuntimeUtil.isNone(enumValue)) {
@@ -886,7 +916,7 @@ public final class PythonContextRuntime {
                     return enumValue;
                 }
             }
-            String qualifiedName = packageName == null || PYTHON.equals(packageName) ? simpleName : packageName + "." + simpleName;
+            String qualifiedName = qualifiedName(classReference);
             throw new IllegalArgumentException("Cannot resolve Python enum constant: " + qualifiedName + "." + name);
         });
     }
@@ -895,49 +925,46 @@ public final class PythonContextRuntime {
      * Create a new instance, omitting trailing null arguments that correspond to Python constructor
      * defaults.
      *
-     * @param packageName The package name
-     * @param simpleName The simple name
+     * @param classReference The Python class reference
      * @param requiredArgCount The number of non-defaulted positional constructor arguments
      * @param args The arguments
      * @return The new instance
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static Value newInstanceWithDefaultedTrailingNulls(@Nullable String packageName,
-                                                             String simpleName,
+    public static Value newInstanceWithDefaultedTrailingNulls(PythonClassReference classReference,
                                                              int requiredArgCount,
                                                              Object... args) {
-        return newInstance(packageName, simpleName, trimDefaultedTrailingNulls(requiredArgCount, args));
+        return newInstance(classReference, trimDefaultedTrailingNulls(requiredArgCount, args));
     }
 
     /**
      * Create a Python instance without invoking {@code __init__}.
      *
-     * @param packageName The package name
-     * @param simpleName The simple name
+     * @param classReference The Python class reference
      * @return The new uninitialized instance
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static Value newUninitializedInstance(@Nullable String packageName, String simpleName) {
+    public static Value newUninitializedInstance(PythonClassReference classReference) {
         Context context = getContext();
-        Value pythonClass = findClass(packageName, simpleName, context);
+        Value pythonClass = findClass(classReference, context);
         return context.eval(PYTHON, "lambda cls: object.__new__(cls)").execute(pythonClass);
     }
 
     /**
      * Create a new instance and set properties via member assignment when no constructor exists.
-     * This overload accepts a map of property values and will instantiate the Python class with
-     * no positional arguments, then populate attributes using Graal Polyglot putMember.
      *
-     * @param packageName The package name (nullable)
-     * @param simpleName  The simple class name
-     * @param props       Map of property names to values
-     * @return The new instance with members populated.
+     * @param classReference The Python class reference
+     * @param props Map of property names to values
+     * @return The new instance with members populated
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static Value newInstance(@Nullable String packageName, String simpleName, Map<String, Object> props) {
-        Value pythonClass = findClass(packageName, simpleName);
+    public static Value newInstance(PythonClassReference classReference, Map<String, Object> props) {
+        Value pythonClass = findClass(classReference);
         return withContextClassLoader(() -> {
-            Value instance = instantiate(packageName, simpleName, new Object[0], pythonClass);
+            Value instance = instantiate(classReference, new Object[0], pythonClass);
             if (props != null && !props.isEmpty()) {
                 Value propertySetter = propertySetter(instance.getContext());
                 for (java.util.Map.Entry<String, Object> e : props.entrySet()) {
@@ -955,14 +982,14 @@ public final class PythonContextRuntime {
     /**
      * Create a new frozen dataclass instance and set properties without invoking __init__.
      *
-     * @param packageName The package name (nullable)
-     * @param simpleName  The simple class name
-     * @param props       Map of property names to values
-     * @return The new frozen dataclass instance with members populated.
+     * @param classReference The Python class reference
+     * @param props Map of property names to values
+     * @return The new frozen dataclass instance with members populated
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static Value newFrozenDataclassInstance(@Nullable String packageName, String simpleName, Map<String, Object> props) {
-        Value pythonClass = findClass(packageName, simpleName);
+    public static Value newFrozenDataclassInstance(PythonClassReference classReference, Map<String, Object> props) {
+        Value pythonClass = findClass(classReference);
         return withContextClassLoader(() -> {
             Value instance = uninitializedInstanceFactory(pythonClass.getContext()).execute(pythonClass);
             if (props != null && !props.isEmpty()) {
@@ -987,27 +1014,14 @@ public final class PythonContextRuntime {
         return helper(context, SET_INSTANCE_PROPERTY, SET_INSTANCE_PROPERTY_SOURCE);
     }
 
-    private static Value instantiate(@Nullable String packageName, String simpleName, Object[] args, Value pythonClass) {
+    private static Value instantiate(PythonClassReference classReference, Object[] args, Value pythonClass) {
         return withContextClassLoader(() -> {
             if (pythonClass.canInstantiate()) {
                 return pythonClass.newInstance(GraalPyRuntimeUtil.coerceArgumentsToContext(pythonClass.getContext(), args));
             } else {
-                String qualifiedName = packageName == null || PYTHON.equals(packageName) ? simpleName :  packageName + "." + simpleName;
-                throw new InstantiationException("Cannot instantiate class: " + qualifiedName + ". Ensure the class is a valid Python class and is non-abstract.");
+                throw new InstantiationException("Cannot instantiate class: " + qualifiedName(classReference) + ". Ensure the class is a valid Python class and is non-abstract.");
             }
         });
-    }
-
-    /**
-     * Create a new instance for the given simple name and args.
-     *
-     * @param simpleName The simple name
-     * @param args       The args
-     * @return The new instance
-     */
-    public static Value newInstance(String simpleName, Object... args) {
-        Value pythonClass = findClass(simpleName);
-        return instantiate(null, simpleName, args, pythonClass);
     }
 
     private static Object[] trimDefaultedTrailingNulls(int requiredArgCount, Object[] args) {
@@ -1018,93 +1032,53 @@ public final class PythonContextRuntime {
         return length == args.length ? args : Arrays.copyOf(args, length);
     }
 
-    public static Value findClass(@org.jspecify.annotations.Nullable String packageName, String simpleName) {
-        return findClass(packageName, simpleName, getContext());
-    }
-
     /**
-     * Resolve a Python class in a specific context without consulting the pooled-context routing
-     * logic used by generated public entry points.
-     * <p>
-     * Pool and event-loop code use this overload to keep imports and resulting {@link Value}
-     * instances owned by the context they will later execute in.
+     * Find a Python class by pre-split class reference.
      *
-     * @param packageName The Python package, or {@code null}/{@code python} for top-level classes
-     * @param simpleName The simple or nested class name
-     * @param ctx The context that should perform imports and member lookups
-     * @return The resolved Python class value
-     */
-    static Value findClass(@org.jspecify.annotations.Nullable String packageName, String simpleName, Context ctx) {
-        if (packageName == null || PYTHON.equals(packageName)) {
-            return findClass(simpleName, ctx);
-        }
-
-        String importName = rootName(simpleName);
-        try {
-            return nestedMember(importPackageMember(ctx, packageName, importName), simpleName);
-        } catch (Exception e) {
-            throw new InstantiationException("Failed to import Python class [" + packageName + "." + simpleName + "]: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Find a Python class by fully qualified name.
-     * @param simpleName The class name
+     * @param classReference The Python class reference
      * @return The class Value
+     * @since 5.1.0
      */
     @UsedByGeneratedCode
-    public static Value findClass(String simpleName) {
-        return findClass(simpleName, getContext());
+    public static Value findClass(PythonClassReference classReference) {
+        return findClass(classReference, getContext());
     }
 
-    /**
-     * Resolve a top-level or nested Python class from a specific context.
-     * <p>
-     * This mirrors the package-aware overload for top-level scripts and nested classes while
-     * avoiding accidental use of the global primary context from pooled context creation.
-     *
-     * @param simpleName The simple or nested class name
-     * @param ctx The context that should perform imports and member lookups
-     * @return The resolved Python class value
-     */
-    static Value findClass(String simpleName, Context ctx) {
-        String importName = rootName(simpleName);
-        Value v = ctx.getBindings(PYTHON).getMember(importName);
-        if (v == null) {
-            Value member = importModule(ctx, importName).getMember(importName);
-            if (member == null) {
-                throw new InstantiationException("Cannot find Python class: " + simpleName);
+    static Value findClass(PythonClassReference classReference, Context ctx) {
+        if (classReference.packageName() == null || PYTHON.equals(classReference.packageName())) {
+            Value value = ctx.getBindings(PYTHON).getMember(classReference.rootName());
+            if (value == null) {
+                Value member = importModule(ctx, classReference.rootName()).getMember(classReference.rootName());
+                if (member == null) {
+                    throw new InstantiationException("Cannot find Python class: " + classReference.displayName());
+                }
+                value = member;
             }
-            v = member;
+            return nestedMember(value, classReference);
         }
-        return nestedMember(v, simpleName);
+
+        try {
+            return nestedMember(importPackageMember(ctx, classReference.packageName(), classReference.rootName()), classReference);
+        } catch (Exception e) {
+            throw new InstantiationException("Failed to import Python class [" + qualifiedName(classReference) + "]: " + e.getMessage(), e);
+        }
     }
 
-    private static String rootName(String simpleName) {
-        int nestedSeparator = simpleName.indexOf('.');
-        return nestedSeparator < 0 ? simpleName : simpleName.substring(0, nestedSeparator);
-    }
-
-    private static Value nestedMember(Value root, String simpleName) {
+    private static Value nestedMember(Value root, PythonClassReference classReference) {
         Value value = root;
-        int nestedSeparator = simpleName.indexOf('.');
-        if (nestedSeparator < 0) {
-            return value;
-        }
-        int start = nestedSeparator + 1;
-        while (start < simpleName.length()) {
-            int end = simpleName.indexOf('.', start);
-            String nestedName = end < 0 ? simpleName.substring(start) : simpleName.substring(start, end);
+        for (String nestedName : classReference.nestedMemberNames()) {
             value = value.getMember(nestedName);
             if (value == null) {
-                throw new InstantiationException("Cannot find Python class: " + simpleName);
+                throw new InstantiationException("Cannot find Python class: " + classReference.displayName());
             }
-            if (end < 0) {
-                break;
-            }
-            start = end + 1;
         }
         return value;
+    }
+
+    private static String qualifiedName(PythonClassReference classReference) {
+        return classReference.packageName() == null || PYTHON.equals(classReference.packageName())
+            ? classReference.displayName()
+            : classReference.packageName() + "." + classReference.displayName();
     }
 
     /**
@@ -1150,50 +1124,18 @@ public final class PythonContextRuntime {
     /**
      * Invoke a static method on the given Python class.
      *
-     * @param packageName The package name
-     * @param simpleName  The simple class name
-     * @param methodName  The method name
-     * @param args        The method arguments
+     * @param classReference The Python class reference
+     * @param methodName The method name
+     * @param args The method arguments
      * @return The method result
+     * @since 5.1.0
      */
-    public static Value invokeStaticMethod(@Nullable String packageName, String simpleName, String methodName, Object... args) {
-        if (packageName == null || PYTHON.equals(packageName)) {
-            return invokeStaticMethod(simpleName, methodName, args);
-        } else {
-            Context ctx = getContext();
-            enterExecution(ctx);
-            try {
-                return findClass(packageName, simpleName, ctx).invokeMember(methodName, args);
-            } finally {
-                exitExecution(ctx);
-            }
-        }
-    }
-
-    /**
-     * Invoke a static method on the given Python class.
-     *
-     * @param simpleName  The simple class name
-     * @param methodName  The method name
-     * @param args        The method arguments
-     * @return The method result
-     */
-    public static Value invokeStaticMethod(String simpleName, String methodName, Object... args) {
+    @UsedByGeneratedCode
+    public static Value invokeStaticMethod(PythonClassReference classReference, String methodName, Object... args) {
         Context ctx = getContext();
         enterExecution(ctx);
         try {
-            String importName = rootName(simpleName);
-            Value v = ctx.getBindings(PYTHON).getMember(importName);
-            if (v != null) {
-                return nestedMember(v, simpleName).invokeMember(methodName, args);
-            } else {
-                Value member = importModule(ctx, importName).getMember(importName);
-                if (member == null) {
-                    throw new InstantiationException("Cannot find Python class: " + simpleName);
-                }
-                return nestedMember(member, simpleName)
-                    .invokeMember(methodName, args);
-            }
+            return findClass(classReference, ctx).invokeMember(methodName, args);
         } finally {
             exitExecution(ctx);
         }
