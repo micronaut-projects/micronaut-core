@@ -63,6 +63,7 @@ public final class PythonAsyncioRuntime {
             + "')",
         "micronaut-import-asyncio-runtime.py"
     ).cached(true).buildLiteral();
+
     private static final Source ASYNCIO_FALLBACK_LOADER_SOURCE = Source.newBuilder(GraalPyRuntimeUtil.PYTHON, """
         import sys as __micronaut_sys
         import types as __micronaut_types
@@ -159,14 +160,39 @@ public final class PythonAsyncioRuntime {
         updateState(current -> new RuntimeState(enabled, current.eventLoopProviders(), current.executorService(), current.executorServiceProvider()));
     }
 
+    /**
+     * Replace the event loop providers used to detect the active Python event loop.
+     * <p>
+     * This hook is package-private so Micronaut infrastructure can refresh runtime
+     * state when the application context starts or changes without exposing the
+     * provider list as a public API.
+     *
+     * @param providers The currently available event loop providers.
+     */
     static void setEventLoopProviders(Collection<PythonEventLoopProvider> providers) {
         updateState(current -> new RuntimeState(current.enabled(), List.copyOf(providers), current.executorService(), current.executorServiceProvider()));
     }
 
+    /**
+     * Set the blocking executor used by Python {@code asyncio.run_in_executor(None, ...)}.
+     * <p>
+     * A direct executor takes precedence over the provider variant and is primarily
+     * used when infrastructure has already resolved the Micronaut blocking executor.
+     *
+     * @param executorService The resolved blocking executor, or {@code null} to defer to the provider.
+     */
     static void setExecutorService(@Nullable ExecutorService executorService) {
         updateState(current -> new RuntimeState(current.enabled(), current.eventLoopProviders(), executorService, current.executorServiceProvider()));
     }
 
+    /**
+     * Set the lazy provider for the blocking executor used by Python {@code run_in_executor}.
+     * <p>
+     * The provider is consulted only when no direct executor has been configured,
+     * which keeps executor resolution lazy during application context initialization.
+     *
+     * @param executorServiceProvider The blocking executor provider, or {@code null} when unavailable.
+     */
     static void setExecutorServiceProvider(@Nullable BeanProvider<ExecutorService> executorServiceProvider) {
         updateState(current -> new RuntimeState(current.enabled(), current.eventLoopProviders(), current.executorService(), executorServiceProvider));
     }
@@ -185,6 +211,14 @@ public final class PythonAsyncioRuntime {
         return null;
     }
 
+    /**
+     * Resolve the event loop currently associated with the calling execution context.
+     * <p>
+     * Package collaborators use this to route async Python invocations without
+     * duplicating provider iteration or depending on the runtime state's shape.
+     *
+     * @return The current event loop, or {@code null} when execution is not on a known loop.
+     */
     static @Nullable PythonEventLoop currentEventLoopForContext() {
         return currentEventLoop(state);
     }
