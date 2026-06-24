@@ -15,9 +15,11 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -133,6 +135,10 @@ public final class GraalPyRuntimeUtil {
                     return namespace[name]
             return None
         """, "micronaut-raw-class-member.py").cached(true).buildLiteral();
+    private static final String LEN = "__len__";
+    private static final String ITER = "__iter__";
+    private static final String NEXT = "__next__";
+    private static final String GETITEM = "__getitem__";
 
     /**
      * Returns whether the value represents Java null or Python None.
@@ -241,12 +247,15 @@ public final class GraalPyRuntimeUtil {
             case Map<?, ?> map -> {
                 Map<Object, Object> result = new HashMap<>();
                 for (Map.Entry<?, ?> entry : map.entrySet()) {
-                    result.put(coerceToContext(entry.getKey(), context), coerceToContext(entry.getValue(), context));
+                    result.put(
+                        coerceToContext(entry.getKey(), context),
+                        coerceToContext(entry.getValue(), context)
+                    );
                 }
                 return result;
             }
             case Set<?> set -> {
-                Set<@Nullable Object> result = new java.util.HashSet<>();
+                Set<@Nullable Object> result = new HashSet<>();
                 for (Object element : set) {
                     result.add(coerceToContext(element, context));
                 }
@@ -508,7 +517,7 @@ public final class GraalPyRuntimeUtil {
      * @param source The source Python object.
      * @param target The target Python object.
      */
-    public static void copyTransferableMembers(Value source, Value target) {
+    public static void copyTransferableMembers(@Nullable Value source, @Nullable Value target) {
         if (source == null || target == null || isNone(source) || isNone(target) || !source.hasMembers()) {
             return;
         }
@@ -557,6 +566,17 @@ public final class GraalPyRuntimeUtil {
 
     /**
      * Invoke a generated bridge method on a Python receiver.
+     * <p>
+     * Generated Java stubs use this method instead of calling {@link Value#invokeMember(String, Object...)}
+     * directly so every Python call enters the {@link PythonContextRuntime} execution tracker for the
+     * receiver's actual context. The execution frame keeps graceful shutdown and pooled-context cleanup
+     * from observing the context as idle while a bridge invocation, or nested bridge invocation, is still
+     * unwinding.
+     * <p>
+     * Invocation is delegated to a context-local Python helper because Python method lookup is not just
+     * a map lookup. The helper first uses {@code getattr} for normal bound-method behavior, then falls
+     * back to walking the class {@code __mro__} and applying {@code __get__} so descriptors and inherited
+     * methods are invoked with Python semantics before the result crosses back to Java.
      *
      * @param receiver The Python receiver
      * @param name The method name
@@ -777,16 +797,16 @@ public final class GraalPyRuntimeUtil {
             Map<K, V> result = new HashMap<>();
             Value keysValue = graalValue.invokeMember("keys");
             if (keysValue != null && keysValue.hasIterator()) {
-                Value iterator = keysValue.invokeMember("__iter__");
+                Value iterator = keysValue.invokeMember(ITER);
                 while (true) {
                     try {
-                        Value nextValue = iterator.invokeMember("__next__");
+                        Value nextValue = iterator.invokeMember(NEXT);
                         if (nextValue == null || nextValue.isNull()) {
                             break;
                         }
                         try {
                             K convertedKey = convertValue(nextValue, keyType);
-                            Value mapValue = graalValue.invokeMember("__getitem__", nextValue);
+                            Value mapValue = graalValue.invokeMember(GETITEM, nextValue);
                             V convertedValue = convertValue(mapValue, valueType);
                             result.put(convertedKey, convertedValue);
                         } catch (Exception e) {
@@ -812,27 +832,23 @@ public final class GraalPyRuntimeUtil {
      * @param <T> the expected optional element type
      * @return a Java Optional with the converted value or empty
      */
-    @SuppressWarnings("unchecked")
-    public static <T> java.util.Optional<T> convertOptional(Value graalValue, Class<T> elementType) {
+    public static <T> Optional<T> convertOptional(Value graalValue, Class<T> elementType) {
         if (isNone(graalValue)) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
         if (graalValue.isHostObject()) {
             Object hostObject = graalValue.asHostObject();
             if (hostObject instanceof Optional<?> optional) {
                 if (optional.isEmpty()) {
-                    return java.util.Optional.empty();
+                    return Optional.empty();
                 }
                 Object optionalValue = optional.get();
-                if (optionalValue == null) {
-                    return java.util.Optional.empty();
-                }
                 if (elementType.isInstance(optionalValue)) {
-                    return java.util.Optional.of(elementType.cast(optionalValue));
+                    return Optional.of(elementType.cast(optionalValue));
                 }
                 if (optionalValue instanceof Value value) {
                     T convertedValue = convertValue(value, elementType);
-                    return convertedValue == null ? java.util.Optional.empty() : java.util.Optional.of(convertedValue);
+                    return convertedValue == null ? Optional.empty() : Optional.of(convertedValue);
                 }
             }
         }
@@ -840,10 +856,10 @@ public final class GraalPyRuntimeUtil {
         // Convert the value and wrap in Optional
         T convertedValue = convertValue(graalValue, elementType);
         if (convertedValue == null) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
 
-        return java.util.Optional.of(convertedValue);
+        return Optional.of(convertedValue);
     }
 
     /**
@@ -861,15 +877,15 @@ public final class GraalPyRuntimeUtil {
             return null;
         }
 
-        java.util.Set<T> result = new java.util.HashSet<>();
+        Set<@Nullable T> result = new HashSet<>();
 
         try {
             // Try to iterate directly over the set
             if (graalValue.hasIterator()) {
-                Value iterator = graalValue.invokeMember("__iter__");
+                Value iterator = graalValue.invokeMember(ITER);
                 while (true) {
                     try {
-                        Value nextValue = iterator.invokeMember("__next__");
+                        Value nextValue = iterator.invokeMember(NEXT);
                         if (nextValue == null || nextValue.isNull()) {
                             break;
                         }
@@ -898,7 +914,7 @@ public final class GraalPyRuntimeUtil {
                 }
             } catch (Exception ex) {
                 // If conversion fails, return empty set
-                return new java.util.HashSet<>();
+                return new HashSet<>();
             }
         }
 
@@ -1011,7 +1027,7 @@ public final class GraalPyRuntimeUtil {
             if (convertedBody == null) {
                 return (HttpResponse<T>) response;
             }
-            return ((MutableHttpResponse<T>) mutableResponse).body(convertedBody);
+            return mutableResponse.body(convertedBody);
         }
         return (HttpResponse<T>) response;
     }
@@ -1020,16 +1036,20 @@ public final class GraalPyRuntimeUtil {
         if (item == null || itemType.isInstance(item)) {
             return itemType.cast(item);
         }
-        if (item instanceof HttpResponse<?> response && HttpResponse.class.isAssignableFrom(itemType)) {
-            return itemType.cast(convertHttpResponse(response, Object.class));
-        }
-        if (item instanceof Value value) {
-            return convertValue(value, itemType);
-        }
-        try {
-            return convertValue(Value.asValue(item), itemType);
-        } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
-            return itemType.cast(item);
+        switch (item) {
+            case HttpResponse<?> response when HttpResponse.class.isAssignableFrom(itemType) -> {
+                return itemType.cast(convertHttpResponse(response, Object.class));
+            }
+            case Value value -> {
+                return convertValue(value, itemType);
+            }
+            default -> {
+                try {
+                    return convertValue(Value.asValue(item), itemType);
+                } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
+                    return itemType.cast(item);
+                }
+            }
         }
     }
 
@@ -1123,10 +1143,15 @@ public final class GraalPyRuntimeUtil {
      * @param value The Python enum value
      * @return The enum string value
      */
-    public static String enumStringValue(Value value) {
+    @SuppressWarnings("unused")
+    @UsedByGeneratedCode
+    public static String enumStringValue(@Nullable Value value) {
+        if (value == null) {
+            return "null";
+        }
         Value target = value;
-        if (value != null && value.hasMembers() && value.hasMember("value")) {
-            target = value.getMember("value");
+        if (value.hasMembers() && value.hasMember(AnnotationMetadata.VALUE_MEMBER)) {
+            target = value.getMember(AnnotationMetadata.VALUE_MEMBER);
         }
         if (isNone(target)) {
             return "null";
@@ -1198,14 +1223,14 @@ public final class GraalPyRuntimeUtil {
     private static long getSize(Value value) {
         try {
             // Try __len__ first (Python standard)
-            if (value.canInvokeMember("__len__")) {
-                Value length = value.invokeMember("__len__");
+            if (value.canInvokeMember(LEN)) {
+                Value length = value.invokeMember(LEN);
                 return length.asLong();
             }
 
             // Try len() function
-            if (value.canInvokeMember("__len__")) {
-                Value length = value.invokeMember("__len__");
+            if (value.canInvokeMember(LEN)) {
+                Value length = value.invokeMember(LEN);
                 return length.asLong();
             }
 
@@ -1219,10 +1244,10 @@ public final class GraalPyRuntimeUtil {
             // If all else fails, try to iterate and count
             if (value.hasIterator()) {
                 long count = 0;
-                Value iterator = value.invokeMember("__iter__");
+                Value iterator = value.invokeMember(ITER);
                 while (true) {
                     try {
-                        iterator.invokeMember("__next__");
+                        iterator.invokeMember(NEXT);
                         count++;
                     } catch (Exception e) {
                         break;
@@ -1250,15 +1275,15 @@ public final class GraalPyRuntimeUtil {
             }
 
             // Try __getitem__ method
-            if (collection.canInvokeMember("__getitem__")) {
-                return collection.invokeMember("__getitem__", index);
+            if (collection.canInvokeMember(GETITEM)) {
+                return collection.invokeMember(GETITEM, index);
             }
 
             // Try iteration to specific index
             if (collection.hasIterator()) {
-                Value iterator = collection.invokeMember("__iter__");
+                Value iterator = collection.invokeMember(ITER);
                 for (long i = 0; i <= index; i++) {
-                    Value item = iterator.invokeMember("__next__");
+                    Value item = iterator.invokeMember(NEXT);
                     if (i == index) {
                         return item;
                     }

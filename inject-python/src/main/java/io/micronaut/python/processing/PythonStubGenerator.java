@@ -434,7 +434,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             VariableDef.MethodParameter val = methodParameters.get(0);
                                             List<StatementDef> assigns = new ArrayList<>();
                                             if (extendsPythonClass) {
-                                                assigns.add(aThis.superRef().invokeConstructor(val));
+                                                assigns.add(aThis.superRef().invokeSuperConstructor(val));
                                                 if (pythonValueFinal != null) {
                                                     assigns.add(aThis.field(pythonValueFinal).assign(val));
                                                 }
@@ -468,7 +468,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
                                     .build(((aThis, methodParameters) -> {
                                             if (extendsPythonClass) {
-                                                return aThis.superRef().invokeConstructor(methodParameters.get(0));
+                                                return aThis.superRef().invokeSuperConstructor(methodParameters.get(0));
                                             } else {
                                                 return aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(methodParameters.get(0));
                                             }
@@ -761,11 +761,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     if (isIntrospectedBean) {
                                         return aThis.invokeConstructor(pythonInstance);
                                     } else if (extendsPythonClass) {
-                                        return aThis.superRef().invokeConstructor(pythonInstance);
+                                        return aThis.superRef().invokeSuperConstructor(pythonInstance);
                                     } else if (extendsHostClass) {
                                         List<ExpressionDef> superArguments = superConstructorArguments(superType, parameters, methodParameters);
                                         return StatementDef.multi(
-                                            aThis.superRef().invokeConstructor(superArguments),
+                                            aThis.superRef().invokeSuperConstructor(superArguments),
                                             aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance)
                                         );
                                     } else {
@@ -799,7 +799,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         )
                                     );
                                 if (extendsPythonClass) {
-                                    return aThis.superRef().invokeConstructor(pythonInstance);
+                                    return aThis.superRef().invokeSuperConstructor(pythonInstance);
                                 } else {
                                     return aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance);
                                 }
@@ -3121,7 +3121,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (genericReturnType.isVoid() || !Object.class.getName().equals(genericReturnType.getName())) {
             return null;
         }
-        resolvedReturnType = null;
         for (ClassElement typeArgument : typeArguments.values()) {
             resolvedReturnType = typeArgument;
         }
