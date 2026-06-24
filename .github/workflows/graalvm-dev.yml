@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Build Matrix
-        uses: micronaut-projects/github-actions/graalvm/build-matrix@6f9eb3a2ab5fcd2dde3c39a9dc9a3a05076d22e5 # master
+        uses: micronaut-projects/github-actions/graalvm/build-matrix@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
         id: build-matrix
         with:
           java-version: '25'
@@ -51,7 +51,7 @@ jobs:
           export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - name: Pre-Build Steps
-        uses: micronaut-projects/github-actions/graalvm/pre-build@6f9eb3a2ab5fcd2dde3c39a9dc9a3a05076d22e5 # master
+        uses: micronaut-projects/github-actions/graalvm/pre-build@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
         id: pre-build
         with:
           java: ${{ matrix.java }}
@@ -59,7 +59,7 @@ jobs:
           nativeTestTask: ${{ matrix.native_test_task }}
           gradle-java: '25'
       - name: Build Steps
-        uses: micronaut-projects/github-actions/graalvm/build@6f9eb3a2ab5fcd2dde3c39a9dc9a3a05076d22e5 # master
+        uses: micronaut-projects/github-actions/graalvm/build@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
         id: build
         env:
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
@@ -69,7 +69,7 @@ jobs:
         with:
           nativeTestTask: ${{ matrix.native_test_task }}
       - name: Post-Build Steps
-        uses: micronaut-projects/github-actions/graalvm/post-build@6f9eb3a2ab5fcd2dde3c39a9dc9a3a05076d22e5 # master
+        uses: micronaut-projects/github-actions/graalvm/post-build@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
         id: post-build
         with:
           java: ${{ matrix.java }}
