@@ -139,6 +139,7 @@ public final class PythonContextRuntime {
      * Register the active Python pool after the pool bean decides whether pooling is enabled.
      * <p>
      * A {@code null} pool intentionally routes generated bridge calls back to the primary context.
+     * This method stays package-private so only the pool lifecycle code can change global routing.
      *
      * @param pool The Python pool
      */
@@ -220,6 +221,9 @@ public final class PythonContextRuntime {
     /**
      * Associate a context with the shared engine that owns it so shutdown can wait for both
      * context-local executions and engine-wide executions before closing resources.
+     * <p>
+     * The context-to-engine relationship is mutable because pooled contexts may be created after
+     * the primary context. Updating this mapping also keeps the per-engine context count balanced.
      *
      * @param context The GraalPy context being tracked
      * @param engine The engine backing the context
@@ -245,6 +249,9 @@ public final class PythonContextRuntime {
     /**
      * Remove a context from execution tracking and notify any engine listeners when the removed
      * context was the last context associated with that engine.
+     * <p>
+     * This is part of shutdown coordination; it clears cached helper/member state before the
+     * context can be closed and releases listeners waiting for engine ownership to reach zero.
      *
      * @param context The GraalPy context being removed
      */
@@ -288,6 +295,9 @@ public final class PythonContextRuntime {
 
     /**
      * Mark the primary context as actively executing host-initiated Python code.
+     * <p>
+     * This overload is for legacy generated paths that do not already hold a pooled or event-loop
+     * context. New context-specific code should prefer {@link #enterExecution(Context)}.
      */
     static void enterExecution() {
         enterExecution(getContext());
@@ -357,6 +367,9 @@ public final class PythonContextRuntime {
 
     /**
      * Mark an execution against the primary context as complete.
+     * <p>
+     * This must only be paired with {@link #enterExecution()} so the aggregate and primary-context
+     * execution counters remain balanced.
      */
     static void exitExecution() {
         exitExecution(getContext());
@@ -390,7 +403,16 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Read the aggregate active execution count used by shutdown diagnostics and tests.
+     * Return the aggregate number of active Python executions across all registered contexts.
+     * <p>
+     * This counter is incremented by {@link #enterExecution(Context)} and decremented by
+     * {@link #exitExecution(Context)} for every generated bridge entry into Python. It is deliberately
+     * aggregate-only: context-local and engine-local counts are stored in {@link ContextState} and
+     * {@link EngineState} so shutdown can wait at the correct granularity.
+     * <p>
+     * Maintainers should treat this method as an observability hook for tests and diagnostics, not
+     * as a synchronization primitive. Use one of the {@code onNoActiveExecutions} registration methods
+     * when cleanup must wait for a safe idle point.
      *
      * @return The number of active Python executions known to the runtime
      */
@@ -399,10 +421,15 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Run a listener when the given context has no active executions.
+     * Register a listener to run when the supplied context has no active Python executions.
      * <p>
-     * The listener runs immediately when the context is idle; otherwise it is queued on the
-     * context state and executed by the final matching {@link #exitExecution(Context)}.
+     * The listener runs synchronously when the context is already idle. Otherwise it is stored on
+     * the context state and drained by the {@link #exitExecution(Context)} call that decrements the
+     * context-local execution count to zero. This is the context-scoped shutdown gate used before a
+     * GraalPy context can be closed.
+     * <p>
+     * Listener registration and counter checks are performed under {@link #ACTIVE_EXECUTIONS_LOCK}
+     * so a new listener cannot miss the transition from active to idle.
      *
      * @param context The context to observe
      * @param listener The listener to run when the context is idle
@@ -422,10 +449,13 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Run a listener after the current execution frame exits and the context is idle.
+     * Register a listener to run after the current execution frame exits and the context is idle.
      * <p>
      * This is used during bean/context destruction so cleanup cannot run in the middle of a nested
-     * generated bridge invocation that is still unwinding.
+     * generated bridge invocation that is still unwinding. When a scoped execution frame is active,
+     * the listener is first attached to that frame and only then registered with
+     * {@link #onNoActiveExecutions(Context, Runnable)}. Without that two-step handoff, a nested call
+     * could make the context appear idle before the outer bridge call has restored its Java-side state.
      *
      * @param context The context to observe
      * @param listener The listener to run after the current frame and active executions complete
@@ -439,10 +469,15 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Run a listener once all distinct contexts in the collection are idle.
+     * Register a listener to run once every distinct context in the collection is idle.
      * <p>
-     * Duplicate contexts are collapsed by identity so a pooled context cannot make the listener
-     * wait for the same active execution more than once.
+     * Duplicate contexts are collapsed by identity so a pooled context cannot make the listener wait
+     * for the same active execution more than once. For active contexts, this method installs a small
+     * gate listener on each context; the original listener runs only after the final active context
+     * reaches zero executions. If no supplied context is active, the listener runs immediately.
+     * <p>
+     * This overload is used by pooled shutdown because the pool owns multiple contexts and all of
+     * them must be idle before cached values and GraalPy contexts are discarded.
      *
      * @param contexts The contexts to observe
      * @param listener The listener to run when every observed context is idle
@@ -478,7 +513,15 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Run a listener when the engine has no active executions across any registered context.
+     * Register a listener to run when the engine has no active executions across registered contexts.
+     * <p>
+     * Engine tracking is separate from context tracking because several contexts can share the same
+     * GraalPy engine. This listener is therefore the safe hook for engine-level cleanup: it waits
+     * until all currently registered contexts using the engine have left Python execution.
+     * <p>
+     * The listener runs immediately when the engine is unknown or idle; otherwise it is queued on
+     * the engine state and drained by the {@link #exitExecution(Context)} call that brings the
+     * engine-local execution count to zero.
      *
      * @param engine The engine to observe
      * @param listener The listener to run when the engine is idle
@@ -498,7 +541,15 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Run a listener when no registered contexts remain for the engine.
+     * Register a listener to run when no registered contexts remain for the engine.
+     * <p>
+     * This differs from {@link #onNoActiveExecutions(Engine, Runnable)}: an engine can be idle while
+     * still owning open contexts. Use this hook when engine cleanup must wait for every associated
+     * context to be unregistered, not merely for executions to finish.
+     * <p>
+     * The listener runs immediately when the engine is not tracked or has no contexts; otherwise it
+     * is queued and released by {@link #unregisterContextEngine(Context)} when the context count
+     * reaches zero.
      *
      * @param engine The engine to observe
      * @param listener The listener to run when the engine no longer owns contexts
@@ -542,8 +593,9 @@ public final class PythonContextRuntime {
     /**
      * Dispatch a no-active-executions listener.
      * <p>
-     * The default implementation runs inline; tests can replace behavior through package access if
-     * the shutdown dispatch strategy changes.
+     * The default implementation runs inline to preserve ordering with context close operations.
+     * The package-private boundary keeps a single future extension point if listener dispatch needs
+     * to move to an executor.
      *
      * @param listener The listener to dispatch
      */
@@ -973,6 +1025,9 @@ public final class PythonContextRuntime {
     /**
      * Resolve a Python class in a specific context without consulting the pooled-context routing
      * logic used by generated public entry points.
+     * <p>
+     * Pool and event-loop code use this overload to keep imports and resulting {@link Value}
+     * instances owned by the context they will later execute in.
      *
      * @param packageName The Python package, or {@code null}/{@code python} for top-level classes
      * @param simpleName The simple or nested class name
@@ -1004,6 +1059,9 @@ public final class PythonContextRuntime {
 
     /**
      * Resolve a top-level or nested Python class from a specific context.
+     * <p>
+     * This mirrors the package-aware overload for top-level scripts and nested classes while
+     * avoiding accidental use of the global primary context from pooled context creation.
      *
      * @param simpleName The simple or nested class name
      * @param ctx The context that should perform imports and member lookups
@@ -1063,6 +1121,9 @@ public final class PythonContextRuntime {
 
     /**
      * Resolve a Python module from a specific context.
+     * <p>
+     * Pooled script caching depends on this method returning a module value owned by {@code ctx};
+     * callers must not share the returned value with another GraalPy context.
      *
      * @param packageName The Python package, or {@code python} for top-level scripts
      * @param scriptName The script/module name
@@ -1242,6 +1303,9 @@ public final class PythonContextRuntime {
 
     /**
      * Run a void action while holding the per-context monitor.
+     * <p>
+     * This overload exists for call sites that need the same locking discipline as
+     * {@link #withContextLock(Context, Supplier)} but do not produce a value.
      *
      * @param context The context whose state should be locked
      * @param action The action to run while holding the lock
@@ -1296,6 +1360,9 @@ public final class PythonContextRuntime {
 
     /**
      * Check whether the supplied context is the primary runtime context by identity.
+     * <p>
+     * Identity comparison is intentional because multiple GraalPy contexts can share the same
+     * engine and equivalent configuration but still own incompatible {@link Value} instances.
      *
      * @param context The context to compare
      * @return {@code true} when the context is the primary runtime context
