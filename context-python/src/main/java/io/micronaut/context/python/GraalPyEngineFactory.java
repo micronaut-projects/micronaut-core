@@ -31,6 +31,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.Map;
 
 /**
@@ -53,9 +54,15 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
      */
     @Singleton
     @Named(GraalPyRuntimeUtil.PYTHON)
-    Engine pythonEngine(EngineConfiguration engineConfiguration) {
+    Engine pythonEngine(GraalPyEngineConfiguration engineConfiguration) {
         // Keep defaults; options and instruments are configured on contexts.
-        return buildPythonEngine(engineConfiguration);
+        LOG.debug("Creating GraalPy Engine");
+        long now = System.currentTimeMillis();
+        try {
+            return buildPythonEngine(engineConfiguration);
+        } finally {
+            LOG.debug("Created GraalPy Engine in {}ms", System.currentTimeMillis() - now);
+        }
     }
 
     /**
@@ -67,7 +74,7 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
      *
      * @return A new Python polyglot engine.
      */
-    static Engine buildPythonEngine(EngineConfiguration engineConfiguration) {
+    static Engine buildPythonEngine(GraalPyEngineConfiguration engineConfiguration) {
         return engineConfiguration.builder
             .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
             .logHandler(new GraalPySlf4jLogHandler())
@@ -80,7 +87,7 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
      * @return A new Python polyglot engine.
      */
     static Engine buildPythonEngine() {
-        return buildPythonEngine(new EngineConfiguration());
+        return buildPythonEngine(new GraalPyEngineConfiguration());
     }
 
     /**
@@ -127,8 +134,8 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
      * Configuration options for the GraalPy Engine.
      *
      */
-    @ConfigurationProperties(EngineConfiguration.PREFIX)
-    static final class EngineConfiguration {
+    @ConfigurationProperties(GraalPyEngineConfiguration.PREFIX)
+    static final class GraalPyEngineConfiguration {
         public static final String PREFIX = "graalpy.engine";
 
         @ConfigurationBuilder(prefixes = "", excludes = {"out", "in", "err", "exceptionHandler", "messageTransport"})
@@ -140,6 +147,7 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
          */
         void setOptions(@MapFormat(keyFormat = StringConvention.RAW, transformation = MapFormat.MapTransformation.FLAT) @Nullable Map<String, String> options) {
             if (options != null) {
+                GraalPyEngineFactory.LOG.debug("Using GraalPy engine options {}", options);
                 builder.options(options);
             }
         }

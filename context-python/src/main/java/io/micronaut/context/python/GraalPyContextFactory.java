@@ -101,11 +101,13 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
         try {
             var classLoader = applicationContext.getClassLoader();
+            LOG.debug("Building Primary GraalPy context");
+            long now = System.currentTimeMillis();
             var context = buildContext(hostAccess, engine, classLoader);
 
             // Make context available to bridge classes
             PythonContextRuntime.setContext(context, classLoader);
-
+            LOG.debug("Created Primary GraalPy Context in {}ms", System.currentTimeMillis() - now);
             return context;
 
         } catch (Exception e) {

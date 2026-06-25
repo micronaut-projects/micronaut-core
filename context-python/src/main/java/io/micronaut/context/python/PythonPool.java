@@ -105,9 +105,12 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         this.applicationContext = applicationContext;
         int configuredPoolSize = configuration.size();
         this.warnThresholdMs = configuration.warnWaitMs();
+        this.targetSize = configuration.enabled() ? (configuredPoolSize > 0 ? configuredPoolSize : computeDefaultSize()) : 0;
+    }
+
+    private static int computeDefaultSize() {
         int processors = Runtime.getRuntime().availableProcessors();
-        int defaultSize = Math.max(1, processors * 2);
-        this.targetSize = configuration.enabled() ? (configuredPoolSize > 0 ? configuredPoolSize : defaultSize) : 0;
+        return Math.max(1, processors * 2);
     }
 
     @Override
@@ -383,6 +386,9 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
     private synchronized @Nullable Context createBorrowedPooledContext() {
         if (closed || size.get() >= targetSize) {
             return null;
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Creating Pooled Python context {}", size.get());
         }
         Context c = createContext();
         if (closed) {
