@@ -32,5 +32,6 @@ public final class LoggingConverterRegistrar implements TypeConverterRegistrar {
     @Override
     public void register(MutableConversionService conversionService) {
         conversionService.addConverter(CharSequence.class, LogLevel.class, new CharSequenceToEnumConverter<>());
+        conversionService.addConverter(Boolean.class, LogLevel.class, value -> value ? null : LogLevel.OFF);
     }
 }
