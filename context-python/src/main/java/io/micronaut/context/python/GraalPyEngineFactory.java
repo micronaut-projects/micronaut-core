@@ -141,6 +141,11 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
         @ConfigurationBuilder(prefixes = "", excludes = {"out", "in", "err", "exceptionHandler", "messageTransport"})
         Engine.Builder builder = Engine.newBuilder();
 
+        GraalPyEngineConfiguration() {
+            // currently GraalPy spawns too many compiler threads by default. limit to 1 for now.
+            builder.options(Map.of("engine.CompilerThreads", "1"));
+        }
+
         /**
          * Sets the engine options.
          * @param options The options.
