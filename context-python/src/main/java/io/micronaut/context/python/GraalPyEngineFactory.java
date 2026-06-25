@@ -15,16 +15,23 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.event.BeanDestroyedEvent;
 import io.micronaut.context.event.BeanDestroyedEventListener;
+import io.micronaut.core.convert.format.MapFormat;
+import io.micronaut.core.naming.conventions.StringConvention;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.PolyglotException;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Map;
 
 /**
  * Factory for producing a GraalVM Polyglot {@link Engine} for Python contexts.
@@ -46,9 +53,9 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
      */
     @Singleton
     @Named(GraalPyRuntimeUtil.PYTHON)
-    Engine pythonEngine() {
+    Engine pythonEngine(EngineConfiguration engineConfiguration) {
         // Keep defaults; options and instruments are configured on contexts.
-        return buildPythonEngine();
+        return buildPythonEngine(engineConfiguration);
     }
 
     /**
@@ -60,11 +67,20 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
      *
      * @return A new Python polyglot engine.
      */
-    static Engine buildPythonEngine() {
-        return Engine.newBuilder()
+    static Engine buildPythonEngine(EngineConfiguration engineConfiguration) {
+        return engineConfiguration.builder
             .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
             .logHandler(new GraalPySlf4jLogHandler())
             .build();
+    }
+
+    /**
+     * Build a Python polyglot engine with default engine configuration.
+     *
+     * @return A new Python polyglot engine.
+     */
+    static Engine buildPythonEngine() {
+        return buildPythonEngine(new EngineConfiguration());
     }
 
     /**
@@ -104,6 +120,28 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
             }
         } catch (IllegalStateException e) {
             LOG.debug("Python engine still has active contexts during destruction", e);
+        }
+    }
+
+    /**
+     * Configuration options for the GraalPy Engine.
+     *
+     */
+    @ConfigurationProperties(EngineConfiguration.PREFIX)
+    static final class EngineConfiguration {
+        public static final String PREFIX = "graalpy.engine";
+
+        @ConfigurationBuilder(prefixes = "", excludes = {"out", "in", "err", "exceptionHandler", "messageTransport"})
+        Engine.Builder builder = Engine.newBuilder();
+
+        /**
+         * Sets the engine options.
+         * @param options The options.
+         */
+        void setOptions(@MapFormat(keyFormat = StringConvention.RAW, transformation = MapFormat.MapTransformation.FLAT) @Nullable Map<String, String> options) {
+            if (options != null) {
+                builder.options(options);
+            }
         }
     }
 }

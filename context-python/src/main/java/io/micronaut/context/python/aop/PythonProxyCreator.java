@@ -102,7 +102,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private <T> T createIntroductionProxy(RuntimeProxyDefinition<T> proxyDefinition) {
         Value value = PythonContextRuntime.findClass(resolvePythonClassReference(proxyDefinition));
-        AtomicReference<Object> targetBeanRef = new AtomicReference<>();
+        AtomicReference<@Nullable Object> targetBeanRef = new AtomicReference<>();
         Map<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> interceptedMethodsByName = new LinkedHashMap<>();
         for (RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod : proxyDefinition.interceptedMethods()) {
             interceptedMethodsByName.computeIfAbsent(
@@ -328,9 +328,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private PythonContextRuntime.PythonClassReference resolvePythonClassReference(RuntimeProxyDefinition<?> proxyDefinition) {
         for (RuntimeProxyDefinition.InterceptedMethod<?> interceptedMethod : proxyDefinition.interceptedMethods()) {
-            Optional<Class> adaptedBean = interceptedMethod.executableMethod().classValue(Adapter.class, ADAPTED_BEAN);
-            if (adaptedBean.isPresent()) {
-                Optional<? extends BeanDefinition<?>> beanDefinition = proxyDefinition.beanContext().findBeanDefinition(adaptedBean.get());
+            Class<?> adaptedBean = interceptedMethod.executableMethod().classValue(Adapter.class, ADAPTED_BEAN).orElse(null);
+            if (adaptedBean != null) {
+                Optional<? extends BeanDefinition<?>> beanDefinition = proxyDefinition.beanContext()
+                    .findBeanDefinition(adaptedBean);
                 if (beanDefinition.isPresent()) {
                     return classReference(beanDefinition.get());
                 }
@@ -632,14 +633,14 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             case Value value -> value;
             case ValueCoercible valueCoercible -> valueCoercible;
             case List<?> list -> {
-                List<Object> newList = new ArrayList<>(list.size());
+                List<@Nullable Object> newList = new ArrayList<>(list.size());
                 for (Object o : list) {
                     newList.add(unbox(context, o));
                 }
                 yield newList;
             }
             case Set<?> set -> {
-                Set<Object> newSet = new LinkedHashSet<>(set.size());
+                Set<@Nullable Object> newSet = new LinkedHashSet<>(set.size());
                 for (Object o : set) {
                     newSet.add(unbox(context, o));
                 }
@@ -729,7 +730,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             if (elementType == Argument.OBJECT_ARGUMENT) {
                 return value.as(type);
             }
-            List<Object> values = new ArrayList<>();
+            List<@Nullable Object> values = new ArrayList<>();
             if (value.hasArrayElements()) {
                 long size = value.getArraySize();
                 for (long i = 0; i < size; i++) {
