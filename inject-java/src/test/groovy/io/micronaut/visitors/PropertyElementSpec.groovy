@@ -16,6 +16,7 @@
 package io.micronaut.visitors
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.annotation.Get
 import io.micronaut.inject.ast.ClassElement
 import jakarta.annotation.Nullable
@@ -716,6 +717,200 @@ class JacksonPropertyAccessBean {
         readOnly.isReadOnly()
         writeOnly.isWriteOnly()
         setterOnly.isWriteOnly()
+    }
+
+    void "test jackson property on generated dollar prefixed private field uses public accessors"() {
+        given:
+        def introspection = buildBeanIntrospection('test.JacksonDollarPrefixedFieldBean', '''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class JacksonDollarPrefixedFieldBean {
+    public static final String JSON_PROPERTY_$_REF = "$ref";
+
+    @JsonProperty(JSON_PROPERTY_$_REF)
+    @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
+    private String $ref;
+
+    public String get$Ref() {
+        return $ref;
+    }
+
+    public void set$Ref(String $ref) {
+        this.$ref = $ref;
+    }
+}
+''')
+        def property = introspection.getRequiredProperty('$Ref', String)
+
+        expect:
+        property.stringValue(Introspected.Property, "name").orElseThrow() == '$ref'
+    }
+
+    void "test jackson property on generated underscore prefixed private field uses public accessors"() {
+        given:
+        def introspection = buildBeanIntrospection('test.JacksonUnderscorePrefixedFieldBean', '''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class JacksonUnderscorePrefixedFieldBean {
+    public static final String JSON_PROPERTY_DEFAULT = "default";
+
+    @JsonProperty(JSON_PROPERTY_DEFAULT)
+    @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
+    private String _default;
+
+    public String get_default() {
+        return _default;
+    }
+
+    public void set_default(String _default) {
+        this._default = _default;
+    }
+}
+''')
+        def property = introspection.getRequiredProperty('_default', String)
+
+        expect:
+        property.stringValue(Introspected.Property, "name").orElseThrow() == 'default'
+    }
+
+    void "test jackson write only final dollar prefixed field resolves as constructor property"() {
+        given:
+        def introspection = buildBeanIntrospection('test.JacksonWriteOnlyDollarConstructorGetterBean', '''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class JacksonWriteOnlyDollarConstructorGetterBean {
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private final String $ref;
+
+    @JsonCreator
+    JacksonWriteOnlyDollarConstructorGetterBean(@JsonProperty("$ref") String $ref) {
+        this.$ref = $ref;
+    }
+
+    public String get$Ref() {
+        return $ref;
+    }
+}
+''')
+        def property = introspection.getRequiredProperty('$Ref', String)
+        def writeProperty = introspection.getRequiredWriteProperty('$Ref', String)
+        def bean = introspection.instantiate('value')
+        def updated = writeProperty.withValue(bean, 'updated')
+
+        expect:
+        property.isWriteOnly()
+        !property.isReadOnly()
+        introspection.getReadProperty('$Ref').isEmpty()
+        introspection.getWriteProperty('$Ref').isPresent()
+        updated.get$Ref() == 'updated'
+    }
+
+    void "test jackson write only final underscore prefixed field resolves as constructor property"() {
+        given:
+        def introspection = buildBeanIntrospection('test.JacksonWriteOnlyUnderscoreConstructorGetterBean', '''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class JacksonWriteOnlyUnderscoreConstructorGetterBean {
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private final String _default;
+
+    @JsonCreator
+    JacksonWriteOnlyUnderscoreConstructorGetterBean(@JsonProperty("default") String _default) {
+        this._default = _default;
+    }
+
+    public String get_default() {
+        return _default;
+    }
+}
+''')
+        def property = introspection.getRequiredProperty('_default', String)
+        def writeProperty = introspection.getRequiredWriteProperty('_default', String)
+        def bean = introspection.instantiate('value')
+        def updated = writeProperty.withValue(bean, 'updated')
+
+        expect:
+        property.isWriteOnly()
+        !property.isReadOnly()
+        introspection.getReadProperty('_default').isEmpty()
+        introspection.getWriteProperty('_default').isPresent()
+        updated.get_default() == 'updated'
+    }
+
+    void "test jackson write only dollar prefixed record component resolves as constructor property"() {
+        given:
+        def introspection = buildBeanIntrospection('test.JacksonWriteOnlyDollarRecord', '''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+record JacksonWriteOnlyDollarRecord(
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    String $ref
+) {
+}
+''')
+        def property = introspection.getRequiredProperty('$ref', String)
+        def writeProperty = introspection.getRequiredWriteProperty('$ref', String)
+        def bean = introspection.instantiate('value')
+        def updated = writeProperty.withValue(bean, 'updated')
+
+        expect:
+        property.isWriteOnly()
+        !property.isReadOnly()
+        introspection.getReadProperty('$ref').isEmpty()
+        introspection.getWriteProperty('$ref').isPresent()
+        updated.$ref() == 'updated'
+    }
+
+    void "test jackson write only underscore prefixed record component resolves as constructor property"() {
+        given:
+        def introspection = buildBeanIntrospection('test.JacksonWriteOnlyUnderscoreRecord', '''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+record JacksonWriteOnlyUnderscoreRecord(
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    String _default
+) {
+}
+''')
+        def property = introspection.getRequiredProperty('_default', String)
+        def writeProperty = introspection.getRequiredWriteProperty('_default', String)
+        def bean = introspection.instantiate('value')
+        def updated = writeProperty.withValue(bean, 'updated')
+
+        expect:
+        property.isWriteOnly()
+        !property.isReadOnly()
+        introspection.getReadProperty('_default').isEmpty()
+        introspection.getWriteProperty('_default').isPresent()
+        updated._default() == 'updated'
     }
 
     void "test jackson write only record component resolves as write only constructor property"() {
