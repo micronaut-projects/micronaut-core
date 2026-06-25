@@ -151,6 +151,7 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
     @ConfigurationProperties(LOGGER_PROPERTY_PREFIX)
     @Internal
     static final class PropertiesLoggingLevelsConfiguration {
+        @MapFormat(keyFormat = StringConvention.RAW, transformation = MapFormat.MapTransformation.FLAT)
         private Map<String, LogLevel> levels = Map.of();
 
         /**
@@ -167,7 +168,7 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
          *
          * @param levels The log levels
          */
-        public void setLevels(@MapFormat(keyFormat = StringConvention.RAW) Map<String, LogLevel> levels) {
+        public void setLevels(@MapFormat(keyFormat = StringConvention.RAW, transformation = MapFormat.MapTransformation.FLAT) Map<String, LogLevel> levels) {
             this.levels = levels;
         }
     }
