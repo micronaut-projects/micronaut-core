@@ -44,6 +44,10 @@ public final class DefaultServerCookieEncoder implements ServerCookieEncoder {
     }
 
     private String encodeCookie(Cookie cookie) {
+        CookieUtils.verifyCookieComponent(cookie.getName());
+        CookieUtils.verifyCookieComponent(cookie.getValue());
+        CookieUtils.verifyCookieComponent(cookie.getPath());
+        CookieUtils.verifyCookieComponent(cookie.getDomain());
         StringBuilder sb = new StringBuilder();
         sb.append(cookie.getName()).append(EQUAL).append(cookie.getValue());
         if (isMaxAgeSet(cookie)) {

@@ -18,6 +18,7 @@ package io.micronaut.http.cookie;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MutableHttpHeaders;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Utils class to work with cookies.
@@ -55,6 +56,30 @@ public final class CookieUtils {
         int byteCount = StringUtils.utf8Bytes(cookieEncoded);
         if (byteCount > cookieByteLimit) {
             throw new CookieSizeExceededException(cookie.getName(), cookieByteLimit, byteCount);
+        }
+    }
+
+    /**
+     * Verifies that a cookie component (name, value, path, domain, ...) does not contain a character
+     * that would let it break out of its position in the {@code Set-Cookie} or {@code Cookie} header.
+     * Control characters enable HTTP response splitting / header injection
+     * (<a href="https://cwe.mitre.org/data/definitions/113.html">CWE-113</a>) and {@code ;} enables
+     * cookie attribute injection. The Netty backed encoders reject the same characters; the pure-Java
+     * encoders rely on this method to stay consistent.
+     *
+     * @param component The cookie component to verify, ignored when {@code null}
+     * @throws IllegalArgumentException if the component contains a prohibited character
+     */
+    static void verifyCookieComponent(@Nullable CharSequence component) {
+        if (component == null) {
+            return;
+        }
+        for (int i = 0; i < component.length(); i++) {
+            char c = component.charAt(i);
+            if (c < ' ' || c == 0x7f || c == ';') {
+                throw new IllegalArgumentException("Cookie contains a prohibited character 0x"
+                    + Integer.toHexString(c) + " at index " + i);
+            }
         }
     }
 

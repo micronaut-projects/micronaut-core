@@ -36,6 +36,17 @@ class DefaultServerCookieEncoderTest {
         assertInstanceOf(DefaultServerCookieEncoder.class, ServerCookieEncoder.INSTANCE);
     }
 
+    @Test
+    void encodeRejectsHeaderInjection() {
+        ServerCookieEncoder cookieEncoder = new DefaultServerCookieEncoder();
+        // ';' would inject an additional cookie attribute (e.g. Domain/Path/Secure)
+        assertThrows(IllegalArgumentException.class, () -> cookieEncoder.encode(Cookie.of("SID", "a; Domain=evil.example")));
+        // CR/LF would split the Set-Cookie header into additional response headers (CWE-113)
+        assertThrows(IllegalArgumentException.class, () -> cookieEncoder.encode(Cookie.of("SID", "a\r\nSet-Cookie: admin=true")));
+        assertThrows(IllegalArgumentException.class, () -> cookieEncoder.encode(Cookie.of("SID", "a").path("/\r\nLocation: https://evil.example")));
+        assertThrows(IllegalArgumentException.class, () -> cookieEncoder.encode(Cookie.of("SID", "a").domain("evil.example; Secure")));
+    }
+
     private static String expires(Long maxAgeSeconds) {
         ZoneId gmtZone = ZoneId.of("GMT");
         LocalDateTime localDateTime = LocalDateTime.now(gmtZone).plusSeconds(maxAgeSeconds);
