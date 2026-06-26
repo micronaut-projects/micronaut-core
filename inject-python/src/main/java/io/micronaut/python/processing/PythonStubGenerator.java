@@ -1225,6 +1225,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         if (anInterface.isPrimitive()) {
             TypeDef primitiveType = TypeDef.of(anInterface);
+            if (typeArgument && TypeDef.Primitive.VOID.equals(primitiveType)) {
+                return ClassTypeDef.of(Void.class);
+            }
             return typeArgument ? TypeDescriptors.toBoxedIfNecessary(primitiveType) : primitiveType;
         }
         if (anInterface.isArray()) {

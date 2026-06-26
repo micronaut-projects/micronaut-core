@@ -29,7 +29,6 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -42,7 +41,6 @@ import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.TypeAnnotatedClassElement;
 import io.micronaut.python.processing.visitor.TypeRef;
-import io.micronaut.sourcegen.model.ClassTypeDef;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.inject.ast.ClassElement;
@@ -427,8 +425,7 @@ public final class GraalPyUtil {
     ) {
         ClassElement resolvedType = resolvePythonTypeToJava(typeParameterDef, visitorContext, boundGenerics);
         if (resolvedType.isPrimitive()) {
-            ClassTypeDef boxedType = TypeDescriptors.toBoxedIfNecessary(io.micronaut.sourcegen.model.TypeDef.of(resolvedType));
-            ClassElement boxedClassElement = visitorContext.getClassElement(boxedType.getName()).orElseGet(() -> ClassElement.of(boxedType.getName()));
+            ClassElement boxedClassElement = boxPrimitiveTypeIfNeeded(resolvedType, visitorContext);
             AnnotationMetadata annotationMetadata = resolvedType.getTypeAnnotationMetadata();
             if (annotationMetadata.isEmpty()) {
                 return boxedClassElement;
@@ -768,6 +765,8 @@ public final class GraalPyUtil {
                     visitorContext.getClassElement(Byte.class).orElse(ClassElement.of(Byte.class));
                 case "char" ->
                     visitorContext.getClassElement(Character.class).orElse(ClassElement.of(Character.class));
+                case "void" ->
+                    visitorContext.getClassElement(Void.class).orElse(ClassElement.of(Void.class));
                 default -> elementType;
             };
         }

@@ -158,6 +158,31 @@ public void none_return() {
 ''')
     }
 
+    void "bridge method boxes none and primitive http response type arguments"() {
+        String source = '''
+from micronaut.http import HttpResponse
+from micronaut.http.annotation import Controller, Get
+
+@Controller("/response-generics")
+class ResponseGenericsController:
+    @Get("/none")
+    def none_response(self) -> HttpResponse[None]:
+        return HttpResponse.ok()
+
+    @Get("/int")
+    def int_response(self) -> HttpResponse[int]:
+        return HttpResponse.ok(1)
+'''
+
+        expect:
+        assertGeneratedSourceContains(source, '''
+public HttpResponse<Void> none_response() {
+''')
+        assertGeneratedSourceContains(source, '''
+public HttpResponse<Integer> int_response() {
+''')
+    }
+
     void "bridge method preserves resolved wildcard generic signature"() {
         expect:
         assertGeneratedSourceContains('''
