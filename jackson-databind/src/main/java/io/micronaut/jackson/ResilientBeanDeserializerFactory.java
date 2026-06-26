@@ -16,7 +16,6 @@
 package io.micronaut.jackson;
 
 import com.fasterxml.jackson.databind.BeanDescription;
-import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.cfg.DeserializerFactoryConfig;
@@ -49,9 +48,7 @@ final class ResilientBeanDeserializerFactory extends BeanDeserializerFactory {
             return super._constructDefaultValueInstantiator(ctxt, beanDesc);
         } catch (IllegalArgumentException e) {
             if (e.getMessage().startsWith("Failed to access RecordComponents of type ")) {
-                final DeserializationConfig config = ctxt.getConfig();
-                return new CreatorCollectionState(ctxt, beanDesc, config.getDefaultVisibilityChecker(beanDesc.getBeanClass(), beanDesc.getClassInfo()),
-                        new CreatorCollector(beanDesc, config), _findCreatorsFromProperties(ctxt, beanDesc)).creators.constructValueInstantiator(ctxt);
+                return new CreatorCollector(beanDesc, ctxt.getConfig()).constructValueInstantiator(ctxt);
             }
             throw e;
         }
