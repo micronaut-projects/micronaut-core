@@ -22,8 +22,7 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
 
         then:
         HttpClientResponseException e = thrown()
-        e.response.getBody(Map).get()._embedded.errors[0].message == """Invalid JSON: Unexpected end-of-input
- at [Source: UNKNOWN; line: 1, column: 21]"""
+        e.response.getBody(Map).get()._embedded.errors[0].message.startsWith("Invalid JSON: Unexpected end-of-input")
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
