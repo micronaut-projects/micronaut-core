@@ -1,10 +1,13 @@
 package io.micronaut.jackson.databind
 
+import tools.jackson.core.JsonGenerator
 import tools.jackson.core.JsonParser
 import tools.jackson.core.JacksonException
 import tools.jackson.databind.DeserializationContext
-import tools.jackson.databind.ValueDeserializer
 import tools.jackson.databind.ObjectMapper
+import tools.jackson.databind.SerializationContext
+import tools.jackson.databind.ValueDeserializer
+import tools.jackson.databind.ValueSerializer
 import tools.jackson.databind.module.SimpleModule
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.type.Argument
@@ -53,6 +56,42 @@ class JacksonDatabindMapperSpec extends Specification {
         testBean.value == BigInteger.valueOf(42)
     }
 
+    def 'wraps JacksonException as IOException'() {
+        given:
+        def objectMapper = new ObjectMapper()
+        objectMapper = objectMapper.rebuild().addModule(new SimpleModule() {
+            {
+                addDeserializer(TestBean, new FailingDeserializer())
+            }
+        }).build()
+        def jsonMapper = new JacksonDatabindMapper(objectMapper)
+
+        when:
+        jsonMapper.readValue('42', TestBean)
+
+        then:
+        def e = thrown(IOException)
+        e.cause instanceof TestJacksonException
+    }
+
+    def 'wraps JacksonException from write as IOException'() {
+        given:
+        def objectMapper = new ObjectMapper()
+        objectMapper = objectMapper.rebuild().addModule(new SimpleModule() {
+            {
+                addSerializer(TestBean, new FailingSerializer())
+            }
+        }).build()
+        def jsonMapper = new JacksonDatabindMapper(objectMapper)
+
+        when:
+        jsonMapper.writeValueAsBytes(new TestBean())
+
+        then:
+        def e = thrown(IOException)
+        e.cause instanceof TestJacksonException
+    }
+
     private static final class TestBean {
         BigInteger value
     }
@@ -67,6 +106,26 @@ class JacksonDatabindMapperSpec extends Specification {
         TestBean deserialize(JsonParser p, DeserializationContext ctxt, TestBean intoValue) throws IOException {
             intoValue.value = p.objectReadContext().readValue(p, BigInteger)
             return intoValue
+        }
+    }
+
+    private static final class FailingDeserializer extends ValueDeserializer<TestBean> {
+        @Override
+        TestBean deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JacksonException {
+            throw new TestJacksonException()
+        }
+    }
+
+    private static final class FailingSerializer extends ValueSerializer<TestBean> {
+        @Override
+        void serialize(TestBean value, JsonGenerator gen, SerializationContext serializers) {
+            throw new TestJacksonException()
+        }
+    }
+
+    private static final class TestJacksonException extends JacksonException {
+        TestJacksonException() {
+            super('test')
         }
     }
 }
