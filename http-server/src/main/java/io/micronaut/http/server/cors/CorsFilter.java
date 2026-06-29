@@ -419,11 +419,11 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     }
 
     private static boolean isAny(List<String> values) {
-        return values == CorsOriginConfiguration.ANY;
+        return values != null && values.size() == 1 && "*".equals(values.get(0));
     }
 
     private static boolean isAnyMethod(List<HttpMethod> allowedMethods) {
-        return allowedMethods == CorsOriginConfiguration.ANY_METHOD;
+        return allowedMethods == null || allowedMethods.isEmpty();
     }
 
     private boolean methodAllowed(CorsOriginConfiguration config,
