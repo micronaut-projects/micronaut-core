@@ -55,11 +55,6 @@ import io.netty.util.concurrent.OrderedEventExecutor;
  */
 @Internal
 public final class EventLoopFlow {
-    /**
-     * This adds some extra checks to find bugs.
-     */
-    private static final boolean STRICT_CHECKING = false;
-
     private final OrderedEventExecutor loop;
     /**
      * Generation assigned to the next task.
@@ -91,18 +86,6 @@ public final class EventLoopFlow {
         int generation = submitGeneration++;
         if (loop.inEventLoop()) {
             if (runGeneration == generation) {
-                if (STRICT_CHECKING) {
-                    runGeneration = generation + 1;
-                    try {
-                        delayTask.run();
-                    } finally {
-                        if (runGeneration != generation + 1 || submitGeneration != generation + 1) {
-                            throw new AssertionError("Nested call?");
-                        }
-                    }
-                    return false;
-                }
-
                 /*
                  * All previous tasks have run completely, the caller can run the task immediately.
                  * Technically, we should only increment the runGeneration after the caller has
@@ -140,11 +123,6 @@ public final class EventLoopFlow {
             try {
                 task.run();
             } finally {
-                if (STRICT_CHECKING) {
-                    if (runGeneration != generation) {
-                        throw new AssertionError("Weird");
-                    }
-                }
                 runGeneration = generation + 1;
             }
         }
