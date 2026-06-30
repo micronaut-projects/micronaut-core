@@ -15,10 +15,12 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
+import io.micronaut.scheduling.LoomSupport;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Source;
@@ -37,6 +39,8 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -111,6 +115,7 @@ public final class PythonContextRuntime {
     private static volatile @Nullable Context context;
     private static volatile @Nullable ClassLoader contextClassLoader;
     private static volatile @Nullable PythonPool pythonPool;
+    private static volatile @Nullable BeanProvider<ExecutorService> pooledExecutorServiceProvider;
     private static final AtomicInteger ACTIVE_EXECUTIONS = new AtomicInteger();
     private static final Object ACTIVE_EXECUTIONS_LOCK = new Object();
     private static final IdentityHashMap<Context, ContextState> CONTEXT_STATES = new IdentityHashMap<>();
@@ -177,6 +182,15 @@ public final class PythonContextRuntime {
      */
     static void setPythonPool(@Nullable PythonPool pool) {
         PythonContextRuntime.pythonPool = pool;
+    }
+
+    /**
+     * Register the executor used when pooled Python execution is requested from a virtual thread.
+     *
+     * @param executorServiceProvider The executor provider, or {@code null} when unavailable
+     */
+    static void setPooledExecutorServiceProvider(@Nullable BeanProvider<ExecutorService> executorServiceProvider) {
+        PythonContextRuntime.pooledExecutorServiceProvider = executorServiceProvider;
     }
 
     /**
@@ -681,6 +695,9 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static <T> T withPooled(PythonClassReference classReference, java.util.function.Function<Value, T> fn) {
+        if (shouldOffloadPooledExecution()) {
+            return offloadPooledExecution(() -> withPooled(classReference, fn));
+        }
         if (isReuseContext() || pythonPool == null) {
             return fn.apply(findClass(classReference));
         }
@@ -737,6 +754,9 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static <T> T withPooledScript(String packageName, String scriptName, java.util.function.Function<Value, T> fn) {
+        if (shouldOffloadPooledExecution()) {
+            return offloadPooledExecution(() -> withPooledScript(packageName, scriptName, fn));
+        }
         if (isReuseContext() || pythonPool == null) {
             return fn.apply(findScript(packageName, scriptName));
         }
@@ -745,6 +765,94 @@ public final class PythonContextRuntime {
             return fn.apply(getPythonPool().getEventLoopScript(eventLoop, packageName, scriptName));
         }
         return getPythonPool().withScript(packageName, scriptName, fn);
+    }
+
+    /**
+     * Create a wrapper for a Python value that is evaluated and cached in each pooled context.
+     *
+     * @param expression The Python expression or statements to evaluate
+     * @return A pooled value wrapper
+     * @since 5.1.0
+     */
+    public static PooledValue withPooledValue(String expression) {
+        return new PooledValue() {
+            @Override
+            public <T> T withValue(java.util.function.Function<Value, T> callback) {
+                return PythonContextRuntime.withPooledValue(expression, callback);
+            }
+        };
+    }
+
+    /**
+     * Execute a callback with a Python value evaluated and cached in a borrowed pooled context.
+     *
+     * @param expression The Python expression or statements to evaluate
+     * @param fn Function receiving the pooled value
+     * @param <T> Result type returned by the function
+     * @return Result returned from the function
+     * @since 5.1.0
+     */
+    public static <T> T withPooledValue(String expression, java.util.function.Function<Value, T> fn) {
+        if (shouldOffloadPooledExecution()) {
+            return offloadPooledExecution(() -> withPooledValue(expression, fn));
+        }
+        if (isReuseContext() || pythonPool == null) {
+            Context context = getContext();
+            Value value = getOrCreateValue(context, expression);
+            return fn.apply(value);
+        }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop != null) {
+            Context context = getPythonPool().getEventLoopContext(eventLoop);
+            return fn.apply(getPythonPool().getValue(context, expression));
+        }
+        return getPythonPool().withValue(expression, fn);
+    }
+
+    private static Value getOrCreateValue(Context context, String expression) {
+        return withContextLock(context, () -> {
+            ContextState state = contextState(context);
+            String key = "value:" + expression;
+            Value value = state.helpers.get(key);
+            if (value == null || GraalPyRuntimeUtil.isNone(value)) {
+                value = context.eval(PYTHON, expression);
+                Value existing = state.helpers.putIfAbsent(key, value);
+                if (existing != null && !GraalPyRuntimeUtil.isNone(existing)) {
+                    value = existing;
+                }
+            }
+            return value;
+        });
+    }
+
+    private static boolean shouldOffloadPooledExecution() {
+        BeanProvider<ExecutorService> provider = pooledExecutorServiceProvider;
+        return provider != null
+            && provider.isResolvable()
+            && PythonAsyncioRuntime.currentEventLoopForContext() == null
+            && LoomSupport.isVirtual(Thread.currentThread());
+    }
+
+    private static <T> T offloadPooledExecution(Supplier<T> action) {
+        BeanProvider<ExecutorService> provider = pooledExecutorServiceProvider;
+        if (provider == null || !provider.isResolvable()) {
+            return action.get();
+        }
+        try {
+            return provider.get().submit(action::get).get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while offloading pooled Python execution", e);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new IllegalStateException("Pooled Python execution failed", cause);
+        }
     }
 
     /**
@@ -1332,6 +1440,7 @@ public final class PythonContextRuntime {
         context = null;
         contextClassLoader = null;
         pythonPool = null;
+        pooledExecutorServiceProvider = null;
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
             CONTEXT_STATES.values().forEach(ContextState::clear);
             CONTEXT_STATES.clear();

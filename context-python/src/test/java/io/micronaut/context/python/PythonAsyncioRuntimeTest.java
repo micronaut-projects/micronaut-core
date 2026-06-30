@@ -236,6 +236,26 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
+    void pooledValueIsEvaluatedOncePerPooledContext() {
+        try (ApplicationContext ignored = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            PooledValue render = PythonContextRuntime.withPooledValue("""
+                count = 0
+                def render(value):
+                    global count
+                    count += 1
+                    return f"{value}:{count}"
+                render
+                """);
+
+            assertEquals("first:1", render.executeAsString("first"));
+            assertEquals("second:2", render.executeAsString("second"));
+        }
+    }
+
+    @Test
     void poolStartupDoesNotCreatePooledContexts() {
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "micronaut.python.pool.enabled", true,
@@ -1202,7 +1222,7 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
-    void configurerDoesNotMaterializeBlockingExecutorOnContextStart() {
+    void configurerDoesNotMaterializeIoExecutorOnContextStart() {
         AtomicBoolean resolved = new AtomicBoolean();
         AtomicReference<ExecutorService> executorService = new AtomicReference<>();
         BeanProvider<ExecutorService> executorServiceProvider = new BeanProvider<>() {

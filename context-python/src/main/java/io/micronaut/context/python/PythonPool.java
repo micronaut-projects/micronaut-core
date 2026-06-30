@@ -237,6 +237,25 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
     }
 
     /**
+     * Borrow a context, resolve a cached evaluated value in that context, and release the context
+     * after the callback completes.
+     *
+     * @param expression The Python expression or statements to evaluate
+     * @param fn The callback that receives the context-local value
+     * @param <T> The callback result type
+     * @return The callback result
+     */
+    <T> T withValue(String expression, java.util.function.Function<Value, T> fn) {
+        Context c = borrow();
+        try {
+            Value v = getOrCreateValue(c, expression);
+            return fn.apply(v);
+        } finally {
+            release(c);
+        }
+    }
+
+    /**
      * Resolve a class instance from an available pooled context without borrowing it.
      * <p>
      * This is intended for callers that only need a cached class value and do not require exclusive
@@ -291,6 +310,17 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
      */
     Value getScript(Context context, String packageName, String scriptName) {
         return getOrCreateScript(context, packageName, scriptName);
+    }
+
+    /**
+     * Resolve a cached evaluated value in a caller-selected context.
+     *
+     * @param context The context that should own the value
+     * @param expression The Python expression or statements to evaluate
+     * @return The context-local value
+     */
+    Value getValue(Context context, String expression) {
+        return getOrCreateValue(context, expression);
     }
 
     /**
@@ -358,6 +388,10 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
                 script.putMember(attribute, coerceInjectedValue(script, value, async));
             }
         }
+    }
+
+    Context getEventLoopContext(PythonEventLoop eventLoop) {
+        return getOrCreateEventLoopContext(eventLoop);
     }
 
     private Context getOrCreateEventLoopContext(PythonEventLoop eventLoop) {
@@ -463,6 +497,12 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
         });
     }
 
+    private Value getOrCreateValue(Context c, String expression) {
+        Map<String, Value> m = cache.computeIfAbsent(c, _ -> new ConcurrentHashMap<>());
+        String key = valueKey(expression);
+        return m.computeIfAbsent(key, _ -> PythonContextRuntime.withContextLock(c, () -> c.eval(PYTHON, expression)));
+    }
+
     private static @Nullable Object coerceInjectedValue(Value script, Object value, boolean async) {
         return async
             ? GraalPyRuntimeUtil.asyncMemberValue(script, value)
@@ -471,6 +511,10 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
 
     private static String scriptKey(String pkg, String script) {
         return "script:" + Objects.toString(pkg, PYTHON) + ":" + script;
+    }
+
+    private static String valueKey(String expression) {
+        return "value:" + expression;
     }
 
     private static Value loadClass(Context ctx, PythonContextRuntime.PythonClassReference classReference) {

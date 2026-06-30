@@ -38,11 +38,12 @@ final class PythonAsyncioRuntimeConfigurer {
     @Inject
     PythonAsyncioRuntimeConfigurer(PythonAsyncioConfiguration configuration,
                                    Collection<PythonEventLoopProvider> eventLoopProviders,
-                                   @Nullable @Named(TaskExecutors.BLOCKING) BeanProvider<ExecutorService> executorServiceProvider) {
+                                   @Nullable @Named(TaskExecutors.IO) BeanProvider<ExecutorService> executorServiceProvider) {
         PythonAsyncioRuntime.setEnabled(configuration.enabled());
         PythonAsyncioRuntime.setEventLoopProviders(eventLoopProviders);
         PythonAsyncioRuntime.setExecutorService(null);
         PythonAsyncioRuntime.setExecutorServiceProvider(executorServiceProvider);
+        PythonContextRuntime.setPooledExecutorServiceProvider(executorServiceProvider);
     }
 
     /**
@@ -54,5 +55,6 @@ final class PythonAsyncioRuntimeConfigurer {
         PythonAsyncioRuntime.setEventLoopProviders(List.of());
         PythonAsyncioRuntime.setExecutorService(null);
         PythonAsyncioRuntime.setExecutorServiceProvider(null);
+        PythonContextRuntime.setPooledExecutorServiceProvider(null);
     }
 }
