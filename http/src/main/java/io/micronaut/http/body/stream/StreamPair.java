@@ -89,6 +89,7 @@ final class StreamPair {
         return (old & mask) != mask && ((old | flag) & mask) == mask;
     }
 
+    @SuppressWarnings("java:S2095") // streams are returned to the caller through Pair
     static Pair createStreamPair(ExtendedInputStream upstream, ByteBody.SplitBackpressureMode backpressureMode) {
         StreamPair pair = new StreamPair(upstream);
         return switch (backpressureMode) {
