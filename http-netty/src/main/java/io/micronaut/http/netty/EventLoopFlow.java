@@ -86,6 +86,7 @@ public final class EventLoopFlow {
      * @param delayTask The task to run if it can't be run immediately
      * @return {@code true} if the caller should instead run the task immediately
      */
+    @SuppressWarnings("java:S1143") // strict debug check intentionally throws from finally
     public boolean executeNow(Runnable delayTask) {
         // pick a generation ID for this task.
         int generation = submitGeneration++;
@@ -133,6 +134,7 @@ public final class EventLoopFlow {
         }
 
         @Override
+        @SuppressWarnings("java:S1143") // strict debug check intentionally throws from finally
         public void run() {
             if (runGeneration != generation) {
                 throw new IllegalStateException("Improper run order. Expected " + generation + ", was " + runGeneration);
