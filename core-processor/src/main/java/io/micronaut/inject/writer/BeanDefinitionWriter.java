@@ -1049,6 +1049,15 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     /**
+     * Returns the pre destroy method definitions scheduled for invocation.
+     *
+     * @return The pre destroy method definitions scheduled for invocation
+     */
+    public List<MethodDefinition<ClassElement, MethodElement>> getPreDestroyMethods() {
+        return preDestroyMethods;
+    }
+
+    /**
      * @return Is interface
      */
     public boolean isInterface() {
