@@ -62,6 +62,7 @@ class HttpHeadersSpec extends Specification {
         HttpHeaders.ACCEPT_LANGUAGE,
         HttpHeaders.ACCEPT_RANGES,
         HttpHeaders.ACCEPT_PATCH,
+        HttpHeaders.ACCEPT_QUERY,
         HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS,
         HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS,
         HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS,

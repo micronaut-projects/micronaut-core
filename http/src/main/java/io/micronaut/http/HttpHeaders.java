@@ -539,6 +539,7 @@ public interface HttpHeaders extends Headers {
         ACCEPT_LANGUAGE,
         ACCEPT_RANGES,
         ACCEPT_PATCH,
+        ACCEPT_QUERY,
         ACCESS_CONTROL_ALLOW_CREDENTIALS,
         ACCESS_CONTROL_ALLOW_HEADERS,
         ACCESS_CONTROL_ALLOW_METHODS,
