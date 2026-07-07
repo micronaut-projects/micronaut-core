@@ -67,7 +67,13 @@ public enum MethodConvention {
     /**
      * The default trace method of controllers.
      */
-    TRACE("");
+    TRACE(""),
+
+    /**
+     * The default query method of controllers.
+     * @since 5.1.4
+     */
+    QUERY("");
 
     /**
      * Path for the id.

@@ -1230,7 +1230,7 @@ final class NettyHttpClient implements
     }
 
     private static boolean requiresRequestBody(HttpMethod method) {
-        return method != null && (method.equals(HttpMethod.POST) || method.equals(HttpMethod.PUT) || method.equals(HttpMethod.PATCH));
+        return method != null && (method.equals(HttpMethod.POST) || method.equals(HttpMethod.PUT) || method.equals(HttpMethod.PATCH) || method.equals(HttpMethod.QUERY));
     }
 
     private static boolean permitsRequestBody(HttpMethod method) {
@@ -1486,7 +1486,10 @@ final class NettyHttpClient implements
                     String location = nettyHeaders.get(HttpHeaderNames.LOCATION);
 
                     MutableHttpRequest<Object> redirectRequest;
-                    if (code == 307 || code == 308) {
+                    boolean isRedirectWithBody = code == 307 || code == 308;
+                    boolean isQueryRedirect = (code == 301 || code == 302) && request.getMethod() == io.micronaut.http.HttpMethod.QUERY;
+                    boolean preserveBody = isRedirectWithBody || isQueryRedirect;
+                    if (preserveBody) {
                         redirectRequest = io.micronaut.http.HttpRequest.create(request.getMethod(), location);
                         request.getBody().ifPresent(redirectRequest::body);
                     } else {
@@ -1499,7 +1502,7 @@ final class NettyHttpClient implements
                     redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
                     return resolveRedirectURI(request, redirectRequest)
                         .flatMap(uri -> {
-                            setRedirectHeaders(request, redirectRequest.uri(uri), code == 307 || code == 308);
+                            setRedirectHeaders(request, redirectRequest.uri(uri), preserveBody);
                             return sendRequestWithRedirects(propagatedContext, blockHint, redirectRequest.uri(uri), readResponse);
                         });
                 } else {

@@ -70,6 +70,19 @@ import org.jspecify.annotations.Nullable;
     <T> MutableHttpRequest<T> patch(String uri, T body);
 
     /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#QUERY} request for the given URI.
+     *
+     * @param uri  The URI
+     * @param body The body
+     * @param <T>  The body type
+     * @return The {@link MutableHttpRequest} instance
+     * @since 5.1.4
+     */
+    default <T> MutableHttpRequest<T> query(String uri, T body) {
+        return create(HttpMethod.QUERY, uri).body(body);
+    }
+
+    /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#HEAD} request for the given URI.
      *
      * @param uri The URI

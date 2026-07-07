@@ -82,6 +82,12 @@ public interface HttpHeaders extends Headers {
     String ACCEPT_PATCH = "Accept-Patch";
 
     /**
+     * {@code "Accept-Query"}.
+     * @since 5.1.4
+     */
+    String ACCEPT_QUERY = "Accept-Query";
+
+    /**
      * {@code "Access-Control-Allow-Credentials"}.
      */
     String ACCESS_CONTROL_ALLOW_CREDENTIALS = "Access-Control-Allow-Credentials";

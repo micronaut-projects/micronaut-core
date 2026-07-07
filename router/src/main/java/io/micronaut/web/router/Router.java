@@ -384,6 +384,19 @@ public interface Router {
     }
 
     /**
+     * Find the first {@link RouteMatch} route for an {@link HttpMethod#QUERY} method and the given URI.
+     *
+     * @param uri The URI
+     * @param <T> The target type
+     * @param <R> The return type
+     * @return An {@link Optional} of {@link RouteMatch}
+     * @since 5.1.4
+     */
+    default <T, R> Optional<UriRouteMatch<T, R>> QUERY(CharSequence uri) {
+        return route(HttpMethod.QUERY, uri);
+    }
+
+    /**
      * Find the first {@link RouteMatch} route for an {@link HttpMethod#DELETE} method and the given URI.
      *
      * @param uri The URI

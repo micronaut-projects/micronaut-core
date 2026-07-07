@@ -703,6 +703,124 @@ public interface RouteBuilder {
     UriRoute PATCH(String uri, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
+     * Route the specified URI to the specified target for an HTTP QUERY. Since the method to execute is not
+     * specified "query" is used by default.
+     *
+     * @param uri    The URI
+     * @param target The target object
+     * @return The route
+     * @since 5.1.4
+     */
+    default UriRoute QUERY(String uri, Object target) {
+        return QUERY(uri, target, MethodConvention.QUERY.methodName());
+    }
+
+    /**
+     * <p>Route to the specified object. The URI route is built by the configured {@link UriNamingStrategy}.</p>
+     *
+     * @param target The object
+     * @return The route
+     * @since 5.1.4
+     */
+    default UriRoute QUERY(Object target) {
+        Class<?> type = target.getClass();
+        return QUERY(getUriNamingStrategy().resolveUri(type), target);
+    }
+
+    /**
+     * <p>Route to the specified object and ID. The URI route is built by the configured {@link UriNamingStrategy}.</p>
+     *
+     * @param target The object
+     * @param id     The route id
+     * @return The route
+     * @since 5.1.4
+     */
+    default UriRoute QUERY(Object target, PropertyConvention id) {
+        Class<?> type = target.getClass();
+        return QUERY(getUriNamingStrategy().resolveUri(type, id), target, MethodConvention.QUERY.methodName());
+    }
+
+    /**
+     * <p>Route to the specified class. The URI route is built by the configured {@link UriNamingStrategy}.</p>
+     *
+     * @param type The class
+     * @return The route
+     * @since 5.1.4
+     */
+    default UriRoute QUERY(Class<?> type) {
+        return QUERY(getUriNamingStrategy().resolveUri(type), type, MethodConvention.QUERY.methodName());
+    }
+
+    /**
+     * <p>Route to the specified class and ID. The URI route is built by the configured {@link UriNamingStrategy}.</p>
+     *
+     * @param type The class
+     * @param id   The route id
+     * @return The route
+     * @since 5.1.4
+     */
+    default UriRoute QUERY(Class<?> type, PropertyConvention id) {
+        return QUERY(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.QUERY.methodName());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri    The URI
+     * @param method The method
+     * @return The route
+     * @since 5.1.4
+     */
+    default UriRoute QUERY(String uri, ExecutableMethod<?, ?> method) {
+        return QUERY(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param beanDefinition The bean definition
+     * @param uri            The URI
+     * @param method         The method
+     * @return The route
+     * @since 5.1.4
+     */
+    default UriRoute QUERY(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        return QUERY(uri, beanDefinition.getBeanType(), method.getMethodName(), method.getArgumentTypes());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri            The URI
+     * @param target         The target
+     * @param method         The method
+     * @param parameterTypes The parameter types for the target method
+     * @return The route
+     * @since 5.1.4
+     */
+    UriRoute QUERY(String uri, Object target, String method, Class<?>... parameterTypes);
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri            The URI
+     * @param type           The type
+     * @param method         The method
+     * @param parameterTypes The parameter types for the target method
+     * @return The route
+     * @since 5.1.4
+     */
+    UriRoute QUERY(String uri, Class<?> type, String method, Class<?>... parameterTypes);
+
+    /**
      * Route the specified URI to the specified target for an HTTP DELETE. Since the method to execute is not
      * specified "index" is used by default.
      *

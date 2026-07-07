@@ -283,6 +283,16 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
+    public UriRoute QUERY(String uri, Object target, String method, Class<?>... parameterTypes) {
+        return buildRoute(HttpMethod.QUERY, uri, target.getClass(), method, parameterTypes);
+    }
+
+    @Override
+    public UriRoute QUERY(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
+        return buildRoute(HttpMethod.QUERY, uri, type, method, parameterTypes);
+    }
+
+    @Override
     public UriRoute DELETE(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.DELETE, uri, target.getClass(), method, parameterTypes);
     }
@@ -340,6 +350,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     @Override
     public UriRoute PATCH(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         return buildBeanRoute(HttpMethod.PATCH, uri, beanDefinition, method);
+    }
+
+    @Override
+    public UriRoute QUERY(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        return buildBeanRoute(HttpMethod.QUERY, uri, beanDefinition, method);
     }
 
     @Override
