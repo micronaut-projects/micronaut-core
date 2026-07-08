@@ -719,6 +719,36 @@ class JacksonPropertyAccessBean {
         setterOnly.isWriteOnly()
     }
 
+    void "test jackson pojo builder empty prefix uses fluent writers for json property fields"() {
+        given:
+        def introspection = buildBeanIntrospection('test.JacksonFluentBuilderBean', '''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+import tools.jackson.databind.annotation.JsonPOJOBuilder;
+
+@Introspected
+@JsonPOJOBuilder(withPrefix = "")
+class JacksonFluentBuilderBean {
+    @JsonProperty("json_code")
+    private String code;
+
+    public JacksonFluentBuilderBean code(String code) {
+        this.code = code;
+        return this;
+    }
+}
+''')
+        def code = introspection.beanProperties.find { it.name == 'code' }
+
+        expect:
+        code != null
+        !code.isReadOnly()
+        code.isWriteOnly()
+        code.stringValue(Introspected.Property, "name").get() == 'json_code'
+    }
+
     void "test jackson property on generated dollar prefixed private field uses public accessors"() {
         given:
         def introspection = buildBeanIntrospection('test.JacksonDollarPrefixedFieldBean', '''
@@ -781,6 +811,62 @@ class JacksonUnderscorePrefixedFieldBean {
 
         expect:
         property.stringValue(Introspected.Property, "name").orElseThrow() == 'default'
+    }
+
+    void "test jackson property on generated boolean is prefixed private field uses public accessor"() {
+        given:
+        def introspection = buildBeanIntrospection('test.JacksonBooleanIsPrefixedFieldBean', '''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class JacksonBooleanIsPrefixedFieldBean {
+    @JsonProperty("default")
+    private final Boolean isDefault;
+
+    JacksonBooleanIsPrefixedFieldBean(Boolean isDefault) {
+        this.isDefault = isDefault;
+    }
+
+    public Boolean isDefault() {
+        return isDefault;
+    }
+}
+''')
+        def property = introspection.getRequiredProperty('default', Boolean)
+
+        expect:
+        property.stringValue(Introspected.Property, "name").orElseThrow() == 'default'
+    }
+
+    void "test jackson property on generated acronym private field uses public accessor"() {
+        given:
+        def introspection = buildBeanIntrospection('test.JacksonAcronymFieldBean', '''
+package test;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class JacksonAcronymFieldBean {
+    @JsonProperty("CACertChain")
+    private final String cACertChain;
+
+    JacksonAcronymFieldBean(String cACertChain) {
+        this.cACertChain = cACertChain;
+    }
+
+    public String getCACertChain() {
+        return cACertChain;
+    }
+}
+''')
+        def property = introspection.getRequiredProperty('CACertChain', String)
+
+        expect:
+        property.stringValue(Introspected.Property, "name").orElseThrow() == 'CACertChain'
     }
 
     void "test jackson write only final dollar prefixed field resolves as constructor property"() {

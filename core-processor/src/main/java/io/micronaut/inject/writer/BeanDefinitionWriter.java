@@ -1969,7 +1969,17 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             classDefBuilder.addField(injectionMethodsField);
             initStatements.add(beanDefinitionTypeDef.getStaticField(injectionMethodsField)
                 .put(methodReferenceArray.instantiate(allMethods.stream()
-                    .map(md -> getNewMethodReference(md.methodElement().getDeclaringType(), md.methodElement(), md.annotationMetadata(), postConstructMethods.contains(md), preDestroyMethods.contains(md)))
+                    .map(md -> {
+                        boolean postConstructMethod = postConstructMethods.contains(md);
+                        boolean preDestroyMethod = preDestroyMethods.contains(md);
+                        return getNewMethodReference(
+                            getMethodReferenceDeclaringType(md.methodElement(), postConstructMethod, preDestroyMethod),
+                            md.methodElement(),
+                            md.annotationMetadata(),
+                            postConstructMethod,
+                            preDestroyMethod
+                        );
+                    })
                     .toList())));
             failStatements.add(beanDefinitionTypeDef.getStaticField(injectionMethodsField).put(ExpressionDef.nullValue()));
         }
@@ -2536,12 +2546,22 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     private void collectExposedTypes(Set<String> exposedTypeNames, ClassElement element) {
-        String className = getClassName(element);
-        if (!exposedTypeNames.add(className) || IGNORED_EXPOSED_INTERFACES.contains(className)) {
-            return;
+        if (isAccessibleFromBeanDefinition(element)) {
+            String className = getClassName(element);
+            if (!exposedTypeNames.add(className) || IGNORED_EXPOSED_INTERFACES.contains(className)) {
+                return;
+            }
         }
         element.getSuperType().ifPresent(superType -> collectExposedTypes(exposedTypeNames, superType));
         element.getInterfaces().forEach(iface -> collectExposedTypes(exposedTypeNames, iface));
+    }
+
+    private boolean isAccessibleFromBeanDefinition(ClassElement element) {
+        if (element.isArray()) {
+            return isAccessibleFromBeanDefinition(element.fromArray());
+        }
+        return element.isPublic() ||
+            (!element.isPrivate() && element.getPackageName().equals(NameUtils.getPackageName(beanDefinitionName)));
     }
 
     private String getClassName(ClassElement element) {
@@ -4140,6 +4160,18 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                     METHOD_REFERENCE_CONSTRUCTOR, values
                 );
         }
+    }
+
+    private ClassElement getMethodReferenceDeclaringType(MethodElement methodElement,
+                                                        boolean isPostConstructMethod,
+                                                        boolean isPreDestroyMethod) {
+        ClassElement declaringType = methodElement.getDeclaringType();
+        if ((isPostConstructMethod || isPreDestroyMethod) &&
+            methodElement.isPublic() &&
+            !isAccessibleFromBeanDefinition(declaringType)) {
+            return beanTypeElement;
+        }
+        return declaringType;
     }
 
     private ExpressionDef getNewFieldReference(TypedElement declaringType, FieldElement fieldElement) {

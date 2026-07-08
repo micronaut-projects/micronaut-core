@@ -304,7 +304,31 @@ public final class AstBeanPropertiesUtils {
                 return accessorPropertyName;
             }
         }
+        if (isBooleanAccessorPropertyFieldName(fieldPropertyName)) {
+            String accessorPropertyName = NameUtils.decapitalize(fieldPropertyName.substring(2));
+            if (props.containsKey(accessorPropertyName)) {
+                return accessorPropertyName;
+            }
+        }
+        if (isAcronymPropertyFieldName(fieldPropertyName)) {
+            String accessorPropertyName = Character.toUpperCase(fieldPropertyName.charAt(0)) + fieldPropertyName.substring(1);
+            if (props.containsKey(accessorPropertyName)) {
+                return accessorPropertyName;
+            }
+        }
         return fieldPropertyName;
+    }
+
+    private static boolean isBooleanAccessorPropertyFieldName(String fieldPropertyName) {
+        return fieldPropertyName.length() > 2 &&
+            fieldPropertyName.startsWith("is") &&
+            Character.isUpperCase(fieldPropertyName.charAt(2));
+    }
+
+    private static boolean isAcronymPropertyFieldName(String fieldPropertyName) {
+        return fieldPropertyName.length() > 1 &&
+            Character.isLowerCase(fieldPropertyName.charAt(0)) &&
+            Character.isUpperCase(fieldPropertyName.charAt(1));
     }
 
     private static boolean isIntrospectedPropertyReader(MethodElement methodElement, BeanProperties.Visibility visibility) {
