@@ -102,6 +102,29 @@ class Test implements Runnable {
         reference.exposedTypes == [Runnable] as Set
     }
 
+    void "test exposed types omit package-private supertypes from another package"() {
+        given:
+        def reference = buildBeanDefinitionReference('limittypes.Test', '''
+package limittypes;
+
+import jakarta.inject.Singleton;
+import test.exposedtypes.internal.PublicExposedType;
+
+@Singleton
+class Test extends PublicExposedType {
+}
+
+''')
+
+        when:
+        def exposedTypeNames = reference.exposedTypes*.name as Set
+
+        then:
+        exposedTypeNames.contains('limittypes.Test')
+        exposedTypeNames.contains('test.exposedtypes.internal.PublicExposedType')
+        !exposedTypeNames.contains('test.exposedtypes.internal.HiddenExposedType')
+    }
+
     void "test fail compilation on invalid exposed bean type"() {
         when:
         buildBeanDefinition('limittypes.Test', '''
