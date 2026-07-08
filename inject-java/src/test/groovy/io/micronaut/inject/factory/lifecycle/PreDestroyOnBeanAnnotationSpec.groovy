@@ -50,7 +50,7 @@ class Foo {}
         bean != null
 
         when:
-        context.destroyBean(bean.getClass())
+        context.destroyBean(bean)
 
         then:
         bean.closed
@@ -131,7 +131,7 @@ class TestFactory {
         bean != null
 
         when:
-        context.destroyBean(bean.getClass())
+        context.destroyBean(bean)
 
         then:
         bean.closed

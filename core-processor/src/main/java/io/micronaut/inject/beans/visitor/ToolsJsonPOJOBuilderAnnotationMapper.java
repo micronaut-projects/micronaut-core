@@ -15,14 +15,7 @@
  */
 package io.micronaut.inject.beans.visitor;
 
-import io.micronaut.core.annotation.AccessorsStyle;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.annotation.NamedAnnotationMapper;
-import io.micronaut.inject.visitor.VisitorContext;
-
-import java.lang.annotation.Annotation;
-import java.util.List;
 
 /**
  * Makes Jackson builder methods visible to bean property resolution.
@@ -31,21 +24,10 @@ import java.util.List;
  * @since 5.1.4
  */
 @Internal
-public final class ToolsJsonPOJOBuilderAnnotationMapper implements NamedAnnotationMapper {
-
-    private static final String MEMBER_WITH_PREFIX = "withPrefix";
+public final class ToolsJsonPOJOBuilderAnnotationMapper extends AbstractJsonPOJOBuilderAnnotationMapper {
 
     @Override
     public String getName() {
         return "tools.jackson.databind.annotation.JsonPOJOBuilder";
-    }
-
-    @Override
-    public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
-        return List.of(
-            AnnotationValue.builder(AccessorsStyle.class)
-                .member("writePrefixes", annotation.stringValue(MEMBER_WITH_PREFIX).orElse("with"))
-                .build()
-        );
     }
 }

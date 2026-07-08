@@ -639,6 +639,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private final String beanFullClassName;
     private final String beanDefinitionName;
+    private final String beanDefinitionPackageName;
     private final TypeDef beanTypeDef;
     private final Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
     private final ClassTypeDef beanDefinitionTypeDef;
@@ -798,6 +799,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         this.isConfigurationProperties = isConfigurationProperties(this.annotationMetadata);
         validateExposedTypes(this.annotationMetadata, visitorContext);
         this.beanDefinitionName = beanDefinitionName;
+        this.beanDefinitionPackageName = NameUtils.getPackageName(beanDefinitionName);
         this.visitorContext = visitorContext;
         this.evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, getOriginatingElement());
         evaluatedExpressionProcessor.processEvaluatedExpressions(this.annotationMetadata,
@@ -2561,7 +2563,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             return isAccessibleFromBeanDefinition(element.fromArray());
         }
         return element.isPublic() ||
-            (!element.isPrivate() && element.getPackageName().equals(NameUtils.getPackageName(beanDefinitionName)));
+            (!element.isPrivate() && element.getPackageName().equals(beanDefinitionPackageName));
     }
 
     private String getClassName(ClassElement element) {
