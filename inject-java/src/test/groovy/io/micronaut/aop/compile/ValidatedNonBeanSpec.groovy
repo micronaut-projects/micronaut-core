@@ -1,7 +1,9 @@
 package io.micronaut.aop.compile
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.ValidatedBeanDefinition
 
 class ValidatedNonBeanSpec extends AbstractTypeElementSpec {
 
@@ -28,5 +30,33 @@ interface Contract {
 """)
         then:
         beanDefinition == null
+    }
+
+    void "test method validation does not make the bean definition validated"() {
+        when:
+        BeanDefinition beanDefinition = buildInterceptedBeanDefinition("test.DefaultContract", """
+package test;
+
+import jakarta.inject.Singleton;
+import jakarta.validation.constraints.NotNull;
+
+@Singleton
+class DefaultContract implements Contract {
+
+    @Override
+    public Long parseLong(@NotNull CharSequence sequence) {
+        return 0L;
+    }
+}
+
+interface Contract {
+    Long parseLong(@NotNull CharSequence sequence);
+}
+
+""")
+
+        then:
+        beanDefinition instanceof AdvisedBeanType
+        !(beanDefinition instanceof ValidatedBeanDefinition)
     }
 }
