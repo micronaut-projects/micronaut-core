@@ -388,7 +388,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @param <T>  The body type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
-     * @since 5.1.4
+     * @since 5.2.0
      */
     static <T> MutableHttpRequest<T> QUERY(URI uri, T body) {
         return QUERY(uri.toString(), body);
@@ -402,7 +402,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @param <T>  The body type
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
-     * @since 5.1.4
+     * @since 5.2.0
      */
     static <T> MutableHttpRequest<T> QUERY(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");

@@ -709,7 +709,7 @@ public interface RouteBuilder {
      * @param uri    The URI
      * @param target The target object
      * @return The route
-     * @since 5.1.4
+     * @since 5.2.0
      */
     default UriRoute QUERY(String uri, Object target) {
         return QUERY(uri, target, MethodConvention.QUERY.methodName());
@@ -720,7 +720,7 @@ public interface RouteBuilder {
      *
      * @param target The object
      * @return The route
-     * @since 5.1.4
+     * @since 5.2.0
      */
     default UriRoute QUERY(Object target) {
         Class<?> type = target.getClass();
@@ -733,7 +733,7 @@ public interface RouteBuilder {
      * @param target The object
      * @param id     The route id
      * @return The route
-     * @since 5.1.4
+     * @since 5.2.0
      */
     default UriRoute QUERY(Object target, PropertyConvention id) {
         Class<?> type = target.getClass();
@@ -745,7 +745,7 @@ public interface RouteBuilder {
      *
      * @param type The class
      * @return The route
-     * @since 5.1.4
+     * @since 5.2.0
      */
     default UriRoute QUERY(Class<?> type) {
         return QUERY(getUriNamingStrategy().resolveUri(type), type, MethodConvention.QUERY.methodName());
@@ -757,7 +757,7 @@ public interface RouteBuilder {
      * @param type The class
      * @param id   The route id
      * @return The route
-     * @since 5.1.4
+     * @since 5.2.0
      */
     default UriRoute QUERY(Class<?> type, PropertyConvention id) {
         return QUERY(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.QUERY.methodName());
@@ -771,7 +771,7 @@ public interface RouteBuilder {
      * @param uri    The URI
      * @param method The method
      * @return The route
-     * @since 5.1.4
+     * @since 5.2.0
      */
     default UriRoute QUERY(String uri, ExecutableMethod<?, ?> method) {
         return QUERY(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
@@ -786,7 +786,7 @@ public interface RouteBuilder {
      * @param uri            The URI
      * @param method         The method
      * @return The route
-     * @since 5.1.4
+     * @since 5.2.0
      */
     default UriRoute QUERY(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
         return QUERY(uri, beanDefinition.getBeanType(), method.getMethodName(), method.getArgumentTypes());
@@ -802,7 +802,7 @@ public interface RouteBuilder {
      * @param method         The method
      * @param parameterTypes The parameter types for the target method
      * @return The route
-     * @since 5.1.4
+     * @since 5.2.0
      */
     UriRoute QUERY(String uri, Object target, String method, Class<?>... parameterTypes);
 
@@ -816,7 +816,7 @@ public interface RouteBuilder {
      * @param method         The method
      * @param parameterTypes The parameter types for the target method
      * @return The route
-     * @since 5.1.4
+     * @since 5.2.0
      */
     UriRoute QUERY(String uri, Class<?> type, String method, Class<?>... parameterTypes);
 

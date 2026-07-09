@@ -83,7 +83,7 @@ public interface HttpHeaders extends Headers {
 
     /**
      * {@code "Accept-Query"}.
-     * @since 5.1.4
+     * @since 5.2.0
      */
     String ACCEPT_QUERY = "Accept-Query";
 

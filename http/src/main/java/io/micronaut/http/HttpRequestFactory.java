@@ -76,7 +76,7 @@ import org.jspecify.annotations.Nullable;
      * @param body The body
      * @param <T>  The body type
      * @return The {@link MutableHttpRequest} instance
-     * @since 5.1.4
+     * @since 5.2.0
      */
     default <T> MutableHttpRequest<T> query(String uri, T body) {
         return create(HttpMethod.QUERY, uri).body(body);

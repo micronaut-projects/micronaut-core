@@ -390,7 +390,7 @@ public interface Router {
      * @param <T> The target type
      * @param <R> The return type
      * @return An {@link Optional} of {@link RouteMatch}
-     * @since 5.1.4
+     * @since 5.2.0
      */
     default <T, R> Optional<UriRouteMatch<T, R>> QUERY(CharSequence uri) {
         return route(HttpMethod.QUERY, uri);

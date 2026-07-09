@@ -72,7 +72,7 @@ import org.jspecify.annotations.Nullable;
 
     /**
      * See https://www.rfc-editor.org/rfc/rfc10008.txt.
-     * @since 5.1.4
+     * @since 5.2.0
      */
     QUERY(true, true),
 

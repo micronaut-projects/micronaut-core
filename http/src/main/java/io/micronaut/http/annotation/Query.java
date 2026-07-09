@@ -30,7 +30,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * Annotation that can be applied to method to signify the method receives a {@link io.micronaut.http.HttpMethod#QUERY}.
  *
  * @author Graeme Rocher
- * @since 5.1.4
+ * @since 5.2.0
  */
 @Documented
 @Retention(RUNTIME)

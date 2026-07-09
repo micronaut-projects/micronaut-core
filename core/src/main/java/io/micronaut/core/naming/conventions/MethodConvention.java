@@ -71,7 +71,7 @@ public enum MethodConvention {
 
     /**
      * The default query method of controllers.
-     * @since 5.1.4
+     * @since 5.2.0
      */
     QUERY("");
 
