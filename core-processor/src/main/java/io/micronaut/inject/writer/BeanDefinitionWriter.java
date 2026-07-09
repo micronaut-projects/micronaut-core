@@ -899,7 +899,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     private void applyConfigurationInjectionIfNecessary(AnnotationMetadata annotationMetadata) {
-        if (annotationMetadata.hasAnnotation(RequiresValidation.class)) {
+        if (annotationMetadata.hasDeclaredAnnotation(RequiresValidation.class)) {
             setValidated(true);
         }
     }
