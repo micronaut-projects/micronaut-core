@@ -172,9 +172,11 @@ public final class PyronautCompiler {
             throw new IllegalArgumentException("Invalid package name: " + packageName);
         }
 
-        // Validate that either pythonSrc or pythonCode is specified
-        if ((pythonSrc == null || pythonSrc.isEmpty()) && (pythonCode == null || pythonCode.isEmpty())) {
-            throw new IllegalArgumentException("Either pythonSrc or pythonCode must be specified");
+        // Validate that at least one source language is specified
+        if ((pythonSrc == null || pythonSrc.isEmpty())
+            && (pythonCode == null || pythonCode.isEmpty())
+            && (javaSrc == null || javaSrc.isEmpty())) {
+            throw new IllegalArgumentException("At least one Python or Java source must be specified");
         }
     }
 
@@ -280,6 +282,15 @@ public final class PyronautCompiler {
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(getPackageName()).append(";\n\n");
         sb.append("import io.micronaut.runtime.Micronaut;\n");
+        if (!hasSrc && !hasCode) {
+            sb.append("\nclass PyronautMain {\n");
+            sb.append("    public static void main(String[] args) {\n");
+            sb.append("        Micronaut.run(args);\n");
+            sb.append("    }\n");
+            sb.append("}\n");
+            return sb.toString();
+        }
+
         sb.append("import io.micronaut.context.python.annotation.PythonApplication;\n\n");
         sb.append("@PythonApplication(\n");
 

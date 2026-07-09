@@ -16,6 +16,11 @@
 /**
  * Core APIs for Python integration.
  */
+@io.micronaut.context.annotation.Configuration
+@io.micronaut.context.annotation.Requires(
+    property = PythonConfiguration.ENABLED,
+    notEquals = io.micronaut.core.util.StringUtils.FALSE
+)
 @NullMarked
 package io.micronaut.context.python;
 
