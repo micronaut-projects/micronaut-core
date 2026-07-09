@@ -43,17 +43,6 @@ If you are working with the IntelliJ IDEA development environment, you can impor
 
 Create a branch from the release branch to which you anticipate merging back changes, e.g. `3.4.x`, `3.5.x`, `3.6.x`, etc.
 
-When the managed GraalPy version is a `-SNAPSHOT`, the build automatically bootstraps the required GraalPy artifacts from a `graalpy-extensions` Git checkout into an isolated Maven bundle cache under `checkouts/maven-bundles/`. This avoids publishing GraalPy artifacts into the global Maven local repository.
-
-To use an existing local checkout or prebuilt bundle cache, add the following to `~/.gradle/gradle.properties`:
-
-```
-local.git.graalpy-extensions=/path/to/graalpy-extensions
-micronaut.graalpy.bundle.repo=/path/to/local/maven-bundle
-```
-
-For a one-off invocation, disable the bootstrap path with `./gradlew -Pmicronaut.include.graalpy.extensions=false <task>`.
-
 The most important task to complete before submitting work is the `check` task. This executes all the unit tests as well as various code quality checks.
 
 ```

@@ -129,8 +129,8 @@ git status --short --branch
 
 Current audit as of May 22, 2026:
 
-* Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
-  from the included checkout; no local bundle override was used.
+* Normal Gradle verification resolves the GraalPy `25.1.3` release from Maven
+  Central.
 * The direct-subclass inventory audit has no remaining uncataloged direct
   subclasses.
 * `inject-python-test/DISABLED_TESTS.md` is the authoritative backlog and is
@@ -159,8 +159,8 @@ Current audit as of May 22, 2026:
 
 Historical snapshot as of May 14, 2026:
 
-* Normal Gradle verification resolves the GraalPy `25.1.0-SNAPSHOT` bundle
-  from the included checkout; do not rely on a local bundle override.
+* Normal Gradle verification resolves the GraalPy `25.1.3` release from Maven
+  Central.
 * The latest pending ID is `PY-INJECT-0096`; use `PY-INJECT-0097` for the next
   follow-up pending case.
 * The direct-subclass inventory audit has no remaining uncataloged direct
@@ -434,12 +434,9 @@ Likely first root-cause area:
 
 ## Gradle And GraalPy
 
-The build should resolve `25.1.0-SNAPSHOT` GraalPy artifacts from the included
-GraalPy extension checkout. The normal test command should work without a
-manual bundle checkout override.
-
-If bundle resolution fails, diagnose the included repository wiring first
-instead of relying on a local checkout path.
+The build should resolve the stable `25.1.3` GraalPy artifacts from Maven
+Central. The normal test command should work without a manual bundle checkout
+override.
 
 ## Verification Commands
 
