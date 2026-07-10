@@ -4,10 +4,9 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.io.ResourceLoadStrategy
 import io.micronaut.core.io.ResourceLoadStrategyType
+import spock.lang.Issue
 import spock.lang.Specification
 
-import java.net.URL
-import java.net.URLClassLoader
 import java.nio.charset.StandardCharsets
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
@@ -89,6 +88,41 @@ class ConfigurationLoadStrategySpec extends Specification {
               ApplicationContext ctx = ApplicationContext.builder(cl)
                      .configurationLoadingStrategy(ResourceLoadStrategy.builder()
                          .type(ResourceLoadStrategyType.MERGE_ALL))
+                     .start()) {
+            props = [
+                    foo: ctx.environment.getProperty("foo", String).orElse(null),
+                    appOnly: ctx.environment.getProperty("appOnly", String).orElse(null),
+                    libOnly: ctx.environment.getProperty("libOnly", String).orElse(null)
+            ]
+        }
+
+        then:
+        props.foo == "lib"
+        props.appOnly == "yes"
+        props.libOnly == "yes"
+
+        cleanup:
+        deleteDirectory(result.dir)
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12786")
+    void "MERGE_ALL is honored when bootstrap environment wraps configuration"() {
+        given:
+        def result = duplicateJars(
+                "app-1.0.jar",
+                "lib-1.0.jar",
+                "application.properties",
+                "foo=app\nappOnly=yes\n",
+                "foo=lib\nlibOnly=yes\n"
+        )
+
+        when:
+        Map<String, Object> props
+        try (URLClassLoader cl = new URLClassLoader(result.jars*.toUri()*.toURL() as URL[], getClass().classLoader)
+             ApplicationContext ctx = ApplicationContext.builder(cl)
+                     .bootstrapEnvironment(true)
+                     .configurationLoadingStrategy(ResourceLoadStrategy.builder()
+                             .type(ResourceLoadStrategyType.MERGE_ALL))
                      .start()) {
             props = [
                     foo: ctx.environment.getProperty("foo", String).orElse(null),
