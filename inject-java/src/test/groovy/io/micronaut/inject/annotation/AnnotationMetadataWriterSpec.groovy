@@ -674,6 +674,22 @@ class Test {
         metadata.getAnnotationValuesByName(Digits.name).size() == 1
     }
 
+    void "test executable metadata defaults with self-referential generic argument"() {
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
+package test;
+
+@jakarta.inject.Singleton
+class Test {
+
+    @io.micronaut.context.annotation.Executable
+    <E extends Enum<E>> void someMethod(Class<E> enumType) {}
+}
+''')
+
+        expect:
+        definition.getRequiredMethod("someMethod", Class).arguments.length == 1
+    }
+
     void "test declared repeatable annotations are combined, lookup by name"() {
         BeanDefinition definition = buildBeanDefinition('test.Test', '''\
 package test;

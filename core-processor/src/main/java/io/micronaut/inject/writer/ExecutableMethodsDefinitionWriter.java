@@ -49,8 +49,10 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -186,13 +188,13 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
             annotationMetadataWithDefaults,
             methodElement
         );
-        contributeArgumentDefaults(methodElement.getGenericReturnType());
+        contributeArgumentDefaults(methodElement.getGenericReturnType(), Collections.newSetFromMap(new IdentityHashMap<>()));
         for (ParameterElement parameter : methodElement.getSuspendParameters()) {
             MutableAnnotationMetadata.contributeDefaults(
                 annotationMetadataWithDefaults,
                 parameter.getAnnotationMetadata()
             );
-            contributeArgumentDefaults(parameter.getGenericType());
+            contributeArgumentDefaults(parameter.getGenericType(), Collections.newSetFromMap(new IdentityHashMap<>()));
         }
     }
 
@@ -321,13 +323,16 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
         return new OutputObjectDef(classDefBuilder.build(), null, originatingElements);
     }
 
-    private void contributeArgumentDefaults(ClassElement argumentType) {
+    private void contributeArgumentDefaults(ClassElement argumentType, Set<ClassElement> visitedTypes) {
+        if (!visitedTypes.add(argumentType)) {
+            return;
+        }
         MutableAnnotationMetadata.contributeDefaults(
             annotationMetadataWithDefaults,
             argumentType.getTypeAnnotationMetadata()
         );
         for (ClassElement typeArgument : argumentType.getTypeArguments().values()) {
-            contributeArgumentDefaults(typeArgument);
+            contributeArgumentDefaults(typeArgument, visitedTypes);
         }
     }
 

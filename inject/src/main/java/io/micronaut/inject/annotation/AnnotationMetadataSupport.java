@@ -465,7 +465,7 @@ public final class AnnotationMetadataSupport {
     static void registerRepeatableAnnotation(String repeatable, String repeatableContainer) {
         REPEATABLE_ANNOTATIONS_CONTAINERS.put(repeatable, repeatableContainer);
         if (repeatable.indexOf('$') > -1) {
-            REPEATABLE_ANNOTATIONS_CONTAINERS.putIfAbsent(
+            REPEATABLE_ANNOTATIONS_CONTAINERS.put(
                 repeatable.replace('$', '.'),
                 repeatableContainer.replace('$', '.')
             );

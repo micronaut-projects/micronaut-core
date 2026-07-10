@@ -915,8 +915,13 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     private static boolean isValidationRequiredForInjectionPoint(BeanDefinitionInjectionPoint<ClassElement> injectionPoint) {
-        return !(injectionPoint instanceof BeanInjectionPoint<?> && !injectionPoint.type().isNullable())
-            && injectionPoint.annotationMetadata().hasDeclaredAnnotation(RequiresValidation.class);
+        if (!injectionPoint.annotationMetadata().hasDeclaredAnnotation(RequiresValidation.class)) {
+            return false;
+        }
+        if (injectionPoint instanceof BeanInjectionPoint<?> && !injectionPoint.type().isNullable()) {
+            return false;
+        }
+        return true;
     }
 
     @Override
