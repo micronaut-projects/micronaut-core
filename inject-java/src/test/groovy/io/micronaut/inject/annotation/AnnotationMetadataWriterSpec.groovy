@@ -30,6 +30,8 @@ import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.TypeHint
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.retry.annotation.Recoverable
+import jakarta.validation.constraints.Digits
+import jakarta.validation.constraints.NotNull
 import spock.lang.Unroll
 
 import java.lang.annotation.Documented
@@ -597,6 +599,79 @@ class Test {
         properties[3].get("name", String).get() == "prop1"
         properties[4].get("name", String).get() == "prop3"
         properties[4].getValue(String).get() == "value3"
+    }
+
+    void "test repeatable annotation container lookup by repeated annotation class"() {
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
+package test;
+
+@jakarta.inject.Singleton
+class Test {
+
+    @jakarta.validation.constraints.NotNull.List({
+        @jakarta.validation.constraints.NotNull
+    })
+    @io.micronaut.context.annotation.Executable
+    void someMethod() {}
+}
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod").getAnnotationMetadata()
+
+        then:
+        metadata.hasAnnotation(NotNull)
+        metadata.hasDeclaredAnnotation(NotNull)
+        metadata.getAnnotationValuesByType(NotNull).size() == 1
+        metadata.getAnnotationValuesByName(NotNull.name).size() == 1
+    }
+
+    void "test repeatable annotation container lookup on type argument metadata"() {
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
+package test;
+
+import java.util.List;
+
+@jakarta.inject.Singleton
+class Test {
+
+    @io.micronaut.context.annotation.Executable
+    void someMethod(List<@jakarta.validation.constraints.NotNull String> values) {}
+}
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod", List).arguments[0].typeParameters[0].annotationMetadata
+
+        then:
+        metadata.hasAnnotation(NotNull)
+        metadata.hasDeclaredAnnotation(NotNull)
+        metadata.getAnnotationValuesByType(NotNull).size() == 1
+        metadata.getAnnotationValuesByName(NotNull.name).size() == 1
+    }
+
+    void "test repeatable constraint metadata lookup on executable parameter metadata"() {
+        BeanDefinition definition = buildBeanDefinition('test.Test', '''\
+package test;
+
+@jakarta.inject.Singleton
+class Test {
+
+    @io.micronaut.context.annotation.Executable
+    void someMethod(@jakarta.validation.constraints.Digits(integer = 3, fraction = 2) String amount) {}
+}
+''')
+
+        when:
+        AnnotationMetadata metadata = definition.getRequiredMethod("someMethod", String).arguments[0].annotationMetadata
+        List<AnnotationValue<Digits>> values = metadata.getAnnotationValuesByType(Digits)
+
+        then:
+        metadata.hasDeclaredAnnotation(Digits)
+        values.size() == 1
+        values[0].intValue("integer").getAsInt() == 3
+        values[0].intValue("fraction").getAsInt() == 2
+        metadata.getAnnotationValuesByName(Digits.name).size() == 1
     }
 
     void "test declared repeatable annotations are combined, lookup by name"() {

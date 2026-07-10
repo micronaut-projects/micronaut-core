@@ -903,7 +903,8 @@ record ProductDTO(String name, String price, String distributor) {
 ''')
 
         expect:
-        AnnotationMetadataSupport.getRepeatableAnnotation(Mapper.Mapping.class.name)
+        AnnotationMetadataSupport.getRepeatableAnnotation(Mapper.Mapping.class.name) == Mapper.name
+        AnnotationMetadataSupport.getRepeatableAnnotation(Mapper.Mapping.class.name.replace('$', '.')) == Mapper.name
         definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper)
         definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper.Mapping)
     }
