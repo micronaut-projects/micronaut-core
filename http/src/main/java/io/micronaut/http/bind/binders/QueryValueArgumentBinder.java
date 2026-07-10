@@ -197,6 +197,15 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
 
         try {
             T instance = introspectionBuilder.build();
+
+            if (instance == null) {
+                if (argument.isNullable()) {
+                    return BindingResult.empty();
+                }
+
+                return BindingResult.unsatisfied();
+            }
+
             return () -> Optional.of(instance);
         } catch (Exception e) {
             return BindingResult.unsatisfied();
