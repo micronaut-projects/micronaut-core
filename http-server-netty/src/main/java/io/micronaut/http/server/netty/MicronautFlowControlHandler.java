@@ -1,17 +1,17 @@
 /*
- * Copyright 2016 The Netty Project
+ * Copyright 2017-2016 original authors
  *
- * The Netty Project licenses this file to you under the Apache License, version
- * 2.0 (the "License"); you may not use this file except in compliance with the
- * License. You may obtain a copy of the License at:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  * https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package io.micronaut.http.server.netty;
 
@@ -23,9 +23,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.MessageToByteEncoder;
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.internal.ObjectPool;
-import io.netty.util.internal.ObjectPool.Handle;
-import io.netty.util.internal.ObjectPool.ObjectCreator;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -53,7 +50,7 @@ final class MicronautFlowControlHandler extends ChannelDuplexHandler {
 
     private final boolean releaseMessages;
 
-    private RecyclableArrayDeque queue;
+    private ArrayDeque<Object> queue;
 
     private ChannelConfig config;
 
@@ -92,7 +89,7 @@ final class MicronautFlowControlHandler extends ChannelDuplexHandler {
                 }
             }
 
-            queue.recycle();
+            queue.clear();
             queue = null;
         }
     }
@@ -133,7 +130,7 @@ final class MicronautFlowControlHandler extends ChannelDuplexHandler {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         if (queue == null) {
-            queue = RecyclableArrayDeque.newInstance();
+            queue = new ArrayDeque<>(2);
         }
 
         queue.offer(msg);
@@ -189,7 +186,7 @@ final class MicronautFlowControlHandler extends ChannelDuplexHandler {
         // messages were consumed and the queue ended up being drained
         // to an empty state.
         if (queue != null && queue.isEmpty()) {
-            queue.recycle();
+            queue.clear();
             queue = null;
 
             if (consumed > 0) {
@@ -200,40 +197,4 @@ final class MicronautFlowControlHandler extends ChannelDuplexHandler {
         return consumed;
     }
 
-    /**
-     * A recyclable {@link ArrayDeque}.
-     */
-    private static final class RecyclableArrayDeque extends ArrayDeque<Object> {
-
-        private static final long serialVersionUID = 0L;
-
-        /**
-         * A value of {@code 2} should be a good choice for most scenarios.
-         */
-        private static final int DEFAULT_NUM_ELEMENTS = 2;
-
-        private static final ObjectPool<RecyclableArrayDeque> RECYCLER = ObjectPool.newPool(
-                new ObjectCreator<RecyclableArrayDeque>() {
-            @Override
-            public RecyclableArrayDeque newObject(Handle<RecyclableArrayDeque> handle) {
-                return new RecyclableArrayDeque(DEFAULT_NUM_ELEMENTS, handle);
-            }
-        });
-
-        public static RecyclableArrayDeque newInstance() {
-            return RECYCLER.get();
-        }
-
-        private final Handle<RecyclableArrayDeque> handle;
-
-        private RecyclableArrayDeque(int numElements, Handle<RecyclableArrayDeque> handle) {
-            super(numElements);
-            this.handle = handle;
-        }
-
-        public void recycle() {
-            clear();
-            handle.recycle(this);
-        }
-    }
 }
