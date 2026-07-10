@@ -249,6 +249,41 @@ public final class StringUtils {
     }
 
     /**
+     * Returns a new string without a trailing character that matches the supplied character.
+     *
+     * @param str The string
+     * @param c   The character to remove
+     * @return The string without a trailing character matching the supplied character, or {@code null} when the input is {@code null}.
+     * @since 5.1.6
+     */
+    @Nullable
+    public static String trimTrailingCharacter(@Nullable String str, char c) {
+        if (isEmpty(str)) {
+            return str;
+        }
+        int length = str.length();
+        if (str.charAt(length - 1) == c) {
+            return str.substring(0, length - 1);
+        }
+        return str;
+    }
+
+    /**
+     * Returns a new string without a trailing slash character, unless the string is a single slash.
+     *
+     * @param str The string
+     * @return The string without a trailing slash character, or {@code null} when the input is {@code null}.
+     * @since 5.1.6
+     */
+    @Nullable
+    public static String trimTrailingSlashExceptRoot(@Nullable String str) {
+        if (isEmpty(str)) {
+            return str;
+        }
+        return str.length() > 1 ? trimTrailingCharacter(str, '/') : str;
+    }
+
+    /**
      * Returns a new string without any leading characters that match the supplied predicate.
      *
      * @param str       The string

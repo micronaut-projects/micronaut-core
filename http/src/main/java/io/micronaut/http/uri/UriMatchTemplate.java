@@ -173,9 +173,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
             throw new IllegalArgumentException("Argument 'uri' cannot be null");
         }
         int length = uri.length();
-        if (length > 1 && uri.charAt(length - 1) == '/') {
-            uri = uri.substring(0, length - 1);
-        }
+        uri = StringUtils.trimTrailingSlashExceptRoot(uri);
 
         if (isRoot && (length == 0 || (length == 1 && uri.charAt(0) == '/'))) {
             if (rootMatchInfo == null) {
@@ -188,9 +186,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         if (parameterIndex > -1) {
             uri = uri.substring(0, parameterIndex);
         }
-        if (uri.endsWith("/")) {
-            uri = uri.substring(0, uri.length() - 1);
-        }
+        uri = StringUtils.trimTrailingSlashExceptRoot(uri);
         if (exactMatch) {
             if (uri.equals(templateString)) {
                 if (exactMatchInfo == null) {

@@ -27,6 +27,8 @@ import io.micronaut.web.router.RouteBuilder;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+import java.util.Objects;
+
 /**
  * The default {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} if none is provided by the application.
  *
@@ -86,9 +88,7 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
             if (contextPath.charAt(0) != '/') {
                 contextPath = '/' + contextPath;
             }
-            if (contextPath.charAt(contextPath.length() - 1) == '/') {
-                contextPath = contextPath.substring(0, contextPath.length() - 1);
-            }
+            contextPath = Objects.requireNonNull(StringUtils.trimTrailingSlashExceptRoot(contextPath));
         }
         return contextPath;
     }
