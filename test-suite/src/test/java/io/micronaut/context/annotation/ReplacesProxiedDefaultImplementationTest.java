@@ -1,15 +1,13 @@
 package io.micronaut.context.annotation;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
-import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import io.micronaut.context.annotation.DefaultImplementation;
-import io.micronaut.context.annotation.Replaces;
 import io.micronaut.scheduling.annotation.Async;
 import jakarta.inject.Singleton;
+import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 class ReplacesProxiedDefaultImplementationTest {
     @Test
