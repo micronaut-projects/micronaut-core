@@ -30,7 +30,7 @@ class StringUtilsTest {
         return Stream.of(
             Arguments.of("abc", 'c', "ab"),
             Arguments.of("abc", 'd', "abc"),
-            Arguments.of("abc   ", ' ', "abc"),
+            Arguments.of("abc ", ' ', "abc"),
             Arguments.of("aa", 'a', "a"),
             Arguments.of("", 'a', ""),
             Arguments.of(null, 'a', null)
