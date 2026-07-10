@@ -253,7 +253,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                         @Override
                         protected void requestDemand() {
                             bodyRequested(ctx);
-                            super.requestDemand();
+                            ctx.executor().execute(() -> super.requestDemand());
                         }
                     };
                 } else {
@@ -278,6 +278,9 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
                 ctx.channel().pipeline().addAfter(ctx.name(), HANDLER_BODY_PUBLISHER, publisher);
                 ctx.fireChannelRead(createStreamedMessage(inMsg, publisher));
+                if (streamId > -1) {
+                    ctx.executor().execute(ctx::read);
+                }
             }
         } else if (msg instanceof HttpContent) {
             handleReadHttpContent(ctx, (HttpContent) msg);
@@ -303,7 +306,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Calling ctx.read() for cancelled subscription");
             }
-            ctx.read();
+            ctx.executor().execute(ctx::read);
             if (isClient()) {
                 ctx.fireChannelWritabilityChanged();
             }
@@ -332,14 +335,14 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                 }
                 currentlyStreamedMessage = null;
             }
-            ctx.read();
+            ctx.executor().execute(ctx::read);
         }
     }
 
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         if (ignoreBodyRead) {
-            ctx.read();
+            ctx.executor().execute(ctx::read);
         } else {
             ctx.fireChannelReadComplete();
         }
@@ -485,14 +488,14 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         if (sendLastHttpContent) {
             ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, promise).addListener((f) -> {
                 sentOutMessage(ctx);
-                ctx.read();
+                ctx.executor().execute(ctx::read);
                 outgoingInFlight = false;
                 proceedWriteOutgoing(ctx);
             });
         } else {
             promise.setSuccess();
             sentOutMessage(ctx);
-            ctx.read();
+            ctx.executor().execute(ctx::read);
             outgoingInFlight = false;
             proceedWriteOutgoing(ctx);
         }

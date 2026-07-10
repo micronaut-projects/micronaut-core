@@ -1226,7 +1226,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 if (request instanceof NettyHttpRequest) {
                     cleanupRequest(context, (NettyHttpRequest<?>) request);
                 }
-                context.read();
+                context.executor().execute(context::read);
             }
         };
 

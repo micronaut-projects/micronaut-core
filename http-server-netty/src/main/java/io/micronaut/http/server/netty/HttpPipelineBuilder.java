@@ -326,7 +326,6 @@ final class HttpPipelineBuilder {
          * for ALPN HTTP 2 and h2c.
          */
         private void insertHttp2DownstreamHandlers() {
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
             if (accessLogHandler != null) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
             }
