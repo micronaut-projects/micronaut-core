@@ -59,6 +59,35 @@ class Test {
 ''')
     }
 
+    void "test that a factory that returns an external class without accessible constructors compiles"() {
+        expect:
+        buildBeanDefinition('factproxyexternal.TestFactory', '''
+package factproxyexternal;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.factory.proxytarget.FactoryWithScopedProxySpec.ExternalClassWithoutAccessibleConstructor;
+
+@Factory
+class TestFactory {
+
+    @Bean
+    @io.micronaut.runtime.context.scope.ThreadLocal
+    ExternalClassWithoutAccessibleConstructor external() {
+        return ExternalClassWithoutAccessibleConstructor.create();
+    }
+}
+''')
+    }
+
+    static class ExternalClassWithoutAccessibleConstructor {
+        private ExternalClassWithoutAccessibleConstructor(String name) {
+        }
+
+        static ExternalClassWithoutAccessibleConstructor create() {
+            new ExternalClassWithoutAccessibleConstructor("test")
+        }
+    }
+
 
     void "test mock bean compiles"() {
         expect:"mock bean to compile"

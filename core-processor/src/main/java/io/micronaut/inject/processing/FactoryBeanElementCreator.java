@@ -199,7 +199,7 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
 
             MethodElement constructorElement = producedType.getPrimaryConstructor().orElse(null);
             MethodElement defaultConstructor = producedType.getDefaultConstructor().orElse(null);
-            if (!producedType.isInterface() && defaultConstructor == null) {
+            if (!producedType.isInterface() && constructorElement != null && defaultConstructor == null) {
                 final String proxyTargetMode = producedAnnotationMetadata.stringValue(AnnotationUtil.ANN_AROUND, "proxyTargetMode").orElse("ERROR");
                 switch (proxyTargetMode) {
                     case "ALLOW":
