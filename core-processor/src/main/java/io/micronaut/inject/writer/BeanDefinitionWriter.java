@@ -2421,9 +2421,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                     collectExposedTypes(exposedTypeNames, beanTypeElement.getFirstTypeArgument()
                         .orElseThrow(() -> new IllegalStateException("No type argument found for array type: " + beanTypeElement.getType())));
                 }
-                collectExposedTypes(exposedTypeNames, beanTypeElement);
+                collectBeanTypeAndExposedTypes(exposedTypeNames, beanTypeElement);
             } else {
-                collectExposedTypes(exposedTypeNames, beanTypeElement);
+                collectBeanTypeAndExposedTypes(exposedTypeNames, beanTypeElement);
             }
         }
         if (exposedTypeNames.isEmpty()) {
@@ -2548,14 +2548,22 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     private void collectExposedTypes(Set<String> exposedTypeNames, ClassElement element) {
-        if (isAccessibleFromBeanDefinition(element)) {
+        collectExposedTypes(exposedTypeNames, element, true);
+    }
+
+    private void collectExposedTypes(Set<String> exposedTypeNames, ClassElement element, boolean rootType) {
+        if (rootType || isAccessibleFromBeanDefinition(element)) {
             String className = getClassName(element);
             if (!exposedTypeNames.add(className) || IGNORED_EXPOSED_INTERFACES.contains(className)) {
                 return;
             }
         }
-        element.getSuperType().ifPresent(superType -> collectExposedTypes(exposedTypeNames, superType));
-        element.getInterfaces().forEach(iface -> collectExposedTypes(exposedTypeNames, iface));
+        element.getSuperType().ifPresent(superType -> collectExposedTypes(exposedTypeNames, superType, false));
+        element.getInterfaces().forEach(iface -> collectExposedTypes(exposedTypeNames, iface, false));
+    }
+
+    private void collectBeanTypeAndExposedTypes(Set<String> exposedTypeNames, ClassElement element) {
+        collectExposedTypes(exposedTypeNames, element);
     }
 
     private boolean isAccessibleFromBeanDefinition(ClassElement element) {
