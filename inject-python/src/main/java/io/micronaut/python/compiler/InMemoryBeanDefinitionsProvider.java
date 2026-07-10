@@ -27,6 +27,9 @@ import io.micronaut.inject.provider.JakartaProviderBeanDefinition;
 import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
 
 import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -56,14 +59,18 @@ public final class InMemoryBeanDefinitionsProvider implements BeanDefinitionsPro
             Enumeration<URL> resources = classLoader.getResources("META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference");
             while (resources.hasMoreElements()) {
                 URL resource = resources.nextElement();
-                String className = resource.toString().substring("mem:/CLASS_OUTPUT/META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/".length());
-                BeanDefinitionReference beanDefRef = (BeanDefinitionReference) InstantiationUtils.tryInstantiate(className, classLoader).orElse(null);
-                if (beanDefRef != null) {
-                    references.add(beanDefRef);
+                try {
+                    String className = beanDefinitionReferenceName(resource);
+                    BeanDefinitionReference beanDefRef = (BeanDefinitionReference) InstantiationUtils.tryInstantiate(className, classLoader).orElse(null);
+                    if (beanDefRef != null) {
+                        references.add(beanDefRef);
+                    }
+                } catch (RuntimeException ignored) {
+                    // Ignore resources that do not represent a loadable in-memory bean definition.
                 }
             }
 
-        } catch (Exception e) {
+        } catch (IOException e) {
             // No bean definitions found, continue
         }
 
@@ -86,6 +93,16 @@ public final class InMemoryBeanDefinitionsProvider implements BeanDefinitionsPro
             finalList.addAll(builtInBeanReferences);
         }
         return finalList;
+    }
+
+    private static String beanDefinitionReferenceName(URL resource) {
+        String path = resource.getPath();
+        String prefix = "/CLASS_OUTPUT/META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/";
+        int start = path.indexOf(prefix);
+        if (start < 0) {
+            throw new IllegalArgumentException("Unexpected bean definition reference URL: " + resource);
+        }
+        return URLDecoder.decode(path.substring(start + prefix.length()), StandardCharsets.UTF_8);
     }
 
     private List<BeanDefinitionReference<?>> getBuiltInBeanReferences() {

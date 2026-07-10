@@ -20,6 +20,7 @@ import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
 import io.micronaut.annotation.processing.MixinVisitorProcessor;
 import io.micronaut.annotation.processing.PackageElementVisitorProcessor;
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -474,8 +475,18 @@ final class PyronautJavaCompiler {
                                               List<File> annotationProcessorPath,
                                               List<String> compilerOptions) {
         List<String> options = new ArrayList<>();
-        addClasspathOption("-classpath", mergeClasspath(annotationProcessorPath, classpath), options);
-        addClasspathOption("-bootclasspath", bootClasspath, options);
+        if (CollectionUtils.isNotEmpty(classpath)) {
+            addClasspathOption("-classpath", classpath, options);
+        }
+        if (CollectionUtils.isNotEmpty(annotationProcessorPath)) {
+            addClasspathOption("--processor-path", annotationProcessorPath, options);
+        } else {
+            // inherit from classpath
+            options.add("-proc:full");
+        }
+        if (CollectionUtils.isNotEmpty(bootClasspath)) {
+            addClasspathOption("-bootclasspath", bootClasspath, options);
+        }
         if (compilerOptions != null) {
             options.addAll(compilerOptions);
         }
