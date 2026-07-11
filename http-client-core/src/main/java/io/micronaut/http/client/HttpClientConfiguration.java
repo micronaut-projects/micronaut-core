@@ -1453,6 +1453,26 @@ public abstract class HttpClientConfiguration {
         private int maxHeaderListSize = DEFAULT_MAX_HEADER_LIST_SIZE;
 
         /**
+         * Default constructor.
+         */
+        public Http2ClientConfiguration() {
+        }
+
+        /**
+         * Copy constructor.
+         *
+         * @param copy The HTTP/2 configuration to copy
+         */
+        protected Http2ClientConfiguration(@Nullable Http2ClientConfiguration copy) {
+            if (copy != null) {
+                this.pingIntervalRead = copy.pingIntervalRead;
+                this.pingIntervalWrite = copy.pingIntervalWrite;
+                this.pingIntervalIdle = copy.pingIntervalIdle;
+                this.maxHeaderListSize = copy.maxHeaderListSize;
+            }
+        }
+
+        /**
          * For HTTP/2 connections, the interval from the last inbound message to when an automated ping
          * should be sent. This can be used to keep low-traffic connections alive.
          *

@@ -176,6 +176,36 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         ctx.close()
     }
 
+    void 'test service HTTP/2 configuration inherits global values and allows overrides'() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'micronaut.http.client.http2.max-header-list-size': 32768,
+                'micronaut.http.client.http2.ping-interval-read': '30s',
+                'micronaut.http.client.http2.ping-interval-write': '40s',
+                'micronaut.http.client.http2.ping-interval-idle': '50s',
+                'micronaut.http.services.foo.url': 'http://localhost',
+                'micronaut.http.services.bar.url': 'http://localhost',
+                'micronaut.http.services.bar.http2.max-header-list-size': 65536,
+                'micronaut.http.services.bar.http2.ping-interval-write': '60s',
+        )
+
+        ServiceHttpClientConfiguration foo = ctx.getBean(ServiceHttpClientConfiguration, Qualifiers.byName("foo"))
+        ServiceHttpClientConfiguration bar = ctx.getBean(ServiceHttpClientConfiguration, Qualifiers.byName("bar"))
+
+        expect:
+        foo.http2Configuration.maxHeaderListSize == 32768
+        foo.http2Configuration.pingIntervalRead == Duration.ofSeconds(30)
+        foo.http2Configuration.pingIntervalWrite == Duration.ofSeconds(40)
+        foo.http2Configuration.pingIntervalIdle == Duration.ofSeconds(50)
+        bar.http2Configuration.maxHeaderListSize == 65536
+        bar.http2Configuration.pingIntervalRead == Duration.ofSeconds(30)
+        bar.http2Configuration.pingIntervalWrite == Duration.ofSeconds(60)
+        bar.http2Configuration.pingIntervalIdle == Duration.ofSeconds(50)
+
+        cleanup:
+        ctx.close()
+    }
+
     void "test that manually defining an HTTP client without URL doesn't create bean"() {
         given:
         ApplicationContext clientApp = ApplicationContext.run(
