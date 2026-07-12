@@ -32,6 +32,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
@@ -48,8 +49,10 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -185,6 +188,14 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
             annotationMetadataWithDefaults,
             methodElement
         );
+        contributeArgumentDefaults(methodElement.getGenericReturnType(), Collections.newSetFromMap(new IdentityHashMap<>()));
+        for (ParameterElement parameter : methodElement.getSuspendParameters()) {
+            MutableAnnotationMetadata.contributeDefaults(
+                annotationMetadataWithDefaults,
+                parameter.getAnnotationMetadata()
+            );
+            contributeArgumentDefaults(parameter.getGenericType(), Collections.newSetFromMap(new IdentityHashMap<>()));
+        }
     }
 
     public final void addBridgeMethod(MethodElement methodElement, MethodElement proxyMethod) {
@@ -302,9 +313,27 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
         if (methodDispatchWriter.getDispatchTargets().size() > MIN_METHODS_TO_GENERATE_GET_METHOD) {
             classDefBuilder.addMethod(buildGetMethod());
         }
+        List<StatementDef> staticStatements = new ArrayList<>();
+        AnnotationMetadataGenUtils.addAnnotationDefaults(staticStatements, annotationMetadataWithDefaults, loadClassValueExpressionFn);
+        if (!staticStatements.isEmpty()) {
+            classDefBuilder.addStaticInitializer(StatementDef.multi(staticStatements));
+        }
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
         return new OutputObjectDef(classDefBuilder.build(), null, originatingElements);
+    }
+
+    private void contributeArgumentDefaults(ClassElement argumentType, Set<ClassElement> visitedTypes) {
+        if (!visitedTypes.add(argumentType)) {
+            return;
+        }
+        MutableAnnotationMetadata.contributeDefaults(
+            annotationMetadataWithDefaults,
+            argumentType.getTypeAnnotationMetadata()
+        );
+        for (ClassElement typeArgument : argumentType.getTypeArguments().values()) {
+            contributeArgumentDefaults(typeArgument, visitedTypes);
+        }
     }
 
     private MethodDef buildGetMethod() {

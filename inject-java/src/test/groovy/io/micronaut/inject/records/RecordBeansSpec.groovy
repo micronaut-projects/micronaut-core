@@ -54,6 +54,7 @@ class RecordBeansSpec extends AbstractTypeElementSpec {
         BeanDefinition<?> definition = context.getBeanDefinition(Test2)
 
         then:
+        !(definition instanceof ValidatedBeanDefinition)
         !ClassUtils.isPresent('io.micronaut.inject.records.$Test2$Introspection', context.getClassLoader())
         ClassUtils.isPresent('io.micronaut.inject.records.$Test2$Definition', context.getClassLoader())
         !ClassUtils.isPresent('io.micronaut.inject.records.$Test2$Definition$Intercepted', context.getClassLoader())

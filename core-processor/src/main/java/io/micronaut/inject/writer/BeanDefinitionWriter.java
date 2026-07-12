@@ -739,7 +739,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         );
         this.constructorDefinition = constructorDefinition;
 
-        applyConfigurationInjectionIfNecessary(constructorDefinition.annotationMetadata());
+        applyConfigurationInjectionIfNecessary(constructorDefinition);
         evaluatedExpressionProcessor.processEvaluatedExpressions(constructorDefinition.constructorElement());
     }
 
@@ -893,15 +893,35 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     private void postProcessMethod(MethodDefinition<ClassElement, MethodElement> methodDefinition) {
-        applyConfigurationInjectionIfNecessary(methodDefinition.annotationMetadata());
+        applyConfigurationInjectionIfNecessary(methodDefinition);
         applyDefaultNamedToParameters(List.of(methodDefinition.methodElement().getParameters()));
         evaluatedExpressionProcessor.processEvaluatedExpressions(methodDefinition.methodElement());
     }
 
-    private void applyConfigurationInjectionIfNecessary(AnnotationMetadata annotationMetadata) {
+    private void applyConfigurationInjectionIfNecessary(ConstructorDefinition<ClassElement, MethodElement> constructorDefinition) {
+        applyConfigurationInjectionIfNecessary(constructorDefinition.annotationMetadata(), constructorDefinition.injectionPoints());
+    }
+
+    private void applyConfigurationInjectionIfNecessary(MethodDefinition<ClassElement, MethodElement> methodDefinition) {
+        applyConfigurationInjectionIfNecessary(methodDefinition.annotationMetadata(), methodDefinition.injectionPoints());
+    }
+
+    private void applyConfigurationInjectionIfNecessary(AnnotationMetadata annotationMetadata, List<BeanDefinitionInjectionPoint<ClassElement>> injectionPoints) {
         if (annotationMetadata.hasDeclaredAnnotation(RequiresValidation.class)) {
-            setValidated(true);
+            if (injectionPoints.stream().anyMatch(BeanDefinitionWriter::isValidationRequiredForInjectionPoint)) {
+                setValidated(true);
+            }
         }
+    }
+
+    private static boolean isValidationRequiredForInjectionPoint(BeanDefinitionInjectionPoint<ClassElement> injectionPoint) {
+        if (!injectionPoint.annotationMetadata().hasDeclaredAnnotation(RequiresValidation.class)) {
+            return false;
+        }
+        if (injectionPoint instanceof BeanInjectionPoint<?> && !injectionPoint.type().isNullable()) {
+            return false;
+        }
+        return true;
     }
 
     @Override
@@ -2411,6 +2431,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             exposedTypeNames = new LinkedHashSet<>();
             if (interceptedType != null) {
                 collectExposedTypes(exposedTypeNames, visitorContext.getClassElement(interceptedType).orElseThrow(() -> new IllegalStateException("Intercepted type not found: " + interceptedType)));
+                exposedTypeNames.add(interceptedType);
                 exposedTypeNames.add(beanProducingElement.getName()); // Allow finding the proxy by it's name
             } else if (exposes != null) {
                 exposes.forEach(name -> exposedTypeNames.add(name.getName()));
