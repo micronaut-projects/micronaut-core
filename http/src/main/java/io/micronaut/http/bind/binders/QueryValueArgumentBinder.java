@@ -16,6 +16,7 @@
 package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Introspected;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
@@ -173,8 +174,11 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
 
         for (int index = 0; index < builderArguments.length; index++) {
             Argument<?> builderArg = builderArguments[index];
-            String propertyName = builderArg.getName();
+            String propertyName = builderArg.getAnnotationMetadata().stringValue(Introspected.Property.class, AnnotationMetadata.VALUE_MEMBER).orElse(builderArg.getName());
             List<String> values = parameters.getAll(propertyName);
+            if (values.isEmpty() && !propertyName.equals(builderArg.getName())) {
+                values = parameters.getAll(builderArg.getName());
+            }
             boolean hasNoValue = values.isEmpty();
             @Nullable String defaultValue = hasNoValue ? builderArg
                 .getAnnotationMetadata()
