@@ -186,7 +186,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         if (parameterIndex > -1) {
             uri = uri.substring(0, parameterIndex);
         }
-        uri = StringUtils.trimTrailingSlashExceptRoot(uri);
+        uri = StringUtils.trimTrailingCharacter(uri, '/');
         if (exactMatch) {
             if (uri.equals(templateString)) {
                 if (exactMatchInfo == null) {
