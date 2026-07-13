@@ -53,6 +53,7 @@ class DefaultServerCookieEncoderTest {
     @Test
     void encodeRejectsInvalidStrictCookieNames() {
         ServerCookieEncoder cookieEncoder = new DefaultServerCookieEncoder();
+        assertThrows(IllegalArgumentException.class, () -> cookieEncoder.encode(new SimpleCookie("", "value")));
         for (char separator : "()<>@,;:\\\"/[]?={} \t".toCharArray()) {
             Cookie cookie = new SimpleCookie("S" + separator + "ID", "value");
             assertThrows(IllegalArgumentException.class, () -> cookieEncoder.encode(cookie));
@@ -67,6 +68,11 @@ class DefaultServerCookieEncoderTest {
         for (String value : new String[] {"a b", "a,b", "a\\b", "a\"b", "caf" + (char) 0xe9}) {
             assertThrows(IllegalArgumentException.class, () -> cookieEncoder.encode(new SimpleCookie("SID", value)));
         }
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+            () -> cookieEncoder.encode(new SimpleCookie("SID", "a\r\nb")));
+        assertEquals("Cookie value contains an invalid character 0xd", exception.getMessage());
+        assertFalse(exception.getMessage().contains("\r"));
+        assertFalse(exception.getMessage().contains("\n"));
     }
 
     @Test
@@ -74,7 +80,20 @@ class DefaultServerCookieEncoderTest {
         ServerCookieEncoder cookieEncoder = new DefaultServerCookieEncoder();
         assertEquals("SID=\"31d4d96e407aad42\"", cookieEncoder.encode(cookie("SID", "\"31d4d96e407aad42\"")).get(0));
         assertEquals("SID=\"\"", cookieEncoder.encode(cookie("SID", "\"\"")).get(0));
-        assertThrows(IllegalArgumentException.class, () -> cookieEncoder.encode(new SimpleCookie("SID", "\"unbalanced")));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+            () -> cookieEncoder.encode(new SimpleCookie("SID", "\"unbalanced")));
+        assertEquals("Cookie value wrapping quotes are not balanced", exception.getMessage());
+        assertFalse(exception.getMessage().contains("unbalanced"));
+    }
+
+    @Test
+    void encodeRejectsInvalidAttributesWithSanitizedMessage() {
+        ServerCookieEncoder cookieEncoder = new DefaultServerCookieEncoder();
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+            () -> cookieEncoder.encode(cookie("SID", "a").path("/\r\nLocation: https://evil.example")));
+        assertEquals("Path contains a prohibited character 0xd", exception.getMessage());
+        assertFalse(exception.getMessage().contains("\r"));
+        assertFalse(exception.getMessage().contains("\n"));
     }
 
     @Test

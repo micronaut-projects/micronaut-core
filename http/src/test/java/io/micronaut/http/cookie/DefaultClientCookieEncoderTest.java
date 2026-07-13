@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class DefaultClientCookieEncoderTest {
     @Test
@@ -32,6 +33,7 @@ class DefaultClientCookieEncoderTest {
     @Test
     void encodeRejectsInvalidStrictCookieNames() {
         ClientCookieEncoder cookieEncoder = new DefaultClientCookieEncoder();
+        assertThrows(IllegalArgumentException.class, () -> cookieEncoder.encode(new SimpleCookie("", "value")));
         for (char separator : "()<>@,;:\\\"/[]?={} \t".toCharArray()) {
             Cookie cookie = new SimpleCookie("S" + separator + "ID", "value");
             assertThrows(IllegalArgumentException.class, () -> cookieEncoder.encode(cookie));
@@ -46,6 +48,11 @@ class DefaultClientCookieEncoderTest {
         for (String value : new String[] {"a b", "a,b", "a\\b", "a\"b", "caf" + (char) 0xe9}) {
             assertThrows(IllegalArgumentException.class, () -> cookieEncoder.encode(new SimpleCookie("SID", value)));
         }
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+            () -> cookieEncoder.encode(new SimpleCookie("SID", "a\r\nb")));
+        assertEquals("Cookie value contains an invalid character 0xd", exception.getMessage());
+        assertFalse(exception.getMessage().contains("\r"));
+        assertFalse(exception.getMessage().contains("\n"));
     }
 
     @Test
@@ -53,7 +60,10 @@ class DefaultClientCookieEncoderTest {
         ClientCookieEncoder cookieEncoder = new DefaultClientCookieEncoder();
         assertEquals("SID=\"31d4d96e407aad42\"", cookieEncoder.encode(new SimpleCookie("SID", "\"31d4d96e407aad42\"")));
         assertEquals("SID=\"\"", cookieEncoder.encode(new SimpleCookie("SID", "\"\"")));
-        assertThrows(IllegalArgumentException.class, () -> cookieEncoder.encode(new SimpleCookie("SID", "\"unbalanced")));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+            () -> cookieEncoder.encode(new SimpleCookie("SID", "\"unbalanced")));
+        assertEquals("Cookie value wrapping quotes are not balanced", exception.getMessage());
+        assertFalse(exception.getMessage().contains("unbalanced"));
     }
 
     @Test

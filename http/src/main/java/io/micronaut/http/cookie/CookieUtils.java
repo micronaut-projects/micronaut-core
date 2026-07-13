@@ -67,10 +67,13 @@ public final class CookieUtils {
      * @throws IllegalArgumentException if the name contains a prohibited character
      */
     static void verifyCookieName(CharSequence name) {
+        if (name.isEmpty()) {
+            throw new IllegalArgumentException("Cookie name must not be empty");
+        }
         for (int i = 0; i < name.length(); i++) {
             char c = name.charAt(i);
             if (!isValidCookieNameChar(c)) {
-                throw new IllegalArgumentException("Cookie name contains an invalid char: " + c);
+                throw new IllegalArgumentException("Cookie name contains an invalid character 0x" + hex(c));
             }
         }
     }
@@ -87,12 +90,12 @@ public final class CookieUtils {
         CharSequence cookieValue = value == null ? "" : value;
         CharSequence unwrappedValue = unwrapCookieValue(cookieValue);
         if (unwrappedValue == null) {
-            throw new IllegalArgumentException("Cookie value wrapping quotes are not balanced: " + cookieValue);
+            throw new IllegalArgumentException("Cookie value wrapping quotes are not balanced");
         }
         for (int i = 0; i < unwrappedValue.length(); i++) {
             char c = unwrappedValue.charAt(i);
             if (!isValidCookieValueChar(c)) {
-                throw new IllegalArgumentException("Cookie value contains an invalid char: " + c);
+                throw new IllegalArgumentException("Cookie value contains an invalid character 0x" + hex(c));
             }
         }
     }
@@ -112,9 +115,13 @@ public final class CookieUtils {
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
             if (!isValidCookieAttributeValueChar(c)) {
-                throw new IllegalArgumentException(name + " contains the prohibited characters: " + c);
+                throw new IllegalArgumentException(name + " contains a prohibited character 0x" + hex(c));
             }
         }
+    }
+
+    private static String hex(char c) {
+        return Integer.toHexString(c);
     }
 
     private static boolean isValidCookieNameChar(char c) {
