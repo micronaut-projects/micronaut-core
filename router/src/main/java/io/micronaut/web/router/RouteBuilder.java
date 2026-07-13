@@ -1220,7 +1220,7 @@ public interface RouteBuilder {
          * Normalizes a URI.
          * <p>
          * Ensures the string:
-         * 1) Does not end with a /
+         * 1) Does not end with a / (except for the root path "/", which is preserved as-is)
          * 2) Starts with a /
          *
          * @param uri The URI
