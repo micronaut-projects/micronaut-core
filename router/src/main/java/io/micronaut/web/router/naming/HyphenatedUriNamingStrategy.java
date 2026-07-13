@@ -27,8 +27,6 @@ import io.micronaut.web.router.RouteBuilder;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import java.util.Objects;
-
 /**
  * The default {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} if none is provided by the application.
  *
