@@ -19,8 +19,10 @@ import com.google.devtools.ksp.symbol.KSValueParameter
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ArrayableClassElement
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import java.util.Optional
 
 internal class KotlinParameterElement(
     private val presetType: ClassElement?,
@@ -78,6 +80,15 @@ internal class KotlinParameterElement(
     override fun getMethodElement() = methodElement
 
     override fun getName() = internalName
+
+    override fun getDocumentation(parse: Boolean): Optional<String> {
+        // A KSValueParameter is not a KSDeclaration and carries no docString of its own; a Kotlin
+        // constructor parameter is documented by the owning class KDoc's @property/@param tag.
+        if (!parse || methodElement !is ConstructorElement) {
+            return Optional.empty()
+        }
+        return Optional.ofNullable(methodElement.getOwningType().parsedKDoc.parameterDoc(internalName))
+    }
 
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata) =
         super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ParameterElement
