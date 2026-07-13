@@ -1220,7 +1220,7 @@ public interface RouteBuilder {
          * Normalizes a URI.
          * <p>
          * Ensures the string:
-         * 1) Does not end with a /
+         * 1) Does not end with a / (except for the root path "/", which is preserved as-is)
          * 2) Starts with a /
          *
          * @param uri The URI
@@ -1232,9 +1232,7 @@ public interface RouteBuilder {
                 if (len > 0 && uri.charAt(0) != '/') {
                     uri = '/' + uri;
                 }
-                if (len > 1 && uri.charAt(uri.length() - 1) == '/') {
-                    uri = uri.substring(0, uri.length() - 1);
-                }
+                uri = StringUtils.trimTrailingSlashExceptRoot(uri);
                 if (len > 0) {
                     return uri;
                 }
