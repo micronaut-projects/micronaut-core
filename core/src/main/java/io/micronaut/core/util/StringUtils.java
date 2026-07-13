@@ -269,7 +269,7 @@ public final class StringUtils {
     }
 
     /**
-     * Returns a new string without a trailing slash character, unless the string is a single slash.
+     * Returns a new string without a single trailing slash character, unless the string is a single slash.
      *
      * @param str The string
      * @return The string without a trailing slash character, or {@code null} when the input is {@code null}.
