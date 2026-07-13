@@ -15,13 +15,49 @@
  */
 package io.micronaut.kotlin.processing.beans.configproperties
 
+import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
+import com.google.devtools.ksp.processing.SymbolProcessorProvider
+import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.visitor.ConfigurationMetadataWriterVisitor
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.util.CollectionUtils
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.kotlin.processing.visitor.TypeElementSymbolProcessor
 import spock.lang.Specification
 
 class ConfigurationPropertiesSpec extends Specification {
+
+    void "test configuration metadata generation with an empty Kotlin source"() {
+        when:
+        KotlinCompiler.compile([
+            KotlinCompiler.kotlinSource('MyConfiguration.kt', '''
+                package test
+
+                import io.micronaut.context.annotation.ConfigurationProperties
+
+                @ConfigurationProperties("test")
+                class MyConfiguration
+            '''),
+            KotlinCompiler.kotlinSource('Empty.kt', '')
+        ], { ClassElement ignored -> }, [configurationMetadataProcessorProvider()])
+
+        then:
+        noExceptionThrown()
+    }
+
+    private static SymbolProcessorProvider configurationMetadataProcessorProvider() {
+        return { SymbolProcessorEnvironment environment ->
+            new TypeElementSymbolProcessor(environment) {
+                @Override
+                protected Collection<TypeElementVisitor<?, ?>> findTypeElementVisitors() {
+                    return [new ConfigurationMetadataWriterVisitor()]
+                }
+            }
+        } as SymbolProcessorProvider
+    }
 
     void "test submap with generics binding"() {
         given:

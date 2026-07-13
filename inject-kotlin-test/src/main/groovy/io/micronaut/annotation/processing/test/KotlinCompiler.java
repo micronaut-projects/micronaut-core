@@ -99,6 +99,17 @@ public class KotlinCompiler {
         return toClassLoader(resultPair);
     }
 
+    /**
+     * Creates a Kotlin source file for use with {@link #compile(List, Consumer, List)}.
+     *
+     * @param name source file name
+     * @param source Kotlin source content
+     * @return Kotlin source file
+     */
+    public static SourceFile kotlinSource(String name, @Language("kotlin") String source) {
+        return SourceFile.Companion.kotlin(name, source, true);
+    }
+
     @NotNull
     private static URLClassLoader toClassLoader(Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> resultPair) {
         try {
@@ -139,12 +150,28 @@ public class KotlinCompiler {
     }
 
     public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compile(String name, @Language("kotlin") String clazz, Consumer<ClassElement> classElements, List<SymbolProcessorProvider> extraSymbolProcessorProviders) {
+        return compile(
+            Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)),
+            classElements,
+            extraSymbolProcessorProviders
+        );
+    }
+
+    /**
+     * Compile Kotlin source files both directly and through KSP.
+     *
+     * @param sources Kotlin sources to compile
+     * @param classElements consumer for compiled class elements
+     * @param extraSymbolProcessorProviders additional KSP processors
+     * @return the direct and KSP compilation results
+     */
+    public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compile(List<SourceFile> sources, Consumer<ClassElement> classElements, List<SymbolProcessorProvider> extraSymbolProcessorProviders) {
         try {
             Files.deleteIfExists(KOTLIN_COMPILATION.getWorkingDir().toPath());
         } catch (IOException e) {
             // ignore
         }
-        KOTLIN_COMPILATION.setSources(Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)));
+        KOTLIN_COMPILATION.setSources(sources);
         JvmCompilationResult result = KOTLIN_COMPILATION.compile();
         if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(result.getMessages());
