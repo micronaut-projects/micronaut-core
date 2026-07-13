@@ -249,7 +249,7 @@ public final class StringUtils {
     }
 
     /**
-     * Returns a new string without a trailing character that matches the supplied character.
+     * Returns a new string without a single trailing character that matches the supplied character.
      *
      * @param str The string
      * @param c   The character to remove
