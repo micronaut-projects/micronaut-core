@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.util.ExceptionUtils;
+import io.micronaut.core.io.service.ServiceScanner.StaticServiceDefinitions;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -89,6 +90,13 @@ public final class MicronautMetaServiceLoaderUtils {
      * @throws IOException The exception
      */
     public static Set<String> findMicronautMetaServiceEntries(ClassLoader classLoader, String serviceName) throws IOException {
+        StaticServiceDefinitions staticDefinitions = ServiceScanner.findStaticServiceDefinitions();
+        if (staticDefinitions != null) {
+            Set<String> serviceEntries = staticDefinitions.serviceTypeMap().get(serviceName);
+            if (serviceEntries != null) {
+                return serviceEntries;
+            }
+        }
         CacheEntry ce = cacheEntry;
         if (ce == null || ce.classLoader != classLoader) {
             ce = new CacheEntry(classLoader, findAllMicronautMetaServices(classLoader));
@@ -105,10 +113,6 @@ public final class MicronautMetaServiceLoaderUtils {
      * @throws IOException
      */
     public static Map<String, Set<String>> findAllMicronautMetaServices(ClassLoader classLoader) throws IOException {
-        final ServiceScanner.StaticServiceDefinitions ssd = ServiceScanner.findStaticServiceDefinitions();
-        if (ssd != null) {
-            return ssd.serviceTypeMap();
-        }
         List<URI> resourceDefs = IOUtils.getResources(classLoader, MICRONAUT_SERVICES_PATH);
         if (resourceDefs.isEmpty()) {
             return Map.of();
