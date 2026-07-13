@@ -27,8 +27,11 @@ public final class DefaultClientCookieEncoder implements ClientCookieEncoder {
     
     @Override
     public String encode(Cookie cookie) {
-        CookieUtils.verifyCookieComponent(cookie.getName());
-        CookieUtils.verifyCookieComponent(cookie.getValue());
-        return cookie.getName() + EQUAL + (cookie.getValue() != null ? cookie.getValue() : "");
+        String name = cookie.getName();
+        String value = cookie.getValue();
+        value = value == null ? "" : value;
+        CookieUtils.verifyCookieName(name);
+        CookieUtils.verifyCookieValue(value);
+        return name + EQUAL + value;
     }
 }
