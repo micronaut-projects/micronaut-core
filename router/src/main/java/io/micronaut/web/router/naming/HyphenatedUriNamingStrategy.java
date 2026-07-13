@@ -88,7 +88,7 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
             if (contextPath.charAt(0) != '/') {
                 contextPath = '/' + contextPath;
             }
-            contextPath = Objects.requireNonNull(StringUtils.trimTrailingSlashExceptRoot(contextPath));
+            contextPath = StringUtils.trimTrailingCharacter(contextPath, '/');
         }
         return contextPath;
     }
