@@ -187,6 +187,7 @@ public class IOUtils {
                 return Paths.get(uri).resolve(path);
             } else if ("jrt".equals(scheme)) {
                 FileSystem fs = FileSystems.newFileSystem(URI.create("jrt:/"), Map.of());
+                toClose.add(fs);
                 return fs.getPath(uri.getPath());
             } else {
                 // graal resource: case

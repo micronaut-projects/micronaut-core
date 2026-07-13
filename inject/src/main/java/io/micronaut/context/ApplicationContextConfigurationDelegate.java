@@ -19,6 +19,7 @@ import io.micronaut.context.env.EnvironmentNamesDeducer;
 import io.micronaut.context.env.EnvironmentPackagesDeducer;
 import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.inject.BeanConfiguration;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.MutableConversionService;
@@ -138,6 +139,11 @@ class ApplicationContextConfigurationDelegate implements ApplicationContextConfi
     @Override
     public Collection<PropertySourcesLocator> getPropertySourcesLocators() {
         return delegate.getPropertySourcesLocators();
+    }
+
+    @Override
+    public ResourceLoadStrategy getConfigurationLoadingStrategy() {
+        return delegate.getConfigurationLoadingStrategy();
     }
 
     @Override
