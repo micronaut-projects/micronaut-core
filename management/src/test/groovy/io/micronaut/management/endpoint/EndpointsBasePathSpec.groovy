@@ -85,6 +85,7 @@ class EndpointsBasePathSpec extends Specification {
 
         where:
         path << [
+                '/admin/',
                 '/admin',
                 'admin/',
                 'admin'

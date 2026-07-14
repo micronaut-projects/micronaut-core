@@ -18,17 +18,14 @@ package io.micronaut.management.endpoint.health.filter;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.health.HealthStatus;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthResult;
-import io.micronaut.web.router.MethodBasedRouteMatch;
-import io.micronaut.web.router.RouteAttributes;
 
 /**
  * A filter that matches the {@link HealthEndpoint}
@@ -37,7 +34,11 @@ import io.micronaut.web.router.RouteAttributes;
  * @author graemerocher
  * @since 1.0
  */
-@ServerFilter(Filter.MATCH_ALL_PATTERN)
+@ServerFilter(
+    value = {HealthResultFilter.DEFAULT_MAPPING,
+        HealthResultFilter.LIVENESS_PROBE_MAPPING,
+        HealthResultFilter.READINESS_PROBE_MAPPING},
+    patternStyle = FilterPatternStyle.REGEX)
 @Requires(beans = HealthEndpoint.class)
 @Internal
 public class HealthResultFilter {
@@ -46,11 +47,11 @@ public class HealthResultFilter {
      * Configurable default mapping for filter.
      */
     public static final String DEFAULT_MAPPING =
-        "${" + EndpointDefaultConfiguration.PREFIX + ".path:" +
-            EndpointDefaultConfiguration.DEFAULT_ENDPOINT_BASE_PATH + "}${" +
+        "/?${" + EndpointDefaultConfiguration.PREFIX + ".path:" +
+            EndpointDefaultConfiguration.DEFAULT_ENDPOINT_BASE_PATH + "}/?${" +
             HealthEndpoint.PREFIX + ".id:health}";
-    public static final String LIVENESS_PROBE_MAPPING = DEFAULT_MAPPING + "/liveness";
-    public static final String READINESS_PROBE_MAPPING = DEFAULT_MAPPING + "/readiness";
+    public static final String LIVENESS_PROBE_MAPPING = DEFAULT_MAPPING + "/?liveness";
+    public static final String READINESS_PROBE_MAPPING = DEFAULT_MAPPING + "/?readiness";
 
     private final HealthEndpoint healthEndpoint;
 
@@ -66,16 +67,10 @@ public class HealthResultFilter {
     /**
      * Set response status by health result.
      *
-     * @param request http request
      * @param response http response
      */
     @ResponseFilter
-    public void doFilter(HttpRequest<?> request, MutableHttpResponse<?> response) {
-        if (!(RouteAttributes.getRouteMatch(request).orElse(null) instanceof MethodBasedRouteMatch<?, ?> routeMatch)
-            || !HealthEndpoint.class.isAssignableFrom(routeMatch.getDeclaringType())) {
-            return;
-        }
-
+    public void doFilter(MutableHttpResponse<?> response) {
         Object body = response.body();
         if (body instanceof HealthResult healthResult) {
             HealthStatus status = healthResult.getStatus();
