@@ -149,10 +149,10 @@ internal open class KotlinClassElement(
         while (clazz != null) {
             // We need to aggregate all the hierarchy properties because
             // getAllProperties doesn't return correct parent of the property
-            properties.addAll(clazz.getDeclaredSyntheticBeanProperties())
+            properties.addAll(clazz.getDeclaredSyntheticBeanProperties(this))
             clazz.interfaces.forEach {
                 if (it is KotlinClassElement) {
-                    properties.addAll(it.getDeclaredSyntheticBeanProperties())
+                    properties.addAll(it.getDeclaredSyntheticBeanProperties(this))
                 }
             }
 
@@ -338,7 +338,22 @@ internal open class KotlinClassElement(
 
     override fun getSyntheticBeanProperties() = nativeProperties
 
-    private fun getDeclaredSyntheticBeanProperties() = declaredNativeProperties
+    private fun getDeclaredSyntheticBeanProperties(owningType: KotlinClassElement): List<PropertyElement> {
+        if (owningType == this) {
+            return declaredNativeProperties
+        }
+        return declaration.getDeclaredProperties()
+            .filter { !it.isPrivate() && !hasAnnotation(it, JvmField::class.java) }
+            .map {
+                KotlinPropertyElement(
+                    owningType,
+                    it,
+                    elementAnnotationMetadataFactory,
+                    visitorContext
+                )
+            }
+            .toList()
+    }
 
     override fun getAccessibleStaticCreators(): List<MethodElement> {
         val staticCreators: MutableList<MethodElement> = mutableListOf()
