@@ -1,8 +1,10 @@
 package io.micronaut.http.client.config
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpVersion
 import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.HttpClientConfiguration
+import io.micronaut.http.client.HttpVersionSelection
 import spock.lang.Issue
 import spock.lang.Specification
 
@@ -156,5 +158,49 @@ class DefaultHttpClientConfigurationSpec extends Specification {
 
         expect:
         cfg.connectionPoolIdleTimeout.empty
+    }
+
+    void "copy constructor copies top-level HTTP client settings"() {
+        given:
+        def cfg = new TestHttpClientConfiguration()
+        cfg.requestTimeout = Duration.ofSeconds(2)
+        cfg.decompressionEnabled = false
+        cfg.plaintextMode = HttpVersionSelection.PlaintextMode.H2C
+        cfg.alpnModes = [HttpVersionSelection.ALPN_HTTP_1]
+        cfg.allowBlockEventLoop = true
+        cfg.dnsResolutionMode = HttpClientConfiguration.DnsResolutionMode.NOOP
+        cfg.addressResolverGroupName = 'custom-resolver'
+        cfg.pcapLoggingPathPattern = '/tmp/client.pcap'
+        cfg.httpVersion = HttpVersion.HTTP_2_0
+
+        when:
+        def copy = new TestHttpClientConfiguration(cfg)
+
+        then:
+        copy.requestTimeout == Duration.ofSeconds(2)
+        !copy.decompressionEnabled
+        copy.plaintextMode == HttpVersionSelection.PlaintextMode.H2C
+        copy.alpnModes == [HttpVersionSelection.ALPN_HTTP_1]
+        copy.allowBlockEventLoop
+        copy.dnsResolutionMode == HttpClientConfiguration.DnsResolutionMode.NOOP
+        copy.addressResolverGroupName == 'custom-resolver'
+        copy.pcapLoggingPathPattern == '/tmp/client.pcap'
+        copy.httpVersion == HttpVersion.HTTP_2_0
+    }
+
+    static final class TestHttpClientConfiguration extends HttpClientConfiguration {
+        private final ConnectionPoolConfiguration connectionPoolConfiguration = new ConnectionPoolConfiguration()
+
+        TestHttpClientConfiguration() {
+        }
+
+        TestHttpClientConfiguration(HttpClientConfiguration copy) {
+            super(copy)
+        }
+
+        @Override
+        ConnectionPoolConfiguration getConnectionPoolConfiguration() {
+            connectionPoolConfiguration
+        }
     }
 }

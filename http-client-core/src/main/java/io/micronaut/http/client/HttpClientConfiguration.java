@@ -282,6 +282,7 @@ public abstract class HttpClientConfiguration {
             this.connectTtl = copy.connectTtl;
             this.defaultCharset = copy.defaultCharset;
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
+            this.decompressionEnabled = copy.decompressionEnabled;
             this.eventLoopGroup = copy.eventLoopGroup;
             this.followRedirects = copy.followRedirects;
             this.redirectAlwaysFilteredHeaders = copy.redirectAlwaysFilteredHeaders;
@@ -299,6 +300,7 @@ public abstract class HttpClientConfiguration {
             this.proxySelector = copy.proxySelector;
             this.proxyType = copy.proxyType;
             this.proxyUsername = copy.proxyUsername;
+            this.requestTimeout = copy.requestTimeout;
             this.readIdleTimeout = copy.readIdleTimeout;
             this.connectionPoolIdleTimeout = copy.connectionPoolIdleTimeout;
             this.readTimeout = copy.readTimeout;
@@ -307,6 +309,12 @@ public abstract class HttpClientConfiguration {
             this.sslConfiguration = copy.sslConfiguration;
             this.threadFactory = copy.threadFactory;
             this.httpVersion = copy.httpVersion;
+            this.plaintextMode = copy.plaintextMode;
+            this.alpnModes = copy.alpnModes;
+            this.allowBlockEventLoop = copy.allowBlockEventLoop;
+            this.dnsResolutionMode = copy.dnsResolutionMode;
+            this.addressResolverGroupName = copy.addressResolverGroupName;
+            this.pcapLoggingPathPattern = copy.pcapLoggingPathPattern;
         }
     }
 
