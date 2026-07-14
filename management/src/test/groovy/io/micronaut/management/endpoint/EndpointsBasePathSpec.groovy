@@ -25,6 +25,7 @@ import io.micronaut.management.endpoint.annotation.Read
 import io.micronaut.management.endpoint.annotation.Selector
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
+import spock.lang.Unroll
 
 class EndpointsBasePathSpec extends Specification {
 
@@ -58,6 +59,36 @@ class EndpointsBasePathSpec extends Specification {
         cleanup:
         rxClient.close()
         server.close()
+    }
+
+    @Unroll
+    void "health status filter works with endpoint base path '#path'"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'endpoints.all.path': path,
+                'endpoints.health.sensitive': false,
+                'endpoints.health.disk-space.threshold': '9999GB'
+        ])
+        HttpClient client = server.applicationContext.createBean(HttpClient.class, server.getURL())
+
+        when:
+        client.toBlocking().exchange('/admin/health')
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.SERVICE_UNAVAILABLE
+
+        cleanup:
+        client.close()
+        server.close()
+
+        where:
+        path << [
+                '/admin',
+                'admin/',
+                'admin'
+        ]
     }
 
     void "test routes with a server context path"() {
