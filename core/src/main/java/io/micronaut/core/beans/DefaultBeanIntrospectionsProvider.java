@@ -25,7 +25,7 @@ import java.util.List;
  * The default implementation of {@link BeanIntrospectionsProvider}.
  *
  * @author Denis Stepanov
- * @since 5.1.0
+ * @since 5.2.0
  */
 @Internal
 final class DefaultBeanIntrospectionsProvider implements BeanIntrospectionsProvider {

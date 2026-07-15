@@ -35,7 +35,7 @@ import java.util.Objects;
  * @param documentation The parameter documentation string.
  * @param declaringFunction The function that declares this argument.
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public record ArgumentDef(

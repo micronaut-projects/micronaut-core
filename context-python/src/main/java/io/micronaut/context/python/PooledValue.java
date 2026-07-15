@@ -28,7 +28,7 @@ import java.util.function.Function;
  * when the result is consumed immediately, because the underlying context is returned to the pool
  * before the method returns.
  *
- * @since 5.1.0
+ * @since 5.2.0
  */
 @Experimental
 public interface PooledValue {

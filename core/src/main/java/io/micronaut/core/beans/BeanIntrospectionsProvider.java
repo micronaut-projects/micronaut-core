@@ -23,7 +23,7 @@ import java.util.List;
  * The provider of bean introspections.
  *
  * @author Denis Stepanov
- * @since 5.1.0
+ * @since 5.2.0
  */
 @Experimental
 public interface BeanIntrospectionsProvider {

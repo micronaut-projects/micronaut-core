@@ -49,7 +49,7 @@ import org.reactivestreams.Subscription;
  * Provides type-safe conversion methods for List, Map, and other collection types.
  *
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Internal
 @SuppressWarnings({"checkstyle:InnerTypeLast", "checkstyle:JavadocMethod", "checkstyle:TodoComment"})

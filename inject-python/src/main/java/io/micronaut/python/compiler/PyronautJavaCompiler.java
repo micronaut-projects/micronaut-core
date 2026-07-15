@@ -63,7 +63,7 @@ import java.util.stream.Stream;
  * Utility class for compiling Java sources with Micronaut annotation processors.
  *
  * @author Micronaut
- * @since 5.0.0
+ * @since 5.2.0
  */
 final class PyronautJavaCompiler {
 

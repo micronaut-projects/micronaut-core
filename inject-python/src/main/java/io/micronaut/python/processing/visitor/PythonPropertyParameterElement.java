@@ -29,7 +29,7 @@ import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
  * unlike ParameterElement.of() which creates immutable elements.
  *
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public final class PythonPropertyParameterElement extends AbstractPythonElement implements ParameterElement {

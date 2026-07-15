@@ -30,7 +30,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * This annotation allows inlining Python code or scanning directories for Python files
  * that will be processed during compilation.
  *
- * @since 5.0.0
+ * @since 5.2.0
  * @author Micronaut
  */
 @Documented

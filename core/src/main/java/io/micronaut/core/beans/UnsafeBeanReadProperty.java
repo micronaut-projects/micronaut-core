@@ -54,7 +54,7 @@ public interface UnsafeBeanReadProperty<B, T> extends BeanReadProperty<B, T> {
      *
      * @param bean The bean
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     default boolean getBooleanUnsafe(B bean) {
         return Objects.requireNonNull((Boolean) getUnsafe(bean));
@@ -68,7 +68,7 @@ public interface UnsafeBeanReadProperty<B, T> extends BeanReadProperty<B, T> {
      *
      * @param bean The bean
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     default byte getByteUnsafe(B bean) {
         return Objects.requireNonNull((Byte) getUnsafe(bean));
@@ -82,7 +82,7 @@ public interface UnsafeBeanReadProperty<B, T> extends BeanReadProperty<B, T> {
      *
      * @param bean The bean
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     default short getShortUnsafe(B bean) {
         return Objects.requireNonNull((Short) getUnsafe(bean));
@@ -96,7 +96,7 @@ public interface UnsafeBeanReadProperty<B, T> extends BeanReadProperty<B, T> {
      *
      * @param bean The bean
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     default char getCharUnsafe(B bean) {
         return Objects.requireNonNull((Character) getUnsafe(bean));
@@ -110,7 +110,7 @@ public interface UnsafeBeanReadProperty<B, T> extends BeanReadProperty<B, T> {
      *
      * @param bean The bean
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     default int getIntUnsafe(B bean) {
         return Objects.requireNonNull((Integer) getUnsafe(bean));
@@ -124,7 +124,7 @@ public interface UnsafeBeanReadProperty<B, T> extends BeanReadProperty<B, T> {
      *
      * @param bean The bean
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     default long getLongUnsafe(B bean) {
         return Objects.requireNonNull((Long) getUnsafe(bean));
@@ -138,7 +138,7 @@ public interface UnsafeBeanReadProperty<B, T> extends BeanReadProperty<B, T> {
      *
      * @param bean The bean
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     default float getFloatUnsafe(B bean) {
         return Objects.requireNonNull((Float) getUnsafe(bean));
@@ -152,7 +152,7 @@ public interface UnsafeBeanReadProperty<B, T> extends BeanReadProperty<B, T> {
      *
      * @param bean The bean
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     default double getDoubleUnsafe(B bean) {
         return Objects.requireNonNull((Double) getUnsafe(bean));

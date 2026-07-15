@@ -25,7 +25,7 @@ import org.jspecify.annotations.NonNull;
  * Value.as(TargetType) can convert guest values to the desired host type.
  *
  * @param <T> The target type
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public interface TargetTypeMapping<T> {

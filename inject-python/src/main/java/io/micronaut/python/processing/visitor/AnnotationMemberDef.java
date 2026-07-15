@@ -34,7 +34,7 @@ import java.util.Objects;
  * @param annotationMetadata The annotation metadata for the member
  * @param decorators Decorators applied to the member
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public record AnnotationMemberDef(String name,

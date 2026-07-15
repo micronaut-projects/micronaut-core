@@ -58,7 +58,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  * available via PythonContextRuntime for bridge classes to use.
  *
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Factory
 @Experimental

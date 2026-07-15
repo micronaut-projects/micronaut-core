@@ -40,7 +40,7 @@ import org.jetbrains.annotations.Nullable;
  * A field element returning data from a Python {@link AttributeDef}.
  *
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public final class PythonFieldElement extends AbstractPythonElement implements FieldElement, ElementProvider {

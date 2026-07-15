@@ -27,7 +27,7 @@ import io.micronaut.core.util.StringUtils;
  * instances through the {@link io.micronaut.core.beans.BeanIntrospector} API.
  *
  * @author graemerocher
- * @since 3.0.0
+ * @since 5.2.0
  */
 @Internal
 public class BeanIntrospectionScanner implements AnnotationScanner {
@@ -47,7 +47,7 @@ public class BeanIntrospectionScanner implements AnnotationScanner {
      * Creates a scanner that resolves bean introspections from the supplied class loader.
      *
      * @param classLoader The class loader to scan for bean introspections
-     * @since 5.1.0
+     * @since 5.2.0
      */
     public BeanIntrospectionScanner(ClassLoader classLoader) {
         this(BeanIntrospector.forClassLoader(classLoader));

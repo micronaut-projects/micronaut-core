@@ -22,7 +22,7 @@ import io.micronaut.core.util.ArgumentUtils;
  * Static registry for the provider used by {@link BeanIntrospector} to discover introspections.
  *
  * @author Denis Stepanov
- * @since 5.1.0
+ * @since 5.2.0
  */
 @Experimental
 public final class BeanIntrospectionProviders {

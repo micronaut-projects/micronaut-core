@@ -29,7 +29,7 @@ import java.util.Objects;
  * @param arguments The list of function arguments.
  * @param declaringFunction The function that declares these arguments.
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public record ArgumentsDef(

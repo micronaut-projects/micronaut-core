@@ -45,7 +45,7 @@ import javax.lang.model.element.Element;
  * @param originatingElement The Java element that triggered Python processing.
  * @param classesCache The per-processing-run class element cache.
  * @param scriptsCache The per-processing-run script element cache.
- * @since 4.8.0
+ * @since 5.2.0
  * @author Micronaut
  */
 @Experimental

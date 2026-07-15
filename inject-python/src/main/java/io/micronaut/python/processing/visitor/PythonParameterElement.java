@@ -34,7 +34,7 @@ import io.micronaut.python.processing.util.GraalPyUtil;
  * </p>
  *
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public final class PythonParameterElement extends AbstractPythonElement implements ParameterElement {

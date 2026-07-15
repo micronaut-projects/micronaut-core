@@ -35,7 +35,7 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
  * </p>
  *
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public final class PythonEnumElement extends AbstractPythonClassElement implements EnumElement {

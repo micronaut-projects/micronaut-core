@@ -30,7 +30,7 @@ import io.micronaut.aop.InterceptorKind;
  * to test AOP functionality with Python classes.
  *
  * @author Micronaut
- * @since 4.8.0
+ * @since 5.2.0
  */
 @Around
 @InterceptorBinding(kind = InterceptorKind.AROUND)

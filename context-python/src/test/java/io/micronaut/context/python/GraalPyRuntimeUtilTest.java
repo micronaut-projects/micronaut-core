@@ -39,7 +39,7 @@ import org.junit.jupiter.api.Test;
  * Test class for GraalPyRuntimeUtil to verify generic type handling.
  *
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 class GraalPyRuntimeUtilTest {
 

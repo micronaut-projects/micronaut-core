@@ -61,7 +61,7 @@ import java.util.stream.Collectors;
  * during Java compilation.
  *
  * @author Micronaut
- * @since 4.8.0
+ * @since 5.2.0
  */
 @SupportedAnnotationTypes(PythonAnnotationProcessor.PYTHON_APPLICATION_ANNOTATION)
 @Experimental

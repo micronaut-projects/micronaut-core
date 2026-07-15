@@ -75,7 +75,7 @@ import javax.lang.model.element.Element;
  * @author Micronaut Team
  * @see FunctionDef
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.FunctionDef">Python AST FunctionDef</a>
- * @since 5.0.0
+ * @since 5.2.0
  */
 @SuppressWarnings("checkstyle:InnerTypeLast")
 @Experimental

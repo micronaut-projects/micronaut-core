@@ -42,7 +42,7 @@ import org.jspecify.annotations.NonNull;
  * unlike MethodElement.of() which creates immutable elements.
  *
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public final class PythonPropertySetterMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider {

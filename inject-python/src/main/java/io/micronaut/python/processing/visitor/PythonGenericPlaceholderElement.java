@@ -30,7 +30,7 @@ import java.util.Optional;
  * Implementation of {@link GenericPlaceholderElement} for Python TypeVars.
  *
  * @author Micronaut
- * @since 4.8.0
+ * @since 5.2.0
  */
 @Experimental
 public final class PythonGenericPlaceholderElement extends AbstractPythonClassElement implements GenericPlaceholderElement {

@@ -44,7 +44,7 @@ import java.util.stream.Stream;
  * </ul>
  *
  * @author Micronaut
- * @since 4.8.0
+ * @since 5.2.0
  */
 @Experimental
 public final class PyronautCompiler {

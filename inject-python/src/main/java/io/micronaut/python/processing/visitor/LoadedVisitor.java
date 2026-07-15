@@ -28,7 +28,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
  * element being visited by the annotation processor.
  *
  * @author James Kleeh
- * @since 1.0
+ * @since 5.2.0
  */
 @Internal
 final class LoadedVisitor implements Ordered {

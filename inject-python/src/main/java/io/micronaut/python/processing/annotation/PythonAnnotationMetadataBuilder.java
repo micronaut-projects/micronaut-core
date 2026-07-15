@@ -75,7 +75,7 @@ import java.util.Set;
  * annotation processing, converting Python decorators to Java annotation metadata.
  *
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<ElementDef, DecoratorDef> {

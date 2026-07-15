@@ -28,7 +28,7 @@ import io.micronaut.core.annotation.Experimental;
  * @param typeAnnotation The return type annotation, or null if no return type is specified.
  * @param decorators The decorators found on the return type annotation.
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public record ReturnDef(

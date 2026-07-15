@@ -24,7 +24,7 @@ import java.util.List;
  * that can be processed by Micronaut's annotation processing system.
  *
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public sealed interface ElementDef permits AnnotationMemberDef, ArgumentDef, AttributeDef, ClassDef, FunctionDef, PropertyDef, ReturnDef, ScriptDef {

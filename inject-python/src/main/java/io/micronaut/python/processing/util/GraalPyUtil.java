@@ -52,7 +52,7 @@ import io.micronaut.python.processing.visitor.PythonVisitorContext;
  * for Python AST processing within Micronaut.
  *
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public final class GraalPyUtil {

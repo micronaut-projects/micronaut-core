@@ -36,7 +36,7 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
  * </p>
  *
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public final class PythonElementFactory implements ElementFactory<ElementDef, ClassDef, FunctionDef, AttributeDef> {

@@ -56,7 +56,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
  * closed safely.
  *
  * @author Micronaut Team
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public final class PythonContextRuntime {
@@ -133,7 +133,7 @@ public final class PythonContextRuntime {
      * @param nestedMemberNames The nested member names below the root class
      * @param displayName The class display name used in diagnostics
      * @param cacheKey The stable class cache key used by pooled contexts
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public record PythonClassReference(
@@ -199,7 +199,7 @@ public final class PythonContextRuntime {
      * @param fallback The startup-context instance
      * @param classReference The Python class reference
      * @return An event-loop-local instance, or the fallback when no event-loop context is active
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value asyncInstance(Value fallback, PythonClassReference classReference) {
@@ -654,7 +654,7 @@ public final class PythonContextRuntime {
      *
      * @param classReference The Python class reference
      * @return The pooled class instance (Value) from some context
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value findPooledClass(PythonClassReference classReference) {
@@ -674,7 +674,7 @@ public final class PythonContextRuntime {
      * @param classReference The Python class reference
      * @param context The context
      * @return The pooled class instance (Value)
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value findPooledClass(PythonClassReference classReference, Context context) {
@@ -691,7 +691,7 @@ public final class PythonContextRuntime {
      * @param fn Function receiving the pooled Value
      * @param <T> Result type returned by the function
      * @return Result returned from the function
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static <T> T withPooled(PythonClassReference classReference, java.util.function.Function<Value, T> fn) {
@@ -772,7 +772,7 @@ public final class PythonContextRuntime {
      *
      * @param expression The Python expression or statements to evaluate
      * @return A pooled value wrapper
-     * @since 5.1.0
+     * @since 5.2.0
      */
     public static PooledValue withPooledValue(String expression) {
         return new PooledValue() {
@@ -790,7 +790,7 @@ public final class PythonContextRuntime {
      * @param fn Function receiving the pooled value
      * @param <T> Result type returned by the function
      * @return Result returned from the function
-     * @since 5.1.0
+     * @since 5.2.0
      */
     public static <T> T withPooledValue(String expression, java.util.function.Function<Value, T> fn) {
         if (shouldOffloadPooledExecution()) {
@@ -898,7 +898,7 @@ public final class PythonContextRuntime {
      * @param methodName The method name
      * @param args Arguments
      * @return The polyglot result
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value invokePooled(PythonClassReference classReference, String methodName, Object... args) {
@@ -940,7 +940,7 @@ public final class PythonContextRuntime {
      * @param classReference The Python class reference
      * @param args The args
      * @return The new instance
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value newIntroduction(PythonClassReference classReference, Object... args) {
@@ -979,7 +979,7 @@ public final class PythonContextRuntime {
      * @param requiredArgCount The number of non-defaulted positional constructor arguments
      * @param args The arguments
      * @return The new instance
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value newIntroductionWithDefaultedTrailingNulls(PythonClassReference classReference,
@@ -994,7 +994,7 @@ public final class PythonContextRuntime {
      * @param classReference The Python class reference
      * @param args The args
      * @return The new instance
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value newInstance(PythonClassReference classReference, Object... args) {
@@ -1008,7 +1008,7 @@ public final class PythonContextRuntime {
      * @param classReference The Python class reference
      * @param name The enum constant name
      * @return The Python enum constant
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value enumValue(PythonClassReference classReference, String name) {
@@ -1038,7 +1038,7 @@ public final class PythonContextRuntime {
      * @param requiredArgCount The number of non-defaulted positional constructor arguments
      * @param args The arguments
      * @return The new instance
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value newInstanceWithDefaultedTrailingNulls(PythonClassReference classReference,
@@ -1052,7 +1052,7 @@ public final class PythonContextRuntime {
      *
      * @param classReference The Python class reference
      * @return The new uninitialized instance
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value newUninitializedInstance(PythonClassReference classReference) {
@@ -1067,7 +1067,7 @@ public final class PythonContextRuntime {
      * @param classReference The Python class reference
      * @param props Map of property names to values
      * @return The new instance with members populated
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value newInstance(PythonClassReference classReference, Map<String, Object> props) {
@@ -1094,7 +1094,7 @@ public final class PythonContextRuntime {
      * @param classReference The Python class reference
      * @param props Map of property names to values
      * @return The new frozen dataclass instance with members populated
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value newFrozenDataclassInstance(PythonClassReference classReference, Map<String, Object> props) {
@@ -1146,7 +1146,7 @@ public final class PythonContextRuntime {
      *
      * @param classReference The Python class reference
      * @return The class Value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value findClass(PythonClassReference classReference) {
@@ -1237,7 +1237,7 @@ public final class PythonContextRuntime {
      * @param methodName The method name
      * @param args The method arguments
      * @return The method result
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     public static Value invokeStaticMethod(PythonClassReference classReference, String methodName, Object... args) {

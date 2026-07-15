@@ -29,7 +29,7 @@ import java.lang.annotation.Target;
  * Metadata for generated Python bridge classes.
  *
  * @author Micronaut Team
- * @since 5.1.0
+ * @since 5.2.0
  */
 @Documented
 @Inherited

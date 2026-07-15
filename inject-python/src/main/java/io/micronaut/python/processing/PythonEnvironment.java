@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
  * @param scripts A map of Python script names to their definitions.
  * @param decorators A map of Python decorator names to their definitions.
  * @param context The GraalVM Polyglot context used for executing Python code.
- * @since 4.8.0
+ * @since 5.2.0
  * @author Micronaut
  */
 @Experimental

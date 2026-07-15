@@ -48,7 +48,7 @@ import io.micronaut.python.processing.visitor.PythonMethodElement;
  *     ElementAnnotationMetadata metadata = factory.build(someElement);
  * </pre>
  *
- * @since 5.0.0
+ * @since 5.2.0
  */
 @Experimental
 public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnotationMetadataFactory<ElementDef, DecoratorDef> {
