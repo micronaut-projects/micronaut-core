@@ -181,11 +181,18 @@ class DefaultHttpClientConfigurationSpec extends Specification {
         !copy.decompressionEnabled
         copy.plaintextMode == HttpVersionSelection.PlaintextMode.H2C
         copy.alpnModes == [HttpVersionSelection.ALPN_HTTP_1]
+        !copy.alpnModes.is(cfg.alpnModes)
         copy.allowBlockEventLoop
         copy.dnsResolutionMode == HttpClientConfiguration.DnsResolutionMode.NOOP
         copy.addressResolverGroupName == 'custom-resolver'
         copy.pcapLoggingPathPattern == '/tmp/client.pcap'
         copy.httpVersion == HttpVersion.HTTP_2_0
+
+        when:
+        cfg.alpnModes << HttpVersionSelection.ALPN_HTTP_2
+
+        then:
+        copy.alpnModes == [HttpVersionSelection.ALPN_HTTP_1]
     }
 
     static final class TestHttpClientConfiguration extends HttpClientConfiguration {
