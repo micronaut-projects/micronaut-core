@@ -5,6 +5,7 @@ import io.micronaut.http.HttpVersion
 import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.HttpVersionSelection
+import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 import spock.lang.Specification
 
@@ -158,6 +159,24 @@ class DefaultHttpClientConfigurationSpec extends Specification {
 
         expect:
         cfg.connectionPoolIdleTimeout.empty
+    }
+
+    void "service client configuration inherits pcap logging path pattern"() {
+        given:
+        def pcapLoggingPathPattern = '/tmp/{localAddress}-{remoteAddress}-{qualifier}-{random}-{timestamp}.pcap'
+        def ctx = ApplicationContext.run(
+                'micronaut.http.client.pcap-logging-path-pattern': pcapLoggingPathPattern,
+                'micronaut.http.services.foo.url': 'http://localhost'
+        )
+
+        when:
+        def config = ctx.getBean(HttpClientConfiguration, Qualifiers.byName('foo'))
+
+        then:
+        config.pcapLoggingPathPattern == pcapLoggingPathPattern
+
+        cleanup:
+        ctx.close()
     }
 
     void "copy constructor copies top-level HTTP client settings"() {
