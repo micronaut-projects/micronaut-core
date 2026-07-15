@@ -48,7 +48,9 @@ class PoolController:
     @Get("/list")
     def l(self) -> list[str]:
         return self.reader.get_list()
-'''
+        '''
+        def previousContextIdProperty = System.getProperty("micronaut.python.context-id.enabled")
+        System.setProperty("micronaut.python.context-id.enabled", "true")
         Map<String, Object> props = ["micronaut.python.pool.size": 4]
         ApplicationContext context = buildContext(python, true, props)
         def readerClass = context.classLoader.loadClass("python.CtxReader")
@@ -87,6 +89,11 @@ class PoolController:
         executor?.shutdownNow()
         client?.close()
         context?.close()
+        if (previousContextIdProperty == null) {
+            System.clearProperty("micronaut.python.context-id.enabled")
+        } else {
+            System.setProperty("micronaut.python.context-id.enabled", previousContextIdProperty)
+        }
     }
 
     void "pooled class with ctor args fails compilation"() {

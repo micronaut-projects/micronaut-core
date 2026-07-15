@@ -68,6 +68,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     public static final String INTERNAL_MAIN = "__main__.py";
     public static final String APPLICATION_MAIN = "main.py";
     public static final String PYRONAUT_MAIN_CLASS = "pyronaut_application.PyronautMain";
+    /** Enables the per-context Python builtin used by context-reuse tests. */
+    public static final String CONTEXT_ID_PROPERTY = "micronaut.python.context-id.enabled";
     private static final Logger LOG = LoggerFactory.getLogger(GraalPyContextFactory.class);
 
     private final ApplicationContext applicationContext;
@@ -212,12 +214,14 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         PythonContextRuntime.registerContextEngine(context, engine);
         LOG.debug("GraalPy Context Built in {}ms", System.currentTimeMillis() - now);
 
-        // set a per-context unique id for tests and tracing via builtins
-        now = System.currentTimeMillis();
-        String id = java.util.UUID.randomUUID().toString();
-        context.eval(PYTHON, "import builtins; builtins.__MN_CTX_ID__ = '" + id + "'");
-        LOG.debug("GraalPy Context ID registered in {}ms", System.currentTimeMillis() - now);
-
+        // The per-context builtin is only needed by context-reuse tests. Avoid
+        // evaluating another Python snippet during normal application startup.
+        if (Boolean.getBoolean(CONTEXT_ID_PROPERTY)) {
+            now = System.currentTimeMillis();
+            String id = java.util.UUID.randomUUID().toString();
+            context.eval(PYTHON, "import builtins; builtins.__MN_CTX_ID__ = '" + id + "'");
+            LOG.debug("GraalPy Context ID registered in {}ms", System.currentTimeMillis() - now);
+        }
         // Try to load the generated pyronaut_application.py from META-INF
         now = System.currentTimeMillis();
         evaluateMain(classLoader, INTERNAL_MAIN, context);
