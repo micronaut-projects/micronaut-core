@@ -38,6 +38,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -310,7 +311,7 @@ public abstract class HttpClientConfiguration {
             this.threadFactory = copy.threadFactory;
             this.httpVersion = copy.httpVersion;
             this.plaintextMode = copy.plaintextMode;
-            this.alpnModes = copy.alpnModes;
+            this.alpnModes = new ArrayList<>(copy.alpnModes);
             this.allowBlockEventLoop = copy.allowBlockEventLoop;
             this.dnsResolutionMode = copy.dnsResolutionMode;
             this.addressResolverGroupName = copy.addressResolverGroupName;
