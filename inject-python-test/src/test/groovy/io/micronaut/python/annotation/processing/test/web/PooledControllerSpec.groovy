@@ -47,6 +47,8 @@ def pair() -> str:
     own = ctx()
     return own + ":" + message_service.ctx_id()
 '''
+        def previousContextIdProperty = System.getProperty("micronaut.python.context-id.enabled")
+        System.setProperty("micronaut.python.context-id.enabled", "true")
         Map<String, Object> props = ["micronaut.python.pool.size": 4]
         ApplicationContext context = buildContext(python, true, props)
         def server = context.getBean(EmbeddedServer)
@@ -84,5 +86,10 @@ def pair() -> str:
         executor?.shutdownNow()
         client?.close()
         context?.close()
+        if (previousContextIdProperty == null) {
+            System.clearProperty("micronaut.python.context-id.enabled")
+        } else {
+            System.setProperty("micronaut.python.context-id.enabled", previousContextIdProperty)
+        }
     }
 }

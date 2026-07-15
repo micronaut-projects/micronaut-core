@@ -55,6 +55,8 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     systemProperty("micronaut.python.pool.enabled", "false")
+    // The asyncio context-isolation test compares IDs across pooled contexts.
+    systemProperty("micronaut.python.context-id.enabled", "true")
 }
 
 tasks.named<PythonCompile>("compileTestPython") {
