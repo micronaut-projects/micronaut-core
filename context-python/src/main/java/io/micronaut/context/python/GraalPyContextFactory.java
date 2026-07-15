@@ -183,12 +183,13 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                                         ClassLoader classLoader,
                                         Map<String, String> options,
                                         String applicationMain) throws IOException {
-        var beacon = findBeacon(classLoader);
         System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
         System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
+        long now = System.currentTimeMillis();
+
         Context.Builder builder = Context.newBuilder().apply(GraalPyResources.forVirtualFileSystem(VirtualFileSystem.newBuilder()
                 .resourceDirectory(APPLICATION_PATH)
-                .resourceLoadingClass(beacon).build()))
+                .resourceClassLoader(classLoader).build()))
             .allowExperimentalOptions(true)
             .allowCreateProcess(true)
             .allowValueSharing(true)
@@ -204,16 +205,24 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             .ifPresent(executable -> builder.option("python.Executable", executable.toString()));
         options.forEach(builder::option);
 
+        LOG.debug("Configured GraalPy Context.Builder in {}ms", System.currentTimeMillis() - now);
+
+        now = System.currentTimeMillis();
         var context = builder.build();
         PythonContextRuntime.registerContextEngine(context, engine);
-        context.initialize(PYTHON);
+        LOG.debug("GraalPy Context Built in {}ms", System.currentTimeMillis() - now);
+
         // set a per-context unique id for tests and tracing via builtins
+        now = System.currentTimeMillis();
         String id = java.util.UUID.randomUUID().toString();
         context.eval(PYTHON, "import builtins; builtins.__MN_CTX_ID__ = '" + id + "'");
+        LOG.debug("GraalPy Context ID registered in {}ms", System.currentTimeMillis() - now);
 
         // Try to load the generated pyronaut_application.py from META-INF
+        now = System.currentTimeMillis();
         evaluateMain(classLoader, INTERNAL_MAIN, context);
         evaluateMain(classLoader, applicationMain, context);
+        LOG.debug("GraalPy main.py evaluated in {}ms", System.currentTimeMillis() - now);
         return context;
     }
 
@@ -235,24 +244,19 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     }
 
     private static void evaluateMain(ClassLoader classLoader, String mainPy, Context context) throws IOException {
+        String mainPyPath = APPLICATION_SRC_PATH + mainPy;
         try (InputStream inputStream = classLoader
-            .getResourceAsStream(APPLICATION_SRC_PATH + mainPy)) {
+            .getResourceAsStream(mainPyPath)) {
 
             if (inputStream != null) {
+                LOG.debug("Evaluating main.py {}", mainPyPath);
                 String scriptContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+                LOG.trace("Resolved main.py source");
+                LOG.trace(scriptContent);
                 Source source = Source.newBuilder(PYTHON, scriptContent, mainPy)
                     .build();
                 context.eval(source);
             }
-        }
-    }
-
-    private static Class<?> findBeacon(ClassLoader classLoader) {
-        try {
-            return classLoader.loadClass(PYRONAUT_MAIN_CLASS);
-        } catch (ClassNotFoundException e) {
-            // will happen when compiled as a native image
-            return GraalPyContextFactory.class;
         }
     }
 
