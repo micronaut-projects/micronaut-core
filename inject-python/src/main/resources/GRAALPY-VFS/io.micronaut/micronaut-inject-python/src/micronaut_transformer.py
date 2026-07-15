@@ -220,12 +220,20 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                 except SyntaxError as e:
                     print(f"Error parsing java type assignment: {e}")
 
-            # Add the generated decorator functions
+            # Add generated decorators. Their standalone snippets each carry
+            # the helper prelude, but a combined source needs only one copy.
+            micronaut_annotation_emitted = bool(self.transformed_code)
             for decorator_code in self.transformed_code:
                 try:
                     # Parse the generated decorator code
                     decorator_ast = ast.parse(decorator_code)
-                    generated_nodes.extend(decorator_ast.body)
+                    for generated_node in decorator_ast.body:
+                        if (isinstance(generated_node, ast.FunctionDef)
+                                and generated_node.name == 'micronaut_annotation'):
+                            if micronaut_annotation_emitted:
+                                continue
+                            micronaut_annotation_emitted = True
+                        generated_nodes.append(generated_node)
                 except SyntaxError as e:
                     print(f"Error parsing generated decorator: {e}")
                     continue
