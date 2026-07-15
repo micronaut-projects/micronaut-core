@@ -272,7 +272,7 @@ public final class AnnotationMetadataSupport {
 
         coreRepeatableAnnotationsContainers.put("io.micronaut.aop.InterceptorBinding", "io.micronaut.aop.InterceptorBindingDefinitions");
         CORE_REPEATABLE_ANNOTATIONS_CONTAINERS = Collections.unmodifiableMap(coreRepeatableAnnotationsContainers);
-        REPEATABLE_ANNOTATIONS_CONTAINERS.putAll(coreRepeatableAnnotationsContainers);
+        coreRepeatableAnnotationsContainers.forEach(AnnotationMetadataSupport::registerRepeatableAnnotation);
     }
 
     /**
@@ -450,7 +450,7 @@ public final class AnnotationMetadataSupport {
      */
     @Internal
     static void registerRepeatableAnnotations(Map<String, String> repeatableAnnotations) {
-        REPEATABLE_ANNOTATIONS_CONTAINERS.putAll(repeatableAnnotations);
+        repeatableAnnotations.forEach(AnnotationMetadataSupport::registerRepeatableAnnotation);
     }
 
     /**
@@ -464,6 +464,12 @@ public final class AnnotationMetadataSupport {
     @Internal
     static void registerRepeatableAnnotation(String repeatable, String repeatableContainer) {
         REPEATABLE_ANNOTATIONS_CONTAINERS.put(repeatable, repeatableContainer);
+        if (repeatable.indexOf('$') > -1) {
+            REPEATABLE_ANNOTATIONS_CONTAINERS.put(
+                repeatable.replace('$', '.'),
+                repeatableContainer.replace('$', '.')
+            );
+        }
     }
 
     /**

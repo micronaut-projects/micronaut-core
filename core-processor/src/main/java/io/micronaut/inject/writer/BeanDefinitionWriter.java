@@ -639,6 +639,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private final String beanFullClassName;
     private final String beanDefinitionName;
+    private final String beanDefinitionPackageName;
     private final TypeDef beanTypeDef;
     private final Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
     private final ClassTypeDef beanDefinitionTypeDef;
@@ -738,7 +739,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         );
         this.constructorDefinition = constructorDefinition;
 
-        applyConfigurationInjectionIfNecessary(constructorDefinition.annotationMetadata());
+        applyConfigurationInjectionIfNecessary(constructorDefinition);
         evaluatedExpressionProcessor.processEvaluatedExpressions(constructorDefinition.constructorElement());
     }
 
@@ -798,6 +799,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         this.isConfigurationProperties = isConfigurationProperties(this.annotationMetadata);
         validateExposedTypes(this.annotationMetadata, visitorContext);
         this.beanDefinitionName = beanDefinitionName;
+        this.beanDefinitionPackageName = NameUtils.getPackageName(beanDefinitionName);
         this.visitorContext = visitorContext;
         this.evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, getOriginatingElement());
         evaluatedExpressionProcessor.processEvaluatedExpressions(this.annotationMetadata,
@@ -891,15 +893,35 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     private void postProcessMethod(MethodDefinition<ClassElement, MethodElement> methodDefinition) {
-        applyConfigurationInjectionIfNecessary(methodDefinition.annotationMetadata());
+        applyConfigurationInjectionIfNecessary(methodDefinition);
         applyDefaultNamedToParameters(List.of(methodDefinition.methodElement().getParameters()));
         evaluatedExpressionProcessor.processEvaluatedExpressions(methodDefinition.methodElement());
     }
 
-    private void applyConfigurationInjectionIfNecessary(AnnotationMetadata annotationMetadata) {
-        if (annotationMetadata.hasAnnotation(RequiresValidation.class)) {
-            setValidated(true);
+    private void applyConfigurationInjectionIfNecessary(ConstructorDefinition<ClassElement, MethodElement> constructorDefinition) {
+        applyConfigurationInjectionIfNecessary(constructorDefinition.annotationMetadata(), constructorDefinition.injectionPoints());
+    }
+
+    private void applyConfigurationInjectionIfNecessary(MethodDefinition<ClassElement, MethodElement> methodDefinition) {
+        applyConfigurationInjectionIfNecessary(methodDefinition.annotationMetadata(), methodDefinition.injectionPoints());
+    }
+
+    private void applyConfigurationInjectionIfNecessary(AnnotationMetadata annotationMetadata, List<BeanDefinitionInjectionPoint<ClassElement>> injectionPoints) {
+        if (annotationMetadata.hasDeclaredAnnotation(RequiresValidation.class)) {
+            if (injectionPoints.stream().anyMatch(BeanDefinitionWriter::isValidationRequiredForInjectionPoint)) {
+                setValidated(true);
+            }
         }
+    }
+
+    private static boolean isValidationRequiredForInjectionPoint(BeanDefinitionInjectionPoint<ClassElement> injectionPoint) {
+        if (!injectionPoint.annotationMetadata().hasDeclaredAnnotation(RequiresValidation.class)) {
+            return false;
+        }
+        if (injectionPoint instanceof BeanInjectionPoint<?> && !injectionPoint.type().isNullable()) {
+            return false;
+        }
+        return true;
     }
 
     @Override
@@ -1969,7 +1991,17 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             classDefBuilder.addField(injectionMethodsField);
             initStatements.add(beanDefinitionTypeDef.getStaticField(injectionMethodsField)
                 .put(methodReferenceArray.instantiate(allMethods.stream()
-                    .map(md -> getNewMethodReference(md.methodElement().getDeclaringType(), md.methodElement(), md.annotationMetadata(), postConstructMethods.contains(md), preDestroyMethods.contains(md)))
+                    .map(md -> {
+                        boolean postConstructMethod = postConstructMethods.contains(md);
+                        boolean preDestroyMethod = preDestroyMethods.contains(md);
+                        return getNewMethodReference(
+                            getMethodReferenceDeclaringType(md.methodElement(), postConstructMethod, preDestroyMethod),
+                            md.methodElement(),
+                            md.annotationMetadata(),
+                            postConstructMethod,
+                            preDestroyMethod
+                        );
+                    })
                     .toList())));
             failStatements.add(beanDefinitionTypeDef.getStaticField(injectionMethodsField).put(ExpressionDef.nullValue()));
         }
@@ -2399,6 +2431,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             exposedTypeNames = new LinkedHashSet<>();
             if (interceptedType != null) {
                 collectExposedTypes(exposedTypeNames, visitorContext.getClassElement(interceptedType).orElseThrow(() -> new IllegalStateException("Intercepted type not found: " + interceptedType)));
+                exposedTypeNames.add(interceptedType);
                 exposedTypeNames.add(beanProducingElement.getName()); // Allow finding the proxy by it's name
             } else if (exposes != null) {
                 exposes.forEach(name -> exposedTypeNames.add(name.getName()));
@@ -2409,9 +2442,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                     collectExposedTypes(exposedTypeNames, beanTypeElement.getFirstTypeArgument()
                         .orElseThrow(() -> new IllegalStateException("No type argument found for array type: " + beanTypeElement.getType())));
                 }
-                collectExposedTypes(exposedTypeNames, beanTypeElement);
+                collectBeanTypeAndExposedTypes(exposedTypeNames, beanTypeElement);
             } else {
-                collectExposedTypes(exposedTypeNames, beanTypeElement);
+                collectBeanTypeAndExposedTypes(exposedTypeNames, beanTypeElement);
             }
         }
         if (exposedTypeNames.isEmpty()) {
@@ -2536,12 +2569,30 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     private void collectExposedTypes(Set<String> exposedTypeNames, ClassElement element) {
-        String className = getClassName(element);
-        if (!exposedTypeNames.add(className) || IGNORED_EXPOSED_INTERFACES.contains(className)) {
-            return;
+        collectExposedTypes(exposedTypeNames, element, true);
+    }
+
+    private void collectExposedTypes(Set<String> exposedTypeNames, ClassElement element, boolean rootType) {
+        if (rootType || isAccessibleFromBeanDefinition(element)) {
+            String className = getClassName(element);
+            if (!exposedTypeNames.add(className) || IGNORED_EXPOSED_INTERFACES.contains(className)) {
+                return;
+            }
         }
-        element.getSuperType().ifPresent(superType -> collectExposedTypes(exposedTypeNames, superType));
-        element.getInterfaces().forEach(iface -> collectExposedTypes(exposedTypeNames, iface));
+        element.getSuperType().ifPresent(superType -> collectExposedTypes(exposedTypeNames, superType, false));
+        element.getInterfaces().forEach(iface -> collectExposedTypes(exposedTypeNames, iface, false));
+    }
+
+    private void collectBeanTypeAndExposedTypes(Set<String> exposedTypeNames, ClassElement element) {
+        collectExposedTypes(exposedTypeNames, element);
+    }
+
+    private boolean isAccessibleFromBeanDefinition(ClassElement element) {
+        if (element.isArray()) {
+            return isAccessibleFromBeanDefinition(element.fromArray());
+        }
+        return element.isPublic() ||
+            (!element.isPrivate() && element.getPackageName().equals(beanDefinitionPackageName));
     }
 
     private String getClassName(ClassElement element) {
@@ -4140,6 +4191,18 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                     METHOD_REFERENCE_CONSTRUCTOR, values
                 );
         }
+    }
+
+    private ClassElement getMethodReferenceDeclaringType(MethodElement methodElement,
+                                                        boolean isPostConstructMethod,
+                                                        boolean isPreDestroyMethod) {
+        ClassElement declaringType = methodElement.getDeclaringType();
+        if ((isPostConstructMethod || isPreDestroyMethod) &&
+            methodElement.isPublic() &&
+            !isAccessibleFromBeanDefinition(declaringType)) {
+            return beanTypeElement;
+        }
+        return declaringType;
     }
 
     private ExpressionDef getNewFieldReference(TypedElement declaringType, FieldElement fieldElement) {

@@ -50,7 +50,7 @@ class Foo {}
         bean != null
 
         when:
-        context.destroyBean(bean.getClass())
+        context.destroyBean(bean)
 
         then:
         bean.closed
@@ -102,6 +102,43 @@ class AbstractTest implements AutoCloseable {
         then:
         bean.closed
         bean != context.getBean(beanType)
+    }
+
+    void "test pre destroy with bean method on package-private parent class from another package"() {
+        given:
+        ApplicationContext context = buildContext('test.TestFactory$TestBean', '''\
+package test;
+
+import io.micronaut.context.annotation.*;
+import test.exposedtypes.internal.PublicExposedType;
+
+@Factory
+class TestFactory {
+
+    @Bean(preDestroy="close")
+    @jakarta.inject.Singleton
+    PublicExposedType testBean() {
+        return new PublicExposedType();
+    }
+}
+
+''')
+
+        when:
+        def bean = context.getBean(Class.forName('test.exposedtypes.internal.PublicExposedType'))
+
+        then:
+        bean != null
+
+        when:
+        context.destroyBean(bean)
+
+        then:
+        bean.closed
+        bean != context.getBean(bean.getClass())
+
+        cleanup:
+        context.close()
     }
 
     void "test pre destroy with bean method on parent interface"() {

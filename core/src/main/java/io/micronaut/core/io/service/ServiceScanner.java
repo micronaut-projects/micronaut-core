@@ -61,10 +61,9 @@ final class ServiceScanner<S> {
         this.transformer = transformer;
     }
 
-    @Nullable
-    static StaticServiceDefinitions findStaticServiceDefinitions() {
+    static ServiceScanner.@Nullable ExclusiveStaticServiceDefinitions findStaticServiceDefinitions() {
         if (hasImageSingletons()) {
-            return ImageSingletons.contains(StaticServiceDefinitions.class) ? ImageSingletons.lookup(StaticServiceDefinitions.class) : null;
+            return ImageSingletons.contains(ExclusiveStaticServiceDefinitions.class) ? ImageSingletons.lookup(ExclusiveStaticServiceDefinitions.class) : null;
         } else {
             return null;
         }
@@ -135,7 +134,7 @@ final class ServiceScanner<S> {
             this.classLoader = classLoader;
             this.lineCondition = lineCondition;
             this.transformer = transformer;
-            final ServiceScanner.StaticServiceDefinitions ssd = ServiceScanner.findStaticServiceDefinitions();
+            final ExclusiveStaticServiceDefinitions ssd = ServiceScanner.findStaticServiceDefinitions();
             if (ssd != null) {
                 Map<String, Set<String>> stringSetMap = ssd.serviceTypeMap();
                 serviceEntries = stringSetMap.get(serviceName);
@@ -342,8 +341,8 @@ final class ServiceScanner<S> {
     }
 
     @Internal
-    record StaticServiceDefinitions(Map<String, Set<String>> serviceTypeMap) {
-        StaticServiceDefinitions {
+    record ExclusiveStaticServiceDefinitions(Map<String, Set<String>> serviceTypeMap) {
+        ExclusiveStaticServiceDefinitions {
             if (serviceTypeMap == null) {
                 serviceTypeMap = new HashMap<>();
             }

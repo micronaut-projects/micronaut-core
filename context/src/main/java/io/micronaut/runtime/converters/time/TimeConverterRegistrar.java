@@ -197,7 +197,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             try {
                 ZoneId result = ZoneId.of(object.toString());
                 return Optional.of(result);
-            } catch (DateTimeParseException e) {
+            } catch (DateTimeException e) {
                 context.reject(object, e);
                 return Optional.empty();
             }
