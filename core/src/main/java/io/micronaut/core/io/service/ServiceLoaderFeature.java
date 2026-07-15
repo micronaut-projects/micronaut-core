@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.BuildTimeInit;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanInfo;
 import io.micronaut.core.graal.GraalReflectionConfigurer;
-import io.micronaut.core.io.service.ServiceScanner.StaticServiceDefinitions;
+import io.micronaut.core.io.service.ServiceScanner.ExclusiveStaticServiceDefinitions;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.util.ArrayUtils;
 import org.graalvm.nativeimage.ImageSingletons;
@@ -69,7 +69,7 @@ class ServiceLoaderFeature implements Feature {
     public void beforeAnalysis(BeforeAnalysisAccess access) {
         configureForReflection(access);
 
-        StaticServiceDefinitions staticServiceDefinitions = buildStaticServiceDefinitions(access);
+        ExclusiveStaticServiceDefinitions staticServiceDefinitions = buildStaticServiceDefinitions(access);
         final Collection<Set<String>> allTypeNames = staticServiceDefinitions.serviceTypeMap().values();
         for (Set<String> typeNameSet : allTypeNames) {
             Iterator<String> i = typeNameSet.iterator();
@@ -160,8 +160,8 @@ class ServiceLoaderFeature implements Feature {
      * Add an image singleton.
      * @param staticServiceDefinitions The static definitions.
      */
-    protected void addImageSingleton(StaticServiceDefinitions staticServiceDefinitions) {
-        ImageSingletons.add(StaticServiceDefinitions.class, staticServiceDefinitions);
+    protected void addImageSingleton(ExclusiveStaticServiceDefinitions staticServiceDefinitions) {
+        ImageSingletons.add(ExclusiveStaticServiceDefinitions.class, staticServiceDefinitions);
     }
 
     /**
@@ -203,14 +203,14 @@ class ServiceLoaderFeature implements Feature {
      * @param access The access
      * @return The definitions
      */
-    protected StaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
+    protected ExclusiveStaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
         try {
             Map<String, Set<String>> services = MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(getClass().getClassLoader());
             for (String internalService : INTERNAL_SERVICE) {
                 Set<String> entries = services.computeIfAbsent(internalService, x -> new LinkedHashSet<>());
                 collectDynamicServices(entries, internalService);
             }
-            return new StaticServiceDefinitions(
+            return new ExclusiveStaticServiceDefinitions(
                 services
             );
         } catch (IOException e) {

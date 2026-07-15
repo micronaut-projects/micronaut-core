@@ -331,6 +331,11 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @ConfigurationProperties("ssl")
     public static class ServiceSslClientConfiguration extends AbstractClientSslConfiguration {
 
+        public ServiceSslClientConfiguration() {
+            // Enable by default, like ClientSslConfiguration; otherwise a per-service ssl block leaves SSL disabled.
+            setEnabled(true);
+        }
+
         /**
          * Sets the key configuration.
          *

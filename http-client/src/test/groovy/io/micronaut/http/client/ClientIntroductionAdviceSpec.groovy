@@ -45,6 +45,14 @@ class ClientIntroductionAdviceSpec extends Specification {
         myService.index() == 'success'
     }
 
+    void "test implement private nested HTTP client"() {
+        given:
+        PrivateNestedClient client = server.applicationContext.getBean(PrivateNestedClient)
+
+        expect:
+        client.index() == 'success'
+    }
+
     void "test accept type defaults to json"() {
         given:
         AcceptTypeClient client = server.applicationContext.getBean(AcceptTypeClient)
@@ -448,6 +456,11 @@ class ClientIntroductionAdviceSpec extends Specification {
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Client('/aop')
     static interface MyClient extends MyApi {
+    }
+
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
+    @Client('/aop')
+    private static interface PrivateNestedClient extends MyApi {
     }
 
     @Client('/accept')

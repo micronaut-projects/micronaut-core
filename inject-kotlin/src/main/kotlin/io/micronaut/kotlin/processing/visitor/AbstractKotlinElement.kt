@@ -27,6 +27,7 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSModifierListOwner
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.KSTypeAlias
 import com.google.devtools.ksp.symbol.KSTypeArgument
 import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.Modifier
@@ -284,15 +285,23 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         parentTypeArguments: Map<String, ClassElement>,
         visitedTypes: MutableSet<Any> = HashSet()
     ): Map<String, ClassElement> {
+        // A non-generic typealias (e.g. typealias BarList = List<Bar>) has no typeParameters
+        // on the alias itself, so KSType.arguments is empty and the concrete type arguments
+        // (Bar) would be lost. Expand to the underlying type to recover them.
+        val effectiveType = if (type.declaration is KSTypeAlias && type.declaration.typeParameters.isEmpty()) {
+            (type.declaration as KSTypeAlias).type.resolve()
+        } else {
+            type
+        }
         val typeArguments = mutableMapOf<String, ClassElement>()
-        val typeParameters = type.declaration.typeParameters
-        if (type.arguments.isEmpty() || type.arguments.size != typeParameters.size) {
+        val typeParameters = effectiveType.declaration.typeParameters
+        if (effectiveType.arguments.isEmpty() || effectiveType.arguments.size != typeParameters.size) {
             typeParameters.forEach {
                 typeArguments[it.name.asString()] =
                     resolveTypeParameter(owner, it, parentTypeArguments, visitedTypes)
             }
         } else {
-            type.arguments.forEachIndexed { i, typeArgument ->
+            effectiveType.arguments.forEachIndexed { i, typeArgument ->
                 val variableName = typeParameters[i].name.asString()
                 if (typeArgument.variance == Variance.STAR) {
                     val typeParameter =

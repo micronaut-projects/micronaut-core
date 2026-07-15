@@ -202,7 +202,7 @@ public final class AstBeanPropertiesUtils {
                 continue;
             }
             String fieldPropertyName = fieldElement.getSimpleName();
-            String propertyName = resolvePropertyNameForField(props, fieldPropertyName);
+            String propertyName = resolvePropertyNameForField(props, fieldPropertyName, isIntrospectedPropertyField);
             boolean isPropertyField = propertyFields.contains(fieldPropertyName);
             boolean hasConstructorWriteAccess = isIntrospectedPropertyField
                 && isWriteOnlyIntrospectedProperty(fieldElement)
@@ -294,7 +294,9 @@ public final class AstBeanPropertiesUtils {
         return beanProperties;
     }
 
-    private static String resolvePropertyNameForField(Map<String, BeanPropertyData> props, String fieldPropertyName) {
+    private static String resolvePropertyNameForField(Map<String, BeanPropertyData> props,
+                                                      String fieldPropertyName,
+                                                      boolean isIntrospectedPropertyField) {
         if (props.containsKey(fieldPropertyName)) {
             return fieldPropertyName;
         }
@@ -304,7 +306,33 @@ public final class AstBeanPropertiesUtils {
                 return accessorPropertyName;
             }
         }
+        if (isIntrospectedPropertyField) {
+            if (isBooleanAccessorPropertyFieldName(fieldPropertyName)) {
+                String accessorPropertyName = NameUtils.decapitalize(fieldPropertyName.substring(2));
+                if (props.containsKey(accessorPropertyName)) {
+                    return accessorPropertyName;
+                }
+            }
+            if (isAcronymPropertyFieldName(fieldPropertyName)) {
+                String accessorPropertyName = Character.toUpperCase(fieldPropertyName.charAt(0)) + fieldPropertyName.substring(1);
+                if (props.containsKey(accessorPropertyName)) {
+                    return accessorPropertyName;
+                }
+            }
+        }
         return fieldPropertyName;
+    }
+
+    private static boolean isBooleanAccessorPropertyFieldName(String fieldPropertyName) {
+        return fieldPropertyName.length() > 2 &&
+            fieldPropertyName.startsWith("is") &&
+            Character.isUpperCase(fieldPropertyName.charAt(2));
+    }
+
+    private static boolean isAcronymPropertyFieldName(String fieldPropertyName) {
+        return fieldPropertyName.length() > 1 &&
+            Character.isLowerCase(fieldPropertyName.charAt(0)) &&
+            Character.isUpperCase(fieldPropertyName.charAt(1));
     }
 
     private static boolean isIntrospectedPropertyReader(MethodElement methodElement, BeanProperties.Visibility visibility) {

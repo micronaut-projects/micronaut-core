@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.util.ExceptionUtils;
-import io.micronaut.core.io.service.ServiceScanner.StaticServiceDefinitions;
+import io.micronaut.core.io.service.ServiceScanner.ExclusiveStaticServiceDefinitions;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -90,7 +90,7 @@ public final class MicronautMetaServiceLoaderUtils {
      * @throws IOException The exception
      */
     public static Set<String> findMicronautMetaServiceEntries(ClassLoader classLoader, String serviceName) throws IOException {
-        StaticServiceDefinitions staticDefinitions = ServiceScanner.findStaticServiceDefinitions();
+        ExclusiveStaticServiceDefinitions staticDefinitions = ServiceScanner.findStaticServiceDefinitions();
         if (staticDefinitions != null) {
             Set<String> serviceEntries = staticDefinitions.serviceTypeMap().get(serviceName);
             if (serviceEntries != null) {

@@ -165,12 +165,6 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
         BeanIntrospection.Builder<T> introspectionBuilder = introspection.builder();
         Argument<?>[] builderArguments = introspectionBuilder.getBuilderArguments();
 
-        if (builderArguments.length == 0) {
-            return BindingResult.empty();
-        }
-
-        boolean hasAnyValue = false;
-
         for (int index = 0; index < builderArguments.length; index++) {
             Argument<?> builderArg = builderArguments[index];
             String propertyName = builderArg.getName();
@@ -179,10 +173,6 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
             @Nullable String defaultValue = hasNoValue ? builderArg
                 .getAnnotationMetadata()
                 .stringValue(Bindable.class, "defaultValue").orElse(null) : null;
-
-            if (!hasNoValue || defaultValue != null) {
-                hasAnyValue = true;
-            }
 
             ArgumentConversionContext<?> conversionContext = context.with(builderArg);
             Optional<?> converted = hasNoValue ? conversionService.convert(defaultValue, conversionContext) : conversionService.convert(values, conversionContext);
@@ -205,12 +195,17 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
             }
         }
 
-        if (!hasAnyValue) {
-            return BindingResult.empty();
-        }
-
         try {
             T instance = introspectionBuilder.build();
+
+            if (instance == null) {
+                if (argument.isNullable()) {
+                    return BindingResult.empty();
+                }
+
+                return BindingResult.unsatisfied();
+            }
+
             return () -> Optional.of(instance);
         } catch (Exception e) {
             return BindingResult.unsatisfied();
