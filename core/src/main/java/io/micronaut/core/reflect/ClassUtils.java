@@ -76,6 +76,69 @@ public class ClassUtils {
     public static final String CLASS_EXTENSION = ".class";
 
     /**
+     * The primitive {@code boolean} type name.
+     *
+     * @since 5.1.0
+     */
+    public static final String PRIMITIVE_TYPE_NAME_BOOLEAN = "boolean";
+
+    /**
+     * The primitive {@code byte} type name.
+     *
+     * @since 5.1.0
+     */
+    public static final String PRIMITIVE_TYPE_NAME_BYTE = "byte";
+
+    /**
+     * The primitive {@code short} type name.
+     *
+     * @since 5.1.0
+     */
+    public static final String PRIMITIVE_TYPE_NAME_SHORT = "short";
+
+    /**
+     * The primitive {@code char} type name.
+     *
+     * @since 5.1.0
+     */
+    public static final String PRIMITIVE_TYPE_NAME_CHAR = "char";
+
+    /**
+     * The primitive {@code int} type name.
+     *
+     * @since 5.1.0
+     */
+    public static final String PRIMITIVE_TYPE_NAME_INT = "int";
+
+    /**
+     * The primitive {@code long} type name.
+     *
+     * @since 5.1.0
+     */
+    public static final String PRIMITIVE_TYPE_NAME_LONG = "long";
+
+    /**
+     * The primitive {@code float} type name.
+     *
+     * @since 5.1.0
+     */
+    public static final String PRIMITIVE_TYPE_NAME_FLOAT = "float";
+
+    /**
+     * The primitive {@code double} type name.
+     *
+     * @since 5.1.0
+     */
+    public static final String PRIMITIVE_TYPE_NAME_DOUBLE = "double";
+
+    /**
+     * The primitive {@code void} type name.
+     *
+     * @since 5.1.0
+     */
+    public static final String PRIMITIVE_TYPE_NAME_VOID = "void";
+
+    /**
      * A logger that should be used for any reflection access.
      */
     public static final Logger REFLECTION_LOGGER;
@@ -91,27 +154,27 @@ public class ClassUtils {
 
     @SuppressWarnings("unchecked")
     private static final Map<String, Class<?>> PRIMITIVE_TYPE_MAP = CollectionUtils.mapOf(
-        "int", Integer.TYPE,
-        "boolean", Boolean.TYPE,
-        "long", Long.TYPE,
-        "byte", Byte.TYPE,
-        "double", Double.TYPE,
-        "float", Float.TYPE,
-        "char", Character.TYPE,
-        "short", Short.TYPE,
-        "void", void.class
+        PRIMITIVE_TYPE_NAME_INT, Integer.TYPE,
+        PRIMITIVE_TYPE_NAME_BOOLEAN, Boolean.TYPE,
+        PRIMITIVE_TYPE_NAME_LONG, Long.TYPE,
+        PRIMITIVE_TYPE_NAME_BYTE, Byte.TYPE,
+        PRIMITIVE_TYPE_NAME_DOUBLE, Double.TYPE,
+        PRIMITIVE_TYPE_NAME_FLOAT, Float.TYPE,
+        PRIMITIVE_TYPE_NAME_CHAR, Character.TYPE,
+        PRIMITIVE_TYPE_NAME_SHORT, Short.TYPE,
+        PRIMITIVE_TYPE_NAME_VOID, void.class
     );
 
     @SuppressWarnings("unchecked")
     private static final Map<String, Class<?>> PRIMITIVE_ARRAY_MAP = CollectionUtils.mapOf(
-        "int", int[].class,
-        "boolean", boolean[].class,
-        "long", long[].class,
-        "byte", byte[].class,
-        "double", double[].class,
-        "float", float[].class,
-        "char", char[].class,
-        "short", short[].class
+        PRIMITIVE_TYPE_NAME_INT, int[].class,
+        PRIMITIVE_TYPE_NAME_BOOLEAN, boolean[].class,
+        PRIMITIVE_TYPE_NAME_LONG, long[].class,
+        PRIMITIVE_TYPE_NAME_BYTE, byte[].class,
+        PRIMITIVE_TYPE_NAME_DOUBLE, double[].class,
+        PRIMITIVE_TYPE_NAME_FLOAT, float[].class,
+        PRIMITIVE_TYPE_NAME_CHAR, char[].class,
+        PRIMITIVE_TYPE_NAME_SHORT, short[].class
     );
 
     static {

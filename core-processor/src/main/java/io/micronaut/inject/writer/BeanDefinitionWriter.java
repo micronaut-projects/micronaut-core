@@ -1589,7 +1589,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         String propertyName = injectionPoint.propertyName();
         ClassElement propertyType = injectionPoint.type();
         Map<String, ClassElement> generics = propertyType.getTypeArguments();
-        boolean isDurationWithTimeUnit = propertyType.getName().equals(Duration.class.getName());
+        boolean isDurationWithTimeUnit = isDurationWithTimeUnit(methodElement, propertyType);
 
         // Optional optional = AbstractBeanDefinition.getValueForPath(...)
         String localName = builderVar.name() + "_optional" + NameUtils.capitalize(propertyName);
@@ -1625,6 +1625,14 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                         })
                     );
             });
+    }
+
+    private boolean isDurationWithTimeUnit(MethodElement methodElement, ClassElement propertyType) {
+        ParameterElement[] parameters = methodElement.getParameters();
+        return parameters.length == 2
+            && propertyType.getName().equals(Duration.class.getName())
+            && parameters[0].getType().getSimpleName().equalsIgnoreCase("long")
+            && parameters[1].getType().isAssignable(TimeUnit.class);
     }
 
     private StatementDef injectAndReturn(VariableDef.This aThis,

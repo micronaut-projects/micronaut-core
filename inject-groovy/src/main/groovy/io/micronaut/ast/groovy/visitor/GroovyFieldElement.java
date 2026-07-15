@@ -147,7 +147,8 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
 
     @Override
     public boolean isPackagePrivate() {
-        return !Modifier.isPublic(fieldNode.getModifiers()) && !Modifier.isProtected(fieldNode.getModifiers()) && !Modifier.isPrivate(fieldNode.getModifiers());
+        return super.isPackagePrivate() ||
+            (!Modifier.isPublic(fieldNode.getModifiers()) && !Modifier.isProtected(fieldNode.getModifiers()) && !Modifier.isPrivate(fieldNode.getModifiers()));
     }
 
     @Override

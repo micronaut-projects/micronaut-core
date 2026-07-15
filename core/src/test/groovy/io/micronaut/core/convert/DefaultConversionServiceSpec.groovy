@@ -94,6 +94,27 @@ class DefaultConversionServiceSpec extends Specification {
         targetType << [File, Date, Integer, BigInteger, Float, Double, Long, Short, Byte, BigDecimal, URL, URI, Locale, UUID, Currency, TimeZone, Charset, Status]
     }
 
+    void "test invalid locale conversion"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        expect:
+        !conversionService.convert("?/", Locale).isPresent()
+    }
+
+    void "test invalid locale convert required"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        when:
+        conversionService.convertRequired("?/", Locale)
+
+        then:
+        def e = thrown(ConversionErrorException)
+        e.conversionError.originalValue.get() == "?/"
+        e.message.contains('Locale part "?/" contains invalid characters')
+    }
+
     void "test convert required"() {
         given:
         ConversionService conversionService = new DefaultMutableConversionService()

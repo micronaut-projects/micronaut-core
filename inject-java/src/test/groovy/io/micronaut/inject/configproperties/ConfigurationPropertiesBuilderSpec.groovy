@@ -21,6 +21,8 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
 import org.neo4j.driver.Config
 
+import java.time.Duration
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -535,6 +537,68 @@ class Neo4jProperties {
 
         then:
         config.idleTimeBeforeConnectionTest() == 6000
+    }
+
+    void "test builder method Duration argument"() {
+        given:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.DurationProperties', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.time.Duration;
+
+@ConfigurationProperties("duration.test")
+class DurationProperties {
+
+    @ConfigurationBuilder(
+        prefixes="with"
+    )
+    Options.Builder options = Options.builder();
+
+}
+
+class Options {
+    private final Duration connectionTimeout;
+
+    Options(Duration connectionTimeout) {
+        this.connectionTimeout = connectionTimeout;
+    }
+
+    public Duration getConnectionTimeout() {
+        return connectionTimeout;
+    }
+
+    static Builder builder() {
+        return new Builder();
+    }
+
+    static final class Builder {
+        private Duration connectionTimeout;
+
+        public Builder withConnectionTimeout(Duration connectionTimeout) {
+            this.connectionTimeout = connectionTimeout;
+            return this;
+        }
+
+        public Options build() {
+            return new Options(connectionTimeout);
+        }
+    }
+}
+''')
+
+        when:
+        InstantiatableBeanDefinition factory = beanDefinition
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'duration.test.connection-timeout': '6s'
+        )
+        def bean = factory.instantiate(applicationContext)
+
+        then:
+        bean.options.build().getConnectionTimeout() == Duration.ofSeconds(6)
+
+        cleanup:
+        applicationContext?.close()
     }
 
     void "test using a builder that is marked final"() {

@@ -79,6 +79,8 @@ Preferred mapping:
 Guardrails:
 
 - Do not handwrite separate Maven/Gradle dependency blocks when `dependency:` is suitable.
+- Do not replace Micronaut `snippet::` macros with direct Asciidoctor `[source]` includes or pasted code blocks just because the current examples have one language. The macro is the multi-language, source-backed contract for generated module docs.
+- Do not remove snippet callouts when touching examples. Preserve existing callout tags and callout explanations unless the underlying executable source no longer has that behavior.
 - Do not duplicate configuration property tables manually when generated references exist.
 - Keep environment-sensitive instructions explicit (for example `MICRONAUT_ENVIRONMENTS=dev`).
 - Prefer stable links to official Micronaut docs for endpoint semantics.
@@ -122,6 +124,7 @@ When finishing docs work, report:
 
 - [ ] `toc.yml` and `.adoc` changes are consistent.
 - [ ] Macros and includes follow Micronaut maintainer conventions.
+- [ ] Existing `snippet::` macros and callouts are preserved unless executable source changes require a different tagged snippet.
 - [ ] `publishGuide` and `docs` executed successfully.
 - [ ] Output and navigation verified under `build/docs/`.
 - [ ] Guidance remains maintainer-focused (not generic app docs).

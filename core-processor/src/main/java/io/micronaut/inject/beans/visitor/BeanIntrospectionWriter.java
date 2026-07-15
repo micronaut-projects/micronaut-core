@@ -347,11 +347,17 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                 } else {
                     MethodElement constructor = this.constructor == null ? defaultConstructor : this.constructor;
                     if (constructor != null) {
-                        if (copyConstructorDispatchTarget == null) {
-                            copyConstructorDispatchTarget = new CopyConstructorDispatchTarget(beanType, beanProperties, dispatchWriter, constructor);
+                        CopyConstructorDispatchTarget copyConstructorTarget;
+                        if (readMember == null) {
+                            copyConstructorTarget = new CopyConstructorDispatchTarget(beanType, beanProperties, dispatchWriter, constructor);
+                        } else {
+                            if (copyConstructorDispatchTarget == null) {
+                                copyConstructorDispatchTarget = new CopyConstructorDispatchTarget(beanType, beanProperties, dispatchWriter, constructor);
+                            }
+                            copyConstructorTarget = copyConstructorDispatchTarget;
                         }
-                        copyConstructorDispatchTarget.propertyNames.put(name, dispatchWriter.getDispatchTargets().size());
-                        withMethodIndex = dispatchWriter.addDispatchTarget(copyConstructorDispatchTarget);
+                        copyConstructorTarget.propertyNames.put(name, dispatchWriter.getDispatchTargets().size());
+                        withMethodIndex = dispatchWriter.addDispatchTarget(copyConstructorTarget);
                     }
                 }
             }
@@ -752,6 +758,11 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         if (dispatchOneMethod != null) {
             classDefBuilder.addMethod(dispatchOneMethod);
         }
+        MethodDef dispatchOneVoidMethod = dispatchWriter.buildDispatchOneVoidMethod();
+        if (dispatchOneVoidMethod != null) {
+            classDefBuilder.addMethod(dispatchOneVoidMethod);
+        }
+        addPrimitiveDispatchMethods(classDefBuilder);
         MethodDef dispatchMethod = dispatchWriter.buildDispatchMethod();
         if (dispatchMethod != null) {
             classDefBuilder.addMethod(dispatchMethod);
@@ -826,6 +837,34 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
         return classDefBuilder.build();
+    }
+
+    private void addPrimitiveDispatchMethods(ClassDef.ClassDefBuilder classDefBuilder) {
+        addPrimitiveDispatchMethods(classDefBuilder, "Boolean", TypeDef.Primitive.BOOLEAN);
+        addPrimitiveDispatchMethods(classDefBuilder, "Byte", TypeDef.Primitive.BYTE);
+        addPrimitiveDispatchMethods(classDefBuilder, "Short", TypeDef.Primitive.SHORT);
+        addPrimitiveDispatchMethods(classDefBuilder, "Char", TypeDef.Primitive.CHAR);
+        addPrimitiveDispatchMethods(classDefBuilder, "Int", TypeDef.Primitive.INT);
+        addPrimitiveDispatchMethods(classDefBuilder, "Long", TypeDef.Primitive.LONG);
+        addPrimitiveDispatchMethods(classDefBuilder, "Float", TypeDef.Primitive.FLOAT);
+        addPrimitiveDispatchMethods(classDefBuilder, "Double", TypeDef.Primitive.DOUBLE);
+    }
+
+    private void addPrimitiveDispatchMethods(ClassDef.ClassDefBuilder classDefBuilder,
+                                             String suffix,
+                                             TypeDef.Primitive primitiveType) {
+        MethodDef getMethod = dispatchWriter.buildPrimitiveGetMethod("dispatchGet" + suffix, primitiveType);
+        if (getMethod != null) {
+            classDefBuilder.addMethod(getMethod);
+        }
+        MethodDef setMethod = dispatchWriter.buildPrimitiveSetMethod("dispatchSet" + suffix, primitiveType);
+        if (setMethod != null) {
+            classDefBuilder.addMethod(setMethod);
+        }
+        MethodDef setVoidMethod = dispatchWriter.buildPrimitiveSetVoidMethod("dispatchSet" + suffix + "Void", primitiveType);
+        if (setVoidMethod != null) {
+            classDefBuilder.addMethod(setVoidMethod);
+        }
     }
 
     private MethodDef getBooleanMethod(Method method, boolean state) {
@@ -1098,14 +1137,25 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             String nonMutableMessage = null;
             ParameterElement[] parameters = constructor.getParameters();
             Object[] constructorArguments = new Object[parameters.length];
+            boolean[] newValueArguments = new boolean[parameters.length];
 
             for (int i = 0; i < parameters.length; i++) {
                 ParameterElement parameter = parameters[i];
                 String parameterName = parameter.getName();
+                String propertyName = resolvePropertyNameForConstructorArgument(parameterName);
 
                 BeanPropertyData prop = beanProperties.stream()
-                    .filter(bp -> bp.name.equals(parameterName))
+                    .filter(bp -> bp.name.equals(propertyName))
                     .findAny().orElse(null);
+
+                Integer propertyIndex = propertyNames.get(propertyName);
+                if (propertyIndex != null && propertyNames.size() == 1) {
+                    newValueArguments[i] = true;
+                    if (prop != null) {
+                        constructorProps.add(prop);
+                    }
+                    continue;
+                }
 
                 int readDispatchIndex = prop == null ? -1 : prop.getDispatchIndex;
                 if (readDispatchIndex != -1) {
@@ -1148,26 +1198,29 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                         ParameterElement parameter = parameters[i];
                         Object constructorArgument = constructorArguments[i];
 
-                        ExpressionDef oldValueExp;
-                        if (constructorArgument instanceof MethodElement readMethod) {
-                            oldValueExp = prevBeanVar.invoke(readMethod);
-                        } else {
-                            oldValueExp = prevBeanVar.field((FieldElement) constructorArgument);
-                        }
-
-                        Integer propertyIndex = propertyNames.get(parameter.getName());
+                        Integer propertyIndex = propertyNames.get(resolvePropertyNameForConstructorArgument(parameter.getName()));
                         ExpressionDef paramExp;
-                        if (propertyIndex != null) {
-                            ExpressionDef.Cast newPropertyValue = value.cast(TypeDef.erasure(parameter.getType()));
-                            if (propertyNames.size() == 1) {
-                                paramExp =  newPropertyValue;
+                        if (newValueArguments[i]) {
+                            paramExp = value.cast(TypeDef.erasure(parameter.getType()));
+                        } else if (propertyIndex != null) {
+                            ExpressionDef oldValueExp;
+                            if (constructorArgument instanceof MethodElement readMethod) {
+                                oldValueExp = prevBeanVar.invoke(readMethod);
                             } else {
-                                paramExp = caseExpression.equalsStructurally(ExpressionDef.constant((int) propertyIndex)).doIfElse(
-                                        newPropertyValue,
-                                        oldValueExp
-                                );
+                                oldValueExp = prevBeanVar.field((FieldElement) constructorArgument);
                             }
+                            ExpressionDef.Cast newPropertyValue = value.cast(TypeDef.erasure(parameter.getType()));
+                            paramExp = caseExpression.equalsStructurally(ExpressionDef.constant((int) propertyIndex)).doIfElse(
+                                newPropertyValue,
+                                oldValueExp
+                            );
                         } else {
+                            ExpressionDef oldValueExp;
+                            if (constructorArgument instanceof MethodElement readMethod) {
+                                oldValueExp = prevBeanVar.invoke(readMethod);
+                            } else {
+                                oldValueExp = prevBeanVar.field((FieldElement) constructorArgument);
+                            }
                             paramExp = oldValueExp;
                         }
                         values.add(paramExp);
@@ -1259,6 +1312,24 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         @Override
         public TypedElement getDeclaringType() {
             return constructor.getDeclaringType();
+        }
+
+        private String resolvePropertyNameForConstructorArgument(String parameterName) {
+            if (hasBeanProperty(parameterName)) {
+                return parameterName;
+            }
+            if (parameterName.length() > 1 && parameterName.charAt(0) == '$') {
+                String accessorPropertyName = "$" + Character.toUpperCase(parameterName.charAt(1)) + parameterName.substring(2);
+                if (hasBeanProperty(accessorPropertyName)) {
+                    return accessorPropertyName;
+                }
+            }
+            return parameterName;
+        }
+
+        private boolean hasBeanProperty(String propertyName) {
+            return propertyNames.containsKey(propertyName) ||
+                beanProperties.stream().anyMatch(bp -> bp.name.equals(propertyName));
         }
 
     }

@@ -37,8 +37,18 @@ dependencies {
     jmh(libs.jmh.core)
 }
 
+val jmhIncludes = providers.gradleProperty("jmh.includes")
+    .map { it.split(",").map(String::trim).filter(String::isNotEmpty) }
+    .getOrElse(listOf("io.micronaut.http.server.StartupBenchmark"))
+val jmhFork = providers.gradleProperty("jmh.fork").map(String::toInt).getOrElse(1)
+val jmhIterations = providers.gradleProperty("jmh.iterations").map(String::toInt).getOrElse(10)
+val jmhWarmupIterations = providers.gradleProperty("jmh.warmupIterations").map(String::toInt).getOrElse(5)
+
 jmh {
-    includes = listOf("io.micronaut.http.server.StartupBenchmark")
+    includes = jmhIncludes
+    fork = jmhFork
+    iterations = jmhIterations
+    warmupIterations = jmhWarmupIterations
     duplicateClassesStrategy = DuplicatesStrategy.WARN
 }
 

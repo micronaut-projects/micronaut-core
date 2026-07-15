@@ -22,6 +22,7 @@ import javax.tools.FileObject;
 import javax.tools.ForwardingJavaFileManager;
 import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
+import javax.tools.JavaFileManager.Location;
 import javax.tools.SimpleJavaFileObject;
 import javax.tools.StandardLocation;
 import javax.tools.JavaFileObject.Kind;

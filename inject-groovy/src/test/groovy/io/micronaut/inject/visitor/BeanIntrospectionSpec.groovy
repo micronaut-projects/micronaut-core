@@ -1,6 +1,7 @@
 package io.micronaut.inject.visitor
 
 import com.blazebit.persistence.impl.function.entity.ValuesEntity
+import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.Executable
@@ -25,6 +26,41 @@ class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
 
     def setup() {
         System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, IntrospectedTypeElementVisitor.name)
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12727")
+    void "test json property on groovy property is not treated as inaccessible field"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.CustomErrorResponse', '''
+package test
+
+import com.fasterxml.jackson.annotation.JsonProperty
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class CustomErrorResponse {
+    String error
+
+    @JsonProperty("error_description")
+    String errorDescription
+
+    @JsonProperty("error_uri")
+    String errorUri
+}
+''')
+        BeanProperty errorDescription = introspection.getRequiredProperty("errorDescription", String)
+        BeanProperty errorUri = introspection.getRequiredProperty("errorUri", String)
+        def bean = introspection.instantiate()
+
+        when:
+        errorDescription.set(bean, "invalid")
+        errorUri.set(bean, "https://example.com/errors/invalid")
+
+        then:
+        errorDescription.get(bean) == "invalid"
+        errorDescription.stringValue(JsonProperty).get() == "error_description"
+        errorUri.get(bean) == "https://example.com/errors/invalid"
+        errorUri.stringValue(JsonProperty).get() == "error_uri"
     }
 
     void "test annotations"() {
