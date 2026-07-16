@@ -192,6 +192,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         Context.Builder builder = Context.newBuilder().apply(GraalPyResources.forVirtualFileSystem(VirtualFileSystem.newBuilder()
                 .resourceDirectory(APPLICATION_PATH)
                 .resourceClassLoader(classLoader).build()))
+            .logHandler(new GraalPySlf4jLogHandler())
             .allowExperimentalOptions(true)
             .allowCreateProcess(true)
             .allowValueSharing(true)

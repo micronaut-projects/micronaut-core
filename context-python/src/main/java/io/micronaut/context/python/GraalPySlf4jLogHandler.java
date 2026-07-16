@@ -15,12 +15,15 @@
  */
 package io.micronaut.context.python;
 
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.MessageFormat;
+import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -30,27 +33,68 @@ import java.util.logging.LogRecord;
  */
 final class GraalPySlf4jLogHandler extends Handler {
     private static final String DEFAULT_LOGGER_NAME = "org.graalvm.polyglot";
+    private static final Map<String, Logger> CACHED_LOGGERS = new ConcurrentHashMap<>();
 
     @Override
-    public void publish(LogRecord record) {
-        if (record == null || !isLoggable(record)) {
+    public void publish(@Nullable LogRecord record) {
+        if (record == null) {
             return;
         }
-        Logger logger = LoggerFactory.getLogger(loggerName(record));
-        String message = message(record);
-        Throwable thrown = record.getThrown();
         int level = record.getLevel().intValue();
+
         if (level >= Level.SEVERE.intValue()) {
-            logError(logger, message, thrown);
+            Logger logger = resolveLogger(record);
+
+            if (logger.isErrorEnabled()) {
+                String message = message(record);
+                if (message != null) {
+                    Throwable thrown = record.getThrown();
+                    logError(logger, message, thrown);
+                }
+            }
         } else if (level >= Level.WARNING.intValue()) {
-            logWarn(logger, message, thrown);
+            Logger logger = resolveLogger(record);
+            if (logger.isWarnEnabled()) {
+                String message = message(record);
+                if (message != null) {
+                    Throwable thrown = record.getThrown();
+                    logWarn(logger, message, thrown);
+                }
+            }
         } else if (level >= Level.INFO.intValue()) {
-            logInfo(logger, message, thrown);
+            Logger logger = resolveLogger(record);
+            if (logger.isInfoEnabled()) {
+                String message = message(record);
+                if (message != null) {
+                    Throwable thrown = record.getThrown();
+                    logInfo(logger, message, thrown);
+                }
+            }
         } else if (level >= Level.FINE.intValue()) {
-            logDebug(logger, message, thrown);
+            Logger logger = resolveLogger(record);
+            if (logger.isDebugEnabled()) {
+                String message = message(record);
+                if (message != null) {
+                    Throwable thrown = record.getThrown();
+                    logDebug(logger, message, thrown);
+                }
+            }
         } else {
-            logTrace(logger, message, thrown);
+            Logger logger = resolveLogger(record);
+            if (logger.isTraceEnabled()) {
+                String message = message(record);
+                if (message != null) {
+                    Throwable thrown = record.getThrown();
+                    logTrace(logger, message, thrown);
+                }
+            }
         }
+    }
+
+    private static Logger resolveLogger(LogRecord record) {
+        String loggerName = loggerName(record);
+        Logger logger = CACHED_LOGGERS.computeIfAbsent(loggerName, LoggerFactory::getLogger);
+        return logger;
     }
 
     @Override
@@ -69,7 +113,7 @@ final class GraalPySlf4jLogHandler extends Handler {
         return loggerName;
     }
 
-    static String message(LogRecord record) {
+    static @Nullable String message(LogRecord record) {
         String message = localizedMessage(record);
         Object[] parameters = record.getParameters();
         if (message == null || parameters == null || parameters.length == 0) {
@@ -82,7 +126,7 @@ final class GraalPySlf4jLogHandler extends Handler {
         }
     }
 
-    private static String localizedMessage(LogRecord record) {
+    private static @Nullable String localizedMessage(LogRecord record) {
         String message = record.getMessage();
         ResourceBundle resourceBundle = record.getResourceBundle();
         if (message == null || resourceBundle == null) {
@@ -95,7 +139,7 @@ final class GraalPySlf4jLogHandler extends Handler {
         }
     }
 
-    private static void logError(Logger logger, String message, Throwable thrown) {
+    private static void logError(Logger logger, String message, @Nullable Throwable thrown) {
         if (thrown == null) {
             logger.error(message);
         } else {
@@ -103,7 +147,7 @@ final class GraalPySlf4jLogHandler extends Handler {
         }
     }
 
-    private static void logWarn(Logger logger, String message, Throwable thrown) {
+    private static void logWarn(Logger logger, String message, @Nullable Throwable thrown) {
         if (thrown == null) {
             logger.warn(message);
         } else {
@@ -111,7 +155,7 @@ final class GraalPySlf4jLogHandler extends Handler {
         }
     }
 
-    private static void logInfo(Logger logger, String message, Throwable thrown) {
+    private static void logInfo(Logger logger, String message, @Nullable Throwable thrown) {
         if (thrown == null) {
             logger.info(message);
         } else {
@@ -119,7 +163,7 @@ final class GraalPySlf4jLogHandler extends Handler {
         }
     }
 
-    private static void logDebug(Logger logger, String message, Throwable thrown) {
+    private static void logDebug(Logger logger, String message, @Nullable Throwable thrown) {
         if (thrown == null) {
             logger.debug(message);
         } else {
@@ -127,7 +171,7 @@ final class GraalPySlf4jLogHandler extends Handler {
         }
     }
 
-    private static void logTrace(Logger logger, String message, Throwable thrown) {
+    private static void logTrace(Logger logger, String message, @Nullable Throwable thrown) {
         if (thrown == null) {
             logger.trace(message);
         } else {
