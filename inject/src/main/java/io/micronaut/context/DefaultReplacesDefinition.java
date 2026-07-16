@@ -20,10 +20,12 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
+import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.ReplacesDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Optional;
@@ -47,6 +49,7 @@ public record DefaultReplacesDefinition<T>(Class<T> beanType,
                                            @Nullable Class<?> factoryClass) implements ReplacesDefinition<T> {
 
 
+    @SuppressWarnings("unchecked")
     public DefaultReplacesDefinition(Class<T> beanType, AnnotationValue<Replaces> replacesAnnotation) {
         this(
             beanType,
@@ -119,7 +122,7 @@ public record DefaultReplacesDefinition<T>(Class<T> beanType,
 
     private boolean checkIfTypeMatches(BeanDefinition<T> definitionToBeReplaced,
                                        Class<T> beanTypeToReplace) {
-        Class<T> bt = definitionToBeReplaced.getBeanType();
+        Class<?> bt = getCanonicalBeanType(definitionToBeReplaced);
         Class<?> defaultImplementation = definitionToBeReplaced.getDefaultImplementation();
         if (defaultImplementation != null) {
             if (defaultImplementation == bt) {
@@ -129,5 +132,15 @@ public record DefaultReplacesDefinition<T>(Class<T> beanType,
             }
         }
         return beanTypeToReplace != Object.class && beanTypeToReplace.isAssignableFrom(bt);
+    }
+
+    private Class<?> getCanonicalBeanType(BeanDefinition<T> beanDefinition) {
+        if (beanDefinition instanceof AdvisedBeanType<?> advisedBeanType) {
+            return advisedBeanType.getInterceptedType();
+        }
+        if (beanDefinition instanceof ProxyBeanDefinition<?> proxyBeanDefinition) {
+            return proxyBeanDefinition.getTargetType();
+        }
+        return beanDefinition.getBeanType();
     }
 }

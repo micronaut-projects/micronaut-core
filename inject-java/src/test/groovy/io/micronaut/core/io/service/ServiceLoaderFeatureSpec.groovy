@@ -4,7 +4,6 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import org.jspecify.annotations.Nullable
 import io.micronaut.core.expressions.EvaluatedExpression
 import io.micronaut.core.graal.GraalReflectionConfigurer
-import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import org.graalvm.nativeimage.hosted.Feature
 
@@ -53,7 +52,7 @@ class CustomCondition implements Condition {
             }
 
             @Override
-            protected void addImageSingleton(ServiceScanner.StaticServiceDefinitions staticServiceDefinitions) {
+            protected void addImageSingleton(ServiceScanner.ExclusiveStaticServiceDefinitions staticServiceDefinitions) {
                 // no-op
             }
 
@@ -83,8 +82,8 @@ class CustomCondition implements Condition {
             }
 
             @Override
-            protected ServiceScanner.StaticServiceDefinitions buildStaticServiceDefinitions(Feature.BeforeAnalysisAccess access) {
-                return new ServiceScanner.StaticServiceDefinitions((BeanDefinitionReference.name): [definition.getClass().name] as Set)
+            protected ServiceScanner.ExclusiveStaticServiceDefinitions buildStaticServiceDefinitions(Feature.BeforeAnalysisAccess access) {
+                return new ServiceScanner.ExclusiveStaticServiceDefinitions((BeanDefinitionReference.name): [definition.getClass().name] as Set)
             }
         }
 
