@@ -94,7 +94,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public org.graalvm.polyglot.Context graalPyContext(
         @Named(PYTHON) HostAccess hostAccess,
-        @Named(PYTHON) Engine engine) {
+        @Named(PYTHON) Engine engine,
+        GraalPyContextConfiguration contextConfiguration) {
         if (PythonContextRuntime.isInitialized() && PythonContextRuntime.isReuseContext()) {
             providedContext = true;
             // Reuse context: this is an optimization for reloading
@@ -105,7 +106,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             var classLoader = applicationContext.getClassLoader();
             LOG.debug("Building Primary GraalPy context");
             long now = System.currentTimeMillis();
-            var context = buildContext(hostAccess, engine, classLoader);
+            var context = buildContext(hostAccess, engine, classLoader, contextConfiguration);
 
             // Make context available to bridge classes
             PythonContextRuntime.setContext(context, classLoader);
@@ -157,7 +158,9 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         if (PythonContextRuntime.isInitialized() && PythonContextRuntime.isReuseContext()) {
             return PythonContextRuntime.getContext();
         }
-        var context = buildContext(bootstrapHostAccess(classLoader), GraalPyEngineFactory.buildPythonEngine(), classLoader, options, applicationMain);
+        GraalPyContextConfiguration contextConfiguration = new GraalPyContextConfiguration();
+        contextConfiguration.getBuilder().options(options);
+        var context = buildContext(bootstrapHostAccess(classLoader), GraalPyEngineFactory.buildPythonEngine(), classLoader, contextConfiguration, applicationMain);
         PythonContextRuntime.setReuseContext(true);
         PythonContextRuntime.setContext(context, classLoader);
         return context;
@@ -170,26 +173,28 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     }
 
     static Context buildContext(HostAccess hostAccess, Engine engine, ClassLoader classLoader) throws IOException {
-        return buildContext(hostAccess, engine, classLoader, Map.of());
+        return buildContext(hostAccess, engine, classLoader, new GraalPyContextConfiguration());
     }
 
     private static Context buildContext(HostAccess hostAccess,
                                         Engine engine,
                                         ClassLoader classLoader,
-                                        Map<String, String> options) throws IOException {
-        return buildContext(hostAccess, engine, classLoader, options, APPLICATION_MAIN);
+                                        GraalPyContextConfiguration contextConfiguration) throws IOException {
+        return buildContext(hostAccess, engine, classLoader, contextConfiguration, APPLICATION_MAIN);
     }
 
     private static Context buildContext(HostAccess hostAccess,
                                         Engine engine,
                                         ClassLoader classLoader,
-                                        Map<String, String> options,
+                                        GraalPyContextConfiguration contextConfiguration,
                                         String applicationMain) throws IOException {
         System.setProperty("org.graalvm.python.vfs.allow_multiple", "true");
         System.setProperty("org.graalvm.python.vfs.multiple_vfs_checks_as_warning", "true");
         long now = System.currentTimeMillis();
 
-        Context.Builder builder = Context.newBuilder().apply(GraalPyResources.forVirtualFileSystem(VirtualFileSystem.newBuilder()
+
+        Context.Builder builder = contextConfiguration.getBuilder()
+            .apply(GraalPyResources.forVirtualFileSystem(VirtualFileSystem.newBuilder()
                 .resourceDirectory(APPLICATION_PATH)
                 .resourceClassLoader(classLoader).build()))
             .logHandler(new GraalPySlf4jLogHandler())
@@ -197,7 +202,6 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             .allowCreateProcess(true)
             .allowValueSharing(true)
             .allowPolyglotAccess(PolyglotAccess.ALL)
-            .option("python.WarnExperimentalFeatures", "false")
             // Allow access to host classes
             .allowHostAccess(hostAccess)
             .hostClassLoader(classLoader)
@@ -206,7 +210,11 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             .allowHostClassLookup(_ -> true);
         resolveVirtualEnvExecutable(System.getenv())
             .ifPresent(executable -> builder.option("python.Executable", executable.toString()));
-        options.forEach(builder::option);
+
+        // enable logging at the context level
+        if (LOG.isDebugEnabled() || LOG.isTraceEnabled()) {
+            builder.option("log.level", "FINE");
+        }
 
         LOG.debug("Configured GraalPy Context.Builder in {}ms", System.currentTimeMillis() - now);
 
@@ -335,4 +343,5 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     public int getOrder() {
         return Ordered.LOWEST_PRECEDENCE;
     }
+
 }

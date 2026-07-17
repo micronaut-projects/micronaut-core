@@ -15,6 +15,9 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.inject.qualifiers.Qualifiers;
+import org.graalvm.polyglot.Context;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -23,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
+import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -50,5 +54,15 @@ final class GraalPyContextFactoryTest {
     @Test
     void ignoresBlankVirtualEnv() {
         assertTrue(GraalPyContextFactory.resolveVirtualEnvExecutable(Map.of("VIRTUAL_ENV", " ")).isEmpty());
+    }
+
+    @Test
+    void contextOptionsCanBeConfiguredFromMicronautProperties() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "graalpy.context.options", Map.of("log.level", "FINE")
+        ))) {
+            GraalPyContextConfiguration config = applicationContext.getBean(GraalPyContextConfiguration.class);
+            assertTrue(config.getOptions().containsKey("log.level"));
+        }
     }
 }
