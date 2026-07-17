@@ -381,6 +381,35 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#QUERY} request for the given URI.
+     *
+     * @param uri  The URI
+     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON})
+     * @param <T>  The body type
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     * @since 5.2.0
+     */
+    static <T> MutableHttpRequest<T> QUERY(URI uri, T body) {
+        return QUERY(uri.toString(), body);
+    }
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#QUERY} request for the given URI.
+     *
+     * @param uri  The URI
+     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON})
+     * @param <T>  The body type
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     * @since 5.2.0
+     */
+    static <T> MutableHttpRequest<T> QUERY(String uri, T body) {
+        Objects.requireNonNull(uri, "Argument [uri] is required");
+        return HttpRequestFactory.INSTANCE.query(uri, body);
+    }
+
+    /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI.
      *
      * @param uri  The URI
