@@ -60,6 +60,7 @@ public final class PyronautCompiler {
     private final File targetDir;
     private final List<File> annotationProcessorPath;
     private final List<File> classpath;
+    private final List<File> runtimeClasspath;
     private final List<File> bootclasspath;
     private final ClassLoader parentClassLoader;
     private final Consumer<ClassElement> classElementCallback;
@@ -77,6 +78,7 @@ public final class PyronautCompiler {
         this.annotationProcessorPath = builder.annotationProcessorPath != null ? List.copyOf(builder.annotationProcessorPath) : null;
         this.bootclasspath = builder.bootclasspath != null ? List.copyOf(builder.bootclasspath) : null;
         this.classpath = builder.classpath != null ? List.copyOf(builder.classpath) : null;
+        this.runtimeClasspath = builder.runtimeClasspath != null ? List.copyOf(builder.runtimeClasspath) : null;
         this.parentClassLoader = builder.parentClassLoader != null ? builder.parentClassLoader : PyronautCompiler.class.getClassLoader();
         this.classElementCallback = builder.classElementCallback;
         this.compilerOptions = builder.compilerOptions != null ? List.copyOf(builder.compilerOptions) : null;
@@ -123,10 +125,11 @@ public final class PyronautCompiler {
     }
 
     private ClassLoader createRuntimeClassLoader() {
-        if (classpath == null || classpath.isEmpty()) {
+        List<File> effectiveRuntimeClasspath = runtimeClasspath != null ? runtimeClasspath : classpath;
+        if (effectiveRuntimeClasspath == null || effectiveRuntimeClasspath.isEmpty()) {
             return parentClassLoader;
         }
-        URL[] urls = classpath.stream()
+        URL[] urls = effectiveRuntimeClasspath.stream()
             .map(PyronautCompiler::toUrl)
             .toArray(URL[]::new);
         return new URLClassLoader(urls, parentClassLoader);
@@ -340,6 +343,7 @@ public final class PyronautCompiler {
         private List<File> annotationProcessorPath;
         private List<File> bootclasspath;
         private List<File> classpath;
+        private List<File> runtimeClasspath;
         private ClassLoader parentClassLoader;
         private List<String> compilerOptions;
         private Consumer<ClassElement> classElementCallback;
@@ -436,6 +440,18 @@ public final class PyronautCompiler {
          */
         public Builder classpath(List<File> classpath) {
             this.classpath = classpath;
+            return this;
+        }
+
+        /**
+         * Set classpath entries used by the in-memory application runtime.
+         * When unset, the compile classpath is used for backward compatibility.
+         *
+         * @param runtimeClasspath The runtime classpath files
+         * @return This builder
+         */
+        public Builder runtimeClasspath(List<File> runtimeClasspath) {
+            this.runtimeClasspath = runtimeClasspath;
             return this;
         }
 
