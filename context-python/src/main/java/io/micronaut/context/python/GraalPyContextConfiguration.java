@@ -61,7 +61,10 @@ public final class GraalPyContextConfiguration {
 
     GraalPyContextConfiguration() {
         // we use experimental features by default so don't warn about them
-        builder.option("python.WarnExperimentalFeatures", "false");
+        builder.option("python.WarnExperimentalFeatures", "false")
+        // make sure all logging is routed through GraalPyExceptionHandler
+               .option("log.level", "ALL");
+
     }
 
     /**

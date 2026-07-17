@@ -211,11 +211,6 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         resolveVirtualEnvExecutable(System.getenv())
             .ifPresent(executable -> builder.option("python.Executable", executable.toString()));
 
-        // enable logging at the context level
-        if (LOG.isDebugEnabled() || LOG.isTraceEnabled()) {
-            builder.option("log.level", "FINE");
-        }
-
         LOG.debug("Configured GraalPy Context.Builder in {}ms", System.currentTimeMillis() - now);
 
         now = System.currentTimeMillis();
