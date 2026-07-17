@@ -16,6 +16,7 @@
 package io.micronaut.context.python;
 
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -33,6 +35,30 @@ final class PythonContextRuntimeTest {
 
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void waitsForEveryContextUsingAnEngineBeforeRunningShutdownGate() {
+        try (Engine sharedEngine = Engine.newBuilder(PYTHON).build();
+             Engine otherEngine = Engine.newBuilder(PYTHON).build();
+             Context first = Context.newBuilder(PYTHON).engine(sharedEngine).build();
+             Context second = Context.newBuilder(PYTHON).engine(sharedEngine).build();
+             Context unrelated = Context.newBuilder(PYTHON).engine(otherEngine).build()) {
+            AtomicInteger invocations = new AtomicInteger();
+            PythonContextRuntime.registerContext(first);
+            PythonContextRuntime.registerContext(second);
+            PythonContextRuntime.registerContext(unrelated);
+
+            PythonContextRuntime.onNoContexts(sharedEngine, invocations::incrementAndGet);
+            PythonContextRuntime.unregisterContext(unrelated);
+            assertEquals(0, invocations.get());
+
+            PythonContextRuntime.unregisterContext(first);
+            assertEquals(0, invocations.get());
+
+            PythonContextRuntime.unregisterContext(second);
+            assertEquals(1, invocations.get());
+        }
+    }
 
     @Test
     void importsClassesAndScriptsFromPythonKeywordPackageSegments() throws IOException {

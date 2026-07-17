@@ -119,7 +119,6 @@ public final class PythonContextRuntime {
     private static final AtomicInteger ACTIVE_EXECUTIONS = new AtomicInteger();
     private static final Object ACTIVE_EXECUTIONS_LOCK = new Object();
     private static final IdentityHashMap<Context, ContextState> CONTEXT_STATES = new IdentityHashMap<>();
-    private static final IdentityHashMap<Engine, EngineState> ENGINE_STATES = new IdentityHashMap<>();
     private static final ScopedValue<ExecutionFrame> CURRENT_EXECUTION = ScopedValue.newInstance();
 
     private PythonContextRuntime() {
@@ -166,10 +165,6 @@ public final class PythonContextRuntime {
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
             return CONTEXT_STATES.get(context);
         }
-    }
-
-    private static EngineState engineState(Engine engine) {
-        return ENGINE_STATES.computeIfAbsent(engine, ignored -> new EngineState());
     }
 
     /**
@@ -265,56 +260,31 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Associate a context with the shared engine that owns it so shutdown can wait for both
-     * context-local executions and engine-wide executions before closing resources.
-     * <p>
-     * The context-to-engine relationship is mutable because pooled contexts may be created after
-     * the primary context. Updating this mapping also keeps the per-engine context count balanced.
+     * Register a context for execution and shared-engine shutdown tracking.
      *
      * @param context The GraalPy context being tracked
-     * @param engine The engine backing the context
      */
-    static void registerContextEngine(Context context, Engine engine) {
-        synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            ContextState contextState = CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
-            Engine previousEngine = contextState.engine;
-            if (previousEngine == engine) {
-                return;
-            }
-            if (previousEngine != null) {
-                EngineState previousState = ENGINE_STATES.get(previousEngine);
-                if (previousState != null && --previousState.contexts <= 0) {
-                    ENGINE_STATES.remove(previousEngine);
-                }
-            }
-            contextState.engine = engine;
-            engineState(engine).contexts++;
-        }
+    static void registerContext(Context context) {
+        contextState(context);
     }
 
     /**
-     * Remove a context from execution tracking and notify any engine listeners when the removed
-     * context was the last context associated with that engine.
+     * Remove a context from execution tracking and notify listeners waiting for its removal.
      * <p>
      * This is part of shutdown coordination; it clears cached helper/member state before the
-     * context can be closed and releases listeners waiting for engine ownership to reach zero.
+     * context can be closed and releases shared-engine shutdown gates that include this context.
      *
      * @param context The GraalPy context being removed
      */
-    static void unregisterContextEngine(Context context) {
-        List<Runnable> listeners = List.of();
+    static void unregisterContext(Context context) {
+        List<Runnable> listeners;
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
             ContextState contextState = CONTEXT_STATES.remove(context);
             if (contextState != null) {
+                listeners = List.copyOf(contextState.noContextListeners);
                 contextState.clear();
-                Engine engine = contextState.engine;
-                if (engine != null) {
-                    EngineState engineState = ENGINE_STATES.get(engine);
-                    if (engineState != null && --engineState.contexts <= 0) {
-                        ENGINE_STATES.remove(engine);
-                        listeners = engineState.noContextsListeners;
-                    }
-                }
+            } else {
+                listeners = List.of();
             }
         }
         runNoActiveExecutionsListeners(listeners);
@@ -332,9 +302,6 @@ public final class PythonContextRuntime {
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
             ContextState state = CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
             state.activeExecutions++;
-            if (state.engine != null) {
-                engineState(state.engine).activeExecutions++;
-            }
             ACTIVE_EXECUTIONS.incrementAndGet();
         }
     }
@@ -380,8 +347,8 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Mark a context execution as complete and run any listeners whose context or engine no
-     * longer has active executions.
+     * Mark a context execution as complete and run any listeners whose context no longer has
+     * active executions.
      *
      * @param context The context leaving Python execution
      */
@@ -394,16 +361,6 @@ public final class PythonContextRuntime {
                 if (state.activeExecutions == 0 && !state.noActiveExecutionsListeners.isEmpty()) {
                     listeners.addAll(state.noActiveExecutionsListeners);
                     state.noActiveExecutionsListeners.clear();
-                }
-                if (state.engine != null) {
-                    EngineState engineState = ENGINE_STATES.get(state.engine);
-                    if (engineState != null) {
-                        engineState.activeExecutions = Math.max(0, engineState.activeExecutions - 1);
-                        if (engineState.activeExecutions == 0 && !engineState.noActiveExecutionsListeners.isEmpty()) {
-                            listeners.addAll(engineState.noActiveExecutionsListeners);
-                            engineState.noActiveExecutionsListeners.clear();
-                        }
-                    }
                 }
             }
             ACTIVE_EXECUTIONS.updateAndGet(value -> Math.max(0, value - 1));
@@ -453,8 +410,7 @@ public final class PythonContextRuntime {
      * <p>
      * This counter is incremented by {@link #enterExecution(Context)} and decremented by
      * {@link #exitExecution(Context)} for every generated bridge entry into Python. It is deliberately
-     * aggregate-only: context-local and engine-local counts are stored in {@link ContextState} and
-     * {@link EngineState} so shutdown can wait at the correct granularity.
+     * aggregate-only: context-local counts are stored in {@link ContextState} for shutdown gates.
      * <p>
      * Maintainers should treat this method as an observability hook for tests and diagnostics, not
      * as a synchronization primitive. Use one of the {@code onNoActiveExecutions} registration methods
@@ -559,43 +515,15 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Register a listener to run when the engine has no active executions across registered contexts.
-     * <p>
-     * Engine tracking is separate from context tracking because several contexts can share the same
-     * GraalPy engine. This listener is therefore the safe hook for engine-level cleanup: it waits
-     * until all currently registered contexts using the engine have left Python execution.
-     * <p>
-     * The listener runs immediately when the engine is unknown or idle; otherwise it is queued on
-     * the engine state and drained by the {@link #exitExecution(Context)} call that brings the
-     * engine-local execution count to zero.
-     *
-     * @param engine The engine to observe
-     * @param listener The listener to run when the engine is idle
-     */
-    static void onNoActiveExecutions(Engine engine, Runnable listener) {
-        boolean runNow;
-        synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            EngineState state = ENGINE_STATES.get(engine);
-            runNow = state == null || state.activeExecutions == 0;
-            if (state != null && !runNow) {
-                state.noActiveExecutionsListeners.add(listener);
-            }
-        }
-        if (runNow) {
-            listener.run();
-        }
-    }
-
-    /**
      * Register a listener to run when no registered contexts remain for the engine.
      * <p>
-     * This differs from {@link #onNoActiveExecutions(Engine, Runnable)}: an engine can be idle while
-     * still owning open contexts. Use this hook when engine cleanup must wait for every associated
-     * context to be unregistered, not merely for executions to finish.
+     * Context ownership is derived from {@link Context#getEngine()}; each currently matching context
+     * receives a shared removal gate. Context shutdown waits for active executions before unregistering,
+     * so this is also the safe hook for engine cleanup.
      * <p>
-     * The listener runs immediately when the engine is not tracked or has no contexts; otherwise it
-     * is queued and released by {@link #unregisterContextEngine(Context)} when the context count
-     * reaches zero.
+     * The listener runs immediately when no registered context uses the engine. Registration and gate
+     * installation happen under {@link #ACTIVE_EXECUTIONS_LOCK} so a concurrent unregister cannot
+     * miss the listener.
      *
      * @param engine The engine to observe
      * @param listener The listener to run when the engine no longer owns contexts
@@ -603,10 +531,19 @@ public final class PythonContextRuntime {
     static void onNoContexts(Engine engine, Runnable listener) {
         boolean runNow;
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            EngineState state = ENGINE_STATES.get(engine);
-            runNow = state == null || state.contexts == 0;
-            if (state != null && !runNow) {
-                state.noContextsListeners.add(listener);
+            List<ContextState> states = CONTEXT_STATES.entrySet().stream()
+                .filter(entry -> entry.getKey().getEngine() == engine)
+                .map(Map.Entry::getValue)
+                .toList();
+            runNow = states.isEmpty();
+            if (!runNow) {
+                AtomicInteger remaining = new AtomicInteger(states.size());
+                Runnable gate = () -> {
+                    if (remaining.decrementAndGet() == 0) {
+                        listener.run();
+                    }
+                };
+                states.forEach(state -> state.noContextListeners.add(gate));
             }
         }
         if (runNow) {
@@ -1444,7 +1381,6 @@ public final class PythonContextRuntime {
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
             CONTEXT_STATES.values().forEach(ContextState::clear);
             CONTEXT_STATES.clear();
-            ENGINE_STATES.clear();
             ACTIVE_EXECUTIONS.set(0);
         }
     }
@@ -1488,23 +1424,16 @@ public final class PythonContextRuntime {
         private final IdentityHashMap<Value, Map<String, Object>> asyncMembers = new IdentityHashMap<>();
         private final Map<String, Value> helpers = new ConcurrentHashMap<>();
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
+        private final List<Runnable> noContextListeners = new ArrayList<>();
         private int activeExecutions;
-        private @Nullable Engine engine;
 
         private void clear() {
             asyncMembers.clear();
             helpers.clear();
             noActiveExecutionsListeners.clear();
+            noContextListeners.clear();
             activeExecutions = 0;
-            engine = null;
         }
-    }
-
-    private static final class EngineState {
-        private final List<Runnable> noContextsListeners = new ArrayList<>();
-        private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
-        private int contexts;
-        private int activeExecutions;
     }
 
     private static final class ExecutionFrame {

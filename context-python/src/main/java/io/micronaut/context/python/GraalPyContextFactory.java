@@ -212,7 +212,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
         now = System.currentTimeMillis();
         var context = builder.build();
-        PythonContextRuntime.registerContextEngine(context, engine);
+        PythonContextRuntime.registerContext(context);
         LOG.debug("GraalPy Context Built in {}ms", System.currentTimeMillis() - now);
 
         // The per-context builtin is only needed by context-reuse tests. Avoid
@@ -307,7 +307,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             throw e;
         } finally {
             if (closed) {
-                PythonContextRuntime.unregisterContextEngine(ctx);
+                PythonContextRuntime.unregisterContext(ctx);
             }
         }
     }

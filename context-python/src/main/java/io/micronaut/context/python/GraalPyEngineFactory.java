@@ -93,19 +93,17 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
     /**
      * Close the shared Python engine after Micronaut destroys the engine bean.
      * <p>
-     * Shutdown is deferred until all tracked Python contexts and active executions
-     * are gone. Closing an engine too early can invalidate in-flight bridge calls,
-     * so this listener coordinates with {@link PythonContextRuntime} instead of
-     * closing directly from the bean destruction callback.
+     * Shutdown is deferred until all tracked Python contexts are gone. Context shutdown waits
+     * for active executions before closing, so closing an engine too early cannot invalidate
+     * in-flight bridge calls. This listener coordinates with {@link PythonContextRuntime}
+     * instead of closing directly from the bean destruction callback.
      *
      * @param event The destroyed engine bean event.
      */
     @Override
     public void onDestroyed(@NonNull BeanDestroyedEvent<Engine> event) {
         Engine engine = event.getBean();
-        PythonContextRuntime.onNoContexts(engine, () ->
-            PythonContextRuntime.onNoActiveExecutions(engine, () -> closeEngine(engine))
-        );
+        PythonContextRuntime.onNoContexts(engine, () -> closeEngine(engine));
     }
 
     /**
