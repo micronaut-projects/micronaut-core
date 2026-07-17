@@ -9,7 +9,7 @@ class FactoryAbstractInheritanceSpec extends AbstractTypeElementSpec {
     void "test inherited factory methods resolve their owning factory"() {
         given:
         def context = buildContext('''
-package factinhertest;
+package factinheritest;
 
 import jakarta.inject.Singleton;
 import io.micronaut.context.annotation.Factory;
@@ -34,7 +34,7 @@ class Product {
 ''')
 
         expect:
-        context.getBeansOfType(context.classLoader.loadClass('factinhertest.Product')).size() == 2
+        context.getBeansOfType(context.classLoader.loadClass('factinheritest.Product')).size() == 2
     }
 
     void "test that beans are generated for child factories but not parent"() {
