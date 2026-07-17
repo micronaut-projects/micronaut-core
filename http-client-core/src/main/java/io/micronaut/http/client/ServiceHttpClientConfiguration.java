@@ -140,7 +140,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
         @Nullable ServiceSslClientConfiguration sslConfiguration,
         HttpClientConfiguration defaultHttpClientConfiguration) {
-        this(serviceId, connectionPoolConfiguration, webSocketCompressionConfiguration, new ServiceHttp2ClientConfiguration(), sslConfiguration, defaultHttpClientConfiguration);
+        this(serviceId, connectionPoolConfiguration, webSocketCompressionConfiguration, null, sslConfiguration, defaultHttpClientConfiguration);
     }
 
     /**
@@ -168,7 +168,8 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         }
         this.connectionPoolConfiguration = Objects.requireNonNullElseGet(connectionPoolConfiguration, ServiceConnectionPoolConfiguration::new);
         this.webSocketCompressionConfiguration = Objects.requireNonNullElseGet(webSocketCompressionConfiguration, ServiceWebSocketCompressionConfiguration::new);
-        this.http2Configuration = Objects.requireNonNullElseGet(http2Configuration, ServiceHttp2ClientConfiguration::new);
+        this.http2Configuration = http2Configuration == null ?
+                new ServiceHttp2ClientConfiguration(defaultHttpClientConfiguration) : http2Configuration;
     }
 
     /**
@@ -323,6 +324,21 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      */
     @ConfigurationProperties(Http2ClientConfiguration.PREFIX)
     public static class ServiceHttp2ClientConfiguration extends Http2ClientConfiguration {
+        /**
+         * Default constructor.
+         */
+        public ServiceHttp2ClientConfiguration() {
+        }
+
+        /**
+         * Creates a service configuration initialized from the default HTTP client configuration.
+         *
+         * @param defaultConfiguration The default HTTP client configuration
+         */
+        @Inject
+        public ServiceHttp2ClientConfiguration(HttpClientConfiguration defaultConfiguration) {
+            super(defaultConfiguration.getHttp2Configuration());
+        }
     }
 
     /**
