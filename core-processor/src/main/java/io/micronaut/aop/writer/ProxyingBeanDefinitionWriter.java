@@ -309,6 +309,7 @@ public abstract class ProxyingBeanDefinitionWriter implements ElementProxyBuilde
 
     protected final void processAlreadyVisitedMethods(BeanDefinitionWriter parent) {
         parent.getPostConstructMethods().forEach(proxyBeanDefinitionWriter::addPostConstruct);
+        parent.getPreDestroyMethods().forEach(proxyBeanDefinitionWriter::addPreDestroy);
     }
 
     @Override

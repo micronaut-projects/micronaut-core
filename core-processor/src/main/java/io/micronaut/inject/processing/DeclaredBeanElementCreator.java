@@ -403,15 +403,17 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
      * @return true if processed
      */
     protected boolean visitAopMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
+        AnnotationMetadata methodAnnotationMetadata = methodElement.getMethodAnnotationMetadata();
+        boolean methodHasDeclaredAroundAdvice = InterceptedMethodUtil.hasDeclaredAroundAdvice(methodAnnotationMetadata);
+        boolean publicOnlyAroundAdvice = InterceptedMethodUtil.hasPublicOnlyAroundMethodVisibility(classElement.getAnnotationMetadata());
         boolean aopDefinedOnClassAndPublicMethod = isAopProxy
             && !methodElement.isStatic()
-            && (methodElement.isPublic() || methodElement.isPackagePrivate());
-        AnnotationMetadata methodAnnotationMetadata = methodElement.getMethodAnnotationMetadata();
+            && (methodElement.isPublic() || (!publicOnlyAroundAdvice && methodElement.isPackagePrivate()));
         if (aopDefinedOnClassAndPublicMethod ||
-            !isAopProxy && InterceptedMethodUtil.hasAroundStereotype(methodAnnotationMetadata) ||
-            InterceptedMethodUtil.hasDeclaredAroundAdvice(methodAnnotationMetadata) && !classElement.isAbstract()) {
+            (!isAopProxy && InterceptedMethodUtil.hasAroundStereotype(methodAnnotationMetadata)) ||
+            (methodHasDeclaredAroundAdvice && !classElement.isAbstract())) {
             if (methodElement.isFinal()) {
-                if (InterceptedMethodUtil.hasDeclaredAroundAdvice(methodAnnotationMetadata)) {
+                if (methodHasDeclaredAroundAdvice) {
                     throw new ProcessingException(methodElement, "Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.");
                 } else if (!methodElement.isSynthetic() && aopDefinedOnClassAndPublicMethod && isDeclaredInThisClass(methodElement)) {
                     throw new ProcessingException(methodElement, "Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.");

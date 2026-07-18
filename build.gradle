@@ -14,6 +14,28 @@ repositories {
     mavenCentral()
 }
 
+def pistolMavenPublishing = providers.gradleProperty("pistolMavenPublishing")
+    .map { it.toBoolean() }
+    .orElse(false)
+
+if (pistolMavenPublishing.get()) {
+    allprojects {
+        plugins.withId("maven-publish") {
+            publishing {
+                repositories {
+                    maven {
+                        name = "Pistol"
+                        url = uri("s3://pistol-maven/maven2")
+                        authentication {
+                            create("awsIm", org.gradle.authentication.aws.AwsImAuthentication)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 tasks.named("updateVersionCatalogs") {
     // we set the list to empty because we accept upgrades which improve the status
     rejectedQualifiers = []

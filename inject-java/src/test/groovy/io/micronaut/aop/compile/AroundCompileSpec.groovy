@@ -1005,6 +1005,279 @@ class MyBean {
         t.message.contains 'Method annotated as executable but is declared private'
     }
 
+    void 'test class level public only around advice'() {
+        given:
+        ApplicationContext context = buildContext('''
+package publiconlyaround;
+
+import java.lang.annotation.*;
+import java.util.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Singleton
+@TestAnn
+class PublicOnlyBean {
+    public boolean constructorHelperInvoked;
+
+    PublicOnlyBean() {
+        packageHelper("ctor");
+    }
+
+    public String publicMethod(String value) {
+        return value;
+    }
+
+    public String callPackageHelper(String value) {
+        return packageHelper(value);
+    }
+
+    public String callProtectedHelper(String value) {
+        return protectedHelper(value);
+    }
+
+    public String callMethodLevelPackageHelper(String value) {
+        return methodLevelPackageHelper(value);
+    }
+
+    String packageHelper(String value) {
+        constructorHelperInvoked = true;
+        return "package " + value;
+    }
+
+    protected String protectedHelper(String value) {
+        return "protected " + value;
+    }
+
+    @TestAnn
+    String methodLevelPackageHelper(String value) {
+        return "method " + value;
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around(methodVisibility = Around.MethodVisibility.PUBLIC_ONLY)
+@interface TestAnn {
+}
+
+@InterceptorBean(TestAnn.class)
+class TestInterceptor implements MethodInterceptor<Object, Object> {
+    public int invoked;
+    public final List<String> methods = new ArrayList<>();
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        invoked++;
+        methods.add(context.getMethodName());
+        return context.proceed();
+    }
+}
+''')
+        def bean = getBean(context, 'publiconlyaround.PublicOnlyBean')
+        def interceptor = getBean(context, 'publiconlyaround.TestInterceptor')
+
+        expect:
+        bean.constructorHelperInvoked
+        interceptor.methods.isEmpty()
+
+        when:
+        def publicResult = bean.publicMethod('one')
+        def packageResult = bean.callPackageHelper('two')
+        def protectedResult = bean.callProtectedHelper('three')
+        def methodLevelResult = bean.callMethodLevelPackageHelper('four')
+        def interceptedMethodNames = ((Intercepted) bean).interceptedMethods()*.methodName
+
+        then:
+        publicResult == 'one'
+        packageResult == 'package two'
+        protectedResult == 'protected three'
+        methodLevelResult == 'method four'
+        interceptor.methods == [
+                'publicMethod',
+                'callPackageHelper',
+                'callProtectedHelper',
+                'callMethodLevelPackageHelper',
+                'methodLevelPackageHelper'
+        ]
+        interceptedMethodNames.containsAll([
+                'publicMethod',
+                'callPackageHelper',
+                'callProtectedHelper',
+                'callMethodLevelPackageHelper',
+                'methodLevelPackageHelper'
+        ])
+        !interceptedMethodNames.contains('packageHelper')
+        !interceptedMethodNames.contains('protectedHelper')
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test default class level around advice still intercepts package private methods'() {
+        given:
+        ApplicationContext context = buildContext('''
+package defaultaroundvisibility;
+
+import java.lang.annotation.*;
+import java.util.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Singleton
+@TestAnn
+class DefaultVisibilityBean {
+    public String callPackageHelper(String value) {
+        return packageHelper(value);
+    }
+
+    String packageHelper(String value) {
+        return "package " + value;
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface TestAnn {
+}
+
+@InterceptorBean(TestAnn.class)
+class TestInterceptor implements MethodInterceptor<Object, Object> {
+    public final List<String> methods = new ArrayList<>();
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        methods.add(context.getMethodName());
+        return context.proceed();
+    }
+}
+''')
+        def bean = getBean(context, 'defaultaroundvisibility.DefaultVisibilityBean')
+        def interceptor = getBean(context, 'defaultaroundvisibility.TestInterceptor')
+
+        when:
+        def result = bean.callPackageHelper('one')
+        def interceptedMethodNames = ((Intercepted) bean).interceptedMethods()*.methodName
+
+        then:
+        result == 'package one'
+        interceptor.methods == ['callPackageHelper', 'packageHelper']
+        interceptedMethodNames.contains('callPackageHelper')
+        interceptedMethodNames.contains('packageHelper')
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test factory produced class level around advice remains public only'() {
+        given:
+        ApplicationContext context = buildContext('''
+package factoryaroundvisibility;
+
+import java.lang.annotation.*;
+import java.util.*;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+class DefaultProduct {
+    public String callPackageHelper(String value) {
+        return packageHelper(value);
+    }
+
+    String packageHelper(String value) {
+        return "default " + value;
+    }
+}
+
+class PublicOnlyProduct {
+    public String callPackageHelper(String value) {
+        return packageHelper(value);
+    }
+
+    String packageHelper(String value) {
+        return "public only " + value;
+    }
+}
+
+@Factory
+class ProductFactory {
+    @Singleton
+    @DefaultAnn
+    DefaultProduct defaultProduct() {
+        return new DefaultProduct();
+    }
+
+    @Singleton
+    @PublicOnlyAnn
+    PublicOnlyProduct publicOnlyProduct() {
+        return new PublicOnlyProduct();
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface DefaultAnn {
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around(methodVisibility = Around.MethodVisibility.PUBLIC_ONLY)
+@interface PublicOnlyAnn {
+}
+
+@InterceptorBean(DefaultAnn.class)
+class DefaultInterceptor implements MethodInterceptor<Object, Object> {
+    public final List<String> methods = new ArrayList<>();
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        methods.add(context.getMethodName());
+        return context.proceed();
+    }
+}
+
+@InterceptorBean(PublicOnlyAnn.class)
+class PublicOnlyInterceptor implements MethodInterceptor<Object, Object> {
+    public final List<String> methods = new ArrayList<>();
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        methods.add(context.getMethodName());
+        return context.proceed();
+    }
+}
+''')
+        def defaultBean = getBean(context, 'factoryaroundvisibility.DefaultProduct')
+        def publicOnlyBean = getBean(context, 'factoryaroundvisibility.PublicOnlyProduct')
+        def defaultInterceptor = getBean(context, 'factoryaroundvisibility.DefaultInterceptor')
+        def publicOnlyInterceptor = getBean(context, 'factoryaroundvisibility.PublicOnlyInterceptor')
+
+        when:
+        def defaultResult = defaultBean.callPackageHelper('one')
+        def publicOnlyResult = publicOnlyBean.callPackageHelper('two')
+        def defaultInterceptedMethodNames = ((Intercepted) defaultBean).interceptedMethods()*.methodName
+        def publicOnlyInterceptedMethodNames = ((Intercepted) publicOnlyBean).interceptedMethods()*.methodName
+
+        then:
+        defaultResult == 'default one'
+        publicOnlyResult == 'public only two'
+        defaultInterceptor.methods == ['callPackageHelper']
+        publicOnlyInterceptor.methods == ['callPackageHelper']
+        defaultInterceptedMethodNames.contains('callPackageHelper')
+        publicOnlyInterceptedMethodNames.contains('callPackageHelper')
+        !defaultInterceptedMethodNames.contains('packageHelper')
+        !publicOnlyInterceptedMethodNames.contains('packageHelper')
+
+        cleanup:
+        context.close()
+    }
+
     void 'test byte[] return compile'() {
         given:
         ApplicationContext context = buildContext('''
