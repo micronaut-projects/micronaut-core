@@ -5962,9 +5962,38 @@ class AbcPerson {
 
         cleanup:
             applicationContext.close()
-    }
+     }
 
-    @Override
+     void "test introspected private dollar ref property with getter setter"() {
+         when:
+         def introspection = buildBeanIntrospection('test.RefClass', '''
+ package test;
+ 
+ import io.micronaut.core.annotation.Introspected;
+ import com.fasterxml.jackson.annotation.JsonProperty;
+ 
+ @Introspected
+ class RefClass {
+     @JsonProperty("$ref")
+     private String $ref;
+ 
+     public String getRef() {
+         return $ref;
+     }
+ 
+     public void setRef(String ref) {
+         this.$ref = ref;
+     }
+ }
+ ''')
+ 
+         then:
+         introspection != null
+         introspection.getBeanProperties().size() == 1
+         introspection.getProperty("ref").isPresent()
+     }
+
+     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
             @Override
