@@ -39,6 +39,7 @@ import io.micronaut.http.annotation.Patch;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Put;
+import io.micronaut.http.annotation.Query;
 import io.micronaut.http.annotation.Trace;
 import io.micronaut.http.annotation.UriMapping;
 import io.micronaut.http.uri.UriTemplate;
@@ -186,6 +187,29 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                 MediaType[] consumes = resolveConsumes(method);
                 MediaType[] produces = resolveProduces(method);
                 UriRoute route = PATCH(resolveUri(bean, uri,
+                        method,
+                        uriNamingStrategy),
+                        bean,
+                        method);
+                route = route.consumes(consumes).produces(produces);
+                if (definition.port > -1) {
+                    route.exposedPort(definition.port);
+                }
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Created Route: {}", route);
+                }
+            }
+        });
+
+        httpMethodsHandlers.put(Query.class, (RouteDefinition definition) -> {
+            final ExecutableMethod method = definition.executableMethod;
+            final BeanDefinition bean = definition.beanDefinition;
+
+            Set<String> uris = this.resolveUrisMapping(Query.class, method);
+            for (String uri: uris) {
+                MediaType[] consumes = resolveConsumes(method);
+                MediaType[] produces = resolveProduces(method);
+                UriRoute route = QUERY(resolveUri(bean, uri,
                         method,
                         uriNamingStrategy),
                         bean,

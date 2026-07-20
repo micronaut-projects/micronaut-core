@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthResult;
@@ -33,11 +34,11 @@ import io.micronaut.management.health.indicator.HealthResult;
  * @author graemerocher
  * @since 1.0
  */
-@ServerFilter({
-    HealthResultFilter.DEFAULT_MAPPING,
-    HealthResultFilter.LIVENESS_PROBE_MAPPING,
-    HealthResultFilter.READINESS_PROBE_MAPPING
-})
+@ServerFilter(
+    value = {HealthResultFilter.DEFAULT_MAPPING,
+        HealthResultFilter.LIVENESS_PROBE_MAPPING,
+        HealthResultFilter.READINESS_PROBE_MAPPING},
+    patternStyle = FilterPatternStyle.REGEX)
 @Requires(beans = HealthEndpoint.class)
 @Internal
 public class HealthResultFilter {
@@ -46,11 +47,11 @@ public class HealthResultFilter {
      * Configurable default mapping for filter.
      */
     public static final String DEFAULT_MAPPING =
-        "${" + EndpointDefaultConfiguration.PREFIX + ".path:" +
-            EndpointDefaultConfiguration.DEFAULT_ENDPOINT_BASE_PATH + "}${" +
+        "/?${" + EndpointDefaultConfiguration.PREFIX + ".path:" +
+            EndpointDefaultConfiguration.DEFAULT_ENDPOINT_BASE_PATH + "}/?${" +
             HealthEndpoint.PREFIX + ".id:health}";
-    public static final String LIVENESS_PROBE_MAPPING = DEFAULT_MAPPING + "/liveness";
-    public static final String READINESS_PROBE_MAPPING = DEFAULT_MAPPING + "/readiness";
+    public static final String LIVENESS_PROBE_MAPPING = DEFAULT_MAPPING + "/?liveness";
+    public static final String READINESS_PROBE_MAPPING = DEFAULT_MAPPING + "/?readiness";
 
     private final HealthEndpoint healthEndpoint;
 

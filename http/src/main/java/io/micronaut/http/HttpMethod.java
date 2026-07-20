@@ -71,6 +71,12 @@ import org.jspecify.annotations.Nullable;
     PATCH(true, true),
 
     /**
+     * See https://www.rfc-editor.org/rfc/rfc10008.txt.
+     * @since 5.2.0
+     */
+    QUERY(true, true),
+
+    /**
      * A custom non-standard HTTP method.
      */
     CUSTOM(false, true);
@@ -135,7 +141,7 @@ import org.jspecify.annotations.Nullable;
      * @return True if it does
      */
     public static boolean requiresRequestBody(HttpMethod method) {
-        return method != null && (method.equals(POST) || method.equals(PUT) || method.equals(PATCH));
+        return method != null && (method.equals(POST) || method.equals(PUT) || method.equals(PATCH) || method.equals(QUERY));
     }
 
     /**
@@ -199,6 +205,9 @@ import org.jspecify.annotations.Nullable;
             case "PATCH":
             case "patch":
                 return PATCH;
+            case "QUERY":
+            case "query":
+                return QUERY;
             default:
                 return null;
         }
