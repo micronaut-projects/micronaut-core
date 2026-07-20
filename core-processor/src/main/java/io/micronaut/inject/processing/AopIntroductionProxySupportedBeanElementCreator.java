@@ -91,6 +91,9 @@ final class AopIntroductionProxySupportedBeanElementCreator<R> extends DeclaredB
 
     @Override
     protected boolean visitMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
+        if (visitInjectAndLifecycleMethod(beanDefinitionBuilder, methodElement)) {
+            return true;
+        }
         if (intercept(methodElement)) {
             return true;
         }
