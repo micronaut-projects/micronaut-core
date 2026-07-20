@@ -16,7 +16,6 @@
 package io.micronaut.http.server.cors;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
@@ -42,6 +41,7 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import jakarta.inject.Inject;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +49,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -419,11 +420,11 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     }
 
     private static boolean isAny(List<String> values) {
-        return values == CorsOriginConfiguration.ANY;
+        return Objects.equals(values, CorsOriginConfiguration.ANY);
     }
 
     private static boolean isAnyMethod(List<HttpMethod> allowedMethods) {
-        return allowedMethods == CorsOriginConfiguration.ANY_METHOD;
+        return Objects.equals(allowedMethods, CorsOriginConfiguration.ANY_METHOD);
     }
 
     private boolean methodAllowed(CorsOriginConfiguration config,
