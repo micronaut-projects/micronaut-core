@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
 import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
+import io.micronaut.python.compiler.PythonBytecodeCompiler;
 import org.graalvm.polyglot.Source;
 import org.jetbrains.annotations.NotNull;
 
@@ -80,6 +81,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
     private ClassLoader classLoader;
+    private boolean compilePythonBytecode;
+    private PythonBytecodeCompiler bytecodeCompiler;
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -89,6 +92,16 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      */
     public void setClassElementCallback(Consumer<ClassElement> callback) {
         this.classElementCallback = callback;
+    }
+
+    /**
+     * Set whether generated Python VFS resources should include GraalPy bytecode caches.
+     *
+     * @param compilePythonBytecode Whether bytecode caches should be emitted
+     * @since 5.2.0
+     */
+    public void setCompilePythonBytecode(boolean compilePythonBytecode) {
+        this.compilePythonBytecode = compilePythonBytecode;
     }
 
     @Override
@@ -106,6 +119,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     @Override
     public void close() throws Exception {
         parser.close();
+        if (bytecodeCompiler != null) {
+            bytecodeCompiler.close();
+        }
     }
 
     @Override
@@ -187,15 +203,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             StringBuilder filesList = new StringBuilder();
             if (StringUtils.isNotEmpty(values.code())) {
                 mainPy = transformedList.get(0).runtimeCode();
-                // Write runtime Python code to META-INF
-                javaVisitorContext.visitMetaInfFile(APPLICATION_LAUNCHER_PATH, originatingElement)
-                    .ifPresent(generatedFile -> {
-                        try (var writer = generatedFile.openWriter()) {
-                            writer.write(mainPy);
-                        } catch (IOException e) {
-                            throw new ProcessingException(originatingElement, "Failed to write Python code to [" + APPLICATION_LAUNCHER_PATH + "]: " + e.getMessage(), e);
-                        }
-                    });
+                writePythonToVfs(filesList, APPLICATION_LAUNCHER_PATH, mainPy, originatingElement);
             } else {
                 if (hasSrcDirs) {
                     // source mode, so we need to write out each source to META-INF
@@ -231,16 +239,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                         .addAll(transformResult.allClassNames());
                                 }
                             }
-                            filesList.append("/META-INF/").append(targetSource).append("\n");
                             Source runtimeSource = transformResult.runtimeSource();
-                            javaVisitorContext.visitMetaInfFile(targetSource, originatingElement)
-                                .ifPresent(generatedFile -> {
-                                    try (var writer = generatedFile.openWriter()) {
-                                        writer.write(runtimeSource.getCharacters().toString());
-                                    } catch (IOException e) {
-                                        throw new ProcessingException(originatingElement, "Failed to write Python code to [" + targetSource + "]: " + e.getMessage(), e);
-                                    }
-                                });
+                            writePythonToVfs(filesList, targetSource, runtimeSource.getCharacters().toString(), originatingElement);
                         }
                     }
 
@@ -263,15 +263,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                     }
                                 }
                             }
-                            filesList.append("/META-INF/").append(mainFilePath).append("\n");
-                            javaVisitorContext.visitMetaInfFile(mainFilePath, originatingElement)
-                                .ifPresent(generatedFile -> {
-                                    try (var writer = generatedFile.openWriter()) {
-                                        writer.write(mainContent.toString());
-                                    } catch (IOException e) {
-                                        throw new ProcessingException(originatingElement, "Failed to write Python code to [" + mainFilePath + "]: " + e.getMessage(), e);
-                                    }
-                                });
+                            writePythonToVfs(filesList, mainFilePath, mainContent.toString(), originatingElement);
                         } else {
 
                             String initFilePath = APPLICATION_SRC_PATH + parent + "__init__.py";
@@ -296,15 +288,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                             if (!exportedTypes.isEmpty()) {
                                 initContent.append("\n__all__ = ").append(toListOfString(exportedTypes)).append("\n");
                             }
-                            filesList.append("/META-INF/").append(initFilePath).append("\n");
-                            javaVisitorContext.visitMetaInfFile(initFilePath, originatingElement)
-                                .ifPresent(generatedFile -> {
-                                    try (var writer = generatedFile.openWriter()) {
-                                        writer.write(initContent.toString());
-                                    } catch (IOException e) {
-                                        throw new ProcessingException(originatingElement, "Failed to write Python code to [" + initFilePath + "]: " + e.getMessage(), e);
-                                    }
-                                });
+                            writePythonToVfs(filesList, initFilePath, initContent.toString(), originatingElement);
                         }
                     }
                 }
@@ -493,6 +477,53 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         return null;
     }
 
+    private void writePythonToVfs(StringBuilder filesList,
+                                  String filePath,
+                                  String content,
+                                  ClassElement originatingElement) {
+        javaVisitorContext.visitMetaInfFile(filePath, originatingElement)
+            .ifPresent(generatedFile -> {
+                try (var writer = generatedFile.openWriter()) {
+                    writer.write(content);
+                } catch (IOException e) {
+                    throw new ProcessingException(originatingElement, "Failed to write Python code to [" + filePath + "]: " + e.getMessage(), e);
+                }
+            });
+        filesList.append("/META-INF/").append(filePath).append('\n');
+
+        if (!compilePythonBytecode) {
+            return;
+        }
+        try {
+            if (bytecodeCompiler == null) {
+                bytecodeCompiler = new PythonBytecodeCompiler();
+            }
+            PythonBytecodeCompiler.Result result = bytecodeCompiler.compile(content, filePath);
+            String cacheFilePath = cacheFilePath(filePath, result.cachePath());
+            javaVisitorContext.visitMetaInfFile(cacheFilePath, originatingElement)
+                .ifPresent(generatedFile -> {
+                    try (var output = generatedFile.openOutputStream()) {
+                        output.write(result.bytes());
+                    } catch (IOException e) {
+                        throw new ProcessingException(originatingElement, "Failed to write Python bytecode to [" + cacheFilePath + "]: " + e.getMessage(), e);
+                    }
+                });
+            filesList.append("/META-INF/").append(cacheFilePath).append('\n');
+        } catch (ProcessingException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ProcessingException(originatingElement, "Failed to compile Python bytecode for [" + filePath + "]: " + e.getMessage(), e);
+        }
+    }
+
+    private static String cacheFilePath(String sourcePath, String cachePath) {
+        int sourceSeparator = sourcePath.lastIndexOf('/');
+        int cacheSeparator = cachePath.lastIndexOf('/');
+        String parent = sourceSeparator == -1 ? "" : sourcePath.substring(0, sourceSeparator + 1);
+        String cacheFile = cacheSeparator == -1 ? cachePath : cachePath.substring(cacheSeparator + 1);
+        return parent + "__pycache__/" + cacheFile;
+    }
+
     private void writeAllToVFS(
         StringBuilder filesList,
         Map<String, String> decorators,
@@ -532,18 +563,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 String packagePath = packageName.isEmpty() ? simpleName : packageName.replace('.', '/') + "/" + simpleName;
                 String filePath = APPLICATION_SRC_PATH + packagePath + ".py";
 
-                // Write decorator file
-                javaVisitorContext.visitMetaInfFile(filePath, originatingElement)
-                    .ifPresent(generatedFile -> {
-                        try (var writer = generatedFile.openWriter()) {
-                            writer.write(decoratorCode);
-                        } catch (IOException e) {
-                            throw new ProcessingException(originatingElement, "Failed to write decorator to VFS: " + filePath, e);
-                        }
-                    });
-
-                // Add to files list
-                filesList.append("/META-INF/").append(filePath).append("\n");
+                writePythonToVfs(filesList, filePath, decoratorCode, originatingElement);
             }
         }
 
@@ -621,17 +641,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 initContent.append("\n__all__ = ").append(toListOfString(allNames)).append("\n");
             }
 
-            // Write the __init__.py file
-            javaVisitorContext.visitMetaInfFile(initFilePath, originatingElement)
-                .ifPresent(generatedFile -> {
-                    try (var writer = generatedFile.openWriter()) {
-                        writer.write(initContent.toString());
-                    } catch (IOException e) {
-                        throw new ProcessingException(originatingElement, "Failed to write __init__.py to VFS: " + initFilePath, e);
-                    }
-                });
-
-            filesList.append("/META-INF/").append(initFilePath).append("\n");
+            writePythonToVfs(filesList, initFilePath, initContent.toString(), originatingElement);
         }
 
         // Write fileslist.txt

@@ -66,6 +66,7 @@ public final class PyronautCompiler {
     private final Consumer<ClassElement> classElementCallback;
     private final List<String> compilerOptions;
     private final boolean verboseErrors;
+    private final boolean compilePythonBytecode;
     private final File errorDumpDirectory;
 
     private PyronautCompiler(Builder builder) {
@@ -83,6 +84,7 @@ public final class PyronautCompiler {
         this.classElementCallback = builder.classElementCallback;
         this.compilerOptions = builder.compilerOptions != null ? List.copyOf(builder.compilerOptions) : null;
         this.verboseErrors = builder.verboseErrors;
+        this.compilePythonBytecode = builder.compilePythonBytecode;
         this.errorDumpDirectory = builder.errorDumpDirectory;
         validateConfiguration();
     }
@@ -166,6 +168,7 @@ public final class PyronautCompiler {
             compiler.setErrorDumpDirectory(errorDumpDirectory);
         }
         compiler.setSourceSnapshots(createSourceSnapshots());
+        compiler.setCompilePythonBytecode(compilePythonBytecode);
         return compiler;
     }
 
@@ -348,6 +351,7 @@ public final class PyronautCompiler {
         private List<String> compilerOptions;
         private Consumer<ClassElement> classElementCallback;
         private boolean verboseErrors;
+        private boolean compilePythonBytecode;
         private File errorDumpDirectory;
 
         private Builder() {
@@ -509,6 +513,19 @@ public final class PyronautCompiler {
          */
         public Builder verboseErrors(boolean verboseErrors) {
             this.verboseErrors = verboseErrors;
+            return this;
+        }
+
+        /**
+         * Enable generation of hash-based GraalPy bytecode for Python resources generated during
+         * annotation processing. Source resources remain available alongside the bytecode.
+         *
+         * @param compilePythonBytecode Whether generated Python resources should include bytecode
+         * @return This builder
+         * @since 5.2.0
+         */
+        public Builder compilePythonBytecode(boolean compilePythonBytecode) {
+            this.compilePythonBytecode = compilePythonBytecode;
             return this;
         }
 

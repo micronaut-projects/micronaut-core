@@ -18,6 +18,8 @@ package io.micronaut.context.python;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.graalvm.polyglot.Context;
+import org.graalvm.python.embedding.GraalPyResources;
+import org.graalvm.python.embedding.VirtualFileSystem;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -63,6 +65,20 @@ final class GraalPyContextFactoryTest {
         ))) {
             GraalPyContextConfiguration config = applicationContext.getBean(GraalPyContextConfiguration.class);
             assertTrue(config.getOptions().containsKey("log.level"));
+        }
+    }
+
+    @Test
+    void importsPackagedAsyncioRuntimeFromBytecodeCache() {
+        VirtualFileSystem vfs = VirtualFileSystem.newBuilder()
+            .resourceDirectory(GraalPyContextFactory.APPLICATION_PATH)
+            .resourceLoadingClass(GraalPyContextFactory.class)
+            .build();
+        try (Context context = GraalPyResources.contextBuilder(vfs).allowAllAccess(true).build()) {
+            String cachePath = context.eval(PYTHON, "import micronaut_asyncio; micronaut_asyncio.__cached__").asString();
+
+            assertTrue(cachePath.contains("/__pycache__/micronaut_asyncio."));
+            assertTrue(cachePath.endsWith(".pyc"));
         }
     }
 }

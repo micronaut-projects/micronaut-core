@@ -757,6 +757,49 @@ class Message:
         context?.close()
     }
 
+    def "test bytecode-enabled in-memory compiler transforms annotated application and decorator modules"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class Message:
+    text: str
+
+    def formattedDateCreated(self) -> str:
+        return "formatted: " + self.text
+'''
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .compilePythonBytecode(true)
+            .build()
+
+        when:
+        def classLoader = compiler.buildClassLoader()
+        def filesList = classLoader.getResourceAsStream("META-INF/GRAALPY-VFS/micronaut-application/fileslist.txt").text
+        def context = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .beanDefinitionsProvider(new InMemoryBeanDefinitionsProvider())
+            .build()
+            .start()
+        def messageClass = classLoader.loadClass("python.Message")
+        def message = messageClass.getConstructor(String).newInstance("today")
+
+        then:
+        filesList.contains("/src/__main__.py")
+        filesList.contains("/src/__pycache__/__main__.")
+        filesList.contains("/src/micronaut/core/annotation/Introspected.py")
+        filesList.contains("/src/micronaut/core/annotation/__pycache__/Introspected.")
+        filesList.contains("/src/micronaut/core/__pycache__/__init__.")
+        messageClass.getMethod("formattedDateCreated").returnType == String
+        message.formattedDateCreated() == "formatted: today"
+
+        cleanup:
+        context?.close()
+    }
+
     def "test Python sources in multiple distinct packages are processed"() {
         given:
         def tempDir = File.createTempDir("pyronaut-test-multi-package", "")
@@ -942,6 +985,69 @@ class UserController:
         cleanup:
         context.close()
         tempSrcDir.deleteDir()
+    }
+
+    def "test bytecode-enabled disk compiler loads annotated relative-import application from cache"() {
+        given:
+        def tempSrcDir = File.createTempDir("pyronaut-test-bytecode-relative-src", "")
+        def tempTargetDir = File.createTempDir("pyronaut-test-bytecode-relative-target", "")
+        def exampleDir = new File(tempSrcDir, "example")
+        exampleDir.mkdirs()
+
+        new File(exampleDir, "HelloController.py").text = '''
+from jakarta.inject import Singleton
+from .UserController import UserController
+
+@Singleton
+class HelloController:
+    def __init__(self, dependency: UserController):
+        self.dependency = dependency
+
+    def hello(self):
+        return self.dependency.getUsers()[0]
+'''
+        new File(exampleDir, "UserController.py").text = '''
+from jakarta.inject import Singleton
+
+@Singleton
+class UserController:
+    def getUsers(self):
+        return ["user1", "user2"]
+'''
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(tempSrcDir.absolutePath)
+            .javaSrc("inject-python-test/src/test/java")
+            .targetDir(tempTargetDir)
+            .compilePythonBytecode(true)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
+        def filesList = new File(tempTargetDir, "META-INF/GRAALPY-VFS/micronaut-application/fileslist.txt").text
+        def context = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .build()
+            .start()
+        def pythonContext = context.getBean(org.graalvm.polyglot.Context)
+        def cachedModule = pythonContext.eval("python", "import importlib; importlib.import_module('example.HelloController').__cached__").asString()
+
+        then:
+        filesList.contains("/src/example/HelloController.py")
+        filesList.contains("/src/example/__pycache__/HelloController.")
+        filesList.contains("/src/example/__init__.py")
+        filesList.contains("/src/example/__pycache__/__init__.")
+        filesList.contains("/src/jakarta/inject/Singleton.py")
+        filesList.contains("/src/jakarta/inject/__pycache__/Singleton.")
+        context.getBean(classLoader.loadClass('example.UserController'))
+        context.getBean(classLoader.loadClass('example.HelloController'))
+        cachedModule.contains("/__pycache__/HelloController.")
+        cachedModule.endsWith(".pyc")
+
+        cleanup:
+        context?.close()
+        tempSrcDir.deleteDir()
+        tempTargetDir.deleteDir()
     }
 
     def "test relative submodule import resolves generic repository entity"() {

@@ -33,6 +33,7 @@ import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotAccess;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
+import org.graalvm.polyglot.Value;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.slf4j.Logger;
@@ -40,7 +41,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -71,6 +71,19 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     /** Enables the per-context Python builtin used by context-reuse tests. */
     public static final String CONTEXT_ID_PROPERTY = "micronaut.python.context-id.enabled";
     private static final Logger LOG = LoggerFactory.getLogger(GraalPyContextFactory.class);
+    private static final Source LOAD_VFS_MODULE_SOURCE = Source.newBuilder(PYTHON, """
+        import importlib.util as __micronaut_importlib_util
+        import sys as __micronaut_sys
+        import types as __micronaut_types
+
+        def __micronaut_load_vfs_module(module_path):
+            module = __micronaut_sys.modules.get('__main__')
+            if module is None:
+                module = __micronaut_types.ModuleType('__main__')
+                __micronaut_sys.modules['__main__'] = module
+            spec = __micronaut_importlib_util.spec_from_file_location('__main__', module_path)
+            spec.loader.exec_module(module)
+        """, "micronaut-load-vfs-module.py").cached(true).buildLiteral();
 
     private final ApplicationContext applicationContext;
     private boolean providedContext = false;
@@ -258,12 +271,9 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
             if (inputStream != null) {
                 LOG.debug("Evaluating main.py {}", mainPyPath);
-                String scriptContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-                LOG.trace("Resolved main.py source");
-                LOG.trace(scriptContent);
-                Source source = Source.newBuilder(PYTHON, scriptContent, mainPy)
-                    .build();
-                context.eval(source);
+                String modulePath = "/graalpy_vfs/src/" + mainPy;
+                Value loader = PythonContextRuntime.helper(context, "__micronaut_load_vfs_module", LOAD_VFS_MODULE_SOURCE);
+                loader.executeVoid(modulePath);
             }
         }
     }

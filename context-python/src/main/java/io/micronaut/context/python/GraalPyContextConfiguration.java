@@ -42,6 +42,8 @@ public final class GraalPyContextConfiguration {
         "out",
         "in",
         "err",
+        "options",
+        "environment",
         "exceptionHandler",
         "messageTransport",
         "sharedEngine",

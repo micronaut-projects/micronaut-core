@@ -81,6 +81,7 @@ final class PyronautJavaCompiler {
     private boolean verboseErrors;
     private File errorDumpDirectory = DEFAULT_ERROR_DUMP_DIRECTORY;
     private List<SourceSnapshot> sourceSnapshots = List.of();
+    private boolean compilePythonBytecode;
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -117,6 +118,15 @@ final class PyronautJavaCompiler {
      */
     public void setSourceSnapshots(List<SourceSnapshot> sourceSnapshots) {
         this.sourceSnapshots = sourceSnapshots == null ? List.of() : List.copyOf(sourceSnapshots);
+    }
+
+    /**
+     * Set whether the Python annotation processor should emit bytecode resources.
+     *
+     * @param compilePythonBytecode Whether bytecode resources should be emitted
+     */
+    public void setCompilePythonBytecode(boolean compilePythonBytecode) {
+        this.compilePythonBytecode = compilePythonBytecode;
     }
 
     /**
@@ -565,6 +575,7 @@ final class PyronautJavaCompiler {
 
         PythonAnnotationProcessor pythonProcessor = new PythonAnnotationProcessor();
         pythonProcessor.setClassLoader(classLoader);
+        pythonProcessor.setCompilePythonBytecode(compilePythonBytecode);
         if (classElementCallback != null) {
             pythonProcessor.setClassElementCallback(classElementCallback);
         }

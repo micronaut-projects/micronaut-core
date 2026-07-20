@@ -32,7 +32,7 @@ public record PythonAsyncioConfiguration(
     /**
      * Configuration prefix for Python asyncio.
      */
-    public static final String PREFIX = "micronaut.python.asyncio";
+    public static final String PREFIX = PythonConfiguration.PREFIX + ".asyncio";
 
     /**
      * Property used to enable or disable Python asyncio support.

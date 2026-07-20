@@ -22,6 +22,8 @@
     notEquals = io.micronaut.core.util.StringUtils.FALSE
 )
 @NullMarked
+@Experimental
 package io.micronaut.context.python;
 
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.NullMarked;

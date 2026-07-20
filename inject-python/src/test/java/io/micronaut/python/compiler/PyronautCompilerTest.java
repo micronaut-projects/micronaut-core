@@ -21,9 +21,11 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class PyronautCompilerTest {
 
@@ -40,5 +42,39 @@ final class PyronautCompilerTest {
         assertNotNull(mainClass.getMethod("main", String[].class));
         assertFalse(mainClass.isAnnotationPresent(PythonApplication.class));
         assertNotNull(classLoader.loadClass("Greeting"));
+    }
+
+    @Test
+    void optionallyIncludesPythonBytecodeInTheInMemoryVfs() throws Exception {
+        ClassLoader classLoader = PyronautCompiler.builder()
+            .pythonCode("answer = 42")
+            .compilePythonBytecode(true)
+            .build()
+            .buildClassLoader();
+
+        String filesList;
+        try (var input = classLoader.getResourceAsStream("META-INF/GRAALPY-VFS/micronaut-application/fileslist.txt")) {
+            assertNotNull(input);
+            filesList = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        assertTrue(filesList.contains("__main__.py"));
+        assertTrue(filesList.contains("__pycache__/__main__."));
+        assertTrue(filesList.contains(".pyc"));
+    }
+
+    @Test
+    void leavesPythonBytecodeOutOfTheInMemoryVfsByDefault() throws Exception {
+        ClassLoader classLoader = PyronautCompiler.builder()
+            .pythonCode("answer = 42")
+            .build()
+            .buildClassLoader();
+
+        String filesList;
+        try (var input = classLoader.getResourceAsStream("META-INF/GRAALPY-VFS/micronaut-application/fileslist.txt")) {
+            assertNotNull(input);
+            filesList = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        assertTrue(filesList.contains("__main__.py"));
+        assertFalse(filesList.contains(".pyc"));
     }
 }
