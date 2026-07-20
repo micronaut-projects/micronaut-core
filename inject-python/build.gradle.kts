@@ -1,5 +1,3 @@
-import io.micronaut.build.internal.python.PythonVfsBytecodeCompile
-
 plugins {
     id("io.micronaut.build.internal.convention-library")
 }
@@ -33,19 +31,4 @@ dependencies {
 }
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
-}
-
-val compileVfsPythonBytecode = tasks.register<PythonVfsBytecodeCompile>("compileVfsPythonBytecode") {
-    sourceDirectory.set(layout.projectDirectory.dir("src/main/resources/GRAALPY-VFS/io.micronaut/micronaut-inject-python"))
-    destinationDirectory.set(layout.buildDirectory.dir("generated/resources/python-bytecode/GRAALPY-VFS/io.micronaut/micronaut-inject-python"))
-    filesListPath.set("fileslist.txt")
-    compilerClasspath.from(configurations.runtimeClasspath)
-    compilerClasspath.from(files(tasks.compileJava.flatMap { it.destinationDirectory }))
-}
-
-tasks.processResources {
-    exclude("GRAALPY-VFS/io.micronaut/micronaut-inject-python/**")
-    from(compileVfsPythonBytecode) {
-        into("GRAALPY-VFS/io.micronaut/micronaut-inject-python")
-    }
 }
