@@ -25,6 +25,11 @@ dependencies {
         }
     }
     api(libs.managed.graalpy.embedding)
+    api(libs.managed.polyglot.tools) {
+        artifact {
+            type = "pom"
+        }
+    }
     implementation(projects.micronautCoreReactive)
     compileOnlyApi(projects.micronautHttp)
     compileOnly(libs.jetbrains.annotations)

@@ -116,6 +116,7 @@ boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "manag
 boms-kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "managed-kotlin-coroutines" }
 managed-graalpy = { module = 'org.graalvm.python:python', version.ref = 'managed-graalpy' }
 managed-graalpy-embedding = { module = 'org.graalvm.python:python-embedding', version.ref = 'managed-graalpy' }
+managed-polyglot-tools = { module = 'org.graalvm.polyglot:tools', version.ref = 'managed-graalpy' }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
 boms-jackson = { module = "tools.jackson:jackson-bom", version.ref = "managed-jackson" }
 boms-micronaut-sourcegen = { module = "io.micronaut.sourcegen:micronaut-sourcegen-bom", version.ref = "micronaut-sourcegen" }

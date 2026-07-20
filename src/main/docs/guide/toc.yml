@@ -338,6 +338,7 @@ languageSupport:
     title: Micronaut for Python
     typeOrdering: Type Ordering and Forward References
     keywords: Python Keywords in Java APIs
+    graalTools: GraalPy Tools
     asyncAwait:
       title: Async/Await
       asyncioRuntime: Netty-Backed Asyncio Runtime
