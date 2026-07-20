@@ -355,4 +355,21 @@ class CorsFilterSpec extends Specification {
     private static boolean containsAccessControlHeaders(HttpResponse<?> response) {
         response.headers.names().stream().anyMatch { it.startsWith("Access-Control-Allow-") }
     }
+
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-origins", value = "http://www.foo.com")
+    @Property(name = "micronaut.server.cors.configurations.foo.allowed-headers", value = "*")
+    void "preflight request succeeds when allowed-headers is configured as wildcard via application configuration"() {
+        given:
+        HttpRequest request = HttpRequest.OPTIONS("/example")
+                .header(HttpHeaders.ORIGIN, 'http://www.foo.com')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, 'GET')
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, 'Content-Type')
+
+        when:
+        HttpResponse<?> response = execute(request)
+
+        then:
+        HttpStatus.OK == response.status()
+        response.headers.contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)
+    }
 }
