@@ -17,6 +17,7 @@ package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.visitor.ClassDef;
@@ -240,18 +241,36 @@ public final class PythonAstParser {
 
     public @NotNull List<TransformResult> transform(VisitorContext visitorContext, Source... pythonSource) {
         Value bindings = context.getBindings(PYTHON);
+        Map<String, ClassElement> classElementCache = new LinkedHashMap<>();
+        Set<String> missingClassElements = new java.util.HashSet<>();
+        Map<String, Object[]> packageClassElementsCache = new LinkedHashMap<>();
         bindings.putMember("callback_get_class_element", (Function<String, Object>) name -> {
             // Transform package names back from "micronaut." to "io.micronaut." for Java lookups
             name = normalizeKeywordSafePackageName(name);
             String javaName = name.startsWith("micronaut.") ? "io." + name : name;
+            ClassElement cachedClassElement = classElementCache.get(javaName);
+            if (cachedClassElement != null) {
+                return cachedClassElement;
+            }
+            if (missingClassElements.contains(javaName)) {
+                return null;
+            }
             var classElement = visitorContext.getClassElement(javaName);
-            return classElement.orElse(null);
+            if (classElement.isPresent()) {
+                classElementCache.put(javaName, classElement.get());
+                return classElement.get();
+            }
+            missingClassElements.add(javaName);
+            return null;
         });
         bindings.putMember("callback_get_class_elements", (Function<String, Object[]>) packageName -> {
             // Transform package names back from "micronaut." to "io.micronaut." for Java lookups
             packageName = normalizeKeywordSafePackageName(packageName);
             String javaPackageName = packageName.startsWith("micronaut.") ? "io." + packageName : packageName;
-            return visitorContext.getClassElements(javaPackageName, "*");
+            return packageClassElementsCache.computeIfAbsent(
+                javaPackageName,
+                name -> visitorContext.getClassElements(name, "*")
+            );
         });
         List<TransformResult> results = new ArrayList<>();
         for (Source source : pythonSource) {

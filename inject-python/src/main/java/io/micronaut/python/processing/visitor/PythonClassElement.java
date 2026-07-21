@@ -59,25 +59,29 @@ public final class PythonClassElement extends AbstractPythonClassElement {
     private final List<ClassElement> introductionInterfaces = new ArrayList<>();
 
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment) {
-        super(classDef, environment);
-        excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);
-        markPropertyInjectionBeanCandidate();
-        moveIntroductionInterfacesToImplementedInterfaces();
+        this(classDef, environment, 0, null, true);
     }
 
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment, int arrayDimensions) {
-        super(classDef, environment, arrayDimensions);
-        excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);
-        markPropertyInjectionBeanCandidate();
-        moveIntroductionInterfacesToImplementedInterfaces();
+        this(classDef, environment, arrayDimensions, null, true);
     }
 
     PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment, int arrayDimensions, Map<String, ClassElement> resolvedTypeArguments) {
+        this(classDef, environment, arrayDimensions, resolvedTypeArguments, true);
+    }
+
+    private PythonClassElement(ClassDef classDef,
+                               PythonProcessingEnvironment environment,
+                               int arrayDimensions,
+                               Map<String, ClassElement> resolvedTypeArguments,
+                               boolean initializeClassMetadata) {
         super(classDef, environment, arrayDimensions);
         this.resolvedTypeArguments = resolvedTypeArguments;
         excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);
-        markPropertyInjectionBeanCandidate();
-        moveIntroductionInterfacesToImplementedInterfaces();
+        if (initializeClassMetadata) {
+            markPropertyInjectionBeanCandidate();
+            moveIntroductionInterfacesToImplementedInterfaces();
+        }
     }
 
     @Override
@@ -92,7 +96,9 @@ public final class PythonClassElement extends AbstractPythonClassElement {
 
     @Override
     protected PythonClassElement copyThis() {
-        return new PythonClassElement(getNativeType(), environment, arrayDimensions);
+        // makeCopy copies the original metadata and resolved introduction interfaces. Repeating
+        // discovery here is costly and cannot produce additional information for the same class.
+        return new PythonClassElement(getNativeType(), environment, arrayDimensions, null, false);
     }
 
     @Override

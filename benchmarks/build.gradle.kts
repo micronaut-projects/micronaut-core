@@ -20,6 +20,8 @@ dependencies {
 
     api(projects.micronautInject)
     api(projects.micronautInjectJavaTest)
+    api(projects.micronautInjectPython)
+    api(projects.micronautContextPython)
     api(projects.micronautHttpServer)
     api(projects.micronautHttpServerNetty)
     api(projects.micronautHttpClient)
@@ -43,18 +45,31 @@ val jmhIncludes = providers.gradleProperty("jmh.includes")
 val jmhFork = providers.gradleProperty("jmh.fork").map(String::toInt).getOrElse(1)
 val jmhIterations = providers.gradleProperty("jmh.iterations").map(String::toInt).getOrElse(10)
 val jmhWarmupIterations = providers.gradleProperty("jmh.warmupIterations").map(String::toInt).getOrElse(5)
+val jmhProfilers = providers.gradleProperty("jmh.profilers")
+    .map { it.split(",").map(String::trim).filter(String::isNotEmpty) }
+    .getOrElse(emptyList())
+val jmhHumanOutput = providers.gradleProperty("jmh.humanOutput")
+    .map(layout.projectDirectory::file)
 
 jmh {
     includes = jmhIncludes
     fork = jmhFork
     iterations = jmhIterations
     warmupIterations = jmhWarmupIterations
+    profilers = jmhProfilers
+    humanOutputFile.set(jmhHumanOutput)
     duplicateClassesStrategy = DuplicatesStrategy.WARN
 }
 
 tasks {
     processJmhResources {
         duplicatesStrategy = DuplicatesStrategy.WARN
+    }
+
+    named<Jar>("jmhJar") {
+        isZip64 = true
+        manifest.attributes["Multi-Release"] = "true"
+        exclude("GRAALPY-VFS/**")
     }
 }
 

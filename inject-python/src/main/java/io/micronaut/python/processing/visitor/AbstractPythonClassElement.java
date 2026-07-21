@@ -85,6 +85,7 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     /** Query implementation for enclosed elements. */
     private final PythonEnclosedElementsQuery enclosedElementsQuery = new PythonEnclosedElementsQuery();
     private Map<InheritedMethodKey, ElementAnnotationMetadata> inheritedInterfaceMethodAnnotationMetadata = new LinkedHashMap<>();
+    private volatile List<PropertyElement> beanProperties;
 
     protected ElementDef typeAnnotationsKey;
     private ElementAnnotationMetadata typeAnnotationMetadata;
@@ -595,16 +596,15 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
 
     @Override
     public List<PropertyElement> getBeanProperties(PropertyElementQuery propertyElementQuery) {
-        // For Python, we create properties from both @property decorators and regular attributes
-
-        // First, add properties from @property decorators (these are already PropertyDef instances)
-        List<PropertyElement> decoratorProperties = getEnclosedElements(ElementQuery.of(PropertyElement.class));
-        List<PropertyElement> allProperties = new java.util.ArrayList<>(decoratorProperties);
-
-        // Then, create properties from regular attributes that aren't already represented as properties
-        addAttributeBackedProperties(this, this, allProperties);
-
-        // Apply propertyElementQuery filtering
+        List<PropertyElement> allProperties = beanProperties;
+        if (allProperties == null) {
+            // Python class definitions are immutable for a processing run, so retain the
+            // property elements and only reapply the caller-specific query filters.
+            List<PropertyElement> properties = new ArrayList<>(getEnclosedElements(ElementQuery.of(PropertyElement.class)));
+            addAttributeBackedProperties(this, this, properties);
+            allProperties = List.copyOf(properties);
+            beanProperties = allProperties;
+        }
         return filterProperties(allProperties, propertyElementQuery);
     }
 

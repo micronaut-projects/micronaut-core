@@ -80,9 +80,6 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
         this.declaringType = declaringType;
         this.owningType = owningType;
 
-        // Resolve type first before creating synthetic methods
-        this.type = resolveType();
-
         // For Python properties, fields don't exist - everything is dynamic
         this.field = propertyDef.field() != null ? new PythonFieldElement(
             propertyDef.field(),
@@ -91,6 +88,11 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
             owningType,
             metadataFactory
         ) : null;
+
+        // Resolve the type from the field instance when available. Apart from avoiding
+        // duplicate element construction, this keeps the field and property type backed by
+        // the same resolved element.
+        this.type = resolveType();
 
         // Determine access kinds based on property definition
         // If we have a getter (decorated property), use METHOD access
@@ -281,15 +283,8 @@ public final class PythonPropertyElement extends AbstractPythonElement implement
 
     private ClassElement resolveType() {
         // First try to get type from field if it exists
-        if (propertyDef.hasField()) {
-            PythonFieldElement fieldElement = new PythonFieldElement(
-                propertyDef.field(),
-                environment,
-                declaringType,
-                owningType,
-                environment.metadataFactory()
-            );
-            ClassElement fieldType = fieldElement.getType();
+        if (field != null) {
+            ClassElement fieldType = field.getType();
             if (fieldType != null) {
                 return fieldType;
             }

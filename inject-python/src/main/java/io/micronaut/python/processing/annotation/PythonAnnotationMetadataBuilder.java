@@ -82,6 +82,8 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
     private final Map<String, DecoratorDef> decorators;
     private final PythonVisitorContext visitorContext;
     private final Map<String, String> binaryClassNameCache = new HashMap<>();
+    private final Map<String, Optional<ElementDef>> annotationMirrorCache = new HashMap<>();
+    private final Map<String, AnnotationMemberDef> javaAnnotationMemberCache = new HashMap<>();
 
     public PythonAnnotationMetadataBuilder(Map<String, DecoratorDef> decorators, PythonVisitorContext visitorContext) {
         this.decorators = decorators;
@@ -1383,6 +1385,10 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
 
     @Override
     protected Optional<ElementDef> getAnnotationMirror(String annotationName) {
+        return annotationMirrorCache.computeIfAbsent(annotationName, this::resolveAnnotationMirror);
+    }
+
+    private Optional<ElementDef> resolveAnnotationMirror(String annotationName) {
         JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
         if (javaVisitorContext == null) {
             return Optional.empty();
@@ -1453,7 +1459,7 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
         if (javaAnnotationType == null) {
             return resolvePythonAnnotationMember(annotationElement.name(), memberName);
         } else {
-            return resolveJavaMemberDef(javaAnnotationType, memberName);
+            return resolveJavaAnnotationMember(javaAnnotationType, memberName);
         }
     }
 
@@ -1461,7 +1467,15 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
         if (javaAnnotationType == null) {
             return resolvePythonAnnotationMember(annotationName, memberName);
         }
-        return resolveJavaMemberDef(javaAnnotationType, memberName);
+        return resolveJavaAnnotationMember(javaAnnotationType, memberName);
+    }
+
+    private AnnotationMemberDef resolveJavaAnnotationMember(ClassElement javaAnnotationType, String memberName) {
+        String cacheKey = javaAnnotationType.getName() + '#' + memberName;
+        return javaAnnotationMemberCache.computeIfAbsent(
+            cacheKey,
+            ignored -> resolveJavaMemberDef(javaAnnotationType, memberName)
+        );
     }
 
     private AnnotationMemberDef resolvePythonAnnotationMember(String annotationName, String memberName) {
