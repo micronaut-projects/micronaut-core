@@ -99,6 +99,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      *
      * @param engine The engine
      * @param hostAccess The host access
+     * @param contextConfiguration The GraalPy context configuration
      * @return The initialized GraalPy context
      */
     @io.micronaut.context.annotation.Context

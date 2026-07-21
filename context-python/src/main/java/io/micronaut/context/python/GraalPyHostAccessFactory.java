@@ -266,69 +266,6 @@ final class GraalPyHostAccessFactory {
         return pythonClassResolver.findClass(moduleName, simpleName);
     }
 
-    private static final class PythonClassResolver {
-        private final Map<Class<?>, TargetTypeMapping<?>> mappingsByTargetType;
-        private final Map<String, Class<?>> mappingsByClassName;
-        private final Map<String, Optional<Class<?>>> uniqueMappingsBySimpleName;
-        private final Map<PythonClassLookupKey, Optional<Class<?>>> resolvedClasses = new ConcurrentHashMap<>();
-
-        private PythonClassResolver(Collection<TargetTypeMapping<?>> mappings) {
-            Map<Class<?>, TargetTypeMapping<?>> mappingsByTargetType = new HashMap<>(mappings.size());
-            Map<String, Class<?>> mappingsByClassName = new HashMap<>(mappings.size());
-            Map<String, Class<?>> mappingsBySimpleName = new HashMap<>(mappings.size());
-            Map<String, Boolean> ambiguousSimpleNames = new HashMap<>();
-            for (TargetTypeMapping<?> mapping : mappings) {
-                Class<?> targetType = mapping.targetType();
-                mappingsByTargetType.put(targetType, mapping);
-                mappingsByClassName.put(targetType.getName(), targetType);
-                String simpleName = targetType.getSimpleName();
-                Class<?> existing = mappingsBySimpleName.putIfAbsent(simpleName, targetType);
-                if (existing != null && existing != targetType) {
-                    ambiguousSimpleNames.put(simpleName, true);
-                }
-            }
-            Map<String, Optional<Class<?>>> uniqueMappingsBySimpleName = new HashMap<>(mappingsBySimpleName.size());
-            for (Map.Entry<String, Class<?>> entry : mappingsBySimpleName.entrySet()) {
-                uniqueMappingsBySimpleName.put(
-                    entry.getKey(),
-                    ambiguousSimpleNames.containsKey(entry.getKey()) ? Optional.empty() : Optional.of(entry.getValue())
-                );
-            }
-            this.mappingsByTargetType = Map.copyOf(mappingsByTargetType);
-            this.mappingsByClassName = Map.copyOf(mappingsByClassName);
-            this.uniqueMappingsBySimpleName = Map.copyOf(uniqueMappingsBySimpleName);
-        }
-
-        private @Nullable TargetTypeMapping<?> mappingForClass(Class<?> pythonClass) {
-            return mappingsByTargetType.get(pythonClass);
-        }
-
-        private @Nullable Class<?> findPythonClass(@Nullable Value value) {
-            return GraalPyHostAccessFactory.findPythonClass(value, this);
-        }
-
-        private @Nullable Class<?> findClass(@Nullable String moduleName, String simpleName) {
-            String normalizedModuleName = moduleName == null || moduleName.isBlank() ? null : moduleName;
-            return resolvedClasses.computeIfAbsent(
-                new PythonClassLookupKey(normalizedModuleName, simpleName),
-                key -> Optional.ofNullable(resolveClass(key))
-            ).orElse(null);
-        }
-
-        private @Nullable Class<?> resolveClass(PythonClassLookupKey key) {
-            if (key.moduleName() != null) {
-                Class<?> exact = mappingsByClassName.get(toGeneratedClassName(key.moduleName(), key.simpleName()));
-                if (exact != null) {
-                    return exact;
-                }
-            }
-            return uniqueMappingsBySimpleName.getOrDefault(key.simpleName(), Optional.empty()).orElse(null);
-        }
-    }
-
-    private record PythonClassLookupKey(@Nullable String moduleName, String simpleName) {
-    }
-
     private static String toGeneratedClassName(String moduleName, String simpleName) {
         String generatedSimpleName = simpleName.replace('.', '$');
         if (moduleName.equals(generatedSimpleName) || moduleName.endsWith("." + generatedSimpleName)) {
@@ -346,6 +283,65 @@ final class GraalPyHostAccessFactory {
             return null;
         }
         return member.asString();
+    }
+
+    private static final class PythonClassResolver {
+        private final Map<Class<?>, TargetTypeMapping<?>> mappingsByTargetType;
+        private final Map<String, Class<?>> mappingsByClassName;
+        private final Map<String, Optional<Class<?>>> uniqueMappingsBySimpleName;
+        private final Map<PythonClassLookupKey, Optional<Class<?>>> resolvedClasses = new ConcurrentHashMap<>();
+
+        private PythonClassResolver(Collection<TargetTypeMapping<?>> mappings) {
+            Map<Class<?>, TargetTypeMapping<?>> byType = new HashMap<>(mappings.size());
+            Map<String, Class<?>> byName = new HashMap<>(mappings.size());
+            Map<String, Class<?>> bySimpleName = new HashMap<>(mappings.size());
+            Map<String, Boolean> ambiguous = new HashMap<>();
+            for (TargetTypeMapping<?> mapping : mappings) {
+                Class<?> targetType = mapping.targetType();
+                byType.put(targetType, mapping);
+                byName.put(targetType.getName(), targetType);
+                String simpleName = targetType.getSimpleName();
+                Class<?> existing = bySimpleName.putIfAbsent(simpleName, targetType);
+                if (existing != null && existing != targetType) {
+                    ambiguous.put(simpleName, true);
+                }
+            }
+            Map<String, Optional<Class<?>>> unique = new HashMap<>(bySimpleName.size());
+            for (Map.Entry<String, Class<?>> entry : bySimpleName.entrySet()) {
+                unique.put(entry.getKey(), ambiguous.containsKey(entry.getKey())
+                    ? Optional.empty() : Optional.of(entry.getValue()));
+            }
+            mappingsByTargetType = Map.copyOf(byType);
+            mappingsByClassName = Map.copyOf(byName);
+            uniqueMappingsBySimpleName = Map.copyOf(unique);
+        }
+
+        private @Nullable TargetTypeMapping<?> mappingForClass(Class<?> pythonClass) {
+            return mappingsByTargetType.get(pythonClass);
+        }
+
+        private @Nullable Class<?> findPythonClass(@Nullable Value value) {
+            return GraalPyHostAccessFactory.findPythonClass(value, this);
+        }
+
+        private @Nullable Class<?> findClass(@Nullable String moduleName, String simpleName) {
+            String normalized = moduleName == null || moduleName.isBlank() ? null : moduleName;
+            return resolvedClasses.computeIfAbsent(new PythonClassLookupKey(normalized, simpleName),
+                key -> Optional.ofNullable(resolveClass(key))).orElse(null);
+        }
+
+        private @Nullable Class<?> resolveClass(PythonClassLookupKey key) {
+            if (key.moduleName() != null) {
+                Class<?> exact = mappingsByClassName.get(toGeneratedClassName(key.moduleName(), key.simpleName()));
+                if (exact != null) {
+                    return exact;
+                }
+            }
+            return uniqueMappingsBySimpleName.getOrDefault(key.simpleName(), Optional.empty()).orElse(null);
+        }
+    }
+
+    private record PythonClassLookupKey(@Nullable String moduleName, String simpleName) {
     }
 
 }

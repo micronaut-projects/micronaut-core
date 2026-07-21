@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.util.CollectionUtils;
-import jakarta.inject.Inject;
 import org.graalvm.polyglot.Context;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;

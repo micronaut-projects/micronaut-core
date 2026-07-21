@@ -548,12 +548,6 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
         return false;
     }
 
-    private record BindingDefinition(InterceptorKind kind, @Nullable AnnotationClassValue<?> interceptorType) {
-    }
-
-    private record BindingKey(String annotationName, InterceptorKind kind) {
-    }
-
     private static boolean hasSyntheticNullable(ElementDef element) {
         TypeRef typeRef = switch (element) {
             case ArgumentDef argumentDef -> argumentDef.typeAnnotation();
@@ -1572,6 +1566,12 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
             return javaVisitorContext.getAnnotationMetadataBuilder().getRetentionPolicy(annotation.name());
         }
         return RetentionPolicy.RUNTIME;
+    }
+
+    private record BindingDefinition(InterceptorKind kind, @Nullable AnnotationClassValue<?> interceptorType) {
+    }
+
+    private record BindingKey(String annotationName, InterceptorKind kind) {
     }
 
 }

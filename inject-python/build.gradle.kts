@@ -9,7 +9,7 @@ micronautBuild {
         usesMicronautTest()
     }
     binaryCompatibility {
-        enabledAfter("5.1.0")
+        enabledAfter("5.2.0")
     }
 }
 

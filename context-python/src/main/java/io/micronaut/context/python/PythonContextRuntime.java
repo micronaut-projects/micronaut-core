@@ -134,27 +134,6 @@ public final class PythonContextRuntime {
      * @param cacheKey The stable class cache key used by pooled contexts
      * @since 5.2.0
      */
-    @UsedByGeneratedCode
-    public record PythonClassReference(
-        @Nullable String packageName,
-        String rootName,
-        String[] nestedMemberNames,
-        String displayName,
-        String cacheKey
-    ) {
-        /**
-         * Create a Python class reference.
-         */
-        public PythonClassReference {
-            nestedMemberNames = nestedMemberNames.clone();
-        }
-
-        @Override
-        public String[] nestedMemberNames() {
-            return nestedMemberNames.clone();
-        }
-    }
-
     private static ContextState contextState(Context context) {
         synchronized (ACTIVE_EXECUTIONS_LOCK) {
             return CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
@@ -1417,6 +1396,43 @@ public final class PythonContextRuntime {
      */
     public static boolean isReuseContext() {
         return REUSE_CONTEXT.get();
+    }
+
+    /**
+     * Pre-split Python class identity used by generated bridge code.
+     *
+     * @param packageName The Python package, or {@code null} for top-level classes
+     * @param rootName The top-level Python import/member name
+     * @param nestedMemberNames The nested member names below the root class
+     * @param displayName The class display name used in diagnostics
+     * @param cacheKey The stable class cache key used by pooled contexts
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public record PythonClassReference(
+        @Nullable String packageName,
+        String rootName,
+        String[] nestedMemberNames,
+        String displayName,
+        String cacheKey
+    ) {
+        /**
+         * Create a Python class reference.
+         *
+         * @param packageName The Python package
+         * @param rootName The top-level Python import/member name
+         * @param nestedMemberNames The nested member names below the root class
+         * @param displayName The class display name used in diagnostics
+         * @param cacheKey The stable class cache key used by pooled contexts
+         */
+        public PythonClassReference {
+            nestedMemberNames = nestedMemberNames.clone();
+        }
+
+        @Override
+        public String[] nestedMemberNames() {
+            return nestedMemberNames.clone();
+        }
     }
 
     private static final class ContextState {
