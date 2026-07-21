@@ -30,6 +30,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -76,7 +82,29 @@ final class GraalPyHostAccessFactory {
         registerValueCoercibleHostMapping(builder, RuntimeException.class);
         registerPythonClassMapping(builder, pythonClassResolver);
         registerObjectMapping(builder, pythonClassResolver);
+        registerStandardLibraryMappings(builder);
         return builder.build();
+    }
+
+    private static void registerStandardLibraryMappings(HostAccess.Builder builder) {
+        builder.targetTypeMapping(Value.class, LocalDate.class,
+            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "date"),
+            GraalPyRuntimeUtil::convertLocalDate);
+        builder.targetTypeMapping(Value.class, LocalTime.class,
+            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "time"),
+            GraalPyRuntimeUtil::convertLocalTime);
+        builder.targetTypeMapping(Value.class, LocalDateTime.class,
+            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "datetime"),
+            GraalPyRuntimeUtil::convertLocalDateTime);
+        builder.targetTypeMapping(Value.class, Duration.class,
+            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "timedelta"),
+            GraalPyRuntimeUtil::convertDuration);
+        builder.targetTypeMapping(Value.class, ZoneOffset.class,
+            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "timezone"),
+            GraalPyRuntimeUtil::convertZoneOffset);
+        builder.targetTypeMapping(Value.class, UUID.class,
+            value -> GraalPyRuntimeUtil.isPythonType(value, "uuid", "UUID"),
+            GraalPyRuntimeUtil::convertUuid);
     }
 
     /**

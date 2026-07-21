@@ -23,6 +23,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
@@ -486,6 +492,18 @@ public final class GraalPyUtil {
             case "bytes", "bytearray" -> PrimitiveElement.BYTE.toArray();
             case "str" ->
                 visitorContext.getClassElement(String.class).orElse(ClassElement.of(String.class));
+            case "date", "datetime.date" ->
+                visitorContext.getClassElement(LocalDate.class).orElse(ClassElement.of(LocalDate.class));
+            case "time", "datetime.time" ->
+                visitorContext.getClassElement(LocalTime.class).orElse(ClassElement.of(LocalTime.class));
+            case "datetime", "datetime.datetime" ->
+                visitorContext.getClassElement(LocalDateTime.class).orElse(ClassElement.of(LocalDateTime.class));
+            case "timedelta", "datetime.timedelta" ->
+                visitorContext.getClassElement(Duration.class).orElse(ClassElement.of(Duration.class));
+            case "tzinfo", "timezone", "datetime.tzinfo", "datetime.timezone" ->
+                visitorContext.getClassElement(ZoneOffset.class).orElse(ClassElement.of(ZoneOffset.class));
+            case "UUID", "uuid.UUID" ->
+                visitorContext.getClassElement(UUID.class).orElse(ClassElement.of(UUID.class));
             case "dict", "typing.Dict" ->
                 visitorContext.getClassElement(Map.class).orElse(ClassElement.of(Map.class));
             case "list", "typing.List" ->

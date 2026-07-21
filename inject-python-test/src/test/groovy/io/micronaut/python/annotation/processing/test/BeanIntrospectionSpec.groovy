@@ -21,6 +21,13 @@ import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.python.compiler.Serdeable
 
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneOffset
+import java.util.UUID
+
 /**
  * Tests for Python bean introspection.
  *
@@ -28,6 +35,54 @@ import io.micronaut.python.compiler.Serdeable
  * @since 4.8.0
  */
 class BeanIntrospectionSpec extends AbstractPythonTypeElementSpec {
+
+    void "introspection maps Python datetime and UUID properties to Java types"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from datetime import date, time, datetime, timedelta, timezone
+from uuid import UUID
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class StandardValues:
+    date_value: date
+    time_value: time
+    datetime_value: datetime
+    duration_value: timedelta
+    offset_value: timezone
+    uuid_value: UUID
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.StandardValues")
+        def date = LocalDate.of(2026, 7, 21)
+        def time = LocalTime.of(12, 34, 56, 123000000)
+        def dateTime = LocalDateTime.of(2026, 7, 21, 12, 34, 56, 123000000)
+        def duration = Duration.ofSeconds(-1, 999999000)
+        def offset = ZoneOffset.ofHoursMinutes(5, 30)
+        def uuid = UUID.fromString("123e4567-e89b-12d3-a456-426614174000")
+        def instance = introspection.instantiate(date, time, dateTime, duration, offset, uuid)
+
+        then:
+        introspection.getRequiredProperty("date_value", LocalDate).type == LocalDate
+        introspection.getRequiredProperty("time_value", LocalTime).type == LocalTime
+        introspection.getRequiredProperty("datetime_value", LocalDateTime).type == LocalDateTime
+        introspection.getRequiredProperty("duration_value", Duration).type == Duration
+        introspection.getRequiredProperty("offset_value", ZoneOffset).type == ZoneOffset
+        introspection.getRequiredProperty("uuid_value", UUID).type == UUID
+        instance.date_value == date
+        instance.time_value == time
+        instance.datetime_value == dateTime
+        instance.duration_value == duration
+        instance.offset_value == offset
+        instance.uuid_value == uuid
+
+        cleanup:
+        context?.close()
+    }
 
     void "test nullable annotated generated id resolves to boxed Integer"() {
         given:

@@ -19,6 +19,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
 
 import io.micronaut.http.HttpResponse;
 import org.graalvm.polyglot.Context;
@@ -30,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -107,6 +114,23 @@ class GraalPyRuntimeUtilTest {
         Value language = context.eval("python", "'KOTLIN'");
 
         assertEquals(TestLanguage.KOTLIN, GraalPyRuntimeUtil.convertValue(language, TestLanguage.class));
+    }
+
+    @Test
+    void convertsPythonStandardLibraryValuesThroughHostAccess() {
+        try (Context mappedContext = Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of()))
+            .build()) {
+            assertEquals(LocalDate.of(2026, 7, 21), mappedContext.eval("python", "__import__('datetime').date(2026, 7, 21)").as(LocalDate.class));
+            assertEquals(LocalTime.of(12, 34, 56, 123_000_000), mappedContext.eval("python", "__import__('datetime').time(12, 34, 56, 123000)").as(LocalTime.class));
+            assertEquals(LocalDateTime.of(2026, 7, 21, 12, 34, 56, 123_000_000), mappedContext.eval("python", "__import__('datetime').datetime(2026, 7, 21, 12, 34, 56, 123000)").as(LocalDateTime.class));
+            assertEquals(Duration.ofSeconds(-1, 999_999_000), mappedContext.eval("python", "__import__('datetime').timedelta(microseconds=-1)").as(Duration.class));
+            assertEquals(ZoneOffset.ofHoursMinutes(5, 30), mappedContext.eval("python", "__import__('datetime').timezone(__import__('datetime').timedelta(hours=5, minutes=30))").as(ZoneOffset.class));
+            assertEquals(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"), mappedContext.eval("python", "__import__('uuid').UUID('123e4567-e89b-12d3-a456-426614174000')").as(UUID.class));
+            assertThrows(RuntimeException.class, () -> mappedContext.eval("python", "__import__('datetime').time(12, tzinfo=__import__('datetime').timezone.utc)").as(LocalTime.class));
+            assertThrows(RuntimeException.class, () -> mappedContext.eval("python", "type('CustomZone', (__import__('datetime').tzinfo,), {'utcoffset': lambda self, value: __import__('datetime').timedelta(hours=1)})()").as(ZoneOffset.class));
+        }
     }
 
     @Test

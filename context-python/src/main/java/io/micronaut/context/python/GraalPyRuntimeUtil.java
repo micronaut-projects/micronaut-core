@@ -24,6 +24,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -62,11 +68,38 @@ public final class GraalPyRuntimeUtil {
     private static final String ASYNC_MEMBER_VALUE = "__micronaut_async_member_value";
     private static final String INVOKE_METHOD = "__micronaut_invoke_method";
     private static final String RAW_CLASS_MEMBER = "__micronaut_get_raw_class_member";
+    private static final String TO_PYTHON_STANDARD_TYPE = "__micronaut_to_python_standard_type";
+    private static final String UTC_OFFSET = "__micronaut_utc_offset";
     private static final AsyncMemberAdapter ASYNC_MEMBER_ADAPTER = new AsyncMemberAdapter();
     private static final Source PUT_MEMBER_SOURCE = Source.newBuilder(PYTHON, """
         def __micronaut_put_member(target, name, value):
             setattr(target, name, value)
         """, "micronaut-put-member.py").cached(true).buildLiteral();
+    private static final Source TO_PYTHON_STANDARD_TYPE_SOURCE = Source.newBuilder(PYTHON, """
+        import datetime
+        import uuid
+
+        def __micronaut_to_python_standard_type(kind, value, nanos=0):
+            if kind == "date":
+                return datetime.date.fromisoformat(value)
+            if kind == "time":
+                return datetime.time.fromisoformat(value)
+            if kind == "datetime":
+                return datetime.datetime.fromisoformat(value)
+            if kind == "duration":
+                return datetime.timedelta(seconds=value, microseconds=nanos // 1000)
+            if kind == "zone_offset":
+                if value == "Z":
+                    return datetime.timezone.utc
+                return datetime.time.fromisoformat("00:00:00" + value).tzinfo
+            if kind == "uuid":
+                return uuid.UUID(value)
+            raise ValueError("Unsupported Micronaut Python standard type: " + kind)
+        """, "micronaut-to-python-standard-type.py").cached(true).buildLiteral();
+    private static final Source UTC_OFFSET_SOURCE = Source.newBuilder(PYTHON, """
+        def __micronaut_utc_offset(value):
+            return value.utcoffset(None)
+        """, "micronaut-utc-offset.py").cached(true).buildLiteral();
     private static final Source ASYNC_MEMBER_VALUE_SOURCE = Source.newBuilder(PYTHON, """
         def __micronaut_async_member_value(target, adapter, context):
             import asyncio
@@ -230,6 +263,10 @@ public final class GraalPyRuntimeUtil {
      * @return The coerced value
      */
     public static @Nullable Object coerceToContext(@Nullable Object value, Context context) {
+        Object standardType = coerceStandardTypeToContext(value, context);
+        if (standardType != value) {
+            return standardType;
+        }
         switch (value) {
             case null -> {
                 return null;
@@ -292,6 +329,10 @@ public final class GraalPyRuntimeUtil {
         if (declaredType == null) {
             return coerceToContext(value, context);
         }
+        Object standardType = coerceStandardTypeToContext(value, context);
+        if (standardType != value) {
+            return standardType;
+        }
         return switch (value) {
             case PooledValueCoercible pooledValueCoercible ->
                 pooledValueCoercible.asPolyglotValue(context);
@@ -304,6 +345,87 @@ public final class GraalPyRuntimeUtil {
             case Object[] _ when declaredType.isArray() -> coerceToContext(value, context);
             default -> value;
         };
+    }
+
+    private static @Nullable Object coerceStandardTypeToContext(@Nullable Object value, Context context) {
+        return switch (value) {
+            case null -> null;
+            case LocalDate localDate ->
+                standardTypeHelper(context).execute("date", localDate.toString());
+            case LocalTime localTime ->
+                standardTypeHelper(context).execute("time", localTime.toString());
+            case LocalDateTime localDateTime ->
+                standardTypeHelper(context).execute("datetime", localDateTime.toString());
+            case Duration duration ->
+                standardTypeHelper(context).execute("duration", duration.getSeconds(), duration.getNano());
+            case ZoneOffset zoneOffset ->
+                standardTypeHelper(context).execute("zone_offset", zoneOffset.getId(), 0);
+            case UUID uuid -> standardTypeHelper(context).execute("uuid", uuid.toString());
+            default -> value;
+        };
+    }
+
+    private static Value standardTypeHelper(Context context) {
+        return PythonContextRuntime.helper(context, TO_PYTHON_STANDARD_TYPE, TO_PYTHON_STANDARD_TYPE_SOURCE);
+    }
+
+    static boolean isPythonType(Value value, String module, String typeName) {
+        if (value == null || value.isNull() || !value.hasMembers()) {
+            return false;
+        }
+        Value type = value.getMember("__class__");
+        return type != null && type.hasMembers()
+            && module.equals(stringMember(type, "__module__"))
+            && typeName.equals(stringMember(type, "__name__"));
+    }
+
+    static LocalDate convertLocalDate(Value value) {
+        return LocalDate.parse(value.invokeMember("isoformat").asString());
+    }
+
+    static LocalTime convertLocalTime(Value value) {
+        rejectAware(value, "time");
+        return LocalTime.parse(value.invokeMember("isoformat").asString());
+    }
+
+    static LocalDateTime convertLocalDateTime(Value value) {
+        rejectAware(value, "datetime");
+        return LocalDateTime.parse(value.invokeMember("isoformat").asString());
+    }
+
+    static Duration convertDuration(Value value) {
+        long days = value.getMember("days").asLong();
+        long seconds = value.getMember("seconds").asLong();
+        long microseconds = value.getMember("microseconds").asLong();
+        return Duration.ofDays(days).plusSeconds(seconds).plusNanos(Math.multiplyExact(microseconds, 1_000));
+    }
+
+    static ZoneOffset convertZoneOffset(Value value) {
+        if (!isPythonType(value, "datetime", "timezone")) {
+            throw new IllegalArgumentException("Only fixed-offset datetime.timezone values can be converted to ZoneOffset");
+        }
+        Value offsetValue = PythonContextRuntime.helper(value.getContext(), UTC_OFFSET, UTC_OFFSET_SOURCE).execute(value);
+        Duration offset = convertDuration(offsetValue);
+        if (offset.getNano() != 0) {
+            throw new IllegalArgumentException("datetime.timezone offset must be an exact number of seconds");
+        }
+        return ZoneOffset.ofTotalSeconds(Math.toIntExact(offset.getSeconds()));
+    }
+
+    static UUID convertUuid(Value value) {
+        return UUID.fromString(value.invokeMember("__str__").asString());
+    }
+
+    private static void rejectAware(Value value, String typeName) {
+        Value tzinfo = value.getMember("tzinfo");
+        if (tzinfo != null && !isNone(tzinfo)) {
+            throw new IllegalArgumentException("Aware datetime." + typeName + " values cannot be converted to a naive Java type");
+        }
+    }
+
+    private static @Nullable String stringMember(Value value, String name) {
+        Value member = value.getMember(name);
+        return member == null || member.isNull() ? null : member.asString();
     }
 
     /**

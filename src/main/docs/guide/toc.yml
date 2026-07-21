@@ -337,6 +337,7 @@ languageSupport:
   python:
     title: Micronaut for Python
     typeOrdering: Type Ordering and Forward References
+    standardTypes: Standard Library Type Conversions
     keywords: Python Keywords in Java APIs
     graalTools: GraalPy Tools
     asyncAwait:

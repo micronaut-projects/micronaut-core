@@ -24,6 +24,13 @@ import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Size
 import spock.lang.PendingFeature
 
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneOffset
+import java.util.UUID
+
 /**
  * Tests for Python @Executable annotation producing ExecutableMethod instances.
  *
@@ -31,6 +38,72 @@ import spock.lang.PendingFeature
  * @since 4.8.0
  */
 class ExecutableMethodSpec extends AbstractPythonTypeElementSpec {
+
+    void "executable methods convert datetime and UUID arguments and return values"() {
+        given:
+        def pythonCode = '''
+from datetime import date, time, datetime, timedelta, timezone
+from uuid import UUID
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class StandardValueService:
+    @Executable
+    def date_value(self, value: date) -> date:
+        assert value.year == 2026
+        return value
+
+    @Executable
+    def time_value(self, value: time) -> time:
+        assert value.microsecond == 123000
+        return value
+
+    @Executable
+    def datetime_value(self, value: datetime) -> datetime:
+        assert value.year == 2026
+        return value
+
+    @Executable
+    def duration_value(self, value: timedelta) -> timedelta:
+        assert value.total_seconds() == -0.000001
+        return value
+
+    @Executable
+    def offset_value(self, value: timezone) -> timezone:
+        assert value.utcoffset(None).total_seconds() == 19800
+        return value
+
+    @Executable
+    def uuid_value(self, value: UUID) -> UUID:
+        assert str(value) == "123e4567-e89b-12d3-a456-426614174000"
+        return value
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.StandardValueService")
+        def bean = getBean(context, "python.StandardValueService")
+        def date = LocalDate.of(2026, 7, 21)
+        def time = LocalTime.of(12, 34, 56, 123000000)
+        def dateTime = LocalDateTime.of(2026, 7, 21, 12, 34, 56, 123000000)
+        def duration = Duration.ofSeconds(-1, 999999000)
+        def offset = ZoneOffset.ofHoursMinutes(5, 30)
+        def uuid = UUID.fromString("123e4567-e89b-12d3-a456-426614174000")
+
+        then:
+        definition.findMethod("date_value", LocalDate).get().returnType.type == LocalDate
+        definition.findMethod("uuid_value", UUID).get().arguments[0].type == UUID
+        bean.date_value(date) == date
+        bean.time_value(time) == time
+        bean.datetime_value(dateTime) == dateTime
+        bean.duration_value(duration) == duration
+        bean.offset_value(offset) == offset
+        bean.uuid_value(uuid) == uuid
+
+        cleanup:
+        context?.close()
+    }
 
     def "test @Executable produces BeanDefinition with ExecutableMethod"() {
         given:
