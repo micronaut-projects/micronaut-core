@@ -1870,7 +1870,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private void processExecutableMethodsProcessAtStartup() {
         Map<Class<? extends Annotation>, Collection<ExecutableMethodProcessor>> processorsByAnnotation = CollectionUtils.newLinkedHashMap(10);
-        for (BeanDefinition<Object> definition : beanDefinitionProvider.getProcessedBeans(this)) {
+        List<BeanDefinition<Object>> processedBeans = new ArrayList<>(100);
+        beanDefinitionProvider.getProcessedBeans(this).forEach(processedBeans::add);
+        filterReplacedBeans(processedBeans);
+        for (BeanDefinition<Object> definition : processedBeans) {
             for (ExecutableMethod<Object, ?> method : definition.getExecutableMethodsForProcessing()) {
                 AnnotationMetadata methodAnnotations = method.getAnnotationMetadata();
                 for (Class<? extends Annotation> annotation : methodAnnotations.getAnnotationTypesByStereotype(Executable.class)) {
