@@ -542,7 +542,7 @@ public final class AstBeanPropertiesUtils {
         if ((hasReadAccess && canRead) || (hasWriteAccess && canWrite)) {
             return;
         }
-        if (!canReadField && !canWriteField) {
+        if (!canReadField && !canWriteField && !canRead && !canWrite) {
             failInvalidIntrospectedProperty(
                 fieldElement,
                 "the field is not accessible for visibility [" + visibility + "]"
