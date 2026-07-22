@@ -102,7 +102,11 @@ public final class PythonVisitorContext implements VisitorContext {
 
     @Override
     public void info(String message, Element element) {
-        System.out.println("INFO: " + message + " @ " + element);
+        if (element != null) {
+            System.out.println("INFO: " + message + " @ " + element);
+        } else {
+            System.out.println("INFO: " + message);
+        }
     }
 
     @Override
@@ -116,12 +120,20 @@ public final class PythonVisitorContext implements VisitorContext {
             javaVisitorContext.fail(message, element);
             return;
         }
-        System.err.println("ERROR: " + message + " @ " + element);
+        if (element != null) {
+            System.err.println("ERROR: " + message + " @ " + element);
+        } else {
+            System.err.println("ERROR: " + message);
+        }
     }
 
     @Override
     public void warn(String message, Element element) {
-        System.out.println("WARN: " + message);
+        if (element != null) {
+            System.out.println("WARN: " + message + " @ " + element);
+        } else {
+            System.out.println("WARN: " + message);
+        }
     }
 
     @Override
