@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -358,5 +359,22 @@ public final class PythonVisitorContext implements VisitorContext {
         if (javaVisitorContext != null) {
             javaVisitorContext.finish();
         }
+    }
+
+    @SuppressWarnings("removal")
+    @Override
+    public void addGeneratedResource(String resource) {
+        if (javaVisitorContext != null) {
+            javaVisitorContext.addGeneratedResource(resource);
+        }
+    }
+
+    @Override
+    @SuppressWarnings("removal")
+    public Collection<String> getGeneratedResources() {
+        if (javaVisitorContext != null) {
+            return javaVisitorContext.getGeneratedResources();
+        }
+        return Collections.emptyList();
     }
 }
