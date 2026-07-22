@@ -179,7 +179,8 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
         MediaType.APPLICATION_JSON_PROBLEM,
         MediaType.APPLICATION_JSON_PATCH,
         MediaType.APPLICATION_JSON_MERGE_PATCH,
-        MediaType.APPLICATION_JSON_SCHEMA
+        MediaType.APPLICATION_JSON_SCHEMA,
+        MediaType.APPLICATION_SCIM_JSON
     })
     public @interface ProducesJson {
     }
@@ -200,7 +201,8 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
         MediaType.APPLICATION_JSON_PROBLEM,
         MediaType.APPLICATION_JSON_PATCH,
         MediaType.APPLICATION_JSON_MERGE_PATCH,
-        MediaType.APPLICATION_JSON_SCHEMA
+        MediaType.APPLICATION_JSON_SCHEMA,
+        MediaType.APPLICATION_SCIM_JSON
     })
     public @interface ConsumesJson {
     }

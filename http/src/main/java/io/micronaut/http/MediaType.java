@@ -254,6 +254,16 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_JSON_SCHEMA_TYPE = new MediaType(MediaType.APPLICATION_JSON_SCHEMA);
 
     /**
+     * JSON Schema: application/scim+json.
+     */
+    public static final String APPLICATION_SCIM_JSON = "application/scim+json";
+
+    /**
+     * JSON Schema: application/scim+json.
+     */
+    public static final MediaType APPLICATION_SCIM_JSON_TYPE = new MediaType(MediaType.APPLICATION_SCIM_JSON);
+
+    /**
      * JSON: application/json.
      */
     public static final String APPLICATION_JSON = "application/json";
@@ -933,6 +943,7 @@ public class MediaType implements CharSequence {
             case APPLICATION_JSON_MERGE_PATCH -> APPLICATION_JSON_MERGE_PATCH_TYPE;
             case APPLICATION_JSON_PROBLEM -> APPLICATION_JSON_PROBLEM_TYPE;
             case APPLICATION_JSON_SCHEMA -> APPLICATION_JSON_SCHEMA_TYPE;
+            case APPLICATION_SCIM_JSON -> APPLICATION_SCIM_JSON_TYPE;
             case APPLICATION_YAML -> APPLICATION_YAML_TYPE;
             case APPLICATION_HAL_JSON -> APPLICATION_HAL_JSON_TYPE;
             case APPLICATION_HAL_XML -> APPLICATION_HAL_XML_TYPE;
