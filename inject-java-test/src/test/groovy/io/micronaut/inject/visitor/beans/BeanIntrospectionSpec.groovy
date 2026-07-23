@@ -5964,34 +5964,84 @@ class AbcPerson {
             applicationContext.close()
      }
 
-     void "test introspected private dollar ref property with getter setter"() {
-         when:
-         def introspection = buildBeanIntrospection('test.RefClass', '''
- package test;
- 
- import io.micronaut.core.annotation.Introspected;
- import com.fasterxml.jackson.annotation.JsonProperty;
- 
- @Introspected
- class RefClass {
-     @JsonProperty("$ref")
-     private String $ref;
- 
-     public String getRef() {
-         return $ref;
-     }
- 
-     public void setRef(String ref) {
-         this.$ref = ref;
-     }
- }
- ''')
- 
-         then:
-         introspection != null
-         introspection.getBeanProperties().size() == 1
-         introspection.getProperty("ref").isPresent()
-     }
+    void "test introspected private dollar ref property with getter setter"() {
+        when:
+        def introspection = buildBeanIntrospection('test.RefClass', '''package test;
+
+import io.micronaut.core.annotation.Introspected;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+@Introspected
+class RefClass {
+    @JsonProperty("$ref")
+    private String $ref;
+
+    public String getRef() {
+        return $ref;
+    }
+
+    public void setRef(String ref) {
+        this.$ref = ref;
+    }
+}
+''')
+
+        then:
+        introspection != null
+        introspection.getBeanProperties().size() == 1
+        introspection.getProperty("ref").isPresent()
+    }
+
+    void "test introspecting private field starting with dollar sign and having public accessors (OpenAPI style)"() {
+        when:
+        def introspection = buildBeanIntrospection('test.V1JSONSchemaProps', '''package test;
+
+import io.micronaut.core.annotation.Introspected;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.jspecify.annotations.Nullable;
+
+@Introspected
+class V1JSONSchemaProps {
+    public static final String JSON_PROPERTY_$_REF="$ref";
+
+    @Nullable
+    @JsonProperty(JSON_PROPERTY_$_REF)
+    private String $ref;
+
+    public String get$ref() {
+        return $ref;
+    }
+
+    public void set$ref(String $ref) {
+        this.$ref = $ref;
+    }
+}
+''')
+
+        then:
+        introspection != null
+        introspection.getProperty('$ref').isPresent()
+        introspection.getProperty('$ref').get().type == String.class
+    }
+
+    void "test introspecting private field annotated with JsonProperty without accessors fails"() {
+        when:
+        buildBeanIntrospection('test.PrivateNoAccessors', '''package test;
+
+import io.micronaut.core.annotation.Introspected;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+@Introspected
+class PrivateNoAccessors {
+    @JsonProperty("name")
+    private String name;
+}
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("the field is not accessible for visibility [DEFAULT]")
+    }
 
      @Override
     }
