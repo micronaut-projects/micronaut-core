@@ -90,6 +90,10 @@ internal open class KotlinClassElement(
         nativeType.declaration
     }
 
+    internal val parsedKDoc: ParsedKDoc by lazy {
+        parseKDoc(declaration.docString ?: "")
+    }
+
     val kotlinType: KSType by lazy {
         definedType ?: declaration.asStarProjectedType()
     }

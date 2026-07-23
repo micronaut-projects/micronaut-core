@@ -81,9 +81,8 @@ internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
         return false
     }
 
-    override fun getDocumentation(parse: Boolean): Optional<String> {
-        return Optional.ofNullable(declaration.docString)
-    }
+    override fun getDocumentation(parse: Boolean): Optional<String> =
+        documentationText(declaration.docString, parse)
 
     override fun getWriteTypeAnnotationMetadata(): Optional<AnnotationMetadata> {
         return Optional.of(annotationMetadata.writeAnnotationMetadata)

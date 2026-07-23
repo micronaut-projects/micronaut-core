@@ -181,12 +181,20 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         return super.getModifiers()
     }
 
-    override fun getDocumentation(parse: Boolean): Optional<String> {
-        return if (annotatedInfo is KSDeclaration) {
-            Optional.ofNullable(annotatedInfo.docString)
-        } else {
-            Optional.empty()
+    override fun getDocumentation(parse: Boolean): Optional<String> =
+        documentationText((annotatedInfo as? KSDeclaration)?.docString, parse)
+
+    /**
+     * Turns a raw KDoc string into element documentation: the verbatim string when [parse] is
+     * false, otherwise the prose description with block tags parsed out (empty description → absent).
+     */
+    protected fun documentationText(docString: String?, parse: Boolean): Optional<String> {
+        val raw = docString ?: return Optional.empty()
+        if (!parse) {
+            return Optional.of(raw)
         }
+        val description = parseKDoc(raw).description
+        return if (description.isEmpty()) Optional.empty() else Optional.of(description)
     }
 
     protected fun resolveDeclaringType(
