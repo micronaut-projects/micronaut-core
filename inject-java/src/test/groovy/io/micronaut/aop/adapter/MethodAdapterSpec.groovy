@@ -112,7 +112,7 @@ interface Parser {
 
     void "test method adapter inherits metadata"() {
         when:"An adapter method is parsed that has requirements"
-        BeanDefinition definition = buildBeanDefinition('test.Test$ApplicationEventListener$onStartup1$Intercepted','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test$ApplicationEventListener$onStartup1$Intercepted','''\\
 package test;
 
 import io.micronaut.aop.*;
@@ -226,7 +226,7 @@ public class Test {
 
     void  "test method adapter produces additional bean"() {
         when:"An adapter method is parsed"
-        BeanDefinition definition = buildBeanDefinition('test.Test$ApplicationEventListener$onStartup1$Intercepted','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test$ApplicationEventListener$onStartup1$Intercepted','''\\
 package test;
 
 import io.micronaut.aop.*;
@@ -254,7 +254,7 @@ class Test {
 
     void "test method adapter inherited from an interface produces additional bean"() {
         when:"An adapter method is parsed"
-        BeanDefinition definition = buildBeanDefinition('test.Test$ApplicationEventListener$onStartup1$Intercepted','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test$ApplicationEventListener$onStartup1$Intercepted','''\\
 package test;
 
 import io.micronaut.aop.*;
@@ -285,9 +285,54 @@ interface TestContract {
         definition.getTypeArguments(ApplicationEventListener).get(0).type == StartupEvent
     }
 
+    void "test event listener inherited from superclass is generated for each subclass"() {
+        given:
+        def context = buildContext('test.FirstListener', """
+package test;
+
+import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.runtime.event.annotation.EventListener;
+import jakarta.inject.Singleton;
+
+class MyEvent {}
+
+class ParentListener {
+    int count = 0;
+
+    @EventListener
+    void onEvent(MyEvent event) {
+        count++;
+    }
+}
+
+@Singleton
+class FirstListener extends ParentListener {
+}
+
+@Singleton
+class SecondListener extends ParentListener {
+}
+""")
+
+        when:
+        def publisher = context.getBean(io.micronaut.context.event.ApplicationEventPublisher)
+        def first = context.getBean(context.classLoader.loadClass('test.FirstListener'))
+        def second = context.getBean(context.classLoader.loadClass('test.SecondListener'))
+        def listeners = context.getBeansOfType(ApplicationEventListener)
+        publisher.publishEvent(context.classLoader.loadClass('test.MyEvent').newInstance())
+
+        then:
+        first.count == 1
+        second.count == 1
+        listeners.size() == 2
+
+        cleanup:
+        context.close()
+    }
+
     void  "test method adapter honours type restraints - correct path"() {
         when:"An adapter method is parsed"
-        BeanDefinition definition = buildBeanDefinition('test.Test$Foo$myMethod1$Intercepted','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test$Foo$myMethod1$Intercepted','''\\
 package test;
 
 import io.micronaut.aop.*;
@@ -316,7 +361,7 @@ interface Foo<T extends CharSequence> extends java.util.function.Consumer<T> {}
 
     void  "test method adapter honours type restraints - compilation error"() {
         when:"An adapter method is parsed"
-        BeanDefinition definition = buildBeanDefinition('test.Test$Foo$myMethod$Intercepted','''\
+        BeanDefinition definition = buildBeanDefinition('test.Test$Foo$myMethod$Intercepted','''\\
 package test;
 
 import io.micronaut.aop.*;
@@ -342,7 +387,7 @@ interface Foo<T extends CharSequence> extends java.util.function.Consumer<T> {}
 
     void  "test method adapter wrong argument count"() {
         when:"An adapter method is parsed"
-        buildBeanDefinition('test.Test$ApplicationEventListener$onStartup$Intercepted','''\
+        buildBeanDefinition('test.Test$ApplicationEventListener$onStartup$Intercepted','''\\
 package test;
 
 import io.micronaut.aop.*;
@@ -368,7 +413,7 @@ class Test {
 
     void  "test method adapter argument order"() {
         when:"An adapter method is parsed"
-        BeanDefinition definition = buildBeanDefinition('org.atinject.jakartatck.auto.events.EventListener$EventHandlerMultipleArguments$onEvent1$Intercepted','''\
+        BeanDefinition definition = buildBeanDefinition('org.atinject.jakartatck.auto.events.EventListener$EventHandlerMultipleArguments$onEvent1$Intercepted','''\\
 package org.atinject.jakartatck.auto.events;
 
 @jakarta.inject.Singleton
