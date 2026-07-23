@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.BeanProperties
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.util.CollectionUtils
+import spock.lang.Issue
 import spock.lang.Specification
 
 class ConfigurationPropertiesSpec extends Specification {
@@ -177,5 +178,34 @@ class ConfigurationPropertiesSpec extends Specification {
 
         cleanup:
             context.close()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/10215")
+    void "test configuration properties binding for kebab/snake case names containing digits"() {
+        given:
+        ApplicationContext context = ApplicationContext.run([
+                'configuration-example.camelCaseProp': 1,
+                'configuration-example.camelCase1234Prop': 2,
+                'configuration-example.foo-123-bar': 3,
+                'configuration-example.snake_case_prop': 5,
+                'configuration-example.snake_case1234_prop': 6,
+                'configuration-example.kebab-case-prop': 7,
+                'configuration-example.kebab-case1234-prop': 8,
+        ])
+
+        when:
+        DigitsConfigurationExample cfg = context.getBean(DigitsConfigurationExample)
+
+        then:
+        cfg.camelCaseProp == 1
+        cfg.camelCase1234Prop == 2
+        cfg.foo123Bar == 3
+        cfg.snakeCaseProp == 5
+        cfg.snakeCase1234Prop == 6
+        cfg.kebabCaseProp == 7
+        cfg.kebabCase1234Prop == 8
+
+        cleanup:
+        context.close()
     }
 }
