@@ -16,7 +16,6 @@
 package io.micronaut.json.bind
 
 import com.fasterxml.jackson.annotation.JsonCreator
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
@@ -24,15 +23,12 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.exceptions.ConversionErrorException
+import io.micronaut.core.type.Argument
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
 class JsonBeanPropertyBinderSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
@@ -58,7 +54,18 @@ class JsonBeanPropertyBinderSpec extends Specification {
                   'authors[1].name': 'JRR Tolkien', 'authors[1].age': 110]                                      | new Book(authors: [new Author(name: "Stephen King", age: 60), new Author(name: "JRR Tolkien", age: 110)])
         Book   | ['authorsByInitials[SK].name' : 'Stephen King', 'authorsByInitials[SK].age': 60,
                   'authorsByInitials[JRR].name': 'JRR Tolkien', 'authorsByInitials[JRR].age': 110]              | new Book(authorsByInitials: [SK: new Author(name: "Stephen King", age: 60), JRR: new Author(name: "JRR Tolkien", age: 110)])
+    }
 
+    void 'test bind raw map target preserves nested uppercase keys'() {
+        given:
+        JsonBeanPropertyBinder binder = context.getBean(JsonBeanPropertyBinder)
+
+        when:
+        Map result = binder.bind(io.micronaut.core.convert.ConversionContext.of(Argument.of(Map)), [props: ['AB_VALUE': 'value']]).getValue().get()
+
+        then:
+        result.props.AB_VALUE == 'value'
+        !result.props.containsKey('aB_VALUE')
     }
 
     void "test convert map to immutable object"() {
@@ -87,7 +94,6 @@ class JsonBeanPropertyBinderSpec extends Specification {
     static class Author {
         String name
         Integer age
-
         Publisher publisher
     }
 
@@ -97,10 +103,8 @@ class JsonBeanPropertyBinderSpec extends Specification {
         String name
     }
 
-
     @Introspected
     static class ImmutablePerson {
-
         @JsonProperty("first_name")
         private String firstName
 

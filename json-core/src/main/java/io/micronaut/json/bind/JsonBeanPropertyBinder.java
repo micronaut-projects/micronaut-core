@@ -70,7 +70,9 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
     @Override
     public BindingResult<Object> bind(ArgumentConversionContext<Object> context, Map<CharSequence, ? super Object> source) {
         try {
-            JsonNode objectNode = buildSourceObjectNode(source.entrySet());
+            JsonNode objectNode = Map.class.isAssignableFrom(context.getArgument().getType())
+                ? jsonMapper.writeValueToTree(source)
+                : buildSourceObjectNode(source.entrySet());
             Object result = jsonMapper.readValueFromTree(objectNode, context.getArgument());
             return () -> Optional.ofNullable(result);
         } catch (Exception e) {
