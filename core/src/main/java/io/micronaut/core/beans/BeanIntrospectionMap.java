@@ -17,7 +17,6 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
 import org.jspecify.annotations.Nullable;
 
@@ -143,7 +142,7 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
 
     @Override
     public Set<String> keySet() {
-        return CollectionUtils.setOf(beanIntrospection.getPropertyNames());
+        return new LinkedHashSet<>(Arrays.asList(beanIntrospection.getPropertyNames()));
     }
 
     @Override
@@ -170,6 +169,6 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
             public Object setValue(@Nullable Object value) {
                 return put(key, value);
             }
-        }).collect(Collectors.toSet());
+        }).collect(Collectors.toCollection(LinkedHashSet::new));
     }
 }

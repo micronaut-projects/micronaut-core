@@ -15,6 +15,9 @@
  */
 package io.micronaut.http.uri
 
+import io.micronaut.core.annotation.Introspected
+import spock.lang.Issue
+
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -141,6 +144,16 @@ class UriTemplateSpec extends Specification {
         '/foo'         | '/find{?keys1*}{&keys2*}'      | '/foo/find{?keys1*}{&keys2*}'
 
 
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/11192")
+    void "test bean expansion preserves property order for query parameters"() {
+        given:
+        UriTemplate uriTemplate = new UriTemplate('/foo{?offset,max,sort,order}')
+        Pagination pagination = new Pagination(0, 10, 'name', 'asc')
+
+        expect:
+        uriTemplate.expand(pagination) == '/foo?offset=0&max=10&sort=name&order=asc'
     }
 
     @Unroll
@@ -608,4 +621,20 @@ class UriTemplateSpec extends Specification {
         'http://example.com:8080/{?keys*}{&keys2*}'   | [keys: [var: null], keys2: [var2: 'bar']]          | 'http://example.com:8080/&var2=bar'
     }
 
+
+
+    @Introspected
+    static class Pagination {
+        int offset
+        int max
+        String sort
+        String order
+
+        Pagination(int offset, int max, String sort, String order) {
+            this.offset = offset
+            this.max = max
+            this.sort = sort
+            this.order = order
+        }
+    }
 }

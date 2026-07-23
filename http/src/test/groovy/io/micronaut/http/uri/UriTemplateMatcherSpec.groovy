@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.uri
 
+import io.micronaut.core.annotation.Introspected
+
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -189,6 +191,16 @@ class UriTemplateMatcherSpec extends Specification {
         "/books{#hashtag}"               | "/books/"             | true    | [:]
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/11192")
+    void "test matcher expansion preserves property order for exploded query parameters"() {
+        given:
+        UriTemplateMatcher matcher = new UriTemplateMatcher('/foo{?pagination*}')
+        Pagination pagination = new Pagination(0, 10, 'name', 'asc')
+
+        expect:
+        matcher.expand([pagination: pagination]) == '/foo?offset=0&max=10&sort=name&order=asc'
+    }
+
     @Issue("https://github.com/micronaut-projects/micronaut-aws/issues/110")
     @Unroll
     void "Test URI template #template matches uri with encoded characters: #uri"() {
@@ -209,5 +221,21 @@ class UriTemplateMatcherSpec extends Specification {
         "/{+someId}"    | '/username@company.com'       | true      | [someId: 'username@company.com']
         "/{+someId}"    | '/username%2B1@company.com'   | true      | [someId: 'username%2B1@company.com']
         "/{+someId}"    | '/username+1@company.com'     | true      | [someId: 'username+1@company.com']
+    }
+
+
+    @Introspected
+    static class Pagination {
+        int offset
+        int max
+        String sort
+        String order
+
+        Pagination(int offset, int max, String sort, String order) {
+            this.offset = offset
+            this.max = max
+            this.sort = sort
+            this.order = order
+        }
     }
 }
