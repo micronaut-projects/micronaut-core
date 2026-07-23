@@ -20,11 +20,13 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
+import jakarta.annotation.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -52,6 +54,18 @@ public class BodyArgumentTest {
                 .build()));
     }
 
+    @Test
+    void testNullableExplicitBodyComponentWithMissingJsonField() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/body-arguments-test/getNullableMessage", "{}")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.ACCEPT, MediaType.TEXT_PLAIN),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("null")
+                .build()));
+    }
+
     @Controller("/body-arguments-test")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class BodyController {
@@ -60,6 +74,12 @@ public class BodyArgumentTest {
         @Produces(MediaType.TEXT_PLAIN)
         String getA(String a) {
             return a;
+        }
+
+        @Post(uri = "/getNullableMessage")
+        @Produces(MediaType.TEXT_PLAIN)
+        String getNullableMessage(@Body("message") @Nullable String message) {
+            return String.valueOf(message);
         }
     }
 }

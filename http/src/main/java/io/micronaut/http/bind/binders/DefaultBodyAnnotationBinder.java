@@ -90,8 +90,11 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     protected BindingResult<ConvertibleValues<?>> bindFullBodyConvertibleValues(HttpRequest<?> source) {
-        Optional<ConvertibleValues> convertibleValuesBody = source.getBody(ConvertibleValues.class);
-        return () -> (Optional) convertibleValuesBody;
+        Optional<?> body = source.getBody();
+        if (body.isPresent()) {
+            return () -> (Optional) conversionService.convert(body.get(), ConvertibleValues.class);
+        }
+        return Optional::empty;
     }
 
     /**
