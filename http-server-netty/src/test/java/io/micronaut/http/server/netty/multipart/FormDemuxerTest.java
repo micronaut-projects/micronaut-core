@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
@@ -44,6 +45,10 @@ public class FormDemuxerTest {
         return new FormDemuxer(PostBodyDecoder.builder().forUrlEncodedData(), channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, body);
     }
 
+    private FormDemuxer createMultipart(ByteBody body, String boundary) {
+        return new FormDemuxer(PostBodyDecoder.builder().forMultipartBoundary(boundary), channel, BodySizeLimits.UNLIMITED, BodySizeLimits.UNLIMITED, body);
+    }
+
     private static <T> Queue<T> toQueue(Flux<T> flux) {
         QueueSubscriber<T> subscriber = new QueueSubscriber<>();
         subscriber.noBackpressure();
@@ -72,6 +77,47 @@ public class FormDemuxerTest {
         QueueSubscriber<String> data = content(field.byteBody()).noBackpressure();
         assertEquals("bar", data.queue.poll());
         assertTrue(data.complete);
+    }
+
+    @Test
+    public void multipartContentTypeMixedCase() {
+        // Regression test: real clients (curl, browsers, MultipartBody) send the conventional
+        // mixed-case "Content-Type" header on multipart parts. This must be recognized.
+        String boundary = "boundary1234";
+        String body = "--" + boundary + "\r\n" +
+            "Content-Disposition: form-data; name=\"file\"; filename=\"test.pdf\"\r\n" +
+            "Content-Type: application/pdf\r\n" +
+            "\r\n" +
+            "file content\r\n" +
+            "--" + boundary + "--\r\n";
+
+        Queue<RawFormField> fields = toQueue(createMultipart(byteBodyFactory.copyOf(body, StandardCharsets.UTF_8), boundary).fields());
+
+        RawFormField field = fields.remove();
+        assertEquals("file", field.metadata().name());
+        assertEquals("test.pdf", field.metadata().fileName());
+        assertEquals(MediaType.of("application/pdf"), field.metadata().mediaType());
+        content(field.byteBody()).noBackpressure();
+    }
+
+    @Test
+    public void multipartContentTypeLowerCase() {
+        // lower-case header names must also be recognized, since HTTP header names are
+        // case-insensitive per RFC 7230 section 3.2.
+        String boundary = "boundary1234";
+        String body = "--" + boundary + "\r\n" +
+            "content-disposition: form-data; name=\"file\"; filename=\"test.pdf\"\r\n" +
+            "content-type: application/pdf\r\n" +
+            "\r\n" +
+            "file content\r\n" +
+            "--" + boundary + "--\r\n";
+
+        Queue<RawFormField> fields = toQueue(createMultipart(byteBodyFactory.copyOf(body, StandardCharsets.UTF_8), boundary).fields());
+
+        RawFormField field = fields.remove();
+        assertEquals("file", field.metadata().name());
+        assertEquals(MediaType.of("application/pdf"), field.metadata().mediaType());
+        content(field.byteBody()).noBackpressure();
     }
 
     @Test
