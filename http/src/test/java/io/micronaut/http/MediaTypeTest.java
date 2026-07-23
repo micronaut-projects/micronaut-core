@@ -99,6 +99,7 @@ class MediaTypeTest {
             APPLICATION_JSON_PATCH_TYPE,
             APPLICATION_JSON_MERGE_PATCH_TYPE,
             APPLICATION_JSON_SCHEMA_TYPE,
+            APPLICATION_SCIM_JSON_TYPE,
             APPLICATION_VND_ERROR_TYPE
          );
     }
