@@ -333,9 +333,9 @@ public final class FormDemuxer implements BufferConsumer {
                 ParsedHeaderValue parsedHeaderValue = decoder.parsedHeaderValue();
                 if (parsedHeaderValue instanceof ContentDisposition cd) {
                     this.disposition = cd;
-                } else if (HttpHeaderNames.CONTENT_TYPE.contentEquals(decoder.headerName())) {
+                } else if (HttpHeaderNames.CONTENT_TYPE.contentEqualsIgnoreCase(decoder.headerName())) {
                     this.mediaType = MediaType.of(decoder.headerValue());
-                } else if (HttpHeaderNames.CONTENT_LENGTH.contentEquals(decoder.headerName())) {
+                } else if (HttpHeaderNames.CONTENT_LENGTH.contentEqualsIgnoreCase(decoder.headerName())) {
                     this.contentLength = Long.parseLong(decoder.headerValue());
                 }
             } else if (event == PostBodyDecoder.Event.HEADERS_COMPLETE) {
