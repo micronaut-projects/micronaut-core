@@ -112,9 +112,9 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
             try {
                 final Optional<ResourceBundle> bundle = resolveBundle(locale);
                 if (bundle.isPresent()) {
-                    return bundle.map(b -> b.getString(code));
+                    opt = bundle.map(b -> b.getString(code));
                 } else {
-                    return resolveDefault(code);
+                    opt = resolveDefault(code);
                 }
             } catch (MissingResourceException e) {
                 opt = resolveDefault(code);
