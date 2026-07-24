@@ -9,11 +9,18 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import org.reactivestreams.Subscriber
+import org.reactivestreams.Subscription
 import reactor.core.publisher.Flux
+import spock.util.concurrent.PollingConditions
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 
+import java.io.ByteArrayOutputStream
+import java.util.Arrays
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ThreadLocalRandom
+import java.util.concurrent.TimeUnit
 
 class StreamPressureSpec extends Specification {
     def 'producer pressure'() {
@@ -41,37 +48,80 @@ class StreamPressureSpec extends Specification {
     def 'consumer pressure'() {
         given:
         def ctx = ApplicationContext.run(['spec.name': 'StreamPressureSpec'])
+        def conditions = new PollingConditions(timeout: 5, delay: 0.1)
 
         byte[] data = new byte[1024 * 1024]
         ThreadLocalRandom.current().nextBytes(data)
         def serverStream = new PipedOutputStream()
         ctx.getBean(MyController).stream = new PipedInputStream(serverStream)
 
-        def clientOStream = new PipedOutputStream()
-        def clientIStream = new PipedInputStream(clientOStream)
+        def received = new ByteArrayOutputStream()
+        def subscriptionReady = new CountDownLatch(1)
+        def lock = new Object()
+        Subscription subscription = null
+        def subscriberError = null
 
         def server = ctx.getBean(EmbeddedServer)
         server.start()
         def client = ctx.createBean(StreamingHttpClient, server.URI)
 
         when:
-        Flux.from(client.dataStream(HttpRequest.GET("/stream-pressure"))).subscribe {
-            clientOStream.write(it.toByteArray())
-        }
+        Flux.from(client.dataStream(HttpRequest.GET("/stream-pressure"))).subscribe(new Subscriber<ByteBuffer<?>>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                subscription = s
+                subscriptionReady.countDown()
+                s.request(1)
+            }
+
+            @Override
+            void onNext(ByteBuffer<?> byteBuffer) {
+                synchronized (lock) {
+                    received.write(byteBuffer.toByteArray())
+                }
+                subscription.request(1)
+            }
+
+            @Override
+            void onError(Throwable t) {
+                subscriberError = t
+                subscriptionReady.countDown()
+            }
+
+            @Override
+            void onComplete() {
+            }
+        })
+        assert subscriptionReady.await(5, TimeUnit.SECONDS)
         serverStream.write(data)
         serverStream.flush()
         then:
-        clientIStream.readNBytes(data.length) == data
+        conditions.eventually {
+            byte[] firstChunk
+            synchronized (lock) {
+                assert received.size() >= data.length
+                firstChunk = Arrays.copyOfRange(received.toByteArray(), 0, data.length)
+            }
+            assert firstChunk == data
+            assert subscriberError == null
+        }
 
         when:
         serverStream.write(data)
         serverStream.flush()
         then:
-        clientIStream.readNBytes(data.length) == data
+        conditions.eventually {
+            byte[] secondChunk
+            synchronized (lock) {
+                assert received.size() >= data.length * 2
+                secondChunk = Arrays.copyOfRange(received.toByteArray(), data.length, data.length * 2)
+            }
+            assert secondChunk == data
+            assert subscriberError == null
+        }
 
         cleanup:
         serverStream.close()
-        clientIStream.close()
         server.stop()
         client.close()
         ctx.close()
