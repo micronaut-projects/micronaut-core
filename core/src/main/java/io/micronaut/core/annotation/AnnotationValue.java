@@ -1020,6 +1020,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return Optional.empty();
         }
         Object o = getRawSingleValue(member, valueMapper);
+        if (o instanceof AnnotationClassValue<?> annotationClassValue) {
+            return Optional.of(annotationClassValue.getName());
+        }
         if (o != null) {
             return Optional.of(o.toString());
         }
@@ -1038,6 +1041,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return Optional.empty();
         }
         Object o = getRawSingleValue(member, valueMapper);
+        if (o instanceof AnnotationClassValue<?> annotationClassValue) {
+            return Optional.of(annotationClassValue.getName());
+        }
         if (o != null) {
             return Optional.of(o.toString());
         }

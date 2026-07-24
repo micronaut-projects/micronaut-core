@@ -1,5 +1,7 @@
 package io.micronaut.test.lombok;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import tools.jackson.databind.annotation.JsonDeserialize;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
@@ -57,6 +59,15 @@ public class LombokIntrospectedBuilderTest {
 
         Assertions.assertEquals("Name", foo.getName());
         Assertions.assertNotNull(introspection);
+    }
+
+    @Test
+    void testJacksonBuilderAnnotationsVisibleInIntrospection() {
+        BeanIntrospection<Bar> introspection = BeanIntrospection.getIntrospection(Bar.class);
+
+        assertTrue(introspection.hasAnnotation(JsonIgnoreProperties.class));
+        assertTrue(introspection.hasAnnotation(JsonDeserialize.class));
+        assertEquals(Foo.FooBuilder.class.getName(), introspection.stringValue(JsonDeserialize.class, "builder").orElse(null));
     }
 
     @Test
