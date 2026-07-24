@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.client.loadbalance;
 
+import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import org.jspecify.annotations.Nullable;
@@ -55,6 +57,10 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
 
     @Override
     public Publisher<ServiceInstance> select(@Nullable Object discriminator) {
-        return Publishers.map(discoveryClient.getInstances(serviceID), this::getNextAvailable);
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        return Publishers.map(
+            ReactivePropagation.propagate(propagatedContext, discoveryClient.getInstances(serviceID)),
+            this::getNextAvailable
+        );
     }
 }
