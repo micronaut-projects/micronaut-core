@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Type
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.qualifiers.Qualifiers
+import jakarta.annotation.PostConstruct
 import jakarta.inject.Named
 import jakarta.inject.Singleton
 import spock.lang.Issue
@@ -109,6 +110,40 @@ class RegisterSingletonSpec extends Specification {
         context.close()
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/11656')
+    void "test createBean followed by registerSingleton invokes post construct twice"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+
+        when:
+        def bean = context.createBean(DoublePostConstructBean)
+        context.registerSingleton(bean)
+
+        then:
+        bean.postConstructCalls == 2
+        context.getBean(DoublePostConstructBean).is(bean)
+
+        cleanup:
+        context.close()
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/11656')
+    void "test createBean followed by registerSingleton with inject false does not invoke post construct again"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+
+        when:
+        def bean = context.createBean(DoublePostConstructBean)
+        context.registerSingleton(bean, false)
+
+        then:
+        bean.postConstructCalls == 1
+        context.getBean(DoublePostConstructBean).is(bean)
+
+        cleanup:
+        context.close()
+    }
+
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1851')
     void "test register singleton with type qualifier"() {
         when:
@@ -172,4 +207,14 @@ class RegisterSingletonSpec extends Specification {
     static interface Reporter<B> {}
     static class Span {}
     static class TestReporter implements Reporter<Span> {}
+
+    @Singleton
+    static class DoublePostConstructBean {
+        int postConstructCalls
+
+        @PostConstruct
+        void init() {
+            postConstructCalls++
+        }
+    }
 }

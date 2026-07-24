@@ -77,7 +77,8 @@ public interface BeanContext extends
     <T> T inject(T instance);
 
     /**
-     * Creates a new instance of the given bean performing dependency injection and returning a new instance.
+     * Creates a new instance of the given bean performing dependency injection, invoking any
+     * {@link jakarta.annotation.PostConstruct} hooks, and returning a new instance.
      * <p>
      * Note that the instance returned is not saved as a singleton in the context.
      *
@@ -90,7 +91,8 @@ public interface BeanContext extends
     }
 
     /**
-     * Creates a new instance of the given bean performing dependency injection and returning a new instance.
+     * Creates a new instance of the given bean performing dependency injection, invoking any
+     * {@link jakarta.annotation.PostConstruct} hooks, and returning a new instance.
      * <p>
      * Note that the instance returned is not saved as a singleton in the context.
      *
@@ -102,7 +104,8 @@ public interface BeanContext extends
     <T> T createBean(Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
-     * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
+     * <p>Creates a new instance of the given bean performing dependency injection, invoking any
+     * {@link jakarta.annotation.PostConstruct} hooks, and returning a new instance.</p>
      *
      * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed
      * in the {@code argumentValues} parameter will be used</p>
@@ -118,7 +121,8 @@ public interface BeanContext extends
     <T> T createBean(Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Map<String, Object> argumentValues);
 
     /**
-     * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
+     * <p>Creates a new instance of the given bean performing dependency injection, invoking any
+     * {@link jakarta.annotation.PostConstruct} hooks, and returning a new instance.</p>
      *
      * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
      * the {@code argumentValues} parameter will be used</p>
@@ -134,7 +138,8 @@ public interface BeanContext extends
     <T> T createBean(Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Object... args);
 
     /**
-     * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
+     * <p>Creates a new instance of the given bean performing dependency injection, invoking any
+     * {@link jakarta.annotation.PostConstruct} hooks, and returning a new instance.</p>
      *
      * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
      * the {@code argumentValues} parameter will be used</p>
@@ -151,7 +156,8 @@ public interface BeanContext extends
     }
 
     /**
-     * <p>Creates a new instance of the given bean performing dependency injection and returning a new instance.</p>
+     * <p>Creates a new instance of the given bean performing dependency injection, invoking any
+     * {@link jakarta.annotation.PostConstruct} hooks, and returning a new instance.</p>
      *
      * <p>If the bean defines any {@link io.micronaut.context.annotation.Parameter} values then the values passed in
      * the {@code argumentValues} parameter will be used</p>

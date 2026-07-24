@@ -111,8 +111,8 @@ public interface BeanDefinitionRegistry {
      * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
      * compiled ahead of time.</p>
      *
-     * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
-     * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
+     * <p>If bean definition data is found and injection is enabled, the method will perform dependency injection on
+     * the instance followed by invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
      *
      * <p>If no bean definition data is found the bean is registered as is.</p>
      *
@@ -515,8 +515,8 @@ public interface BeanDefinitionRegistry {
      * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
      * compiled ahead of time.</p>
      *
-     * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
-     * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
+     * <p>If bean definition data is found and injection is enabled, the method will perform dependency injection on
+     * the instance followed by invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
      *
      * <p>If no bean definition data is found the bean is registered as is.</p>
      *
