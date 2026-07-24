@@ -570,8 +570,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         if (!methodElement.hasStereotype(Executable.class)) {
             return false;
         }
-        if (methodElement.isSynthetic()) {
-            // Synthetic methods cannot be executable as @Executable cannot be put on a field
+        if (methodElement.isSynthetic() && !methodElement.getMethodAnnotationMetadata().hasDeclaredStereotype(Executable.class)) {
             return false;
         }
         if (methodElement.getMethodAnnotationMetadata().hasStereotype(Executable.class)) {

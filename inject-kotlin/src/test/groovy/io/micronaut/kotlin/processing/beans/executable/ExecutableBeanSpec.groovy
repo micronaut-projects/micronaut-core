@@ -163,6 +163,44 @@ class ExecutableBean1 {
         definition.findMethod("round", float.class).get().returnType.type == Integer[].class
     }
 
+    @Issue('#11867')
+    void "test executable annotation on kotlin getter and setter"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.FoobarSingleton','''\
+package test
+
+import io.micronaut.context.annotation.Executable
+
+@jakarta.inject.Singleton
+class FoobarSingleton {
+
+    @get:Executable
+    @set:Executable
+    var counter: Int = 0
+
+    @Executable
+    fun getCounter2(): Int = counter
+
+    @Executable
+    fun counterGet(): Int = counter
+
+    @Executable
+    fun counterSet(value: Int) {
+        this.counter = value
+    }
+}
+''')
+
+        expect:
+        definition != null
+        definition.executableMethods.size() == 5
+        definition.executableMethods.any { it.methodName == "getCounter" && it.argumentTypes.length == 0 }
+        definition.executableMethods.any { it.methodName == "setCounter" && it.argumentTypes == [int] as Class[] }
+        definition.executableMethods.any { it.methodName == "getCounter2" && it.argumentTypes.length == 0 }
+        definition.executableMethods.any { it.methodName == "counterGet" && it.argumentTypes.length == 0 }
+        definition.executableMethods.any { it.methodName == "counterSet" && it.argumentTypes == [int] as Class[] }
+    }
+
     @Issue('#2789')
     void "test don't generate executable methods for inherited protected or package private methods"() {
         given:
