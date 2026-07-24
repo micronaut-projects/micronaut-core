@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.tck.tests;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.ReflectiveAccess;
@@ -34,6 +36,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings({
@@ -97,6 +100,21 @@ public class HeadersTest {
                 .build()));
     }
 
+
+    @Test
+    void convertsHeaderToJsonCreatorTypeViaGetFirst() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/foo/custom-header").header("id", "abc"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> {
+                    Optional<String> body = response.getBody(String.class);
+                    assertTrue(body.isPresent());
+                    assertEquals("abc", body.get());
+                })
+                .build()));
+    }
+
     @Controller("/foo")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ProduceController {
@@ -119,10 +137,39 @@ public class HeadersTest {
         ETags receiveMultipleHeaders(HttpRequest<?> request) {
             return new ETags(request.getHeaders().getAll(HttpHeaders.ETAG));
         }
+
+        @Get("/custom-header")
+        String customHeader(HttpRequest<?> request) {
+            return request.getHeaders().getFirst("id", MyAppId.class).map(MyAppId::value).orElse("missing");
+        }
     }
 
     @Introspected
     @ReflectiveAccess
     record ETags(List<String> headers) {
+    }
+
+    @Introspected
+    @ReflectiveAccess
+    static final class MyAppId {
+        private final String value;
+
+        private MyAppId(String value) {
+            this.value = value;
+        }
+
+        String value() {
+            return value;
+        }
+
+        @JsonCreator
+        public static MyAppId valueOf(@JsonProperty String value) {
+            return new MyAppId(value);
+        }
+
+        @JsonCreator
+        public static MyAppId of(@JsonProperty String value) {
+            return valueOf(value);
+        }
     }
 }

@@ -18,6 +18,9 @@ package io.micronaut.core.convert;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.convert.converters.MultiValuesConverterFactory;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
@@ -1246,7 +1249,44 @@ public class DefaultMutableConversionService implements MutableConversionService
                 }
             }
         }
+        TypeConverter<Object, T> creatorConverter = resolveCreatorCharSequenceConverter(sourceType, targetType);
+        if (creatorConverter != null) {
+            return creatorConverter;
+        }
         return UNCONVERTIBLE;
+    }
+
+    @Nullable
+    private <T> TypeConverter<Object, T> resolveCreatorCharSequenceConverter(Class<?> sourceType, Class<T> targetType) {
+        if (!CharSequence.class.isAssignableFrom(sourceType)
+                || targetType == Object.class
+                || targetType == String.class
+                || CharSequence.class.isAssignableFrom(targetType)) {
+            return null;
+        }
+        try {
+            BeanIntrospection<T> introspection = BeanIntrospection.getIntrospection(targetType);
+            BeanConstructor<T> constructor = introspection.getConstructor();
+            Argument<?>[] arguments = constructor.getArguments();
+            if (arguments.length != 1 || arguments[0].getType() == targetType) {
+                return null;
+            }
+            Argument<?> constructorArgument = arguments[0];
+            return (object, ignoredTargetType, context) -> {
+                Optional<?> converted = convert(object, constructorArgument.getType(), context.with(constructorArgument));
+                if (converted.isEmpty()) {
+                    return Optional.empty();
+                }
+                try {
+                    return Optional.of(constructor.instantiate(converted.get()));
+                } catch (Exception e) {
+                    context.reject(object, e);
+                    return Optional.empty();
+                }
+            };
+        } catch (IntrospectionException e) {
+            return null;
+        }
     }
 
     private List<Class<?>> resolveHierarchy(Class<?> sourceType) {
