@@ -2,14 +2,18 @@ package io.micronaut.runtime.context.scope
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.context.annotation.Context
 import io.micronaut.context.annotation.EachProperty
 import io.micronaut.context.annotation.Value
 import io.micronaut.context.env.Environment
 import io.micronaut.core.util.StringUtils
+import jakarta.annotation.PreDestroy
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.context.scope.refresh.RefreshScope
 import io.micronaut.scheduling.TaskExecutors
+import jakarta.inject.Provider
+import jakarta.inject.Singleton
 import spock.lang.Specification
 import spock.util.environment.RestoreSystemProperties
 
@@ -235,6 +239,39 @@ class RefreshScopeSpec extends Specification {
         file.delete()
     }
 
+    void "test refreshable bean recreated during refresh sees refreshed configuration"() {
+        given:
+        System.setProperty("foo.bar", "test")
+        ApplicationContext beanContext = ApplicationContext.builder().start()
+        RefreshScope refreshScope = beanContext.getBean(RefreshScope)
+        RefreshReentryObserver observer = beanContext.getBean(RefreshReentryObserver)
+
+        when:
+        RefreshBeanWithCapturedConfig bean = beanContext.getBean(RefreshBeanWithCapturedConfig)
+
+        then:
+        bean.initialBar == 'test'
+        bean.currentBar == 'test'
+        observer.recreatedInitialBar == null
+        observer.recreatedCurrentBar == null
+
+        when:
+        System.setProperty("foo.bar", "bar")
+        Environment environment = beanContext.getEnvironment()
+        Map<String, Object> previousValues = environment.refreshAndDiff()
+        refreshScope.onRefreshEvent(new RefreshEvent(previousValues))
+        RefreshBeanWithCapturedConfig refreshedBean = beanContext.getBean(RefreshBeanWithCapturedConfig)
+
+        then:
+        observer.recreatedInitialBar == 'bar'
+        observer.recreatedCurrentBar == 'bar'
+        refreshedBean.initialBar == 'bar'
+        refreshedBean.currentBar == 'bar'
+
+        cleanup:
+        beanContext?.stop()
+    }
+
     @Refreshable
     static class RefreshBean {
 
@@ -296,6 +333,45 @@ class RefreshScopeSpec extends Specification {
 
         String testSecondConfigProps() {
             return config.bar
+        }
+    }
+
+    @Context
+    static class RefreshReentryObserver {
+        final Provider<RefreshBeanWithCapturedConfig> beanProvider
+        String recreatedInitialBar
+        String recreatedCurrentBar
+
+        RefreshReentryObserver(Provider<RefreshBeanWithCapturedConfig> beanProvider) {
+            this.beanProvider = beanProvider
+        }
+
+        void recordRecreatedBean() {
+            RefreshBeanWithCapturedConfig bean = beanProvider.get()
+            recreatedInitialBar = bean.initialBar
+            recreatedCurrentBar = bean.currentBar
+        }
+    }
+
+    @Refreshable("foo")
+    static class RefreshBeanWithCapturedConfig {
+        final MyConfig config
+        final RefreshReentryObserver observer
+        final String initialBar
+
+        RefreshBeanWithCapturedConfig(MyConfig config, RefreshReentryObserver observer) {
+            this.config = config
+            this.observer = observer
+            this.initialBar = config.bar
+        }
+
+        String getCurrentBar() {
+            return config.bar
+        }
+
+        @PreDestroy
+        void onDestroy() {
+            observer.recordRecreatedBean()
         }
     }
 

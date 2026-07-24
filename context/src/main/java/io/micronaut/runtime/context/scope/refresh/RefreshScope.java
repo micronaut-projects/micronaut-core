@@ -19,6 +19,7 @@ import io.micronaut.aop.InterceptedProxy;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.LifeCycle;
+import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
@@ -139,11 +140,11 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
     public final void onRefreshEvent(RefreshEvent event) {
         Map<String, Object> changes = event.getSource();
         if (changes == RefreshEvent.ALL_KEYS) {
-            disposeOfAllBeans();
             refreshAllConfigurationProperties();
+            disposeOfAllBeans();
         } else {
-            disposeOfBeanSubset(changes.keySet());
             refreshSubsetOfConfigurationProperties(changes.keySet());
+            disposeOfBeanSubset(changes.keySet());
         }
     }
 
