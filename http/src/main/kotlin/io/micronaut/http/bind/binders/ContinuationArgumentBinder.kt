@@ -92,15 +92,15 @@ class DelegatingCoroutineContext : CoroutineContext {
     var delegatingCoroutineContext: CoroutineContext? = null
 
     override fun <R> fold(initial: R, operation: (R, CoroutineContext.Element) -> R): R {
-        return delegatingCoroutineContext!!.fold(initial, operation)
+        return delegatingCoroutineContext?.fold(initial, operation) ?: initial
     }
 
     override fun <E : CoroutineContext.Element> get(key: CoroutineContext.Key<E>): E? {
-        return delegatingCoroutineContext!![key]
+        return delegatingCoroutineContext?.get(key)
     }
 
     override fun minusKey(key: CoroutineContext.Key<*>): CoroutineContext {
-        return delegatingCoroutineContext!!.minusKey(key)
+        return delegatingCoroutineContext?.minusKey(key) ?: EmptyCoroutineContext
     }
 
 }
