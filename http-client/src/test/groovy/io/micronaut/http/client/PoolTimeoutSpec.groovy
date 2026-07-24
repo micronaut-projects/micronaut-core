@@ -11,10 +11,13 @@ import io.micronaut.scheduling.annotation.ExecuteOn
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Issue
+import spock.lang.Retry
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import java.util.concurrent.TimeUnit
 
+@Retry
 class PoolTimeoutSpec extends Specification {
 
     @AutoCleanup
@@ -35,6 +38,12 @@ class PoolTimeoutSpec extends Specification {
         def fut1 = Mono.from(client.retrieve("/slow-controller?req=1")).toFuture().thenApply {
             TimeUnit.SECONDS.sleep(3)
             it
+        }
+        def firstRequestSettled = new PollingConditions(timeout: 2, delay: 0.1)
+
+        expect:
+        firstRequestSettled.eventually {
+            assert !fut1.isDone()
         }
 
         when:
