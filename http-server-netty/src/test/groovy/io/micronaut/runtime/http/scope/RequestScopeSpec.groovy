@@ -15,6 +15,7 @@
  */
 package io.micronaut.runtime.http.scope
 
+import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.ApplicationEventListener
@@ -31,6 +32,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn
 import jakarta.annotation.PreDestroy
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import spock.lang.Issue
 import spock.lang.Shared
 import spock.util.concurrent.PollingConditions
 
@@ -156,6 +158,24 @@ class RequestScopeSpec extends AbstractMicronautSpec {
         result == "OK"
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/11806")
+    void "test finding registration for destroyed request scope bean during later request"() {
+        when:
+        String first = httpClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope-capture"), String)
+
+        then:
+        first == "captured"
+        conditions.eventually {
+            RequestBean.BEANS_CREATED.first().dead
+        }
+
+        when:
+        String second = httpClient.toBlocking().retrieve(HttpRequest.GET("/test-request-scope-find-destroyed"), String)
+
+        then:
+        second == "not-found"
+    }
+
     @Requires(property = "spec.name", value = "RequestScopeSpec")
     @RequestScope
     static class RequestBean {
@@ -259,6 +279,9 @@ class RequestScopeSpec extends AbstractMicronautSpec {
     static class MessageService {
 
         @Inject
+        BeanContext beanContext
+
+        @Inject
         RequestBean requestBean
 
         @Inject
@@ -276,6 +299,16 @@ class RequestScopeSpec extends AbstractMicronautSpec {
             int count2 = requestScopeFactoryBean.count()
             assert count1 == count2
             return "message count ${count()}, count within request ${count1}"
+        }
+
+        String captureRequestBean() {
+            requestBean.count()
+            CapturedRequestBeanHolder.requestBean = requestBean
+            return "captured"
+        }
+
+        String findCapturedRequestBeanRegistration() {
+            return beanContext.findBeanRegistration(CapturedRequestBeanHolder.requestBean).isPresent() ? "found" : "not-found"
         }
     }
 
@@ -306,6 +339,22 @@ class RequestScopeSpec extends AbstractMicronautSpec {
             }
             throw new IllegalStateException("Request does not match")
         }
+
+        @Get("/test-request-scope-capture")
+        String captureRequestBean() {
+            return messageService.captureRequestBean()
+        }
+
+        @Get("/test-request-scope-find-destroyed")
+        String findDestroyedRequestBean() {
+            return messageService.findCapturedRequestBeanRegistration()
+        }
+    }
+
+    @Requires(property = "spec.name", value = "RequestScopeSpec")
+    @Singleton
+    static class CapturedRequestBeanHolder {
+        static RequestBean requestBean
     }
 
     @Requires(property = "spec.name", value = "RequestScopeSpec")
