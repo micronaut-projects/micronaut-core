@@ -26,10 +26,12 @@ import reactor.core.publisher.Flux;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ProxyBackpressureTest {
     private static final int CHUNK_SIZE = 1024 * 1024;
     private static final int TOTAL_CHUNKS = 128;
+    private static final long MAX_INITIAL_EMISSION = 32L * CHUNK_SIZE;
 
     private static boolean isNotCiEnvironment() {
         return System.getenv("CI") == null;
@@ -121,7 +123,7 @@ public class ProxyBackpressureTest {
             subscriber.subscription.request(1);
             Awaitility.await().atMost(60, TimeUnit.SECONDS).until(() -> subscriber.received > 1024);
             TimeUnit.SECONDS.sleep(5);
-            Assertions.assertTrue(ctrl.emitted < 32 * CHUNK_SIZE);
+            Assertions.assertTrue(ctrl.emitted.get() < MAX_INITIAL_EMISSION);
 
             subscriber.subscription.request(Long.MAX_VALUE);
             Awaitility.await().atMost(60, TimeUnit.SECONDS).until(() -> subscriber.complete);
@@ -129,14 +131,14 @@ public class ProxyBackpressureTest {
                 Assertions.fail(subscriber.error);
             }
             Assertions.assertEquals(TOTAL_CHUNKS * CHUNK_SIZE, subscriber.received);
-            Assertions.assertEquals(TOTAL_CHUNKS * CHUNK_SIZE, ctrl.emitted);
+            Assertions.assertEquals(TOTAL_CHUNKS * CHUNK_SIZE, ctrl.emitted.get());
         }
     }
 
     @Controller
     @Requires(property = "spec.name", value = "ProxyBackpressureTest")
     static class Ctrl {
-        volatile long emitted = 0;
+        final AtomicLong emitted = new AtomicLong();
 
         @Get("/large")
         Publisher<byte[]> large() {
@@ -146,7 +148,7 @@ public class ProxyBackpressureTest {
                     ThreadLocalRandom.current().nextBytes(arr);
                     return arr;
                 })
-                .doOnNext(it -> emitted += it.length);
+                .doOnNext(it -> emitted.addAndGet(it.length));
         }
     }
 
