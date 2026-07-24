@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import org.jspecify.annotations.Nullable;
@@ -102,7 +103,18 @@ public final class ConfigurationUtils {
         if (prefix == null) {
             return StringUtils.EMPTY_STRING;
         }
-        return prefix;
+        return normalizeConfigurationPrefix(prefix);
+    }
+
+    private static String normalizeConfigurationPrefix(String prefix) {
+        String[] segments = prefix.split("\\.");
+        for (int i = 0; i < segments.length; i++) {
+            String segment = segments[i];
+            if (!segment.isEmpty() && !segment.endsWith(EACH_PROPERTY_LIST_SUFFIX) && !segment.endsWith(EACH_PROPERTY_MAP_SUFFIX)) {
+                segments[i] = NameUtils.hyphenate(segment, true);
+            }
+        }
+        return String.join(".", segments);
     }
 
     private static String computeIterablePrefix(AnnotationMetadata annotationMetadata, @Nullable String prefix) {
