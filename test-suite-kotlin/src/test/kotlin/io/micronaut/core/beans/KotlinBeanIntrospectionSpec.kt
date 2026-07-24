@@ -6,6 +6,7 @@ import java.time.LocalDate.now
 import kotlin.test.assertFails
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 
 class KotlinBeanIntrospectionSpec {
 
@@ -233,4 +234,14 @@ class KotlinBeanIntrospectionSpec {
         assertEquals(bean.a38, attributes[38])
         assertEquals(bean.a39, attributes[39])
     }
+    @Test
+    fun testDuplicatePropertiesFromIndependentInterfaces() {
+        val introspection = BeanIntrospection.getIntrospection(Issue12262Bean::class.java)
+
+        assertArrayEquals(arrayOf("foo"), introspection.propertyNames)
+        val bean = introspection.instantiate("bar")
+        assertEquals("bar", bean.foo)
+        assertEquals("bar", introspection.getRequiredProperty("foo", String::class.java).get(bean))
+    }
+
 }

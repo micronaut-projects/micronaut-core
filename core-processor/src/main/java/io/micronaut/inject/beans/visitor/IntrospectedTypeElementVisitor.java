@@ -44,6 +44,7 @@ import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -52,7 +53,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
@@ -462,9 +465,14 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 PropertyElementQuery propertyElementQuery,
                                 ClassElement ce,
                                 BeanIntrospectionWriter writer) {
-        List<PropertyElement> beanProperties = ce.getBeanProperties(propertyElementQuery).stream()
+        List<PropertyElement> beanProperties = new ArrayList<>(ce.getBeanProperties(propertyElementQuery).stream()
             .filter(p -> !p.isExcluded())
-            .toList();
+            .collect(Collectors.toMap(
+                PropertyElement::getName,
+                Function.identity(),
+                (existing, replacement) -> existing,
+                LinkedHashMap::new
+            )).values());
         Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
         constructorElement.ifPresent(constructorEl -> {
             if (ArrayUtils.isNotEmpty(constructorEl.getParameters())) {
