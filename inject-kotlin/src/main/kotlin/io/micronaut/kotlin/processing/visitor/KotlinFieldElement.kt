@@ -17,6 +17,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.Origin
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.FieldElement
@@ -47,7 +48,11 @@ internal class KotlinFieldElement(
         newClassElement(nativeType, internalKSType, declaringType.typeArguments)
     }
 
-    override fun isFinal() = declaration.setter == null
+    override fun isFinal() = if (declaration.origin == Origin.JAVA) {
+        super<AbstractKotlinElement>.isFinal()
+    } else {
+        declaration.setter == null
+    }
 
     override fun isReflectionRequired() = true // all Kotlin fields are private
 

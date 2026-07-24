@@ -94,6 +94,12 @@ public class KotlinCompiler {
         return toClassLoader(resultPair);
     }
 
+    public static URLClassLoader buildClassLoader(List<SourceFile> sources) {
+        Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> resultPair = compile(sources, classElement -> {
+        });
+        return toClassLoader(resultPair);
+    }
+
     @NotNull
     private static URLClassLoader toClassLoader(Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> resultPair) {
         try {
@@ -130,12 +136,16 @@ public class KotlinCompiler {
     }
 
     public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compile(String name, @Language("kotlin") String clazz, Consumer<ClassElement> classElements) {
+        return compile(Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)), classElements);
+    }
+
+    public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compile(List<SourceFile> sources, Consumer<ClassElement> classElements) {
         try {
             Files.deleteIfExists(KOTLIN_COMPILATION.getWorkingDir().toPath());
         } catch (IOException e) {
             // ignore
         }
-        KOTLIN_COMPILATION.setSources(Collections.singletonList(SourceFile.Companion.kotlin(name + ".kt", clazz, true)));
+        KOTLIN_COMPILATION.setSources(sources);
         JvmCompilationResult result = KOTLIN_COMPILATION.compile();
         if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {
             throw new RuntimeException(result.getMessages());
@@ -153,26 +163,7 @@ public class KotlinCompiler {
     }
 
     public static Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> compileJava(String name, @Language("java") String clazz, Consumer<ClassElement> classElements) {
-        try {
-            Files.deleteIfExists(KOTLIN_COMPILATION.getWorkingDir().toPath());
-        } catch (IOException e) {
-            // ignore
-        }
-        KOTLIN_COMPILATION.setSources(Collections.singletonList(SourceFile.Companion.java(name + ".java", clazz, true)));
-        JvmCompilationResult result = KOTLIN_COMPILATION.compile();
-        if (result.getExitCode() != KotlinCompilation.ExitCode.OK) {
-            throw new RuntimeException(result.getMessages());
-        }
-
-        KSP_COMPILATION.setSources(KOTLIN_COMPILATION.getSources());
-        ClassElementTypeElementSymbolProcessorProvider classElementTypeElementSymbolProcessorProvider = new ClassElementTypeElementSymbolProcessorProvider(classElements);
-        KspKt.setSymbolProcessorProviders(KSP_COMPILATION, Arrays.asList(classElementTypeElementSymbolProcessorProvider, new BeanDefinitionProcessorProvider()));
-        JvmCompilationResult kspResult = KSP_COMPILATION.compile();
-        if (kspResult.getExitCode() != KotlinCompilation.ExitCode.OK) {
-            throw new RuntimeException(kspResult.getMessages());
-        }
-
-        return new Pair<>(new Pair<>(KOTLIN_COMPILATION, result), new Pair<>(KSP_COMPILATION, kspResult));
+        return compile(Collections.singletonList(SourceFile.Companion.java(name + ".java", clazz, true)), classElements);
     }
 
     public static BeanIntrospection<?> buildBeanIntrospection(String name, @Language("kotlin") String clazz) {
@@ -193,6 +184,22 @@ public class KotlinCompiler {
     public static BeanDefinition<?> buildBeanDefinition(String packageName, String simpleName, @Language("kotlin") String clazz) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         final URLClassLoader classLoader = buildClassLoader(packageName + "." + simpleName, clazz);
         String beanDefName = (simpleName.startsWith("$") ? "" : '$') + simpleName + BeanDefinitionWriter.CLASS_SUFFIX;
+        String beanFullName = packageName + "." + beanDefName;
+        return (BeanDefinition<?>) loadDefinition(classLoader, beanFullName);
+    }
+
+    public static BeanDefinition<?> buildBeanDefinition(String javaName,
+                                                        @Language("java") String javaSource,
+                                                        String kotlinName,
+                                                        @Language("kotlin") String kotlinSource,
+                                                        String className) throws InstantiationException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        final URLClassLoader classLoader = buildClassLoader(List.of(
+            SourceFile.Companion.java(javaName, javaSource, true),
+            SourceFile.Companion.kotlin(kotlinName, kotlinSource, true)
+        ));
+        String simpleName = NameUtils.getSimpleName(className);
+        String beanDefName = (simpleName.startsWith("$") ? "" : '$') + simpleName + BeanDefinitionWriter.CLASS_SUFFIX;
+        String packageName = NameUtils.getPackageName(className);
         String beanFullName = packageName + "." + beanDefName;
         return (BeanDefinition<?>) loadDefinition(classLoader, beanFullName);
     }
@@ -263,14 +270,45 @@ public class KotlinCompiler {
         return buildContext(clazz, false);
     }
 
+    public static ApplicationContext buildContext(List<SourceFile> sources) {
+        return buildContext(sources, false);
+    }
+
+    public static ApplicationContext buildContext(String javaName,
+                                                  @Language("java") String javaSource,
+                                                  String kotlinName,
+                                                  @Language("kotlin") String kotlinSource) {
+        return buildContext(List.of(
+            SourceFile.Companion.java(javaName, javaSource, true),
+            SourceFile.Companion.kotlin(kotlinName, kotlinSource, true)
+        ));
+    }
+
     public static ApplicationContext buildContext(@Language("kotlin") String clazz, boolean includeAllBeans) {
         return buildContext(clazz, includeAllBeans, Collections.emptyMap());
+    }
+
+    public static ApplicationContext buildContext(List<SourceFile> sources, boolean includeAllBeans) {
+        return buildContext(sources, includeAllBeans, Collections.emptyMap());
     }
 
     @SuppressWarnings("java:S2095")
     public static ApplicationContext buildContext(@Language("kotlin") String clazz, boolean includeAllBeans, Map<String, Object> config) {
         Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> pair = compile("temp", clazz, classElement -> {
         });
+        return buildContext(pair, includeAllBeans, config);
+    }
+
+    @SuppressWarnings("java:S2095")
+    public static ApplicationContext buildContext(List<SourceFile> sources, boolean includeAllBeans, Map<String, Object> config) {
+        Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> pair = compile(sources, classElement -> {
+        });
+        return buildContext(pair, includeAllBeans, config);
+    }
+
+    private static ApplicationContext buildContext(Pair<Pair<KotlinCompilation, JvmCompilationResult>, Pair<KotlinCompilation, JvmCompilationResult>> pair,
+                                                   boolean includeAllBeans,
+                                                   Map<String, Object> config) {
         ClassLoader classLoader = toClassLoader(pair);
         var builder = ApplicationContext.builder();
         builder.classLoader(classLoader);

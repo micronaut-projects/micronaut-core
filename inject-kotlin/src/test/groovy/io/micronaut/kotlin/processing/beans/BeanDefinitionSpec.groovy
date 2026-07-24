@@ -132,6 +132,42 @@ class F
         definition.injectedFields.size() == 1
     }
 
+    void "test inherited java field injection on kotlin bean"() {
+        when:
+        def context = KotlinCompiler.buildContext('Parent.java', '''
+package test;
+
+import io.micronaut.context.ApplicationContext;
+import jakarta.inject.Inject;
+
+public class Parent {
+    @Inject
+    ApplicationContext context;
+}
+''', 'Child.kt', '''
+package test
+
+import jakarta.annotation.PostConstruct
+import jakarta.inject.Singleton
+
+@Singleton
+class Dependency
+
+@Singleton
+class Child(private val dependency: Dependency) : Parent() {
+    var injected = false
+
+    @PostConstruct
+    fun init() {
+        injected = context != null
+    }
+}
+''')
+
+        then:
+        getBean(context, 'test.Child').injected
+    }
+
     void "test abstract mapper singleton"() {
         given:
         def definition = KotlinCompiler.buildIntroducedBeanDefinition('test.ProductMappers', '''
