@@ -23,6 +23,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -127,6 +128,15 @@ public abstract class ResponseLifecycle {
         HttpResponse<?> httpResponse) {
         Object body = httpResponse.body();
         MutableHttpResponse<?> response = httpResponse.toMutableResponse();
+        if (nettyRequest.getMethod() == HttpMethod.HEAD && !response.getHeaders().contains(HttpHeaders.CONTENT_LENGTH)) {
+            RouteAttributes.getHeadBody(response).ifPresent(headBody -> {
+                if (headBody instanceof byte[] bytes) {
+                    response.contentLength(bytes.length);
+                } else if (headBody instanceof CharSequence sequence) {
+                    response.contentLength(sequence.toString().getBytes(MessageBodyWriter.getCharset(response.getContentType().orElse(null), response.getHeaders())).length);
+                }
+            });
+        }
         if (nettyRequest.getMethod() != HttpMethod.HEAD && body != null) {
             Object routeInfoO = RouteAttributes.getRouteInfo(response).orElse(null);
             // usually this is a UriRouteInfo, avoid scalability issues here
