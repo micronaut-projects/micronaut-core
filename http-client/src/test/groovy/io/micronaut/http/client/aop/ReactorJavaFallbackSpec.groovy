@@ -2,7 +2,10 @@ package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.annotation.SingleResult
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.*
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.retry.annotation.Fallback
 import io.micronaut.retry.annotation.Recoverable
@@ -13,13 +16,12 @@ import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-import io.micronaut.core.async.annotation.SingleResult
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-class ReactorJavaFallbackSpec extends Specification{
+class ReactorJavaFallbackSpec extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ReactorJavaFallbackSpec'])
@@ -77,6 +79,23 @@ class ReactorJavaFallbackSpec extends Specification{
         book.title == "Fallback Book"
     }
 
+    void "test fallback excludes and includes are honored for reactive responses"() {
+        given:
+        ConditionalBookClient client = embeddedServer.applicationContext.getBean(ConditionalBookClient)
+
+        when:
+        Mono.from(client.excluded(99)).block()
+
+        then:
+        thrown(HttpClientResponseException)
+
+        when:
+        Book included = Mono.from(client.included(99)).block()
+
+        then:
+        included.title == "Fallback Book"
+    }
+
     @Requires(property = 'spec.name', value = 'ReactorJavaFallbackSpec')
     @Client('/rxjava/fallback/books')
     @Recoverable
@@ -84,8 +103,14 @@ class ReactorJavaFallbackSpec extends Specification{
     }
 
     @Requires(property = 'spec.name', value = 'ReactorJavaFallbackSpec')
+    @Client('/rxjava/fallback/books')
+    @Recoverable
+    static interface ConditionalBookClient extends ConditionalBookApi {
+    }
+
+    @Requires(property = 'spec.name', value = 'ReactorJavaFallbackSpec')
     @Fallback
-    static class BookFallback implements BookApi {
+    static class BookFallback implements BookApi, ConditionalBookApi {
 
         @Override
         @SingleResult
@@ -121,13 +146,25 @@ class ReactorJavaFallbackSpec extends Specification{
         Publisher<Book> update(Long id, String title) {
             return Mono.just(new Book(title: "Fallback Book"))
         }
+
+        @Override
+        @SingleResult
+        @Fallback(excludes = [HttpClientResponseException])
+        Publisher<Book> excluded(Long id) {
+            return Mono.just(new Book(title: "Fallback Book"))
+        }
+
+        @Override
+        @SingleResult
+        @Fallback(includes = [HttpClientResponseException])
+        Publisher<Book> included(Long id) {
+            return Mono.just(new Book(title: "Fallback Book"))
+        }
     }
 
     @Requires(property = 'spec.name', value = 'ReactorJavaFallbackSpec')
     @Controller("/rxjava/fallback/books")
-    static class BookController implements BookApi {
-
-        Map<Long, Book> books = new LinkedHashMap<>()
+    static class BookController implements BookApi, ConditionalBookApi {
 
         @Override
         @SingleResult
@@ -163,6 +200,18 @@ class ReactorJavaFallbackSpec extends Specification{
         Publisher<Book> update(Long id, String title) {
             Mono.error(new RuntimeException("bad"))
         }
+
+        @Override
+        @SingleResult
+        Publisher<Book> excluded(Long id) {
+            Mono.error(new HttpClientResponseException("Not Found", HttpResponse.notFound()))
+        }
+
+        @Override
+        @SingleResult
+        Publisher<Book> included(Long id) {
+            Mono.error(new HttpClientResponseException("Not Found", HttpResponse.notFound()))
+        }
     }
 
     static interface BookApi {
@@ -189,6 +238,17 @@ class ReactorJavaFallbackSpec extends Specification{
         @Patch("/{id}")
         @SingleResult
         Publisher<Book> update(Long id, String title)
+    }
+
+    static interface ConditionalBookApi {
+
+        @Get("/excluded/{id}")
+        @SingleResult
+        Publisher<Book> excluded(Long id)
+
+        @Get("/included/{id}")
+        @SingleResult
+        Publisher<Book> included(Long id)
     }
 
     static class Book {

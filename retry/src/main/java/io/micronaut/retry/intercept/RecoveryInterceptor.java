@@ -20,10 +20,12 @@ import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.retry.annotation.DefaultRetryPredicate;
 import io.micronaut.retry.annotation.Fallback;
 import io.micronaut.retry.annotation.Recoverable;
 import io.micronaut.retry.exception.FallbackException;
@@ -34,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -47,6 +50,11 @@ import java.util.concurrent.CompletionStage;
  */
 @Singleton
 public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
+
+    private record FallbackResult(MethodExecutionHandle<?, Object> handle,
+                                  AnnotationValue<Fallback> beanAnnotation,
+                                  AnnotationValue<Fallback> methodAnnotation) {
+    }
 
     /**
      * Positioned before the {@link io.micronaut.retry.annotation.Retryable} interceptor.
@@ -116,9 +124,13 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
     @SuppressWarnings("unchecked")
     private Publisher<?> fallbackForReactiveType(MethodInvocationContext<Object, Object> context, Publisher<?> publisher) {
         return Flux.from(publisher).onErrorResume(throwable -> {
-            Optional<? extends MethodExecutionHandle<?, Object>> fallbackMethod = findFallbackMethod(context);
+            Optional<FallbackResult> fallbackMethod = findFallbackMethod(context);
             if (fallbackMethod.isPresent()) {
-                MethodExecutionHandle<?, Object> fallbackHandle = fallbackMethod.get();
+                FallbackResult fallback = fallbackMethod.get();
+                MethodExecutionHandle<?, Object> fallbackHandle = fallback.handle();
+                if (!canFallback(fallback.beanAnnotation(), fallback.methodAnnotation(), throwable)) {
+                    return Flux.error(throwable);
+                }
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass(), fallbackHandle);
                 }
@@ -146,7 +158,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
      * @param context The context
      * @return The fallback method if it is present
      */
-    public Optional<? extends MethodExecutionHandle<?, Object>> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
+    public Optional<FallbackResult> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
         Class<?> declaringType = context.classValue(Recoverable.class, "api").orElseGet(context::getDeclaringType);
         BeanDefinition<?> beanDefinition = beanContext.findBeanDefinition(declaringType, Qualifiers.byStereotype(Fallback.class)).orElse(null);
         if (beanDefinition != null) {
@@ -154,11 +166,40 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
                 beanDefinition.findMethod(context.getMethodName(), context.getArgumentTypes()).orElse(null);
             if (fallBackMethod != null) {
                 MethodExecutionHandle<?, Object> executionHandle = beanContext.createExecutionHandle(beanDefinition, (ExecutableMethod<Object, ?>) fallBackMethod);
-                return Optional.of(executionHandle);
+                AnnotationValue<Fallback> beanAnnotation = beanDefinition.findAnnotation(Fallback.class)
+                    .orElse(AnnotationValue.builder(Fallback.class).build());
+                AnnotationValue<Fallback> methodAnnotation = fallBackMethod.findAnnotation(Fallback.class)
+                    .orElse(AnnotationValue.builder(Fallback.class).build());
+                return Optional.of(new FallbackResult(executionHandle, beanAnnotation, methodAnnotation));
             }
         }
-        context.setAttribute(FALLBACK_NOT_FOUND, Boolean.TRUE);
+        context.setAttribute(FALLBACK_NOT_FOUND, true);
         return Optional.empty();
+    }
+
+    private boolean canFallback(AnnotationValue<Fallback> beanFallback,
+                                AnnotationValue<Fallback> methodFallback,
+                                Throwable throwable) {
+        List<Class<? extends Throwable>> includes = mergeIncludes(beanFallback, methodFallback);
+        List<Class<? extends Throwable>> excludes = mergeExcludes(beanFallback, methodFallback);
+        return new DefaultRetryPredicate(includes, excludes).test(throwable);
+    }
+
+    private static List<Class<? extends Throwable>> mergeIncludes(AnnotationValue<Fallback> beanFallback,
+                                                                  AnnotationValue<Fallback> methodFallback) {
+        List<Class<? extends Throwable>> methodIncludes = resolveThrowableClasses(methodFallback, "includes");
+        return methodIncludes.isEmpty() ? resolveThrowableClasses(beanFallback, "includes") : methodIncludes;
+    }
+
+    private static List<Class<? extends Throwable>> mergeExcludes(AnnotationValue<Fallback> beanFallback,
+                                                                  AnnotationValue<Fallback> methodFallback) {
+        List<Class<? extends Throwable>> methodExcludes = resolveThrowableClasses(methodFallback, "excludes");
+        return methodExcludes.isEmpty() ? resolveThrowableClasses(beanFallback, "excludes") : methodExcludes;
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static List<Class<? extends Throwable>> resolveThrowableClasses(AnnotationValue<Fallback> fallback, String member) {
+        return (List) List.of(fallback.classValues(member));
     }
 
     @SuppressWarnings("unchecked")
@@ -168,9 +209,14 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
             if (throwable == null) {
                 newFuture.complete(o);
             } else {
-                Optional<? extends MethodExecutionHandle<?, Object>> fallbackMethod = findFallbackMethod(context);
+                Optional<FallbackResult> fallbackMethod = findFallbackMethod(context);
                 if (fallbackMethod.isPresent()) {
-                    MethodExecutionHandle<?, Object> fallbackHandle = fallbackMethod.get();
+                    FallbackResult fallbackResult = fallbackMethod.get();
+                    MethodExecutionHandle<?, Object> fallbackHandle = fallbackResult.handle();
+                    if (!canFallback(fallbackResult.beanAnnotation(), fallbackResult.methodAnnotation(), throwable)) {
+                        newFuture.completeExceptionally(throwable);
+                        return;
+                    }
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass(), fallbackHandle);
                     }
@@ -211,9 +257,14 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
             if (throwable == null) {
                 newFuture.complete(o);
             } else {
-                Optional<? extends MethodExecutionHandle<?, Object>> fallbackMethod = findFallbackMethod(context);
+                Optional<FallbackResult> fallbackMethod = findFallbackMethod(context);
                 if (fallbackMethod.isPresent()) {
-                    MethodExecutionHandle<?, Object> fallbackHandle = fallbackMethod.get();
+                    FallbackResult fallbackResult = fallbackMethod.get();
+                    MethodExecutionHandle<?, Object> fallbackHandle = fallbackResult.handle();
+                    if (!canFallback(fallbackResult.beanAnnotation(), fallbackResult.methodAnnotation(), throwable)) {
+                        newFuture.completeExceptionally(throwable);
+                        return;
+                    }
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass(), fallbackHandle);
                     }
@@ -244,9 +295,13 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
             LOG.error("Type [{}] executed with error: {}", context.getTarget().getClass().getName(), exception.getMessage(), exception);
         }
 
-        Optional<? extends MethodExecutionHandle<?, Object>> fallback = findFallbackMethod(context);
+        Optional<FallbackResult> fallback = findFallbackMethod(context);
         if (fallback.isPresent()) {
-            MethodExecutionHandle<?, Object> fallbackMethod = fallback.get();
+            FallbackResult fallbackResult = fallback.get();
+            MethodExecutionHandle<?, Object> fallbackMethod = fallbackResult.handle();
+            if (!canFallback(fallbackResult.beanAnnotation(), fallbackResult.methodAnnotation(), exception)) {
+                throw exception;
+            }
             try {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass().getName(), fallbackMethod);

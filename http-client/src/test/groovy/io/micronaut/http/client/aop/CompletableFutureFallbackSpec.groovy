@@ -17,8 +17,10 @@ package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.retry.annotation.Fallback
 import io.micronaut.retry.annotation.Recoverable
 import io.micronaut.runtime.server.EmbeddedServer
@@ -26,6 +28,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Specification
 
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -87,6 +90,24 @@ class CompletableFutureFallbackSpec extends Specification {
         book.title == "Fallback Book"
     }
 
+    void "test fallback excludes and includes are honored for CompletableFuture responses"() {
+        given:
+        ConditionalBookClient conditionalClient = server.applicationContext.getBean(ConditionalBookClient)
+
+        when:
+        conditionalClient.excluded(99).get()
+
+        then:
+        def e = thrown(ExecutionException)
+        e.cause instanceof HttpClientResponseException
+
+        when:
+        Book included = conditionalClient.included(99).get()
+
+        then:
+        included.title == "Fallback Book"
+    }
+
 
     @Client('/future/fallback/books')
     @Recoverable
@@ -94,9 +115,15 @@ class CompletableFutureFallbackSpec extends Specification {
     static interface BookClient extends BookApi {
     }
 
+    @Client('/future/fallback/books')
+    @Recoverable
+    @Requires(property = 'spec.name', value = 'CompletableFutureFallbackSpec')
+    static interface ConditionalBookClient extends ConditionalBookApi {
+    }
+
     @Fallback
     @Requires(property = 'spec.name', value = 'CompletableFutureFallbackSpec')
-    static class BookFallback implements BookApi {
+    static class BookFallback implements BookApi, ConditionalBookApi {
 
         @Override
         CompletableFuture<Book> get(Long id) {
@@ -122,11 +149,23 @@ class CompletableFutureFallbackSpec extends Specification {
         CompletableFuture<Book> update(Long id, String title) {
             return CompletableFuture.completedFuture(new Book(title: "Fallback Book"))
         }
+
+        @Override
+        @Fallback(excludes = [HttpClientResponseException])
+        CompletableFuture<Book> excluded(Long id) {
+            return CompletableFuture.completedFuture(new Book(title: "Fallback Book"))
+        }
+
+        @Override
+        @Fallback(includes = [HttpClientResponseException])
+        CompletableFuture<Book> included(Long id) {
+            return CompletableFuture.completedFuture(new Book(title: "Fallback Book"))
+        }
     }
 
     @Controller("/future/fallback/books")
     @Requires(property = 'spec.name', value = 'CompletableFutureFallbackSpec')
-    static class BookController implements BookApi {
+    static class BookController implements BookApi, ConditionalBookApi {
 
         Map<Long, Book> books = new LinkedHashMap<>()
         AtomicLong currentId = new AtomicLong(0)
@@ -165,6 +204,20 @@ class CompletableFutureFallbackSpec extends Specification {
             f.completeExceptionally(new RuntimeException("bad"))
             return f
         }
+
+        @Override
+        CompletableFuture<Book> excluded(Long id) {
+            CompletableFuture<Book> future = new CompletableFuture<>()
+            future.completeExceptionally(new HttpClientResponseException("Not Found", HttpResponse.notFound()))
+            return future
+        }
+
+        @Override
+        CompletableFuture<Book> included(Long id) {
+            CompletableFuture<Book> future = new CompletableFuture<>()
+            future.completeExceptionally(new HttpClientResponseException("Not Found", HttpResponse.notFound()))
+            return future
+        }
     }
 
     static interface BookApi {
@@ -185,10 +238,18 @@ class CompletableFutureFallbackSpec extends Specification {
         CompletableFuture<Book> update(Long id, String title)
     }
 
+    static interface ConditionalBookApi {
+
+        @Get("/excluded/{id}")
+        CompletableFuture<Book> excluded(Long id)
+
+        @Get("/included/{id}")
+        CompletableFuture<Book> included(Long id)
+    }
+
 
     static class Book {
         Long id
         String title
     }
 }
-
