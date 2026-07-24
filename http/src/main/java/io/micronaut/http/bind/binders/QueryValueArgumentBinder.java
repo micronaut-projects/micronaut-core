@@ -98,7 +98,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
         }
 
         BindingResult<T> bindSimpleResult = bindSimple(context, source, annotationMetadata, parameters, argument);
-        if (bindSimpleResult.isSatisfied()) {
+        if (!bindSimpleResult.getConversionErrors().isEmpty() || bindSimpleResult.isSatisfied()) {
             return bindSimpleResult;
         }
         return bindPojo(context, parameters, argument);
