@@ -73,7 +73,7 @@ public final class WritableBodyWriter implements TypedMessageBodyHandler<Writabl
         try {
             object.writeTo(outputStream, MessageBodyWriter.getCharset(mediaType, outgoingHeaders));
             outputStream.flush();
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             throw new CodecException("Error writing body text: " + e.getMessage(), e);
         }
     }
@@ -111,7 +111,7 @@ public final class WritableBodyWriter implements TypedMessageBodyHandler<Writabl
     public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<Writable> type, MediaType mediaType, Writable object) throws CodecException {
         try {
             return bodyFactory.buffer(o -> object.writeTo(o, MessageBodyWriter.getCharset(mediaType, response.getHeaders())));
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             throw new CodecException("Failed to buffer Writable", e);
         }
     }
