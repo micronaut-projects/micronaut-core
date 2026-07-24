@@ -341,6 +341,8 @@ class DefaultUriBuilder implements UriBuilder {
             String pathStr = path.toString();
             if (isTemplate(pathStr, values)) {
                 pathStr = UriTemplate.of(pathStr).expand(values);
+            } else {
+                pathStr = encodePath(pathStr);
             }
 
             builder.append(pathStr);
@@ -405,5 +407,54 @@ class DefaultUriBuilder implements UriBuilder {
 
     private String encode(String userInfo) {
         return URLEncoder.encode(userInfo, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Percent-encode characters that are illegal in a URI path, leaving valid {@code %XX}
+     * sequences untouched so already-encoded paths are not double-encoded.
+     */
+    private static String encodePath(String path) {
+        StringBuilder sb = null;
+        for (int i = 0; i < path.length();) {
+            char c = path.charAt(i);
+            if (c == '%' && i + 2 < path.length() && isHexDigit(path.charAt(i + 1)) && isHexDigit(path.charAt(i + 2))) {
+                if (sb != null) {
+                    sb.append(path, i, i + 3);
+                }
+                i += 3;
+                continue;
+            }
+            int cp = path.codePointAt(i);
+            int len = Character.charCount(cp);
+            if (isAllowedPathChar(cp)) {
+                if (sb != null) {
+                    sb.appendCodePoint(cp);
+                }
+            } else {
+                if (sb == null) {
+                    sb = new StringBuilder(path.length() + 8);
+                    sb.append(path, 0, i);
+                }
+                sb.append(URLEncoder.encode(path.substring(i, i + len), StandardCharsets.UTF_8).replace("+", "%20"));
+            }
+            i += len;
+        }
+        return sb == null ? path : sb.toString();
+    }
+
+    private static boolean isAllowedPathChar(int c) {
+        return (c >= 'a' && c <= 'z')
+            || (c >= 'A' && c <= 'Z')
+            || (c >= '0' && c <= '9')
+            || switch (c) {
+                case '-', '.', '_', '~',
+                     '!', '$', '&', '\'', '(', ')', '*', '+', ',', ';', '=',
+                     ':', '@', '/' -> true;
+                default -> false;
+            };
+    }
+
+    private static boolean isHexDigit(char c) {
+        return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
     }
 }

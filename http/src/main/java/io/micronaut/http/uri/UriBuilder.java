@@ -106,7 +106,8 @@ public interface UriBuilder {
     UriBuilder replaceQueryParam(String name, Object... values);
 
     /**
-     * The constructed URI.
+     * The constructed URI. Illegal path characters are percent-encoded; existing valid
+     * percent-encoded sequences are preserved.
      *
      * @return Build the URI
      * @throws io.micronaut.http.exceptions.UriSyntaxException if the URI to be constructed is invalid

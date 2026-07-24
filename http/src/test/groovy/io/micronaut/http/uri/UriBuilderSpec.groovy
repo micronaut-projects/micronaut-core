@@ -196,4 +196,42 @@ class UriBuilderSpec extends Specification {
         then:
         builder.build().toString() == "https://google.com/search?q1=v1&q2=v2"
     }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12578")
+    void "test path with curly braces is encoded on build"() {
+        given:
+        String url = 'https://abc.com/XXX/YYY;abcd=${ABCD};ab_cd=1'
+
+        when:
+        URI uri = UriBuilder.of(url).build()
+
+        then:
+        uri.toString() == 'https://abc.com/XXX/YYY;abcd=$%7BABCD%7D;ab_cd=1'
+        !uri.rawPath.contains('{')
+        !uri.rawPath.contains('}')
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/7288")
+    void "test path with spaces is encoded on build"() {
+        expect:
+        UriBuilder.of("").path("this has a space in it").build().toString() ==
+                "/this%20has%20a%20space%20in%20it"
+        UriBuilder.of("https://example.com").path("foo bar").build().toString() ==
+                "https://example.com/foo%20bar"
+    }
+
+    void "test already percent-encoded path is not double encoded"() {
+        expect:
+        UriBuilder.of("").path("this%20has%20a%20space%20in%20it").build().toString() ==
+                "/this%20has%20a%20space%20in%20it"
+        UriBuilder.of("https://example.com/foo%20bar").build().toString() ==
+                "https://example.com/foo%20bar"
+        UriBuilder.of("https://example.com/foo%2Fbar").build().toString() ==
+                "https://example.com/foo%2Fbar"
+    }
+
+    void "test path with unicode is utf8 percent encoded"() {
+        expect:
+        UriBuilder.of("").path("café").build().toString() == "/caf%C3%A9"
+    }
 }
