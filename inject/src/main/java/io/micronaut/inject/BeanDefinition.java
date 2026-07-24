@@ -369,6 +369,14 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
 
     @Override
     default Argument<T> asArgument() {
+        List<Argument<?>> typeArguments = getTypeArguments(getBeanType());
+        if (!typeArguments.isEmpty()) {
+            return Argument.of(
+                getBeanType(),
+                getAnnotationMetadata(),
+                typeArguments.toArray(Argument.ZERO_ARGUMENTS)
+            );
+        }
         return Argument.of(
                 getBeanType(),
                 getAnnotationMetadata(),
