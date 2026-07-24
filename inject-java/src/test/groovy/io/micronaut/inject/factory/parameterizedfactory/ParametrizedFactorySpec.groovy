@@ -19,6 +19,8 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
+import java.util.LinkedHashSet
+
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -83,4 +85,22 @@ class ParametrizedFactorySpec extends Specification  {
         cleanup:
         context.close()
     }
+    void "test createBean accepts compatible sequenced set parameter"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        def input = new LinkedHashSet<Integer>()
+        input.add(1)
+        input.add(2)
+
+        when:
+        SequencedSetParamBean bean = context.createBean(SequencedSetParamBean, input)
+
+        then:
+        bean != null
+        bean.set.is(input)
+
+        cleanup:
+        context.close()
+    }
+
 }

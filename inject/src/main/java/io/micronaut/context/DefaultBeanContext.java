@@ -1058,7 +1058,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (args.length > i) {
                     Object val = args[i];
                     if (val != null) {
-                        if (argumentType.isInstance(val) && !CollectionUtils.isIterableOrMap(argumentType)) {
+                        if (argumentType.isInstance(val)) {
                             argumentValues.put(requiredArgument.getName(), val);
                         } else {
                             argumentValues.put(requiredArgument.getName(), conversionService.convert(val, requiredArgument).orElseThrow(() ->
