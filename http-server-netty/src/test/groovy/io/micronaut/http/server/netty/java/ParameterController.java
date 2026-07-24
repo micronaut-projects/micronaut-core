@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.java;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Introspected;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.MediaType;
@@ -23,6 +24,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.QueryValue;
+import jakarta.validation.constraints.Pattern;
 
 import java.util.List;
 import java.util.Map;
@@ -60,6 +62,11 @@ public class ParameterController {
         return "Parameter Value: " + (max != null ? max : "null");
     }
 
+    @Get("/nullable-pattern")
+    String nullablePattern(@QueryValue("name") @Nullable @Pattern(regexp = "^(alice|bob)$") String name) {
+        return "Parameter Value: " + (name != null ? name : "null");
+    }
+
     @Post(value = "/nullable-body", consumes = MediaType.APPLICATION_JSON)
     String nullableBody(@Nullable Integer max) {
         return "Body Value: " + (max != null ? max : "null");
@@ -95,4 +102,12 @@ public class ParameterController {
             return "Parameter Value: none";
         }
     }
+}
+
+@Introspected(
+    visibility = Introspected.Visibility.PUBLIC,
+    classes = {
+        String.class
+    })
+class IntrospectedAnnotationAppender {
 }

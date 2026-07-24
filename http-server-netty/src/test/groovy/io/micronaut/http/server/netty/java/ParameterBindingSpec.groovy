@@ -84,6 +84,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         '/java/parameter/optional?max=20'                                | "Parameter Value: 20"       | HttpStatus.OK
         '/java/parameter/nullable'                                       | "Parameter Value: null"     | HttpStatus.OK
         '/java/parameter/nullable?max=20'                                | "Parameter Value: 20"       | HttpStatus.OK
+        '/java/parameter/nullable-pattern'                               | "Parameter Value: null"     | HttpStatus.OK
         HttpRequest.POST('/java/parameter/nullable-body', '{}')          | "Body Value: null"          | HttpStatus.OK
         HttpRequest.POST('/java/parameter/nullable-body', '{"max": 20}') | "Body Value: 20"            | HttpStatus.OK
         HttpRequest.POST('/java/parameter/requires-body', '{}')          | null                        | HttpStatus.BAD_REQUEST
