@@ -38,7 +38,7 @@ public sealed interface NettyRequestArgumentBinder<T> extends RequestArgumentBin
         if (source instanceof NettyHttpRequest<?> nettyHttpRequest) {
             return bindForNettyRequest(context, nettyHttpRequest);
         }
-        return BindingResult.EMPTY;
+        return BindingResult.BINDING_RESULT_EMPTY;
     }
 
     /**

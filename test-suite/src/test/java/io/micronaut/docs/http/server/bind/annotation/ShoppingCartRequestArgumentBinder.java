@@ -42,7 +42,7 @@ public class ShoppingCartRequestArgumentBinder
 
         Cookie cookie = source.getCookies().get("shoppingCart");
         if (cookie == null) {
-            return BindingResult.EMPTY;
+            return BindingResult.BINDING_RESULT_EMPTY;
         }
 
         Optional<Map<String, Object>> cookieValue = objectSerializer.deserialize(

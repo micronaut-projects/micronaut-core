@@ -30,10 +30,10 @@ import java.time.Duration;
  * @author Jonas Konrad
  */
 @ConfigurationProperties(GracefulShutdownConfiguration.PREFIX)
-@Requires(property = GracefulShutdownConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
+@Requires(property = GracefulShutdownConfiguration.MICRONAUT_LIFECYCLE_GRACEFUL_SHUTDOWN_ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public final class GracefulShutdownConfiguration implements Toggleable {
     public static final String PREFIX = "micronaut.lifecycle.graceful-shutdown";
-    public static final String ENABLED = PREFIX + ".enabled";
+    public static final String MICRONAUT_LIFECYCLE_GRACEFUL_SHUTDOWN_ENABLED = PREFIX + ".enabled";
 
     private boolean enabled;
     private Duration gracePeriod = Duration.ofSeconds(15);

@@ -56,6 +56,6 @@ public class BasicAuthArgumentBinder implements TypedRequestArgumentBinder<Basic
                 return () -> Optional.of(new BasicAuth(values[0], values[1]));
             }
         }
-        return BindingResult.EMPTY;
+        return BindingResult.BINDING_RESULT_EMPTY;
     }
 }

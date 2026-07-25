@@ -28,7 +28,7 @@ class ShoppingCartRequestArgumentBinder(
             .stringValue(ShoppingCart::class.java)
             .orElse(context.argument.name)
 
-        val cookie = source.cookies.get("shoppingCart") ?: return BindingResult.EMPTY
+        val cookie = source.cookies.get("shoppingCart") ?: return BindingResult.BINDING_RESULT_EMPTY
 
         val cookieValue: Optional<Map<String, Any>> = objectSerializer.deserialize(
                 cookie.value.toByteArray(),

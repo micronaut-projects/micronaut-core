@@ -87,7 +87,7 @@ public final class DefaultUnmatchedRequestArgumentBinder<T> implements Postponed
                 pending.add(pendingRequestBindingResult);
                 allUnsatisfied = false;
             } else {
-                if (result != BindingResult.UNSATISFIED) {
+                if (result != BindingResult.BINDING_RESULT_UNSATISFIED) {
                     errors.addAll(result.getConversionErrors());
                     allUnsatisfied = false;
                 }

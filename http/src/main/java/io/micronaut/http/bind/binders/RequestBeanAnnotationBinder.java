@@ -105,7 +105,7 @@ public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentB
             }
         } else {
             //noinspection unchecked
-            return BindingResult.EMPTY;
+            return BindingResult.BINDING_RESULT_EMPTY;
         }
     }
 

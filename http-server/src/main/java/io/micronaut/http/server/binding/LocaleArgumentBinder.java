@@ -55,7 +55,7 @@ public class LocaleArgumentBinder implements TypedRequestArgumentBinder<Locale> 
         if (locale.isPresent()) {
             return () -> locale;
         } else {
-            return BindingResult.UNSATISFIED;
+            return BindingResult.BINDING_RESULT_UNSATISFIED;
         }
     }
 }

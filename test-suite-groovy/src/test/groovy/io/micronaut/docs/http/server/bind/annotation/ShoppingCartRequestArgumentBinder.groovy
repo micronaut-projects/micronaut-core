@@ -43,7 +43,7 @@ class ShoppingCartRequestArgumentBinder
 
         Cookie cookie = source.cookies.get("shoppingCart")
         if (!cookie) {
-            return BindingResult.EMPTY
+            return BindingResult.BINDING_RESULT_EMPTY
         }
 
         Optional<Map<String, Object>> cookieValue = objectSerializer.deserialize(

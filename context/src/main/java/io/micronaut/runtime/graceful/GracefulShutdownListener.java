@@ -39,7 +39,7 @@ import java.util.concurrent.TimeoutException;
  */
 @Singleton
 @Requires(bean = GracefulShutdownManager.class)
-@Requires(property = GracefulShutdownConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
+@Requires(property = GracefulShutdownConfiguration.MICRONAUT_LIFECYCLE_GRACEFUL_SHUTDOWN_ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @Experimental
 public final class GracefulShutdownListener implements ApplicationEventListener<ShutdownEvent>, Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(GracefulShutdownListener.class);

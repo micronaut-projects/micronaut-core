@@ -20,12 +20,12 @@ class GracefulShutdownContextSpec extends Specification {
         given:
         def mgmtPort = SocketUtils.findAvailableTcpPort()
         def ctx = ApplicationContext.run([
-                (GracefulShutdownConfiguration.ENABLED): true,
-                'micronaut.application.name': 'foo',
-                "spec.name": "GracefulShutdownContextSpec",
-                'endpoints.health.sensitive': false,
-                'endpoints.all.port': mgmtPort,
-                'micronaut.http.client.exception-on-error-status': false
+                (GracefulShutdownConfiguration.MICRONAUT_LIFECYCLE_GRACEFUL_SHUTDOWN_ENABLED): true,
+                'micronaut.application.name'                                                 : 'foo',
+                "spec.name"                                                                  : "GracefulShutdownContextSpec",
+                'endpoints.health.sensitive'                                                 : false,
+                'endpoints.all.port'                                                         : mgmtPort,
+                'micronaut.http.client.exception-on-error-status'                            : false
         ])
         def server = ctx.getBean(EmbeddedServer)
         server.start()

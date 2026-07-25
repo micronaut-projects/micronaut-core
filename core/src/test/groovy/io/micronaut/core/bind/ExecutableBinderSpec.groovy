@@ -100,7 +100,7 @@ class ExecutableBinderSpec extends Specification {
         ArgumentBinder argumentBinder = Mock(ArgumentBinder)
 
         argumentBinder.bind(_, _) >> ({ args ->
-            return ArgumentBinder.BindingResult.UNSATISFIED
+            return ArgumentBinder.BindingResult.BINDING_RESULT_UNSATISFIED
         } )
 
         registry.findArgumentBinder(_) >> Optional.of( argumentBinder)
@@ -138,7 +138,7 @@ class ExecutableBinderSpec extends Specification {
         ArgumentBinder argumentBinder = Mock(ArgumentBinder)
 
         argumentBinder.bind(_, _) >> ({ args ->
-            return ArgumentBinder.BindingResult.UNSATISFIED
+            return ArgumentBinder.BindingResult.BINDING_RESULT_UNSATISFIED
         } )
 
         registry.findArgumentBinder(_) >> Optional.of( argumentBinder)

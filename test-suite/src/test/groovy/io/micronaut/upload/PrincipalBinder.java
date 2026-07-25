@@ -23,7 +23,7 @@ public class PrincipalBinder implements TypedRequestArgumentBinder<Principal> {
         if (existing.isPresent()) {
             return () -> existing;
         } else {
-            return BindingResult.EMPTY;
+            return BindingResult.BINDING_RESULT_EMPTY;
         }
     }
 }

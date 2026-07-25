@@ -79,7 +79,7 @@ public class WebSocketStateBinderRegistry implements ArgumentBinderRegistry<WebS
             ConvertibleValues<Object> uriVariables = source.getSession().getUriVariables();
             if (uriVariables.contains(argument.getName())) {
                 Optional<T> val = uriVariables.get(argument.getName(), argument);
-                return val.isEmpty() ? ArgumentBinder.BindingResult.UNSATISFIED : () -> val;
+                return val.isEmpty() ? ArgumentBinder.BindingResult.BINDING_RESULT_UNSATISFIED : () -> val;
             }
             return (ArgumentBinder.BindingResult<T>) queryValueArgumentBinder.bind((ArgumentConversionContext<Object>) context, source.getOriginatingRequest());
         });
