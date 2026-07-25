@@ -95,7 +95,11 @@ public class AccessLogFormatParser {
     private String[] elements;
 
     static {
-        SoftServiceLoader<LogElementBuilder> builders = SoftServiceLoader.load(LogElementBuilder.class, LogElementBuilder.class.getClassLoader())
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        if (classLoader == null) {
+            classLoader = LogElementBuilder.class.getClassLoader();
+        }
+        SoftServiceLoader<LogElementBuilder> builders = SoftServiceLoader.load(LogElementBuilder.class, classLoader)
             .disableFork();
         LOG_ELEMENT_BUILDERS = new ArrayList<>();
         builders.collectAll(LOG_ELEMENT_BUILDERS);

@@ -79,13 +79,21 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
                 exResolvers = this.expressionResolvers;
                 if (exResolvers == null) {
                     exResolvers = new ArrayList<>(DEFAULT_EXPRESSION_RESOLVERS);
-                    ClassLoader classLoader = (environment instanceof Environment e) ? e.getClassLoader() : environment.getClass().getClassLoader();
+                    ClassLoader classLoader = (environment instanceof Environment e) ? e.getClassLoader() : fallbackClassLoader();
                     SoftServiceLoader.load(PropertyExpressionResolver.class, classLoader).collectAll(exResolvers);
                     this.expressionResolvers = exResolvers;
                 }
             }
         }
         return exResolvers;
+    }
+
+    private ClassLoader fallbackClassLoader() {
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        if (contextClassLoader != null) {
+            return contextClassLoader;
+        }
+        return environment.getClass().getClassLoader();
     }
 
     @Override
