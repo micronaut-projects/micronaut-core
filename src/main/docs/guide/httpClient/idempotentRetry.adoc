@@ -1,0 +1,67 @@
+Since Micronaut Framework 5.0, the HTTP client supports an opt-in transport-level retry filter that automatically retries idempotent requests on transient failures, following https://www.rfc-editor.org/rfc/rfc9110.html[RFC 9110]. The filter ships with the HTTP client core — no additional dependency is required, unlike ann:retry.annotation.Retryable[] which requires the `micronaut-retry` library.
+
+Compared to ann:retry.annotation.Retryable[]: this filter operates below `@Client` interfaces, applies to programmatic clients as well, and never retries non-idempotent requests (such as a `POST` without an `Idempotency-Key` header).
+
+[NOTE]
+====
+This filter is in-process and self-contained. If you run inside a service mesh (Istio, Linkerd, Consul Connect), in-mesh service-to-service retries are typically best handled by the mesh's `VirtualService` / equivalent — the mesh sees every call, applies retry budgets across services, and is language-agnostic. The application-side filter is most valuable when:
+
+* Calling **external APIs** (Stripe, Twilio, S3, OAuth providers, partner integrations) — traffic that leaves the mesh.
+* Running on **deployment targets without a mesh** (AWS Lambda, ECS, App Runner, Heroku, plain VMs).
+* You need **idempotency-key-aware** `POST` retry, which mesh proxies cannot do safely without application help.
+* You want **per-`@Client` retry policy** that's finer-grained than per-destination mesh rules.
+
+When the mesh and this filter both retry the same request, you get retry storms. Pick one layer per traffic class.
+====
+
+Enable it via configuration:
+
+[configuration]
+----
+micronaut:
+  http:
+    client:
+      retry:
+        enabled: true
+        attempts: 3        # total attempts including the first
+        delay: 500ms       # initial back-off
+        multiplier: 1.5    # exponential factor
+        max-delay: 10s
+        jitter: 0.25
+        respect-retry-after: true
+----
+
+The default policy retries:
+
+* Methods designated as idempotent by https://www.rfc-editor.org/rfc/rfc9110.html#name-idempotent-methods[RFC 9110 Section 9.2.2]: `GET`, `HEAD`, `PUT`, `DELETE`, `OPTIONS`, `TRACE`.
+* Any request carrying an `Idempotency-Key` header (a de facto convention for marking `POST`/`PATCH` as safe to retry).
+* Failures with status `5xx` (https://www.rfc-editor.org/rfc/rfc9110.html#name-server-error-5xx[RFC 9110 Section 15.6]), `429` (https://www.rfc-editor.org/rfc/rfc6585.html#section-4[RFC 6585 Section 4]), or `408` (https://www.rfc-editor.org/rfc/rfc9110.html#name-408-request-timeout[RFC 9110 Section 15.5.9]).
+* Transport-level errors (connect/read timeouts, connection resets).
+
+For `429` and `503` responses carrying a `Retry-After` header, the server-supplied delay is honored (capped by `max-delay`). The header format (delta-seconds or HTTP-date) is defined by https://www.rfc-editor.org/rfc/rfc9110.html#name-retry-after[RFC 9110 Section 10.2.3], which canonically associates it with `503` (and 3xx redirects, handled separately by the redirect follower); the `429` association comes from https://www.rfc-editor.org/rfc/rfc6585.html#section-4[RFC 6585 Section 4].
+
+NOTE: Requests with a streamed body (a `Publisher<ByteBuffer>` or similar) are not retried, since the body cannot be replayed. Buffer the body before sending if retries are desired.
+
+[IMPORTANT]
+====
+*Timeout interaction.* Each attempt has its own `read-timeout` (it's a fresh network call). However, retry delays are spent inside the same reactive stream as the original request, so they count against `request-timeout`. The cumulative worst-case is roughly `attempts × read-timeout + (attempts - 1) × max-delay`. Default Micronaut sets `request-timeout` to `read-timeout + 1s`, which is too small for even one retry. When enabling this filter, raise `request-timeout` accordingly:
+
+[configuration]
+----
+micronaut:
+  http:
+    client:
+      read-timeout: 5s          # per attempt
+      request-timeout: 30s      # ≥ attempts × read-timeout + sum_of_backoffs
+      retry:
+        enabled: true
+        attempts: 3
+        max-delay: 2s
+----
+====
+
+To customize the policy, replace either of the predicate beans. The example below extends the default response predicate to also retry HTTP `425 Too Early`:
+
+snippet::io.micronaut.docs.http.client.retry.CustomResponseRetryPredicate[tags="class", indent=0, title="Custom HttpResponseRetryPredicate"]
+
+<1> The `@Requires` line scopes the bean to a single test spec; remove it in production code so the predicate is always picked up.

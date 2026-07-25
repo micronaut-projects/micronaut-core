@@ -1100,6 +1100,16 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * Obtains the idempotent retry configuration.
+     *
+     * @return The retry configuration, or {@code null} if retry is not configured.
+     * @since 5.0.0
+     */
+    public HttpClientConfiguration.@Nullable RetryConfiguration getRetryConfiguration() {
+        return null;
+    }
+
+    /**
      * The path pattern to use for logging outgoing connections to pcap. This is an unsupported option: Behavior may
      * change, or it may disappear entirely, without notice! Only implemented for netty.
      *
@@ -1532,6 +1542,219 @@ public abstract class HttpClientConfiguration {
          */
         public void setMaxHeaderListSize(@ReadableBytes int maxHeaderListSize) {
             this.maxHeaderListSize = maxHeaderListSize;
+        }
+    }
+
+    /**
+     * Configuration for <a href="https://www.rfc-editor.org/rfc/rfc9110.html">RFC 9110</a>-aware
+     * idempotent client-side retry. Disabled by default. See
+     * {@link io.micronaut.http.client.retry.HttpRequestRetryPredicate} and
+     * {@link io.micronaut.http.client.retry.HttpResponseRetryPredicate} for the default policy.
+     *
+     * @since 5.0.0
+     */
+    public static class RetryConfiguration implements Toggleable {
+
+        /**
+         * The prefix to use for configuration.
+         */
+        public static final String PREFIX = "retry";
+
+        /**
+         * The default enable value.
+         */
+        public static final boolean DEFAULT_ENABLED = false;
+
+        /**
+         * The default total number of attempts (including the first).
+         */
+        public static final int DEFAULT_ATTEMPTS = 3;
+
+        /**
+         * The default initial back-off delay in milliseconds.
+         */
+        public static final long DEFAULT_DELAY_MILLIS = 500;
+
+        /**
+         * The default back-off multiplier.
+         */
+        public static final double DEFAULT_MULTIPLIER = 1.5;
+
+        /**
+         * The default maximum back-off delay in seconds.
+         */
+        public static final long DEFAULT_MAX_DELAY_SECONDS = 10;
+
+        /**
+         * The default jitter factor.
+         */
+        public static final double DEFAULT_JITTER = 0.25;
+
+        /**
+         * The default value for honoring server {@code Retry-After} hints.
+         */
+        public static final boolean DEFAULT_RESPECT_RETRY_AFTER = true;
+
+        private boolean enabled = DEFAULT_ENABLED;
+        private int attempts = DEFAULT_ATTEMPTS;
+        private Duration delay = Duration.ofMillis(DEFAULT_DELAY_MILLIS);
+        private double multiplier = DEFAULT_MULTIPLIER;
+        private Duration maxDelay = Duration.ofSeconds(DEFAULT_MAX_DELAY_SECONDS);
+        private double jitter = DEFAULT_JITTER;
+        private boolean respectRetryAfter = DEFAULT_RESPECT_RETRY_AFTER;
+
+        /**
+         * Whether idempotent retry is enabled. Default ({@value #DEFAULT_ENABLED}).
+         *
+         * @return {@code true} if retry is enabled
+         */
+        @Override
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * Sets whether idempotent retry is enabled. Default value (false).
+         *
+         * @param enabled {@code true} to enable retry
+         */
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        /**
+         * Total attempts including the first; {@code 1} disables retry. Default
+         * ({@value #DEFAULT_ATTEMPTS}).
+         *
+         * @return The total attempts
+         */
+        public int getAttempts() {
+            return attempts;
+        }
+
+        /**
+         * Sets the total attempts including the first; 1 disables retry. Values below 1 are
+         * coerced to 1. Default value (3).
+         *
+         * @param attempts The total attempts
+         */
+        public void setAttempts(int attempts) {
+            this.attempts = Math.max(1, attempts);
+        }
+
+        /**
+         * Initial back-off delay. Default ({@value #DEFAULT_DELAY_MILLIS} ms).
+         *
+         * @return The initial delay
+         */
+        public Duration getDelay() {
+            return delay;
+        }
+
+        /**
+         * Sets the initial back-off delay. Default value (500ms).
+         *
+         * @param delay The initial delay
+         * @throws IllegalArgumentException if {@code delay} is negative
+         */
+        public void setDelay(Duration delay) {
+            Objects.requireNonNull(delay, "delay");
+            if (delay.isNegative()) {
+                throw new IllegalArgumentException("delay cannot be negative");
+            }
+            this.delay = delay;
+        }
+
+        /**
+         * Exponential back-off multiplier. Default ({@value #DEFAULT_MULTIPLIER}).
+         *
+         * @return The multiplier
+         */
+        public double getMultiplier() {
+            return multiplier;
+        }
+
+        /**
+         * Sets the exponential back-off multiplier. Default value (1.5).
+         *
+         * @param multiplier The multiplier
+         * @throws IllegalArgumentException if {@code multiplier} is negative
+         */
+        public void setMultiplier(double multiplier) {
+            if (multiplier < 0) {
+                throw new IllegalArgumentException("multiplier cannot be negative");
+            }
+            this.multiplier = multiplier;
+        }
+
+        /**
+         * Maximum back-off delay between retries. Default ({@value #DEFAULT_MAX_DELAY_SECONDS} s).
+         *
+         * @return The maximum delay
+         */
+        public Duration getMaxDelay() {
+            return maxDelay;
+        }
+
+        /**
+         * Sets the maximum back-off delay between retries. Default value (10s).
+         *
+         * @param maxDelay The maximum delay
+         * @throws IllegalArgumentException if {@code maxDelay} is negative
+         */
+        public void setMaxDelay(Duration maxDelay) {
+            Objects.requireNonNull(maxDelay, "maxDelay");
+            if (maxDelay.isNegative()) {
+                throw new IllegalArgumentException("maxDelay cannot be negative");
+            }
+            this.maxDelay = maxDelay;
+        }
+
+        /**
+         * Jitter factor applied to back-off delays, in {@code [0, 1]}. Default
+         * ({@value #DEFAULT_JITTER}).
+         *
+         * @return The jitter factor
+         */
+        public double getJitter() {
+            return jitter;
+        }
+
+        /**
+         * Sets the jitter factor applied to back-off delays, in [0, 1]. Default value (0.25).
+         *
+         * @param jitter The jitter factor
+         * @throws IllegalArgumentException if {@code jitter} is outside {@code [0, 1]}
+         */
+        public void setJitter(double jitter) {
+            if (jitter < 0 || jitter > 1) {
+                throw new IllegalArgumentException("jitter must be in the range [0, 1]");
+            }
+            this.jitter = jitter;
+        }
+
+        /**
+         * Whether to honor the server-supplied {@code Retry-After} header on {@code 429}
+         * (<a href="https://www.rfc-editor.org/rfc/rfc6585.html#section-4">RFC 6585 §4</a>)
+         * and {@code 503}
+         * (<a href="https://www.rfc-editor.org/rfc/rfc9110.html#name-retry-after">RFC 9110 §10.2.3</a>)
+         * responses, capped by {@link #getMaxDelay()}. Default
+         * ({@value #DEFAULT_RESPECT_RETRY_AFTER}).
+         *
+         * @return {@code true} if {@code Retry-After} is honored
+         */
+        public boolean isRespectRetryAfter() {
+            return respectRetryAfter;
+        }
+
+        /**
+         * Sets whether to honor the server-supplied Retry-After header on 429 and 503
+         * responses. Default value (true).
+         *
+         * @param respectRetryAfter {@code true} to honor {@code Retry-After}
+         */
+        public void setRespectRetryAfter(boolean respectRetryAfter) {
+            this.respectRetryAfter = respectRetryAfter;
         }
     }
 

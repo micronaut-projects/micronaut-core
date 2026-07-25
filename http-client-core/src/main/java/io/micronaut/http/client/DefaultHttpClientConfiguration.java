@@ -41,6 +41,7 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     private final DefaultConnectionPoolConfiguration connectionPoolConfiguration;
     private final DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration;
     private final DefaultHttp2ClientConfiguration http2Configuration;
+    private DefaultRetryConfiguration retryConfiguration = new DefaultRetryConfiguration();
 
     /**
      * Default constructor.
@@ -95,6 +96,23 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
         return http2Configuration;
     }
 
+    @Override
+    public RetryConfiguration getRetryConfiguration() {
+        return retryConfiguration;
+    }
+
+    /**
+     * Sets the retry configuration.
+     *
+     * @param retryConfiguration The retry configuration
+     */
+    @Inject
+    public void setRetryConfiguration(@Nullable DefaultRetryConfiguration retryConfiguration) {
+        if (retryConfiguration != null) {
+            this.retryConfiguration = retryConfiguration;
+        }
+    }
+
     /**
      * The default connection pool configuration.
      */
@@ -120,5 +138,14 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     @BootstrapContextCompatible
     @Primary
     public static class DefaultHttp2ClientConfiguration extends Http2ClientConfiguration {
+    }
+
+    /**
+     * The default retry configuration.
+     */
+    @ConfigurationProperties(RetryConfiguration.PREFIX)
+    @BootstrapContextCompatible
+    @Primary
+    public static class DefaultRetryConfiguration extends RetryConfiguration {
     }
 }

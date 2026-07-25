@@ -1,4 +1,9 @@
-Recovering from failure is critical for HTTP clients, and that is where Micronaut's integrated <<retry, Retry Advice>> comes in handy.
+Recovering from failure is critical for HTTP clients. Micronaut offers two complementary retry mechanisms:
+
+* The ann:retry.annotation.Retryable[] annotation described below — AOP advice that wraps ann:http.client.annotation.Client[] interface methods. Requires the `micronaut-retry` dependency.
+* <<idempotentRetry, RFC 9110 Idempotent Retry>> — an HTTP-aware transport-level filter built into the HTTP client core. No extra dependency. Applies to programmatic and declarative clients.
+
+This section covers ann:retry.annotation.Retryable[]; see <<retry, Retry Advice>> for general retry mechanics.
 
 NOTE: Since Micronaut Framework 4.0, declarative clients annotated with ann:http.client.annotation.Client[] no longer invoke fallbacks by default. To restore the previous behaviour add the following dependency and annotate any declarative clients with ann:retry.annotation.Recoverable[].
 

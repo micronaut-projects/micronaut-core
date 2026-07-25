@@ -129,6 +129,32 @@ import org.jspecify.annotations.Nullable;
     }
 
     /**
+     * Whether the method is <em>safe</em> per
+     * <a href="https://www.rfc-editor.org/rfc/rfc9110.html#name-safe-methods">RFC 9110 §9.2.1</a>:
+     * a safe method has no intended server-side state change and is therefore inherently
+     * idempotent.
+     *
+     * @return {@code true} for {@link #GET}, {@link #HEAD}, {@link #OPTIONS}, {@link #TRACE}
+     * @since 5.0.0
+     */
+    public boolean isSafe() {
+        return this == GET || this == HEAD || this == OPTIONS || this == TRACE;
+    }
+
+    /**
+     * Whether the method is <em>idempotent</em> per
+     * <a href="https://www.rfc-editor.org/rfc/rfc9110.html#name-idempotent-methods">RFC 9110 §9.2.2</a>:
+     * repeating the request has the same effect as a single invocation. All safe methods are
+     * idempotent; additionally {@link #PUT} and {@link #DELETE} are idempotent.
+     *
+     * @return {@code true} for the safe methods plus {@link #PUT} and {@link #DELETE}
+     * @since 5.0.0
+     */
+    public boolean isIdempotent() {
+        return isSafe() || this == PUT || this == DELETE;
+    }
+
+    /**
      * Whether the given method requires a request body.
      *
      * @param method The {@link HttpMethod}
