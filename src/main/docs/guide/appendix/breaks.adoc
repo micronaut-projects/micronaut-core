@@ -43,6 +43,23 @@ Check https://groovy-lang.org/releasenotes/groovy-5.0.html#Groovy5.0-breaking[Gr
 
 The Micronaut APIs use <<jspecify, JSpecify Annotations>>, and we recommend users to embrace JSpecify nullability annotations.
 
+==== ByteBody.split() method removed
+
+The parameter-less api:http.body.ByteBody#split--[ByteBody.split()] method has been removed. This method used `SplitBackpressureMode.SLOWEST` by default, which can lead to deadlocks when used in HTTP filters if both bodies are consumed at different rates.
+
+Users must now explicitly specify the backpressure mode by calling api:http.body.ByteBody#split-io.micronaut.http.body.ByteBody.SplitBackpressureMode-[split(SplitBackpressureMode)] instead. Consider using `SplitBackpressureMode.FASTEST`, `SplitBackpressureMode.ORIGINAL`, or `SplitBackpressureMode.NEW` to avoid potential deadlocks.
+
+[source,java]
+----
+// Before (Micronaut 4.x)
+CloseableByteBody splitBody = byteBody.split();
+
+// After (Micronaut 5.0)
+CloseableByteBody splitBody = byteBody.split(SplitBackpressureMode.FASTEST);
+----
+
+NOTE: The parameter-less `split()` method remains available in api:http.body.AvailableByteBody[], where deadlocks are not an issue since the entire body is immediately available.
+
 ==== Bean context changes
 
 The default implementations of api:context.BeanContext[BeanContext], api:context.ApplicationContext[ApplicationContext] and api:context.env.Environment[Environment] are no longer public and non-final.

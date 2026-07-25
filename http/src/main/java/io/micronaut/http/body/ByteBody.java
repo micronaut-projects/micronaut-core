@@ -33,16 +33,16 @@ import java.util.concurrent.CompletableFuture;
  * fully in memory, depending on implementation.
  * <p>Each {@link ByteBody} may only be used once for a "primary" operation (such as
  * {@link #toInputStream()}). However, <i>before</i> that primary operation, it may be
- * {@link #split() split} multiple times. Splitting returns a new {@link ByteBody} that is
+ * {@link #split(SplitBackpressureMode) split} multiple times. Splitting returns a new {@link ByteBody} that is
  * independent. That means if you want to do two primary operations on the same
  * {@link ByteBody}, you can instead split it once and then do one of the primary operations
- * on the body returned by {@link #split()}.
- * <p>To ensure resource cleanup, {@link #split()} returns a {@link CloseableByteBody}. This
+ * on the body returned by {@link #split(SplitBackpressureMode)}.
+ * <p>To ensure resource cleanup, {@link #split(SplitBackpressureMode)} returns a {@link CloseableByteBody}. This
  * body must be closed if no terminal operation is performed, otherwise there may be a memory leak
  * or stalled connection!
  * <p>An individual {@link ByteBody} is <i>not</i> thread-safe: You may not call
- * {@link #split()} concurrently from multiple threads for example. However, the new
- * {@link ByteBody} returned from {@link #split()} is independent, so you may use it on a
+ * {@link #split(SplitBackpressureMode)} concurrently from multiple threads for example. However, the new
+ * {@link ByteBody} returned from {@link #split(SplitBackpressureMode)} is independent, so you may use it on a
  * different thread as this one.
  *
  * @author Jonas Konrad
@@ -51,17 +51,12 @@ import java.util.concurrent.CompletableFuture;
 @Experimental
 public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, InternalByteBody {
     /**
-     * Equivalent to {@code split(SplitBackpressureMode.SLOWEST)}.
-     *
-     * @return The newly split body. Must be closed by the caller, unless a terminal operation is
-     * performed on it
-     */
-    default CloseableByteBody split() {
-        return split(SplitBackpressureMode.SLOWEST);
-    }
-
-    /**
      * Create a new, independent {@link ByteBody} that contains the same data as this one.
+     * <p><b>Warning:</b> Using {@link SplitBackpressureMode#SLOWEST} from an HTTP filter can cause
+     * deadlocks if both bodies are consumed at different rates and the slower consumer blocks the
+     * execution thread. Consider using {@link SplitBackpressureMode#FASTEST},
+     * {@link SplitBackpressureMode#ORIGINAL}, or {@link SplitBackpressureMode#NEW} instead, or
+     * ensure the split bodies are consumed on different threads.
      *
      * @param backpressureMode How to handle backpressure between the old and new body. See
      *                         {@link SplitBackpressureMode} documentation
