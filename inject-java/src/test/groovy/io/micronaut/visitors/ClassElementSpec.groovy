@@ -38,14 +38,74 @@ import io.micronaut.inject.ast.WildcardElement
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Null
-import java.sql.SQLException
-import java.util.function.Supplier
 import spock.lang.IgnoreIf
 import spock.lang.Issue
+import spock.lang.Requires
 import spock.lang.Unroll
 import spock.util.environment.Jvm
 
+import javax.lang.model.element.VariableElement
+import java.sql.SQLException
+import java.util.function.Supplier
+
 class ClassElementSpec extends AbstractTypeElementSpec {
+
+    @Requires({Jvm.current.isJava22Compatible()})
+    void "test external type annotation nullable property"() {
+        expect:
+        buildClassElement('''
+class MyClass {
+
+    io.micronaut.inject.test.MyBean myField;
+
+}
+''') { ClassElement classElement ->
+            def ageProperty =  classElement.getFields().iterator().next().getType().getBeanProperties().find { it.name == "age"}
+            def propertyField = ageProperty.getField().get()
+            VariableElement javaField = propertyField.getNativeType().element()
+            assert javaField.asType().getAnnotationMirrors().size() == 1
+            assert ageProperty.isNullable()
+            ageProperty
+        }
+    }
+
+    void "test type annotation nullable property"() {
+        expect:
+        buildClassElement('''
+import org.jspecify.annotations.Nullable;
+
+class MyBean {
+
+    private String name;
+    @Nullable
+    private Integer age;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Integer getAge() {
+        return age;
+    }
+
+    public void setAge(Integer age) {
+        this.age = age;
+    }
+}
+
+''') { ClassElement classElement ->
+            def ageProperty =  classElement.getBeanProperties().find { it.name == "age"}
+            def propertyField = ageProperty.getField().get()
+            VariableElement javaField = propertyField.getNativeType().element()
+            assert javaField.asType().getAnnotationMirrors().size() == 1
+            assert ageProperty.isNullable()
+            ageProperty
+        }
+    }
 
     void "test duplicate methods"() {
         expect:
