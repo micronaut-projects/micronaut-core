@@ -336,6 +336,12 @@ internal open class KotlinClassElement(
 
     override fun isNullable() = kotlinType.isMarkedNullable
 
+    override fun isRecord() = internalIsRecord
+
+    private val internalIsRecord: Boolean by lazy {
+        isJavaRecord(nativeType.declaration)
+    }
+
     override fun getSyntheticBeanProperties() = nativeProperties
 
     private fun getDeclaredSyntheticBeanProperties() = declaredNativeProperties
@@ -819,16 +825,11 @@ internal open class KotlinClassElement(
 
                 MethodElement::class.java -> {
                     return if (isJavaRecord(classNode)) {
-                        classNode.getAllFunctions().filter {
-                            !listOf(
-                                "hashCode",
-                                "toString",
-                                "equals"
-                            ).contains(it.simpleName.asString())
-                        }.filter { func: KSFunctionDeclaration ->
-                            !func.isConstructor() &&
-                                    (includeAbstract || !func.isAbstract || !classNode.isAbstract())
-                        }
+                        classNode.getAllFunctions()
+                            .filter { func: KSFunctionDeclaration ->
+                                !func.isConstructor() &&
+                                        (includeAbstract || !func.isAbstract || !classNode.isAbstract())
+                            }
                             .toList()
                     } else {
                         classNode.getDeclaredFunctions()
@@ -842,11 +843,18 @@ internal open class KotlinClassElement(
                 }
 
                 FieldElement::class.java -> {
-                    classNode.getDeclaredProperties()
-                        .filter {
-                            it.hasBackingField && it.origin != Origin.SYNTHETIC
-                        }
-                        .toList()
+                    if (isJavaRecord(classNode)) {
+                        // For Java records, return all declared properties (record components)
+                        // without filtering by hasBackingField or origin since record components
+                        // may be synthesized by KSP
+                        classNode.getDeclaredProperties().toList()
+                    } else {
+                        classNode.getDeclaredProperties()
+                            .filter {
+                                it.hasBackingField && it.origin != Origin.SYNTHETIC
+                            }
+                            .toList()
+                    }
                 }
 
                 PropertyElement::class.java -> {

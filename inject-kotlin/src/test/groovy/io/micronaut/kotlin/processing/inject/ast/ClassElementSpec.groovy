@@ -37,11 +37,20 @@ record Product2(Double price, String name) {
 ''')
         def methods = ce.getMethods()
         def properties = ce.getBeanProperties()
+        def fields = ce.getFields()
         expect:
-            methods.size() == 2
-            methods.get(0).name == "price"
-            !methods.get(0).getReturnType().isPrimitive()
-            methods.get(1).name == "name"
+            ce.isRecord()
+            fields.size() == 2
+            fields.get(0).name == "price"
+            fields.get(1).name == "name"
+            methods.size() == 5
+            methods.any { it.name == "price" }
+            methods.any { it.name == "name" }
+            methods.any { it.name == "hashCode" }
+            methods.any { it.name == "equals" }
+            methods.any { it.name == "toString" }
+            methods.find { it.name == "price" }.returnType.name == Double.name
+            !methods.find { it.name == "price" }.returnType.isPrimitive()
             properties.size() == 2
             properties.get(0).name == "price"
             !properties.get(0).getType().isPrimitive()
