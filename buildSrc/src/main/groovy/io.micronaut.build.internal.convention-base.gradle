@@ -40,6 +40,106 @@ tasks.withType(JavaCompile).configureEach {
     options.forkOptions.memoryMaximumSize = "2g"
 }
 
+def moduleInfoJava = file("src/main/java/module-info.java")
+
+if (moduleInfoJava.exists()) {
+    pluginManager.withPlugin("java") {
+        def sourceSets = extensions.findByType(org.gradle.api.tasks.SourceSetContainer)
+        if (sourceSets != null) {
+            sourceSets.named("main") {
+                java {
+                    exclude("module-info.java")
+                }
+            }
+            tasks.named("compileJava", JavaCompile).configure {
+                exclude("module-info.java")
+                modularity.inferModulePath = false
+            }
+            def moduleName = providers.provider {
+                def matcher = (moduleInfoJava.text =~ /\bmodule\s+([\w.]+)\s*\{/
+                )
+                if (!matcher.find()) {
+                    throw new GradleException("Unable to determine module name from ${moduleInfoJava}")
+                }
+                matcher.group(1)
+            }
+            def limitModules = providers.provider {
+                def requiresMatcher = (moduleInfoJava.text =~ /\brequires\s+(?:transitive\s+|static\s+)?([\w.]+)\s*;/)
+                def modules = new LinkedHashSet<String>()
+                modules.add(moduleName.get())
+                while (requiresMatcher.find()) {
+                    modules.add(requiresMatcher.group(1))
+                }
+                modules.join(',')
+            }
+            def modulePath = providers.provider {
+                // JPMS doesn't allow split packages on the module-path. Some optional Micronaut
+                // RxJava modules ship overlapping packages (e.g. io.micronaut.rxjava3.info).
+                // Those are not part of the core module graph we compile module-info against.
+                configurations.compileClasspath.files
+                    .findAll { f ->
+                        // Exclude modules known to cause JPMS split packages or duplicate packages
+                        // while compiling module-info.java. These are not part of the module graph
+                        // we validate at descriptor compile time.
+                        !(
+                            f.name.startsWith('micronaut-rxjava2') ||
+                            f.name.startsWith('micronaut-rxjava3') ||
+                            f.name.startsWith('micronaut-core-processor') ||
+                            f.name.contains('sourcegen-model') ||
+                            f.name.contains('sourcegen-bytecode-writer')
+                        )
+                    }
+                    .collect { it.absolutePath }
+                    .join(File.pathSeparator)
+            }
+            def addModules = providers.provider {
+                // Automatic modules are not always resolved via --limit-modules alone.
+                // Explicitly add what we require to make module resolution deterministic.
+                def requiresMatcher = (moduleInfoJava.text =~ /\brequires\s+(?:transitive\s+|static\s+)?([\w.]+)\s*;/)
+                def modules = new LinkedHashSet<String>()
+                while (requiresMatcher.find()) {
+                    modules.add(requiresMatcher.group(1))
+                }
+                modules.isEmpty() ? null : modules.join(',')
+            }
+            def mainClassesDirs = providers.provider {
+                sourceSets.named("main").get().output.classesDirs.asPath
+            }
+            def compileModuleInfo = tasks.register("compileModuleInfoJava", JavaCompile) {
+                dependsOn(tasks.named("classes"))
+                source(moduleInfoJava)
+                destinationDirectory.set(layout.buildDirectory.dir("classes/java/module-info"))
+                classpath = files()
+                doFirst {
+                    def javaDest = tasks.named("compileJava", JavaCompile).get().destinationDirectory.get().asFile
+                    delete(new File(javaDest, "module-info.class"))
+                }
+                options.compilerArgumentProviders.add(new CommandLineArgumentProvider() {
+                    @Override
+                    Iterable<String> asArguments() {
+                        def args = [
+                            "--module-path", modulePath.get(),
+                            "--limit-modules", limitModules.get(),
+                            "--patch-module", "${moduleName.get()}=${mainClassesDirs.get()}"
+                        ]
+                        def additional = addModules.get()
+                        if (additional) {
+                            args.addAll(["--add-modules", additional])
+                        }
+                        return args
+                    }
+                })
+            }
+            tasks.named("jar", Jar).configure {
+                dependsOn(compileModuleInfo)
+                from(compileModuleInfo.map { it.destinationDirectory }) {
+                    include("module-info.class")
+                }
+            }
+        }
+    }
+}
+
 tasks.withType(GroovyCompile).configureEach {
     options.fork = true
     options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
@@ -113,4 +213,3 @@ spotless {
         targetExclude '**/io/micronaut/http/netty/stream/package-info.java'
     }
 }
-
