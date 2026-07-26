@@ -131,6 +131,11 @@ public abstract class HttpClientConfiguration {
     /**
      * The default value.
      */
+    public static final boolean DEFAULT_BUFFER_ERROR_BODY_FOR_STREAMING = false;
+
+    /**
+     * The default value.
+     */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_ALLOW_BLOCK_EVENT_LOOP = false;
 
@@ -221,6 +226,7 @@ public abstract class HttpClientConfiguration {
     private int maxRedirects = DEFAULT_MAX_REDIRECTS;
 
     private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
+    private boolean bufferErrorBodyForStreaming = DEFAULT_BUFFER_ERROR_BODY_FOR_STREAMING;
     private boolean decompressionEnabled = true;
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
@@ -280,6 +286,7 @@ public abstract class HttpClientConfiguration {
             this.numOfThreads = copy.numOfThreads;
             this.connectTimeout = copy.connectTimeout;
             this.connectTtl = copy.connectTtl;
+            this.bufferErrorBodyForStreaming = copy.bufferErrorBodyForStreaming;
             this.defaultCharset = copy.defaultCharset;
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
             this.eventLoopGroup = copy.eventLoopGroup;
@@ -404,6 +411,23 @@ public abstract class HttpClientConfiguration {
     @Nullable
     public WebSocketCompressionConfiguration getWebSocketCompressionConfiguration() {
         return null;
+    }
+
+    /**
+     * @return Whether the error response body should be buffered and parsed for streaming clients.
+     */
+    public boolean isBufferErrorBodyForStreaming() {
+        return bufferErrorBodyForStreaming;
+    }
+
+    /**
+     * Sets whether the error response body should be buffered and parsed for streaming clients, so that
+     * {@code getResponse().getBody(..)} is populated on error. Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_BUFFER_ERROR_BODY_FOR_STREAMING})
+     *
+     * @param bufferErrorBodyForStreaming Whether
+     */
+    public void setBufferErrorBodyForStreaming(boolean bufferErrorBodyForStreaming) {
+        this.bufferErrorBodyForStreaming = bufferErrorBodyForStreaming;
     }
 
     /**
