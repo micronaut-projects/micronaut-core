@@ -74,6 +74,25 @@ class ClientStreamSpec extends Specification {
         !ex.response.getBody(Map).isPresent()
     }
 
+    void "test a stream error body is buffered when buffer-error-body-for-streaming is enabled"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.http.client.buffer-error-body-for-streaming': true
+        ])
+        def client = server.applicationContext.getBean(BookClientNoErrorType)
+
+        when:
+        Flux.from(client.errorStream()).blockFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(Map).isPresent()
+        ex.response.getBody(Map).get().get("error") == "from server"
+
+        cleanup:
+        server.close()
+    }
+
     void "test a stream that returns an error response"() {
         when:
         Flux.from(bookClient.errorStream2()).blockFirst()

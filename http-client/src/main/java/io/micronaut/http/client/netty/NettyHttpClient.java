@@ -1247,7 +1247,7 @@ final class NettyHttpClient implements
     }
 
     private ExecutionFlow<HttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, ExecutionFlow<HttpResponse<?>> publisher) {
-        if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
+        if (errorType != null && (errorType != HttpClient.DEFAULT_ERROR_TYPE || configuration.isBufferErrorBodyForStreaming())) {
             return publisher.onErrorResume(clientException -> {
                 if (clientException instanceof HttpClientResponseException exception) {
                     final HttpResponse<?> response = exception.getResponse();
