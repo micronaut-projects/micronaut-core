@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.netty;
+package io.micronaut.http.client.netty;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.netty.RequiresNetty;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -25,13 +26,13 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Requires the Netty HTTP server to be enabled. The server is enabled by default
- * and can be disabled with {@code micronaut.netty.server.enabled=false}.
+ * Requires the Netty HTTP client to be enabled. The client is enabled by default
+ * and can be disabled with {@code micronaut.http.client.netty.enabled=false}.
  *
  * @since 5.2.0
  */
 @RequiresNetty
-@Requires(property = "micronaut.netty.server.enabled", notEquals = StringUtils.FALSE)
+@Requires(property = NettyHttpClientConfiguration.ENABLED, notEquals = StringUtils.FALSE)
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({
@@ -40,5 +41,5 @@ import java.lang.annotation.Target;
     ElementType.ANNOTATION_TYPE,
     ElementType.METHOD
 })
-public @interface RequiresNettyServer {
+public @interface RequiresNettyClient {
 }

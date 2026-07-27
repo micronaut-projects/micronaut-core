@@ -29,13 +29,13 @@ class NettyActivationSpec extends Specification {
         given:
         Map<String, Object> properties = [:]
         if (global != null) {
-            properties['micronaut.netty.enabled'] = global
+            properties['netty.enabled'] = global
         }
         if (server != null) {
-            properties['micronaut.netty.server.enabled'] = server
+            properties['micronaut.server.netty.enabled'] = server
         }
         if (client != null) {
-            properties['micronaut.netty.client.enabled'] = client
+            properties['micronaut.http.client.netty.enabled'] = client
         }
 
         when:

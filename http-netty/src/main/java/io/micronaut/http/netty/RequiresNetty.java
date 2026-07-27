@@ -17,6 +17,7 @@ package io.micronaut.http.netty;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.netty.configuration.NettyGlobalConfiguration;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -26,11 +27,11 @@ import java.lang.annotation.Target;
 
 /**
  * Requires Netty support to be enabled. Netty support is enabled by default and
- * can be disabled with {@code micronaut.netty.enabled=false}.
+ * can be disabled with {@code netty.enabled=false}.
  *
  * @since 5.2.0
  */
-@Requires(property = "micronaut.netty.enabled", notEquals = StringUtils.FALSE)
+@Requires(property = NettyGlobalConfiguration.ENABLED, notEquals = StringUtils.FALSE)
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({

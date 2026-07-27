@@ -20,7 +20,7 @@
  * @since 1.0
  */
 @Configuration
-@Requires(property = "micronaut.netty.enabled", notEquals = StringUtils.FALSE)
+@Requires(property = "netty.enabled", notEquals = StringUtils.FALSE)
 @NullMarked
 package io.micronaut.buffer.netty;
 

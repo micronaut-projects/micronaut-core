@@ -25,5 +25,4 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.annotation.Configuration;
-import io.micronaut.http.netty.RequiresNettyServer;
 import org.jspecify.annotations.NullMarked;

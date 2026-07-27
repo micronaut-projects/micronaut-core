@@ -58,6 +58,16 @@ import java.util.Set;
 public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
+     * Prefix for Netty HTTP server settings.
+     */
+    public static final String PREFIX = HttpServerConfiguration.PREFIX + ".netty";
+
+    /**
+     * Whether the Netty HTTP server is enabled.
+     */
+    public static final String ENABLED = PREFIX + ".enabled";
+
+    /**
      * The default use netty's native transport flag.
      */
     @SuppressWarnings("WeakerAccess")
@@ -189,6 +199,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     private final List<ChannelPipelineListener> pipelineCustomizers;
 
+    private boolean enabled = true;
     private HttpServerType serverType = HttpServerType.STREAMED;
 
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
@@ -257,6 +268,24 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
                                         List<ChannelPipelineListener> pipelineCustomizers) {
         super(applicationConfiguration);
         this.pipelineCustomizers = pipelineCustomizers;
+    }
+
+    /**
+     * Returns whether the Netty HTTP server is enabled.
+     *
+     * @return Whether the Netty HTTP server is enabled.
+     */
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    /**
+     * Sets whether the Netty HTTP server is enabled.
+     *
+     * @param enabled Whether the Netty HTTP server is enabled.
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
     /**

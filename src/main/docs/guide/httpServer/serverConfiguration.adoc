@@ -1,6 +1,6 @@
 The HTTP server features a number of configuration options. They are defined in the api:http.server.netty.configuration.NettyHttpServerConfiguration[] configuration class, which extends api:http.server.HttpServerConfiguration[].
 
-Netty beans are enabled by default. Set `micronaut.netty.enabled=false` to disable all Netty integration, or `micronaut.netty.server.enabled=false` to disable only the Netty server. These properties back api:http.netty.RequiresNetty[] and api:http.netty.RequiresNettyServer[].
+Netty beans are enabled by default. Set `netty.enabled=false` to disable all Netty integration, or `micronaut.server.netty.enabled=false` to disable only the Netty server. These properties back api:http.netty.RequiresNetty[] and api:http.server.netty.RequiresNettyServer[].
 
 The following example shows how to tweak configuration options for the server via your configuration file (e.g `application.yml`):
 
