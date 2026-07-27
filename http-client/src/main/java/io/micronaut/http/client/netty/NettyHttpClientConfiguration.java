@@ -16,6 +16,7 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
@@ -29,6 +30,7 @@ import jakarta.inject.Inject;
  */
 @ConfigurationProperties(NettyHttpClientConfiguration.NAME)
 @Replaces(DefaultHttpClientConfiguration.class)
+@BootstrapContextCompatible
 @Primary
 public class NettyHttpClientConfiguration extends DefaultHttpClientConfiguration {
 
