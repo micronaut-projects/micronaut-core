@@ -51,6 +51,7 @@ class NettyActivationSpec extends Specification {
         context.containsBean(DefaultEventLoopGroupRegistry) == sharedEnabled
         context.containsBean(DefaultNettyEmbeddedServerFactory) == serverEnabled
         context.containsBean(DefaultNettyHttpClientRegistry) == clientEnabled
+        context.containsBean(NettyHttpClientConfiguration) == clientEnabled
         if (sharedEnabled) {
             assert context.getBean(NettyGlobalConfiguration).enabled
         }
@@ -58,7 +59,6 @@ class NettyActivationSpec extends Specification {
             assert context.getBean(NettyHttpServerConfiguration).enabled
         }
         if (clientEnabled) {
-            assert context.getBean(NettyHttpClientConfiguration).enabled
             assert context.getBean(DefaultHttpClientConfiguration).is(context.getBean(NettyHttpClientConfiguration))
         }
 

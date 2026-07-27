@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Replaces;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
@@ -28,7 +29,7 @@ import jakarta.inject.Inject;
  *
  * @since 5.2.0
  */
-@ConfigurationProperties(NettyHttpClientConfiguration.NAME)
+@ConfigurationProperties(StringUtils.EMPTY_STRING)
 @Replaces(DefaultHttpClientConfiguration.class)
 @BootstrapContextCompatible
 @Primary
@@ -49,8 +50,6 @@ public class NettyHttpClientConfiguration extends DefaultHttpClientConfiguration
      */
     public static final String ENABLED = PREFIX + ".enabled";
 
-    private boolean nettyEnabled = true;
-
     /**
      * Creates the Netty HTTP client configuration.
      *
@@ -65,23 +64,5 @@ public class NettyHttpClientConfiguration extends DefaultHttpClientConfiguration
                                         DefaultHttp2ClientConfiguration http2Configuration,
                                         ApplicationConfiguration applicationConfiguration) {
         super(connectionPoolConfiguration, webSocketCompressionConfiguration, http2Configuration, applicationConfiguration);
-    }
-
-    /**
-     * Returns whether the Netty HTTP client is enabled.
-     *
-     * @return Whether the Netty HTTP client is enabled.
-     */
-    public boolean isEnabled() {
-        return nettyEnabled;
-    }
-
-    /**
-     * Sets whether the Netty HTTP client is enabled.
-     *
-     * @param enabled Whether the Netty HTTP client is enabled.
-     */
-    public void setEnabled(boolean enabled) {
-        this.nettyEnabled = enabled;
     }
 }
