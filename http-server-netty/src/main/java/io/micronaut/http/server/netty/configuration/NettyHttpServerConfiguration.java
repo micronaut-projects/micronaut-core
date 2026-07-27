@@ -55,6 +55,7 @@ import java.util.Set;
  */
 @ConfigurationProperties("netty")
 @Replaces(HttpServerConfiguration.class)
+@SuppressWarnings("FileLength")
 public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
@@ -199,7 +200,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     private final List<ChannelPipelineListener> pipelineCustomizers;
 
-    private boolean enabled = true;
+    private boolean nettyEnabled = true;
     private HttpServerType serverType = HttpServerType.STREAMED;
 
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
@@ -276,7 +277,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @return Whether the Netty HTTP server is enabled.
      */
     public boolean isEnabled() {
-        return enabled;
+        return nettyEnabled;
     }
 
     /**
@@ -285,7 +286,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * @param enabled Whether the Netty HTTP server is enabled.
      */
     public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+        this.nettyEnabled = enabled;
     }
 
     /**

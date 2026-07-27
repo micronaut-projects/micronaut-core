@@ -44,7 +44,7 @@ public class NettyGlobalConfiguration {
     private static final boolean DEFAULT_THREAD_FACTORY_DAEMON = false;
     private static final int DEFAULT_THREAD_FACTORY_PRIORITY = Thread.NORM_PRIORITY;
 
-    private boolean enabled = true;
+    private boolean nettyEnabled = true;
     private ResourceLeakDetector. @Nullable Level resourceLeakDetectorLevel;
     private boolean defaultThreadFactoryReactorNonBlocking = DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING;
     private boolean defaultThreadFactoryDaemon = DEFAULT_THREAD_FACTORY_DAEMON;
@@ -56,7 +56,7 @@ public class NettyGlobalConfiguration {
      * @return Whether Netty is enabled.
      */
     public boolean isEnabled() {
-        return enabled;
+        return nettyEnabled;
     }
 
     /**
@@ -65,7 +65,7 @@ public class NettyGlobalConfiguration {
      * @param enabled Whether Netty is enabled.
      */
     public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+        this.nettyEnabled = enabled;
     }
 
     /**

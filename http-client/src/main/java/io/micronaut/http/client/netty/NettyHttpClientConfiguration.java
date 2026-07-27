@@ -16,27 +16,54 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
+import io.micronaut.runtime.ApplicationConfiguration;
+import jakarta.inject.Inject;
 
 /**
  * Configuration for the Netty HTTP client.
  *
  * @since 5.2.0
  */
-@ConfigurationProperties(NettyHttpClientConfiguration.PREFIX)
-public class NettyHttpClientConfiguration {
+@ConfigurationProperties(NettyHttpClientConfiguration.NAME)
+@Replaces(DefaultHttpClientConfiguration.class)
+@Primary
+public class NettyHttpClientConfiguration extends DefaultHttpClientConfiguration {
+
+    /**
+     * The Netty HTTP client configuration name.
+     */
+    public static final String NAME = "netty";
 
     /**
      * Prefix for Netty HTTP client settings.
      */
-    public static final String PREFIX = DefaultHttpClientConfiguration.PREFIX + ".netty";
+    public static final String PREFIX = DefaultHttpClientConfiguration.PREFIX + "." + NAME;
 
     /**
      * Whether the Netty HTTP client is enabled.
      */
     public static final String ENABLED = PREFIX + ".enabled";
 
-    private boolean enabled = true;
+    private boolean nettyEnabled = true;
+
+    /**
+     * Creates the Netty HTTP client configuration.
+     *
+     * @param connectionPoolConfiguration The connection pool configuration.
+     * @param webSocketCompressionConfiguration The WebSocket compression configuration.
+     * @param http2Configuration The HTTP/2 configuration.
+     * @param applicationConfiguration The application configuration.
+     */
+    @Inject
+    public NettyHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration,
+                                        DefaultWebSocketCompressionConfiguration webSocketCompressionConfiguration,
+                                        DefaultHttp2ClientConfiguration http2Configuration,
+                                        ApplicationConfiguration applicationConfiguration) {
+        super(connectionPoolConfiguration, webSocketCompressionConfiguration, http2Configuration, applicationConfiguration);
+    }
 
     /**
      * Returns whether the Netty HTTP client is enabled.
@@ -44,7 +71,7 @@ public class NettyHttpClientConfiguration {
      * @return Whether the Netty HTTP client is enabled.
      */
     public boolean isEnabled() {
-        return enabled;
+        return nettyEnabled;
     }
 
     /**
@@ -53,6 +80,6 @@ public class NettyHttpClientConfiguration {
      * @param enabled Whether the Netty HTTP client is enabled.
      */
     public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+        this.nettyEnabled = enabled;
     }
 }

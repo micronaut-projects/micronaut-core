@@ -17,8 +17,12 @@ package io.micronaut.http.server.netty
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.netty.DefaultNettyHttpClientRegistry
+import io.micronaut.http.client.netty.NettyHttpClientConfiguration
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupRegistry
+import io.micronaut.http.netty.configuration.NettyGlobalConfiguration
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -27,6 +31,7 @@ class NettyActivationSpec extends Specification {
     @Unroll
     void "Netty activation global=#global server=#server client=#client"() {
         given:
+        ApplicationContext context = null
         Map<String, Object> properties = [:]
         if (global != null) {
             properties['netty.enabled'] = global
@@ -39,22 +44,33 @@ class NettyActivationSpec extends Specification {
         }
 
         when:
-        ApplicationContext context = ApplicationContext.run(properties)
+        context = ApplicationContext.run(properties)
 
         then:
         context.containsBean(NettyByteBufferFactory) == sharedEnabled
         context.containsBean(DefaultEventLoopGroupRegistry) == sharedEnabled
         context.containsBean(DefaultNettyEmbeddedServerFactory) == serverEnabled
         context.containsBean(DefaultNettyHttpClientRegistry) == clientEnabled
+        if (sharedEnabled) {
+            assert context.getBean(NettyGlobalConfiguration).enabled
+        }
+        if (serverEnabled) {
+            assert context.getBean(NettyHttpServerConfiguration).enabled
+        }
+        if (clientEnabled) {
+            assert context.getBean(NettyHttpClientConfiguration).enabled
+            assert context.getBean(DefaultHttpClientConfiguration).is(context.getBean(NettyHttpClientConfiguration))
+        }
 
         cleanup:
-        context.close()
+        context?.close()
 
         where:
         global | server | client || sharedEnabled | serverEnabled | clientEnabled
         null   | null   | null   || true          | true          | true
         true   | true   | true   || true          | true          | true
         false  | null   | null   || false         | false         | false
+        false  | true   | true   || false         | false         | false
         true   | false  | null   || true          | false         | true
         true   | null   | false  || true          | true          | false
     }
