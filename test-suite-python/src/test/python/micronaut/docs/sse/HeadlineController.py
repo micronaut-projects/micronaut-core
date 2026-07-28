@@ -9,7 +9,6 @@ from micronaut.http.sse import Event
 Duration = java.type("java.time.Duration")
 Mono = java.type("reactor.core.publisher.Mono")
 Publisher = java.type("org.reactivestreams.Publisher")
-ZonedDateTime = java.type("java.time.ZonedDateTime")
 
 
 @Requires(property="spec.name", value="SseHeadlineControllerSpec")
@@ -20,7 +19,7 @@ class HeadlineController:
     @Get(value="/headlines", processes=MediaType.TEXT_EVENT_STREAM)  # <1>
     def streamHeadlines(self) -> Publisher[Event[Headline]]:
         def build_event():
-            headline = Headline("Latest Headline at " + str(ZonedDateTime.now()))
+            headline = Headline("Latest Headline")
             return Event.of(headline)
 
         return (

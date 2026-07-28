@@ -51,3 +51,10 @@ tasks {
         from("$projectDir/src/main/groovy")
     }
 }
+
+tasks.withType<Test>().configureEach {
+    forkEvery = 100
+    maxParallelForks = 4
+    useJUnitPlatform()
+    systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
+}

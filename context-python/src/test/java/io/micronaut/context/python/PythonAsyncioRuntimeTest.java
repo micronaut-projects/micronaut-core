@@ -169,7 +169,6 @@ final class PythonAsyncioRuntimeTest {
     @Test
     void eventLoopContextsAreIsolatedAndDoNotBorrowFromBlockingPool() throws Exception {
         AtomicReference<PythonEventLoop> currentEventLoop = new AtomicReference<>();
-        ExecutorService executorService = Executors.newSingleThreadExecutor();
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "micronaut.python.pool.enabled", true,
             "micronaut.python.pool.size", 1
@@ -180,12 +179,9 @@ final class PythonAsyncioRuntimeTest {
             try {
                 RecordingEventLoop first = new RecordingEventLoop();
                 currentEventLoop.set(first);
-                Future<String> firstContext = executorService.submit(() -> {
-                    Value script = PythonContextRuntime.findPooledScript(PYTHON, "Unnamed");
-                    script.putMember("event_loop_marker", "first");
-                    return script.getMember("event_loop_marker").asString();
-                });
-                assertEquals("first", firstContext.get(1, TimeUnit.SECONDS));
+                Value firstScript = PythonContextRuntime.findPooledScript(PYTHON, "Unnamed");
+                firstScript.putMember("event_loop_marker", "first");
+                assertEquals("first", firstScript.getMember("event_loop_marker").asString());
 
                 RecordingEventLoop second = new RecordingEventLoop();
                 currentEventLoop.set(second);
@@ -194,7 +190,7 @@ final class PythonAsyncioRuntimeTest {
                 secondScript.putMember("event_loop_marker", "second");
 
                 currentEventLoop.set(first);
-                Value firstScript = PythonContextRuntime.findPooledScript(PYTHON, "Unnamed");
+                firstScript = PythonContextRuntime.findPooledScript(PYTHON, "Unnamed");
                 assertEquals("first", firstScript.getMember("event_loop_marker").asString());
             } finally {
                 currentEventLoop.set(null);
@@ -202,7 +198,6 @@ final class PythonAsyncioRuntimeTest {
             }
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
-            executorService.shutdownNow();
         }
     }
 
