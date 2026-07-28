@@ -19,8 +19,12 @@
  * @author Sergio del Amo
  * @since 1.0
  */
+@Configuration
+@Requires(property = "netty.enabled", notEquals = StringUtils.FALSE)
 @NullMarked
 package io.micronaut.buffer.netty;
 
-
+import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import org.jspecify.annotations.NullMarked;

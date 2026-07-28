@@ -1,5 +1,7 @@
 === Global Configuration for All Clients
 
+Netty beans are enabled by default. Set `netty.enabled=false` to disable all Netty integration, or `micronaut.http.client.netty.enabled=false` to disable only the Netty client. These properties back api:http.netty.RequiresNetty[] and api:http.client.netty.RequiresNettyClient[].
+
 The default HTTP client configuration is a <<configurationProperties, Configuration Properties>> named api:http.client.DefaultHttpClientConfiguration[] that allows configuring the default behaviour for all HTTP clients. For example, in your configuration file (e.g `application.yml`):
 
 .Altering default HTTP client configuration
