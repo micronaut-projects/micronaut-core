@@ -6,7 +6,14 @@ If you are interested in contributing to the Micronaut Framework and are looking
 
 ## JDK Setup
 
-The Micronaut Framework currently requires JDK 17
+Building Micronaut Framework requires GraalVM for JDK 25, version 25.1.3.
+
+With [SDKMAN](https://sdkman.io/), install and select the required JDK:
+
+```bash
+sdk install java 25.1.3-graalce
+sdk use java 25.1.3-graalce
+```
 
 ## IDE Setup
 
