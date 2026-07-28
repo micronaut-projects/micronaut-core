@@ -252,7 +252,6 @@ httpClient:
     clientJackson: Customizing Jackson Settings
     clientRetry: Retry and Circuit Breaker
     clientFallback: Client Fallbacks
-    netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
   clientHttp2: HTTP/2 Support
   clientHttp3: HTTP/3 Support
@@ -284,7 +283,6 @@ cloud:
     serviceDiscoveryManual: Manual Service Discovery Configuration
   clientSideLoadBalancing:
     title: Client Side Load Balancing
-    netflixRibbon: Netflix Ribbon Support
   distributedTracing: Distributed Tracing
 serverlessFunctions:
   title: Serverless Functions
