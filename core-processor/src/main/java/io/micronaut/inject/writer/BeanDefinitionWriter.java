@@ -1818,7 +1818,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                                  List<StatementDef> additionalStatements,
                                                  List<? extends ExpressionDef> values) {
         MethodElement methodElement = factorMethodDefinition.methodElement();
-        ExpressionDef factoryBean = getFactoryBean(methodParameters, methodElement.getDeclaringType(), methodElement.isStatic(), additionalStatements);
+        ExpressionDef factoryBean = getFactoryBean(methodParameters, methodElement.getOwningType(), methodElement.isStatic(), additionalStatements);
         return getBeanFromFactoryMethod(factorMethodDefinition, factoryBean, values);
     }
 

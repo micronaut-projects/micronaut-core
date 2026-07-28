@@ -337,7 +337,7 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     }
 
     @NextMajorVersion("Require @ReflectiveAccess for private methods in Micronaut 4")
-    private boolean visitInjectAndLifecycleMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
+    protected boolean visitInjectAndLifecycleMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
         // All the cases above are using executable methods
         boolean claimed = false;
         if (methodElement.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
