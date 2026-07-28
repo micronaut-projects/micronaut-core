@@ -23,12 +23,13 @@ jobs:
         with:
           token: ${{ secrets.GH_TOKEN }}
       - uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
-      - name: Set up JDK
-        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
+      - name: "🔧 Setup GraalVM CE"
+        uses: graalvm/setup-graalvm@0def53c0fd8534bc13416c9469f5be45265824fd # v1
         with:
-          distribution: 'temurin'
-          java-version: |
-            25
+          distribution: 'graalvm'
+          java-version: ${{ matrix.java }}
+          version: '25.1'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
       - name: Set the current release version
