@@ -239,6 +239,31 @@ public final class PythonAstParser {
         return transform(visitorContext, pythonSource).get(0);
     }
 
+    /**
+     * Extracts call expressions from source without evaluating user code.
+     *
+     * @param source the Python source
+     * @return discovered calls
+     */
+    /**
+     * Extracts call metadata from Python source without executing it.
+     * @param source Python source
+     * @return discovered calls
+     */
+    public List<PythonCall> extractCalls(Source source) {
+        List<PythonCall> calls = new ArrayList<>();
+        Value bindings = context.getBindings(PYTHON);
+        bindings.putMember("build_call_callback", (Function<Object, Object>) value -> {
+            if (value instanceof PythonCall call) {
+                calls.add(call);
+            }
+            return value;
+        });
+        bindings.putMember("src", source.getCharacters());
+        context.eval(Source.create(PYTHON, getCallExtractionSource()));
+        return calls;
+    }
+
     public @NotNull List<TransformResult> transform(VisitorContext visitorContext, Source... pythonSource) {
         Value bindings = context.getBindings(PYTHON);
         Map<String, ClassElement> classElementCache = new LinkedHashMap<>();
@@ -367,6 +392,30 @@ public final class PythonAstParser {
                 "allClassNames": transformer.all_class_names,
                 "validationErrors": transformer.validation_errors
             }
+            """;
+    }
+
+    private static @Language("python") String getCallExtractionSource() {
+        return """
+            import ast
+            import java
+            PythonCall = java.type("io.micronaut.python.processing.PythonCall")
+
+            def value(node):
+                try:
+                    return str(ast.literal_eval(node))
+                except Exception:
+                    return ast.unparse(node)
+
+            class CallCollector(ast.NodeVisitor):
+                def visit_Call(self, node):
+                    name = node.func.id if isinstance(node.func, ast.Name) else node.func.attr if isinstance(node.func, ast.Attribute) else ""
+                    arguments = [value(argument) for argument in node.args]
+                    keywords = {keyword.arg: value(keyword.value) for keyword in node.keywords if keyword.arg is not None}
+                    build_call_callback(PythonCall(name, arguments, keywords))
+                    self.generic_visit(node)
+
+            CallCollector().visit(ast.parse(src))
             """;
     }
 

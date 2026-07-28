@@ -23,6 +23,7 @@ import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.python.processing.PythonSourceVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonAnnotationProcessor;
 import org.jspecify.annotations.NonNull;
@@ -82,6 +83,8 @@ final class PyronautJavaCompiler {
     private File errorDumpDirectory = DEFAULT_ERROR_DUMP_DIRECTORY;
     private List<SourceSnapshot> sourceSnapshots = List.of();
     private boolean compilePythonBytecode;
+    private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
+    private List<Processor> annotationProcessors = List.of();
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -127,6 +130,22 @@ final class PyronautJavaCompiler {
      */
     public void setCompilePythonBytecode(boolean compilePythonBytecode) {
         this.compilePythonBytecode = compilePythonBytecode;
+    }
+
+    /**
+     * Sets Python source visitors used for this compilation.
+     * @param pythonSourceVisitors Python source visitors
+     */
+    public void setPythonSourceVisitors(List<PythonSourceVisitor> pythonSourceVisitors) {
+        this.pythonSourceVisitors = List.copyOf(pythonSourceVisitors);
+    }
+
+    /**
+     * Sets processors used only for this compilation.
+     * @param annotationProcessors processors to run before standard processors
+     */
+    public void setAnnotationProcessors(List<Processor> annotationProcessors) {
+        this.annotationProcessors = List.copyOf(annotationProcessors);
     }
 
     /**
@@ -186,6 +205,10 @@ final class PyronautJavaCompiler {
 
             success = task.call();
         } catch (RuntimeException e) {
+            RuntimeException propagated = propagatedException(e);
+            if (propagated != null) {
+                throw propagated;
+            }
             throw processingFailure(diagnosticCollector, e);
         } finally {
             Thread.currentThread().setContextClassLoader(previous);
@@ -567,15 +590,16 @@ final class PyronautJavaCompiler {
      */
     private @NonNull List<Processor> getAnnotationProcessors(ClassLoader classLoader) {
         List<Processor> processors = new ArrayList<>();
+        processors.addAll(annotationProcessors);
         processors.add(new MixinVisitorProcessor());
         processors.add(new PackageElementVisitorProcessor());
         processors.add(new TypeElementVisitorProcessor());
         processors.add(new AggregatingTypeElementVisitorProcessor());
         processors.add(new BeanDefinitionInjectProcessor());
-
         PythonAnnotationProcessor pythonProcessor = new PythonAnnotationProcessor();
         pythonProcessor.setClassLoader(classLoader);
         pythonProcessor.setCompilePythonBytecode(compilePythonBytecode);
+        pythonProcessor.setPythonSourceVisitors(pythonSourceVisitors);
         if (classElementCallback != null) {
             pythonProcessor.setClassElementCallback(classElementCallback);
         }
@@ -584,6 +608,17 @@ final class PyronautJavaCompiler {
         processors.add(pythonProcessor);
 
         return processors;
+    }
+
+    private static RuntimeException propagatedException(RuntimeException exception) {
+        Throwable current = exception;
+        while (current != null) {
+            if (current instanceof PyronautCompilerException propagated) {
+                return propagated;
+            }
+            current = current.getCause();
+        }
+        return null;
     }
 
     private static ClassLoader createAnnotationProcessorClassLoader(List<File> annotationProcessorPath) {

@@ -52,6 +52,23 @@ import org.graalvm.polyglot.Source;
 public class PythonAstParserTest {
 
     @Test
+    void extractsCallsWithoutEvaluatingSource() {
+        PythonAstParser parser = new PythonAstParser();
+        try {
+            List<PythonCall> calls = parser.extractCalls(Source.create("python", """
+                from pyronaut.build import Dependency
+                Dependency(group="org.apache.commons", module="commons-lang3", version="3.20.0")
+                """));
+
+            PythonCall dependency = calls.stream().filter(call -> call.name().equals("Dependency")).findFirst().orElseThrow();
+            assertEquals("org.apache.commons", dependency.keywordArguments().get("group"));
+            assertEquals("commons-lang3", dependency.keywordArguments().get("module"));
+        } finally {
+            parser.close();
+        }
+    }
+
+    @Test
     void testParse() {
         try (PythonEnvironment environment = buildEnv()) {
             ClassDef myClass = environment.classes().get("MyClass");

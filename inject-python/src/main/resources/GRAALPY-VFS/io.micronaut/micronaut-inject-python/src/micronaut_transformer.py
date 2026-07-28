@@ -101,6 +101,9 @@ class MicronautTransformer(ast.NodeTransformer):
         if not node.module:
             return node
 
+        if node.module == 'pyronaut.build':
+            return None
+
         java_module = self._to_java_import_module(node.module)
 
         # Special handling for io. prefixed imports to avoid conflict with Python's builtin io module
@@ -139,6 +142,14 @@ class MicronautTransformer(ast.NodeTransformer):
                 return None  # Remove the import from the AST
 
         return node
+
+    def visit_Expr(self, node: ast.Expr):
+        if isinstance(node.value, ast.Call):
+            function = node.value.func
+            name = function.id if isinstance(function, ast.Name) else function.attr if isinstance(function, ast.Attribute) else ''
+            if name in {'Dependency', 'MavenRepository', 'AppConfig'}:
+                return None
+        return self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import):
         """

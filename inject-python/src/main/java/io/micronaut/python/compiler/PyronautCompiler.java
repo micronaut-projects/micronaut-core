@@ -17,6 +17,7 @@ package io.micronaut.python.compiler;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.python.processing.PythonSourceVisitor;
 
 import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
@@ -30,6 +31,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.processing.Processor;
 import java.util.StringTokenizer;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -68,6 +70,8 @@ public final class PyronautCompiler {
     private final boolean verboseErrors;
     private final boolean compilePythonBytecode;
     private final File errorDumpDirectory;
+    private final List<PythonSourceVisitor> pythonSourceVisitors;
+    private final List<Processor> annotationProcessors;
 
     private PyronautCompiler(Builder builder) {
         this.packageName = builder.packageName;
@@ -86,6 +90,8 @@ public final class PyronautCompiler {
         this.verboseErrors = builder.verboseErrors;
         this.compilePythonBytecode = builder.compilePythonBytecode;
         this.errorDumpDirectory = builder.errorDumpDirectory;
+        this.annotationProcessors = builder.annotationProcessors == null ? List.of() : List.copyOf(builder.annotationProcessors);
+        this.pythonSourceVisitors = builder.pythonSourceVisitors == null ? List.of() : List.copyOf(builder.pythonSourceVisitors);
         validateConfiguration();
     }
 
@@ -169,6 +175,8 @@ public final class PyronautCompiler {
         }
         compiler.setSourceSnapshots(createSourceSnapshots());
         compiler.setCompilePythonBytecode(compilePythonBytecode);
+        compiler.setAnnotationProcessors(annotationProcessors);
+        compiler.setPythonSourceVisitors(pythonSourceVisitors);
         return compiler;
     }
 
@@ -353,6 +361,8 @@ public final class PyronautCompiler {
         private boolean verboseErrors;
         private boolean compilePythonBytecode;
         private File errorDumpDirectory;
+        private List<PythonSourceVisitor> pythonSourceVisitors;
+        private List<Processor> annotationProcessors;
 
         private Builder() {
         }
@@ -537,6 +547,26 @@ public final class PyronautCompiler {
          */
         public Builder errorDumpDirectory(File errorDumpDirectory) {
             this.errorDumpDirectory = errorDumpDirectory;
+            return this;
+        }
+
+        /**
+         * @param pythonSourceVisitors visitors to invoke for Python source metadata in this compilation
+         * @return this builder
+         */
+        public Builder pythonSourceVisitors(List<? extends PythonSourceVisitor> pythonSourceVisitors) {
+            this.pythonSourceVisitors = List.copyOf(pythonSourceVisitors);
+            return this;
+        }
+
+        /**
+         * Supplies annotation processors used only for this compilation.
+         *
+         * @param annotationProcessors processors to invoke before standard Pyronaut processors
+         * @return this builder
+         */
+        public Builder annotationProcessors(List<? extends Processor> annotationProcessors) {
+            this.annotationProcessors = List.copyOf(annotationProcessors);
             return this;
         }
 

@@ -80,6 +80,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
     private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
+    private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
     private ClassLoader classLoader;
     private boolean compilePythonBytecode;
     private PythonBytecodeCompiler bytecodeCompiler;
@@ -92,6 +93,15 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      */
     public void setClassElementCallback(Consumer<ClassElement> callback) {
         this.classElementCallback = callback;
+    }
+
+    /**
+     * Sets visitors for Python source metadata in this compilation.
+     *
+     * @param pythonSourceVisitors the visitors
+     */
+    public void setPythonSourceVisitors(List<PythonSourceVisitor> pythonSourceVisitors) {
+        this.pythonSourceVisitors = List.copyOf(pythonSourceVisitors);
     }
 
     /**
@@ -173,6 +183,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             if (transformedList.isEmpty()) {
                 return;
             }
+            processPythonSourceVisitors(transformedList, values);
             transformedList.stream()
                 .flatMap(transformResult -> transformResult.validationErrors().stream())
                 .findFirst()
@@ -334,6 +345,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 environment.classes().size() + " classes and " +
                 environment.decorators().size() + " decorators");
 
+        } catch (io.micronaut.python.compiler.PyronautCompilerException e) {
+            throw e;
         } catch (ProcessingException e) {
             String ls = System.lineSeparator();
             io.micronaut.inject.ast.Element el = e.getElement();
@@ -350,6 +363,30 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             String stacktrace = sw.toString();
             error("Failed Trace: %s", stacktrace);
             error("Fatal error processing Python code: %s", e.getMessage());
+        }
+    }
+
+    private void processPythonSourceVisitors(List<PythonAstParser.TransformResult> transformedList,
+                                             PythonApplicationValues values) {
+        if (pythonSourceVisitors.isEmpty()) {
+            return;
+        }
+        for (PythonAstParser.TransformResult transformed : transformedList) {
+            Source source = transformed.originalSource();
+            String packageName = "";
+            for (String srcDir : values.src()) {
+                if (source.getPath() == null || source.getPath().startsWith(srcDir)) {
+                    packageName = PythonAstParser.getPackageNameOfSource(srcDir, source);
+                    break;
+                }
+            }
+            PythonSource pythonSource = new PythonSource(source.getName(), packageName, parser.extractCalls(source));
+            for (PythonSourceVisitor visitor : pythonSourceVisitors) {
+                visitor.visit(pythonSource, javaVisitorContext);
+            }
+        }
+        for (PythonSourceVisitor visitor : pythonSourceVisitors) {
+            visitor.finish(javaVisitorContext);
         }
     }
 
