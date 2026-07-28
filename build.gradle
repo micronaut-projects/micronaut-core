@@ -77,3 +77,21 @@ configurations.jacocoAggregation.dependencies.removeIf {
 configurations.javadocAggregatorBase.dependencies.removeIf {
     it instanceof ProjectDependency && it.path.startsWith(":test-")
 }
+
+def pythonProjects = [
+        ":micronaut-inject-python",
+        ":micronaut-inject-python-test",
+        ":micronaut-context-python",
+        ":micronaut-context-python-netty",
+        ":test-suite-python"
+]
+
+if (!providers.gradleProperty("python-ci").isPresent()) {
+    subprojects { project ->
+        if (project.path in pythonProjects) {
+            project.tasks.withType(Test).configureEach {
+                enabled = false
+            }
+        }
+    }
+}

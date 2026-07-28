@@ -37,12 +37,6 @@ tasks {
     }
 }
 
-tasks.withType<Test>().configureEach {
-    forkEvery = 1000
-    maxParallelForks = 4
-    useJUnitPlatform()
-    systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
-}
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 //compileJava.options.fork = true
 //compileJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
