@@ -302,9 +302,32 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     }
 
     @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByName(String annotationType) {
+        Environment environment = getEnvironment();
+        List<AnnotationValue<T>> values = environmentAnnotationMetadata.getAnnotationValuesByName(annotationType);
+        if (environment != null) {
+            return values.stream().map(entries ->
+                new EnvironmentAnnotationValue<>(environment, entries)
+            ).collect(Collectors.toList());
+        }
+        return values;
+    }
+
+    @Override
     public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(Class<T> annotationType) {
         Environment environment = getEnvironment();
         List<AnnotationValue<T>> values = environmentAnnotationMetadata.getDeclaredAnnotationValuesByType(annotationType);
+        if (environment != null) {
+            return values.stream().map(entries -> new EnvironmentAnnotationValue<>(environment, entries))
+                .collect(Collectors.toList());
+        }
+        return values;
+    }
+
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByName(String annotationType) {
+        Environment environment = getEnvironment();
+        List<AnnotationValue<T>> values = environmentAnnotationMetadata.getDeclaredAnnotationValuesByName(annotationType);
         if (environment != null) {
             return values.stream().map(entries -> new EnvironmentAnnotationValue<>(environment, entries))
                 .collect(Collectors.toList());

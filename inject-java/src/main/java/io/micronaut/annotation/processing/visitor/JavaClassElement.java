@@ -794,7 +794,15 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     @Override
     public List<ClassElement> getBoundGenericTypes() {
         if (typeArguments == null) {
-            return Collections.emptyList();
+            Map<String, ClassElement> typeArguments = getTypeArguments();
+            if (typeArguments.isEmpty()) {
+                return Collections.emptyList();
+            }
+            return getDeclaredGenericPlaceholders().stream()
+                .map(GenericPlaceholderElement::getVariableName)
+                .map(typeArguments::get)
+                .filter(Objects::nonNull)
+                .toList();
         }
         return typeArguments.stream()
             .map(tm -> newClassElement(tm, getTypeArguments()))

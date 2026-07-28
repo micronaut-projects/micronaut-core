@@ -46,31 +46,14 @@ jobs:
           unset JAVA_HOME
           export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Pre-Build Steps
-        uses: micronaut-projects/github-actions/graalvm/pre-build@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
-        id: pre-build
-        env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
+      - name: "🔧 Setup GraalVM CE"
+        uses: graalvm/setup-graalvm@0def53c0fd8534bc13416c9469f5be45265824fd # v1
         with:
           distribution: 'graalvm'
-          gradle-java: '25'
-          java: ${{ matrix.java }}
-          nativeTestTask: ${{ matrix.native_test_task }}
-      - name: Build Steps
-        uses: micronaut-projects/github-actions/graalvm/build@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
-        id: build
-        env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          DEVELOCITY_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          DEVELOCITY_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
-          GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
-          GH_USERNAME: ${{ secrets.GH_USERNAME }}
-          GRAALVM_QUICK_BUILD: true
-          NATIVE_IMAGE_OPTIONS: "-H:+ReportExceptionStackTraces"
-        with:
-          nativeTestTask: ${{ matrix.native_test_task }}
+          java-version: ${{ matrix.java }}
+          version: '25.1'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          native-image-job-reports: true
       - name: Post-Build Steps
         uses: micronaut-projects/github-actions/graalvm/post-build@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
         id: post-build

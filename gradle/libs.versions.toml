@@ -1,5 +1,6 @@
 [versions]
 awaitility = "4.3.0"
+apiguardian = "1.1.2"
 bcpkix = "1.84"
 blaze = "1.6.18"
 brotli4j = "1.23.0"
@@ -45,6 +46,8 @@ micronaut-test = "5.1.0"
 micronaut-validation = "5.1.0"
 micronaut-rxjava3 = "4.1.0"
 micronaut-reactor = "4.1.0"
+micronaut-data = "5.0.5"
+micronaut-serde = "3.1.0"
 micronaut-kotlin = "5.1.0"
 native-gradle-plugin = "0.11.4"
 neo4j-java-driver = "5.17.0"
@@ -82,6 +85,7 @@ managed-jackson = "3.1.5"
 managed-jackson-annotations = "2.21"
 managed-kotlin = "2.3.21"
 managed-kotlin-coroutines = "1.10.2"
+managed-graalpy = "25.1.3"
 managed-methvin-directory-watcher = "0.19.1"
 managed-netty = "4.2.16.Final"
 managed-netty-tcnative = "2.0.80.Final"
@@ -104,10 +108,15 @@ test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-v
 test-boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "micronaut-rxjava3" }
 test-boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor-bom", version.ref = "micronaut-reactor" }
 test-boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "micronaut-kotlin" }
+test-boms-micronaut-data = { module = "io.micronaut.data:micronaut-data-bom", version.ref = "micronaut-data" }
+test-boms-micronaut-serde = { module = "io.micronaut.serde:micronaut-serde-bom", version.ref = "micronaut-serde" }
 
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
 boms-kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "managed-kotlin-coroutines" }
+managed-graalpy = { module = 'org.graalvm.python:python', version.ref = 'managed-graalpy' }
+managed-graalpy-embedding = { module = 'org.graalvm.python:python-embedding', version.ref = 'managed-graalpy' }
+managed-polyglot-tools = { module = 'org.graalvm.polyglot:tools', version.ref = 'managed-graalpy' }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
 boms-jackson = { module = "tools.jackson:jackson-bom", version.ref = "managed-jackson" }
 boms-micronaut-sourcegen = { module = "io.micronaut.sourcegen:micronaut-sourcegen-bom", version.ref = "micronaut-sourcegen" }
@@ -161,6 +170,7 @@ managed-netty-codec-native-quic = { module = "io.netty:netty-codec-native-quic",
 managed-netty-common = { module = "io.netty:netty-common", version.ref = "managed-netty" }
 managed-netty-handler = { module = "io.netty:netty-handler", version.ref = "managed-netty" }
 managed-netty-handler-proxy = { module = "io.netty:netty-handler-proxy", version.ref = "managed-netty" }
+managed-netty-resolver-dns = { module = "io.netty:netty-resolver-dns", version.ref = "managed-netty" }
 managed-netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "managed-netty" }
 managed-netty-transport-native-kqueue = { module = "io.netty:netty-transport-native-kqueue", version.ref = "managed-netty" }
 managed-netty-transport-native-iouring = { module = "io.netty:netty-transport-native-io_uring", version.ref = "managed-netty" }
@@ -183,6 +193,7 @@ sonatype-scan = { module = "org.sonatype.gradle.plugins:scan-gradle-plugin", ver
 #
 
 awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
+apiguardian = { module = "org.apiguardian:apiguardian-api", version.ref = "apiguardian" }
 
 aws-java-sdk-lambda = { module = "com.amazonaws:aws-java-sdk-lambda" }
 
@@ -237,6 +248,7 @@ junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.re
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit5" }
 junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit5" }
 junit-platform-engine = { module = "org.junit.platform:junit-platform-suite-engine", version.ref = "junit-platform" }
+junit-platform-testkit = { module = "org.junit.platform:junit-platform-testkit", version.ref = "junit-platform" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
 junit-vintage = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit5" }
 
@@ -259,7 +271,6 @@ logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-n
 lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
 
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
-micronaut-build-plugins = { module = "io.micronaut.build.internal:micronaut-gradle-plugins", version.ref="micronaut-build-plugins"}
 micronaut-runtime-groovy = { module = "io.micronaut.groovy:micronaut-runtime-groovy", version.ref = "micronaut-groovy" }
 micronaut-session = { module = "io.micronaut.session:micronaut-session", version.ref = "micronaut-session" }
 micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "micronaut-test" }

@@ -131,7 +131,8 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         MutableConversionService conversionService = configuration.getConversionService().orElseGet(MutableConversionService::create);
         this.propertyPlaceholderResolver = new PropertySourcePropertyResolver(
             conversionService,
-            true
+            true,
+            configuration.getClassLoader()
         );
         this.applicationName = configuration.getApplicationName();
         if (applicationName.isBlank()) {
@@ -142,7 +143,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
         this.classLoader = configuration.getClassLoader();
-        this.annotationScanner = new BeanIntrospectionScanner();
+        this.annotationScanner = new BeanIntrospectionScanner(classLoader);
         DefaultEnvironmentAndPackageDeducer deducer = new DefaultEnvironmentAndPackageDeducer(LOG, configuration);
         EnvironmentNamesDeducer environmentNamesDeducer = configuration.getEnvironmentNamesDeducer();
         if (environmentNamesDeducer == null) {

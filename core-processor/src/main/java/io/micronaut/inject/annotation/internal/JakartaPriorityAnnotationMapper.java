@@ -25,6 +25,7 @@ import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
 
+/** Maps Jakarta's priority annotation to Micronaut's order annotation. */
 @Internal
 public final class JakartaPriorityAnnotationMapper implements NamedAnnotationMapper {
 

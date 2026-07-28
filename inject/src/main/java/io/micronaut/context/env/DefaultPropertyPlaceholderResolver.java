@@ -60,6 +60,8 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     private final ConversionService conversionService;
     private final String prefix;
     @Nullable
+    private final ClassLoader classLoader;
+    @Nullable
     private Collection<PropertyExpressionResolver> expressionResolvers;
 
     /**
@@ -67,9 +69,19 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      * @param conversionService The conversion service
      */
     public DefaultPropertyPlaceholderResolver(PropertyResolver environment, ConversionService conversionService) {
+        this(environment, conversionService, null);
+    }
+
+    /**
+     * @param environment The property resolver for the environment
+     * @param conversionService The conversion service
+     * @param classLoader The class loader to use for expression resolver service loading
+     */
+    public DefaultPropertyPlaceholderResolver(PropertyResolver environment, ConversionService conversionService, @Nullable ClassLoader classLoader) {
         this.environment = environment;
         this.conversionService = conversionService;
         this.prefix = PREFIX;
+        this.classLoader = classLoader;
     }
 
     private Collection<PropertyExpressionResolver> getExpressionResolvers() {
@@ -79,7 +91,8 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
                 exResolvers = this.expressionResolvers;
                 if (exResolvers == null) {
                     exResolvers = new ArrayList<>(DEFAULT_EXPRESSION_RESOLVERS);
-                    ClassLoader classLoader = (environment instanceof Environment e) ? e.getClassLoader() : environment.getClass().getClassLoader();
+                    ClassLoader classLoader = this.classLoader != null ? this.classLoader :
+                        (environment instanceof Environment e) ? e.getClassLoader() : environment.getClass().getClassLoader();
                     SoftServiceLoader.load(PropertyExpressionResolver.class, classLoader).collectAll(exResolvers);
                     this.expressionResolvers = exResolvers;
                 }

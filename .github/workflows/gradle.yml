@@ -51,6 +51,7 @@ jobs:
         with:
           distribution: 'graalvm'
           java-version: ${{ matrix.java }}
+          version: '25.1'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           native-image-job-reports: true
 

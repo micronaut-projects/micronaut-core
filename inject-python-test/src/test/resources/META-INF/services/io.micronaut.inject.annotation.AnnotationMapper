@@ -1,0 +1,2 @@
+io.micronaut.python.annotation.processing.test.factory.mapped.TestConfigurationMapper
+io.micronaut.python.annotation.processing.test.introduction.mapped.ListenerAdviceMarkerMapper

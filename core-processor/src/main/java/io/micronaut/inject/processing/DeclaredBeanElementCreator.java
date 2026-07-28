@@ -47,7 +47,6 @@ import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.visitor.VisitorContext;
-import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -66,7 +65,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-@NullUnmarked
 @Internal
 sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R> permits AopIntroductionProxySupportedBeanElementCreator, ConfigurationReaderBeanElementCreator, FactoryBeanElementCreator {
 
@@ -79,6 +77,7 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     protected final boolean isAopProxy;
     protected final List<Buildable<List<R>>> additionalBuilders = new ArrayList<>();
     private final AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
+    @Nullable
     private ElementProxyBuilder<R> aopProxyBuilder;
 
     protected DeclaredBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy, ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory) {

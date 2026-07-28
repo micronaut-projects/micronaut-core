@@ -1,0 +1,45 @@
+Micronaut maps selected Python standard-library annotations to Java types when generating Python stubs. The conversion applies to bean introspections, generated constructors, executable methods, and Python values returned to Java.
+
+[%header,cols="1,1"]
+|===
+|Python type |Java type
+
+|`datetime.date`
+|`java.time.LocalDate`
+
+|`datetime.time`
+|`java.time.LocalTime`
+
+|`datetime.datetime`
+|`java.time.LocalDateTime`
+
+|`datetime.timedelta`
+|`java.time.Duration`
+
+|`datetime.tzinfo` and `datetime.timezone`
+|`java.time.ZoneOffset`
+
+|`uuid.UUID`
+|`java.util.UUID`
+|===
+
+For example, an executable Python method can use standard Python annotations while its generated Java signature exposes the corresponding Java types:
+
+[source,python]
+----
+from datetime import datetime, timedelta
+from uuid import UUID
+
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class EventService:
+    @Executable
+    def reschedule(self, event_id: UUID, scheduled_at: datetime, delay: timedelta) -> datetime:
+        return scheduled_at + delay
+----
+
+Calling `reschedule` from Java with a `UUID`, `LocalDateTime`, and `Duration` passes native Python `UUID`, `datetime`, and `timedelta` objects to the method. A Python result is converted back to the declared Java type.
+
+`time` and `datetime` use naive Java representations. Values with `tzinfo` are rejected rather than having their time-zone information discarded. `timezone` conversion supports fixed offsets representable by `ZoneOffset`; custom `tzinfo` implementations are not supported.

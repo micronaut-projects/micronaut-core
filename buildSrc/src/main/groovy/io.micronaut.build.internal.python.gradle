@@ -1,0 +1,8 @@
+import io.micronaut.build.internal.python.PyronautCompilerPlugin
+
+pluginManager.apply(PyronautCompilerPlugin)
+
+dependencies {
+    pyronautCompiler(projects.micronautInjectPython)
+    pyronautCompiler(projects.micronautContextPython)
+}

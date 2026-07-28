@@ -9,8 +9,7 @@ repositories {
 
 dependencies {
     implementation libs.htmlsanitycheck
-    implementation libs.micronaut.build.plugins
-
+    implementation(providers.gradleProperty("micronaut-build-version").map { "io.micronaut.build.internal:micronaut-gradle-plugins:${it}" }.get())
     implementation libs.tomlj
     implementation libs.japicmp.gradle.plugin
     implementation libs.native.gradle.plugin

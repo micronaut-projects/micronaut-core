@@ -67,7 +67,7 @@ public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWrit
     private static final Method INTRODUCTION = ReflectionUtils.getRequiredInternalMethod(
         DefaultRuntimeProxyDefinition.class,
         "introduction",
-        BeanResolutionContext.class, BeanDefinition.class);
+        BeanResolutionContext.class, BeanDefinition.class, Object[].class);
 
     public RuntimeProxyBeanDefinitionWriter(ClassElement targetType, BeanDefinitionWriter parent, OptionalValues<Boolean> settings, VisitorContext visitorContext, AnnotationValue<?>... interceptorBinding) {
         super(getConstructor(targetType), targetType, targetType, parent, settings, visitorContext, interceptorBinding);
@@ -78,18 +78,18 @@ public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWrit
     }
 
     public RuntimeProxyBeanDefinitionWriter(ClassElement targetType, boolean implementInterface, VisitorContext visitorContext, AnnotationValue<?>... interceptorBinding) {
-        super(getConstructor(targetType), targetType, targetType, implementInterface, visitorContext, interceptorBinding);
+        super(getConstructor(targetType), targetType, targetType, implementInterface, visitorContext, false, interceptorBinding);
     }
 
     public RuntimeProxyBeanDefinitionWriter(ClassElement proxyType, ClassElement beanType, boolean implementInterface, VisitorContext visitorContext, AnnotationValue<?>... interceptorBinding) {
-        super(getConstructor(beanType), proxyType, proxyType, implementInterface, visitorContext, interceptorBinding);
+        super(getConstructor(beanType), proxyType, proxyType, implementInterface, visitorContext, false, interceptorBinding);
     }
 
     public RuntimeProxyBeanDefinitionWriter(String suffix, ClassElement targetType, boolean implementInterface, VisitorContext visitorContext, AnnotationValue<?>... interceptorBinding) {
         super(getConstructor(targetType),
             ClassElement.of(targetType.getName() + suffix, true, targetType.getAnnotationMetadata(), Map.of()),
             targetType,
-            implementInterface, visitorContext, interceptorBinding);
+            implementInterface, visitorContext, false, interceptorBinding);
     }
 
     @Override
@@ -118,7 +118,7 @@ public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWrit
             ExpressionDef runtimeProxyDefinition;
             if (isIntroduction) {
                 runtimeProxyDefinition = ClassTypeDef.of(DefaultRuntimeProxyDefinition.class)
-                    .invokeStatic(INTRODUCTION, methodParameters.getFirst(), aThis);
+                    .invokeStatic(INTRODUCTION, methodParameters.getFirst(), aThis, TypeDef.OBJECT.array().instantiate(constructorValues));
             } else {
                 runtimeProxyDefinition = ClassTypeDef.of(DefaultRuntimeProxyDefinition.class)
                     .invokeStatic(AROUND, methodParameters.getFirst(), aThis, ExpressionDef.constant(isProxyTarget), TypeDef.OBJECT.array().instantiate(constructorValues));

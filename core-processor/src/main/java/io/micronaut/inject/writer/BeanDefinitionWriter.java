@@ -724,6 +724,18 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                 AnnotationMetadata annotationMetadata,
                                 OriginatingElements originatingElements,
                                 VisitorContext visitorContext) {
+        this(constructorDefinition, beanDefinitionName, annotationMetadata, originatingElements, visitorContext,
+            !constructorDefinition.constructorElement().getOwningType().isInterface() && constructorDefinition.constructorElement().getOwningType().isAbstract());
+    }
+
+    public BeanDefinitionWriter(ConstructorDefinition<ClassElement, MethodElement> constructorDefinition,
+                                @Nullable
+                                String beanDefinitionName,
+                                @Nullable
+                                AnnotationMetadata annotationMetadata,
+                                OriginatingElements originatingElements,
+                                VisitorContext visitorContext,
+                                boolean isAbstractBean) {
         this(
             constructorDefinition,
             constructorDefinition.constructorElement().getOwningType(),
@@ -732,7 +744,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 constructorDefinition.constructorElement().getOwningType().getPackageName(),
                 constructorDefinition.constructorElement().getOwningType().getSimpleName()
             ) : beanDefinitionName + CLASS_SUFFIX,
-            !constructorDefinition.constructorElement().getOwningType().isInterface() && constructorDefinition.constructorElement().getOwningType().isAbstract(),
+            isAbstractBean,
             annotationMetadata,
             originatingElements,
             visitorContext

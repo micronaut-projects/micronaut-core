@@ -157,6 +157,24 @@ public abstract class ProxyingBeanDefinitionWriter implements ElementProxyBuilde
                                         boolean implementInterface,
                                         VisitorContext visitorContext,
                                         AnnotationValue<?>... interceptorBinding) {
+        this(
+            constructor,
+            proxyType,
+            targetType,
+            implementInterface,
+            visitorContext,
+            !constructor.getOwningType().isInterface() && constructor.getOwningType().isAbstract(),
+            interceptorBinding
+        );
+    }
+
+    protected ProxyingBeanDefinitionWriter(MethodElement constructor,
+                                           ClassElement proxyType,
+                                           ClassElement targetType,
+                                           boolean implementInterface,
+                                           VisitorContext visitorContext,
+                                           boolean isAbstractBean,
+                                           AnnotationValue<?>... interceptorBinding) {
         this.constructor = constructor;
         this.originatingElements = targetType.getNativeType() instanceof Class<?> || targetType.getNativeType() instanceof String ? OriginatingElements.of() : OriginatingElements.of(targetType);
 
@@ -173,7 +191,8 @@ public abstract class ProxyingBeanDefinitionWriter implements ElementProxyBuilde
             getCustomBeanDefinitionName(),
             targetType.getAnnotationMetadata(),
             implementInterface ? OriginatingElements.of(targetType) : OriginatingElements.of(),
-            visitorContext
+            visitorContext,
+            isAbstractBean
         );
         if (targetType.isInterface()) {
             if (implementInterface) {

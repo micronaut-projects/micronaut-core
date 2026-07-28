@@ -302,7 +302,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @param arg The argument
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected void dispatchOneVoid(int index, Object target, @Nullable Object arg) {
@@ -321,7 +321,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected boolean dispatchGetBoolean(int index, Object target) {
@@ -340,7 +340,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected byte dispatchGetByte(int index, Object target) {
@@ -359,7 +359,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected short dispatchGetShort(int index, Object target) {
@@ -378,7 +378,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected char dispatchGetChar(int index, Object target) {
@@ -397,7 +397,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected int dispatchGetInt(int index, Object target) {
@@ -416,7 +416,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected long dispatchGetLong(int index, Object target) {
@@ -435,7 +435,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected float dispatchGetFloat(int index, Object target) {
@@ -454,7 +454,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @return The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected double dispatchGetDouble(int index, Object target) {
@@ -472,7 +472,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param target The target
      * @param value The primitive value
      * @return The dispatch result
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     @Nullable
@@ -491,7 +491,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected void dispatchSetBooleanVoid(int index, Object target, boolean value) {
@@ -509,7 +509,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param target The target
      * @param value The primitive value
      * @return The dispatch result
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     @Nullable
@@ -528,7 +528,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected void dispatchSetByteVoid(int index, Object target, byte value) {
@@ -546,7 +546,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param target The target
      * @param value The primitive value
      * @return The dispatch result
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     @Nullable
@@ -565,7 +565,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected void dispatchSetShortVoid(int index, Object target, short value) {
@@ -583,7 +583,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param target The target
      * @param value The primitive value
      * @return The dispatch result
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     @Nullable
@@ -602,7 +602,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected void dispatchSetCharVoid(int index, Object target, char value) {
@@ -620,7 +620,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param target The target
      * @param value The primitive value
      * @return The dispatch result
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     @Nullable
@@ -639,7 +639,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected void dispatchSetIntVoid(int index, Object target, int value) {
@@ -657,7 +657,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param target The target
      * @param value The primitive value
      * @return The dispatch result
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     @Nullable
@@ -676,7 +676,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected void dispatchSetLongVoid(int index, Object target, long value) {
@@ -694,7 +694,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param target The target
      * @param value The primitive value
      * @return The dispatch result
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     @Nullable
@@ -713,7 +713,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected void dispatchSetFloatVoid(int index, Object target, float value) {
@@ -731,7 +731,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param target The target
      * @param value The primitive value
      * @return The dispatch result
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     @Nullable
@@ -750,7 +750,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * @param index The method index
      * @param target The target
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     protected void dispatchSetDoubleVoid(int index, Object target, double value) {

@@ -109,6 +109,21 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
      */
     public static <T> DefaultRuntimeProxyDefinition<T> introduction(BeanResolutionContext resolutionContext,
                                                                     BeanDefinition<T> proxyBeanDefinition) {
+        return introduction(resolutionContext, proxyBeanDefinition, new Object[0]);
+    }
+
+    /**
+     * Creates a new instance for introduction advice.
+     *
+     * @param resolutionContext   The resolution context
+     * @param proxyBeanDefinition The proxy bean definition
+     * @param constructorValues   The constructor values
+     * @param <T>                 The proxy type
+     * @return The definition
+     */
+    public static <T> DefaultRuntimeProxyDefinition<T> introduction(BeanResolutionContext resolutionContext,
+                                                                    BeanDefinition<T> proxyBeanDefinition,
+                                                                    Object[] constructorValues) {
 
         Collection<ExecutableMethod<T, ?>> executableMethods = proxyBeanDefinition.getExecutableMethods();
         InterceptorRegistry interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
@@ -125,7 +140,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                 interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) executableMethod, (Interceptor[]) methodInterceptors));
             }
         }
-        return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, true, false, new Object[0]);
+        return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, true, false, constructorValues);
     }
 
     @Override

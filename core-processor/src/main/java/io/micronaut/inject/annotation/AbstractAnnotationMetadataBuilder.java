@@ -1047,7 +1047,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             defaultValues = new LinkedHashMap<>(defaults);
         } else {
             Map<? extends T, ?> annotationDefaultValues = readAnnotationDefaultValues(annotationName, annotationType);
-            defaultValues = getAnnotationDefaults(annotationType, annotationName, annotationDefaultValues, new HashMap<>());
+            defaultValues = getAnnotationDefaults(annotationType, annotationName, annotationDefaultValues, new LinkedHashMap<>());
             if (defaultValues != null && !defaultValues.isEmpty()) {
                 // Don't cache empty values is it can be invalid annotation type provided by KSP or Groovy
                 // Add the default for any retention type annotation

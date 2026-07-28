@@ -1,0 +1,75 @@
+Micronaut's GraalPy support includes the GraalVM tools for debugging, profiling, and inspecting GraalPy applications. Configure the tools through the GraalPy engine options.
+
+See the https://www.graalvm.org/latest/reference-manual/tools/[GraalVM tools documentation] for an overview of the available tools.
+
+== CPU sampler
+
+Enable the CPU sampler by adding the following to `application.toml`:
+
+[source,toml]
+----
+[graalpy.engine.options]
+cpusampler = true
+"cpusampler.DumpInterval" = 1000
+----
+
+To include parsers and other internal elements, enable `SampleInternal` and use a shorter sampling period:
+
+[source,toml]
+----
+[graalpy.engine.options]
+cpusampler = true
+"cpusampler.SampleInternal" = true
+"cpusampler.Period" = 1
+"cpusampler.DumpInterval" = 1000
+----
+
+Run the application with experimental options enabled:
+
+[source,bash]
+----
+-Dpolyglot.engine.AllowExperimentalOptions=true ...
+----
+
+For additional CPU sampler, CPU tracer, and memory tracer options, see the https://www.graalvm.org/latest/tools/profiling/[GraalVM profiling documentation].
+
+== Chrome Inspector
+
+Enable the Chrome Inspector debugger with:
+
+[source,toml]
+----
+[graalpy.engine.options]
+inspect = true
+----
+
+Start the application and open the DevTools link printed by GraalVM in Chrome. The inspector lets you set breakpoints, inspect variables, step through Python code, and evaluate expressions. See the https://www.graalvm.org/latest/tools/chrome-debugger/[GraalVM Chrome Debugger documentation] for details.
+
+== Debug Adapter Protocol
+
+GraalPy can also expose a Debug Adapter Protocol endpoint for IDE integrations:
+
+[source,toml]
+----
+[graalpy.engine.options]
+dap = true
+----
+
+For example, use the following VS Code `launch.json` configuration to attach to the debug server:
+
+[source,json]
+----
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Attach",
+            "type": "node",
+            "request": "attach",
+            "debugServer": 4711
+        }
+    ]
+}
+----
+
+The exact options supported depend on the GraalVM version. Use `graalpy --help:tools` or consult the https://www.graalvm.org/latest/reference-manual/tools/[GraalVM tools documentation].

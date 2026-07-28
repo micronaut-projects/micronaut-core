@@ -61,7 +61,7 @@ public interface UnsafeBeanWriteProperty<B, T> extends BeanWriteProperty<B, T> {
      *
      * @param bean The bean
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
     default void setBooleanUnsafe(B bean, boolean value) {
@@ -76,7 +76,7 @@ public interface UnsafeBeanWriteProperty<B, T> extends BeanWriteProperty<B, T> {
      *
      * @param bean The bean
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
     default void setByteUnsafe(B bean, byte value) {
@@ -91,7 +91,7 @@ public interface UnsafeBeanWriteProperty<B, T> extends BeanWriteProperty<B, T> {
      *
      * @param bean The bean
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
     default void setShortUnsafe(B bean, short value) {
@@ -106,7 +106,7 @@ public interface UnsafeBeanWriteProperty<B, T> extends BeanWriteProperty<B, T> {
      *
      * @param bean The bean
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
     default void setCharUnsafe(B bean, char value) {
@@ -121,7 +121,7 @@ public interface UnsafeBeanWriteProperty<B, T> extends BeanWriteProperty<B, T> {
      *
      * @param bean The bean
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
     default void setIntUnsafe(B bean, int value) {
@@ -136,7 +136,7 @@ public interface UnsafeBeanWriteProperty<B, T> extends BeanWriteProperty<B, T> {
      *
      * @param bean The bean
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
     default void setLongUnsafe(B bean, long value) {
@@ -151,7 +151,7 @@ public interface UnsafeBeanWriteProperty<B, T> extends BeanWriteProperty<B, T> {
      *
      * @param bean The bean
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
     default void setFloatUnsafe(B bean, float value) {
@@ -166,7 +166,7 @@ public interface UnsafeBeanWriteProperty<B, T> extends BeanWriteProperty<B, T> {
      *
      * @param bean The bean
      * @param value The primitive value
-     * @since 5.1.0
+     * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
     default void setDoubleUnsafe(B bean, double value) {

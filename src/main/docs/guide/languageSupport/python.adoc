@@ -1,0 +1,3 @@
+Micronaut framework supports Python through compile-time processing of Python sources.
+
+The Python support integrates Python classes, annotations, and type metadata with Micronaut's compile-time bean definition model.

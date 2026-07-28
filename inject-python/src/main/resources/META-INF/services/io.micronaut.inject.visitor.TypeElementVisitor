@@ -1,0 +1,2 @@
+io.micronaut.python.processing.PythonStubGenerator
+io.micronaut.python.processing.TargetTypeMappingGenerator

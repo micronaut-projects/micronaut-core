@@ -252,7 +252,6 @@ httpClient:
     clientJackson: Customizing Jackson Settings
     clientRetry: Retry and Circuit Breaker
     clientFallback: Client Fallbacks
-    netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
   clientHttp2: HTTP/2 Support
   clientHttp3: HTTP/3 Support
@@ -284,7 +283,6 @@ cloud:
     serviceDiscoveryManual: Manual Service Discovery Configuration
   clientSideLoadBalancing:
     title: Client Side Load Balancing
-    netflixRibbon: Netflix Ribbon Support
   distributedTracing: Distributed Tracing
 serverlessFunctions:
   title: Serverless Functions
@@ -334,6 +332,17 @@ languageSupport:
     ide: Configuring an IDE
     retainparameternames: Retaining Parameter Names
   groovy: Micronaut for Groovy
+  python:
+    title: Micronaut for Python
+    typeOrdering: Type Ordering and Forward References
+    standardTypes: Standard Library Type Conversions
+    keywords: Python Keywords in Java APIs
+    graalTools: GraalPy Tools
+    asyncAwait:
+      title: Async/Await
+      asyncioRuntime: Netty-Backed Asyncio Runtime
+      asyncioNetworking: Asyncio Networking and TLS
+      asyncioUnsupported: Unsupported Asyncio APIs
   kotlin:
     title: Micronaut for Kotlin
     kaptOrKsp: Kotlin support via KAPT or KSP

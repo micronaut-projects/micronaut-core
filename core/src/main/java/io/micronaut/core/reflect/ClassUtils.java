@@ -78,63 +78,63 @@ public class ClassUtils {
     /**
      * The primitive {@code boolean} type name.
      *
-     * @since 5.1.0
+     * @since 5.2.0
      */
     public static final String PRIMITIVE_TYPE_NAME_BOOLEAN = "boolean";
 
     /**
      * The primitive {@code byte} type name.
      *
-     * @since 5.1.0
+     * @since 5.2.0
      */
     public static final String PRIMITIVE_TYPE_NAME_BYTE = "byte";
 
     /**
      * The primitive {@code short} type name.
      *
-     * @since 5.1.0
+     * @since 5.2.0
      */
     public static final String PRIMITIVE_TYPE_NAME_SHORT = "short";
 
     /**
      * The primitive {@code char} type name.
      *
-     * @since 5.1.0
+     * @since 5.2.0
      */
     public static final String PRIMITIVE_TYPE_NAME_CHAR = "char";
 
     /**
      * The primitive {@code int} type name.
      *
-     * @since 5.1.0
+     * @since 5.2.0
      */
     public static final String PRIMITIVE_TYPE_NAME_INT = "int";
 
     /**
      * The primitive {@code long} type name.
      *
-     * @since 5.1.0
+     * @since 5.2.0
      */
     public static final String PRIMITIVE_TYPE_NAME_LONG = "long";
 
     /**
      * The primitive {@code float} type name.
      *
-     * @since 5.1.0
+     * @since 5.2.0
      */
     public static final String PRIMITIVE_TYPE_NAME_FLOAT = "float";
 
     /**
      * The primitive {@code double} type name.
      *
-     * @since 5.1.0
+     * @since 5.2.0
      */
     public static final String PRIMITIVE_TYPE_NAME_DOUBLE = "double";
 
     /**
      * The primitive {@code void} type name.
      *
-     * @since 5.1.0
+     * @since 5.2.0
      */
     public static final String PRIMITIVE_TYPE_NAME_VOID = "void";
 

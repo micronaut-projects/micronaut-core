@@ -389,13 +389,18 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
             }
         }
         if (upperType.isPrimitive()) {
-            // TODO: Support primitives for wildcards (? extends byte[])
+            // Primitive wildcard bounds are not represented as wildcard elements.
+            return upperType;
+        }
+        if (!(upperType instanceof JavaClassElement javaUpperType)
+            || !upperBoundsAsElements.stream().allMatch(JavaClassElement.class::isInstance)
+            || !lowerBoundsAsElements.stream().allMatch(JavaClassElement.class::isInstance)) {
             return upperType;
         }
         return new JavaWildcardElement(
             elementAnnotationMetadataFactory,
             wt,
-            (JavaClassElement) upperType,
+            javaUpperType,
             upperBoundsAsElements.stream().map(JavaClassElement.class::cast).toList(),
             lowerBoundsAsElements.stream().map(JavaClassElement.class::cast).toList(),
             doc
@@ -485,9 +490,14 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
             List<? extends TypeMirror> boundsUnresolved = upperBound instanceof IntersectionType it ?
                 it.getBounds() :
                 Collections.singletonList(upperBound);
-            boundsUnresolved.stream()
-                .map(tm -> (JavaClassElement) newClassElement(owner, tm, parentTypeArguments, visitedTypes, true, doc))
-                .forEach(bounds::add);
+            for (TypeMirror boundType : boundsUnresolved) {
+                ClassElement bound = newClassElement(owner, boundType, parentTypeArguments, visitedTypes, true, doc);
+                if (bound instanceof JavaClassElement javaClassElement) {
+                    bounds.add(javaClassElement);
+                } else {
+                    return bound;
+                }
+            }
         }
         return new JavaGenericPlaceholderElement(new JavaNativeElement.Placeholder(tv.asElement(), tv, getNativeType()), tv, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType, doc);
     }

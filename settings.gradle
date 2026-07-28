@@ -25,6 +25,8 @@ include "core"
 include "core-reactive"
 include "core-processor"
 include "context"
+include 'context-python'
+include 'context-python-netty'
 include "context-propagation"
 include "discovery-core"
 include "function"
@@ -52,6 +54,8 @@ include "inject-java-helper"
 include "inject-java-helper2"
 include 'inject-kotlin'
 include 'inject-kotlin-test'
+include 'inject-python'
+include 'inject-python-test'
 include "inject-test-utils"
 include "jackson-core"
 include "jackson-databind"
@@ -80,6 +84,7 @@ include "test-suite-http2-server-tck-netty"
 include "test-suite-kotlin"
 include "test-suite-kotlin-ksp-all-open"
 include "test-suite-groovy"
+include "test-suite-python"
 include "test-suite-logback"
 include "test-suite-logback-external-configuration"
 include "test-suite-logback-graalvm"
@@ -98,5 +103,4 @@ micronautBuild {
     nonStandardProjectNamePrefixes.addAll(["test-", "benchmarks"])
 
     importMicronautCatalog("boms-micronaut-sourcegen")
-    addSnapshotRepository()
 }
