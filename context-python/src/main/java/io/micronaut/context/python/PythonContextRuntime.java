@@ -43,6 +43,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
@@ -1267,7 +1268,7 @@ public final class PythonContextRuntime {
         }
     }
 
-    static <T> T withPrimaryContext(java.util.function.Function<Context, T> callback) {
+    static <T extends @Nullable Object> T withPrimaryContext(Function<Context, T> callback) {
         Context primary = getContext();
         return withContextLock(primary,
             () -> withExecutionFrame(primary, () -> callback.apply(primary)));

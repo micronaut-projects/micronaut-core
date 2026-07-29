@@ -23,7 +23,9 @@ import org.graalvm.polyglot.Context;
  * Customizes every GraalPy context builder created by Micronaut.
  *
  * <p>Implementations are loaded with {@link java.util.ServiceLoader} semantics and invoked in
- * {@link #getOrder() order}. A customizer must not build or retain the supplied builder.</p>
+ * {@link #getOrder() order} each time a context is built. Implementations may therefore be
+ * invoked multiple times and should be idempotent. A customizer must not build or retain the
+ * supplied builder.</p>
  *
  * @author Micronaut Team
  * @since 5.2.0

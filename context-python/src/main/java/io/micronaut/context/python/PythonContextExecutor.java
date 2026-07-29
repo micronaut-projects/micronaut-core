@@ -17,6 +17,7 @@ package io.micronaut.context.python;
 
 import io.micronaut.core.annotation.Experimental;
 import org.graalvm.polyglot.Context;
+import org.jspecify.annotations.Nullable;
 
 import java.util.function.Function;
 
@@ -38,7 +39,7 @@ public interface PythonContextExecutor {
      *
      * @param callback The callback
      * @param <T> The callback result type
-     * @return The callback result
+     * @return The callback result, possibly {@code null}
      */
-    <T> T withContext(Function<Context, T> callback);
+    <T extends @Nullable Object> T withContext(Function<Context, T> callback);
 }

@@ -47,6 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
@@ -202,7 +203,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     }
 
     @Override
-    public <T> T withContext(java.util.function.Function<Context, T> callback) {
+    public <T extends @Nullable Object> T withContext(Function<Context, T> callback) {
         Objects.requireNonNull(callback, "callback");
         if (PythonContextRuntime.isReuseContext() || targetSize <= 0) {
             return PythonContextRuntime.withPrimaryContext(callback);
