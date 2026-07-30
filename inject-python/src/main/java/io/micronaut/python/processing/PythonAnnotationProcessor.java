@@ -773,7 +773,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         javaVisitorContext.visitMetaInfFile(APPLICATION_PATH + "fileslist.txt", originatingElement)
             .ifPresent(generatedFile -> {
                 try (var writer = generatedFile.openWriter()) {
-                    writer.write(filesList.toString());
+                    List<String> entries = filesList.toString().lines().sorted().toList();
+                    if (!entries.isEmpty()) {
+                        writer.write(String.join("\n", entries));
+                        writer.write('\n');
+                    }
                 } catch (IOException e) {
                     throw new ProcessingException(originatingElement, "Failed to write fileslist.txt to VFS");
                 }

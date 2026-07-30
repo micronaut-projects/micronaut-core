@@ -933,6 +933,8 @@ final class PyronautCompilerIncrementalTest {
         Path filesList = output.resolve(
             "META-INF/GRAALPY-VFS/micronaut-application/fileslist.txt"
         );
+        List<String> cleanEntries = Files.readAllLines(filesList);
+        assertEquals(cleanEntries.stream().sorted().toList(), cleanEntries);
         Files.setLastModifiedTime(initializer, UNCHANGED_MARKER);
         Files.setLastModifiedTime(filesList, UNCHANGED_MARKER);
 
