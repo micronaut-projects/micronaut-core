@@ -993,6 +993,34 @@ final class PyronautCompilerIncrementalTest {
     }
 
     @Test
+    void regeneratesSharedPythonPackageOutputsAfterStructuralChange(@TempDir Path directory)
+        throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python/pkg"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        Files.writeString(alpha, "class Alpha:\n    value: int = 1\n");
+        Files.writeString(python.resolve("beta.py"), "class Beta:\n    value: int = 2\n");
+        compilePython(directory.resolve("python"), java, output, cache);
+        Path initializer = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/pkg/__init__.py"
+        );
+
+        Files.writeString(alpha, """
+            class Alpha:
+                value: int = 1
+            class Added:
+                value: int = 3
+            """);
+        compilePython(directory.resolve("python"), java, output, cache);
+
+        String content = Files.readString(initializer);
+        assertTrue(content.contains("from .alpha import Added"));
+        assertTrue(content.contains("from .beta import Beta"));
+    }
+
+    @Test
     void propagatesDependenciesAcrossJavaAndPython(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python"));
         Path java = Files.createDirectories(directory.resolve("java/example"));

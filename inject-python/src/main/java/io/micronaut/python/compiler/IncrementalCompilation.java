@@ -55,7 +55,7 @@ import java.util.stream.Stream;
 @Internal
 final class IncrementalCompilation {
     private static final String STATE_FILE = "state.properties";
-    private static final String STATE_VERSION = "6";
+    private static final String STATE_VERSION = "7";
     private static final String SOURCE_PREFIX = "source.";
     private static final String VFS_SOURCE_PREFIX = "META-INF/GRAALPY-VFS/micronaut-application/src/";
     private static final String VFS_ROOT = "META-INF/GRAALPY-VFS/micronaut-application";
@@ -177,7 +177,8 @@ final class IncrementalCompilation {
         Set<String> isolatingAffected = Set.copyOf(affected);
         Set<String> aggregationTriggers = new LinkedHashSet<>(previous.aggregatingInputs());
         aggregationTriggers.addAll(currentAggregatingInputs);
-        boolean aggregating = affected.stream().anyMatch(aggregationTriggers::contains);
+        boolean aggregating = affected.stream().anyMatch(aggregationTriggers::contains)
+            || pythonSharedInputsChanged(changed, previous.sources(), currentSources);
         if (aggregating) {
             affected.addAll(currentAggregatingInputs);
         }
@@ -262,7 +263,7 @@ final class IncrementalCompilation {
                 Set<String> declaredPythonOutputs = compilationTrace.pythonProcessorOutputs();
                 plan.previous().pythonAggregatingOutputs().stream()
                     .filter(output -> isBytecodeForDeclaredPythonOutput(output, declaredPythonOutputs)
-                        || (!plan.aggregating() && !output.startsWith(VFS_ROOT + '/')))
+                        || !plan.aggregating())
                     .forEach(pythonAggregatingOutputs::add);
                 Set<String> stalePythonOutputs = new LinkedHashSet<>(
                     plan.previous().pythonAggregatingOutputs()
@@ -330,6 +331,7 @@ final class IncrementalCompilation {
                 source.language(),
                 source.relativePath(),
                 source.hash(),
+                source.pythonSharedFingerprint(),
                 Set.copyOf(dependencies),
                 Set.of(),
                 Set.copyOf(types)
@@ -495,6 +497,24 @@ final class IncrementalCompilation {
         return changed;
     }
 
+    private static boolean pythonSharedInputsChanged(Set<String> changed,
+                                                     Map<String, SourceState> previous,
+                                                     Map<String, SourceState> current) {
+        for (String key : changed) {
+            SourceState old = previous.get(key);
+            SourceState replacement = current.get(key);
+            SourceState source = replacement == null ? old : replacement;
+            if (source != null
+                && source.language() == Language.PYTHON
+                && (old == null
+                    || replacement == null
+                    || !old.pythonSharedFingerprint().equals(replacement.pythonSharedFingerprint()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static Set<String> affectedSources(Set<String> changed,
                                                Map<String, SourceState> previous,
                                                Map<String, SourceState> current) {
@@ -551,6 +571,7 @@ final class IncrementalCompilation {
                             language,
                             relative,
                             hash(content.getBytes(StandardCharsets.UTF_8)),
+                            language == Language.PYTHON ? pythonSharedFingerprint(content) : "",
                             Set.of(),
                             Set.of(),
                             types
@@ -616,6 +637,7 @@ final class IncrementalCompilation {
                 state.language(),
                 state.relativePath(),
                 state.hash(),
+                state.pythonSharedFingerprint(),
                 Set.copyOf(dependencies),
                 Set.of(),
                 state.types()
@@ -626,6 +648,44 @@ final class IncrementalCompilation {
 
     private static String pythonModule(String relativePath) {
         return relativePath.substring(0, relativePath.length() - ".py".length()).replace('/', '.');
+    }
+
+    private static String pythonSharedFingerprint(String content) {
+        MessageDigest digest = digest();
+        boolean continuation = false;
+        int bracketDepth = 0;
+        for (String line : content.lines().toList()) {
+            String stripped = line.stripLeading();
+            boolean sharedInput = continuation
+                || stripped.startsWith("@")
+                || stripped.startsWith("class ")
+                || stripped.startsWith("def ")
+                || stripped.startsWith("async def ")
+                || stripped.startsWith("import ")
+                || stripped.startsWith("from ");
+            if (!sharedInput) {
+                continue;
+            }
+            update(digest, stripped);
+            bracketDepth += bracketDelta(stripped);
+            continuation = bracketDepth > 0 || stripped.endsWith("\\");
+            if (!continuation) {
+                bracketDepth = 0;
+            }
+        }
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static int bracketDelta(String line) {
+        int delta = 0;
+        for (int i = 0; i < line.length(); i++) {
+            delta += switch (line.charAt(i)) {
+                case '(', '[', '{' -> 1;
+                case ')', ']', '}' -> -1;
+                default -> 0;
+            };
+        }
+        return delta;
     }
 
     private static Set<String> javaTypes(String content) {
@@ -705,6 +765,7 @@ final class IncrementalCompilation {
             source.language(),
             source.relativePath(),
             source.hash(),
+            source.pythonSharedFingerprint(),
             source.dependencies(),
             Set.copyOf(assigned.get(key)),
             source.types()
@@ -919,6 +980,7 @@ final class IncrementalCompilation {
                     Language.valueOf(properties.getProperty(prefix + "language")),
                     required(properties, prefix + "relative"),
                     required(properties, prefix + "hash"),
+                    required(properties, prefix + "python.shared"),
                     decodeList(properties.getProperty(prefix + "dependencies", "")),
                     decodeList(properties.getProperty(prefix + "outputs", "")),
                     decodeList(properties.getProperty(prefix + "types", ""))
@@ -984,6 +1046,7 @@ final class IncrementalCompilation {
             properties.setProperty(prefix + "language", source.language().name());
             properties.setProperty(prefix + "relative", source.relativePath());
             properties.setProperty(prefix + "hash", source.hash());
+            properties.setProperty(prefix + "python.shared", source.pythonSharedFingerprint());
             properties.setProperty(prefix + "dependencies", encodeList(source.dependencies()));
             properties.setProperty(prefix + "outputs", encodeList(source.outputs()));
             properties.setProperty(prefix + "types", encodeList(source.types()));
@@ -1244,6 +1307,7 @@ final class IncrementalCompilation {
                                Language language,
                                String relativePath,
                                String hash,
+                               String pythonSharedFingerprint,
                                Set<String> dependencies,
                                Set<String> outputs,
                                Set<String> types) {

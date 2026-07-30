@@ -258,6 +258,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
             String mainPy;
             StringBuilder filesList = new StringBuilder();
+            boolean processSharedOutputs = incrementalSources == null || processAggregatingVisitors;
             if (StringUtils.isNotEmpty(values.code())) {
                 mainPy = transformedList.get(0).runtimeCode();
                 writePythonToVfs(filesList, APPLICATION_LAUNCHER_PATH, mainPy, originatingElement);
@@ -284,7 +285,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 path = path.substring(srcDir.length() + 1);
                             }
                             String targetSource = APPLICATION_SRC_PATH + path;
-                            if (!transformResult.allClassNames().isEmpty()) {
+                            if (processSharedOutputs && !transformResult.allClassNames().isEmpty()) {
                                 // has classes
                                 int parentIndex = path.lastIndexOf('/');
                                 if (parentIndex > -1) {
@@ -303,51 +304,52 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                         }
                     }
 
-                    TreeSet<String> byParent = allModules.keySet().stream().map(pe -> pe.parent)
-                        .collect(Collectors.toCollection(TreeSet::new));
-                    for (String parent : byParent) {
-                        if (StringUtils.isEmpty(parent)) {
-                            // root, generate __main__.py instead
-                            String mainFilePath = APPLICATION_SRC_PATH + parent + "__main__.py";
-                            StringBuilder mainContent = new StringBuilder();
-                            List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
-                                .filter(entry -> entry.getKey().parent.equals(parent))
-                                .toList();
-                            for (Map.Entry<PathEntry, List<String>> entry : entries) {
-                                List<String> types = entry.getValue();
-                                String filename = entry.getKey().filename;
-                                if (!types.isEmpty()) {
-                                    for (String type : types) {
-                                        mainContent.append("from ").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
-                                    }
-                                }
-                            }
-                            writePythonToVfs(filesList, mainFilePath, mainContent.toString(), originatingElement);
-                        } else {
-
-                            String initFilePath = APPLICATION_SRC_PATH + parent + "__init__.py";
-                            StringBuilder initContent = new StringBuilder();
-                            List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
-                                .filter(entry -> entry.getKey().parent.equals(parent))
-                                .toList();
-                            List<String> exportedTypes = new ArrayList<>();
-                            for (Map.Entry<PathEntry, List<String>> entry : entries) {
-                                List<String> types = entry.getValue();
-                                String filename = entry.getKey().filename;
-                                if (!types.isEmpty()) {
-                                    for (String type : types) {
-                                        initContent.append("from .").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
-                                        // Check if this type has decorators (is in allExportedTypes)
-                                        if (allExportedTypes.contains(type)) {
-                                            exportedTypes.add(type);
+                    if (processSharedOutputs) {
+                        TreeSet<String> byParent = allModules.keySet().stream().map(pe -> pe.parent)
+                            .collect(Collectors.toCollection(TreeSet::new));
+                        for (String parent : byParent) {
+                            if (StringUtils.isEmpty(parent)) {
+                                // root, generate __main__.py instead
+                                String mainFilePath = APPLICATION_SRC_PATH + parent + "__main__.py";
+                                StringBuilder mainContent = new StringBuilder();
+                                List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
+                                    .filter(entry -> entry.getKey().parent.equals(parent))
+                                    .toList();
+                                for (Map.Entry<PathEntry, List<String>> entry : entries) {
+                                    List<String> types = entry.getValue();
+                                    String filename = entry.getKey().filename;
+                                    if (!types.isEmpty()) {
+                                        for (String type : types) {
+                                            mainContent.append("from ").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
                                         }
                                     }
                                 }
+                                writePythonToVfs(filesList, mainFilePath, mainContent.toString(), originatingElement);
+                            } else {
+                                String initFilePath = APPLICATION_SRC_PATH + parent + "__init__.py";
+                                StringBuilder initContent = new StringBuilder();
+                                List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
+                                    .filter(entry -> entry.getKey().parent.equals(parent))
+                                    .toList();
+                                List<String> exportedTypes = new ArrayList<>();
+                                for (Map.Entry<PathEntry, List<String>> entry : entries) {
+                                    List<String> types = entry.getValue();
+                                    String filename = entry.getKey().filename;
+                                    if (!types.isEmpty()) {
+                                        for (String type : types) {
+                                            initContent.append("from .").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
+                                            // Check if this type has decorators (is in allExportedTypes)
+                                            if (allExportedTypes.contains(type)) {
+                                                exportedTypes.add(type);
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!exportedTypes.isEmpty()) {
+                                    initContent.append("\n__all__ = ").append(toListOfString(exportedTypes)).append("\n");
+                                }
+                                writePythonToVfs(filesList, initFilePath, initContent.toString(), originatingElement);
                             }
-                            if (!exportedTypes.isEmpty()) {
-                                initContent.append("\n__all__ = ").append(toListOfString(exportedTypes)).append("\n");
-                            }
-                            writePythonToVfs(filesList, initFilePath, initContent.toString(), originatingElement);
                         }
                     }
                 }
@@ -371,7 +373,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 });
 
             }
-            writeAllToVFS(filesList, allDecorators, allImports, originatingElement);
+            if (processSharedOutputs) {
+                writeAllToVFS(filesList, allDecorators, allImports, originatingElement);
+            }
 
             // Run type element visitor processing
             ClassLoader effectiveClassLoader = this.classLoader != null
@@ -576,8 +580,18 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             } else {
                 throw new ProcessingException(originatingElement, "Source directories are not set.");
             }
-            return parser.transform(javaVisitorContext, sources.toArray(new Source[0]));
+            return parser.transform(
+                javaVisitorContext,
+                selectTransformSources(sources).toArray(new Source[0])
+            );
         }
+    }
+
+    final List<Source> selectTransformSources(List<Source> sources) {
+        if (incrementalSources == null || processAggregatingVisitors) {
+            return sources;
+        }
+        return sources.stream().filter(this::isAffectedSource).toList();
     }
 
     private Optional<PythonApplicationValues> readPythonApplicationValues(Element element) {

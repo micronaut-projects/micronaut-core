@@ -52,6 +52,24 @@ import org.graalvm.polyglot.Source;
 public class PythonAstParserTest {
 
     @Test
+    void incrementalProcessorTransformsOnlyAffectedSourcesUnlessAggregationIsRequired(
+        @TempDir Path directory
+    ) throws Exception {
+        Path alphaPath = Files.writeString(directory.resolve("alpha.py"), "answer = 1\n");
+        Path betaPath = Files.writeString(directory.resolve("beta.py"), "answer = 2\n");
+        Source alpha = Source.newBuilder("python", alphaPath.toFile()).build();
+        Source beta = Source.newBuilder("python", betaPath.toFile()).build();
+        var processor = new PythonAnnotationProcessor();
+        processor.setIncrementalSources(Set.of(alphaPath.toAbsolutePath().normalize().toString()));
+        processor.setProcessAggregatingVisitors(false);
+
+        assertEquals(List.of(alpha), processor.selectTransformSources(List.of(alpha, beta)));
+
+        processor.setProcessAggregatingVisitors(true);
+        assertEquals(List.of(alpha, beta), processor.selectTransformSources(List.of(alpha, beta)));
+    }
+
+    @Test
     void bytecodeCompilerReusesParserContextWithoutOwningIt() {
         PythonAstParser parser = new PythonAstParser();
         try {
