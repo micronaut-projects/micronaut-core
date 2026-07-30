@@ -59,12 +59,28 @@ public final class PythonBytecodeCompiler implements AutoCloseable {
 
     private final Context context;
     private final Value compiler;
+    private final boolean ownsContext;
 
     /**
      * Create an embedded GraalPy bytecode compiler.
      */
     public PythonBytecodeCompiler() {
-        context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        this(Context.newBuilder(PYTHON).allowAllAccess(true).build(), true);
+    }
+
+    /**
+     * Create a bytecode compiler that reuses an existing GraalPy context.
+     * Closing this compiler does not close the supplied context.
+     *
+     * @param context The existing context
+     */
+    public PythonBytecodeCompiler(Context context) {
+        this(context, false);
+    }
+
+    private PythonBytecodeCompiler(Context context, boolean ownsContext) {
+        this.context = context;
+        this.ownsContext = ownsContext;
         context.eval(COMPILE_SOURCE);
         compiler = context.getBindings(PYTHON).getMember("_mn_compile_python_bytecode");
     }
@@ -140,7 +156,9 @@ public final class PythonBytecodeCompiler implements AutoCloseable {
 
     @Override
     public void close() {
-        context.close();
+        if (ownsContext) {
+            context.close();
+        }
     }
 
     /**

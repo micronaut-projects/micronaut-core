@@ -52,6 +52,22 @@ import org.graalvm.polyglot.Source;
 public class PythonAstParserTest {
 
     @Test
+    void bytecodeCompilerReusesParserContextWithoutOwningIt() {
+        PythonAstParser parser = new PythonAstParser();
+        try {
+            try (var compiler = parser.bytecodeCompiler()) {
+                assertTrue(compiler.compile("answer = 42", "/graalpy_vfs/src/example.py").bytes().length > 0);
+            }
+
+            try (PythonEnvironment environment = parser.parse("answer = 42")) {
+                assertNotNull(environment);
+            }
+        } finally {
+            parser.close();
+        }
+    }
+
+    @Test
     void extractsCallsWithoutEvaluatingSource() {
         PythonAstParser parser = new PythonAstParser();
         try {

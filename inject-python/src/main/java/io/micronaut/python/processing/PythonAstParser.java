@@ -20,6 +20,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.python.compiler.PythonBytecodeCompiler;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.ScriptDef;
@@ -66,7 +67,7 @@ public final class PythonAstParser {
         this(classLoader, false);
     }
 
-    PythonAstParser(ClassLoader classLoader, boolean interpreterOnly) {
+    PythonAstParser(ClassLoader classLoader, boolean incremental) {
         var contextBuilder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                 .resourceDirectory(INJECT_RESOURCES)
                 .resourceLoadingClass(PythonAstParser.class)
@@ -75,14 +76,18 @@ public final class PythonAstParser {
             .allowHostAccess(HostAccess.ALL)
             .hostClassLoader(classLoader)
             .allowHostClassLookup(name -> name.startsWith("io.micronaut"));
-        if (interpreterOnly) {
-            // Incremental processing is a short-lived workload. Avoid spending more time compiling
-            // Python processing code than the reduced source set can recover during this invocation.
+        if (incremental) {
+            // Incremental processing is a short-lived workload. A single compiler thread avoids
+            // paying the startup cost of GraalPy's core-count-based compiler thread pool.
             contextBuilder.allowExperimentalOptions(true)
-                .option("engine.Compilation", "false");
+                .option("engine.CompilerThreads", "1");
         }
         this.context = contextBuilder.build();
         context.initialize(PYTHON);
+    }
+
+    PythonBytecodeCompiler bytecodeCompiler() {
+        return new PythonBytecodeCompiler(context);
     }
 
     public PythonEnvironment parse(@Language("python") String sources) {

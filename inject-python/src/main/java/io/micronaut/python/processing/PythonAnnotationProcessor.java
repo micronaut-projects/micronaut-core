@@ -667,7 +667,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
         try {
             if (bytecodeCompiler == null) {
-                bytecodeCompiler = new PythonBytecodeCompiler();
+                bytecodeCompiler = parser.bytecodeCompiler();
             }
             PythonBytecodeCompiler.Result result = bytecodeCompiler.compile(content, filePath);
             String cacheFilePath = cacheFilePath(filePath, result.cachePath());
