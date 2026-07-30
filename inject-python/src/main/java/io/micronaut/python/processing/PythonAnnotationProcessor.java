@@ -16,6 +16,7 @@
 package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.annotation.processing.AbstractInjectAnnotationProcessor;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.core.naming.NameUtils;
@@ -55,6 +56,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -84,6 +86,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private ClassLoader classLoader;
     private boolean compilePythonBytecode;
     private PythonBytecodeCompiler bytecodeCompiler;
+    private Set<String> incrementalSources;
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -112,6 +115,16 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      */
     public void setCompilePythonBytecode(boolean compilePythonBytecode) {
         this.compilePythonBytecode = compilePythonBytecode;
+    }
+
+    /**
+     * Restricts isolating visitors and bean generation to affected Python sources.
+     *
+     * @param incrementalSources The affected absolute source paths, or {@code null} for all sources
+     */
+    @Internal
+    public void setIncrementalSources(Set<String> incrementalSources) {
+        this.incrementalSources = incrementalSources == null ? null : Set.copyOf(incrementalSources);
     }
 
     @Override
@@ -251,7 +264,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 }
                             }
                             Source runtimeSource = transformResult.runtimeSource();
-                            writePythonToVfs(filesList, targetSource, runtimeSource.getCharacters().toString(), originatingElement);
+                            if (isAffectedSource(source)) {
+                                writePythonToVfs(filesList, targetSource, runtimeSource.getCharacters().toString(), originatingElement);
+                            }
                         }
                     }
 
@@ -326,14 +341,31 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             writeAllToVFS(filesList, allDecorators, allImports, originatingElement);
 
             // Run type element visitor processing
-            PythonTypeElementVisitorProcessor typeElementVisitorProcessor =
-                new PythonTypeElementVisitorProcessor(this.classLoader != null ? this.classLoader : PythonAnnotationProcessor.class.getClassLoader());
-            typeElementVisitorProcessor.init(processingEnvironment);
-            typeElementVisitorProcessor.process(processingEnvironment);
+            ClassLoader effectiveClassLoader = this.classLoader != null
+                ? this.classLoader : PythonAnnotationProcessor.class.getClassLoader();
+            Predicate<ClassElement> affectedElements = affectedElements(transformedList, srcDirs);
+            PythonTypeElementVisitorProcessor aggregatingVisitors =
+                new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.AGGREGATING);
+            aggregatingVisitors.init(processingEnvironment);
+            aggregatingVisitors.process(
+                processingEnvironment,
+                ignored -> true,
+                incrementalSources == null,
+                false
+            );
+            PythonTypeElementVisitorProcessor isolatingVisitors =
+                new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.ISOLATING);
+            isolatingVisitors.init(processingEnvironment);
+            isolatingVisitors.process(
+                processingEnvironment,
+                affectedElements,
+                incrementalSources != null,
+                true
+            );
 
             // Process bean definitions for Python classes
             var beanDefinitionProcessor = new PythonBeanDefinitionProcessor();
-            beanDefinitionProcessor.processBeanDefinitions(processingEnvironment);
+            beanDefinitionProcessor.processBeanDefinitions(processingEnvironment, affectedElements);
 
             // Invoke callback for each class element if callback is set
             if (classElementCallback != null) {
@@ -364,6 +396,62 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             error("Failed Trace: %s", stacktrace);
             error("Fatal error processing Python code: %s", e.getMessage());
         }
+    }
+
+    private boolean isAffectedSource(Source source) {
+        if (incrementalSources == null) {
+            return true;
+        }
+        String path = source.getPath();
+        if (path == null) {
+            return false;
+        }
+        Path sourcePath = Path.of(path).toAbsolutePath().normalize();
+        if (incrementalSources.contains(sourcePath.toString())) {
+            return true;
+        }
+        for (String incrementalSource : incrementalSources) {
+            try {
+                if (Files.isSameFile(sourcePath, Path.of(incrementalSource))) {
+                    return true;
+                }
+            } catch (IOException ignored) {
+                // A missing source cannot be an affected source being processed.
+            }
+        }
+        return false;
+    }
+
+    private Predicate<ClassElement> affectedElements(List<PythonAstParser.TransformResult> transformedList,
+                                                     String[] srcDirs) {
+        if (incrementalSources == null) {
+            return ignored -> true;
+        }
+        Set<String> names = new LinkedHashSet<>();
+        for (PythonAstParser.TransformResult transformed : transformedList) {
+            Source source = transformed.originalSource();
+            if (!isAffectedSource(source)) {
+                continue;
+            }
+            String packageName = "python";
+            for (String srcDir : srcDirs) {
+                if (source.getPath() != null && source.getPath().startsWith(srcDir)) {
+                    packageName = PythonAstParser.getPackageNameOfSource(srcDir, source);
+                    break;
+                }
+            }
+            for (String className : transformed.allClassNames()) {
+                names.add(packageName + '.' + className);
+            }
+            String sourceName = source.getName();
+            if (sourceName.endsWith(".py")) {
+                sourceName = sourceName.substring(0, sourceName.length() - ".py".length());
+            }
+            if (!sourceName.isEmpty()) {
+                names.add(packageName + '.' + Character.toUpperCase(sourceName.charAt(0)) + sourceName.substring(1));
+            }
+        }
+        return element -> names.contains(element.getName());
     }
 
     private void processPythonSourceVisitors(List<PythonAstParser.TransformResult> transformedList,

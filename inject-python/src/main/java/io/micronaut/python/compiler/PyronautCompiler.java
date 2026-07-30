@@ -30,7 +30,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.processing.Processor;
 import java.util.StringTokenizer;
 import java.util.function.Consumer;
@@ -72,6 +74,8 @@ public final class PyronautCompiler {
     private final File errorDumpDirectory;
     private final List<PythonSourceVisitor> pythonSourceVisitors;
     private final List<Processor> annotationProcessors;
+    private final boolean incremental;
+    private final File incrementalCacheDirectory;
 
     private PyronautCompiler(Builder builder) {
         this.packageName = builder.packageName;
@@ -92,6 +96,8 @@ public final class PyronautCompiler {
         this.errorDumpDirectory = builder.errorDumpDirectory;
         this.annotationProcessors = builder.annotationProcessors == null ? List.of() : List.copyOf(builder.annotationProcessors);
         this.pythonSourceVisitors = builder.pythonSourceVisitors == null ? List.of() : List.copyOf(builder.pythonSourceVisitors);
+        this.incremental = builder.incremental;
+        this.incrementalCacheDirectory = builder.incrementalCacheDirectory;
         validateConfiguration();
     }
 
@@ -163,8 +169,136 @@ public final class PyronautCompiler {
         }
 
         PyronautJavaCompiler compiler = createCompiler();
-        JavaFileObject[] sources = createJavaSources();
-        compiler.compileToDisk(targetDir, sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
+        if (!incremental) {
+            JavaFileObject[] sources = createJavaSources();
+            compiler.compileToDisk(targetDir, sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
+            return;
+        }
+
+        File cacheDirectory = incrementalCacheDirectory != null
+            ? incrementalCacheDirectory
+            : defaultIncrementalCacheDirectory();
+        List<String> incrementalCompilerOptions = incrementalCompilerOptions();
+        IncrementalCompilation incrementalCompilation = new IncrementalCompilation(
+            javaSrc,
+            pythonSrc,
+            pythonCode,
+            getPackageName(),
+            applicationClass,
+            targetDir,
+            cacheDirectory,
+            classpath,
+            bootclasspath,
+            annotationProcessorPath,
+            incrementalCompilerOptions,
+            compilePythonBytecode,
+            annotationProcessors,
+            pythonSourceVisitors
+        );
+        boolean aggregating = compiler.hasAggregatingProcessors(
+            classpath,
+            annotationProcessorPath,
+            javaSrc,
+            pythonSrc
+        );
+        IncrementalCompilation.Plan plan = incrementalCompilation.plan(aggregating);
+        if (plan.upToDate()) {
+            return;
+        }
+        try {
+            IncrementalCompilationTrace compilationTrace = compileIncrementally(
+                compiler,
+                incrementalCompilation,
+                plan,
+                incrementalCompilerOptions
+            );
+            if (!plan.fullRebuild()
+                && (!compilationTrace.processorCompatible()
+                    || !compilationTrace.contractViolatingOutputs().isEmpty())) {
+                incrementalCompilation.invalidate();
+                if (!annotationProcessors.isEmpty()) {
+                    incrementalCompilation.prepareOutput(incrementalCompilation.plan(aggregating));
+                    throw new PyronautCompilerException(
+                        "An explicitly supplied annotation processor violated its incremental "
+                            + "contract; the output was cleaned and must be compiled again with "
+                            + "fresh processor instances"
+                    );
+                }
+                plan = incrementalCompilation.plan(aggregating);
+                compilationTrace = compileIncrementally(
+                    compiler,
+                    incrementalCompilation,
+                    plan,
+                    incrementalCompilerOptions
+                );
+            }
+            incrementalCompilation.complete(plan, compilationTrace);
+        } catch (RuntimeException e) {
+            incrementalCompilation.invalidate();
+            throw e;
+        }
+    }
+
+    private IncrementalCompilationTrace compileIncrementally(
+        PyronautJavaCompiler compiler,
+        IncrementalCompilation incrementalCompilation,
+        IncrementalCompilation.Plan plan,
+        List<String> incrementalCompilerOptions
+    ) {
+        incrementalCompilation.prepareOutput(plan);
+        boolean includeGeneratedApplication = applicationClass == null
+            && (plan.fullRebuild()
+                || plan.affectsPythonSources()
+                || (plan.aggregating() && !plan.currentPythonSources().isEmpty()));
+        if (plan.fullRebuild() || !plan.processesAllPythonSources()) {
+            compiler.setIncrementalPythonSources(
+                plan.fullRebuild() ? null : plan.pythonSources()
+            );
+        }
+        JavaFileObject[] sources = createJavaSources(plan.javaSources(), includeGeneratedApplication);
+        if (sources.length == 0) {
+            return IncrementalCompilationTrace.empty();
+        }
+        List<File> effectiveClasspath = plan.fullRebuild()
+            ? classpath
+            : appendClasspath(classpath, targetDir);
+        return compiler.compileToDisk(
+            targetDir,
+            sources,
+            effectiveClasspath,
+            bootclasspath,
+            annotationProcessorPath,
+            incrementalCompilerOptions
+        );
+    }
+
+    private File defaultIncrementalCacheDirectory() {
+        File absoluteTarget = targetDir.getAbsoluteFile();
+        File parent = absoluteTarget.getParentFile();
+        if (parent == null) {
+            parent = new File(".").getAbsoluteFile();
+        }
+        return new File(parent, "." + absoluteTarget.getName() + "-incremental");
+    }
+
+    private static List<File> appendClasspath(List<File> classpath, File entry) {
+        Set<File> result = new LinkedHashSet<>();
+        if (classpath != null) {
+            result.addAll(classpath);
+        }
+        result.add(entry);
+        return List.copyOf(result);
+    }
+
+    private List<String> incrementalCompilerOptions() {
+        List<String> options = new ArrayList<>();
+        if (compilerOptions != null) {
+            compilerOptions.stream()
+                .filter(option -> !option.startsWith("-Amicronaut.processing.incremental="))
+                .forEach(options::add);
+        }
+        options.add("-Amicronaut.processing.incremental=true");
+        return List.copyOf(options);
     }
 
     private PyronautJavaCompiler createCompiler() {
@@ -195,12 +329,17 @@ public final class PyronautCompiler {
     }
 
     private JavaFileObject[] createJavaSources() {
+        return createJavaSources(null, true);
+    }
+
+    private JavaFileObject[] createJavaSources(Set<Path> selectedSources,
+                                               boolean includeGeneratedApplication) {
         List<JavaFileObject> sources = new ArrayList<>();
 
         // Add user-provided Java sources if specified
         if (javaSrc != null && !javaSrc.isEmpty()) {
             try {
-                addJavaSourcesFromDirectory(sources, Paths.get(javaSrc));
+                addJavaSourcesFromDirectory(sources, Paths.get(javaSrc), selectedSources);
             } catch (IOException e) {
                 throw new RuntimeException("Failed to read Java sources from: " + javaSrc, e);
             }
@@ -212,7 +351,7 @@ public final class PyronautCompiler {
                 throw new IllegalArgumentException("javaSrc must be specified when applicationClass is provided");
             }
             // The application class should already be in the sources list from javaSrc
-        } else {
+        } else if (includeGeneratedApplication) {
             // Generate the default PyronautMain class
             String className = getPackageName() + ".PyronautMain";
             String sourceCode = generateMainClassSource();
@@ -262,7 +401,9 @@ public final class PyronautCompiler {
         }
     }
 
-    private void addJavaSourcesFromDirectory(List<JavaFileObject> sources, Path dir) throws IOException {
+    private void addJavaSourcesFromDirectory(List<JavaFileObject> sources,
+                                             Path dir,
+                                             Set<Path> selectedSources) throws IOException {
         if (!Files.isDirectory(dir)) {
             return;
         }
@@ -270,11 +411,13 @@ public final class PyronautCompiler {
         try (Stream<Path> paths = Files.walk(dir)) {
             paths.filter(Files::isRegularFile)
                  .filter(path -> path.toString().endsWith(".java"))
+                 .filter(path -> selectedSources == null
+                     || selectedSources.contains(normalizeSourcePath(path)))
                  .forEach(path -> {
                      try {
                          String content = Files.readString(path);
                          sources.add(new SimpleJavaFileObject(
-                             java.net.URI.create("file:///" + path),
+                             path.toAbsolutePath().normalize().toUri(),
                              JavaFileObject.Kind.SOURCE
                          ) {
                              @Override
@@ -286,6 +429,14 @@ public final class PyronautCompiler {
                          throw new RuntimeException("Failed to read Java source: " + path, e);
                      }
                  });
+        }
+    }
+
+    private static Path normalizeSourcePath(Path path) {
+        try {
+            return path.toRealPath().normalize();
+        } catch (IOException e) {
+            return path.toAbsolutePath().normalize();
         }
     }
 
@@ -363,6 +514,8 @@ public final class PyronautCompiler {
         private File errorDumpDirectory;
         private List<PythonSourceVisitor> pythonSourceVisitors;
         private List<Processor> annotationProcessors;
+        private boolean incremental;
+        private File incrementalCacheDirectory;
 
         private Builder() {
         }
@@ -540,6 +693,32 @@ public final class PyronautCompiler {
         }
 
         /**
+         * Enable incremental disk compilation. Incremental compilation is disabled by default and
+         * has no effect on {@link PyronautCompiler#buildClassLoader()}.
+         *
+         * @param incremental Whether disk compilation should reuse compatible previous outputs
+         * @return This builder
+         * @since 5.2.0
+         */
+        public Builder incremental(boolean incremental) {
+            this.incremental = incremental;
+            return this;
+        }
+
+        /**
+         * Set the directory used to persist incremental compilation state. The directory must not
+         * contain, or be contained by, the target output directory.
+         *
+         * @param incrementalCacheDirectory The incremental compilation state directory
+         * @return This builder
+         * @since 5.2.0
+         */
+        public Builder incrementalCacheDirectory(File incrementalCacheDirectory) {
+            this.incrementalCacheDirectory = incrementalCacheDirectory;
+            return this;
+        }
+
+        /**
          * Set the directory used for full compiler error dump files.
          *
          * @param errorDumpDirectory The dump directory
@@ -551,6 +730,8 @@ public final class PyronautCompiler {
         }
 
         /**
+         * Supplies visitors for Python source metadata.
+         *
          * @param pythonSourceVisitors visitors to invoke for Python source metadata in this compilation
          * @return this builder
          */
