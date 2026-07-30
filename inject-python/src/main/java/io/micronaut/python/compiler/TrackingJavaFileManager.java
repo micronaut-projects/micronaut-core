@@ -56,7 +56,7 @@ final class TrackingJavaFileManager extends ForwardingJavaFileManager<StandardJa
                                                JavaFileObject.Kind kind,
                                                FileObject sibling) throws IOException {
         JavaFileObject output = super.getJavaFileForOutput(location, className, kind, sibling);
-        record(sibling, output);
+        trackOutput(sibling, output);
         return output;
     }
 
@@ -66,7 +66,7 @@ final class TrackingJavaFileManager extends ForwardingJavaFileManager<StandardJa
                                        String relativeName,
                                        FileObject sibling) throws IOException {
         FileObject output = super.getFileForOutput(location, packageName, relativeName, sibling);
-        record(sibling, output);
+        trackOutput(sibling, output);
         return output;
     }
 
@@ -88,7 +88,7 @@ final class TrackingJavaFileManager extends ForwardingJavaFileManager<StandardJa
         this.pythonSourceResolver = pythonSourceResolver;
     }
 
-    private void record(FileObject sibling, FileObject output) {
+    private void trackOutput(FileObject sibling, FileObject output) {
         if (!(sibling instanceof JavaFileObject javaSibling)) {
             return;
         }

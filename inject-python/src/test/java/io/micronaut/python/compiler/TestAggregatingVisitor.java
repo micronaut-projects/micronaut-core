@@ -48,7 +48,7 @@ public final class TestAggregatingVisitor implements TypeElementVisitor<TestAggr
             return;
         }
         written = true;
-        visitorContext.visitMetaInfFile("pyronaut/aggregating.txt")
+        visitorContext.visitGeneratedFile("META-INF/pyronaut/aggregating.txt")
             .ifPresent(file -> {
                 try (var writer = file.openWriter()) {
                     for (String name : visited) {

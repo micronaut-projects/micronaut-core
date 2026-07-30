@@ -59,13 +59,14 @@ final class IncrementalCompilation {
     private static final String SOURCE_PREFIX = "source.";
     private static final String VFS_SOURCE_PREFIX = "META-INF/GRAALPY-VFS/micronaut-application/src/";
     private static final String VFS_ROOT = "META-INF/GRAALPY-VFS/micronaut-application";
+    private static final String PYTHON_INIT_MODULE_SUFFIX = ".__init__";
     private static final Pattern JAVA_PACKAGE = Pattern.compile("(?m)^\\s*package\\s+([\\w.]+)\\s*;");
     private static final Pattern JAVA_TYPE = Pattern.compile("\\b(?:class|interface|record|enum|@interface)\\s+([A-Za-z_$][\\w$]*)");
     private static final Pattern PYTHON_TYPE = Pattern.compile("(?m)^\\s*class\\s+([A-Za-z_]\\w*)\\b");
-    private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_$][\\w$]*(?:\\.[A-Za-z_$][\\w$]*)*");
-    private static final Pattern PYTHON_IMPORT = Pattern.compile(
-        "(?m)^\\s*(?:from\\s+([\\w.]+)\\s+import|import\\s+([\\w.]+))"
-    );
+    private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_$][\\w$]*");
+    private static final Pattern PYTHON_FROM_IMPORT = Pattern.compile("(?m)^\\s*from\\s+(\\S+)\\s+import\\s+");
+    private static final Pattern PYTHON_DIRECT_IMPORT = Pattern.compile("(?m)^\\s*import\\s+([\\w.]+)");
+    private static final Pattern PYTHON_STAR_IMPORT = Pattern.compile("(?m)^\\s*from\\s+\\S+\\s+import\\s+\\*");
     private static final Pattern DYNAMIC_PYTHON_REFERENCE = Pattern.compile(
         "\\b(?:__import__|import_module|getattr|globals|locals)\\s*\\(|@\\s*Mixin\\b"
     );
@@ -86,7 +87,7 @@ final class IncrementalCompilation {
     private final PythonIncrementalMode pythonIncrementalMode;
     private final String globalFingerprint;
 
-    @SuppressWarnings("checkstyle:ParameterNumber")
+    @SuppressWarnings({"checkstyle:ParameterNumber", "java:S107"})
     IncrementalCompilation(String javaSrc,
                            String pythonSrc,
                            String pythonCode,
@@ -364,31 +365,42 @@ final class IncrementalCompilation {
     private static boolean hasDynamicOrUnresolvedPythonRelationship(ScannedSource source,
                                                                     Set<String> pythonModules) {
         if (DYNAMIC_PYTHON_REFERENCE.matcher(source.content()).find()
-            || source.content().matches("(?s).*\\bfrom\\s+[\\w.]+\\s+import\\s+\\*.*")) {
+            || PYTHON_STAR_IMPORT.matcher(source.content()).find()) {
             return true;
         }
-        Matcher imports = PYTHON_IMPORT.matcher(source.content());
-        while (imports.find()) {
-            String module = imports.group(1) != null ? imports.group(1) : imports.group(2);
+        for (String module : pythonImports(source.content())) {
             if (module.startsWith(".")) {
                 String resolved = resolveRelativePythonModule(source.state().relativePath(), module);
-                if (!pythonModules.contains(resolved) && !pythonModules.contains(resolved + ".__init__")) {
+                if (!pythonModules.contains(resolved) && !pythonModules.contains(resolved + PYTHON_INIT_MODULE_SUFFIX)) {
                     return true;
                 }
-                continue;
-            }
-            int separator = module.indexOf('.');
-            String topLevelModule = separator == -1 ? module : module.substring(0, separator);
-            boolean localPackage = pythonModules.stream()
-                .anyMatch(candidate -> candidate.equals(topLevelModule)
-                    || candidate.startsWith(topLevelModule + '.'));
-            if (localPackage
-                && !pythonModules.contains(module)
-                && !pythonModules.contains(module + ".__init__")) {
-                return true;
+            } else {
+                int separator = module.indexOf('.');
+                String topLevelModule = separator == -1 ? module : module.substring(0, separator);
+                boolean localPackage = pythonModules.stream()
+                    .anyMatch(candidate -> candidate.equals(topLevelModule)
+                        || candidate.startsWith(topLevelModule + '.'));
+                if (localPackage
+                    && !pythonModules.contains(module)
+                    && !pythonModules.contains(module + PYTHON_INIT_MODULE_SUFFIX)) {
+                    return true;
+                }
             }
         }
         return false;
+    }
+
+    private static Set<String> pythonImports(String content) {
+        Set<String> modules = new LinkedHashSet<>();
+        Matcher fromImports = PYTHON_FROM_IMPORT.matcher(content);
+        while (fromImports.find()) {
+            modules.add(fromImports.group(1));
+        }
+        Matcher directImports = PYTHON_DIRECT_IMPORT.matcher(content);
+        while (directImports.find()) {
+            modules.add(directImports.group(1));
+        }
+        return modules;
     }
 
     private static String resolveRelativePythonModule(String relativePath, String module) {
@@ -545,29 +557,21 @@ final class IncrementalCompilation {
             Matcher identifiers = IDENTIFIER.matcher(source.content());
             while (identifiers.find()) {
                 String identifier = identifiers.group();
-                while (true) {
-                    for (String owner : typeOwners.getOrDefault(identifier, Set.of())) {
-                        if (!owner.equals(source.state().key())) {
-                            dependencies.add(owner);
-                        }
+                for (String owner : typeOwners.getOrDefault(identifier, Set.of())) {
+                    if (!owner.equals(source.state().key())) {
+                        dependencies.add(owner);
                     }
-                    int separator = identifier.lastIndexOf('.');
-                    if (separator == -1) {
-                        break;
-                    }
-                    identifier = identifier.substring(0, separator);
                 }
             }
             if (source.state().language() == Language.PYTHON) {
-                Matcher imports = PYTHON_IMPORT.matcher(source.content());
-                while (imports.find()) {
-                    String module = imports.group(1) != null ? imports.group(1) : imports.group(2);
+                for (String importedModule : pythonImports(source.content())) {
+                    String module = importedModule;
                     if (module.startsWith(".")) {
                         module = resolveRelativePythonModule(source.state().relativePath(), module);
                     }
                     String owner = pythonModules.get(module);
                     if (owner == null) {
-                        owner = pythonModules.get(module + ".__init__");
+                        owner = pythonModules.get(module + PYTHON_INIT_MODULE_SUFFIX);
                     }
                     if (owner != null && !owner.equals(source.state().key())) {
                         dependencies.add(owner);
@@ -695,14 +699,11 @@ final class IncrementalCompilation {
         if (output.startsWith(VFS_SOURCE_PREFIX)) {
             String relative = output.substring(VFS_SOURCE_PREFIX.length());
             for (SourceState source : sources.values()) {
-                if (source.language() != Language.PYTHON) {
-                    continue;
-                }
-                if (source.relativePath().endsWith("/__init__.py")
-                    || source.relativePath().equals("__init__.py")) {
-                    continue;
-                }
-                if (relative.equals(source.relativePath()) || isPythonBytecode(relative, source.relativePath())) {
+                boolean isolatingPythonSource = source.language() == Language.PYTHON
+                    && !source.relativePath().endsWith("/__init__.py")
+                    && !source.relativePath().equals("__init__.py");
+                if (isolatingPythonSource
+                    && (relative.equals(source.relativePath()) || isPythonBytecode(relative, source.relativePath()))) {
                     return source.key();
                 }
             }

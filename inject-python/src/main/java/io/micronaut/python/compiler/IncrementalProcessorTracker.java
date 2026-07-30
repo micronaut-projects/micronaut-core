@@ -126,56 +126,11 @@ final class IncrementalProcessorTracker {
         return ProcessorKind.UNKNOWN;
     }
 
-    private void record(FileObject output,
-                        ProcessorKind kind,
-                        boolean pythonProcessor,
-                        Element... originatingElements) {
-        String relativeOutput = relativeOutput(output);
-        if (relativeOutput == null) {
-            processorCompatible = false;
-            return;
-        }
-        if (pythonProcessor) {
-            pythonProcessorOutputs.add(relativeOutput);
-        }
-        if (kind != ProcessorKind.ISOLATING) {
-            aggregatingOutputs.add(relativeOutput);
-            return;
-        }
-        if (originatingElements.length != 1) {
-            if (pythonProcessor) {
-                // Python processing produces shared VFS indexes, package initializers, and bridge
-                // modules. They are tracked separately and replaced whenever Python is processed.
-                return;
-            }
-            contractViolatingOutputs.add(relativeOutput);
-            return;
-        }
-        String source = compilationTracker.sourceKey(originatingElements[0]);
-        if (source != null) {
-            isolatingOutputs.computeIfAbsent(source, ignored -> new LinkedHashSet<>())
-                .add(relativeOutput);
-        }
-    }
-
     private static Path normalizeDirectory(Path directory) {
         try {
             return directory.toRealPath().normalize();
         } catch (IOException e) {
             return directory.toAbsolutePath().normalize();
-        }
-    }
-
-    private String relativeOutput(FileObject output) {
-        try {
-            Path outputPath = Path.of(output.toUri()).toAbsolutePath().normalize();
-            if (!outputPath.startsWith(targetDirectory)) {
-                return null;
-            }
-            return targetDirectory.relativize(outputPath).toString()
-                .replace(outputPath.getFileSystem().getSeparator(), "/");
-        } catch (Exception e) {
-            return null;
         }
     }
 
@@ -244,6 +199,48 @@ final class IncrementalProcessorTracker {
             this.pythonProcessor = pythonProcessor;
         }
 
+        private void trackOutput(FileObject output, Element... originatingElements) {
+            String relativeOutput = relativeOutput(output);
+            if (relativeOutput == null) {
+                processorCompatible = false;
+                return;
+            }
+            if (pythonProcessor) {
+                pythonProcessorOutputs.add(relativeOutput);
+            }
+            if (kind != ProcessorKind.ISOLATING) {
+                aggregatingOutputs.add(relativeOutput);
+                return;
+            }
+            if (originatingElements.length != 1) {
+                if (pythonProcessor) {
+                    // Python processing produces shared VFS indexes, package initializers, and bridge
+                    // modules. They are tracked separately and replaced whenever Python is processed.
+                    return;
+                }
+                contractViolatingOutputs.add(relativeOutput);
+                return;
+            }
+            String source = compilationTracker.sourceKey(originatingElements[0]);
+            if (source != null) {
+                isolatingOutputs.computeIfAbsent(source, ignored -> new LinkedHashSet<>())
+                    .add(relativeOutput);
+            }
+        }
+
+        private String relativeOutput(FileObject output) {
+            try {
+                Path outputPath = Path.of(output.toUri()).toAbsolutePath().normalize();
+                if (!outputPath.startsWith(targetDirectory)) {
+                    return null;
+                }
+                return targetDirectory.relativize(outputPath).toString()
+                    .replace(outputPath.getFileSystem().getSeparator(), "/");
+            } catch (Exception e) {
+                return null;
+            }
+        }
+
         @Override
         public JavaFileObject createSourceFile(CharSequence name,
                                                Element... originatingElements) throws IOException {
@@ -255,7 +252,7 @@ final class IncrementalProcessorTracker {
                     originatingElements
                 );
             }
-            record(output, kind, pythonProcessor, originatingElements);
+            trackOutput(output, originatingElements);
             return output;
         }
 
@@ -263,7 +260,7 @@ final class IncrementalProcessorTracker {
         public JavaFileObject createClassFile(CharSequence name,
                                               Element... originatingElements) throws IOException {
             JavaFileObject output = delegate.createClassFile(name, originatingElements);
-            record(output, kind, pythonProcessor, originatingElements);
+            trackOutput(output, originatingElements);
             return output;
         }
 
@@ -273,7 +270,7 @@ final class IncrementalProcessorTracker {
                                          CharSequence relativeName,
                                          Element... originatingElements) throws IOException {
             FileObject output = delegate.createResource(location, moduleAndPkg, relativeName, originatingElements);
-            record(output, kind, pythonProcessor, originatingElements);
+            trackOutput(output, originatingElements);
             return output;
         }
 

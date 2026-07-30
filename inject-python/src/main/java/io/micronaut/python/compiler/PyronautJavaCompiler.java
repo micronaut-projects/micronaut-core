@@ -197,10 +197,7 @@ final class PyronautJavaCompiler {
                 }
             }
             return false;
-        } catch (Throwable e) {
-            if (e instanceof VirtualMachineError virtualMachineError) {
-                throw virtualMachineError;
-            }
+        } catch (Exception | LinkageError e) {
             // Unknown visitor behavior must not be treated as isolating.
             return true;
         } finally {

@@ -209,21 +209,19 @@ public final class PythonTypeElementVisitorProcessor {
                              Predicate<ClassElement> sourceFilter) {
         for (ClassElement mixin : collectPythonClassElements(environment, sourceFilter)) {
             AnnotationValue<Mixin> mixinAnnotation = mixin.getAnnotation(Mixin.class);
-            if (mixinAnnotation == null) {
-                continue;
+            if (mixinAnnotation != null) {
+                String target = mixinAnnotation.stringValue("target")
+                    .orElse(mixinAnnotation.stringValue().orElse(null));
+                if (target != null && !Object.class.getName().equals(target)) {
+                    ClassElement mixinTarget = pythonVisitorContext.getClassElement(target).orElse(null);
+                    if (mixinTarget == null) {
+                        pythonVisitorContext.warn("Cannot access class: " + target, mixin);
+                    } else {
+                        VisitorUtils.applyMixin(mixinAnnotation, mixin, mixinTarget, pythonVisitorContext);
+                        copyPythonPropertyMixinAnnotations(mixinAnnotation, mixin, mixinTarget);
+                    }
+                }
             }
-            String target = mixinAnnotation.stringValue("target")
-                .orElse(mixinAnnotation.stringValue().orElse(null));
-            if (target == null || Object.class.getName().equals(target)) {
-                continue;
-            }
-            ClassElement mixinTarget = pythonVisitorContext.getClassElement(target).orElse(null);
-            if (mixinTarget == null) {
-                pythonVisitorContext.warn("Cannot access class: " + target, mixin);
-                continue;
-            }
-            VisitorUtils.applyMixin(mixinAnnotation, mixin, mixinTarget, pythonVisitorContext);
-            copyPythonPropertyMixinAnnotations(mixinAnnotation, mixin, mixinTarget);
         }
     }
 

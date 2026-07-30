@@ -36,8 +36,8 @@ public final class TestConditionalIsolatingVisitor implements TypeElementVisitor
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         var generatedFile = element.booleanValue(TestConditionalIsolate.class, "valid").orElse(false)
-            ? context.visitMetaInfFile("pyronaut/conditional-isolating.txt", element)
-            : context.visitMetaInfFile("pyronaut/conditional-isolating.txt");
+            ? context.visitGeneratedFile("META-INF/pyronaut/conditional-isolating.txt", element)
+            : context.visitGeneratedFile("META-INF/pyronaut/conditional-isolating.txt");
         generatedFile.ifPresent(file -> {
             try (var writer = file.openWriter()) {
                 writer.write(element.getName());

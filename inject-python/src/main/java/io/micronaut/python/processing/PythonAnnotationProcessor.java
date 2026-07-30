@@ -73,6 +73,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     public static final String APPLICATION_SRC_PATH = "GRAALPY-VFS/micronaut-application/src/";
     public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_SRC_PATH + "__main__.py";
     static final String PYTHON_APPLICATION_ANNOTATION = "io.micronaut.context.python.annotation.PythonApplication";
+    private static final String PYTHON_LANGUAGE = "python";
     private static final Set<String> PYTHON_KEYWORDS = Set.of(
         "False", "None", "True", "and", "as", "assert", "async", "await", "break",
         "class", "continue", "def", "del", "elif", "else", "except", "finally",
@@ -433,7 +434,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             if (!isAffectedSource(source)) {
                 continue;
             }
-            String packageName = "python";
+            String packageName = PYTHON_LANGUAGE;
             for (String srcDir : srcDirs) {
                 if (source.getPath() != null && source.getPath().startsWith(srcDir)) {
                     packageName = PythonAstParser.getPackageNameOfSource(srcDir, source);
@@ -484,7 +485,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         if (!code.isEmpty()) {
             // Transform the source code first
             try {
-                return parser.transform(javaVisitorContext, Source.create("python", code));
+                return parser.transform(javaVisitorContext, Source.create(PYTHON_LANGUAGE, code));
             } catch (Exception e) {
                 throw new ProcessingException(originatingElement, "Error transforming python code: " + e.getMessage(), e);
             }
@@ -526,7 +527,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                                     "Micronaut generates package __init__.py files for the GraalPy VFS; remove [" + relative + "] from the project source."
                                             );
                                         }
-                                        sources.add(Source.newBuilder("python", file.toFile()).build());
+                                        sources.add(Source.newBuilder(PYTHON_LANGUAGE, file.toFile()).build());
                                     }
                                     return FileVisitResult.CONTINUE;
                                 }

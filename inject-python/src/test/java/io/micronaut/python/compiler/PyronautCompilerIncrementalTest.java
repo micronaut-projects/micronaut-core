@@ -919,6 +919,32 @@ final class PyronautCompilerIncrementalTest {
     }
 
     @Test
+    void reprocessesAllPythonSourcesForRelativeStarImports(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python/pkg"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        Files.writeString(alpha, "class Alpha:\n    value: int = 1\n");
+        Files.writeString(python.resolve("symbols.py"), "VALUE = 1\n");
+        Files.writeString(python.resolve("consumer.py"), """
+            from .symbols import *
+            class Consumer:
+                value: int = VALUE
+            """);
+        compilePython(directory.resolve("python"), java, output, cache);
+        Path consumerVfs = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/pkg/consumer.py"
+        );
+        Files.setLastModifiedTime(consumerVfs, UNCHANGED_MARKER);
+
+        Files.writeString(alpha, "class Alpha:\n    value: int = 2\n");
+        compilePython(directory.resolve("python"), java, output, cache);
+
+        assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(consumerVfs));
+    }
+
+    @Test
     void regeneratesSharedPythonPackageOutputs(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python/pkg"));
         Path java = Files.createDirectories(directory.resolve("java"));
