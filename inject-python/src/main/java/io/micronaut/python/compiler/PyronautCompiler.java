@@ -17,6 +17,7 @@ package io.micronaut.python.compiler;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.python.processing.PythonProcessingSession;
 import io.micronaut.python.processing.PythonSourceVisitor;
 
 import javax.tools.JavaFileObject;
@@ -77,6 +78,7 @@ public final class PyronautCompiler {
     private final boolean incremental;
     private final File incrementalCacheDirectory;
     private final PythonIncrementalMode pythonIncrementalMode;
+    private final PythonProcessingSession pythonProcessingSession;
 
     private PyronautCompiler(Builder builder) {
         this.packageName = builder.packageName;
@@ -100,6 +102,7 @@ public final class PyronautCompiler {
         this.incremental = builder.incremental;
         this.incrementalCacheDirectory = builder.incrementalCacheDirectory;
         this.pythonIncrementalMode = builder.pythonIncrementalMode;
+        this.pythonProcessingSession = builder.pythonProcessingSession;
         validateConfiguration();
     }
 
@@ -315,6 +318,7 @@ public final class PyronautCompiler {
         compiler.setCompilePythonBytecode(compilePythonBytecode);
         compiler.setAnnotationProcessors(annotationProcessors);
         compiler.setPythonSourceVisitors(pythonSourceVisitors);
+        compiler.setPythonProcessingSession(pythonProcessingSession);
         return compiler;
     }
 
@@ -521,6 +525,7 @@ public final class PyronautCompiler {
         private boolean incremental;
         private File incrementalCacheDirectory;
         private PythonIncrementalMode pythonIncrementalMode = PythonIncrementalMode.CONSERVATIVE;
+        private PythonProcessingSession pythonProcessingSession;
 
         private Builder() {
         }
@@ -735,6 +740,23 @@ public final class PyronautCompiler {
             this.pythonIncrementalMode = java.util.Objects.requireNonNull(
                 pythonIncrementalMode,
                 "pythonIncrementalMode"
+            );
+            return this;
+        }
+
+        /**
+         * Reuse an initialized GraalPy context across serialized compiler invocations.
+         *
+         * <p>The caller owns the session and must close it after the final compilation.</p>
+         *
+         * @param pythonProcessingSession The reusable Python processing session
+         * @return This builder
+         * @since 5.2.0
+         */
+        public Builder pythonProcessingSession(PythonProcessingSession pythonProcessingSession) {
+            this.pythonProcessingSession = java.util.Objects.requireNonNull(
+                pythonProcessingSession,
+                "pythonProcessingSession"
             );
             return this;
         }

@@ -90,6 +90,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private Set<String> incrementalSources;
     private boolean processAggregatingVisitors = true;
     private Path outputDirectory;
+    private PythonProcessingSession processingSession;
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -150,6 +151,16 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         this.outputDirectory = outputDirectory;
     }
 
+    /**
+     * Sets a session that owns the GraalPy context across compiler invocations.
+     *
+     * @param processingSession The reusable processing session
+     */
+    @Internal
+    public void setProcessingSession(PythonProcessingSession processingSession) {
+        this.processingSession = processingSession;
+    }
+
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
@@ -163,7 +174,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
     @Override
     public void close() throws Exception {
-        if (parser != null) {
+        if (parser != null && processingSession == null) {
             parser.close();
         }
         if (bytecodeCompiler != null) {
@@ -174,7 +185,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         if (roundEnv.processingOver()) {
-            if (parser != null) {
+            if (parser != null && processingSession == null) {
                 parser.close();
             }
             return false;
@@ -211,7 +222,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
     private void initializeParser() {
         if (parser == null) {
-            parser = new PythonAstParser(classLoader, incrementalSources != null);
+            parser = processingSession == null
+                ? new PythonAstParser(classLoader, incrementalSources != null)
+                : processingSession.parser(classLoader, incrementalSources != null);
         }
     }
 

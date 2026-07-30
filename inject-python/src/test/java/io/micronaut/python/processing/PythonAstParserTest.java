@@ -14,6 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -83,6 +85,23 @@ public class PythonAstParserTest {
         } finally {
             parser.close();
         }
+    }
+
+    @Test
+    void processingSessionReusesInitializedContextAcrossCompilations() {
+        PythonProcessingSession session = new PythonProcessingSession();
+        PythonAstParser first = session.parser(getClass().getClassLoader(), true);
+        assertTrue(session.initialized());
+        assertNotNull(first.parse("answer = 1"));
+        PythonAstParser second = session.parser(getClass().getClassLoader(), true);
+        assertSame(first, second);
+        assertNotNull(second.parse("answer = 2"));
+
+        session.close();
+        assertThrows(
+            IllegalStateException.class,
+            () -> session.parser(getClass().getClassLoader(), true)
+        );
     }
 
     @Test

@@ -17,6 +17,7 @@ package io.micronaut.python.compiler;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import io.micronaut.python.processing.PythonProcessingSession;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
@@ -54,6 +55,27 @@ final class PyronautCompilerIncrementalTest {
             .compile();
 
         assertFalse(Files.exists(cache));
+    }
+
+    @Test
+    void reusesPythonProcessingSessionAcrossIncrementalCompilations(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path source = python.resolve("example.py");
+        Files.writeString(source, "class Example:\n    value: int = 1\n");
+
+        try (PythonProcessingSession session = new PythonProcessingSession()) {
+            compilePython(python, java, output, cache, session);
+            assertTrue(session.initialized());
+
+            Files.writeString(source, "class Example:\n    value: int = 2\n");
+            compilePython(python, java, output, cache, session);
+            assertTrue(Files.readString(output.resolve(
+                "META-INF/GRAALPY-VFS/micronaut-application/src/example.py"
+            )).contains("value: int = 2"));
+        }
     }
 
     @Test
@@ -1167,6 +1189,22 @@ final class PyronautCompilerIncrementalTest {
 
     private static void compilePython(Path python, Path java, Path output, Path cache) {
         compilePython(python, java, output, cache, false);
+    }
+
+    private static void compilePython(Path python,
+                                      Path java,
+                                      Path output,
+                                      Path cache,
+                                      PythonProcessingSession session) {
+        PyronautCompiler.builder()
+            .pythonSrc(python.toString())
+            .javaSrc(java.toString())
+            .targetDir(output.toFile())
+            .incremental(true)
+            .incrementalCacheDirectory(cache.toFile())
+            .pythonProcessingSession(session)
+            .build()
+            .compile();
     }
 
     private static void compilePython(Path python,

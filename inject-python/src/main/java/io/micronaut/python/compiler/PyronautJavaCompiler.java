@@ -29,6 +29,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.python.processing.PythonSourceVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonAnnotationProcessor;
+import io.micronaut.python.processing.PythonProcessingSession;
 import org.jspecify.annotations.NonNull;
 
 import javax.annotation.processing.Processor;
@@ -93,6 +94,7 @@ final class PyronautJavaCompiler {
     private boolean compilePythonBytecode;
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
     private List<Processor> annotationProcessors = List.of();
+    private PythonProcessingSession pythonProcessingSession;
     private Set<String> incrementalPythonSources;
     private boolean processAggregatingPythonVisitors = true;
 
@@ -156,6 +158,10 @@ final class PyronautJavaCompiler {
      */
     public void setAnnotationProcessors(List<Processor> annotationProcessors) {
         this.annotationProcessors = List.copyOf(annotationProcessors);
+    }
+
+    void setPythonProcessingSession(PythonProcessingSession pythonProcessingSession) {
+        this.pythonProcessingSession = pythonProcessingSession;
     }
 
     /**
@@ -838,6 +844,7 @@ final class PyronautJavaCompiler {
         pythonProcessor.setIncrementalSources(incrementalPythonSources);
         pythonProcessor.setProcessAggregatingVisitors(processAggregatingPythonVisitors);
         pythonProcessor.setOutputDirectory(outputDirectory);
+        pythonProcessor.setProcessingSession(pythonProcessingSession);
         if (classElementCallback != null) {
             pythonProcessor.setClassElementCallback(classElementCallback);
         }
