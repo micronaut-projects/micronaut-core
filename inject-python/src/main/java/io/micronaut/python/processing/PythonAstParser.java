@@ -77,9 +77,10 @@ public final class PythonAstParser {
             .hostClassLoader(classLoader)
             .allowHostClassLookup(name -> name.startsWith("io.micronaut"));
         if (incremental) {
-            // Incremental processing is a short-lived workload. A single compiler thread avoids
-            // paying the startup cost of GraalPy's core-count-based compiler thread pool.
+            // Incremental processing is a short-lived workload. Tune GraalPy for startup latency
+            // and avoid paying for a core-count-based compiler thread pool.
             contextBuilder.allowExperimentalOptions(true)
+                .option("engine.Mode", "latency")
                 .option("engine.CompilerThreads", "1");
         }
         this.context = contextBuilder.build();
