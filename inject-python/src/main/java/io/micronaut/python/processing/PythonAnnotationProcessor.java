@@ -159,12 +159,13 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 classLoader = PythonAnnotationProcessor.class.getClassLoader();
             }
         }
-        parser = new PythonAstParser(classLoader);
     }
 
     @Override
     public void close() throws Exception {
-        parser.close();
+        if (parser != null) {
+            parser.close();
+        }
         if (bytecodeCompiler != null) {
             bytecodeCompiler.close();
         }
@@ -173,7 +174,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         if (roundEnv.processingOver()) {
-            parser.close();
+            if (parser != null) {
+                parser.close();
+            }
             return false;
         }
         if (annotations.isEmpty()) {
@@ -199,9 +202,16 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             if (element instanceof TypeElement typeElement) {
                 PythonApplicationValues values = readPythonApplicationValues(element).orElse(null);
                 if (values != null) {
+                    initializeParser();
                     processAnnotation(typeElement, values);
                 }
             }
+        }
+    }
+
+    private void initializeParser() {
+        if (parser == null) {
+            parser = new PythonAstParser(classLoader, incrementalSources != null);
         }
     }
 

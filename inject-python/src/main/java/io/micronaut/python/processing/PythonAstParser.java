@@ -63,15 +63,25 @@ public final class PythonAstParser {
     }
 
     PythonAstParser(ClassLoader classLoader) {
-        this.context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+        this(classLoader, false);
+    }
+
+    PythonAstParser(ClassLoader classLoader, boolean interpreterOnly) {
+        var contextBuilder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                 .resourceDirectory(INJECT_RESOURCES)
                 .resourceLoadingClass(PythonAstParser.class)
                 .build())
             // Future hardening should constrain host access to the required Micronaut API surface.
             .allowHostAccess(HostAccess.ALL)
             .hostClassLoader(classLoader)
-            .allowHostClassLookup(name -> name.startsWith("io.micronaut"))
-            .build();
+            .allowHostClassLookup(name -> name.startsWith("io.micronaut"));
+        if (interpreterOnly) {
+            // Incremental processing is a short-lived workload. Avoid spending more time compiling
+            // Python processing code than the reduced source set can recover during this invocation.
+            contextBuilder.allowExperimentalOptions(true)
+                .option("engine.Compilation", "false");
+        }
+        this.context = contextBuilder.build();
         context.initialize(PYTHON);
     }
 
