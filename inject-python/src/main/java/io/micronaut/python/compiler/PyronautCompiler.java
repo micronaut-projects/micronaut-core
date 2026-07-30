@@ -76,6 +76,7 @@ public final class PyronautCompiler {
     private final List<Processor> annotationProcessors;
     private final boolean incremental;
     private final File incrementalCacheDirectory;
+    private final PythonIncrementalMode pythonIncrementalMode;
 
     private PyronautCompiler(Builder builder) {
         this.packageName = builder.packageName;
@@ -98,6 +99,7 @@ public final class PyronautCompiler {
         this.pythonSourceVisitors = builder.pythonSourceVisitors == null ? List.of() : List.copyOf(builder.pythonSourceVisitors);
         this.incremental = builder.incremental;
         this.incrementalCacheDirectory = builder.incrementalCacheDirectory;
+        this.pythonIncrementalMode = builder.pythonIncrementalMode;
         validateConfiguration();
     }
 
@@ -193,7 +195,8 @@ public final class PyronautCompiler {
             incrementalCompilerOptions,
             compilePythonBytecode,
             annotationProcessors,
-            pythonSourceVisitors
+            pythonSourceVisitors,
+            pythonIncrementalMode
         );
         boolean aggregating = compiler.hasAggregatingProcessors(
             classpath,
@@ -516,6 +519,7 @@ public final class PyronautCompiler {
         private List<Processor> annotationProcessors;
         private boolean incremental;
         private File incrementalCacheDirectory;
+        private PythonIncrementalMode pythonIncrementalMode = PythonIncrementalMode.CONSERVATIVE;
 
         private Builder() {
         }
@@ -715,6 +719,22 @@ public final class PyronautCompiler {
          */
         public Builder incrementalCacheDirectory(File incrementalCacheDirectory) {
             this.incrementalCacheDirectory = incrementalCacheDirectory;
+            return this;
+        }
+
+        /**
+         * Set how incremental compilation handles dynamic or unresolved Python relationships.
+         * Defaults to {@link PythonIncrementalMode#CONSERVATIVE}.
+         *
+         * @param pythonIncrementalMode The Python incremental dependency policy
+         * @return This builder
+         * @since 5.2.0
+         */
+        public Builder pythonIncrementalMode(PythonIncrementalMode pythonIncrementalMode) {
+            this.pythonIncrementalMode = java.util.Objects.requireNonNull(
+                pythonIncrementalMode,
+                "pythonIncrementalMode"
+            );
             return this;
         }
 

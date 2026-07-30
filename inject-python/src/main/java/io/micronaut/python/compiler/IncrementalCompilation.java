@@ -83,6 +83,7 @@ final class IncrementalCompilation {
     private final List<String> compilerOptions;
     private final boolean compilePythonBytecode;
     private final List<String> processorTypes;
+    private final PythonIncrementalMode pythonIncrementalMode;
     private final String globalFingerprint;
 
     @SuppressWarnings("checkstyle:ParameterNumber")
@@ -99,7 +100,8 @@ final class IncrementalCompilation {
                            List<String> compilerOptions,
                            boolean compilePythonBytecode,
                            Collection<?> annotationProcessors,
-                           Collection<?> pythonSourceVisitors) {
+                           Collection<?> pythonSourceVisitors,
+                           PythonIncrementalMode pythonIncrementalMode) {
         this.javaRoot = normalizeNullable(javaSrc);
         this.pythonRoots = parseRoots(pythonSrc);
         this.pythonCode = pythonCode;
@@ -112,6 +114,7 @@ final class IncrementalCompilation {
         this.annotationProcessorPath = copy(annotationProcessorPath);
         this.compilerOptions = compilerOptions == null ? List.of() : List.copyOf(compilerOptions);
         this.compilePythonBytecode = compilePythonBytecode;
+        this.pythonIncrementalMode = pythonIncrementalMode;
         this.processorTypes = Stream.concat(annotationProcessors.stream(), pythonSourceVisitors.stream())
             .map(value -> value.getClass().getName())
             .sorted()
@@ -155,7 +158,8 @@ final class IncrementalCompilation {
         }
 
         Set<String> affected = affectedSources(changed, previous.sources(), currentSources);
-        if (requiresConservativePythonProcessing(affected, scannedSources)
+        if ((pythonIncrementalMode == PythonIncrementalMode.CONSERVATIVE
+            && requiresConservativePythonProcessing(affected, scannedSources))
             || containsDeletedPythonSource(affected, currentSources, previous.sources())) {
             currentSources.values().stream()
                 .filter(source -> source.language() == Language.PYTHON)
@@ -341,7 +345,11 @@ final class IncrementalCompilation {
 
     private static boolean requiresConservativePythonProcessing(Set<String> affected,
                                                                 Map<String, ScannedSource> scannedSources) {
-        if (affected.isEmpty()) {
+        boolean affectsPython = affected.stream()
+            .map(scannedSources::get)
+            .filter(java.util.Objects::nonNull)
+            .anyMatch(source -> source.state().language() == Language.PYTHON);
+        if (!affectsPython) {
             return false;
         }
         Set<String> pythonModules = scannedSources.values().stream()
@@ -956,6 +964,7 @@ final class IncrementalCompilation {
         update(digest, "package-name=" + packageName);
         update(digest, "application-class=" + applicationClass);
         update(digest, "python-bytecode=" + compilePythonBytecode);
+        update(digest, "python-incremental-mode=" + pythonIncrementalMode);
         compilerOptions.forEach(option -> update(digest, "option=" + option));
         processorTypes.forEach(type -> update(digest, "processor=" + type));
         hashEntries(digest, "classpath", classpath);

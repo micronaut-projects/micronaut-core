@@ -846,6 +846,54 @@ final class PyronautCompilerIncrementalTest {
     }
 
     @Test
+    void optimisticModeDoesNotExpandDynamicPythonRelationships(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        Files.writeString(alpha, "class Alpha:\n    value: int = 1\n");
+        Files.writeString(python.resolve("dynamic.py"), """
+            class Dynamic:
+                value: object = getattr(object(), "value", None)
+            """);
+        compilePython(python, java, output, cache, PythonIncrementalMode.OPTIMISTIC);
+        Path dynamicVfs = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/dynamic.py"
+        );
+        Files.setLastModifiedTime(dynamicVfs, UNCHANGED_MARKER);
+
+        Files.writeString(alpha, "class Alpha:\n    value: int = 2\n");
+        compilePython(python, java, output, cache, PythonIncrementalMode.OPTIMISTIC);
+
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(dynamicVfs));
+    }
+
+    @Test
+    void doesNotReprocessDynamicPythonSourcesForUnrelatedJavaChanges(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Files.writeString(python.resolve("dynamic.py"), """
+            class Dynamic:
+                value: object = getattr(object(), "value", None)
+            """);
+        Path unrelatedJava = java.resolve("Unrelated.java");
+        Files.writeString(unrelatedJava, "class Unrelated { int value = 1; }\n");
+        compilePython(python, java, output, cache);
+        Path dynamicVfs = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/dynamic.py"
+        );
+        Files.setLastModifiedTime(dynamicVfs, UNCHANGED_MARKER);
+
+        Files.writeString(unrelatedJava, "class Unrelated { int value = 2; }\n");
+        compilePython(python, java, output, cache);
+
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(dynamicVfs));
+    }
+
+    @Test
     void reprocessesAllPythonSourcesForUnresolvedRelativeImports(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python/pkg"));
         Path java = Files.createDirectories(directory.resolve("java"));
@@ -1051,6 +1099,22 @@ final class PyronautCompilerIncrementalTest {
                                       Path java,
                                       Path output,
                                       Path cache,
+                                      PythonIncrementalMode pythonIncrementalMode) {
+        PyronautCompiler.builder()
+            .pythonSrc(python.toString())
+            .javaSrc(java.toString())
+            .targetDir(output.toFile())
+            .incremental(true)
+            .incrementalCacheDirectory(cache.toFile())
+            .pythonIncrementalMode(pythonIncrementalMode)
+            .build()
+            .compile();
+    }
+
+    private static void compilePython(Path python,
+                                      Path java,
+                                      Path output,
+                                      Path cache,
                                       boolean bytecode) {
         PyronautCompiler.builder()
             .pythonSrc(python.toString())
@@ -1119,7 +1183,8 @@ final class PyronautCompilerIncrementalTest {
             List.of("-Amicronaut.processing.incremental=true"),
             bytecode,
             List.of(),
-            List.of()
+            List.of(),
+            PythonIncrementalMode.CONSERVATIVE
         );
     }
 
