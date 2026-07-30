@@ -59,6 +59,7 @@ final class IncrementalProcessorTracker {
     private final JavaCompilationTracker compilationTracker;
     private final Path targetDirectory;
     private final Map<String, Set<String>> isolatingOutputs = new LinkedHashMap<>();
+    private final Set<String> aggregatingInputs = new LinkedHashSet<>();
     private final Set<String> aggregatingOutputs = new LinkedHashSet<>();
     private final Set<String> pythonProcessorOutputs = new LinkedHashSet<>();
     private final Set<String> contractViolatingOutputs = new LinkedHashSet<>();
@@ -79,10 +80,21 @@ final class IncrementalProcessorTracker {
             wrapped.add(new TrackingProcessor(
                 processor,
                 kind,
-                processor instanceof PythonAnnotationProcessor
+                processor instanceof PythonAnnotationProcessor,
+                !isMicronautBuiltInProcessor(processor)
             ));
         }
         return wrapped;
+    }
+
+    private static boolean isMicronautBuiltInProcessor(Processor processor) {
+        return processor instanceof AggregatingTypeElementVisitorProcessor
+            || processor instanceof AggregatingPackageElementVisitorProcessor
+            || processor instanceof MixinVisitorProcessor
+            || processor instanceof PackageElementVisitorProcessor
+            || processor instanceof TypeElementVisitorProcessor
+            || processor instanceof BeanDefinitionInjectProcessor
+            || processor instanceof PythonAnnotationProcessor;
     }
 
     Map<String, Set<String>> isolatingOutputs() {
@@ -91,6 +103,10 @@ final class IncrementalProcessorTracker {
 
     Set<String> aggregatingOutputs() {
         return aggregatingOutputs;
+    }
+
+    Set<String> aggregatingInputs() {
+        return aggregatingInputs;
     }
 
     Set<String> pythonProcessorOutputs() {
@@ -138,13 +154,16 @@ final class IncrementalProcessorTracker {
         private final Processor delegate;
         private final ProcessorKind kind;
         private final boolean pythonProcessor;
+        private final boolean strictIsolating;
 
         private TrackingProcessor(Processor delegate,
                                   ProcessorKind kind,
-                                  boolean pythonProcessor) {
+                                  boolean pythonProcessor,
+                                  boolean strictIsolating) {
             this.delegate = delegate;
             this.kind = kind;
             this.pythonProcessor = pythonProcessor;
+            this.strictIsolating = strictIsolating;
         }
 
         @Override
@@ -166,7 +185,12 @@ final class IncrementalProcessorTracker {
         public void init(ProcessingEnvironment processingEnvironment) {
             delegate.init(new TrackingProcessingEnvironment(
                 processingEnvironment,
-                new TrackingFiler(processingEnvironment.getFiler(), kind, pythonProcessor)
+                new TrackingFiler(
+                    processingEnvironment.getFiler(),
+                    kind,
+                    pythonProcessor,
+                    strictIsolating
+                )
             ));
         }
 
@@ -190,13 +214,16 @@ final class IncrementalProcessorTracker {
         private final Filer delegate;
         private final ProcessorKind kind;
         private final boolean pythonProcessor;
+        private final boolean strictIsolating;
 
         private TrackingFiler(Filer delegate,
                               ProcessorKind kind,
-                              boolean pythonProcessor) {
+                              boolean pythonProcessor,
+                              boolean strictIsolating) {
             this.delegate = delegate;
             this.kind = kind;
             this.pythonProcessor = pythonProcessor;
+            this.strictIsolating = strictIsolating;
         }
 
         private void trackOutput(FileObject output, Element... originatingElements) {
@@ -210,12 +237,19 @@ final class IncrementalProcessorTracker {
             }
             if (kind != ProcessorKind.ISOLATING) {
                 aggregatingOutputs.add(relativeOutput);
+                for (Element originatingElement : originatingElements) {
+                    String source = compilationTracker.sourceKey(originatingElement);
+                    if (source != null) {
+                        aggregatingInputs.add(source);
+                    }
+                }
                 return;
             }
             if (originatingElements.length != 1) {
-                if (pythonProcessor) {
+                if (pythonProcessor
+                    || (!strictIsolating && relativeOutput.startsWith("META-INF/swagger/views/"))) {
                     // Python processing produces shared VFS indexes, package initializers, and bridge
-                    // modules. They are tracked separately and replaced whenever Python is processed.
+                    // modules. The OpenAPI visitor also copies immutable UI assets without origins.
                     return;
                 }
                 contractViolatingOutputs.add(relativeOutput);
@@ -278,7 +312,11 @@ final class IncrementalProcessorTracker {
         public FileObject getResource(JavaFileManager.Location location,
                                       CharSequence moduleAndPkg,
                                       CharSequence relativeName) throws IOException {
-            return delegate.getResource(location, moduleAndPkg, relativeName);
+            FileObject resource = delegate.getResource(location, moduleAndPkg, relativeName);
+            if (pythonProcessor) {
+                trackOutput(resource);
+            }
+            return resource;
         }
     }
 

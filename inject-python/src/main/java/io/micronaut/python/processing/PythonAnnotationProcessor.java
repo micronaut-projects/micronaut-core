@@ -88,6 +88,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private boolean compilePythonBytecode;
     private PythonBytecodeCompiler bytecodeCompiler;
     private Set<String> incrementalSources;
+    private boolean processAggregatingVisitors = true;
+    private Path outputDirectory;
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -126,6 +128,26 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     @Internal
     public void setIncrementalSources(Set<String> incrementalSources) {
         this.incrementalSources = incrementalSources == null ? null : Set.copyOf(incrementalSources);
+    }
+
+    /**
+     * Sets whether aggregating Python type visitors should run.
+     *
+     * @param processAggregatingVisitors Whether aggregating visitors should run
+     */
+    @Internal
+    public void setProcessAggregatingVisitors(boolean processAggregatingVisitors) {
+        this.processAggregatingVisitors = processAggregatingVisitors;
+    }
+
+    /**
+     * Sets the class output directory used to reuse unchanged generated Python resources.
+     *
+     * @param outputDirectory The class output directory, or {@code null} for in-memory compilation
+     */
+    @Internal
+    public void setOutputDirectory(Path outputDirectory) {
+        this.outputDirectory = outputDirectory;
     }
 
     @Override
@@ -345,15 +367,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             ClassLoader effectiveClassLoader = this.classLoader != null
                 ? this.classLoader : PythonAnnotationProcessor.class.getClassLoader();
             Predicate<ClassElement> affectedElements = affectedElements(transformedList, srcDirs);
-            PythonTypeElementVisitorProcessor aggregatingVisitors =
-                new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.AGGREGATING);
-            aggregatingVisitors.init(processingEnvironment);
-            aggregatingVisitors.process(
-                processingEnvironment,
-                ignored -> true,
-                incrementalSources == null,
-                false
-            );
+            if (processAggregatingVisitors) {
+                PythonTypeElementVisitorProcessor aggregatingVisitors =
+                    new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.AGGREGATING);
+                aggregatingVisitors.init(processingEnvironment);
+                aggregatingVisitors.process(
+                    processingEnvironment,
+                    ignored -> true,
+                    incrementalSources == null,
+                    false
+                );
+            }
             PythonTypeElementVisitorProcessor isolatingVisitors =
                 new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.ISOLATING);
             isolatingVisitors.init(processingEnvironment);
@@ -607,17 +631,28 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                   String filePath,
                                   String content,
                                   ClassElement originatingElement) {
-        javaVisitorContext.visitMetaInfFile(filePath, originatingElement)
-            .ifPresent(generatedFile -> {
-                try (var writer = generatedFile.openWriter()) {
-                    writer.write(content);
-                } catch (IOException e) {
-                    throw new ProcessingException(originatingElement, "Failed to write Python code to [" + filePath + "]: " + e.getMessage(), e);
+        boolean unchanged = false;
+        var generatedFile = javaVisitorContext.visitMetaInfFile(filePath, originatingElement).orElse(null);
+        if (generatedFile != null) {
+            try {
+                if (outputDirectory != null) {
+                    Path existingFile = outputDirectory.resolve("META-INF").resolve(filePath);
+                    unchanged = Files.isRegularFile(existingFile) && content.equals(Files.readString(existingFile));
                 }
-            });
+                if (unchanged) {
+                    generatedFile.getTextContent();
+                } else {
+                    try (var writer = generatedFile.openWriter()) {
+                        writer.write(content);
+                    }
+                }
+            } catch (IOException e) {
+                throw new ProcessingException(originatingElement, "Failed to write Python code to [" + filePath + "]: " + e.getMessage(), e);
+            }
+        }
         filesList.append("/META-INF/").append(filePath).append('\n');
 
-        if (!compilePythonBytecode) {
+        if (!compilePythonBytecode || unchanged) {
             return;
         }
         try {
@@ -627,8 +662,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             PythonBytecodeCompiler.Result result = bytecodeCompiler.compile(content, filePath);
             String cacheFilePath = cacheFilePath(filePath, result.cachePath());
             javaVisitorContext.visitMetaInfFile(cacheFilePath, originatingElement)
-                .ifPresent(generatedFile -> {
-                    try (var output = generatedFile.openOutputStream()) {
+                .ifPresent(bytecodeFile -> {
+                    try (var output = bytecodeFile.openOutputStream()) {
                         output.write(result.bytes());
                     } catch (IOException e) {
                         throw new ProcessingException(originatingElement, "Failed to write Python bytecode to [" + cacheFilePath + "]: " + e.getMessage(), e);

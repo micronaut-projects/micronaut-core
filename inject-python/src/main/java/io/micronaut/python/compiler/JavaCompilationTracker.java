@@ -77,6 +77,7 @@ final class JavaCompilationTracker implements TaskListener {
             Set.of(),
             Set.of(),
             Set.of(),
+            Set.of(),
             true
         );
     }

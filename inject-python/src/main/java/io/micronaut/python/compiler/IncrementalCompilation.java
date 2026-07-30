@@ -55,7 +55,7 @@ import java.util.stream.Stream;
 @Internal
 final class IncrementalCompilation {
     private static final String STATE_FILE = "state.properties";
-    private static final String STATE_VERSION = "5";
+    private static final String STATE_VERSION = "6";
     private static final String SOURCE_PREFIX = "source.";
     private static final String VFS_SOURCE_PREFIX = "META-INF/GRAALPY-VFS/micronaut-application/src/";
     private static final String VFS_ROOT = "META-INF/GRAALPY-VFS/micronaut-application";
@@ -124,9 +124,13 @@ final class IncrementalCompilation {
         this.globalFingerprint = fingerprintGlobalInputs();
     }
 
-    Plan plan(boolean hasAggregatingProcessors) {
+    Plan plan(Set<String> detectedAggregatingInputs) {
         Map<String, ScannedSource> scannedSources = scanSources();
         Map<String, SourceState> currentSources = createSourceStates(scannedSources);
+        Set<String> currentAggregatingInputs = detectedAggregatingInputs.stream()
+            .filter(currentSources::containsKey)
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        boolean hasAggregatingProcessors = !currentAggregatingInputs.isEmpty();
         State previous = readState();
         if (previous == null
             || !globalFingerprint.equals(previous.globalFingerprint())
@@ -140,6 +144,7 @@ final class IncrementalCompilation {
                 currentSources,
                 previous,
                 hasAggregatingProcessors,
+                currentAggregatingInputs,
                 hasAggregatingProcessors
             );
         }
@@ -154,6 +159,7 @@ final class IncrementalCompilation {
                 currentSources,
                 previous,
                 false,
+                currentAggregatingInputs,
                 hasAggregatingProcessors
             );
         }
@@ -169,10 +175,11 @@ final class IncrementalCompilation {
         }
         addPythonPackageInitializers(affected, currentSources);
         Set<String> isolatingAffected = Set.copyOf(affected);
-        boolean aggregating = hasAggregatingProcessors || previous.aggregatingProcessors();
+        Set<String> aggregationTriggers = new LinkedHashSet<>(previous.aggregatingInputs());
+        aggregationTriggers.addAll(currentAggregatingInputs);
+        boolean aggregating = affected.stream().anyMatch(aggregationTriggers::contains);
         if (aggregating) {
-            affected = new LinkedHashSet<>(currentSources.keySet());
-            affected.addAll(changed);
+            affected.addAll(currentAggregatingInputs);
         }
         addApplicationSourceWhenPythonChanges(affected, isolatingAffected, currentSources, previous.sources());
         return new Plan(
@@ -183,8 +190,14 @@ final class IncrementalCompilation {
             currentSources,
             previous,
             aggregating,
+            currentAggregatingInputs,
             hasAggregatingProcessors
         );
+    }
+
+    Plan plan(boolean hasAggregatingProcessors) {
+        Map<String, ScannedSource> scannedSources = scanSources();
+        return plan(hasAggregatingProcessors ? scannedSources.keySet() : Set.of());
     }
 
     void prepareOutput(Plan plan) {
@@ -208,8 +221,7 @@ final class IncrementalCompilation {
             }
             if (plan.aggregating()) {
                 outputs.addAll(previous.aggregatingOutputs());
-            } else if (affectsPython(plan)) {
-                outputs.addAll(previous.pythonAggregatingOutputs());
+                outputs.removeAll(previous.pythonAggregatingOutputs());
             }
             for (String output : outputs) {
                 deleteManagedOutput(output);
@@ -224,9 +236,10 @@ final class IncrementalCompilation {
         try {
             rebuildPythonFilesList();
             Map<String, SourceState> enrichedSources = mergeCompilationTrace(plan, compilationTrace);
+            Set<String> outputFiles = listOutputs();
             Map<String, SourceState> sources = assignOutputs(
                 enrichedSources,
-                listOutputs(),
+                outputFiles,
                 compilationTrace.outputs(),
                 compilationTrace.aggregatingOutputs(),
                 compilationTrace.pythonProcessorOutputs(),
@@ -234,31 +247,59 @@ final class IncrementalCompilation {
             );
             Set<String> assigned = new HashSet<>();
             sources.values().forEach(source -> assigned.addAll(source.outputs()));
-            Set<String> aggregatingOutputs = new LinkedHashSet<>(listOutputs());
-            aggregatingOutputs.removeAll(assigned);
-            aggregatingOutputs.addAll(compilationTrace.aggregatingOutputs());
+            Set<String> aggregatingOutputs = new LinkedHashSet<>(compilationTrace.aggregatingOutputs());
+            if (!plan.aggregating() && plan.previous() != null) {
+                aggregatingOutputs.addAll(plan.previous().aggregatingOutputs());
+            }
+            aggregatingOutputs.retainAll(outputFiles);
             Set<String> pythonAggregatingOutputs = new LinkedHashSet<>(
                 compilationTrace.pythonProcessorOutputs()
             );
             pythonAggregatingOutputs.removeAll(assigned);
             if (!runsPythonProcessing(plan) && plan.previous() != null) {
                 pythonAggregatingOutputs.addAll(plan.previous().pythonAggregatingOutputs());
-                pythonAggregatingOutputs.retainAll(aggregatingOutputs);
+            } else if (plan.previous() != null) {
+                Set<String> declaredPythonOutputs = compilationTrace.pythonProcessorOutputs();
+                plan.previous().pythonAggregatingOutputs().stream()
+                    .filter(output -> isBytecodeForDeclaredPythonOutput(output, declaredPythonOutputs)
+                        || (!plan.aggregating() && !output.startsWith(VFS_ROOT + '/')))
+                    .forEach(pythonAggregatingOutputs::add);
+                Set<String> stalePythonOutputs = new LinkedHashSet<>(
+                    plan.previous().pythonAggregatingOutputs()
+                );
+                stalePythonOutputs.removeAll(pythonAggregatingOutputs);
+                for (String staleOutput : stalePythonOutputs) {
+                    deleteManagedOutput(staleOutput);
+                }
+                outputFiles = listOutputs();
             }
-            boolean detectedAggregation = plan.detectedAggregatingProcessors()
+            pythonAggregatingOutputs.retainAll(outputFiles);
+            Set<String> sharedOutputs = new LinkedHashSet<>(outputFiles);
+            sharedOutputs.removeAll(assigned);
+            sharedOutputs.removeAll(aggregatingOutputs);
+            sharedOutputs.removeAll(pythonAggregatingOutputs);
+            Set<String> aggregatingInputs = plan.aggregatingInputs();
+            if ((plan.fullRebuild() || plan.aggregating())
+                && !compilationTrace.aggregatingInputs().isEmpty()) {
+                aggregatingInputs = compilationTrace.aggregatingInputs();
+            } else if (!plan.aggregating() && plan.previous() != null) {
+                aggregatingInputs = plan.previous().aggregatingInputs();
+            }
+            if (aggregatingInputs.isEmpty() && !compilationTrace.aggregatingOutputs().isEmpty()) {
+                aggregatingInputs = Set.copyOf(sources.keySet());
+            }
+            boolean detectedAggregation = !aggregatingInputs.isEmpty()
                 || !compilationTrace.aggregatingOutputs().isEmpty();
             boolean processorCompatible = compilationTrace.processorCompatible()
                 && compilationTrace.contractViolatingOutputs().isEmpty()
-                && (detectedAggregation
-                    || aggregatingOutputs.stream().allMatch(output ->
-                        pythonAggregatingOutputs.contains(output)
-                            || isKnownCompilerSharedOutput(output)));
+                && sharedOutputs.stream().allMatch(this::isKnownCompilerSharedOutput);
             writeState(new State(
                 globalFingerprint,
                 sources,
-                detectedAggregation ? Set.copyOf(sources.keySet()) : Set.of(),
+                aggregatingInputs,
                 Set.copyOf(aggregatingOutputs),
                 Set.copyOf(pythonAggregatingOutputs),
+                Set.copyOf(sharedOutputs),
                 detectedAggregation,
                 processorCompatible
             ));
@@ -303,15 +344,6 @@ final class IncrementalCompilation {
         } catch (IOException ignored) {
             // A missing or unreadable state file causes a full rebuild on the next invocation.
         }
-    }
-
-    private boolean affectsPython(Plan plan) {
-        return plan.isolatingAffectedSources().stream()
-            .map(key -> plan.currentSources().getOrDefault(
-                key,
-                plan.previous() == null ? null : plan.previous().sources().get(key)
-            ))
-            .anyMatch(source -> source != null && source.language() == Language.PYTHON);
     }
 
     private boolean runsPythonProcessing(Plan plan) {
@@ -748,6 +780,7 @@ final class IncrementalCompilation {
         return output.startsWith(VFS_ROOT + '/')
             || output.startsWith(generatedApplicationPath)
             || output.startsWith("META-INF/pyronaut/")
+            || output.startsWith("META-INF/swagger/views/")
             || output.startsWith("META-INF/services/")
             || output.startsWith("META-INF/native-image/");
     }
@@ -759,6 +792,18 @@ final class IncrementalCompilation {
         String stem = file.substring(0, file.length() - ".py".length());
         return output.startsWith(parent + "__pycache__/" + stem + '.')
             && output.endsWith(".pyc");
+    }
+
+    private static boolean isBytecodeForDeclaredPythonOutput(String output,
+                                                             Set<String> declaredPythonOutputs) {
+        if (!output.startsWith(VFS_SOURCE_PREFIX) || !output.endsWith(".pyc")) {
+            return false;
+        }
+        String relativeOutput = output.substring(VFS_SOURCE_PREFIX.length());
+        return declaredPythonOutputs.stream()
+            .filter(candidate -> candidate.startsWith(VFS_SOURCE_PREFIX) && candidate.endsWith(".py"))
+            .map(candidate -> candidate.substring(VFS_SOURCE_PREFIX.length()))
+            .anyMatch(source -> isPythonBytecode(relativeOutput, source));
     }
 
     private static boolean matchesAnyType(String fileName, Set<String> types) {
@@ -798,10 +843,13 @@ final class IncrementalCompilation {
     }
 
     private boolean hasMissingOutputs(State state) {
-        return Stream.concat(
+        return Stream.of(
                 state.sources().values().stream().flatMap(source -> source.outputs().stream()),
-                state.aggregatingOutputs().stream()
+                state.aggregatingOutputs().stream(),
+                state.pythonAggregatingOutputs().stream(),
+                state.sharedOutputs().stream()
             )
+            .flatMap(Stream::sequential)
             .map(targetDirectory::resolve)
             .anyMatch(Predicate.not(Files::isRegularFile));
     }
@@ -883,6 +931,7 @@ final class IncrementalCompilation {
                 decodeList(properties.getProperty("aggregating.inputs", "")),
                 decodeList(properties.getProperty("aggregating.outputs", "")),
                 decodeList(properties.getProperty("python.aggregating.outputs", "")),
+                decodeList(properties.getProperty("shared.outputs", "")),
                 Boolean.parseBoolean(properties.getProperty("aggregating.processors", "false")),
                 Boolean.parseBoolean(properties.getProperty("processor.compatible", "true"))
             );
@@ -893,13 +942,15 @@ final class IncrementalCompilation {
     }
 
     private boolean isValidState(State state) {
-        boolean validOutputs = Stream.concat(
+        boolean validOutputs = Stream.of(
                 state.sources().values().stream().flatMap(source -> source.outputs().stream()),
-                state.aggregatingOutputs().stream()
+                state.aggregatingOutputs().stream(),
+                state.pythonAggregatingOutputs().stream(),
+                state.sharedOutputs().stream()
             )
+            .flatMap(Stream::sequential)
             .allMatch(this::isManagedOutputPath);
-        return validOutputs
-            && state.aggregatingOutputs().containsAll(state.pythonAggregatingOutputs());
+        return validOutputs;
     }
 
     private boolean isManagedOutputPath(String output) {
@@ -925,6 +976,7 @@ final class IncrementalCompilation {
         properties.setProperty("aggregating.inputs", encodeList(state.aggregatingInputs()));
         properties.setProperty("aggregating.outputs", encodeList(state.aggregatingOutputs()));
         properties.setProperty("python.aggregating.outputs", encodeList(state.pythonAggregatingOutputs()));
+        properties.setProperty("shared.outputs", encodeList(state.sharedOutputs()));
         properties.setProperty("aggregating.processors", Boolean.toString(state.aggregatingProcessors()));
         properties.setProperty("processor.compatible", Boolean.toString(state.processorCompatible()));
         for (SourceState source : state.sources().values()) {
@@ -1112,6 +1164,7 @@ final class IncrementalCompilation {
                 Map<String, SourceState> currentSources,
                 State previous,
                 boolean aggregating,
+                Set<String> aggregatingInputs,
                 boolean detectedAggregatingProcessors) {
 
         Set<Path> javaSources() {
@@ -1164,7 +1217,16 @@ final class IncrementalCompilation {
         boolean runsPythonProcessing() {
             return fullRebuild()
                 || affectsPythonSources()
-                || (aggregating() && !currentPythonSources().isEmpty());
+                || aggregatingAffectsPythonSources();
+        }
+
+        boolean aggregatingAffectsPythonSources() {
+            if (!aggregating()) {
+                return false;
+            }
+            return aggregatingInputs.stream()
+                .map(currentSources::get)
+                .anyMatch(source -> source != null && source.language() == Language.PYTHON);
         }
     }
 
@@ -1173,6 +1235,7 @@ final class IncrementalCompilation {
                          Set<String> aggregatingInputs,
                          Set<String> aggregatingOutputs,
                          Set<String> pythonAggregatingOutputs,
+                         Set<String> sharedOutputs,
                          boolean aggregatingProcessors,
                          boolean processorCompatible) {
     }

@@ -198,13 +198,13 @@ public final class PyronautCompiler {
             pythonSourceVisitors,
             pythonIncrementalMode
         );
-        boolean aggregating = compiler.hasAggregatingProcessors(
+        Set<String> aggregatingSources = compiler.aggregatingSources(
             classpath,
             annotationProcessorPath,
             javaSrc,
             pythonSrc
         );
-        IncrementalCompilation.Plan plan = incrementalCompilation.plan(aggregating);
+        IncrementalCompilation.Plan plan = incrementalCompilation.plan(aggregatingSources);
         if (plan.upToDate()) {
             return;
         }
@@ -220,14 +220,14 @@ public final class PyronautCompiler {
                     || !compilationTrace.contractViolatingOutputs().isEmpty())) {
                 incrementalCompilation.invalidate();
                 if (!annotationProcessors.isEmpty()) {
-                    incrementalCompilation.prepareOutput(incrementalCompilation.plan(aggregating));
+                    incrementalCompilation.prepareOutput(incrementalCompilation.plan(aggregatingSources));
                     throw new PyronautCompilerException(
                         "An explicitly supplied annotation processor violated its incremental "
                             + "contract; the output was cleaned and must be compiled again with "
                             + "fresh processor instances"
                     );
                 }
-                plan = incrementalCompilation.plan(aggregating);
+                plan = incrementalCompilation.plan(aggregatingSources);
                 compilationTrace = compileIncrementally(
                     compiler,
                     incrementalCompilation,
@@ -249,10 +249,11 @@ public final class PyronautCompiler {
         List<String> incrementalCompilerOptions
     ) {
         incrementalCompilation.prepareOutput(plan);
+        compiler.setProcessAggregatingPythonVisitors(plan.fullRebuild() || plan.aggregating());
         boolean includeGeneratedApplication = applicationClass == null
             && (plan.fullRebuild()
                 || plan.affectsPythonSources()
-                || (plan.aggregating() && !plan.currentPythonSources().isEmpty()));
+                || plan.aggregatingAffectsPythonSources());
         if (plan.fullRebuild() || !plan.processesAllPythonSources()) {
             compiler.setIncrementalPythonSources(
                 plan.fullRebuild() ? null : plan.pythonSources()

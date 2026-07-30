@@ -342,10 +342,27 @@ final class PyronautCompilerIncrementalTest {
             @TestAggregate
             public class Two {}
             """);
+        Path unrelated = sources.resolve("Unrelated.java");
+        Files.writeString(unrelated, "public class Unrelated {}\n");
 
         compileJava(sources, output, cache);
+        Set<String> aggregatingInputs = decodeStateList(
+            state(cache).getProperty("aggregating.inputs")
+        );
+        assertTrue(aggregatingInputs.contains(one.toRealPath().toString()));
+        assertTrue(aggregatingInputs.contains(sources.resolve("Two.java").toRealPath().toString()));
+        assertFalse(aggregatingInputs.contains(unrelated.toRealPath().toString()));
         Path twoClass = output.resolve("Two.class");
+        Path aggregate = output.resolve("META-INF/pyronaut/aggregating.txt");
         Files.setLastModifiedTime(twoClass, UNCHANGED_MARKER);
+        Files.setLastModifiedTime(aggregate, UNCHANGED_MARKER);
+
+        Files.writeString(unrelated, "public class Unrelated { int changed; }\n");
+        compileJava(sources, output, cache);
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(twoClass));
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(aggregate));
+        Path unrelatedClass = output.resolve("Unrelated.class");
+        Files.setLastModifiedTime(unrelatedClass, UNCHANGED_MARKER);
 
         Files.writeString(one, """
             import io.micronaut.python.compiler.TestAggregate;
@@ -355,7 +372,8 @@ final class PyronautCompilerIncrementalTest {
         compileJava(sources, output, cache);
 
         assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(twoClass));
-        String summary = Files.readString(output.resolve("META-INF/pyronaut/aggregating.txt"));
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(unrelatedClass));
+        String summary = Files.readString(aggregate);
         assertTrue(summary.contains("One"));
         assertTrue(summary.contains("Two"));
         assertFalse(state(cache).getProperty("aggregating.inputs").isBlank());
@@ -416,7 +434,7 @@ final class PyronautCompilerIncrementalTest {
         Files.setLastModifiedTime(aggregate, UNCHANGED_MARKER);
         Files.writeString(java.resolve("Helper.java"), "class Helper {}\n");
         compilePython(python, java, output, cache);
-        assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(aggregate));
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(aggregate));
         summary = Files.readString(aggregate);
         assertTrue(summary.contains("python.One"));
         assertTrue(summary.contains("python.Two"));
@@ -945,7 +963,7 @@ final class PyronautCompilerIncrementalTest {
     }
 
     @Test
-    void regeneratesSharedPythonPackageOutputs(@TempDir Path directory) throws Exception {
+    void preservesUnchangedSharedPythonPackageOutputs(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python/pkg"));
         Path java = Files.createDirectories(directory.resolve("java"));
         Path output = directory.resolve("classes");
@@ -967,7 +985,7 @@ final class PyronautCompilerIncrementalTest {
         Files.writeString(alpha, "class Alpha:\n    value: int = 2\n");
         compilePython(directory.resolve("python"), java, output, cache);
 
-        assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(initializer));
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(initializer));
         assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(filesList));
         assertTrue(Files.readString(filesList).contains("/pkg/__init__.py"));
         assertTrue(decodeStateList(state(cache).getProperty("python.aggregating.outputs")).stream()

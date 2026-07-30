@@ -27,6 +27,7 @@ import java.util.Set;
  * @param dependencies The resolved source dependency graph
  * @param declaredTypes The types declared by each source
  * @param outputs The isolating outputs attributed to each source
+ * @param aggregatingInputs The sources contributing to aggregating processor outputs
  * @param aggregatingOutputs The outputs created by aggregating processors
  * @param pythonProcessorOutputs The outputs created by Python processing
  * @param contractViolatingOutputs The outputs with invalid isolating origins
@@ -36,19 +37,23 @@ record IncrementalCompilationTrace(Set<String> analyzedSources,
                                    Map<String, Set<String>> dependencies,
                                    Map<String, Set<String>> declaredTypes,
                                    Map<String, Set<String>> outputs,
+                                   Set<String> aggregatingInputs,
                                    Set<String> aggregatingOutputs,
                                    Set<String> pythonProcessorOutputs,
                                    Set<String> contractViolatingOutputs,
                                    boolean processorCompatible) {
 
     private static final IncrementalCompilationTrace EMPTY =
-        new IncrementalCompilationTrace(Set.of(), Map.of(), Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), true);
+        new IncrementalCompilationTrace(
+            Set.of(), Map.of(), Map.of(), Map.of(), Set.of(), Set.of(), Set.of(), Set.of(), true
+        );
 
     IncrementalCompilationTrace {
         analyzedSources = Set.copyOf(analyzedSources);
         dependencies = immutableCopy(dependencies);
         declaredTypes = immutableCopy(declaredTypes);
         outputs = immutableCopy(outputs);
+        aggregatingInputs = Set.copyOf(aggregatingInputs);
         aggregatingOutputs = Set.copyOf(aggregatingOutputs);
         pythonProcessorOutputs = Set.copyOf(pythonProcessorOutputs);
         contractViolatingOutputs = Set.copyOf(contractViolatingOutputs);
