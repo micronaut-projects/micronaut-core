@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
 import org.graalvm.polyglot.Context;
 
+import java.util.Set;
+
 /**
  * Customizes every GraalPy context builder created by Micronaut.
  *
@@ -40,6 +42,18 @@ public interface GraalPyContextCustomizer extends Ordered {
      * @param builder The builder to customize
      */
     void customize(Context.Builder builder);
+
+    /**
+     * Returns additional guest languages that must be enabled in the shared engine and contexts.
+     *
+     * <p>Python is always enabled. Implementations should return only languages they require and
+     * must ensure the corresponding language distribution is present at runtime.</p>
+     *
+     * @return The additional Polyglot language identifiers
+     */
+    default Set<String> getAdditionalLanguages() {
+        return Set.of();
+    }
 
     @Override
     default int getOrder() {

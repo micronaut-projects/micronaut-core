@@ -136,17 +136,13 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
         public static final String PREFIX = "graalpy.engine";
 
         @ConfigurationBuilder(prefixes = "", excludes = {"out", "in", "err", "exceptionHandler", "messageTransport"})
-        Engine.Builder builder = Engine.newBuilder();
+        Engine.Builder builder = Engine.newBuilder(
+            GraalPyContextCustomizers.languages(GraalPyContextCustomizers.currentClassLoader())
+        );
 
         GraalPyEngineConfiguration() {
-            // The fallback Truffle runtime has no compiler and therefore does not expose this
-            // option. This runtime is useful when several guest languages are embedded in a
-            // native executable whose application class path is not compatible with Truffle's
-            // runtime compiler.
-            if (!Boolean.getBoolean("truffle.UseFallbackRuntime")) {
-                // currently GraalPy spawns too many compiler threads by default. limit to 1 for now.
-                builder.options(Map.of("engine.CompilerThreads", "1"));
-            }
+            // currently GraalPy spawns too many compiler threads by default. limit to 1 for now.
+            builder.options(Map.of("engine.CompilerThreads", "1"));
         }
 
         /**

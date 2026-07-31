@@ -43,7 +43,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -225,11 +224,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             .allowHostClassLookup(_ -> true);
         resolveVirtualEnvExecutable(System.getenv())
             .ifPresent(executable -> builder.option("python.Executable", executable.toString()));
-        List<GraalPyContextCustomizer> customizers = SoftServiceLoader
-            .load(GraalPyContextCustomizer.class, classLoader)
-            .collectAll();
-        customizers.sort(Comparator.comparingInt(GraalPyContextCustomizer::getOrder));
-        customizers.forEach(customizer -> customizer.customize(builder));
+        GraalPyContextCustomizers.load(classLoader)
+            .forEach(customizer -> customizer.customize(builder));
 
         LOG.debug("Configured GraalPy Context.Builder in {}ms", System.currentTimeMillis() - now);
 
