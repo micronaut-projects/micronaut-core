@@ -24,6 +24,7 @@ import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.util.ReferenceCountUtil;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -34,7 +35,9 @@ import java.nio.CharBuffer;
 import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  * Netty-based {@link ReadBufferFactory}. Also has additional utilities for dealing with netty
@@ -255,14 +258,17 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
                 return first;
             }
         }
-        CompositeByteBuf composite = allocator.compositeBuffer();
+        // toByteBuf consumes each ReadBuffer, so if extraction fails partway, the ByteBufs
+        // already extracted have no owner anymore and must be released explicitly here.
+        List<ByteBuf> components = new ArrayList<>();
         try {
             for (ReadBuffer buffer : buffers) {
-                composite.addComponent(true, toByteBuf(buffer));
+                components.add(toByteBuf(buffer));
             }
-            return adapt(composite);
         } catch (Throwable e) {
-            composite.release();
+            for (ByteBuf component : components) {
+                ReferenceCountUtil.safeRelease(component);
+            }
             for (ReadBuffer buffer : buffers) {
                 try {
                     buffer.close();
@@ -270,6 +276,19 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
                     e.addSuppressed(f);
                 }
             }
+            throw e;
+        }
+        CompositeByteBuf composite = allocator.compositeBuffer();
+        try {
+            // addComponents consolidates at most once, at the end. Adding components one at a time
+            // calls consolidateIfNeeded() after each one, and each consolidation copies everything
+            // accumulated so far, making aggregation O(size^2 / chunkSize). addComponents also
+            // takes ownership of all components, releasing any it did not add, so from here on the
+            // composite is the only thing left to release.
+            composite.addComponents(true, components);
+            return adapt(composite);
+        } catch (Throwable e) {
+            composite.release();
             throw e;
         }
     }
