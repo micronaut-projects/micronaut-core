@@ -16,6 +16,7 @@
 package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.annotation.processing.AbstractInjectAnnotationProcessor;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.core.naming.NameUtils;
@@ -55,6 +56,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -71,6 +73,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     public static final String APPLICATION_SRC_PATH = "GRAALPY-VFS/micronaut-application/src/";
     public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_SRC_PATH + "__main__.py";
     static final String PYTHON_APPLICATION_ANNOTATION = "io.micronaut.context.python.annotation.PythonApplication";
+    private static final String PYTHON_LANGUAGE = "python";
     private static final Set<String> PYTHON_KEYWORDS = Set.of(
         "False", "None", "True", "and", "as", "assert", "async", "await", "break",
         "class", "continue", "def", "del", "elif", "else", "except", "finally",
@@ -84,6 +87,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private ClassLoader classLoader;
     private boolean compilePythonBytecode;
     private PythonBytecodeCompiler bytecodeCompiler;
+    private Set<String> incrementalSources;
+    private boolean processAggregatingVisitors = true;
+    private Path outputDirectory;
+    private PythonProcessingSession processingSession;
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -114,6 +121,46 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         this.compilePythonBytecode = compilePythonBytecode;
     }
 
+    /**
+     * Restricts isolating visitors and bean generation to affected Python sources.
+     *
+     * @param incrementalSources The affected absolute source paths, or {@code null} for all sources
+     */
+    @Internal
+    public void setIncrementalSources(Set<String> incrementalSources) {
+        this.incrementalSources = incrementalSources == null ? null : Set.copyOf(incrementalSources);
+    }
+
+    /**
+     * Sets whether aggregating Python type visitors should run.
+     *
+     * @param processAggregatingVisitors Whether aggregating visitors should run
+     */
+    @Internal
+    public void setProcessAggregatingVisitors(boolean processAggregatingVisitors) {
+        this.processAggregatingVisitors = processAggregatingVisitors;
+    }
+
+    /**
+     * Sets the class output directory used to reuse unchanged generated Python resources.
+     *
+     * @param outputDirectory The class output directory, or {@code null} for in-memory compilation
+     */
+    @Internal
+    public void setOutputDirectory(Path outputDirectory) {
+        this.outputDirectory = outputDirectory;
+    }
+
+    /**
+     * Sets a session that owns the GraalPy context across compiler invocations.
+     *
+     * @param processingSession The reusable processing session
+     */
+    @Internal
+    public void setProcessingSession(PythonProcessingSession processingSession) {
+        this.processingSession = processingSession;
+    }
+
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
@@ -123,12 +170,13 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 classLoader = PythonAnnotationProcessor.class.getClassLoader();
             }
         }
-        parser = new PythonAstParser(classLoader);
     }
 
     @Override
     public void close() throws Exception {
-        parser.close();
+        if (parser != null && processingSession == null) {
+            parser.close();
+        }
         if (bytecodeCompiler != null) {
             bytecodeCompiler.close();
         }
@@ -137,7 +185,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         if (roundEnv.processingOver()) {
-            parser.close();
+            if (parser != null && processingSession == null) {
+                parser.close();
+            }
             return false;
         }
         if (annotations.isEmpty()) {
@@ -163,9 +213,18 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             if (element instanceof TypeElement typeElement) {
                 PythonApplicationValues values = readPythonApplicationValues(element).orElse(null);
                 if (values != null) {
+                    initializeParser();
                     processAnnotation(typeElement, values);
                 }
             }
+        }
+    }
+
+    private void initializeParser() {
+        if (parser == null) {
+            parser = processingSession == null
+                ? new PythonAstParser(classLoader, incrementalSources != null)
+                : processingSession.parser(classLoader, incrementalSources != null);
         }
     }
 
@@ -212,6 +271,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
             String mainPy;
             StringBuilder filesList = new StringBuilder();
+            boolean processSharedOutputs = incrementalSources == null || processAggregatingVisitors;
             if (StringUtils.isNotEmpty(values.code())) {
                 mainPy = transformedList.get(0).runtimeCode();
                 writePythonToVfs(filesList, APPLICATION_LAUNCHER_PATH, mainPy, originatingElement);
@@ -238,7 +298,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 path = path.substring(srcDir.length() + 1);
                             }
                             String targetSource = APPLICATION_SRC_PATH + path;
-                            if (!transformResult.allClassNames().isEmpty()) {
+                            if (processSharedOutputs && !transformResult.allClassNames().isEmpty()) {
                                 // has classes
                                 int parentIndex = path.lastIndexOf('/');
                                 if (parentIndex > -1) {
@@ -251,55 +311,58 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 }
                             }
                             Source runtimeSource = transformResult.runtimeSource();
-                            writePythonToVfs(filesList, targetSource, runtimeSource.getCharacters().toString(), originatingElement);
+                            if (isAffectedSource(source)) {
+                                writePythonToVfs(filesList, targetSource, runtimeSource.getCharacters().toString(), originatingElement);
+                            }
                         }
                     }
 
-                    TreeSet<String> byParent = allModules.keySet().stream().map(pe -> pe.parent)
-                        .collect(Collectors.toCollection(TreeSet::new));
-                    for (String parent : byParent) {
-                        if (StringUtils.isEmpty(parent)) {
-                            // root, generate __main__.py instead
-                            String mainFilePath = APPLICATION_SRC_PATH + parent + "__main__.py";
-                            StringBuilder mainContent = new StringBuilder();
-                            List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
-                                .filter(entry -> entry.getKey().parent.equals(parent))
-                                .toList();
-                            for (Map.Entry<PathEntry, List<String>> entry : entries) {
-                                List<String> types = entry.getValue();
-                                String filename = entry.getKey().filename;
-                                if (!types.isEmpty()) {
-                                    for (String type : types) {
-                                        mainContent.append("from ").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
-                                    }
-                                }
-                            }
-                            writePythonToVfs(filesList, mainFilePath, mainContent.toString(), originatingElement);
-                        } else {
-
-                            String initFilePath = APPLICATION_SRC_PATH + parent + "__init__.py";
-                            StringBuilder initContent = new StringBuilder();
-                            List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
-                                .filter(entry -> entry.getKey().parent.equals(parent))
-                                .toList();
-                            List<String> exportedTypes = new ArrayList<>();
-                            for (Map.Entry<PathEntry, List<String>> entry : entries) {
-                                List<String> types = entry.getValue();
-                                String filename = entry.getKey().filename;
-                                if (!types.isEmpty()) {
-                                    for (String type : types) {
-                                        initContent.append("from .").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
-                                        // Check if this type has decorators (is in allExportedTypes)
-                                        if (allExportedTypes.contains(type)) {
-                                            exportedTypes.add(type);
+                    if (processSharedOutputs) {
+                        TreeSet<String> byParent = allModules.keySet().stream().map(pe -> pe.parent)
+                            .collect(Collectors.toCollection(TreeSet::new));
+                        for (String parent : byParent) {
+                            if (StringUtils.isEmpty(parent)) {
+                                // root, generate __main__.py instead
+                                String mainFilePath = APPLICATION_SRC_PATH + parent + "__main__.py";
+                                StringBuilder mainContent = new StringBuilder();
+                                List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
+                                    .filter(entry -> entry.getKey().parent.equals(parent))
+                                    .toList();
+                                for (Map.Entry<PathEntry, List<String>> entry : entries) {
+                                    List<String> types = entry.getValue();
+                                    String filename = entry.getKey().filename;
+                                    if (!types.isEmpty()) {
+                                        for (String type : types) {
+                                            mainContent.append("from ").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
                                         }
                                     }
                                 }
+                                writePythonToVfs(filesList, mainFilePath, mainContent.toString(), originatingElement);
+                            } else {
+                                String initFilePath = APPLICATION_SRC_PATH + parent + "__init__.py";
+                                StringBuilder initContent = new StringBuilder();
+                                List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
+                                    .filter(entry -> entry.getKey().parent.equals(parent))
+                                    .toList();
+                                List<String> exportedTypes = new ArrayList<>();
+                                for (Map.Entry<PathEntry, List<String>> entry : entries) {
+                                    List<String> types = entry.getValue();
+                                    String filename = entry.getKey().filename;
+                                    if (!types.isEmpty()) {
+                                        for (String type : types) {
+                                            initContent.append("from .").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
+                                            // Check if this type has decorators (is in allExportedTypes)
+                                            if (allExportedTypes.contains(type)) {
+                                                exportedTypes.add(type);
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!exportedTypes.isEmpty()) {
+                                    initContent.append("\n__all__ = ").append(toListOfString(exportedTypes)).append("\n");
+                                }
+                                writePythonToVfs(filesList, initFilePath, initContent.toString(), originatingElement);
                             }
-                            if (!exportedTypes.isEmpty()) {
-                                initContent.append("\n__all__ = ").append(toListOfString(exportedTypes)).append("\n");
-                            }
-                            writePythonToVfs(filesList, initFilePath, initContent.toString(), originatingElement);
                         }
                     }
                 }
@@ -323,17 +386,38 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 });
 
             }
-            writeAllToVFS(filesList, allDecorators, allImports, originatingElement);
+            if (processSharedOutputs) {
+                writeAllToVFS(filesList, allDecorators, allImports, originatingElement);
+            }
 
             // Run type element visitor processing
-            PythonTypeElementVisitorProcessor typeElementVisitorProcessor =
-                new PythonTypeElementVisitorProcessor(this.classLoader != null ? this.classLoader : PythonAnnotationProcessor.class.getClassLoader());
-            typeElementVisitorProcessor.init(processingEnvironment);
-            typeElementVisitorProcessor.process(processingEnvironment);
+            ClassLoader effectiveClassLoader = this.classLoader != null
+                ? this.classLoader : PythonAnnotationProcessor.class.getClassLoader();
+            Predicate<ClassElement> affectedElements = affectedElements(transformedList, srcDirs);
+            if (processAggregatingVisitors) {
+                PythonTypeElementVisitorProcessor aggregatingVisitors =
+                    new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.AGGREGATING);
+                aggregatingVisitors.init(processingEnvironment);
+                aggregatingVisitors.process(
+                    processingEnvironment,
+                    ignored -> true,
+                    incrementalSources == null,
+                    false
+                );
+            }
+            PythonTypeElementVisitorProcessor isolatingVisitors =
+                new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.ISOLATING);
+            isolatingVisitors.init(processingEnvironment);
+            isolatingVisitors.process(
+                processingEnvironment,
+                affectedElements,
+                incrementalSources != null,
+                true
+            );
 
             // Process bean definitions for Python classes
             var beanDefinitionProcessor = new PythonBeanDefinitionProcessor();
-            beanDefinitionProcessor.processBeanDefinitions(processingEnvironment);
+            beanDefinitionProcessor.processBeanDefinitions(processingEnvironment, affectedElements);
 
             // Invoke callback for each class element if callback is set
             if (classElementCallback != null) {
@@ -366,6 +450,62 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
     }
 
+    private boolean isAffectedSource(Source source) {
+        if (incrementalSources == null) {
+            return true;
+        }
+        String path = source.getPath();
+        if (path == null) {
+            return false;
+        }
+        Path sourcePath = Path.of(path).toAbsolutePath().normalize();
+        if (incrementalSources.contains(sourcePath.toString())) {
+            return true;
+        }
+        for (String incrementalSource : incrementalSources) {
+            try {
+                if (Files.isSameFile(sourcePath, Path.of(incrementalSource))) {
+                    return true;
+                }
+            } catch (IOException ignored) {
+                // A missing source cannot be an affected source being processed.
+            }
+        }
+        return false;
+    }
+
+    private Predicate<ClassElement> affectedElements(List<PythonAstParser.TransformResult> transformedList,
+                                                     String[] srcDirs) {
+        if (incrementalSources == null) {
+            return ignored -> true;
+        }
+        Set<String> names = new LinkedHashSet<>();
+        for (PythonAstParser.TransformResult transformed : transformedList) {
+            Source source = transformed.originalSource();
+            if (!isAffectedSource(source)) {
+                continue;
+            }
+            String packageName = PYTHON_LANGUAGE;
+            for (String srcDir : srcDirs) {
+                if (source.getPath() != null && source.getPath().startsWith(srcDir)) {
+                    packageName = PythonAstParser.getPackageNameOfSource(srcDir, source);
+                    break;
+                }
+            }
+            for (String className : transformed.allClassNames()) {
+                names.add(packageName + '.' + className);
+            }
+            String sourceName = source.getName();
+            if (sourceName.endsWith(".py")) {
+                sourceName = sourceName.substring(0, sourceName.length() - ".py".length());
+            }
+            if (!sourceName.isEmpty()) {
+                names.add(packageName + '.' + Character.toUpperCase(sourceName.charAt(0)) + sourceName.substring(1));
+            }
+        }
+        return element -> names.contains(element.getName());
+    }
+
     private void processPythonSourceVisitors(List<PythonAstParser.TransformResult> transformedList,
                                              PythonApplicationValues values) {
         if (pythonSourceVisitors.isEmpty()) {
@@ -396,7 +536,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         if (!code.isEmpty()) {
             // Transform the source code first
             try {
-                return parser.transform(javaVisitorContext, Source.create("python", code));
+                return parser.transform(javaVisitorContext, Source.create(PYTHON_LANGUAGE, code));
             } catch (Exception e) {
                 throw new ProcessingException(originatingElement, "Error transforming python code: " + e.getMessage(), e);
             }
@@ -438,7 +578,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                                     "Micronaut generates package __init__.py files for the GraalPy VFS; remove [" + relative + "] from the project source."
                                             );
                                         }
-                                        sources.add(Source.newBuilder("python", file.toFile()).build());
+                                        sources.add(Source.newBuilder(PYTHON_LANGUAGE, file.toFile()).build());
                                     }
                                     return FileVisitResult.CONTINUE;
                                 }
@@ -453,8 +593,18 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             } else {
                 throw new ProcessingException(originatingElement, "Source directories are not set.");
             }
-            return parser.transform(javaVisitorContext, sources.toArray(new Source[0]));
+            return parser.transform(
+                javaVisitorContext,
+                selectTransformSources(sources).toArray(new Source[0])
+            );
         }
+    }
+
+    final List<Source> selectTransformSources(List<Source> sources) {
+        if (incrementalSources == null || processAggregatingVisitors) {
+            return sources;
+        }
+        return sources.stream().filter(this::isAffectedSource).toList();
     }
 
     private Optional<PythonApplicationValues> readPythonApplicationValues(Element element) {
@@ -518,28 +668,39 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                   String filePath,
                                   String content,
                                   ClassElement originatingElement) {
-        javaVisitorContext.visitMetaInfFile(filePath, originatingElement)
-            .ifPresent(generatedFile -> {
-                try (var writer = generatedFile.openWriter()) {
-                    writer.write(content);
-                } catch (IOException e) {
-                    throw new ProcessingException(originatingElement, "Failed to write Python code to [" + filePath + "]: " + e.getMessage(), e);
+        boolean unchanged = false;
+        var generatedFile = javaVisitorContext.visitMetaInfFile(filePath, originatingElement).orElse(null);
+        if (generatedFile != null) {
+            try {
+                if (outputDirectory != null) {
+                    Path existingFile = outputDirectory.resolve("META-INF").resolve(filePath);
+                    unchanged = Files.isRegularFile(existingFile) && content.equals(Files.readString(existingFile));
                 }
-            });
+                if (unchanged) {
+                    generatedFile.getTextContent();
+                } else {
+                    try (var writer = generatedFile.openWriter()) {
+                        writer.write(content);
+                    }
+                }
+            } catch (IOException e) {
+                throw new ProcessingException(originatingElement, "Failed to write Python code to [" + filePath + "]: " + e.getMessage(), e);
+            }
+        }
         filesList.append("/META-INF/").append(filePath).append('\n');
 
-        if (!compilePythonBytecode) {
+        if (!compilePythonBytecode || unchanged) {
             return;
         }
         try {
             if (bytecodeCompiler == null) {
-                bytecodeCompiler = new PythonBytecodeCompiler();
+                bytecodeCompiler = parser.bytecodeCompiler();
             }
             PythonBytecodeCompiler.Result result = bytecodeCompiler.compile(content, filePath);
             String cacheFilePath = cacheFilePath(filePath, result.cachePath());
             javaVisitorContext.visitMetaInfFile(cacheFilePath, originatingElement)
-                .ifPresent(generatedFile -> {
-                    try (var output = generatedFile.openOutputStream()) {
+                .ifPresent(bytecodeFile -> {
+                    try (var output = bytecodeFile.openOutputStream()) {
                         output.write(result.bytes());
                     } catch (IOException e) {
                         throw new ProcessingException(originatingElement, "Failed to write Python bytecode to [" + cacheFilePath + "]: " + e.getMessage(), e);
@@ -685,7 +846,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         javaVisitorContext.visitMetaInfFile(APPLICATION_PATH + "fileslist.txt", originatingElement)
             .ifPresent(generatedFile -> {
                 try (var writer = generatedFile.openWriter()) {
-                    writer.write(filesList.toString());
+                    List<String> entries = filesList.toString().lines().sorted().toList();
+                    if (!entries.isEmpty()) {
+                        writer.write(String.join("\n", entries));
+                        writer.write('\n');
+                    }
                 } catch (IOException e) {
                     throw new ProcessingException(originatingElement, "Failed to write fileslist.txt to VFS");
                 }

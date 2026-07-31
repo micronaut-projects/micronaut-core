@@ -14,6 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -50,6 +52,57 @@ import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Source;
 
 public class PythonAstParserTest {
+
+    @Test
+    void incrementalProcessorTransformsOnlyAffectedSourcesUnlessAggregationIsRequired(
+        @TempDir Path directory
+    ) throws Exception {
+        Path alphaPath = Files.writeString(directory.resolve("alpha.py"), "answer = 1\n");
+        Path betaPath = Files.writeString(directory.resolve("beta.py"), "answer = 2\n");
+        Source alpha = Source.newBuilder("python", alphaPath.toFile()).build();
+        Source beta = Source.newBuilder("python", betaPath.toFile()).build();
+        var processor = new PythonAnnotationProcessor();
+        processor.setIncrementalSources(Set.of(alphaPath.toAbsolutePath().normalize().toString()));
+        processor.setProcessAggregatingVisitors(false);
+
+        assertEquals(List.of(alpha), processor.selectTransformSources(List.of(alpha, beta)));
+
+        processor.setProcessAggregatingVisitors(true);
+        assertEquals(List.of(alpha, beta), processor.selectTransformSources(List.of(alpha, beta)));
+    }
+
+    @Test
+    void bytecodeCompilerReusesParserContextWithoutOwningIt() {
+        PythonAstParser parser = new PythonAstParser();
+        try {
+            try (var compiler = parser.bytecodeCompiler()) {
+                assertTrue(compiler.compile("answer = 42", "/graalpy_vfs/src/example.py").bytes().length > 0);
+            }
+
+            try (PythonEnvironment environment = parser.parse("answer = 42")) {
+                assertNotNull(environment);
+            }
+        } finally {
+            parser.close();
+        }
+    }
+
+    @Test
+    void processingSessionReusesInitializedContextAcrossCompilations() {
+        PythonProcessingSession session = new PythonProcessingSession();
+        PythonAstParser first = session.parser(getClass().getClassLoader(), true);
+        assertTrue(session.initialized());
+        assertNotNull(first.parse("answer = 1"));
+        PythonAstParser second = session.parser(getClass().getClassLoader(), true);
+        assertSame(first, second);
+        assertNotNull(second.parse("answer = 2"));
+
+        session.close();
+        assertThrows(
+            IllegalStateException.class,
+            () -> session.parser(getClass().getClassLoader(), true)
+        );
+    }
 
     @Test
     void extractsCallsWithoutEvaluatingSource() {

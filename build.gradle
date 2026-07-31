@@ -49,8 +49,8 @@ tasks.named("updateVersionCatalogs") {
 }
 
 if (System.getenv("SONAR_TOKEN") != null) {
-    // deprecated and compile time only classes excluded from coverage
-    def coverageExcludes = [
+    // deprecated and compile time only classes excluded from analysis
+    def analysisExcludes = [
         "**/StreamSoftServiceLoader.java",
         "**/ServiceDescriptionProcessor.java",
         "**/GraalReflectionConfigurer.java",
@@ -63,10 +63,15 @@ if (System.getenv("SONAR_TOKEN") != null) {
         "**/test/support/**",
         "**/micronaut/annotation/processing/test/**"
     ]
+    // Python module tests run in a separate CI workflow without Sonar coverage collection.
+    def coverageExcludes = [
+        "inject-python/src/main/java/**"
+    ]
     sonarqube {
         skipProject = project.name.contains("test")
         properties {
-            property "sonar.exclusions", coverageExcludes.join(",")
+            property "sonar.exclusions", analysisExcludes.join(",")
+            property "sonar.coverage.exclusions", coverageExcludes.join(",")
         }
     }
 }

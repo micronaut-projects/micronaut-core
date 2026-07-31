@@ -20,6 +20,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.python.compiler.PythonBytecodeCompiler;
 import io.micronaut.python.processing.visitor.ClassDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.ScriptDef;
@@ -63,16 +64,31 @@ public final class PythonAstParser {
     }
 
     PythonAstParser(ClassLoader classLoader) {
-        this.context = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+        this(classLoader, false);
+    }
+
+    PythonAstParser(ClassLoader classLoader, boolean incremental) {
+        var contextBuilder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
                 .resourceDirectory(INJECT_RESOURCES)
                 .resourceLoadingClass(PythonAstParser.class)
                 .build())
             // Future hardening should constrain host access to the required Micronaut API surface.
             .allowHostAccess(HostAccess.ALL)
             .hostClassLoader(classLoader)
-            .allowHostClassLookup(name -> name.startsWith("io.micronaut"))
-            .build();
+            .allowHostClassLookup(name -> name.startsWith("io.micronaut"));
+        if (incremental) {
+            // Incremental processing is a short-lived workload. Tune GraalPy for startup latency
+            // and avoid paying for a core-count-based compiler thread pool.
+            contextBuilder.allowExperimentalOptions(true)
+                .option("engine.Mode", "latency")
+                .option("engine.CompilerThreads", "1");
+        }
+        this.context = contextBuilder.build();
         context.initialize(PYTHON);
+    }
+
+    PythonBytecodeCompiler bytecodeCompiler() {
+        return new PythonBytecodeCompiler(context);
     }
 
     public PythonEnvironment parse(@Language("python") String sources) {

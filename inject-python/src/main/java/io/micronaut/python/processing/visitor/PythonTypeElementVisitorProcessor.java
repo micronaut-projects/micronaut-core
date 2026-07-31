@@ -27,6 +27,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Generated;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -65,6 +66,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -73,12 +75,24 @@ import java.util.stream.Collectors;
 @Experimental
 public final class PythonTypeElementVisitorProcessor {
     private final ClassLoader classLoader;
+    private final TypeElementVisitor.VisitorKind visitorKind;
 
     private Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors;
     private List<LoadedVisitor> loadedVisitors;
 
     public PythonTypeElementVisitorProcessor(ClassLoader classLoader) {
+        this(classLoader, null);
+    }
+
+    /**
+     * @param classLoader The visitor class loader
+     * @param visitorKind The visitor kind to execute
+     */
+    @Internal
+    public PythonTypeElementVisitorProcessor(ClassLoader classLoader,
+                                             TypeElementVisitor.VisitorKind visitorKind) {
         this.classLoader = classLoader;
+        this.visitorKind = visitorKind;
     }
 
     /**
@@ -120,6 +134,22 @@ public final class PythonTypeElementVisitorProcessor {
      * @param environment The processing environment
      */
     public void process(PythonProcessingEnvironment environment) {
+        process(environment, ignored -> true, true, true);
+    }
+
+    /**
+     * Processes a selected set of source elements for one visitor kind.
+     *
+     * @param environment The processing environment
+     * @param sourceFilter The source element filter
+     * @param applyMixins Whether mixins should be applied
+     * @param writeAssociatedBeans Whether associated bean definitions should be written
+     */
+    @Internal
+    public void process(PythonProcessingEnvironment environment,
+                        Predicate<ClassElement> sourceFilter,
+                        boolean applyMixins,
+                        boolean writeAssociatedBeans) {
         PythonVisitorContext pythonVisitorContext = environment.visitorContext();
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             try {
@@ -129,8 +159,10 @@ public final class PythonTypeElementVisitorProcessor {
             }
         }
 
-        applyMixins(environment, pythonVisitorContext);
-        List<ClassElement> allClasses = collectClassElements(environment, pythonVisitorContext);
+        if (applyMixins) {
+            applyMixins(environment, pythonVisitorContext, sourceFilter);
+        }
+        List<ClassElement> allClasses = collectClassElements(environment, pythonVisitorContext, sourceFilter);
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             for (ClassElement element : allClasses) {
                 if (element.hasAnnotation(Generated.class)) {
@@ -154,7 +186,9 @@ public final class PythonTypeElementVisitorProcessor {
                 failVisitor(pythonVisitorContext, loadedVisitor, "finish", e);
             }
         }
-        writeAssociatedBeanDefinitions(pythonVisitorContext);
+        if (writeAssociatedBeans) {
+            writeAssociatedBeanDefinitions(pythonVisitorContext);
+        }
     }
 
     private static void failVisitor(PythonVisitorContext visitorContext, LoadedVisitor loadedVisitor, String phase, Throwable throwable) {
@@ -170,38 +204,41 @@ public final class PythonTypeElementVisitorProcessor {
         ), null);
     }
 
-    private void applyMixins(PythonProcessingEnvironment environment, PythonVisitorContext pythonVisitorContext) {
-        for (ClassElement mixin : collectPythonClassElements(environment)) {
+    private void applyMixins(PythonProcessingEnvironment environment,
+                             PythonVisitorContext pythonVisitorContext,
+                             Predicate<ClassElement> sourceFilter) {
+        for (ClassElement mixin : collectPythonClassElements(environment, sourceFilter)) {
             AnnotationValue<Mixin> mixinAnnotation = mixin.getAnnotation(Mixin.class);
-            if (mixinAnnotation == null) {
-                continue;
+            if (mixinAnnotation != null) {
+                String target = mixinAnnotation.stringValue("target")
+                    .orElse(mixinAnnotation.stringValue().orElse(null));
+                if (target != null && !Object.class.getName().equals(target)) {
+                    ClassElement mixinTarget = pythonVisitorContext.getClassElement(target).orElse(null);
+                    if (mixinTarget == null) {
+                        pythonVisitorContext.warn("Cannot access class: " + target, mixin);
+                    } else {
+                        VisitorUtils.applyMixin(mixinAnnotation, mixin, mixinTarget, pythonVisitorContext);
+                        copyPythonPropertyMixinAnnotations(mixinAnnotation, mixin, mixinTarget);
+                    }
+                }
             }
-            String target = mixinAnnotation.stringValue("target")
-                .orElse(mixinAnnotation.stringValue().orElse(null));
-            if (target == null || Object.class.getName().equals(target)) {
-                continue;
-            }
-            ClassElement mixinTarget = pythonVisitorContext.getClassElement(target).orElse(null);
-            if (mixinTarget == null) {
-                pythonVisitorContext.warn("Cannot access class: " + target, mixin);
-                continue;
-            }
-            VisitorUtils.applyMixin(mixinAnnotation, mixin, mixinTarget, pythonVisitorContext);
-            copyPythonPropertyMixinAnnotations(mixinAnnotation, mixin, mixinTarget);
         }
     }
 
-    private List<ClassElement> collectPythonClassElements(PythonProcessingEnvironment environment) {
+    private List<ClassElement> collectPythonClassElements(PythonProcessingEnvironment environment,
+                                                          Predicate<ClassElement> sourceFilter) {
         Map<String, ClassElement> classes = environment.classes();
         Map<String, ClassElement> scripts = environment.scripts();
         List<ClassElement> allClasses = new ArrayList<>(classes.size() + scripts.size());
-        allClasses.addAll(classes.values());
-        allClasses.addAll(scripts.values());
+        classes.values().stream().filter(sourceFilter).forEach(allClasses::add);
+        scripts.values().stream().filter(sourceFilter).forEach(allClasses::add);
         return allClasses;
     }
 
-    private List<ClassElement> collectClassElements(PythonProcessingEnvironment environment, PythonVisitorContext pythonVisitorContext) {
-        List<ClassElement> allClasses = collectPythonClassElements(environment);
+    private List<ClassElement> collectClassElements(PythonProcessingEnvironment environment,
+                                                    PythonVisitorContext pythonVisitorContext,
+                                                    Predicate<ClassElement> sourceFilter) {
+        List<ClassElement> allClasses = collectPythonClassElements(environment, sourceFilter);
         Map<String, ClassElement> uniqueClasses = new LinkedHashMap<>();
         allClasses.forEach(classElement -> uniqueClasses.putIfAbsent(classElement.getName(), classElement));
         for (ClassElement classElement : new ArrayList<>(allClasses)) {
@@ -209,7 +246,9 @@ public final class PythonTypeElementVisitorProcessor {
                 // Imported-element collection can rediscover Python classes that are already part of
                 // the source environment. Type visitors may register associated beans, so visiting the
                 // same class twice would generate duplicate bean definitions for the same association.
-                uniqueClasses.putIfAbsent(importedElement.getName(), importedElement);
+                if (!(importedElement instanceof AbstractPythonClassElement) || sourceFilter.test(importedElement)) {
+                    uniqueClasses.putIfAbsent(importedElement.getName(), importedElement);
+                }
             }
         }
         return new ArrayList<>(uniqueClasses.values());
@@ -384,8 +423,10 @@ public final class PythonTypeElementVisitorProcessor {
     }
 
     private boolean isSupportedVisitorKind(TypeElementVisitor.VisitorKind visitorKind) {
-        return visitorKind == TypeElementVisitor.VisitorKind.ISOLATING
-            || visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING;
+        return this.visitorKind == null
+            ? visitorKind == TypeElementVisitor.VisitorKind.ISOLATING
+                || visitorKind == TypeElementVisitor.VisitorKind.AGGREGATING
+            : this.visitorKind == visitorKind;
     }
 
     /**

@@ -55,6 +55,11 @@ public final class TargetTypeMappingGenerator implements TypeElementVisitor<Obje
     private static final String TARGET_TYPE_MAPPING = "io.micronaut.context.python.TargetTypeMapping";
 
     @Override
+    public VisitorKind getVisitorKind() {
+        return VisitorKind.ISOLATING;
+    }
+
+    @Override
     public TypeElementQuery query() {
         return TypeElementQuery.onlyClass();
     }

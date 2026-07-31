@@ -15,17 +15,21 @@
  */
 package io.micronaut.python.compiler;
 
+import com.sun.source.util.JavacTask;
 import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor;
 import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
 import io.micronaut.annotation.processing.MixinVisitorProcessor;
 import io.micronaut.annotation.processing.PackageElementVisitorProcessor;
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.python.processing.PythonSourceVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.PythonAnnotationProcessor;
+import io.micronaut.python.processing.PythonProcessingSession;
 import org.jspecify.annotations.NonNull;
 
 import javax.annotation.processing.Processor;
@@ -52,8 +56,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.ConcurrentModificationException;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -69,6 +77,7 @@ import java.util.stream.Stream;
 final class PyronautJavaCompiler {
 
     private static final String MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
+    private static final String ISOLATING_PROCESSOR = "org.gradle.annotation.processing.isolating";
     private static final Pattern SOURCE_IN_MESSAGE = Pattern.compile("Python source \\[([^]]+)]");
     private static final Pattern LINE_IN_MESSAGE = Pattern.compile("line (\\d+)");
     private static final DateTimeFormatter DUMP_FILE_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS");
@@ -85,6 +94,9 @@ final class PyronautJavaCompiler {
     private boolean compilePythonBytecode;
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
     private List<Processor> annotationProcessors = List.of();
+    private PythonProcessingSession pythonProcessingSession;
+    private Set<String> incrementalPythonSources;
+    private boolean processAggregatingPythonVisitors = true;
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -148,6 +160,163 @@ final class PyronautJavaCompiler {
         this.annotationProcessors = List.copyOf(annotationProcessors);
     }
 
+    void setPythonProcessingSession(PythonProcessingSession pythonProcessingSession) {
+        this.pythonProcessingSession = pythonProcessingSession;
+    }
+
+    /**
+     * Restricts isolating Python processing to the supplied source paths.
+     *
+     * @param incrementalPythonSources The affected Python sources, or {@code null} for all sources
+     */
+    void setIncrementalPythonSources(Set<String> incrementalPythonSources) {
+        this.incrementalPythonSources = incrementalPythonSources == null
+            ? null
+            : Set.copyOf(incrementalPythonSources);
+    }
+
+    void setProcessAggregatingPythonVisitors(boolean processAggregatingPythonVisitors) {
+        this.processAggregatingPythonVisitors = processAggregatingPythonVisitors;
+    }
+
+    Set<String> aggregatingSources(List<File> classpath,
+                                   List<File> annotationProcessorPath,
+                                   String javaSrc,
+                                   String pythonSrc) {
+        Set<String> candidates = new LinkedHashSet<>();
+        if (!pythonSourceVisitors.isEmpty()) {
+            candidates.addAll(sourceFiles(null, pythonSrc));
+        }
+        for (Processor processor : annotationProcessors) {
+            Set<String> supportedOptions = processor.getSupportedOptions();
+            if (!supportedOptions.contains(ISOLATING_PROCESSOR)) {
+                candidates.addAll(sourcesUsingAnnotations(
+                    processor.getSupportedAnnotationTypes(),
+                    javaSrc,
+                    pythonSrc
+                ));
+            }
+        }
+
+        List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
+        ClassLoader classLoader = createAnnotationProcessorClassLoader(processorClasspath);
+        try {
+            @SuppressWarnings({"rawtypes", "unchecked"})
+            List<TypeElementVisitor<?, ?>> visitors = (List) SoftServiceLoader
+                .load(TypeElementVisitor.class, classLoader)
+                .disableFork()
+                .collectAll();
+            for (TypeElementVisitor<?, ?> visitor : visitors) {
+                if (visitor.isEnabled()
+                    && visitor.getVisitorKind() == TypeElementVisitor.VisitorKind.AGGREGATING) {
+                    candidates.addAll(sourcesUsingAnnotations(
+                        visitor.getSupportedAnnotationNames(),
+                        javaSrc,
+                        pythonSrc
+                    ));
+                }
+            }
+            return Set.copyOf(candidates);
+        } catch (Exception | LinkageError e) {
+            // Unknown visitor behavior must not be treated as isolating.
+            return sourceFiles(javaSrc, pythonSrc);
+        } finally {
+            if (classLoader instanceof URLClassLoader urlClassLoader) {
+                try {
+                    urlClassLoader.close();
+                } catch (IOException ignored) {
+                    // Nothing to do.
+                }
+            }
+        }
+    }
+
+    private static Set<String> sourcesUsingAnnotations(Set<String> annotationNames,
+                                                       String javaSrc,
+                                                       String pythonSrc) {
+        if (annotationNames.stream().anyMatch(name -> name.contains("*"))) {
+            return sourceFiles(javaSrc, pythonSrc);
+        }
+        List<String> normalizedNames = annotationNames.stream()
+            .map(name -> {
+                int separator = name.lastIndexOf('.');
+                String simpleName = separator == -1 ? name : name.substring(separator + 1);
+                return normalizeAnnotationName(simpleName);
+            })
+            .toList();
+        Set<String> sources = new LinkedHashSet<>();
+        for (java.nio.file.Path root : sourceRoots(javaSrc, pythonSrc)) {
+            try (Stream<java.nio.file.Path> paths = Files.walk(root)) {
+                paths
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".java") || path.toString().endsWith(".py"))
+                    .forEach(path -> {
+                        try {
+                            String source = normalizeAnnotationName(Files.readString(path));
+                            if (normalizedNames.stream().anyMatch(source::contains)) {
+                                sources.add(normalizeSourcePath(path));
+                            }
+                        } catch (IOException e) {
+                            sources.add(normalizeSourcePath(path));
+                        }
+                    });
+            } catch (IOException e) {
+                return sourceFiles(javaSrc, pythonSrc);
+            }
+        }
+        return Set.copyOf(sources);
+    }
+
+    private static Set<String> sourceFiles(String javaSrc, String pythonSrc) {
+        Set<String> sources = new LinkedHashSet<>();
+        for (java.nio.file.Path root : sourceRoots(javaSrc, pythonSrc)) {
+            try (Stream<java.nio.file.Path> paths = Files.walk(root)) {
+                paths.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".java") || path.toString().endsWith(".py"))
+                    .map(PyronautJavaCompiler::normalizeSourcePath)
+                    .forEach(sources::add);
+            } catch (IOException e) {
+                return sourceRoots(javaSrc, pythonSrc).stream()
+                    .map(PyronautJavaCompiler::normalizeSourcePath)
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            }
+        }
+        return Set.copyOf(sources);
+    }
+
+    private static String normalizeSourcePath(java.nio.file.Path path) {
+        try {
+            return path.toRealPath().normalize().toString();
+        } catch (IOException e) {
+            return path.toAbsolutePath().normalize().toString();
+        }
+    }
+
+    private static List<java.nio.file.Path> sourceRoots(String javaSrc, String pythonSrc) {
+        List<java.nio.file.Path> roots = new ArrayList<>();
+        if (javaSrc != null && !javaSrc.isBlank()) {
+            roots.add(java.nio.file.Path.of(javaSrc));
+        }
+        if (pythonSrc != null && !pythonSrc.isBlank()) {
+            StringTokenizer tokenizer = new StringTokenizer(pythonSrc, ",");
+            while (tokenizer.hasMoreTokens()) {
+                roots.add(java.nio.file.Path.of(tokenizer.nextToken().trim()));
+            }
+        }
+        return roots.stream().filter(Files::isDirectory).toList();
+    }
+
+    private static String normalizeAnnotationName(String value) {
+        StringBuilder normalized = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            if (Character.isLetterOrDigit(character)) {
+                normalized.append(Character.toLowerCase(character));
+            }
+        }
+        return normalized.toString();
+    }
+
     /**
      * Compile sources to memory using in-memory file manager.
      *
@@ -170,13 +339,13 @@ final class PyronautJavaCompiler {
         return inMemoryJavaFileManager.getOutputFiles();
     }
 
-    private void compileJava(JavaFileObject[] sources,
-                             List<File> classpath,
-                             List<File> bootclasspath,
-                             List<File> annotationProcessorPath,
-                             List<String> compilerOptions,
-                             JavaFileManager fileManager,
-                             DiagnosticCollector<JavaFileObject> diagnosticCollector) {
+    private IncrementalCompilationTrace compileJava(JavaFileObject[] sources,
+                                                    List<File> classpath,
+                                                    List<File> bootclasspath,
+                                                    List<File> annotationProcessorPath,
+                                                    List<String> compilerOptions,
+                                                    JavaFileManager fileManager,
+                                                    DiagnosticCollector<JavaFileObject> diagnosticCollector) {
         List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
         List<File> compileClasspath = effectiveClasspath(classpath);
         List<String> options = buildCompilerOptions(compileClasspath, bootclasspath, annotationProcessorPath, compilerOptions);
@@ -186,7 +355,10 @@ final class PyronautJavaCompiler {
         ClassLoader previous = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(classLoader);
 
-        List<Processor> processors = getAnnotationProcessors(classLoader);
+        java.nio.file.Path outputDirectory = fileManager instanceof TrackingJavaFileManager trackingFileManager
+            ? trackingFileManager.targetDirectory()
+            : null;
+        List<Processor> processors = getAnnotationProcessors(classLoader, outputDirectory);
 
         boolean success;
         try {
@@ -199,11 +371,59 @@ final class PyronautJavaCompiler {
                 Arrays.asList(sources) // Source files
             );
 
-            if (!processors.isEmpty()) {
-                task.setProcessors(processors);
+            JavaCompilationTracker compilationTracker = null;
+            IncrementalProcessorTracker processorTracker = null;
+            if (task instanceof JavacTask javacTask) {
+                compilationTracker = new JavaCompilationTracker(javacTask);
+                javacTask.addTaskListener(compilationTracker);
+                if (fileManager instanceof TrackingJavaFileManager trackingFileManager) {
+                    trackingFileManager.setSourceResolver(
+                        compilationTracker::sourceKey,
+                        compilationTracker::isPythonGeneratedSource
+                    );
+                }
             }
-
+            List<Processor> taskProcessors = processors;
+            if (compilationTracker != null
+                && fileManager instanceof TrackingJavaFileManager trackingFileManager) {
+                processorTracker = new IncrementalProcessorTracker(
+                    compilationTracker,
+                    trackingFileManager.targetDirectory()
+                );
+                taskProcessors = processorTracker.wrap(processors);
+            }
+            if (!taskProcessors.isEmpty()) {
+                task.setProcessors(taskProcessors);
+            }
             success = task.call();
+            if (success && compilationTracker != null) {
+                Map<String, Set<String>> outputs = new LinkedHashMap<>();
+                if (fileManager instanceof TrackingJavaFileManager trackingFileManager) {
+                    mergeOutputs(outputs, trackingFileManager.outputs());
+                }
+                if (processorTracker != null) {
+                    mergeOutputs(outputs, processorTracker.isolatingOutputs());
+                }
+                Set<String> pythonProcessorOutputs = new LinkedHashSet<>();
+                if (fileManager instanceof TrackingJavaFileManager trackingFileManager) {
+                    pythonProcessorOutputs.addAll(trackingFileManager.pythonGeneratedOutputs());
+                }
+                if (processorTracker != null) {
+                    pythonProcessorOutputs.addAll(processorTracker.pythonProcessorOutputs());
+                }
+                IncrementalCompilationTrace trace = compilationTracker.trace(outputs);
+                return new IncrementalCompilationTrace(
+                    trace.analyzedSources(),
+                    trace.dependencies(),
+                    trace.declaredTypes(),
+                    trace.outputs(),
+                    processorTracker == null ? Set.of() : processorTracker.aggregatingInputs(),
+                    processorTracker == null ? Set.of() : processorTracker.aggregatingOutputs(),
+                    Set.copyOf(pythonProcessorOutputs),
+                    processorTracker == null ? Set.of() : processorTracker.contractViolatingOutputs(),
+                    processorTracker == null || processorTracker.processorCompatible()
+                );
+            }
         } catch (RuntimeException e) {
             RuntimeException propagated = propagatedException(e);
             if (propagated != null) {
@@ -219,6 +439,14 @@ final class PyronautJavaCompiler {
         if (!success) {
             throw processingFailure(diagnosticCollector, null);
         }
+        return IncrementalCompilationTrace.empty();
+    }
+
+    private static void mergeOutputs(Map<String, Set<String>> destination,
+                                     Map<String, Set<String>> source) {
+        source.forEach((key, values) -> destination
+            .computeIfAbsent(key, ignored -> new LinkedHashSet<>())
+            .addAll(values));
     }
 
     private RuntimeException processingFailure(DiagnosticCollector<JavaFileObject> diagnosticCollector, RuntimeException exception) {
@@ -482,15 +710,19 @@ final class PyronautJavaCompiler {
      * @param bootclasspath Boot classpath (null to use default)
      * @param annotationProcessorPath Annotation processor path
      */
-    void compileToDisk(File targetDir,
-                       JavaFileObject[] sources,
-                       List<File> classpath,
-                       List<File> bootclasspath,
-                       List<File> annotationProcessorPath,
-                       List<String> compilerOptions) {
+    IncrementalCompilationTrace compileToDisk(File targetDir,
+                                              JavaFileObject[] sources,
+                                              List<File> classpath,
+                                              List<File> bootclasspath,
+                                              List<File> annotationProcessorPath,
+                                              List<String> compilerOptions) {
         DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
         StandardJavaFileManager fileManager =
             compiler.getStandardFileManager(diagnosticCollector, null, null);
+        TrackingJavaFileManager trackingFileManager = new TrackingJavaFileManager(
+            fileManager,
+            targetDir.toPath()
+        );
 
         // Set the class output location
         try {
@@ -500,7 +732,15 @@ final class PyronautJavaCompiler {
             throw new RuntimeException("Failed to set output location", e);
         }
 
-        compileJava(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions, fileManager, diagnosticCollector);
+        return compileJava(
+            sources,
+            classpath,
+            bootclasspath,
+            annotationProcessorPath,
+            compilerOptions,
+            trackingFileManager,
+            diagnosticCollector
+        );
     }
 
     private List<String> buildCompilerOptions(List<File> classpath,
@@ -588,7 +828,8 @@ final class PyronautJavaCompiler {
      *
      * @return The processors
      */
-    private @NonNull List<Processor> getAnnotationProcessors(ClassLoader classLoader) {
+    private @NonNull List<Processor> getAnnotationProcessors(ClassLoader classLoader,
+                                                              java.nio.file.Path outputDirectory) {
         List<Processor> processors = new ArrayList<>();
         processors.addAll(annotationProcessors);
         processors.add(new MixinVisitorProcessor());
@@ -600,6 +841,10 @@ final class PyronautJavaCompiler {
         pythonProcessor.setClassLoader(classLoader);
         pythonProcessor.setCompilePythonBytecode(compilePythonBytecode);
         pythonProcessor.setPythonSourceVisitors(pythonSourceVisitors);
+        pythonProcessor.setIncrementalSources(incrementalPythonSources);
+        pythonProcessor.setProcessAggregatingVisitors(processAggregatingPythonVisitors);
+        pythonProcessor.setOutputDirectory(outputDirectory);
+        pythonProcessor.setProcessingSession(pythonProcessingSession);
         if (classElementCallback != null) {
             pythonProcessor.setClassElementCallback(classElementCallback);
         }

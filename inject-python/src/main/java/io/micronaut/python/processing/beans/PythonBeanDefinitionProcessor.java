@@ -16,9 +16,11 @@
 package io.micronaut.python.processing.beans;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Vetoed;
@@ -47,11 +49,25 @@ public final class PythonBeanDefinitionProcessor {
     public void processBeanDefinitions(
         PythonProcessingEnvironment processingEnvironment
     ) {
+        processBeanDefinitions(processingEnvironment, ignored -> true);
+    }
+
+    /**
+     * Processes bean definitions for selected source elements.
+     *
+     * @param processingEnvironment The processing environment
+     * @param sourceFilter The source element filter
+     */
+    @Internal
+    public void processBeanDefinitions(
+        PythonProcessingEnvironment processingEnvironment,
+        Predicate<ClassElement> sourceFilter
+    ) {
         PythonVisitorContext visitorContext = processingEnvironment.visitorContext();
-        for (ClassElement classElement : processingEnvironment.classes().values()) {
+        for (ClassElement classElement : processingEnvironment.classes().values().stream().filter(sourceFilter).toList()) {
             processClassElement(classElement, visitorContext);
         }
-        for (ClassElement classElement : processingEnvironment.scripts().values()) {
+        for (ClassElement classElement : processingEnvironment.scripts().values().stream().filter(sourceFilter).toList()) {
             processClassElement(classElement, visitorContext);
         }
     }
