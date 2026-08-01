@@ -34,6 +34,8 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
@@ -166,10 +168,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         HttpClient httpClient = clientFactory.getClient(annotationMetadata);
         if (httpMethodMapping.isPresent() && context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
             AnnotationValue<HttpMethodMapping> mapping = Objects.requireNonNull(context.getAnnotation(HttpMethodMapping.class));
-            String uri = mapping.getRequiredValue(String.class);
-            if (StringUtils.isEmpty(uri)) {
-                uri = "/" + context.getMethodName();
-            }
+            String mappedUri = mapping.getRequiredValue(String.class);
+            final String uri = StringUtils.isEmpty(mappedUri) ? "/" + context.getMethodName() : mappedUri;
 
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
             HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase(Locale.ENGLISH));
@@ -185,7 +185,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             try {
                 Argument<?> valueType = interceptedMethod.returnTypeValue();
                 Class<?> reactiveValueType = valueType.getType();
-                return switch (interceptedMethod.resultType()) {
+                // When io.micrometer:context-propagation enables Reactor automatic context
+                // propagation, ThreadLocals may be cleared around coroutine resumes even though
+                // the PropagatedContext is still present in the Kotlin coroutine context.
+                // Re-apply it for the synchronous client setup so filters capture the right context.
+                return withKotlinPropagatedContext(interceptedMethod, () -> switch (interceptedMethod.resultType()) {
                     case PUBLISHER ->
                             handlePublisher(context, returnType, reactiveValueType, httpMethod, httpMethodName,
                                 uri, interceptedMethod, annotationMetadata, httpClient, errorType, valueType, declaringType);
@@ -195,13 +199,66 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     case SYNCHRONOUS ->
                             handleSynchronous(context, returnType, httpClient, httpMethod, httpMethodName, uri,
                                 interceptedMethod, annotationMetadata, errorType, declaringType);
-                };
+                });
             } catch (Exception e) {
                 return interceptedMethod.handleException(e);
             }
         }
         // try other introduction advice
         return context.proceed();
+    }
+
+    private static final boolean KOTLIN_CLIENT_PROPAGATION_AVAILABLE =
+        ClassUtils.isPresent(
+            "io.micronaut.core.async.propagation.KotlinCoroutinePropagation",
+            HttpClientIntroductionAdvice.class.getClassLoader()
+        ) && ClassUtils.isPresent(
+            "io.micronaut.aop.kotlin.KotlinInterceptedMethod",
+            HttpClientIntroductionAdvice.class.getClassLoader()
+        );
+
+    /**
+     * Ensures {@link PropagatedContext} from a Kotlin coroutine context is bound to the current
+     * thread for the duration of {@code action}. This recovers from ThreadLocal loss caused by
+     * Micrometer/Reactor automatic context propagation (see issue 12851).
+     *
+     * @param interceptedMethod The intercepted method
+     * @param action            The client invocation
+     * @return The action result
+     */
+    @Nullable
+    private static Object withKotlinPropagatedContext(InterceptedMethod interceptedMethod, Supplier<Object> action) {
+        // Isolate Kotlin types in a nested class so pure-Java apps without kotlinx-coroutines
+        // never resolve those class constants on this hot path.
+        if (!KOTLIN_CLIENT_PROPAGATION_AVAILABLE
+            || !interceptedMethod.getClass().getName().endsWith("KotlinInterceptedMethodImpl")) {
+            return action.get();
+        }
+        return KotlinClientPropagatedContext.withPropagatedContext(interceptedMethod, action);
+    }
+
+    /**
+     * Isolates Kotlin coroutine types so pure-Java apps without kotlinx-coroutines on the
+     * classpath do not fail class loading of {@link HttpClientIntroductionAdvice}.
+     */
+    private static final class KotlinClientPropagatedContext {
+        private KotlinClientPropagatedContext() {
+        }
+
+        @Nullable
+        static Object withPropagatedContext(InterceptedMethod interceptedMethod, Supplier<Object> action) {
+            io.micronaut.aop.kotlin.KotlinInterceptedMethod kotlinInterceptedMethod =
+                (io.micronaut.aop.kotlin.KotlinInterceptedMethod) interceptedMethod;
+            PropagatedContext fromCoroutine =
+                io.micronaut.core.async.propagation.KotlinCoroutinePropagation.Companion
+                    .findPropagatedContext(kotlinInterceptedMethod.getCoroutineContext());
+            if (fromCoroutine == null || fromCoroutine.isEmpty() || fromCoroutine.isBound()) {
+                return action.get();
+            }
+            try (PropagatedContext.Scope ignore = fromCoroutine.propagate()) {
+                return action.get();
+            }
+        }
     }
 
     @Nullable
