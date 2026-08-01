@@ -596,6 +596,12 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final Method GET_MAP_METHOD = ReflectionUtils.getRequiredMethod(Map.class, "get", Object.class);
     private static final Method LOAD_REFERENCE_METHOD = ReflectionUtils.getRequiredMethod(BeanDefinitionReference.class, "load");
     private static final Method IS_CONTEXT_SCOPE_METHOD = ReflectionUtils.getRequiredMethod(BeanDefinitionReference.class, "isContextScope");
+    private static final Method VALIDATE_BEAN_METHOD = ReflectionUtils.getRequiredMethod(
+        ValidatedBeanDefinition.class,
+        "validate",
+        BeanResolutionContext.class,
+        Object.class
+    );
     private static final Method IS_PROXIED_BEAN_METHOD = ReflectionUtils.getRequiredMethod(BeanDefinitionReference.class, "isProxiedBean");
     private static final Method IS_ENABLED_METHOD = ReflectionUtils.getRequiredMethod(BeanContextConditional.class, "isEnabled", BeanContext.class);
     private static final Method IS_ENABLED2_METHOD = ReflectionUtils.getRequiredMethod(BeanContextConditional.class, "isEnabled", BeanContext.class, BeanResolutionContext.class);
@@ -681,6 +687,13 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private ClassDef.ClassDefBuilder classDefBuilder;
 
     private boolean validated;
+    /**
+     * When true, post-construct {@link ValidatedBeanDefinition#validate} runs full bean validation
+     * (configuration properties). When false, only injection-point validation via
+     * {@link ValidatedBeanDefinition#validateBeanArgument} is needed — typical for
+     * {@code @Singleton} beans with constrained {@code @Value} constructor parameters.
+     */
+    private boolean requiresPostConstructBeanValidation;
 
     private final Function<String, ExpressionDef> loadClassValueExpressionFn;
 
@@ -921,7 +934,14 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private void applyConfigurationInjectionIfNecessary(AnnotationMetadata annotationMetadata, List<BeanDefinitionInjectionPoint<ClassElement>> injectionPoints) {
         if (annotationMetadata.hasDeclaredAnnotation(RequiresValidation.class)) {
             if (injectionPoints.stream().anyMatch(BeanDefinitionWriter::isValidationRequiredForInjectionPoint)) {
-                setValidated(true);
+                // Configuration properties need post-construct bean validation (missing props stay
+                // null until validate). Ordinary beans only need injection-point validation so
+                // constrained @Value constructor params work without @Introspected (#12847).
+                if (isConfigurationProperties) {
+                    setRequiresPostConstructBeanValidation(true);
+                } else {
+                    setValidated(true);
+                }
             }
         }
     }
@@ -1121,6 +1141,12 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     /**
+     * Marks the bean as a {@link ValidatedBeanDefinition} so constructor and member injection
+     * points can be validated via {@link ValidatedBeanDefinition#validateBeanArgument}.
+     * <p>
+     * Does not enable post-construct bean validation; that requires
+     * {@link #setRequiresPostConstructBeanValidation(boolean)}.
+     *
      * @param validated If the bean is validated
      */
     public void setValidated(boolean validated) {
@@ -1133,6 +1159,23 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             if (this.validated) {
                 throw new IllegalStateException("Bean definition " + beanTypeDef + " already marked for validation");
             }
+        }
+    }
+
+    /**
+     * Marks that the bean requires post-construct bean validation (e.g. configuration
+     * properties validated via introspection). Implies {@link #setValidated(true)}.
+     * <p>
+     * Injection-point-only cases (constrained {@code @Value} on a {@code @Singleton}
+     * constructor) should use {@link #setValidated(true)} alone so the bean does not
+     * need {@code @Introspected}.
+     *
+     * @param requiresPostConstructBeanValidation whether to validate the bean after creation
+     */
+    public void setRequiresPostConstructBeanValidation(boolean requiresPostConstructBeanValidation) {
+        if (requiresPostConstructBeanValidation) {
+            setValidated(true);
+            this.requiresPostConstructBeanValidation = true;
         }
     }
 
@@ -1205,6 +1248,16 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 LOAD_REFERENCE_METHOD
             ).build((aThis, methodParameters) -> aThis.type().instantiate().returning())
         );
+
+        // Injection-point constraints are validated via validateBeanArgument during construction.
+        // Skip post-construct bean validation so @Singleton beans with constrained @Value
+        // constructor parameters do not require @Introspected (see #12847).
+        if (validated && !requiresPostConstructBeanValidation) {
+            classDefBuilder.addMethod(
+                MethodDef.override(VALIDATE_BEAN_METHOD)
+                    .build((aThis, methodParameters) -> methodParameters.get(1).returning())
+            );
+        }
 
         if (annotationMetadata.hasDeclaredAnnotation(Context.class)) {
             classDefBuilder.addMethod(
