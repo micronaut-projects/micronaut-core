@@ -933,11 +933,17 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private void applyConfigurationInjectionIfNecessary(AnnotationMetadata annotationMetadata, List<BeanDefinitionInjectionPoint<ClassElement>> injectionPoints) {
         if (annotationMetadata.hasDeclaredAnnotation(RequiresValidation.class)) {
-            if (injectionPoints.stream().anyMatch(BeanDefinitionWriter::isValidationRequiredForInjectionPoint)) {
+            List<BeanDefinitionInjectionPoint<ClassElement>> validatedPoints = injectionPoints.stream()
+                .filter(BeanDefinitionWriter::isValidationRequiredForInjectionPoint)
+                .toList();
+            if (!validatedPoints.isEmpty()) {
                 // Configuration properties need post-construct bean validation (missing props stay
-                // null until validate). Ordinary beans only need injection-point validation so
-                // constrained @Value constructor params work without @Introspected (#12847).
-                if (isConfigurationProperties) {
+                // null until validate). Nullable bean injects with constraints (e.g. @Nullable
+                // @NotNull record params) also need post-construct validate.
+                // Injection-point-only validation is enough for constrained @Value/@Property
+                // parameters on ordinary @Singleton beans so they work without @Introspected
+                // (#12847) while keeping RecordBeansSpec / similar cases correct.
+                if (isConfigurationProperties || needsPostConstructBeanValidation(validatedPoints)) {
                     setRequiresPostConstructBeanValidation(true);
                 } else {
                     setValidated(true);
@@ -954,6 +960,19 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             return false;
         }
         return true;
+    }
+
+    /**
+     * Post-construct {@link ValidatedBeanDefinition#validate} is required when a validated
+     * injection point is a (nullable) bean dependency — null can be injected and only full
+     * bean validation rejects it. Pure {@code @Value}/{@code @Property} constraints are
+     * covered by {@code validateBeanArgument} at inject time.
+     */
+    private boolean needsPostConstructBeanValidation(List<BeanDefinitionInjectionPoint<ClassElement>> validatedPoints) {
+        return validatedPoints.stream().anyMatch(ip ->
+            ip instanceof BeanInjectionPoint<?> || ip instanceof OptionalBeanInjectionPoint<?>
+                || !isValueType(ip.annotationMetadata())
+        );
     }
 
     @Override
