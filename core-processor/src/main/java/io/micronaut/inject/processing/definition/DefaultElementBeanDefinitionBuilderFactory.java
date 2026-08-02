@@ -289,7 +289,7 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
             if (target.hasStereotype(ConfigurationReader.class)) {
                 BeanDefinitionWriter beanDefinitionWriter = (BeanDefinitionWriter) aopProxyWriter.beanDefinitionBuilder();
                 // Configuration beans are validated at the startup and don't require validation advice
-                beanDefinitionWriter.setValidated(true);
+                beanDefinitionWriter.setRequiresPostConstructBeanValidation(true);
             } else {
                 for (MethodElement methodElement : target.getEnclosedElements(ElementQuery.ALL_METHODS.annotated(am -> am.hasAnnotation(ANN_REQUIRES_VALIDATION)))) {
                     methodElement.annotate(ANN_VALIDATED);
