@@ -35,12 +35,12 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.propagation.PropagatedContext;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.KotlinUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.BasicHttpAttributes;
@@ -115,14 +115,24 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     private static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
 
-    private static final boolean KOTLIN_CLIENT_PROPAGATION_AVAILABLE =
-        ClassUtils.isPresent(
-            "io.micronaut.core.async.propagation.KotlinCoroutinePropagation",
-            HttpClientIntroductionAdvice.class.getClassLoader()
-        ) && ClassUtils.isPresent(
-            "io.micronaut.aop.kotlin.KotlinInterceptedMethod",
-            HttpClientIntroductionAdvice.class.getClassLoader()
-        );
+    /**
+     * Whether Kotlin coroutine {@link PropagatedContext} recovery is usable.
+     * Resolved like {@link KotlinUtils}: try to touch optional helpers at class
+     * init and treat {@link NoClassDefFoundError} as unavailable (no reflective
+     * {@code ClassUtils.isPresent} strings that need GraalVM metadata).
+     */
+    private static final boolean KOTLIN_CLIENT_PROPAGATION_AVAILABLE;
+
+    static {
+        boolean available;
+        try {
+            available = KotlinUtils.KOTLIN_COROUTINES_SUPPORTED
+                && KotlinClientPropagatedContext.isAvailable();
+        } catch (NoClassDefFoundError e) {
+            available = false;
+        }
+        KOTLIN_CLIENT_PROPAGATION_AVAILABLE = available;
+    }
 
     private final List<ReactiveClientResultTransformer> transformers;
     private final HttpClientBinderRegistry binderRegistry;
@@ -198,15 +208,20 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 // propagation, ThreadLocals may be cleared around coroutine resumes even though
                 // the PropagatedContext is still present in the Kotlin coroutine context.
                 // Re-apply it for the synchronous client setup so filters capture the right context.
-                // Only allocate the capturing Supplier when Kotlin propagation can apply (hot path).
-                if (needsKotlinPropagatedContext(interceptedMethod)) {
-                    return withKotlinPropagatedContext(interceptedMethod, () -> dispatchClientCall(
+                // Scope open is only attempted for Kotlin suspend clients (no Supplier alloc).
+                PropagatedContext.Scope kotlinScope = null;
+                try {
+                    if (KOTLIN_CLIENT_PROPAGATION_AVAILABLE) {
+                        kotlinScope = KotlinClientPropagatedContext.maybePropagate(interceptedMethod);
+                    }
+                    return dispatchClientCall(
                         context, returnType, reactiveValueType, httpMethod, httpMethodName, uri,
-                        interceptedMethod, annotationMetadata, httpClient, errorType, valueType, declaringType));
+                        interceptedMethod, annotationMetadata, httpClient, errorType, valueType, declaringType);
+                } finally {
+                    if (kotlinScope != null) {
+                        kotlinScope.close();
+                    }
                 }
-                return dispatchClientCall(
-                    context, returnType, reactiveValueType, httpMethod, httpMethodName, uri,
-                    interceptedMethod, annotationMetadata, httpClient, errorType, valueType, declaringType);
             } catch (Exception e) {
                 return interceptedMethod.handleException(e);
             }
@@ -239,27 +254,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 handleSynchronous(context, returnType, httpClient, httpMethod, httpMethodName, uri,
                     interceptedMethod, annotationMetadata, errorType, declaringType);
         };
-    }
-
-    private static boolean needsKotlinPropagatedContext(InterceptedMethod interceptedMethod) {
-        return KOTLIN_CLIENT_PROPAGATION_AVAILABLE
-            && interceptedMethod.getClass().getName().endsWith("KotlinInterceptedMethodImpl");
-    }
-
-    /**
-     * Ensures {@link PropagatedContext} from a Kotlin coroutine context is bound to the current
-     * thread for the duration of {@code action}. This recovers from ThreadLocal loss caused by
-     * Micrometer/Reactor automatic context propagation (see issue 12851).
-     *
-     * @param interceptedMethod The intercepted method
-     * @param action            The client invocation
-     * @return The action result
-     */
-    @Nullable
-    private static Object withKotlinPropagatedContext(InterceptedMethod interceptedMethod, Supplier<Object> action) {
-        // Isolate Kotlin types in a nested class so pure-Java apps without kotlinx-coroutines
-        // never resolve those class constants on this hot path.
-        return KotlinClientPropagatedContext.withPropagatedContext(interceptedMethod, action);
     }
 
     @Nullable
@@ -789,24 +783,40 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     /**
      * Isolates Kotlin coroutine types so pure-Java apps without kotlinx-coroutines on the
      * classpath do not fail class loading of {@link HttpClientIntroductionAdvice}.
+     * Availability is probed via direct class references (same pattern as {@link KotlinUtils}).
      */
     private static final class KotlinClientPropagatedContext {
         private KotlinClientPropagatedContext() {
         }
 
-        @Nullable
-        static Object withPropagatedContext(InterceptedMethod interceptedMethod, Supplier<Object> action) {
-            io.micronaut.aop.kotlin.KotlinInterceptedMethod kotlinInterceptedMethod =
-                (io.micronaut.aop.kotlin.KotlinInterceptedMethod) interceptedMethod;
+        /**
+         * Touch optional Kotlin helpers so missing deps surface as {@link NoClassDefFoundError}
+         * during nested-class init (caught by the outer static block).
+         */
+        static boolean isAvailable() {
+            // Direct references — GraalVM sees them without reflective ClassUtils strings.
+            Class<?> ignoredKim = io.micronaut.aop.kotlin.KotlinInterceptedMethod.class;
+            Object ignoredCompanion =
+                io.micronaut.core.async.propagation.KotlinCoroutinePropagation.Companion;
+            return ignoredKim != null && ignoredCompanion != null;
+        }
+
+        /**
+         * If {@code interceptedMethod} is a Kotlin suspend client call with a non-empty unbound
+         * {@link PropagatedContext} in the coroutine context, open a thread-bound scope.
+         * Otherwise return {@code null} (caller skips close).
+         */
+        static PropagatedContext.@Nullable Scope maybePropagate(InterceptedMethod interceptedMethod) {
+            if (!(interceptedMethod instanceof io.micronaut.aop.kotlin.KotlinInterceptedMethod kotlinInterceptedMethod)) {
+                return null;
+            }
             PropagatedContext fromCoroutine =
                 io.micronaut.core.async.propagation.KotlinCoroutinePropagation.Companion
                     .findPropagatedContext(kotlinInterceptedMethod.getCoroutineContext());
             if (fromCoroutine == null || fromCoroutine.isEmpty() || fromCoroutine.isBound()) {
-                return action.get();
+                return null;
             }
-            try (PropagatedContext.Scope ignore = fromCoroutine.propagate()) {
-                return action.get();
-            }
+            return fromCoroutine.propagate();
         }
     }
 }
