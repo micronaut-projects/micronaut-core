@@ -55,17 +55,19 @@ class PropertySourcePropertyResolverSpec extends Specification {
         }
 
         when: "a request observes the empty catalog between reset and its reinitialization"
-        assert catalogCleared.await(10, TimeUnit.SECONDS)
         ConfigurationException missingDuringRefresh
         try {
-            placeholders.resolveRequiredPlaceholders('${test.value}')
-            throw new AssertionError("Expected placeholder resolution to fail while the catalog is empty")
-        } catch (ConfigurationException e) {
-            missingDuringRefresh = e
+            assert catalogCleared.await(10, TimeUnit.SECONDS)
+            try {
+                placeholders.resolveRequiredPlaceholders('${test.value}')
+                throw new AssertionError("Expected placeholder resolution to fail while the catalog is empty")
+            } catch (ConfigurationException e) {
+                missingDuringRefresh = e
+            }
+        } finally {
+            lookupCompleted.countDown()
+            refreshThread.join(10_000)
         }
-        lookupCompleted.countDown()
-        refreshThread.join(10_000)
-
         then: "the negative lookup must not survive once the catalog has been rebuilt"
         !refreshThread.alive
         missingDuringRefresh.message == 'Could not resolve placeholder ${test.value}'
