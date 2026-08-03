@@ -16,7 +16,7 @@
 package io.micronaut.core.serialize;
 
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.serialize.exceptions.SerializationException;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
@@ -28,6 +28,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.io.OutputStream;
+import java.lang.reflect.Proxy;
 import java.util.Optional;
 
 /**
@@ -75,6 +76,7 @@ public final class JdkSerializer implements ObjectSerializer {
             try (ObjectInputStream objectIn = createObjectInput(inputStream, requiredType)) {
                 try {
                     Object readObject = objectIn.readObject();
+                    validateRequiredType(readObject, requiredType);
 
                     return conversionService.convert(readObject, requiredType);
                 } catch (ClassCastException cce) {
@@ -97,6 +99,7 @@ public final class JdkSerializer implements ObjectSerializer {
             try (ObjectInputStream objectIn = createObjectInput(inputStream, requiredType.getType())) {
                 try {
                     Object readObject = objectIn.readObject();
+                    validateRequiredType(readObject, requiredType.getType());
 
                     return conversionService.convert(readObject, requiredType);
                 } catch (ClassCastException cce) {
@@ -129,28 +132,72 @@ public final class JdkSerializer implements ObjectSerializer {
         ObjectInputStream objectInputStream = new ObjectInputStream(inputStream) {
             @Override
             protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
-                Optional<Class<?>> aClass = ClassUtils.forName(desc.getName(), requiredType.getClassLoader());
-                if (aClass.isPresent()) {
-                    return aClass.get();
+                try {
+                    return Class.forName(desc.getName(), false, resolveClassLoader(requiredType));
+                } catch (ClassNotFoundException | NoClassDefFoundError e) {
+                    return super.resolveClass(desc);
                 }
-                return super.resolveClass(desc);
             }
         };
-        objectInputStream.setObjectInputFilter(new ObjectInputFilter() {
-            private boolean rootTypeChecked;
+        ObjectInputFilter requiredTypeFilter = new RequiredTypeObjectInputFilter(requiredType);
+        ObjectInputFilter inheritedFilter = objectInputStream.getObjectInputFilter();
+        objectInputStream.setObjectInputFilter(inheritedFilter == null
+            ? requiredTypeFilter
+            : ObjectInputFilter.merge(inheritedFilter, requiredTypeFilter));
+        return objectInputStream;
+    }
 
-            @Override
-            public Status checkInput(FilterInfo filterInfo) {
-                Class<?> serialClass = filterInfo.serialClass();
-                if (!rootTypeChecked && serialClass != null && filterInfo.depth() == 1) {
-                    rootTypeChecked = true;
-                    if (!requiredType.isAssignableFrom(serialClass)) {
-                        return Status.REJECTED;
-                    }
-                }
+    private static @Nullable ClassLoader resolveClassLoader(Class<?> requiredType) {
+        ClassLoader classLoader = requiredType.getClassLoader();
+        if (classLoader == null) {
+            classLoader = Thread.currentThread().getContextClassLoader();
+        }
+        if (classLoader == null) {
+            classLoader = ClassLoader.getSystemClassLoader();
+        }
+        return classLoader;
+    }
+
+    private static void validateRequiredType(@Nullable Object object, Class<?> requiredType) {
+        Class<?> wrapperType = ReflectionUtils.getWrapperType(requiredType);
+        if (object != null && !wrapperType.isInstance(object)) {
+            throw new SerializationException(
+                "Invalid type deserialized from stream. Expected: " + requiredType.getName() +
+                    ", actual: " + object.getClass().getName()
+            );
+        }
+    }
+
+    private static final class RequiredTypeObjectInputFilter implements ObjectInputFilter {
+        private static final Module JAVA_BASE = Object.class.getModule();
+
+        private final Class<?> requiredType;
+        private boolean rootTypeChecked;
+
+        private RequiredTypeObjectInputFilter(Class<?> requiredType) {
+            this.requiredType = ReflectionUtils.getWrapperType(requiredType);
+        }
+
+        @Override
+        public Status checkInput(FilterInfo filterInfo) {
+            Class<?> serialClass = filterInfo.serialClass();
+            if (rootTypeChecked || serialClass == null || filterInfo.depth() != 1) {
                 return Status.UNDECIDED;
             }
-        });
-        return objectInputStream;
+            if (serialClass.isInterface() || serialClass == Proxy.class) {
+                return Status.UNDECIDED;
+            }
+            if (requiredType.isAssignableFrom(serialClass) || isJavaBaseSerializationProxy(serialClass)) {
+                rootTypeChecked = true;
+                return Status.UNDECIDED;
+            }
+            return Status.REJECTED;
+        }
+
+        private boolean isJavaBaseSerializationProxy(Class<?> serialClass) {
+            return requiredType.getModule() == JAVA_BASE &&
+                serialClass.getModule() == JAVA_BASE &&
+                requiredType.getPackageName().equals(serialClass.getPackageName());
+        }
     }
 }
