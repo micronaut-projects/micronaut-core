@@ -43,6 +43,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
@@ -615,7 +616,7 @@ public final class PythonContextRuntime {
             return offloadPooledExecution(() -> withPooled(classReference, fn));
         }
         if (isReuseContext() || pythonPool == null) {
-            return fn.apply(findClass(classReference));
+            return withPrimaryContext(context -> fn.apply(findClass(classReference, context)));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
@@ -674,7 +675,7 @@ public final class PythonContextRuntime {
             return offloadPooledExecution(() -> withPooledScript(packageName, scriptName, fn));
         }
         if (isReuseContext() || pythonPool == null) {
-            return fn.apply(findScript(packageName, scriptName));
+            return withPrimaryContext(context -> fn.apply(findScript(packageName, scriptName, context)));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
@@ -713,9 +714,7 @@ public final class PythonContextRuntime {
             return offloadPooledExecution(() -> withPooledValue(expression, fn));
         }
         if (isReuseContext() || pythonPool == null) {
-            Context context = getContext();
-            Value value = getOrCreateValue(context, expression);
-            return fn.apply(value);
+            return withPrimaryContext(context -> fn.apply(getOrCreateValue(context, expression)));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
@@ -1267,6 +1266,12 @@ public final class PythonContextRuntime {
         synchronized (contextState(context).lock) {
             return action.get();
         }
+    }
+
+    static <T extends @Nullable Object> T withPrimaryContext(Function<Context, T> callback) {
+        Context primary = getContext();
+        return withContextLock(primary,
+            () -> withExecutionFrame(primary, () -> callback.apply(primary)));
     }
 
     /**

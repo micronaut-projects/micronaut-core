@@ -1,0 +1,2 @@
+io.micronaut.context.python.SecondGraalPyContextCustomizer
+io.micronaut.context.python.FirstGraalPyContextCustomizer

@@ -48,6 +48,14 @@ tasks.named("updateVersionCatalogs") {
     ignoredModules.add("com.github.ben-manes.caffeine:caffeine")
 }
 
+def pythonProjects = [
+        ":micronaut-inject-python",
+        ":micronaut-inject-python-test",
+        ":micronaut-context-python",
+        ":micronaut-context-python-netty",
+        ":test-suite-python"
+]
+
 if (System.getenv("SONAR_TOKEN") != null) {
     // deprecated and compile time only classes excluded from analysis
     def analysisExcludes = [
@@ -64,14 +72,14 @@ if (System.getenv("SONAR_TOKEN") != null) {
         "**/micronaut/annotation/processing/test/**"
     ]
     // Python module tests run in a separate CI workflow without Sonar coverage collection.
-    def coverageExcludes = [
-        "inject-python/src/main/java/**"
-    ]
+    def pythonCoverageExcludes = pythonProjects.collect {
+        "${project(it).projectDir.name}/**/*"
+    }
     sonarqube {
         skipProject = project.name.contains("test")
         properties {
             property "sonar.exclusions", analysisExcludes.join(",")
-            property "sonar.coverage.exclusions", coverageExcludes.join(",")
+            property "sonar.coverage.exclusions", pythonCoverageExcludes.join(",")
         }
     }
 }
@@ -82,14 +90,6 @@ configurations.jacocoAggregation.dependencies.removeIf {
 configurations.javadocAggregatorBase.dependencies.removeIf {
     it instanceof ProjectDependency && it.path.startsWith(":test-")
 }
-
-def pythonProjects = [
-        ":micronaut-inject-python",
-        ":micronaut-inject-python-test",
-        ":micronaut-context-python",
-        ":micronaut-context-python-netty",
-        ":test-suite-python"
-]
 
 if (!providers.gradleProperty("python-ci").isPresent()) {
     subprojects { project ->

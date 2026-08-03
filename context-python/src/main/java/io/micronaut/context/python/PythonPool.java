@@ -47,6 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
@@ -60,11 +61,12 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 @Singleton
 @io.micronaut.context.annotation.Context
 @Internal
-final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulShutdownCapable, Ordered {
+final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListener<Context>, GracefulShutdownCapable, Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(PythonPool.class);
     private final Engine engine;
     private final HostAccess hostAccess;
     private final ApplicationContext applicationContext;
+    private final GraalPyContextConfiguration contextConfiguration;
     private final long warnThresholdMs;
 
     private final Context primaryContext;
@@ -98,11 +100,13 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
                @Named(GraalPyRuntimeUtil.PYTHON) HostAccess hostAccess,
                @Named(GraalPyRuntimeUtil.PYTHON) Context primaryContext,
                ApplicationContext applicationContext,
+               GraalPyContextConfiguration contextConfiguration,
                PythonPoolConfiguration configuration) {
         this.engine = engine;
         this.primaryContext = primaryContext;
         this.hostAccess = hostAccess;
         this.applicationContext = applicationContext;
+        this.contextConfiguration = contextConfiguration;
         int configuredPoolSize = configuration.size();
         this.warnThresholdMs = configuration.warnWaitMs();
         this.targetSize = configuration.enabled() ? (configuredPoolSize > 0 ? configuredPoolSize : computeDefaultSize()) : 0;
@@ -196,6 +200,26 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
 
     int availableContextCount() {
         return pooledQueue.size();
+    }
+
+    @Override
+    public <T extends @Nullable Object> T withContext(Function<Context, T> callback) {
+        Objects.requireNonNull(callback, "callback");
+        if (PythonContextRuntime.isReuseContext() || targetSize <= 0) {
+            return PythonContextRuntime.withPrimaryContext(callback);
+        }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop != null) {
+            Context eventLoopContext = getEventLoopContext(eventLoop);
+            return PythonContextRuntime.withContextLock(eventLoopContext,
+                () -> PythonContextRuntime.withExecutionFrame(eventLoopContext, () -> callback.apply(eventLoopContext)));
+        }
+        Context borrowed = borrow();
+        try {
+            return PythonContextRuntime.withExecutionFrame(borrowed, () -> callback.apply(borrowed));
+        } finally {
+            release(borrowed);
+        }
     }
 
     /**
@@ -452,7 +476,8 @@ final class PythonPool implements BeanDestroyedEventListener<Context>, GracefulS
             return GraalPyContextFactory.buildContext(
                 hostAccess,
                 engine,
-                applicationContext.getClassLoader()
+                applicationContext.getClassLoader(),
+                contextConfiguration
             );
         } catch (IOException e) {
             throw new ApplicationStartupException("Failed to create Python context: " + e.getMessage(), e);

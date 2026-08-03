@@ -17,6 +17,7 @@ AsyncioConcurrentClientRunner = java.type("micronaut.docs.asyncio.AsyncioConcurr
 @Property(name="micronaut.netty.event-loops.client.num-threads", value="1")
 @Property(name="micronaut.http.client.event-loop-group", value="client")
 @Property(name="micronaut.http.client.pool.max-pending-connections", value="64")
+@Property(name="micronaut.http.client.read-timeout", value="30s")
 @Property(name="micronaut.python.pool.enabled", value="true")
 @MicronautTest
 class PythonAsyncioSpec:

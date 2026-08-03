@@ -57,7 +57,9 @@ public final class GraalPyContextConfiguration {
         "hostClassLoader",
         "apply"
     })
-    Context.Builder builder = Context.newBuilder();
+    Context.Builder builder = Context.newBuilder(
+        GraalPyContextCustomizers.languages(GraalPyContextCustomizers.currentClassLoader())
+    );
     private Map<String, String> options = Map.of();
 
     GraalPyContextConfiguration() {

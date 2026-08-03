@@ -190,10 +190,10 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         return buildContext(hostAccess, engine, classLoader, new GraalPyContextConfiguration());
     }
 
-    private static Context buildContext(HostAccess hostAccess,
-                                        Engine engine,
-                                        ClassLoader classLoader,
-                                        GraalPyContextConfiguration contextConfiguration) throws IOException {
+    static Context buildContext(HostAccess hostAccess,
+                                Engine engine,
+                                ClassLoader classLoader,
+                                GraalPyContextConfiguration contextConfiguration) throws IOException {
         return buildContext(hostAccess, engine, classLoader, contextConfiguration, APPLICATION_MAIN);
     }
 
@@ -224,6 +224,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             .allowHostClassLookup(_ -> true);
         resolveVirtualEnvExecutable(System.getenv())
             .ifPresent(executable -> builder.option("python.Executable", executable.toString()));
+        GraalPyContextCustomizers.load(classLoader)
+            .forEach(customizer -> customizer.customize(builder));
 
         LOG.debug("Configured GraalPy Context.Builder in {}ms", System.currentTimeMillis() - now);
 
