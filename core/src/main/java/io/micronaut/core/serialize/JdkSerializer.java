@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
@@ -37,13 +38,34 @@ import java.util.Optional;
  */
 public final class JdkSerializer implements ObjectSerializer {
 
+    /**
+     * System property that, when set to a non-blank {@link ObjectInputFilter} pattern (as accepted by
+     * {@link ObjectInputFilter.Config#createFilter(String)}), installs a JEP-290 deserialization filter
+     * on every stream created by this serializer. Unset by default, which preserves the previous
+     * (unfiltered) behaviour.
+     *
+     * @since 5.2.0
+     */
+    public static final String SERIAL_FILTER_PROPERTY = "micronaut.serializer.jdk.serial-filter";
+
     private final ConversionService conversionService;
+    private final @Nullable ObjectInputFilter objectInputFilter;
 
     /**
      * @param conversionService The conversion service
      */
     public JdkSerializer(ConversionService conversionService) {
+        this(conversionService, resolveDefaultFilter());
+    }
+
+    /**
+     * @param conversionService The conversion service
+     * @param objectInputFilter The {@link ObjectInputFilter} to apply when deserializing, or {@code null} to apply none
+     * @since 5.2.0
+     */
+    public JdkSerializer(ConversionService conversionService, @Nullable ObjectInputFilter objectInputFilter) {
         this.conversionService = conversionService;
+        this.objectInputFilter = objectInputFilter;
     }
 
     /**
@@ -51,6 +73,14 @@ public final class JdkSerializer implements ObjectSerializer {
      */
     public JdkSerializer() {
         this(ConversionService.SHARED);
+    }
+
+    private static @Nullable ObjectInputFilter resolveDefaultFilter() {
+        String pattern = System.getProperty(SERIAL_FILTER_PROPERTY);
+        if (pattern == null || pattern.isBlank()) {
+            return null;
+        }
+        return ObjectInputFilter.Config.createFilter(pattern);
     }
 
     @Override
@@ -125,7 +155,7 @@ public final class JdkSerializer implements ObjectSerializer {
      * @throws IOException if there is an error
      */
     private ObjectInputStream createObjectInput(InputStream inputStream, Class<?> requiredType) throws IOException {
-        return new ObjectInputStream(inputStream) {
+        ObjectInputStream objectInput = new ObjectInputStream(inputStream) {
             @Override
             protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
                 Optional<Class<?>> aClass = ClassUtils.forName(desc.getName(), requiredType.getClassLoader());
@@ -135,5 +165,9 @@ public final class JdkSerializer implements ObjectSerializer {
                 return super.resolveClass(desc);
             }
         };
+        if (objectInputFilter != null) {
+            objectInput.setObjectInputFilter(objectInputFilter);
+        }
+        return objectInput;
     }
 }
