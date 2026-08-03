@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.serialize
 
+import io.micronaut.core.serialize.exceptions.SerializationException
 import spock.lang.Specification
 
 /**
@@ -41,7 +42,39 @@ class JdkSerializerSpec extends Specification {
         !foo.isPresent()
     }
 
+    void 'test reject serialized type outside required type hierarchy'() {
+        given:
+        DeserializationPayload.deserialized = false
+        def bytes = ObjectSerializer.JDK.serialize(new DeserializationPayload()).get()
+
+        when:
+        ObjectSerializer.JDK.deserialize(bytes, CharSequence)
+
+        then:
+        thrown(SerializationException)
+        !DeserializationPayload.deserialized
+    }
+
+    void 'test deserialize subtype of required type'() {
+        when:
+        def bytes = ObjectSerializer.JDK.serialize(new Foo(name: "test")).get()
+        def foo = ObjectSerializer.JDK.deserialize(bytes, Serializable).get()
+
+        then:
+        foo instanceof Foo
+        foo.name == "test"
+    }
+
     static class Foo implements Serializable {
         String name
+    }
+
+    static class DeserializationPayload implements Serializable {
+        static boolean deserialized
+
+        private void readObject(ObjectInputStream inputStream) throws IOException, ClassNotFoundException {
+            deserialized = true
+            inputStream.defaultReadObject()
+        }
     }
 }

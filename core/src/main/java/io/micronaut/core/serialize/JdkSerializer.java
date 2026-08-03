@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
@@ -125,7 +126,7 @@ public final class JdkSerializer implements ObjectSerializer {
      * @throws IOException if there is an error
      */
     private ObjectInputStream createObjectInput(InputStream inputStream, Class<?> requiredType) throws IOException {
-        return new ObjectInputStream(inputStream) {
+        ObjectInputStream objectInputStream = new ObjectInputStream(inputStream) {
             @Override
             protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
                 Optional<Class<?>> aClass = ClassUtils.forName(desc.getName(), requiredType.getClassLoader());
@@ -135,5 +136,21 @@ public final class JdkSerializer implements ObjectSerializer {
                 return super.resolveClass(desc);
             }
         };
+        objectInputStream.setObjectInputFilter(new ObjectInputFilter() {
+            private boolean rootTypeChecked;
+
+            @Override
+            public Status checkInput(FilterInfo filterInfo) {
+                Class<?> serialClass = filterInfo.serialClass();
+                if (!rootTypeChecked && serialClass != null && filterInfo.depth() == 1) {
+                    rootTypeChecked = true;
+                    if (!requiredType.isAssignableFrom(serialClass)) {
+                        return Status.REJECTED;
+                    }
+                }
+                return Status.UNDECIDED;
+            }
+        });
+        return objectInputStream;
     }
 }
