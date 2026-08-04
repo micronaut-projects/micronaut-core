@@ -305,6 +305,10 @@ public final class AstBeanPropertiesUtils {
             if (props.containsKey(accessorPropertyName)) {
                 return accessorPropertyName;
             }
+            String decapitalizedPropertyName = fieldPropertyName.substring(1);
+            if (props.containsKey(decapitalizedPropertyName)) {
+                return decapitalizedPropertyName;
+            }
         }
         if (isIntrospectedPropertyField) {
             if (isBooleanAccessorPropertyFieldName(fieldPropertyName)) {

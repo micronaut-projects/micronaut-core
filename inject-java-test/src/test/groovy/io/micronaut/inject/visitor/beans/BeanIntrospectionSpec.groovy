@@ -5962,12 +5962,39 @@ class AbcPerson {
 
         cleanup:
             applicationContext.close()
+     }
+
+    void "test introspected private dollar ref property with getter setter"() {
+        when:
+        def introspection = buildBeanIntrospection('test.RefClass', '''package test;
+
+import io.micronaut.core.annotation.Introspected;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+@Introspected
+class RefClass {
+    @JsonProperty("$ref")
+    private String $ref;
+
+    public String getRef() {
+        return $ref;
+    }
+
+    public void setRef(String ref) {
+        this.$ref = ref;
+    }
+}
+''')
+
+        then:
+        introspection != null
+        introspection.getBeanProperties().size() == 1
+        introspection.getProperty("ref").isPresent()
     }
 
     void "test introspecting private field starting with dollar sign and having public accessors (OpenAPI style)"() {
         when:
-        def introspection = buildBeanIntrospection('test.V1JSONSchemaProps', '''
-package test;
+        def introspection = buildBeanIntrospection('test.V1JSONSchemaProps', '''package test;
 
 import io.micronaut.core.annotation.Introspected;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -5999,8 +6026,7 @@ class V1JSONSchemaProps {
 
     void "test introspecting private field annotated with JsonProperty without accessors fails"() {
         when:
-        buildBeanIntrospection('test.PrivateNoAccessors', '''
-package test;
+        buildBeanIntrospection('test.PrivateNoAccessors', '''package test;
 
 import io.micronaut.core.annotation.Introspected;
 import com.fasterxml.jackson.annotation.JsonProperty;
