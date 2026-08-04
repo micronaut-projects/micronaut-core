@@ -71,6 +71,21 @@ class JdkSerializerSpec extends Specification {
         foo.name == "test"
     }
 
+    void 'test an invalid serial-filter system property fails with a message naming the property'() {
+        given:
+        System.setProperty(JdkSerializer.SERIAL_FILTER_PROPERTY, 'maxdepth=notanumber')
+
+        when:
+        new JdkSerializer(ConversionService.SHARED)
+
+        then:
+        def e = thrown(IllegalArgumentException)
+        e.message.contains(JdkSerializer.SERIAL_FILTER_PROPERTY)
+
+        cleanup:
+        System.clearProperty(JdkSerializer.SERIAL_FILTER_PROPERTY)
+    }
+
     static class Foo implements Serializable {
         String name
     }
