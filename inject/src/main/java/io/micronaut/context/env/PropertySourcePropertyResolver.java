@@ -785,6 +785,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                     ));
                 }
             }
+            // A lookup can cache a miss between reset() and catalog reinitialization.
+            // Clear those entries after the rebuilt catalog becomes visible.
+            resetCaches();
         }
     }
 

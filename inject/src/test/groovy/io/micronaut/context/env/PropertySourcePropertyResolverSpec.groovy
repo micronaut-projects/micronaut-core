@@ -30,6 +30,8 @@ import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -37,6 +39,40 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @since 1.0
  */
 class PropertySourcePropertyResolverSpec extends Specification {
+
+    void "placeholder lookup does not retain a missing value observed during catalog reinitialization"() {
+        given:
+        PropertySource source = PropertySource.of("test", ["test.value": "resolved"])
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(source)
+        DefaultPropertyPlaceholderResolver placeholders = new DefaultPropertyPlaceholderResolver(resolver, ConversionService.SHARED)
+        CountDownLatch catalogCleared = new CountDownLatch(1)
+        CountDownLatch lookupCompleted = new CountDownLatch(1)
+        Thread refreshThread = Thread.start {
+            resolver.reset()
+            catalogCleared.countDown()
+            assert lookupCompleted.await(10, TimeUnit.SECONDS)
+            resolver.addPropertySource(source)
+        }
+
+        when: "a request observes the empty catalog between reset and its reinitialization"
+        ConfigurationException missingDuringRefresh
+        try {
+            assert catalogCleared.await(10, TimeUnit.SECONDS)
+            try {
+                placeholders.resolveRequiredPlaceholders('${test.value}')
+                throw new AssertionError("Expected placeholder resolution to fail while the catalog is empty")
+            } catch (ConfigurationException e) {
+                missingDuringRefresh = e
+            }
+        } finally {
+            lookupCompleted.countDown()
+            refreshThread.join(10_000)
+        }
+        then: "the negative lookup must not survive once the catalog has been rebuilt"
+        !refreshThread.alive
+        missingDuringRefresh.message == 'Could not resolve placeholder ${test.value}'
+        placeholders.resolveRequiredPlaceholders('${test.value}') == "resolved"
+    }
 
     @Unroll
     void "test resolve property #property matches for pattern #pattern"() {
