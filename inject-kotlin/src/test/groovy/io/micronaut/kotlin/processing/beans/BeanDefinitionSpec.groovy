@@ -12,6 +12,7 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.HttpMethodMapping
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.AnnotationMetadataSupport
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -25,6 +26,9 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.buildContex
 import static io.micronaut.annotation.processing.test.KotlinCompiler.buildInterceptedBeanDefinition
 import static io.micronaut.annotation.processing.test.KotlinCompiler.getBean
 import static io.micronaut.annotation.processing.test.KotlinCompiler.getBeanDefinition
+
+import java.net.URL
+import java.net.URLClassLoader
 
 class BeanDefinitionSpec extends Specification {
 
@@ -857,6 +861,49 @@ class Test: Runnable {
 ''')
         expect:
         reference.exposedTypes == [Runnable] as Set
+    }
+
+    void "test exposed types include kotlin internal interface from another package"() {
+        // Regression for https://github.com/micronaut-projects/micronaut-core/issues/12854
+        // Kotlin `internal` is public on the JVM; exposed types must still include such interfaces
+        // when the bean lives in a different package from the interface.
+        given:
+        def pair = KotlinCompiler.compile([
+            KotlinCompiler.kotlinSource('Intf.kt', '''
+package demo.package1.subpackage2.subpackage3.subpackage4
+
+internal interface Intf {
+    fun a()
+}
+'''),
+            KotlinCompiler.kotlinSource('Failing.kt', '''
+package demo.package1.subpackage2.subpackage3.subpackage4.subpackage5.subpackage6
+
+import demo.package1.subpackage2.subpackage3.subpackage4.Intf
+import jakarta.inject.Singleton
+
+@Singleton
+internal class Failing : Intf {
+    override fun a() {}
+}
+''')
+        ], { }, [])
+
+        def classpath = []
+        classpath << pair.component1().component2().outputDirectory.toURI().toURL()
+        classpath << pair.component2().component2().outputDirectory.toURI().toURL()
+        classpath.addAll(pair.component2().component1().classpaths.collect { it.toURI().toURL() })
+        classpath.addAll(pair.component1().component1().classpaths.collect { it.toURI().toURL() })
+        def classLoader = new URLClassLoader(classpath as URL[], KotlinCompiler.classLoader)
+        def reference = classLoader
+                .loadClass('demo.package1.subpackage2.subpackage3.subpackage4.subpackage5.subpackage6.$Failing$Definition')
+                .getDeclaredConstructor()
+                .newInstance() as BeanDefinitionReference
+
+        expect:
+        def exposedTypeNames = reference.exposedTypes*.name as Set
+        exposedTypeNames.contains('demo.package1.subpackage2.subpackage3.subpackage4.subpackage5.subpackage6.Failing')
+        exposedTypeNames.contains('demo.package1.subpackage2.subpackage3.subpackage4.Intf')
     }
 
     void "test fail compilation on invalid exposed bean type"() {

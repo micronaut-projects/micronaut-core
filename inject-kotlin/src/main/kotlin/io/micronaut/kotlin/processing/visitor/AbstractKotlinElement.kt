@@ -99,7 +99,14 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     }
 
     override fun isPublic() = if (annotatedInfo is KSDeclaration) {
-        annotatedInfo.getVisibility() == Visibility.PUBLIC
+        // Kotlin `internal` is public on the JVM (module-wide), so Class constants and
+        // bean exposed-type references are valid from any package in the compilation.
+        // Treating only Visibility.PUBLIC as public caused incomplete $EXPOSED_TYPES for
+        // internal interfaces implemented by beans in other packages (issue #12854).
+        when (annotatedInfo.getVisibility()) {
+            Visibility.PUBLIC, Visibility.INTERNAL -> true
+            else -> false
+        }
     } else {
         false
     }
