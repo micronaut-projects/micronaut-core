@@ -80,7 +80,11 @@ public final class JdkSerializer implements ObjectSerializer {
         if (pattern == null || pattern.isBlank()) {
             return null;
         }
-        return ObjectInputFilter.Config.createFilter(pattern);
+        try {
+            return ObjectInputFilter.Config.createFilter(pattern);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid " + SERIAL_FILTER_PROPERTY + " value [" + pattern + "]: " + e.getMessage(), e);
+        }
     }
 
     @Override
@@ -151,7 +155,7 @@ public final class JdkSerializer implements ObjectSerializer {
     /**
      * @param inputStream  The input stream
      * @param requiredType The required type
-     * @return A {@link ObjectOutputStream}
+     * @return A {@link ObjectInputStream}
      * @throws IOException if there is an error
      */
     private ObjectInputStream createObjectInput(InputStream inputStream, Class<?> requiredType) throws IOException {
