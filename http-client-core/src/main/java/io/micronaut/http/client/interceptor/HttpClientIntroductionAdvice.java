@@ -19,6 +19,7 @@ import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.aop.kotlin.KotlinInterceptedMethod;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -40,7 +41,6 @@ import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.KotlinUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.BasicHttpAttributes;
@@ -114,25 +114,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * The default Accept-Types.
      */
     private static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
-
-    /**
-     * Whether Kotlin coroutine {@link PropagatedContext} recovery is usable.
-     * Resolved like {@link KotlinUtils}: try to touch optional helpers at class
-     * init and treat {@link NoClassDefFoundError} as unavailable (no reflective
-     * {@code ClassUtils.isPresent} strings that need GraalVM metadata).
-     */
-    private static final boolean KOTLIN_CLIENT_PROPAGATION_AVAILABLE;
-
-    static {
-        boolean available;
-        try {
-            available = KotlinUtils.KOTLIN_COROUTINES_SUPPORTED
-                && KotlinClientPropagatedContext.isAvailable();
-        } catch (NoClassDefFoundError e) {
-            available = false;
-        }
-        KOTLIN_CLIENT_PROPAGATION_AVAILABLE = available;
-    }
 
     private final List<ReactiveClientResultTransformer> transformers;
     private final HttpClientBinderRegistry binderRegistry;
@@ -211,8 +192,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 // Scope open is only attempted for Kotlin suspend clients (no Supplier alloc).
                 PropagatedContext.Scope kotlinScope = null;
                 try {
-                    if (KOTLIN_CLIENT_PROPAGATION_AVAILABLE) {
-                        kotlinScope = KotlinClientPropagatedContext.maybePropagate(interceptedMethod);
+                    if (interceptedMethod instanceof KotlinInterceptedMethod kotlinInterceptedMethod) {
+                        kotlinScope = KotlinClientPropagatedContext.maybePropagate(kotlinInterceptedMethod);
                     }
                     return dispatchClientCall(
                         context, returnType, reactiveValueType, httpMethod, httpMethodName, uri,
@@ -781,35 +762,22 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     }
 
     /**
-     * Isolates Kotlin coroutine types so pure-Java apps without kotlinx-coroutines on the
-     * classpath do not fail class loading of {@link HttpClientIntroductionAdvice}.
-     * Availability is probed via direct class references (same pattern as {@link KotlinUtils}).
+     * Recovers {@link PropagatedContext} from the Kotlin coroutine context for suspend
+     * client calls. Only called by the caller once it has already established, via
+     * {@code instanceof} {@link KotlinInterceptedMethod}, that the current call is a
+     * Kotlin suspend function (the same guard {@link io.micronaut.aop.internal.intercepted
+     * .KotlinInterceptedMethodImpl} relies on before touching Kotlin coroutine types).
      */
     private static final class KotlinClientPropagatedContext {
         private KotlinClientPropagatedContext() {
         }
 
         /**
-         * Touch optional Kotlin helpers so missing deps surface as {@link NoClassDefFoundError}
-         * during nested-class init (caught by the outer static block).
-         */
-        static boolean isAvailable() {
-            // Direct references — GraalVM sees them without reflective ClassUtils strings.
-            Class<?> ignoredKim = io.micronaut.aop.kotlin.KotlinInterceptedMethod.class;
-            Object ignoredCompanion =
-                io.micronaut.core.async.propagation.KotlinCoroutinePropagation.Companion;
-            return ignoredKim != null && ignoredCompanion != null;
-        }
-
-        /**
-         * If {@code interceptedMethod} is a Kotlin suspend client call with a non-empty unbound
-         * {@link PropagatedContext} in the coroutine context, open a thread-bound scope.
+         * If {@code kotlinInterceptedMethod} carries a non-empty unbound
+         * {@link PropagatedContext} in its coroutine context, open a thread-bound scope.
          * Otherwise return {@code null} (caller skips close).
          */
-        static PropagatedContext.@Nullable Scope maybePropagate(InterceptedMethod interceptedMethod) {
-            if (!(interceptedMethod instanceof io.micronaut.aop.kotlin.KotlinInterceptedMethod kotlinInterceptedMethod)) {
-                return null;
-            }
+        static PropagatedContext.@Nullable Scope maybePropagate(KotlinInterceptedMethod kotlinInterceptedMethod) {
             PropagatedContext fromCoroutine =
                 io.micronaut.core.async.propagation.KotlinCoroutinePropagation.Companion
                     .findPropagatedContext(kotlinInterceptedMethod.getCoroutineContext());
