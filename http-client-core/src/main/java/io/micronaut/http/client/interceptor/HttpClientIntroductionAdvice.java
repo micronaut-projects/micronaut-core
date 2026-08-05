@@ -19,6 +19,7 @@ import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.aop.kotlin.KotlinInterceptedMethod;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -34,6 +35,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
@@ -166,10 +168,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         HttpClient httpClient = clientFactory.getClient(annotationMetadata);
         if (httpMethodMapping.isPresent() && context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
             AnnotationValue<HttpMethodMapping> mapping = Objects.requireNonNull(context.getAnnotation(HttpMethodMapping.class));
-            String uri = mapping.getRequiredValue(String.class);
-            if (StringUtils.isEmpty(uri)) {
-                uri = "/" + context.getMethodName();
-            }
+            String mappedUri = mapping.getRequiredValue(String.class);
+            final String uri = StringUtils.isEmpty(mappedUri) ? "/" + context.getMethodName() : mappedUri;
 
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
             HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase(Locale.ENGLISH));
@@ -185,23 +185,56 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             try {
                 Argument<?> valueType = interceptedMethod.returnTypeValue();
                 Class<?> reactiveValueType = valueType.getType();
-                return switch (interceptedMethod.resultType()) {
-                    case PUBLISHER ->
-                            handlePublisher(context, returnType, reactiveValueType, httpMethod, httpMethodName,
-                                uri, interceptedMethod, annotationMetadata, httpClient, errorType, valueType, declaringType);
-                    case COMPLETION_STAGE ->
-                            handleCompletionStage(context, httpMethod, httpMethodName, uri, interceptedMethod,
-                                annotationMetadata, httpClient, returnType, errorType, valueType, reactiveValueType, declaringType);
-                    case SYNCHRONOUS ->
-                            handleSynchronous(context, returnType, httpClient, httpMethod, httpMethodName, uri,
-                                interceptedMethod, annotationMetadata, errorType, declaringType);
-                };
+                // When io.micrometer:context-propagation enables Reactor automatic context
+                // propagation, ThreadLocals may be cleared around coroutine resumes even though
+                // the PropagatedContext is still present in the Kotlin coroutine context.
+                // Re-apply it for the synchronous client setup so filters capture the right context.
+                // Scope open is only attempted for Kotlin suspend clients (no Supplier alloc).
+                PropagatedContext.Scope kotlinScope = null;
+                try {
+                    if (interceptedMethod instanceof KotlinInterceptedMethod kotlinInterceptedMethod) {
+                        kotlinScope = KotlinClientPropagatedContext.maybePropagate(kotlinInterceptedMethod);
+                    }
+                    return dispatchClientCall(
+                        context, returnType, reactiveValueType, httpMethod, httpMethodName, uri,
+                        interceptedMethod, annotationMetadata, httpClient, errorType, valueType, declaringType);
+                } finally {
+                    if (kotlinScope != null) {
+                        kotlinScope.close();
+                    }
+                }
             } catch (Exception e) {
                 return interceptedMethod.handleException(e);
             }
         }
         // try other introduction advice
         return context.proceed();
+    }
+
+    @Nullable
+    private Object dispatchClientCall(MethodInvocationContext<Object, Object> context,
+                                      ReturnType<?> returnType,
+                                      Class<?> reactiveValueType,
+                                      HttpMethod httpMethod,
+                                      String httpMethodName,
+                                      String uri,
+                                      InterceptedMethod interceptedMethod,
+                                      AnnotationMetadata annotationMetadata,
+                                      HttpClient httpClient,
+                                      Argument<?> errorType,
+                                      Argument<?> valueType,
+                                      Class<?> declaringType) {
+        return switch (interceptedMethod.resultType()) {
+            case PUBLISHER ->
+                handlePublisher(context, returnType, reactiveValueType, httpMethod, httpMethodName,
+                    uri, interceptedMethod, annotationMetadata, httpClient, errorType, valueType, declaringType);
+            case COMPLETION_STAGE ->
+                handleCompletionStage(context, httpMethod, httpMethodName, uri, interceptedMethod,
+                    annotationMetadata, httpClient, returnType, errorType, valueType, reactiveValueType, declaringType);
+            case SYNCHRONOUS ->
+                handleSynchronous(context, returnType, httpClient, httpMethod, httpMethodName, uri,
+                    interceptedMethod, annotationMetadata, errorType, declaringType);
+        };
     }
 
     @Nullable
@@ -725,6 +758,33 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         static RequestBinderResult withErrorResult(@Nullable Object errorResult) {
             return new RequestBinderResult(null, errorResult, true);
+        }
+    }
+
+    /**
+     * Recovers {@link PropagatedContext} from the Kotlin coroutine context for suspend
+     * client calls. Only called by the caller once it has already established, via
+     * {@code instanceof} {@link KotlinInterceptedMethod}, that the current call is a
+     * Kotlin suspend function (the same guard {@link io.micronaut.aop.internal.intercepted
+     * .KotlinInterceptedMethodImpl} relies on before touching Kotlin coroutine types).
+     */
+    private static final class KotlinClientPropagatedContext {
+        private KotlinClientPropagatedContext() {
+        }
+
+        /**
+         * If {@code kotlinInterceptedMethod} carries a non-empty unbound
+         * {@link PropagatedContext} in its coroutine context, open a thread-bound scope.
+         * Otherwise return {@code null} (caller skips close).
+         */
+        static PropagatedContext.@Nullable Scope maybePropagate(KotlinInterceptedMethod kotlinInterceptedMethod) {
+            PropagatedContext fromCoroutine =
+                io.micronaut.core.async.propagation.KotlinCoroutinePropagation.Companion
+                    .findPropagatedContext(kotlinInterceptedMethod.getCoroutineContext());
+            if (fromCoroutine == null || fromCoroutine.isEmpty() || fromCoroutine.isBound()) {
+                return null;
+            }
+            return fromCoroutine.propagate();
         }
     }
 }
