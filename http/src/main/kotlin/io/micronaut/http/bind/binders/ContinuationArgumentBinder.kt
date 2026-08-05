@@ -24,10 +24,12 @@ import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.reactor.ReactorContext
 import reactor.util.context.ContextView
 import java.util.*
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutorService
 import java.util.function.Supplier
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
@@ -56,9 +58,18 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
                                   contextView: ContextView,
                                   propagatedContext: PropagatedContext,
                                   continuationArgumentBinderCoroutineContextFactories: Collection<HttpCoroutineContextFactory<*>>) {
+            setupCoroutineContext(source, contextView, propagatedContext, continuationArgumentBinderCoroutineContextFactories, null)
+        }
+
+        @JvmStatic
+        fun setupCoroutineContext(source: HttpRequest<*>,
+                                  contextView: ContextView,
+                                  propagatedContext: PropagatedContext,
+                                  continuationArgumentBinderCoroutineContextFactories: Collection<HttpCoroutineContextFactory<*>>,
+                                  executorService: ExecutorService?) {
             val customContinuation = source.getAttribute(CONTINUATION_ARGUMENT_ATTRIBUTE_KEY, CustomContinuation::class.java).orElse(null)
             if (customContinuation != null) {
-                var coroutineContext: CoroutineContext = Dispatchers.Default
+                var coroutineContext: CoroutineContext = executorService?.asCoroutineDispatcher() ?: Dispatchers.Default
                 if (reactorContextPresent) {
                     coroutineContext += propagateReactorContext(contextView)
                 }
