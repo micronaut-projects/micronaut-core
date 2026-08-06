@@ -718,7 +718,7 @@ public class DefaultHttpClient implements
                                             case "data" -> {
                                                 ByteBuffer<?> content = buffer.slice(fromIndex, toIndex);
                                                 byte[] d = currentEvent.data;
-                                                if (d == null) {
+                                                if (d.length == 0) {
                                                     currentEvent.data = content.toByteArray();
                                                 } else {
                                                     currentEvent.data = ArrayUtils.concat(d, content.toByteArray());
@@ -2279,7 +2279,7 @@ public class DefaultHttpClient implements
      * Used as a holder for the current SSE event.
      */
     private static final class CurrentEvent {
-        byte[] data;
+        byte[] data = new byte[0];
         String id;
         String name;
         Duration retry;
