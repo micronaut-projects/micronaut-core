@@ -37,7 +37,7 @@ public class HeartbeatTask implements ApplicationEventListener<ServiceReadyEvent
 
     private final Set<ServiceInstance> eventsReference = ConcurrentHashMap.newKeySet();
 
-    private final ApplicationEventPublisher eventPublisher;
+    private final ApplicationEventPublisher<HeartbeatEvent> eventPublisher;
     private final CurrentHealthStatus currentHealthStatus;
 
     /**
@@ -45,7 +45,7 @@ public class HeartbeatTask implements ApplicationEventListener<ServiceReadyEvent
      * @param configuration The configurations for heartbeat
      * @param currentHealthStatus The current status of health indicator
      */
-    public HeartbeatTask(ApplicationEventPublisher eventPublisher, HeartbeatConfiguration configuration, CurrentHealthStatus currentHealthStatus) {
+    public HeartbeatTask(ApplicationEventPublisher<HeartbeatEvent> eventPublisher, HeartbeatConfiguration configuration, CurrentHealthStatus currentHealthStatus) {
         this.eventPublisher = eventPublisher;
         this.currentHealthStatus = currentHealthStatus;
     }
