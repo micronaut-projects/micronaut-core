@@ -55,7 +55,7 @@ import java.util.stream.Stream;
 @Internal
 final class IncrementalCompilation {
     private static final String STATE_FILE = "state.properties";
-    private static final String STATE_VERSION = "7";
+    private static final String STATE_VERSION = "8";
     private static final String SOURCE_PREFIX = "source.";
     private static final String VFS_SOURCE_PREFIX = "META-INF/GRAALPY-VFS/micronaut-application/src/";
     private static final String VFS_ROOT = "META-INF/GRAALPY-VFS/micronaut-application";
@@ -67,6 +67,7 @@ final class IncrementalCompilation {
     private static final Pattern PYTHON_FROM_IMPORT = Pattern.compile("(?m)^\\s*from\\s+(\\S+)\\s+import\\s+");
     private static final Pattern PYTHON_DIRECT_IMPORT = Pattern.compile("(?m)^\\s*import\\s+([\\w.]+)");
     private static final Pattern PYTHON_STAR_IMPORT = Pattern.compile("(?m)^\\s*from\\s+\\S+\\s+import\\s+\\*");
+    private static final Pattern PYTHON_DECLARATION = Pattern.compile("[A-Za-z_]\\w*\\s*(?::|=(?!=))");
     private static final Pattern DYNAMIC_PYTHON_REFERENCE = Pattern.compile(
         "\\b(?:__import__|import_module|getattr|globals|locals)\\s*\\(|@\\s*Mixin\\b"
     );
@@ -164,7 +165,12 @@ final class IncrementalCompilation {
             );
         }
 
-        Set<String> affected = affectedSources(changed, previous.sources(), currentSources);
+        Set<String> affected = affectedSources(
+            changed,
+            previous.sources(),
+            currentSources,
+            pythonIncrementalMode
+        );
         if ((pythonIncrementalMode == PythonIncrementalMode.CONSERVATIVE
             && requiresConservativePythonProcessing(affected, scannedSources))
             || containsDeletedPythonSource(affected, currentSources, previous.sources())) {
@@ -517,7 +523,8 @@ final class IncrementalCompilation {
 
     private static Set<String> affectedSources(Set<String> changed,
                                                Map<String, SourceState> previous,
-                                               Map<String, SourceState> current) {
+                                               Map<String, SourceState> current,
+                                               PythonIncrementalMode pythonIncrementalMode) {
         Map<String, Set<String>> dependents = new HashMap<>();
         Stream.concat(previous.values().stream(), current.values().stream()).forEach(source -> {
             for (String dependency : source.dependencies()) {
@@ -525,7 +532,9 @@ final class IncrementalCompilation {
             }
         });
         Set<String> affected = new LinkedHashSet<>(changed);
-        ArrayDeque<String> queue = new ArrayDeque<>(changed);
+        ArrayDeque<String> queue = changed.stream()
+            .filter(source -> propagatesToDependents(source, previous, current, pythonIncrementalMode))
+            .collect(java.util.stream.Collectors.toCollection(ArrayDeque::new));
         while (!queue.isEmpty()) {
             String source = queue.removeFirst();
             for (String dependent : dependents.getOrDefault(source, Set.of())) {
@@ -535,6 +544,21 @@ final class IncrementalCompilation {
             }
         }
         return affected;
+    }
+
+    private static boolean propagatesToDependents(String source,
+                                                  Map<String, SourceState> previous,
+                                                  Map<String, SourceState> current,
+                                                  PythonIncrementalMode pythonIncrementalMode) {
+        if (pythonIncrementalMode != PythonIncrementalMode.OPTIMISTIC) {
+            return true;
+        }
+        SourceState old = previous.get(source);
+        SourceState replacement = current.get(source);
+        if (old == null || replacement == null || replacement.language() != Language.PYTHON) {
+            return true;
+        }
+        return !old.pythonSharedFingerprint().equals(replacement.pythonSharedFingerprint());
     }
 
     private Map<String, ScannedSource> scanSources() {
@@ -652,18 +676,35 @@ final class IncrementalCompilation {
 
     private static String pythonSharedFingerprint(String content) {
         MessageDigest digest = digest();
+        ArrayDeque<PythonScope> scopes = new ArrayDeque<>();
         boolean continuation = false;
         int bracketDepth = 0;
         for (String line : content.lines().toList()) {
             String stripped = line.stripLeading();
-            boolean sharedInput = continuation
-                || stripped.startsWith("@")
-                || stripped.startsWith("class ")
-                || stripped.startsWith("def ")
-                || stripped.startsWith("async def ")
-                || stripped.startsWith("import ")
-                || stripped.startsWith("from ");
+            if (!continuation && (stripped.isBlank() || stripped.startsWith("#"))) {
+                continue;
+            }
+            int indentation = line.length() - stripped.length();
+            if (!continuation) {
+                while (!scopes.isEmpty() && indentation <= scopes.peek().indentation()) {
+                    scopes.removeFirst();
+                }
+            }
+            boolean functionHeader = stripped.startsWith("def ") || stripped.startsWith("async def ");
+            boolean classHeader = stripped.startsWith("class ");
+            boolean insideFunction = scopes.stream().anyMatch(PythonScope::function);
+            boolean sharedInput = continuation || (!insideFunction && (
+                stripped.startsWith("@")
+                    || classHeader
+                    || functionHeader
+                    || stripped.startsWith("import ")
+                    || stripped.startsWith("from ")
+                    || PYTHON_DECLARATION.matcher(stripped).lookingAt()
+            ));
             if (!sharedInput) {
+                if (classHeader || functionHeader) {
+                    scopes.addFirst(new PythonScope(indentation, functionHeader));
+                }
                 continue;
             }
             update(digest, stripped);
@@ -671,6 +712,9 @@ final class IncrementalCompilation {
             continuation = bracketDepth > 0 || stripped.endsWith("\\");
             if (!continuation) {
                 bracketDepth = 0;
+            }
+            if (classHeader || functionHeader) {
+                scopes.addFirst(new PythonScope(indentation, functionHeader));
             }
         }
         return HexFormat.of().formatHex(digest.digest());
@@ -932,7 +976,10 @@ final class IncrementalCompilation {
                 .toList();
         }
         Files.createDirectories(filesList.getParent());
-        Files.writeString(filesList, String.join(System.lineSeparator(), entries) + System.lineSeparator());
+        String contents = entries.isEmpty() ? "" : String.join("\n", entries) + '\n';
+        if (!Files.isRegularFile(filesList) || !Files.readString(filesList).equals(contents)) {
+            Files.writeString(filesList, contents);
+        }
     }
 
     private void deleteManagedOutput(String output) throws IOException {
@@ -1314,6 +1361,9 @@ final class IncrementalCompilation {
     }
 
     private record ScannedSource(SourceState state, String content) {
+    }
+
+    private record PythonScope(int indentation, boolean function) {
     }
 
     private enum Language {

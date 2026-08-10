@@ -30,6 +30,7 @@ dependencies {
     testImplementation(projects.micronautContext)
     testImplementation(projects.micronautAop)
     testImplementation(projects.micronautContextPython)
+    testImplementation(projects.micronautHttp)
 }
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
