@@ -203,13 +203,17 @@ public final class PyronautCompiler {
             pythonSourceVisitors,
             pythonIncrementalMode
         );
-        Set<String> aggregatingSources = compiler.aggregatingSources(
-            classpath,
-            annotationProcessorPath,
-            javaSrc,
-            pythonSrc
-        );
-        IncrementalCompilation.Plan plan = incrementalCompilation.plan(aggregatingSources);
+        Set<String> aggregatingSources = Set.of();
+        IncrementalCompilation.Plan plan = incrementalCompilation.plan();
+        if (!plan.upToDate()) {
+            aggregatingSources = compiler.aggregatingSources(
+                classpath,
+                annotationProcessorPath,
+                javaSrc,
+                pythonSrc
+            );
+            plan = incrementalCompilation.plan(aggregatingSources);
+        }
         notifyIncrementalCompilationPlan(plan);
         if (plan.upToDate()) {
             return;
@@ -226,7 +230,7 @@ public final class PyronautCompiler {
                     || !compilationTrace.contractViolatingOutputs().isEmpty())) {
                 incrementalCompilation.invalidate();
                 if (!annotationProcessors.isEmpty()) {
-                    incrementalCompilation.prepareOutput(incrementalCompilation.plan(aggregatingSources));
+                    incrementalCompilation.prepareOutput(incrementalCompilation.plan());
                     throw new PyronautCompilerException(
                         "An explicitly supplied annotation processor violated its incremental "
                             + "contract; the output was cleaned and must be compiled again with "

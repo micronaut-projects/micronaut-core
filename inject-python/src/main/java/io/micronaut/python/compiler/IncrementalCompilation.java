@@ -44,6 +44,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.StringTokenizer;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -54,6 +56,8 @@ import java.util.stream.Stream;
  */
 @Internal
 final class IncrementalCompilation {
+    private static final int MAX_GLOBAL_FILE_DIGESTS = 8192;
+    private static final Map<Path, FileDigest> GLOBAL_FILE_DIGESTS = new ConcurrentHashMap<>();
     private static final String STATE_FILE = "state.properties";
     private static final String STATE_VERSION = "8";
     private static final String SOURCE_PREFIX = "source.";
@@ -200,6 +204,16 @@ final class IncrementalCompilation {
             currentAggregatingInputs,
             hasAggregatingProcessors
         );
+    }
+
+    /**
+     * Performs the inexpensive portion of planning. Aggregating processor
+     * discovery is deliberately deferred until a change has been detected.
+     *
+     * @return the current incremental plan
+     */
+    Plan plan() {
+        return plan(Set.of());
     }
 
     Plan plan(boolean hasAggregatingProcessors) {
@@ -943,15 +957,26 @@ final class IncrementalCompilation {
     }
 
     private boolean hasMissingOutputs(State state) {
-        return Stream.of(
+        Set<String> expected = Stream.of(
                 state.sources().values().stream().flatMap(source -> source.outputs().stream()),
                 state.aggregatingOutputs().stream(),
                 state.pythonAggregatingOutputs().stream(),
                 state.sharedOutputs().stream()
             )
             .flatMap(Stream::sequential)
-            .map(targetDirectory::resolve)
-            .anyMatch(Predicate.not(Files::isRegularFile));
+            .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (expected.isEmpty() || !Files.isDirectory(targetDirectory)) {
+            return !expected.isEmpty();
+        }
+        try (Stream<Path> paths = Files.walk(targetDirectory)) {
+            paths.filter(Files::isRegularFile)
+                .map(targetDirectory::relativize)
+                .map(path -> path.toString().replace(File.separatorChar, '/'))
+                .forEach(expected::remove);
+            return !expected.isEmpty();
+        } catch (IOException e) {
+            return true;
+        }
     }
 
     private void rebuildPythonFilesList() throws IOException {
@@ -1157,11 +1182,29 @@ final class IncrementalCompilation {
 
     private static void updateFile(MessageDigest digest, Path file) {
         try {
-            digest.update(Files.readAllBytes(file));
-            digest.update((byte) 0);
+            Path normalized = file.toAbsolutePath().normalize();
+            long size = Files.size(normalized);
+            long modified = Files.getLastModifiedTime(normalized).to(TimeUnit.NANOSECONDS);
+            FileDigest cached = GLOBAL_FILE_DIGESTS.get(normalized);
+            String value;
+            if (cached != null && cached.size() == size && cached.modified() == modified) {
+                value = cached.digest();
+            } else {
+                MessageDigest fileDigest = digest();
+                fileDigest.update(Files.readAllBytes(normalized));
+                value = HexFormat.of().formatHex(fileDigest.digest());
+                if (GLOBAL_FILE_DIGESTS.size() >= MAX_GLOBAL_FILE_DIGESTS) {
+                    GLOBAL_FILE_DIGESTS.clear();
+                }
+                GLOBAL_FILE_DIGESTS.put(normalized, new FileDigest(size, modified, value));
+            }
+            update(digest, value);
         } catch (IOException e) {
             throw new PyronautCompilerException("Failed to fingerprint " + file + ": " + e.getMessage());
         }
+    }
+
+    private record FileDigest(long size, long modified, String digest) {
     }
 
     private void validateDirectories() {
