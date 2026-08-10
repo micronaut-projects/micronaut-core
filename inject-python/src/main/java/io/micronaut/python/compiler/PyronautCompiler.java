@@ -79,6 +79,7 @@ public final class PyronautCompiler {
     private final File incrementalCacheDirectory;
     private final PythonIncrementalMode pythonIncrementalMode;
     private final PythonProcessingSession pythonProcessingSession;
+    private final Consumer<IncrementalCompilationPlan> incrementalCompilationPlanCallback;
 
     private PyronautCompiler(Builder builder) {
         this.packageName = builder.packageName;
@@ -103,6 +104,7 @@ public final class PyronautCompiler {
         this.incrementalCacheDirectory = builder.incrementalCacheDirectory;
         this.pythonIncrementalMode = builder.pythonIncrementalMode;
         this.pythonProcessingSession = builder.pythonProcessingSession;
+        this.incrementalCompilationPlanCallback = builder.incrementalCompilationPlanCallback;
         validateConfiguration();
     }
 
@@ -208,6 +210,7 @@ public final class PyronautCompiler {
             pythonSrc
         );
         IncrementalCompilation.Plan plan = incrementalCompilation.plan(aggregatingSources);
+        notifyIncrementalCompilationPlan(plan);
         if (plan.upToDate()) {
             return;
         }
@@ -231,6 +234,7 @@ public final class PyronautCompiler {
                     );
                 }
                 plan = incrementalCompilation.plan(aggregatingSources);
+                notifyIncrementalCompilationPlan(plan);
                 compilationTrace = compileIncrementally(
                     compiler,
                     incrementalCompilation,
@@ -243,6 +247,22 @@ public final class PyronautCompiler {
             incrementalCompilation.invalidate();
             throw e;
         }
+    }
+
+    private void notifyIncrementalCompilationPlan(IncrementalCompilation.Plan plan) {
+        if (incrementalCompilationPlanCallback == null) {
+            return;
+        }
+        List<Path> sources = plan.affectedSources().stream()
+            .filter(plan.currentSources()::containsKey)
+            .map(Path::of)
+            .sorted()
+            .toList();
+        incrementalCompilationPlanCallback.accept(new IncrementalCompilationPlan(
+            plan.upToDate(),
+            plan.fullRebuild(),
+            sources
+        ));
     }
 
     private IncrementalCompilationTrace compileIncrementally(
@@ -503,6 +523,23 @@ public final class PyronautCompiler {
     }
 
     /**
+     * Describes the source files selected by an incremental disk compilation.
+     *
+     * @param upToDate Whether no compilation is required
+     * @param fullRebuild Whether all current sources must be compiled
+     * @param sources The current source files selected for compilation
+     * @since 5.2.0
+     */
+    @Experimental
+    public record IncrementalCompilationPlan(boolean upToDate,
+                                             boolean fullRebuild,
+                                             List<Path> sources) {
+        public IncrementalCompilationPlan {
+            sources = List.copyOf(sources);
+        }
+    }
+
+    /**
      * Builder for PyronautCompiler.
      */
     @Experimental
@@ -529,6 +566,7 @@ public final class PyronautCompiler {
         private File incrementalCacheDirectory;
         private PythonIncrementalMode pythonIncrementalMode = PythonIncrementalMode.CONSERVATIVE;
         private PythonProcessingSession pythonProcessingSession;
+        private Consumer<IncrementalCompilationPlan> incrementalCompilationPlanCallback;
 
         private Builder() {
         }
@@ -728,6 +766,24 @@ public final class PyronautCompiler {
          */
         public Builder incrementalCacheDirectory(File incrementalCacheDirectory) {
             this.incrementalCacheDirectory = incrementalCacheDirectory;
+            return this;
+        }
+
+        /**
+         * Set a callback that receives each incremental disk compilation plan before it runs.
+         * The callback is also invoked for full rebuild and up-to-date plans while incremental
+         * compilation is enabled.
+         *
+         * @param callback The incremental compilation plan callback
+         * @return This builder
+         * @since 5.2.0
+         */
+        public Builder incrementalCompilationPlanCallback(
+            Consumer<IncrementalCompilationPlan> callback) {
+            this.incrementalCompilationPlanCallback = java.util.Objects.requireNonNull(
+                callback,
+                "callback"
+            );
             return this;
         }
 

@@ -228,12 +228,8 @@ final class PyronautJavaCompiler {
             // Unknown visitor behavior must not be treated as isolating.
             return sourceFiles(javaSrc, pythonSrc);
         } finally {
-            if (pythonProcessingSession == null && classLoader instanceof URLClassLoader urlClassLoader) {
-                try {
-                    urlClassLoader.close();
-                } catch (IOException ignored) {
-                    // Nothing to do.
-                }
+            if (pythonProcessingSession == null) {
+                closeClassLoader(classLoader);
             }
         }
     }
@@ -368,7 +364,8 @@ final class PyronautJavaCompiler {
                                                     JavaFileManager fileManager,
                                                     DiagnosticCollector<JavaFileObject> diagnosticCollector) {
         synchronized (COMPILATION_LOCK) {
-            Properties systemProperties = (Properties) System.getProperties().clone();
+            Properties systemProperties = System.getProperties();
+            Properties originalSystemProperties = (Properties) systemProperties.clone();
             try {
                 return compileJavaIsolated(
                     sources,
@@ -380,7 +377,10 @@ final class PyronautJavaCompiler {
                     diagnosticCollector
                 );
             } finally {
-                System.setProperties(systemProperties);
+                synchronized (systemProperties) {
+                    systemProperties.clear();
+                    systemProperties.putAll(originalSystemProperties);
+                }
             }
         }
     }
@@ -409,7 +409,15 @@ final class PyronautJavaCompiler {
         java.nio.file.Path outputDirectory = fileManager instanceof TrackingJavaFileManager trackingFileManager
             ? trackingFileManager.targetDirectory()
             : null;
-        List<Processor> processors = getAnnotationProcessors(classLoader, outputDirectory);
+        List<Processor> processors;
+        try {
+            processors = getAnnotationProcessors(classLoader, outputDirectory);
+        } catch (RuntimeException | LinkageError e) {
+            if (pythonProcessingSession == null) {
+                closeClassLoader(classLoader);
+            }
+            throw e;
+        }
 
         boolean success;
         try {
@@ -486,6 +494,9 @@ final class PyronautJavaCompiler {
             System.clearProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER);
             System.clearProperty(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER);
             shutdownProcessors(processors);
+            if (pythonProcessingSession == null) {
+                closeClassLoader(classLoader);
+            }
         }
         if (!success) {
             throw processingFailure(diagnosticCollector, null);
@@ -930,6 +941,16 @@ final class PyronautJavaCompiler {
             classLoader = new URLClassLoader(cp.toArray(new URL[0]), classLoader);
         }
         return classLoader;
+    }
+
+    private static void closeClassLoader(ClassLoader classLoader) {
+        if (classLoader instanceof URLClassLoader urlClassLoader) {
+            try {
+                urlClassLoader.close();
+            } catch (IOException ignored) {
+                // Nothing useful can be done while releasing a compiler class loader.
+            }
+        }
     }
 
     record SourceSnapshot(String name, String path, String content) {

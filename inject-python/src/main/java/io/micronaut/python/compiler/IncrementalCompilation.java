@@ -681,40 +681,35 @@ final class IncrementalCompilation {
         int bracketDepth = 0;
         for (String line : content.lines().toList()) {
             String stripped = line.stripLeading();
-            if (!continuation && (stripped.isBlank() || stripped.startsWith("#"))) {
-                continue;
-            }
-            int indentation = line.length() - stripped.length();
-            if (!continuation) {
-                while (!scopes.isEmpty() && indentation <= scopes.peek().indentation()) {
-                    scopes.removeFirst();
+            if (continuation || (!stripped.isBlank() && !stripped.startsWith("#"))) {
+                int indentation = line.length() - stripped.length();
+                if (!continuation) {
+                    while (!scopes.isEmpty() && indentation <= scopes.peek().indentation()) {
+                        scopes.removeFirst();
+                    }
                 }
-            }
-            boolean functionHeader = stripped.startsWith("def ") || stripped.startsWith("async def ");
-            boolean classHeader = stripped.startsWith("class ");
-            boolean insideFunction = scopes.stream().anyMatch(PythonScope::function);
-            boolean sharedInput = continuation || (!insideFunction && (
-                stripped.startsWith("@")
-                    || classHeader
-                    || functionHeader
-                    || stripped.startsWith("import ")
-                    || stripped.startsWith("from ")
-                    || PYTHON_DECLARATION.matcher(stripped).lookingAt()
-            ));
-            if (!sharedInput) {
+                boolean functionHeader = stripped.startsWith("def ") || stripped.startsWith("async def ");
+                boolean classHeader = stripped.startsWith("class ");
+                boolean insideFunction = scopes.stream().anyMatch(PythonScope::function);
+                boolean sharedInput = continuation || (!insideFunction && (
+                    stripped.startsWith("@")
+                        || classHeader
+                        || functionHeader
+                        || stripped.startsWith("import ")
+                        || stripped.startsWith("from ")
+                        || PYTHON_DECLARATION.matcher(stripped).lookingAt()
+                ));
+                if (sharedInput) {
+                    update(digest, stripped);
+                    bracketDepth += bracketDelta(stripped);
+                    continuation = bracketDepth > 0 || stripped.endsWith("\\");
+                    if (!continuation) {
+                        bracketDepth = 0;
+                    }
+                }
                 if (classHeader || functionHeader) {
                     scopes.addFirst(new PythonScope(indentation, functionHeader));
                 }
-                continue;
-            }
-            update(digest, stripped);
-            bracketDepth += bracketDelta(stripped);
-            continuation = bracketDepth > 0 || stripped.endsWith("\\");
-            if (!continuation) {
-                bracketDepth = 0;
-            }
-            if (classHeader || functionHeader) {
-                scopes.addFirst(new PythonScope(indentation, functionHeader));
             }
         }
         return HexFormat.of().formatHex(digest.digest());

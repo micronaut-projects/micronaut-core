@@ -22,9 +22,14 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
  * Owns the initialized GraalPy processing context across multiple serialized compilations.
@@ -121,17 +126,44 @@ public final class PythonProcessingSession implements AutoCloseable {
         if (classpath == null || classpath.isEmpty()) {
             return List.of();
         }
-        List<String> fingerprint = new ArrayList<>(classpath.size() * 3);
+        List<String> fingerprint = new ArrayList<>(classpath.size() * 2);
         for (File entry : classpath) {
             var path = entry.toPath().toAbsolutePath().normalize();
             fingerprint.add(path.toString());
             try {
-                fingerprint.add(Long.toString(Files.size(path)));
-                fingerprint.add(Long.toString(Files.getLastModifiedTime(path).toMillis()));
+                fingerprint.add(fingerprint(path));
             } catch (IOException e) {
                 fingerprint.add("missing");
             }
         }
         return List.copyOf(fingerprint);
+    }
+
+    private static String fingerprint(Path path) throws IOException {
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        if (Files.isDirectory(path)) {
+            try (Stream<Path> entries = Files.walk(path)) {
+                for (Path entry : entries.sorted().toList()) {
+                    update(digest, path.relativize(entry).toString());
+                    update(digest, Files.isDirectory(entry) ? "directory" : "file");
+                    update(digest, Long.toString(Files.size(entry)));
+                    update(digest, Long.toString(Files.getLastModifiedTime(entry).toMillis()));
+                }
+            }
+        } else {
+            update(digest, Long.toString(Files.size(path)));
+            update(digest, Long.toString(Files.getLastModifiedTime(path).toMillis()));
+        }
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static void update(MessageDigest digest, String value) {
+        digest.update(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        digest.update((byte) 0);
     }
 }

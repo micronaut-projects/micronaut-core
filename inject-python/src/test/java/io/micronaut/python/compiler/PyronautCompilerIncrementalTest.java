@@ -67,6 +67,7 @@ final class PyronautCompilerIncrementalTest {
         Files.writeString(sources.resolve("Greeting.java"), "public class Greeting {}\n");
         String property = "micronaut.test.compiler.processor.option";
         String previous = System.getProperty(property);
+        Properties systemProperties = System.getProperties();
         System.setProperty(property, "before");
         try {
             PyronautCompiler.builder()
@@ -77,6 +78,7 @@ final class PyronautCompilerIncrementalTest {
                 .compile();
 
             assertEquals("before", System.getProperty(property));
+            assertSame(systemProperties, System.getProperties());
         } finally {
             if (previous == null) {
                 System.clearProperty(property);
@@ -186,6 +188,61 @@ final class PyronautCompilerIncrementalTest {
             );
             assertNotSame(first, changed);
         }
+    }
+
+    @Test
+    void reusablePythonSessionInvalidatesTheProcessorClassLoaderForExplodedClasses(
+        @TempDir Path directory) throws Exception {
+        Path processorPath = Files.createDirectories(directory.resolve("processor-classes"));
+        Path processorClass = Files.writeString(processorPath.resolve("Example.class"), "first");
+        FileTime directoryTime = Files.getLastModifiedTime(processorPath);
+        try (PythonProcessingSession session = new PythonProcessingSession()) {
+            ClassLoader first = session.classLoader(
+                List.of(processorPath.toFile()),
+                () -> new java.net.URLClassLoader(new java.net.URL[0], getClass().getClassLoader())
+            );
+
+            Files.writeString(processorClass, "changed");
+            Files.setLastModifiedTime(processorPath, directoryTime);
+            ClassLoader changed = session.classLoader(
+                List.of(processorPath.toFile()),
+                () -> new java.net.URLClassLoader(new java.net.URL[0], getClass().getClassLoader())
+            );
+
+            assertNotSame(first, changed);
+        }
+    }
+
+    @Test
+    void reportsSourcesSelectedForIncrementalCompilation(@TempDir Path directory) throws Exception {
+        Path sources = Files.createDirectories(directory.resolve("sources"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = Files.writeString(
+            sources.resolve("Alpha.java"),
+            "public class Alpha { int value() { return 1; } }\n"
+        );
+        Path beta = Files.writeString(sources.resolve("Beta.java"), "public class Beta {}\n");
+        List<PyronautCompiler.IncrementalCompilationPlan> plans = new ArrayList<>();
+
+        compileJavaWithPlanCallback(sources, output, cache, plans);
+        assertEquals(1, plans.size());
+        assertTrue(plans.getFirst().fullRebuild());
+        assertEquals(Set.of(alpha.toRealPath(), beta.toRealPath()), Set.copyOf(plans.getFirst().sources()));
+
+        plans.clear();
+        Files.writeString(alpha, "public class Alpha { int value() { return 2; } }\n");
+        compileJavaWithPlanCallback(sources, output, cache, plans);
+        assertEquals(1, plans.size());
+        assertFalse(plans.getFirst().fullRebuild());
+        assertFalse(plans.getFirst().upToDate());
+        assertEquals(List.of(alpha.toRealPath()), plans.getFirst().sources());
+
+        plans.clear();
+        compileJavaWithPlanCallback(sources, output, cache, plans);
+        assertEquals(1, plans.size());
+        assertTrue(plans.getFirst().upToDate());
+        assertTrue(plans.getFirst().sources().isEmpty());
     }
 
     @Test
@@ -1347,6 +1404,21 @@ final class PyronautCompilerIncrementalTest {
             .options(List.of(options))
             .incremental(true)
             .incrementalCacheDirectory(cache.toFile())
+            .build()
+            .compile();
+    }
+
+    private static void compileJavaWithPlanCallback(
+        Path sources,
+        Path output,
+        Path cache,
+        List<PyronautCompiler.IncrementalCompilationPlan> plans) {
+        PyronautCompiler.builder()
+            .javaSrc(sources.toString())
+            .targetDir(output.toFile())
+            .incremental(true)
+            .incrementalCacheDirectory(cache.toFile())
+            .incrementalCompilationPlanCallback(plans::add)
             .build()
             .compile();
     }
