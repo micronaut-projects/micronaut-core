@@ -319,6 +319,9 @@ public final class PyronautCompiler {
         compiler.setAnnotationProcessors(annotationProcessors);
         compiler.setPythonSourceVisitors(pythonSourceVisitors);
         compiler.setPythonProcessingSession(pythonProcessingSession);
+        if (classElementCallback != null) {
+            compiler.setClassElementCallback(classElementCallback);
+        }
         return compiler;
     }
 

@@ -61,6 +61,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.function.Consumer;
@@ -76,6 +77,7 @@ import java.util.stream.Stream;
  */
 final class PyronautJavaCompiler {
 
+    private static final Object COMPILATION_LOCK = new Object();
     private static final String MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
     private static final String ISOLATING_PROCESSOR = "org.gradle.annotation.processing.isolating";
     private static final Pattern SOURCE_IN_MESSAGE = Pattern.compile("Python source \\[([^]]+)]");
@@ -199,7 +201,12 @@ final class PyronautJavaCompiler {
         }
 
         List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
-        ClassLoader classLoader = createAnnotationProcessorClassLoader(processorClasspath);
+        ClassLoader classLoader = pythonProcessingSession == null
+            ? createAnnotationProcessorClassLoader(processorClasspath)
+            : pythonProcessingSession.classLoader(
+                processorClasspath,
+                () -> createAnnotationProcessorClassLoader(processorClasspath)
+            );
         try {
             @SuppressWarnings({"rawtypes", "unchecked"})
             List<TypeElementVisitor<?, ?>> visitors = (List) SoftServiceLoader
@@ -221,7 +228,7 @@ final class PyronautJavaCompiler {
             // Unknown visitor behavior must not be treated as isolating.
             return sourceFiles(javaSrc, pythonSrc);
         } finally {
-            if (classLoader instanceof URLClassLoader urlClassLoader) {
+            if (pythonProcessingSession == null && classLoader instanceof URLClassLoader urlClassLoader) {
                 try {
                     urlClassLoader.close();
                 } catch (IOException ignored) {
@@ -231,18 +238,15 @@ final class PyronautJavaCompiler {
         }
     }
 
-    private static Set<String> sourcesUsingAnnotations(Set<String> annotationNames,
-                                                       String javaSrc,
-                                                       String pythonSrc) {
-        if (annotationNames.stream().anyMatch(name -> name.contains("*"))) {
+    static Set<String> sourcesUsingAnnotations(Set<String> annotationNames,
+                                               String javaSrc,
+                                               String pythonSrc) {
+        if (annotationNames.contains("*")) {
             return sourceFiles(javaSrc, pythonSrc);
         }
         List<String> normalizedNames = annotationNames.stream()
-            .map(name -> {
-                int separator = name.lastIndexOf('.');
-                String simpleName = separator == -1 ? name : name.substring(separator + 1);
-                return normalizeAnnotationName(simpleName);
-            })
+            .flatMap(name -> annotationSearchTerms(name).stream())
+            .distinct()
             .toList();
         Set<String> sources = new LinkedHashSet<>();
         for (java.nio.file.Path root : sourceRoots(javaSrc, pythonSrc)) {
@@ -265,6 +269,23 @@ final class PyronautJavaCompiler {
             }
         }
         return Set.copyOf(sources);
+    }
+
+    private static List<String> annotationSearchTerms(String annotationName) {
+        if (annotationName.endsWith(".*")) {
+            String packageName = annotationName.substring(0, annotationName.length() - 2);
+            String normalizedPackage = normalizeAnnotationName(packageName);
+            if (packageName.startsWith("io.")) {
+                return List.of(
+                    normalizedPackage,
+                    normalizeAnnotationName(packageName.substring("io.".length()))
+                );
+            }
+            return List.of(normalizedPackage);
+        }
+        int separator = annotationName.lastIndexOf('.');
+        String simpleName = separator == -1 ? annotationName : annotationName.substring(separator + 1);
+        return List.of(normalizeAnnotationName(simpleName));
     }
 
     private static Set<String> sourceFiles(String javaSrc, String pythonSrc) {
@@ -346,10 +367,40 @@ final class PyronautJavaCompiler {
                                                     List<String> compilerOptions,
                                                     JavaFileManager fileManager,
                                                     DiagnosticCollector<JavaFileObject> diagnosticCollector) {
+        synchronized (COMPILATION_LOCK) {
+            Properties systemProperties = (Properties) System.getProperties().clone();
+            try {
+                return compileJavaIsolated(
+                    sources,
+                    classpath,
+                    bootclasspath,
+                    annotationProcessorPath,
+                    compilerOptions,
+                    fileManager,
+                    diagnosticCollector
+                );
+            } finally {
+                System.setProperties(systemProperties);
+            }
+        }
+    }
+
+    private IncrementalCompilationTrace compileJavaIsolated(JavaFileObject[] sources,
+                                                            List<File> classpath,
+                                                            List<File> bootclasspath,
+                                                            List<File> annotationProcessorPath,
+                                                            List<String> compilerOptions,
+                                                            JavaFileManager fileManager,
+                                                            DiagnosticCollector<JavaFileObject> diagnosticCollector) {
         List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
         List<File> compileClasspath = effectiveClasspath(classpath);
         List<String> options = buildCompilerOptions(compileClasspath, bootclasspath, annotationProcessorPath, compilerOptions);
-        ClassLoader classLoader = createAnnotationProcessorClassLoader(processorClasspath);
+        ClassLoader classLoader = pythonProcessingSession == null
+            ? createAnnotationProcessorClassLoader(processorClasspath)
+            : pythonProcessingSession.classLoader(
+                processorClasspath,
+                () -> createAnnotationProcessorClassLoader(processorClasspath)
+            );
         System.setProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
         System.setProperty(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
         ClassLoader previous = Thread.currentThread().getContextClassLoader();
