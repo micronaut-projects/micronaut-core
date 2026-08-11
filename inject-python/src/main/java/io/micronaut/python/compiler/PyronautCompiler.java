@@ -468,7 +468,17 @@ public final class PyronautCompiler {
         sb.append("@PythonApplication(\n");
 
         if (hasSrc) {
-            sb.append("    src = \"").append(pythonSrc).append("\"");
+            sb.append("    src = {");
+            StringTokenizer tokenizer = new StringTokenizer(pythonSrc, ",");
+            String separator = "";
+            while (tokenizer.hasMoreTokens()) {
+                sb.append(separator)
+                    .append('"')
+                    .append(escapeJavaString(tokenizer.nextToken().trim()))
+                    .append('"');
+                separator = ", ";
+            }
+            sb.append('}');
             if (hasCode) {
                 sb.append(",\n");
             }
@@ -691,9 +701,10 @@ public final class PyronautCompiler {
 
         /**
          * Enable generation of hash-based GraalPy bytecode for Python resources generated during
-         * annotation processing. Source resources remain available alongside the bytecode.
+         * annotation processing. Source resources remain available alongside the bytecode. Disabling
+         * this option does not suppress bytecode required for runtime compatibility.
          *
-         * @param compilePythonBytecode Whether generated Python resources should include bytecode
+         * @param compilePythonBytecode Whether generated Python resources should include optional bytecode
          * @return This builder
          * @since 5.2.0
          */

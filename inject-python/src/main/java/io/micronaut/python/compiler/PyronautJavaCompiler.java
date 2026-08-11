@@ -136,9 +136,10 @@ final class PyronautJavaCompiler {
     }
 
     /**
-     * Set whether the Python annotation processor should emit bytecode resources.
+     * Set whether the Python annotation processor should emit optional bytecode resources.
+     * Disabling this option does not suppress bytecode required for runtime compatibility.
      *
-     * @param compilePythonBytecode Whether bytecode resources should be emitted
+     * @param compilePythonBytecode Whether optional bytecode resources should be emitted
      */
     public void setCompilePythonBytecode(boolean compilePythonBytecode) {
         this.compilePythonBytecode = compilePythonBytecode;

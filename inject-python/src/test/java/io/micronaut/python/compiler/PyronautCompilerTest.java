@@ -24,10 +24,27 @@ import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class PyronautCompilerTest {
+
+    @Test
+    void preservesOriginalInlineSourceInTheInMemoryVfs() throws Exception {
+        String source = "# debugger comment\r\n\r\nanswer  =  42  # spacing\r\n";
+        ClassLoader classLoader = PyronautCompiler.builder()
+            .pythonCode(source)
+            .build()
+            .buildClassLoader();
+
+        try (var input = classLoader.getResourceAsStream(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/__main__.py"
+        )) {
+            assertNotNull(input);
+            assertEquals(source, new String(input.readAllBytes(), StandardCharsets.UTF_8));
+        }
+    }
 
     @Test
     void compilesJavaSourcesWithoutPythonApplication(@TempDir Path sourceDirectory) throws Exception {

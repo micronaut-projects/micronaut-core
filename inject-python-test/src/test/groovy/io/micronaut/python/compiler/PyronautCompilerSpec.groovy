@@ -22,6 +22,7 @@ import io.micronaut.data.model.Association
 import io.micronaut.data.model.runtime.RuntimePersistentEntity
 import io.micronaut.data.intercept.annotation.DataMethod
 import io.micronaut.python.processing.PythonAnnotationProcessor
+import org.graalvm.polyglot.PolyglotException
 import org.graalvm.polyglot.Value
 import spock.lang.Specification
 
@@ -70,6 +71,95 @@ class TestClass:
 
         cleanup:
         tempDir.deleteDir()
+    }
+
+    def "test file-backed VFS sources preserve exact content across relative imports"() {
+        given:
+        def tempSrcDir = File.createTempDir("pyronaut-test-original-src", "")
+        def tempTargetDir = File.createTempDir("pyronaut-test-original-target", "")
+        def packageDir = new File(tempSrcDir, "example")
+        packageDir.mkdirs()
+        def serviceCode = '''# debugger-visible comment
+from .helper import answer
+
+
+class Service:
+    def value(self):
+        return answer(  21  )  # preserve spacing
+'''
+        def helperCode = '''def answer(value):
+    return value * 2
+'''
+        new File(packageDir, "service.py").text = serviceCode
+        new File(packageDir, "helper.py").text = helperCode
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(tempSrcDir.absolutePath)
+            .targetDir(tempTargetDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        new File(tempTargetDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}example/service.py").text == serviceCode
+        new File(tempTargetDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}example/helper.py").text == helperCode
+
+        cleanup:
+        tempSrcDir.deleteDir()
+        tempTargetDir.deleteDir()
+    }
+
+    def "test multiple Python source roots preserve exact source and remain loadable"() {
+        given:
+        def firstRoot = File.createTempDir("pyronaut-test-first-root", "")
+        def secondRoot = File.createTempDir("pyronaut-test-second-root", "")
+        def tempTargetDir = File.createTempDir("pyronaut-test-multiple-roots-target", "")
+        def alphaDir = new File(firstRoot, "alpha")
+        def betaDir = new File(secondRoot, "beta")
+        alphaDir.mkdirs()
+        betaDir.mkdirs()
+        def alphaCode = '''# first source root
+from jakarta.inject import Singleton
+
+@Singleton
+class AlphaService:
+    def value(self) -> str:
+        return "alpha"
+'''
+        def betaCode = '''# second source root
+from jakarta.inject import Singleton
+
+@Singleton
+class BetaService:
+    def value(self) -> str:
+        return "beta"
+'''
+        new File(alphaDir, "AlphaService.py").text = alphaCode
+        new File(betaDir, "BetaService.py").text = betaCode
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc("${firstRoot.absolutePath},${secondRoot.absolutePath}")
+            .targetDir(tempTargetDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
+        def context = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .build()
+            .start()
+
+        then:
+        new File(tempTargetDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}alpha/AlphaService.py").text == alphaCode
+        new File(tempTargetDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}beta/BetaService.py").text == betaCode
+        context.getBean(classLoader.loadClass('alpha.AlphaService')) != null
+        context.getBean(classLoader.loadClass('beta.BetaService')) != null
+
+        cleanup:
+        context?.close()
+        firstRoot.deleteDir()
+        secondRoot.deleteDir()
+        tempTargetDir.deleteDir()
     }
 
     def "test buildClassLoader uses explicit parent classloader"() {
@@ -512,11 +602,11 @@ class AsyncImportService:
         tempDir.deleteDir()
     }
 
-    def "test Python keyword-safe Java method aliases are rewritten"() {
+    def "test imported Java keyword methods use generated facades and direct aliases use mapped bytecode"() {
         given:
         def pythonCode = '''
 from java.lang import Thread
-from reactor.core.publisher import Mono
+from reactor.core.publisher import Mono as ImportedMono
 import java
 
 ThreadAlias = java.type("java.lang.Thread")
@@ -534,7 +624,7 @@ class KeywordMethodService:
         return ThreadAlias.yield_()
 
     def imported_reactor(self, publisher):
-        return Mono.from_(publisher)
+        return ImportedMono.from_(publisher)
 
     def assigned_reactor(self, publisher):
         return FluxAlias.from_(publisher)
@@ -551,26 +641,33 @@ class KeywordMethodService:
 
         when:
         compiler.compile()
+        def classLoader = new URLClassLoader(tempDir.toURI().toURL())
+        def context = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .build()
+            .start()
+        def pythonContext = context.getBean(org.graalvm.polyglot.Context)
 
         then:
-        def transformedFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
-        transformedFile.exists()
-        def transformedContent = transformedFile.text
-        transformedContent.contains("getattr(Thread, 'yield')()")
-        transformedContent.contains("getattr(ThreadAlias, 'yield')()")
-        transformedContent.contains("getattr(Mono, 'from')(publisher)")
-        transformedContent.contains("getattr(FluxAlias, 'from')(publisher)")
-        transformedContent.contains("keyword.from_()")
-        !transformedContent.contains("Thread.yield_")
-        !transformedContent.contains("ThreadAlias.yield_")
-        !transformedContent.contains("Mono.from_")
-        !transformedContent.contains("FluxAlias.from_")
+        def sourceFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
+        sourceFile.exists()
+        sourceFile.text == pythonCode
+        new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}java/lang/__init__.py")
+            .text.contains("Thread = _MicronautJavaType(java.type('java.lang.Thread'), False)")
+        new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}reactor/core/publisher/__init__.py")
+            .text.contains("Mono = _MicronautJavaType(java.type('reactor.core.publisher.Mono'), False)")
+        new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}__pycache__")
+            .listFiles().any { it.name.startsWith('__main__.') && it.name.endsWith('.pyc') }
+        pythonContext.eval("python", "KeywordMethodService().imported_reactor(ImportedMono.just('imported')).block()").asString() == 'imported'
+        pythonContext.eval("python", "KeywordMethodService().assigned_reactor(ImportedMono.just('assigned')).blockFirst()").asString() == 'assigned'
+        pythonContext.eval("python", "KeywordMethodService().python_method()").asString() == 'python'
 
         cleanup:
+        context?.close()
         tempDir.deleteDir()
     }
 
-    def "test Python keyword-safe annotation members are rewritten"() {
+    def "test Python keyword-safe annotation members keep original runtime source"() {
         given:
         def pythonCode = '''
 from micronaut.http.annotation import Controller, Error
@@ -591,14 +688,132 @@ class ErrorController:
         compiler.compile()
 
         then:
-        def transformedFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
-        transformedFile.exists()
-        def transformedContent = transformedFile.text
-        transformedContent.contains("@Error(**{'global': True})")
-        !transformedContent.contains("@Error(global_")
+        def sourceFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
+        sourceFile.exists()
+        sourceFile.text == pythonCode
+        new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}micronaut/http/annotation/Error.py")
+            .text.contains('@micronaut_annotation("io.micronaut.http.annotation.Error"')
 
         cleanup:
         tempDir.deleteDir()
+    }
+
+    def "test mapped runtime bytecode preserves original traceback locations with optional bytecode #compileBytecode"() {
+        given:
+        def pythonCode = '''from jakarta.inject import Singleton
+import java
+
+Mono = java.type("reactor.core.publisher.Mono")
+
+@Singleton
+class DebugService:
+    pass
+
+def debug_failure():
+    Mono.from_(Mono.just("ready")).block()
+    raise RuntimeError("debug boom")
+'''
+        def tempDir = File.createTempDir("pyronaut-test-traceback", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .compilePythonBytecode(compileBytecode)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempDir.toURI().toURL())
+        def context = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .build()
+            .start()
+        def pythonContext = context.getBean(org.graalvm.polyglot.Context)
+        pythonContext.eval("python", "debug_failure()")
+
+        then:
+        def error = thrown(PolyglotException)
+        error.message.contains("debug boom")
+        def applicationFrame = error.polyglotStackTrace.find { it.rootName == 'debug_failure' }
+        applicationFrame != null
+        applicationFrame.sourceLocation.startLine == 12
+        applicationFrame.sourceLocation.source.name == '/graalpy_vfs/src/__main__.py'
+        pythonContext.eval("python", "'getattr' in debug_failure.__code__.co_names and 'from_' not in debug_failure.__code__.co_names").asBoolean()
+        new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}").text == pythonCode
+        def cacheFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}__pycache__")
+            .listFiles().find { it.name.startsWith('__main__.') && it.name.endsWith('.pyc') }
+        cacheFile != null
+        java.nio.ByteBuffer.wrap(cacheFile.bytes, 4, 4)
+            .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            .getInt() == 3
+
+        cleanup:
+        context?.close()
+        tempDir.deleteDir()
+
+        where:
+        compileBytecode << [false, true]
+    }
+
+    def "test file-backed mapped runtime bytecode preserves original traceback locations with optional bytecode #compileBytecode"() {
+        given:
+        def pythonCode = '''# directory-backed debugger source
+from jakarta.inject import Singleton
+import java
+
+Mono = java.type("reactor.core.publisher.Mono")
+
+@Singleton
+class DebugService:
+    pass
+
+def debug_failure():
+    Mono.from_(Mono.just("ready")).block()
+    raise RuntimeError("directory debug boom")
+'''
+        def tempSrcDir = File.createTempDir("pyronaut-test-directory-traceback-src", "")
+        def tempTargetDir = File.createTempDir("pyronaut-test-directory-traceback-target", "")
+        def packageDir = new File(tempSrcDir, "example")
+        packageDir.mkdirs()
+        new File(packageDir, "debug_service.py").text = pythonCode
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(tempSrcDir.absolutePath)
+            .targetDir(tempTargetDir)
+            .compilePythonBytecode(compileBytecode)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
+        def context = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .build()
+            .start()
+        def pythonContext = context.getBean(org.graalvm.polyglot.Context)
+        pythonContext.eval("python", "from example.debug_service import debug_failure; debug_failure()")
+
+        then:
+        def error = thrown(PolyglotException)
+        error.message.contains("directory debug boom")
+        def applicationFrame = error.polyglotStackTrace.find { it.rootName == 'debug_failure' }
+        applicationFrame != null
+        applicationFrame.sourceLocation.startLine == 13
+        applicationFrame.sourceLocation.source.name == '/graalpy_vfs/src/example/debug_service.py'
+        pythonContext.eval("python", "'getattr' in debug_failure.__code__.co_names and 'from_' not in debug_failure.__code__.co_names").asBoolean()
+        def moduleCache = pythonContext.eval(
+            "python",
+            "__import__('example.debug_service', fromlist=['']).__cached__"
+        ).asString()
+        moduleCache.contains('/example/__pycache__/debug_service.')
+        moduleCache.endsWith('.pyc')
+        new File(tempTargetDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}example/debug_service.py").text == pythonCode
+
+        cleanup:
+        context?.close()
+        tempSrcDir.deleteDir()
+        tempTargetDir.deleteDir()
+
+        where:
+        compileBytecode << [false, true]
     }
 
     def "test nested annotation members are generated as Python attributes"() {
