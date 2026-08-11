@@ -27,6 +27,7 @@ import javax.lang.model.element.TypeElement;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -34,6 +35,8 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -58,10 +61,71 @@ final class PyronautCompilerIncrementalTest {
     }
 
     @Test
+    void restoresSystemPropertiesChangedByAnnotationProcessors(@TempDir Path directory) throws Exception {
+        Path sources = Files.createDirectories(directory.resolve("sources"));
+        Path output = Files.createDirectories(directory.resolve("classes"));
+        Files.writeString(sources.resolve("Greeting.java"), "public class Greeting {}\n");
+        String property = "micronaut.test.compiler.processor.option";
+        String previous = System.getProperty(property);
+        Properties systemProperties = System.getProperties();
+        System.setProperty(property, "before");
+        try {
+            PyronautCompiler.builder()
+                .javaSrc(sources.toString())
+                .targetDir(output.toFile())
+                .annotationProcessors(List.of(new SystemPropertyMutatingProcessor(property)))
+                .build()
+                .compile();
+
+            assertEquals("before", System.getProperty(property));
+            assertSame(systemProperties, System.getProperties());
+        } finally {
+            if (previous == null) {
+                System.clearProperty(property);
+            } else {
+                System.setProperty(property, previous);
+            }
+        }
+    }
+
+    @Test
+    void packageWildcardOnlySelectsSourcesImportingThatAnnotationPackage(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path pythonController = Files.writeString(python.resolve("controller.py"), """
+            from micronaut.http.annotation import Get
+            @Get("/")
+            def index():
+                return "ok"
+            """);
+        Path unrelatedPython = Files.writeString(python.resolve("seed.py"), "value = 1\n");
+        Path javaController = Files.writeString(java.resolve("Controller.java"), """
+            import io.micronaut.http.annotation.Get;
+            class Controller {
+                @Get("/") String index() { return "ok"; }
+            }
+            """);
+        Path unrelatedJava = Files.writeString(java.resolve("Seed.java"), "class Seed {}\n");
+
+        Set<String> matches = PyronautJavaCompiler.sourcesUsingAnnotations(
+            Set.of("io.micronaut.http.annotation.*"),
+            java.toString(),
+            python.toString()
+        );
+
+        assertEquals(Set.of(
+            pythonController.toRealPath().toString(),
+            javaController.toRealPath().toString()
+        ), matches);
+        assertFalse(matches.contains(unrelatedPython.toRealPath().toString()));
+        assertFalse(matches.contains(unrelatedJava.toRealPath().toString()));
+    }
+
+    @Test
     void reusesPythonProcessingSessionAcrossIncrementalCompilations(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python"));
         Path java = Files.createDirectories(directory.resolve("java"));
-        Path output = directory.resolve("classes");
+        Path output = Files.createDirectories(directory.resolve("classes"));
         Path cache = directory.resolve("incremental");
         Path source = python.resolve("example.py");
         Files.writeString(source, "class Example:\n    value: int = 1\n");
@@ -76,6 +140,109 @@ final class PyronautCompilerIncrementalTest {
                 "META-INF/GRAALPY-VFS/micronaut-application/src/example.py"
             )).contains("value: int = 2"));
         }
+    }
+
+    @Test
+    void reusablePythonSessionPreservesAnnotationMetadata(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = Files.createDirectories(directory.resolve("classes"));
+        Path httpClasspath = Path.of(io.micronaut.http.annotation.Controller.class
+            .getProtectionDomain().getCodeSource().getLocation().toURI());
+        Path source = python.resolve("controller.py");
+        Files.writeString(source, """
+            from micronaut.http.annotation import Controller, Get
+            @Controller("/")
+            class Example:
+                @Get("/")
+                def index(self) -> str:
+                    return "first"
+            """);
+
+        try (PythonProcessingSession session = new PythonProcessingSession()) {
+            assertPythonControllerAnnotations(python, java, output, httpClasspath, session);
+            Files.writeString(source, Files.readString(source).replace("first", "second"));
+            assertPythonControllerAnnotations(python, java, output, httpClasspath, session);
+        }
+    }
+
+    @Test
+    void reusablePythonSessionRetainsTheProcessorClassLoader(@TempDir Path directory) throws Exception {
+        Path processorPath = Files.writeString(directory.resolve("processors.jar"), "test");
+        try (PythonProcessingSession session = new PythonProcessingSession()) {
+            ClassLoader first = session.classLoader(
+                List.of(processorPath.toFile()),
+                () -> new java.net.URLClassLoader(new java.net.URL[0], getClass().getClassLoader())
+            );
+            ClassLoader second = session.classLoader(
+                List.of(processorPath.toFile()),
+                () -> new java.net.URLClassLoader(new java.net.URL[0], getClass().getClassLoader())
+            );
+
+            assertSame(first, second);
+
+            Files.writeString(processorPath, "changed");
+            ClassLoader changed = session.classLoader(
+                List.of(processorPath.toFile()),
+                () -> new java.net.URLClassLoader(new java.net.URL[0], getClass().getClassLoader())
+            );
+            assertNotSame(first, changed);
+        }
+    }
+
+    @Test
+    void reusablePythonSessionInvalidatesTheProcessorClassLoaderForExplodedClasses(
+        @TempDir Path directory) throws Exception {
+        Path processorPath = Files.createDirectories(directory.resolve("processor-classes"));
+        Path processorClass = Files.writeString(processorPath.resolve("Example.class"), "first");
+        FileTime directoryTime = Files.getLastModifiedTime(processorPath);
+        try (PythonProcessingSession session = new PythonProcessingSession()) {
+            ClassLoader first = session.classLoader(
+                List.of(processorPath.toFile()),
+                () -> new java.net.URLClassLoader(new java.net.URL[0], getClass().getClassLoader())
+            );
+
+            Files.writeString(processorClass, "changed");
+            Files.setLastModifiedTime(processorPath, directoryTime);
+            ClassLoader changed = session.classLoader(
+                List.of(processorPath.toFile()),
+                () -> new java.net.URLClassLoader(new java.net.URL[0], getClass().getClassLoader())
+            );
+
+            assertNotSame(first, changed);
+        }
+    }
+
+    @Test
+    void reportsSourcesSelectedForIncrementalCompilation(@TempDir Path directory) throws Exception {
+        Path sources = Files.createDirectories(directory.resolve("sources"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = Files.writeString(
+            sources.resolve("Alpha.java"),
+            "public class Alpha { int value() { return 1; } }\n"
+        );
+        Path beta = Files.writeString(sources.resolve("Beta.java"), "public class Beta {}\n");
+        List<PyronautCompiler.IncrementalCompilationPlan> plans = new ArrayList<>();
+
+        compileJavaWithPlanCallback(sources, output, cache, plans);
+        assertEquals(1, plans.size());
+        assertTrue(plans.getFirst().fullRebuild());
+        assertEquals(Set.of(alpha.toRealPath(), beta.toRealPath()), Set.copyOf(plans.getFirst().sources()));
+
+        plans.clear();
+        Files.writeString(alpha, "public class Alpha { int value() { return 2; } }\n");
+        compileJavaWithPlanCallback(sources, output, cache, plans);
+        assertEquals(1, plans.size());
+        assertFalse(plans.getFirst().fullRebuild());
+        assertFalse(plans.getFirst().upToDate());
+        assertEquals(List.of(alpha.toRealPath()), plans.getFirst().sources());
+
+        plans.clear();
+        compileJavaWithPlanCallback(sources, output, cache, plans);
+        assertEquals(1, plans.size());
+        assertTrue(plans.getFirst().upToDate());
+        assertTrue(plans.getFirst().sources().isEmpty());
     }
 
     @Test
@@ -910,6 +1077,60 @@ final class PyronautCompilerIncrementalTest {
     }
 
     @Test
+    void optimisticModeDoesNotReprocessImportDependentsForBodyOnlyChanges(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path dependency = python.resolve("dependency.py");
+        Files.writeString(
+            dependency,
+            "class Dependency:\n    def value(self) -> int:\n        result = 1\n        return result\n"
+        );
+        Files.writeString(
+            python.resolve("consumer.py"),
+            "from dependency import Dependency\nclass Consumer:\n    value: Dependency\n"
+        );
+        compilePython(python, java, output, cache, PythonIncrementalMode.OPTIMISTIC);
+        Path consumerVfs = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/consumer.py"
+        );
+        Files.setLastModifiedTime(consumerVfs, UNCHANGED_MARKER);
+
+        Files.writeString(
+            dependency,
+            "class Dependency:\n    def value(self) -> int:\n        result = 2\n        return result\n"
+        );
+        compilePython(python, java, output, cache, PythonIncrementalMode.OPTIMISTIC);
+
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(consumerVfs));
+    }
+
+    @Test
+    void optimisticModeReprocessesImportDependentsForDeclarationChanges(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path dependency = python.resolve("dependency.py");
+        Files.writeString(dependency, "class Dependency:\n    value: int = 1\n");
+        Files.writeString(
+            python.resolve("consumer.py"),
+            "from dependency import Dependency\nclass Consumer:\n    value: Dependency\n"
+        );
+        compilePython(python, java, output, cache, PythonIncrementalMode.OPTIMISTIC);
+        Path consumerVfs = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/consumer.py"
+        );
+        Files.setLastModifiedTime(consumerVfs, UNCHANGED_MARKER);
+
+        Files.writeString(dependency, "class Dependency:\n    value: str = \"changed\"\n");
+        compilePython(python, java, output, cache, PythonIncrementalMode.OPTIMISTIC);
+
+        assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(consumerVfs));
+    }
+
+    @Test
     void doesNotReprocessDynamicPythonSourcesForUnrelatedJavaChanges(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python"));
         Path java = Files.createDirectories(directory.resolve("java"));
@@ -1187,6 +1408,21 @@ final class PyronautCompilerIncrementalTest {
             .compile();
     }
 
+    private static void compileJavaWithPlanCallback(
+        Path sources,
+        Path output,
+        Path cache,
+        List<PyronautCompiler.IncrementalCompilationPlan> plans) {
+        PyronautCompiler.builder()
+            .javaSrc(sources.toString())
+            .targetDir(output.toFile())
+            .incremental(true)
+            .incrementalCacheDirectory(cache.toFile())
+            .incrementalCompilationPlanCallback(plans::add)
+            .build()
+            .compile();
+    }
+
     private static void compilePython(Path python, Path java, Path output, Path cache) {
         compilePython(python, java, output, cache, false);
     }
@@ -1205,6 +1441,34 @@ final class PyronautCompilerIncrementalTest {
             .pythonProcessingSession(session)
             .build()
             .compile();
+    }
+
+    private static void assertPythonControllerAnnotations(Path python,
+                                                          Path java,
+                                                          Path output,
+                                                          Path httpClasspath,
+                                                          PythonProcessingSession session) {
+        List<Boolean> controllerAnnotations = new ArrayList<>();
+        List<Boolean> routeAnnotations = new ArrayList<>();
+        PyronautCompiler.builder()
+            .pythonSrc(python.toString())
+            .javaSrc(java.toString())
+            .targetDir(output.toFile())
+            .classpath(List.of(httpClasspath.toFile()))
+            .annotationProcessorPath(List.of(httpClasspath.toFile()))
+            .pythonProcessingSession(session)
+            .classElementCallback(type -> {
+                if (type.getName().endsWith("Example")) {
+                    controllerAnnotations.add(type.isAnnotationPresent("io.micronaut.http.annotation.Controller"));
+                    type.getEnclosedElements(io.micronaut.inject.ast.ElementQuery.ALL_METHODS).stream()
+                        .filter(method -> method.getName().equals("index"))
+                        .forEach(method -> routeAnnotations.add(method.isAnnotationPresent("io.micronaut.http.annotation.Get")));
+                }
+            })
+            .build()
+            .compile();
+        assertEquals(List.of(true), controllerAnnotations);
+        assertEquals(List.of(true), routeAnnotations);
     }
 
     private static void compilePython(Path python,
@@ -1351,6 +1615,26 @@ final class PyronautCompilerIncrementalTest {
                 .filter(path -> path.getFileName().toString().endsWith(suffix))
                 .findFirst()
                 .orElseThrow();
+        }
+    }
+
+    @SupportedAnnotationTypes("*")
+    private static final class SystemPropertyMutatingProcessor extends AbstractProcessor {
+        private final String property;
+
+        private SystemPropertyMutatingProcessor(String property) {
+            this.property = property;
+        }
+
+        @Override
+        public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+            System.setProperty(property, "changed");
+            return false;
+        }
+
+        @Override
+        public SourceVersion getSupportedSourceVersion() {
+            return SourceVersion.latestSupported();
         }
     }
 
