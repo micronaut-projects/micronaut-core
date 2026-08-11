@@ -516,6 +516,65 @@ final class PyronautCompilerIncrementalTest {
     }
 
     @Test
+    void tracksMandatoryRuntimeBytecodeTransitionsIncrementally(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path application = python.resolve("application.py");
+        String originalSource = "# original formatting\nanswer  =  42\n";
+        Files.writeString(application, originalSource);
+        Files.writeString(python.resolve("other.py"), "value = 1\n");
+
+        compilePython(python, java, output, cache);
+        Path vfsSource = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/application.py"
+        );
+        Path filesList = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/fileslist.txt"
+        );
+        assertEquals(originalSource, Files.readString(vfsSource));
+        assertFalse(hasOutput(output, "application.", ".pyc"));
+        assertTrue(Files.readString(filesList).contains("/src/application.py"));
+        assertFalse(Files.readString(filesList).contains("/src/__pycache__/application."));
+
+        String transformedSource = """
+            import java
+            Thread = java.type("java.lang.Thread")
+            def yield_thread():
+                Thread.yield_()
+            """;
+        Files.writeString(application, transformedSource);
+        compilePython(python, java, output, cache);
+        Path mandatoryBytecode = findOutput(output, "application.", ".pyc");
+        assertEquals(transformedSource, Files.readString(vfsSource));
+        assertTrue(Files.isRegularFile(mandatoryBytecode));
+        assertTrue(Files.readString(filesList).contains("/src/__pycache__/application."));
+
+        Files.setLastModifiedTime(vfsSource, UNCHANGED_MARKER);
+        Files.setLastModifiedTime(mandatoryBytecode, UNCHANGED_MARKER);
+        compilePython(python, java, output, cache);
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(vfsSource));
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(mandatoryBytecode));
+
+        Files.writeString(application, originalSource);
+        compilePython(python, java, output, cache);
+        assertEquals(originalSource, Files.readString(vfsSource));
+        assertFalse(hasOutput(output, "application.", ".pyc"));
+        assertFalse(Files.readString(filesList).contains("/src/__pycache__/application."));
+
+        Files.writeString(application, transformedSource);
+        compilePython(python, java, output, cache);
+        assertTrue(hasOutput(output, "application.", ".pyc"));
+        Files.delete(application);
+        compilePython(python, java, output, cache);
+        assertFalse(Files.exists(vfsSource));
+        assertFalse(hasOutput(output, "application.", ".pyc"));
+        assertFalse(Files.readString(filesList).contains("/src/application.py"));
+        assertFalse(Files.readString(filesList).contains("/src/__pycache__/application."));
+    }
+
+    @Test
     void recompilesAllContributorsForAggregatingVisitors(@TempDir Path directory) throws Exception {
         Path sources = Files.createDirectories(directory.resolve("sources"));
         Path output = directory.resolve("classes");
@@ -1615,6 +1674,14 @@ final class PyronautCompilerIncrementalTest {
                 .filter(path -> path.getFileName().toString().endsWith(suffix))
                 .findFirst()
                 .orElseThrow();
+        }
+    }
+
+    private static boolean hasOutput(Path output, String nameToken, String suffix) throws Exception {
+        try (var paths = Files.walk(output)) {
+            return paths.filter(Files::isRegularFile)
+                .map(path -> path.getFileName().toString())
+                .anyMatch(name -> name.contains(nameToken) && name.endsWith(suffix));
         }
     }
 

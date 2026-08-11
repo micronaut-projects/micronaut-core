@@ -112,9 +112,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     /**
-     * Set whether generated Python VFS resources should include GraalPy bytecode caches.
+     * Set whether generated Python VFS resources should include optional GraalPy bytecode caches.
+     * Application sources that require runtime compatibility transformations may include a cache
+     * regardless of this setting so that the original source remains available for debugging.
      *
-     * @param compilePythonBytecode Whether bytecode caches should be emitted
+     * @param compilePythonBytecode Whether optional bytecode caches should be emitted
      * @since 5.2.0
      */
     public void setCompilePythonBytecode(boolean compilePythonBytecode) {
@@ -273,8 +275,15 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             StringBuilder filesList = new StringBuilder();
             boolean processSharedOutputs = incrementalSources == null || processAggregatingVisitors;
             if (StringUtils.isNotEmpty(values.code())) {
-                mainPy = transformedList.get(0).runtimeCode();
-                writePythonToVfs(filesList, APPLICATION_LAUNCHER_PATH, mainPy, originatingElement);
+                PythonAstParser.TransformResult transformResult = transformedList.get(0);
+                mainPy = transformResult.originalSource().getCharacters().toString();
+                writeApplicationPythonToVfs(
+                    filesList,
+                    APPLICATION_LAUNCHER_PATH,
+                    mainPy,
+                    transformResult,
+                    originatingElement
+                );
             } else {
                 if (hasSrcDirs) {
                     // source mode, so we need to write out each source to META-INF
@@ -310,9 +319,14 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                         .addAll(transformResult.allClassNames());
                                 }
                             }
-                            Source runtimeSource = transformResult.runtimeSource();
                             if (isAffectedSource(source)) {
-                                writePythonToVfs(filesList, targetSource, runtimeSource.getCharacters().toString(), originatingElement);
+                                writeApplicationPythonToVfs(
+                                    filesList,
+                                    targetSource,
+                                    source.getCharacters().toString(),
+                                    transformResult,
+                                    originatingElement
+                                );
                             }
                         }
                     }
@@ -668,6 +682,47 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                   String filePath,
                                   String content,
                                   ClassElement originatingElement) {
+        boolean unchanged = writePythonSourceToVfs(filesList, filePath, content, originatingElement);
+
+        if (!compilePythonBytecode || unchanged) {
+            return;
+        }
+        try {
+            PythonBytecodeCompiler.Result result = bytecodeCompiler().compile(content, filePath);
+            writePythonBytecodeToVfs(filesList, filePath, result, originatingElement);
+        } catch (ProcessingException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ProcessingException(originatingElement, "Failed to compile Python bytecode for [" + filePath + "]: " + e.getMessage(), e);
+        }
+    }
+
+    private void writeApplicationPythonToVfs(StringBuilder filesList,
+                                             String filePath,
+                                             String content,
+                                             PythonAstParser.TransformResult transformResult,
+                                             ClassElement originatingElement) {
+        writePythonSourceToVfs(filesList, filePath, content, originatingElement);
+        if (!compilePythonBytecode && !parser.requiresRuntimeBytecode(transformResult)) {
+            return;
+        }
+        try {
+            PythonBytecodeCompiler.Result result = parser.compileRuntimeBytecode(
+                transformResult,
+                runtimeFilename(filePath)
+            );
+            writePythonBytecodeToVfs(filesList, filePath, result, originatingElement);
+        } catch (ProcessingException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ProcessingException(originatingElement, "Failed to compile mapped Python bytecode for [" + filePath + "]: " + e.getMessage(), e);
+        }
+    }
+
+    private boolean writePythonSourceToVfs(StringBuilder filesList,
+                                           String filePath,
+                                           String content,
+                                           ClassElement originatingElement) {
         boolean unchanged = false;
         var generatedFile = javaVisitorContext.visitMetaInfFile(filePath, originatingElement).orElse(null);
         if (generatedFile != null) {
@@ -688,30 +743,52 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             }
         }
         filesList.append("/META-INF/").append(filePath).append('\n');
+        return unchanged;
+    }
 
-        if (!compilePythonBytecode || unchanged) {
-            return;
+    private PythonBytecodeCompiler bytecodeCompiler() {
+        if (bytecodeCompiler == null) {
+            bytecodeCompiler = parser.bytecodeCompiler();
         }
-        try {
-            if (bytecodeCompiler == null) {
-                bytecodeCompiler = parser.bytecodeCompiler();
+        return bytecodeCompiler;
+    }
+
+    private void writePythonBytecodeToVfs(StringBuilder filesList,
+                                          String sourcePath,
+                                          PythonBytecodeCompiler.Result result,
+                                          ClassElement originatingElement) {
+        String bytecodePath = cacheFilePath(sourcePath, result.cachePath());
+        boolean unchanged = false;
+        if (outputDirectory != null) {
+            Path existingFile = outputDirectory.resolve("META-INF").resolve(bytecodePath);
+            try {
+                unchanged = Files.isRegularFile(existingFile) && Arrays.equals(result.bytes(), Files.readAllBytes(existingFile));
+            } catch (IOException e) {
+                throw new ProcessingException(originatingElement, "Failed to read Python bytecode from [" + bytecodePath + "]: " + e.getMessage(), e);
             }
-            PythonBytecodeCompiler.Result result = bytecodeCompiler.compile(content, filePath);
-            String cacheFilePath = cacheFilePath(filePath, result.cachePath());
-            javaVisitorContext.visitMetaInfFile(cacheFilePath, originatingElement)
-                .ifPresent(bytecodeFile -> {
-                    try (var output = bytecodeFile.openOutputStream()) {
-                        output.write(result.bytes());
-                    } catch (IOException e) {
-                        throw new ProcessingException(originatingElement, "Failed to write Python bytecode to [" + cacheFilePath + "]: " + e.getMessage(), e);
-                    }
-                });
-            filesList.append("/META-INF/").append(cacheFilePath).append('\n');
-        } catch (ProcessingException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ProcessingException(originatingElement, "Failed to compile Python bytecode for [" + filePath + "]: " + e.getMessage(), e);
         }
+        boolean bytecodeUnchanged = unchanged;
+        javaVisitorContext.visitMetaInfFile(bytecodePath, originatingElement)
+            .ifPresent(bytecodeFile -> {
+                try {
+                    if (bytecodeUnchanged) {
+                        // Opening the existing output records it for incremental compilation.
+                        bytecodeFile.openInputStream().close();
+                    } else {
+                        try (var output = bytecodeFile.openOutputStream()) {
+                            output.write(result.bytes());
+                        }
+                    }
+                } catch (IOException e) {
+                    throw new ProcessingException(originatingElement, "Failed to write Python bytecode to [" + bytecodePath + "]: " + e.getMessage(), e);
+                }
+            });
+        filesList.append("/META-INF/").append(bytecodePath).append('\n');
+    }
+
+    private static String runtimeFilename(String filePath) {
+        String relativePath = filePath.substring(APPLICATION_PATH.length());
+        return "/graalpy_vfs/" + relativePath;
     }
 
     private static String cacheFilePath(String sourcePath, String cachePath) {
@@ -729,7 +806,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         ClassElement originatingElement) {
         // Collect all packages that need __init__.py files
         Map<String, List<String>> decoratorsByPackage = new LinkedHashMap<>();
-        Map<String, Map<String, String>> javaClassesByPackage = new LinkedHashMap<>();
+        Map<String, Map<String, JavaClassImport>> javaClassesByPackage = new LinkedHashMap<>();
 
 
         // Process decorators
@@ -769,13 +846,18 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         if (javaClassImports != null && !javaClassImports.isEmpty()) {
             javaClassImports.forEach((packageName, imports) -> {
                 String pythonPackageName = toPythonImportName(packageName);
-                Map<String, String> classMappings = javaClassesByPackage.computeIfAbsent(pythonPackageName, (k) ->
+                Map<String, JavaClassImport> classMappings = javaClassesByPackage.computeIfAbsent(pythonPackageName, (k) ->
                     new LinkedHashMap<>()
                 );
                 for (Map<String, String> importInfo : imports) {
                     String variable = importInfo.get("variable");
                     String className = importInfo.get("class_name");
-                    classMappings.put(variable, className);
+                    JavaClassImport javaClassImport = new JavaClassImport(
+                        className,
+                        Boolean.parseBoolean(importInfo.get("interface")),
+                        Boolean.parseBoolean(importInfo.get("keyword_safe"))
+                    );
+                    classMappings.merge(variable, javaClassImport, JavaClassImport::merge);
                 }
             });
         }
@@ -792,7 +874,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         // Write __init__.py files for all packages
         for (String packageName : allPackages) {
             List<String> decoratorsInPackage = decoratorsByPackage.get(packageName);
-            Map<String, String> javaClassesInPackage = javaClassesByPackage.get(packageName);
+            Map<String, JavaClassImport> javaClassesInPackage = javaClassesByPackage.get(packageName);
 
             String packagePath = packageName.replace('.', '/');
             String initFilePath = APPLICATION_SRC_PATH + packagePath + "/__init__.py";
@@ -802,6 +884,35 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             // Add Java import if we have Java classes
             if (javaClassesInPackage != null && !javaClassesInPackage.isEmpty()) {
                 initContent.append("import java\n\n");
+                if (javaClassesInPackage.values().stream().anyMatch(JavaClassImport::requiresFacade)) {
+                    initContent.append("""
+                        import keyword
+
+                        class _MicronautJavaType:
+                            def __init__(self, target, interface=False):
+                                self._target = target
+                                self._interface = interface
+
+                            def __getattr__(self, name):
+                                if name.endswith('_') and keyword.iskeyword(name[:-1]):
+                                    name = name[:-1]
+                                return getattr(self._target, name)
+
+                            def __call__(self, *args, **kwargs):
+                                return self._target(*args, **kwargs)
+
+                            def __getitem__(self, item):
+                                if self._interface:
+                                    return self
+                                return self._target[item]
+
+                            def __mro_entries__(self, bases):
+                                if self._interface:
+                                    return ()
+                                return (self._target,)
+
+                        """);
+                }
             }
 
             List<String> allNames = new java.util.ArrayList<>();
@@ -816,9 +927,22 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
             // Add Java class assignments
             if (javaClassesInPackage != null) {
-                for (java.util.Map.Entry<String, String> mapping : javaClassesInPackage.entrySet()) {
+                for (java.util.Map.Entry<String, JavaClassImport> mapping : javaClassesInPackage.entrySet()) {
                     String typeName = mapping.getKey();
-                    initContent.append(typeName).append(" = java.type('").append(mapping.getValue()).append("')\n");
+                    JavaClassImport javaClassImport = mapping.getValue();
+                    if (javaClassImport.requiresFacade()) {
+                        initContent.append(typeName)
+                            .append(" = _MicronautJavaType(java.type('")
+                            .append(javaClassImport.className())
+                            .append("'), ")
+                            .append(javaClassImport.interfaceType() ? "True" : "False")
+                            .append(")\n");
+                    } else {
+                        initContent.append(typeName)
+                            .append(" = java.type('")
+                            .append(javaClassImport.className())
+                            .append("')\n");
+                    }
                     allNames.add(typeName);
                 }
             }
@@ -913,5 +1037,19 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     private record PythonApplicationValues(String code, String[] src) {
+    }
+
+    private record JavaClassImport(String className, boolean interfaceType, boolean keywordSafe) {
+        private boolean requiresFacade() {
+            return interfaceType || keywordSafe;
+        }
+
+        private JavaClassImport merge(JavaClassImport other) {
+            return new JavaClassImport(
+                other.className,
+                interfaceType || other.interfaceType,
+                keywordSafe || other.keywordSafe
+            );
+        }
     }
 }

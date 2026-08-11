@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +58,26 @@ public final class PythonAstParser {
         "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal",
         "not", "or", "pass", "raise", "return", "try", "while", "with", "yield"
     );
+    private static final Source COMPILE_RUNTIME_AST_SOURCE = Source.newBuilder(PYTHON, """
+        import importlib.util as _mn_runtime_importlib_util
+        import marshal as _mn_runtime_marshal
+        import struct as _mn_runtime_struct
+
+        def _mn_compile_runtime_ast(tree, source, filename):
+            code = compile(tree, filename, 'exec')
+            header = (
+                _mn_runtime_importlib_util.MAGIC_NUMBER
+                + _mn_runtime_struct.pack('<I', 0x03)
+                + _mn_runtime_importlib_util.source_hash(source.encode('utf-8'))
+            )
+            return (
+                _mn_runtime_importlib_util.cache_from_source(filename),
+                header + _mn_runtime_marshal.dumps(code)
+            )
+        """, "micronaut-runtime-ast-compiler.py").cached(true).buildLiteral();
     private final Context context;
+    private final Value runtimeAstCompiler;
+    private final IdentityHashMap<TransformResult, RuntimeArtifact> runtimeArtifacts = new IdentityHashMap<>();
 
     public PythonAstParser() {
         this(PythonAstParser.class.getClassLoader());
@@ -85,6 +105,8 @@ public final class PythonAstParser {
         }
         this.context = contextBuilder.build();
         context.initialize(PYTHON);
+        context.eval(COMPILE_RUNTIME_AST_SOURCE);
+        runtimeAstCompiler = context.getBindings(PYTHON).getMember("_mn_compile_runtime_ast");
     }
 
     PythonBytecodeCompiler bytecodeCompiler() {
@@ -281,6 +303,7 @@ public final class PythonAstParser {
     }
 
     public @NotNull List<TransformResult> transform(VisitorContext visitorContext, Source... pythonSource) {
+        runtimeArtifacts.clear();
         Value bindings = context.getBindings(PYTHON);
         Map<String, ClassElement> classElementCache = new LinkedHashMap<>();
         Set<String> missingClassElements = new java.util.HashSet<>();
@@ -337,7 +360,7 @@ public final class PythonAstParser {
             java.util.List<String> exportedTypes = map.containsKey("exportedTypes") ? (java.util.List<String>) map.get("exportedTypes") : new ArrayList<>();
             java.util.List<String> allClassNames = map.containsKey("allClassNames") ? (java.util.List<String>) map.get("allClassNames") : new ArrayList<>();
             java.util.List<String> validationErrors = map.containsKey("validationErrors") ? (java.util.List<String>) map.get("validationErrors") : new ArrayList<>();
-            results.add(new TransformResult(
+            TransformResult transformResult = new TransformResult(
                 source,
                 code,
                 runtimeCode,
@@ -346,9 +369,39 @@ public final class PythonAstParser {
                 exportedTypes,
                 allClassNames,
                 validationErrors
-            ));
+            );
+            results.add(transformResult);
+            runtimeArtifacts.put(
+                transformResult,
+                new RuntimeArtifact(
+                    result.getHashValue("runtimeTree"),
+                    result.getHashValue("runtimeRequired").asBoolean()
+                )
+            );
         }
         return results;
+    }
+
+    PythonBytecodeCompiler.Result compileRuntimeBytecode(TransformResult transformResult,
+                                                         String filename) {
+        RuntimeArtifact artifact = runtimeArtifacts.get(transformResult);
+        if (artifact == null) {
+            throw new IllegalArgumentException("Unknown Python transform result");
+        }
+        Value result = runtimeAstCompiler.execute(
+            artifact.tree(),
+            transformResult.originalSource().getCharacters().toString(),
+            filename
+        );
+        return new PythonBytecodeCompiler.Result(
+            result.getArrayElement(0).asString(),
+            result.getArrayElement(1).as(byte[].class)
+        );
+    }
+
+    boolean requiresRuntimeBytecode(TransformResult transformResult) {
+        RuntimeArtifact artifact = runtimeArtifacts.get(transformResult);
+        return artifact != null && artifact.required();
     }
 
     private static String normalizeKeywordSafePackageName(String name) {
@@ -391,19 +444,31 @@ public final class PythonAstParser {
     private static @Language("python") String getTransformSource() {
         return """
             import ast
-            from micronaut_transformer import MicronautTransformer, unparse
+            from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, unparse
 
             tree = ast.parse(src)
             transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements)
             transformed_tree = transformer.visit(tree)
-            runtime_tree = ast.parse(src)
-            runtime_transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, True)
-            transformed_runtime_tree = runtime_transformer.visit(runtime_tree)
+            diagnostic_runtime_tree = ast.parse(src)
+            diagnostic_runtime_transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, True)
+            transformed_diagnostic_runtime_tree = diagnostic_runtime_transformer.visit(diagnostic_runtime_tree)
+            executable_runtime_tree = ast.parse(src)
+            original_runtime_tree = ast.dump(executable_runtime_tree, include_attributes=False)
+            missing_decorator_code = transformer.get_missing_runtime_decorator_code(executable_runtime_tree)
+            runtime_transformer = MicronautRuntimeTransformer(
+                callback_get_class_element,
+                callback_get_class_elements,
+                missing_decorator_code
+            )
+            transformed_runtime_tree = runtime_transformer.visit(executable_runtime_tree)
+            ast.fix_missing_locations(transformed_runtime_tree)
             {
                 "code": unparse(transformed_tree),
-                "runtimeCode": unparse(transformed_runtime_tree),
+                "runtimeCode": unparse(transformed_diagnostic_runtime_tree),
+                "runtimeTree": transformed_runtime_tree,
+                "runtimeRequired": ast.dump(transformed_runtime_tree, include_attributes=False) != original_runtime_tree,
                 "decorators": transformer.get_generated_decorator_code(),
-                "javaClassImports": transformer.java_class_imports,
+                "javaClassImports": transformer.get_java_class_imports(),
                 "exportedTypes": transformer.get_exported_types(),
                 "allClassNames": transformer.all_class_names,
                 "validationErrors": transformer.validation_errors
@@ -436,7 +501,11 @@ public final class PythonAstParser {
     }
 
     public void close() {
+        runtimeArtifacts.clear();
         this.context.close();
+    }
+
+    private record RuntimeArtifact(Value tree, boolean required) {
     }
 
     /**
