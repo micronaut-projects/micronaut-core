@@ -157,6 +157,7 @@ class BetaService:
 
         cleanup:
         context?.close()
+        classLoader?.close()
         firstRoot.deleteDir()
         secondRoot.deleteDir()
         tempTargetDir.deleteDir()
@@ -664,6 +665,7 @@ class KeywordMethodService:
 
         cleanup:
         context?.close()
+        classLoader?.close()
         tempDir.deleteDir()
     }
 
@@ -748,6 +750,7 @@ def debug_failure():
 
         cleanup:
         context?.close()
+        classLoader?.close()
         tempDir.deleteDir()
 
         where:
@@ -809,6 +812,7 @@ def debug_failure():
 
         cleanup:
         context?.close()
+        classLoader?.close()
         tempSrcDir.deleteDir()
         tempTargetDir.deleteDir()
 

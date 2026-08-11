@@ -788,7 +788,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
     private static String runtimeFilename(String filePath) {
         String relativePath = filePath.substring(APPLICATION_PATH.length());
-        return "/graalpy_vfs" + relativePath;
+        return "/graalpy_vfs/" + relativePath;
     }
 
     private static String cacheFilePath(String sourcePath, String cachePath) {
