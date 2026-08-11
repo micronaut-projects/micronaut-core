@@ -1204,9 +1204,6 @@ final class IncrementalCompilation {
         }
     }
 
-    private record FileDigest(long size, long modified, String digest) {
-    }
-
     private void validateDirectories() {
         if (cacheDirectory.startsWith(targetDirectory) || targetDirectory.startsWith(cacheDirectory)) {
             throw new IllegalArgumentException(
@@ -1396,6 +1393,9 @@ final class IncrementalCompilation {
                                Set<String> dependencies,
                                Set<String> outputs,
                                Set<String> types) {
+    }
+
+    private record FileDigest(long size, long modified, String digest) {
     }
 
     private record ScannedSource(SourceState state, String content) {
