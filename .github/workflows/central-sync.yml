@@ -25,7 +25,7 @@ jobs:
           ref: v${{ github.event.inputs.release_version }}
       - uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
       - name: "🔧 Setup GraalVM CE"
-        uses: graalvm/setup-graalvm@0def53c0fd8534bc13416c9469f5be45265824fd # v1
+        uses: graalvm/setup-graalvm@5298d94fb55a4f185c602eeac5de1b553882abe2 # v1
         with:
           distribution: 'graalvm'
           java-version: ${{ matrix.java }}
