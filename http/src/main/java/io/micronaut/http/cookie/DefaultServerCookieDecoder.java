@@ -16,6 +16,7 @@
 package io.micronaut.http.cookie;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,8 +58,14 @@ public final class DefaultServerCookieDecoder implements ServerCookieDecoder {
         if (start == end) {
             return;
         }
-        int equals = header.indexOf('=', start);
-        if (equals == -1 || equals >= end) {
+        int equals = -1;
+        for (int i = start; i < end; i++) {
+            if (header.charAt(i) == '=') {
+                equals = i;
+                break;
+            }
+        }
+        if (equals == -1) {
             return;
         }
         String name = header.substring(start, equals).trim();
@@ -66,17 +73,26 @@ public final class DefaultServerCookieDecoder implements ServerCookieDecoder {
             return;
         }
         String value = unwrapValue(header.substring(equals + 1, end).trim());
+        if (value == null) {
+            return;
+        }
         try {
             cookies.add(Cookie.of(name, value));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException ignored) {
             // skip a single malformed pair rather than rejecting the whole header
         }
     }
 
+    // Returns null when the value starts with a double quote that is never closed, so the caller
+    // drops the pair, matching Netty's ServerCookieDecoder.LAX.
+    @Nullable
     private static String unwrapValue(String value) {
         int length = value.length();
-        if (length >= 2 && value.charAt(0) == '"' && value.charAt(length - 1) == '"') {
-            return value.substring(1, length - 1);
+        if (length > 0 && value.charAt(0) == '"') {
+            if (length >= 2 && value.charAt(length - 1) == '"') {
+                return value.substring(1, length - 1);
+            }
+            return null;
         }
         return value;
     }

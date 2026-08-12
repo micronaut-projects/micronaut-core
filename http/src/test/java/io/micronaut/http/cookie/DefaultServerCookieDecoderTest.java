@@ -63,4 +63,18 @@ class DefaultServerCookieDecoderTest {
         assertEquals("quoted value", cookies.get(0).getValue());
         assertEquals("dark", cookies.get(1).getValue());
     }
+
+    @Test
+    void unbalancedOpeningQuoteDropsThePair() {
+        // Netty's ServerCookieDecoder.LAX drops a value that starts with a double quote but never
+        // closes it; both server decoders must agree on this input.
+        ServerCookieDecoder decoder = new DefaultServerCookieDecoder();
+        List<Cookie> cookies = decoder.decode("a=\"unterminated; b=2");
+        assertEquals(1, cookies.size());
+        assertEquals("b", cookies.get(0).getName());
+        assertEquals("2", cookies.get(0).getValue());
+
+        assertEquals(List.of(), decoder.decode("a=\""));
+        assertEquals("", decoder.decode("a=\"\"").get(0).getValue());
+    }
 }
