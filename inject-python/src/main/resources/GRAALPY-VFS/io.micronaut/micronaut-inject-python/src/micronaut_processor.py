@@ -354,7 +354,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                                 self.current_class = self.current_class.withConstructor(func_def)
                             else:
                                 self.current_class = self.current_class.withFunction(func_def)
-                        elif self.current_class is None and node.name != 'micronaut_annotation':
+                        elif self.current_class is None and not was_in_function and node.name != 'micronaut_annotation':
                             if self._is_script_function(node):
                                 self._handle_script_function(func_def)
                             else:
@@ -1024,7 +1024,23 @@ class MicronautAstVisitor(ast.NodeVisitor):
         if not isinstance(getattr(node, "value", None), ast.Call):
             return
         decorator = decorator_to_function(self, node.value)
-        if decorator is None or not self._is_annotation_type(decorator):
+        if decorator is None and isinstance(node.value.func, ast.Name):
+            imported_name = self.imported_types.get(node.value.func.id)
+            if imported_name is not None:
+                decorator = DecoratorDef(node.value.func.id, imported_name, None, {}, [])
+        if decorator is not None and decorator.annotationName() == decorator.name():
+            known_decorator = self.known_decorators.get(decorator.name())
+            if known_decorator is not None:
+                decorator = known_decorator
+        if decorator is not None and decorator.annotationName().startswith("micronaut."):
+            decorator = DecoratorDef(
+                decorator.name(),
+                "io." + decorator.annotationName(),
+                decorator.repeatedName(),
+                decorator.members(),
+                decorator.stereotypes()
+            )
+        if decorator is None:
             return
         self.current_script_decorators.append(decorator)
 

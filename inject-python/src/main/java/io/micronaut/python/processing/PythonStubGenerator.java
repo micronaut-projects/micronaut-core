@@ -2716,7 +2716,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
         Set<String> annotationNames = annotationMetadata.getDeclaredAnnotationNames();
         for (String annotationName : annotationNames) {
-            if (annotationName.equals("io.micronaut.context.annotation.PropertySource") || annotationPackagesToCopy.stream().anyMatch(annotationName::startsWith)) {
+            if (annotationName.equals("io.micronaut.context.annotation.PropertySource")
+                || annotationPackagesToCopy.stream().anyMatch(annotationName::startsWith)) {
                 AnnotationValue<Annotation> av = annotationMetadata.getAnnotation(annotationName);
                 if (av != null) {
                     builder.addAnnotation(AnnotationDef.of(av, visitorContext));

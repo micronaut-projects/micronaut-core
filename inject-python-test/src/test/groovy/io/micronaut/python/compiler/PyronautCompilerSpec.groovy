@@ -442,6 +442,84 @@ class MultipleTestSpec:
         tempDir.deleteDir()
     }
 
+    def "test module-level MicronautTest generates an unpooled annotated stub"() {
+        given:
+        def pythonCode = '''
+from micronaut.test.extensions.junit5.annotation import MicronautTest
+from org.junit.jupiter.api import BeforeEach
+
+MicronautTest()
+
+@BeforeEach
+def setup():
+    pass
+
+def client_for(self):
+    return self.client
+
+def test_root(self):
+    pass
+'''
+        def tempDir = File.createTempDir("pyronaut-test-module-junit-stub", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def generated = new File(tempDir, "python/Script.java")
+        generated.exists()
+        def javaCode = generated.text
+        javaCode.contains('import io.micronaut.test.extensions.junit5.annotation.MicronautTest;')
+        javaCode.contains('@MicronautTest')
+        javaCode.contains('import org.junit.jupiter.api.BeforeEach;')
+        javaCode.contains('@BeforeEach')
+        javaCode.contains('@Test')
+        !javaCode.contains('PooledValueCoercible')
+        !javaCode.contains('findPooledScript')
+        !javaCode.contains('invokePooledScript')
+        !javaCode.contains('public Object decorator(')
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
+    def "test multiple module scripts in one package generate distinct stubs"() {
+        given:
+        def sourceDir = File.createTempDir("pyronaut-test-multiple-scripts", "")
+        def packageDir = new File(sourceDir, "example")
+        packageDir.mkdirs()
+        ["First.py", "Second.py"].each { fileName ->
+            new File(packageDir, fileName).text = '''
+from micronaut.context.annotation import Executable
+
+@Executable
+def ping() -> str:
+    return "pong"
+'''
+        }
+        def targetDir = File.createTempDir("pyronaut-test-multiple-scripts-target", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(sourceDir.absolutePath)
+            .targetDir(targetDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        new File(targetDir, "example/First.java").exists()
+        new File(targetDir, "example/Second.java").exists()
+        !new File(targetDir, "python/Script.java").exists()
+
+        cleanup:
+        sourceDir.deleteDir()
+        targetDir.deleteDir()
+    }
+
     def "test repeatable annotation transformation"() {
         given:
         def pythonCode = '''
