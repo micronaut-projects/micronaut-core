@@ -2283,7 +2283,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             var builder = ClassDef.builder(scriptElement.getPackageName() + "." + scriptElement.getSimpleName())
                 .addModifiers(Modifier.PUBLIC);
             builder.addAnnotation(Vetoed.class);
-            copyAnnotations(scriptElement, builder, Set.of(), context);
+            copyAnnotations(scriptElement, builder, ANNOTATION_PACKAGES_TO_COPY, context);
             builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
             boolean isJunit5TestModule = scriptElement.hasAnnotation(ANN_MICRONAUT_TEST);
 
@@ -2716,8 +2716,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
         Set<String> annotationNames = annotationMetadata.getDeclaredAnnotationNames();
         for (String annotationName : annotationNames) {
-            if (annotationPackagesToCopy.isEmpty()
-                || annotationName.equals("io.micronaut.context.annotation.PropertySource")
+            if (annotationName.equals("io.micronaut.context.annotation.PropertySource")
                 || annotationPackagesToCopy.stream().anyMatch(annotationName::startsWith)) {
                 AnnotationValue<Annotation> av = annotationMetadata.getAnnotation(annotationName);
                 if (av != null) {

@@ -446,8 +446,13 @@ class MultipleTestSpec:
         given:
         def pythonCode = '''
 from micronaut.test.extensions.junit5.annotation import MicronautTest
+from org.junit.jupiter.api import BeforeEach
 
 MicronautTest()
+
+@BeforeEach
+def setup():
+    pass
 
 def client_for(self):
     return self.client
@@ -468,8 +473,11 @@ def test_root(self):
         def generated = new File(tempDir, "python/Script.java")
         generated.exists()
         def javaCode = generated.text
-        javaCode.contains('@io.micronaut.test.extensions.junit5.annotation.MicronautTest')
-        javaCode.contains('@org.junit.jupiter.api.Test\n  public void test_root()')
+        javaCode.contains('import io.micronaut.test.extensions.junit5.annotation.MicronautTest;')
+        javaCode.contains('@MicronautTest')
+        javaCode.contains('import org.junit.jupiter.api.BeforeEach;')
+        javaCode.contains('@BeforeEach')
+        javaCode.contains('@Test')
         !javaCode.contains('PooledValueCoercible')
         !javaCode.contains('findPooledScript')
         !javaCode.contains('invokePooledScript')
