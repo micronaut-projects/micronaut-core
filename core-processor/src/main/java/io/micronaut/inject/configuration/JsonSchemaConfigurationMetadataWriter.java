@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.configuration;
 
+import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -24,6 +25,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
@@ -425,7 +427,8 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
 
     @Nullable
     private static PropertyElement findProperty(ClassElement classElement, @Nullable String currentKey, PropertyMetadata pm) {
-        return classElement.getBeanProperties()
+        return classElement.getBeanProperties(PropertyElementQuery.of(classElement)
+                .visibility(BeanProperties.Visibility.ANY))
             .stream().filter(p -> p.getName().equals(currentKey) || p.getName().equals(pm.getName()))
             .findFirst().orElse(null);
     }
