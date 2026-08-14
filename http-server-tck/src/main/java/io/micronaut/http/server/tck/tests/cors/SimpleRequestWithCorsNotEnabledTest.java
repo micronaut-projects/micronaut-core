@@ -17,22 +17,19 @@ package io.micronaut.http.server.tck.tests.cors;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
-import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Post;
-import io.micronaut.http.annotation.Status;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
+import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -47,6 +44,11 @@ public class SimpleRequestWithCorsNotEnabledTest {
 
     private static final String SPECNAME = "SimpleRequestWithCorsNotEnabledTest";
     private static final String PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH = "micronaut.server.cors.localhost-pass-through";
+    private static final String ENDPOINTS_REFRESH_ENABLED = "endpoints.refresh.enabled";
+    private static final String ENDPOINTS_REFRESH_SENSITIVE = "endpoints.refresh.sensitive";
+    private Map<String, Object> BASE_CONFIG = Map.of(
+        ENDPOINTS_REFRESH_ENABLED, StringUtils.TRUE,
+        ENDPOINTS_REFRESH_SENSITIVE, StringUtils.FALSE);
 
     /**
      * @see <a href="https://github.com/micronaut-projects/micronaut-core/security/advisories/GHSA-583g-g682-crxf">GHSA-583g-g682-crxf</a>
@@ -56,17 +58,9 @@ public class SimpleRequestWithCorsNotEnabledTest {
     @Test
     void corsSimpleRequestNotAllowedForLocalhostAndAny() throws IOException {
         asserts(SPECNAME,
+            BASE_CONFIG,
             createRequest("https://sdelamo.github.io"),
-            (server, request) -> {
-            RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
-                assertEquals(0, refreshCounter.getRefreshCount());
-
-                AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
-                    .status(HttpStatus.FORBIDDEN)
-                    .assertResponse(response -> assertFalse(response.getHeaders().contains("Vary")))
-                    .build());
-                assertEquals(0, refreshCounter.getRefreshCount());
-            });
+            this::assertRefreshEndpointNotHit);
     }
 
     /**
@@ -77,17 +71,12 @@ public class SimpleRequestWithCorsNotEnabledTest {
      */
     @Test
     void corsSimpleRequestAllowedForLocalhostAndAnyWhenConfiguredToAllowIt() throws IOException {
+        Map<String, Object> config = new HashMap<>(BASE_CONFIG);
+        config.put(PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH, StringUtils.TRUE);
         asserts(SPECNAME,
-            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH, StringUtils.TRUE),
+            config,
             createRequest("https://sdelamo.github.io"),
-            (server, request) -> {
-                RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
-                assertEquals(0, refreshCounter.getRefreshCount());
-                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
-                    .build());
-                assertEquals(1, refreshCounter.getRefreshCount());
-        });
+            this::assertRefreshEndpointHit);
     }
 
     /**
@@ -97,24 +86,44 @@ public class SimpleRequestWithCorsNotEnabledTest {
     @Test
     void corsSimpleRequestAllowedForLocalhostAndOriginLocalhost() throws IOException {
         asserts(SPECNAME,
+            BASE_CONFIG,
             createRequest("http://localhost:8000"),
-            (server, request) -> {
-                RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
-                assertEquals(0, refreshCounter.getRefreshCount());
-                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
-                    .build());
-                assertEquals(1, refreshCounter.getRefreshCount());
-            });
+            this::assertRefreshEndpointHit);
+    }
+
+    private void assertRefreshEndpointHit(ServerUnderTest server, HttpRequest<?> request) {
+        assertRefreshEndpointInvocation(server, request, HttpStatus.OK, 1);
+    }
+
+    private void assertRefreshEndpointNotHit(ServerUnderTest server, HttpRequest<?> request) {
+        assertRefreshEndpointInvocation(server, request, HttpStatus.FORBIDDEN, 0);
+    }
+
+    private void assertRefreshEndpointInvocation(ServerUnderTest server, HttpRequest<?> request,
+                                                 HttpStatus expectedStatus,
+                                                 int invocations) {
+        RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
+        assertEquals(0, refreshCounter.getRefreshCount());
+        if (expectedStatus.getCode() >= 400) {
+            AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(expectedStatus)
+                .assertResponse(response -> assertFalse(response.getHeaders().contains("Vary")))
+                .build());
+        } else {
+            AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .build());
+        }
+        assertEquals(invocations, refreshCounter.getRefreshCount());
+        refreshCounter.reset();
     }
 
     private static HttpRequest<?> createRequest(String origin) {
-        return HttpRequest.POST("/refresh", Collections.emptyMap())
+        return HttpRequest.POST("/refresh", Map.of("force", StringUtils.TRUE))
             .header("Accept", "*/*")
             .header("Accept-Encoding", "gzip, deflate, br")
             .header("Accept-Language", "en-GB,en-US;q=0.9,en;q=0.8")
             .header("Connection", "keep-alive")
-            .header("Content-Length", "0")
             .header("Host", "localhost:8080")
             .header("Origin", origin)
             .header("sec-ch-ua", "\"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"108\", \"Google Chrome\";v=\"108\"")
@@ -124,19 +133,6 @@ public class SimpleRequestWithCorsNotEnabledTest {
             .header("Sec-Fetch-Mode", "cors")
             .header("Sec-Fetch-Site", "cross-site")
             .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36");
-    }
-
-    @Requires(property = "spec.name", value = SPECNAME)
-    @Controller
-    static class RefreshController {
-        @Inject
-        ApplicationEventPublisher<RefreshEvent> refreshEventApplicationEventPublisher;
-
-        @Post("/refresh")
-        @Status(HttpStatus.OK)
-        void refresh() {
-            refreshEventApplicationEventPublisher.publishEvent(new RefreshEvent());
-        }
     }
 
     @Requires(property = "spec.name", value = SPECNAME)
@@ -151,6 +147,10 @@ public class SimpleRequestWithCorsNotEnabledTest {
 
         public int getRefreshCount() {
             return refreshCount;
+        }
+
+        public void reset() {
+            refreshCount = 0;
         }
     }
 }
