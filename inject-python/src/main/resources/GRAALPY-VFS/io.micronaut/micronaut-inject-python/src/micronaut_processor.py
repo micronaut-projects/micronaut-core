@@ -1028,7 +1028,19 @@ class MicronautAstVisitor(ast.NodeVisitor):
             imported_name = self.imported_types.get(node.value.func.id)
             if imported_name is not None:
                 decorator = DecoratorDef(node.value.func.id, imported_name, None, {}, [])
-        if decorator is None or not self._is_annotation_type(decorator):
+        if decorator is not None and decorator.annotationName() == decorator.name():
+            known_decorator = self.known_decorators.get(decorator.name())
+            if known_decorator is not None:
+                decorator = known_decorator
+        if decorator is not None and decorator.annotationName().startswith("micronaut."):
+            decorator = DecoratorDef(
+                decorator.name(),
+                "io." + decorator.annotationName(),
+                decorator.repeatedName(),
+                decorator.members(),
+                decorator.stereotypes()
+            )
+        if decorator is None:
             return
         self.current_script_decorators.append(decorator)
 

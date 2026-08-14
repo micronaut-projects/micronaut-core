@@ -73,13 +73,14 @@ public final class PythonScriptElement extends AbstractPythonElement implements 
                 // make bean.
                 // Mark pooled to opt the script into pooled stub generation unless
                 // the module already declares an explicit/default scope.
-                if (!hasStereotype(Scope.class)) {
+                if (scriptDef.decorators().isEmpty() && !hasStereotype(Scope.class)) {
                     annotate("io.micronaut.context.python.scope.ContextPooled");
                 }
                 annotate(Bean.class);
                 applyTypeLevelDefaultAnnotations(enclosedElement);
             }
         }
+        this.typeAnnotationsKey = scriptDef;
     }
 
     private void applyTypeLevelDefaultAnnotations(MemberElement enclosedElement) {
@@ -106,11 +107,7 @@ public final class PythonScriptElement extends AbstractPythonElement implements 
         if (presetAnnotationMetadata != null) {
             return presetAnnotationMetadata;
         }
-        if (typeAnnotationsKey == null) {
-            return super.getAnnotationMetadata();
-        } else {
-            return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getTypeAnnotationMetadata());
-        }
+        return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getTypeAnnotationMetadata());
     }
 
     @Override

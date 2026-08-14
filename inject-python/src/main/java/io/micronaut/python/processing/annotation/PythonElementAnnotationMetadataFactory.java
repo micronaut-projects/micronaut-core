@@ -27,6 +27,8 @@ import io.micronaut.python.processing.visitor.ElementDef;
 import io.micronaut.python.processing.visitor.DecoratorDef;
 import io.micronaut.python.processing.visitor.FunctionDef;
 import io.micronaut.python.processing.visitor.PythonMethodElement;
+import io.micronaut.python.processing.visitor.PythonScriptElement;
+import io.micronaut.python.processing.visitor.ScriptDef;
 
 /**
  * Factory for creating and managing annotation metadata for Python elements.
@@ -76,6 +78,13 @@ public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnot
 
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForClass(ClassElement classElement) {
+        if (classElement instanceof PythonScriptElement scriptElement) {
+            ScriptDef scriptDef = scriptElement.getNativeType();
+            return metadataBuilder.lookupOrBuild(
+                new TypeAnnotationKey(classElement.getNativeType(), scriptDef),
+                scriptDef
+            );
+        }
         if (classElement instanceof AbstractPythonClassElement pythonClassElement) {
             ElementDef typeAnnotationsKey = pythonClassElement.getTypeAnnotationsKey();
             if (typeAnnotationsKey != null) {
