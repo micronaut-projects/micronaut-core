@@ -209,6 +209,8 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
             return List.of(argumentDef);
         } else if (element instanceof ReturnDef returnDef) {
             return List.of(returnDef);
+        } else if (element instanceof ScriptDef scriptDef) {
+            return List.of(scriptDef);
         }
         return List.of();
     }

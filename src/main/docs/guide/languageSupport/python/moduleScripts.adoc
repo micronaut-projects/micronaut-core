@@ -1,0 +1,9 @@
+Python modules can declare Micronaut annotations directly at module level. The annotation becomes metadata on the generated script class, while module-level functions become methods on that class.
+
+For example, a classless controller can declare its route prefix without defining a Python class:
+
+snippet::example.module_routes[tags="module-controller", indent=0, title="Module-level controller annotation"]
+
+Top-level calls are treated as annotations only when the target resolves to a Micronaut or Python-defined annotation. Ordinary module calls remain ordinary Python code.
+
+An explicit controller annotation takes precedence over the implicit controller added for modules containing HTTP routes. Explicit scope annotations also take precedence over the automatic `ContextPooled` scope used by otherwise unscoped route modules.

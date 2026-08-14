@@ -143,6 +143,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private Map<String, ClassElement> allClasses = Map.of();
 
     public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
+    private static final String ANN_MICRONAUT_TEST = "io.micronaut.test.extensions.junit5.annotation.MicronautTest";
     public static final String ANN_JSON_PROPERTY = "com.fasterxml.jackson.annotation.JsonProperty";
     public static final String ANN_JSON_CREATOR = "com.fasterxml.jackson.annotation.JsonCreator";
 
@@ -215,14 +216,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 if (decoratorDef != null) {
                     return;
                 }
-                boolean hasRoute = !scriptElement.getEnclosedElements(
-                    ElementQuery.ALL_METHODS
-                        .onlyAccessible()
-                        .onlyInstance()
-                        .onlyDeclared()
-                        .annotated(ann -> ann.hasStereotype("io.micronaut.http.annotation.HttpMethodMapping"))
-                ).isEmpty();
-                if (hasRoute || scriptElement.hasStereotype("io.micronaut.context.python.scope.ContextPooled")) {
+                if (scriptElement.hasStereotype("io.micronaut.context.python.scope.ContextPooled")) {
                     if (classBuilders.containsKey(scriptElement.getName())) {
                         return;
                     }
@@ -1740,6 +1734,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .get(scriptElement.getName());
     }
 
+    private static boolean isScriptTestMethod(MethodElement methodElement) {
+        return methodElement.getName().startsWith("test");
+    }
+
     private AnnotationObjectDef generateAnnotationStub(DecoratorDef decoratorDef, PythonVisitorContext visitorContext) {
         AnnotationObjectDef.AnnotationObjectDefBuilder builder = AnnotationObjectDef.builder(decoratorDef.annotationName())
             .addModifiers(Modifier.PUBLIC)
@@ -2285,7 +2283,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             var builder = ClassDef.builder(scriptElement.getPackageName() + "." + scriptElement.getSimpleName())
                 .addModifiers(Modifier.PUBLIC);
             builder.addAnnotation(Vetoed.class);
+            copyAnnotations(scriptElement, builder, ANNOTATION_PACKAGES_TO_COPY, context);
             builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
+            boolean isJunit5TestModule = scriptElement.hasAnnotation(ANN_MICRONAUT_TEST);
 
             // Scripts are singletons - add a static instance field
             ClassTypeDef thisType = ClassTypeDef.of(typeName);
@@ -2359,7 +2359,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .onlyAccessible()
                     .onlyInstance()
                     .onlyDeclared()
-                    .annotated(ann ->
+                    .annotated(ann -> isJunit5TestModule ||
                         ann.hasStereotype(Executable.class) ||
                             ann.hasAnnotation(AnnotationUtil.PRE_DESTROY) ||
                             ann.hasAnnotation(AnnotationUtil.POST_CONSTRUCT) ||
@@ -2368,12 +2368,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             isDeclaredBeanMethod(ann)));
 
             for (MethodElement methodElement : methodsToBridge) {
+                boolean isJunit5Test = methodElement.hasDeclaredAnnotation(JUNIT_TEST)
+                    || (isJunit5TestModule && isScriptTestMethod(methodElement));
                 addBridgeMethod(
                     methodElement,
                     scriptElement,
                     builder,
                     context,
-                    false,
+                    isJunit5Test,
                     true,
                     addedMethodNames
                 );
@@ -2387,7 +2389,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     addSetterScript(beanProperty, builder, pythonValue);
                 }
 
-                if (beanProperty.hasStereotype(Bean.class)) {
+                if (beanProperty.hasStereotype(Bean.class) || beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
                     addGetterScript(beanProperty, builder, pythonValue);
                 }
             }
@@ -3014,10 +3016,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         addMethodTypeVariables(signatureMethod, methodBuilder, bridgeSignatureTypeArguments, inferredMethodBounds);
 
         copyAnnotations(methodElement, methodBuilder, ANNOTATION_PACKAGES_TO_COPY, visitorContext);
+        if (isJunit5Test && !methodElement.hasDeclaredAnnotation(JUNIT_TEST)) {
+            methodBuilder.addAnnotation(JUNIT_TEST);
+        }
         @NonNull ParameterElement[] parameters = methodElement.getParameters();
         @NonNull ParameterElement[] signatureParameters = signatureMethod.getParameters();
         @NonNull ParameterElement[] resolvedSignatureParameters = resolvedSignatureMethod.getParameters();
-        for (int i = 0; i < parameters.length; i++) {
+        int receiverOffset = isScript && parameters.length > 0 && "self".equals(parameters[0].getName()) ? 1 : 0;
+        for (int i = receiverOffset; i < parameters.length; i++) {
             @NonNull ParameterElement parameter = parameters[i];
             ParameterElement signatureParameter = i < signatureParameters.length ? signatureParameters[i] : parameter;
             ParameterElement resolvedSignatureParameter = i < resolvedSignatureParameters.length ? resolvedSignatureParameters[i] : signatureParameter;
@@ -3055,9 +3061,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     }
                     var targetValue = targetValueExpression;
                     var targetContext = targetValue.invoke("getContext", POLYGLOT_CONTEXT);
-                    for (int i = 0; i < parameters.length; i++) {
+                    if (receiverOffset == 1) {
+                        parameterExpressions.add(aThis);
+                    }
+                    for (int i = receiverOffset; i < parameters.length; i++) {
                         @NonNull ParameterElement parameter = parameters[i];
-                        VariableDef.MethodParameter methodParameter = methodParameters.get(i);
+                        VariableDef.MethodParameter methodParameter = methodParameters.get(i - receiverOffset);
                         coerceParameterToPolyglotValue(parameter, parameterExpressions, methodParameter, targetContext);
                     }
                     invokedValue = RUNTIME_UTIL.invokeStatic(

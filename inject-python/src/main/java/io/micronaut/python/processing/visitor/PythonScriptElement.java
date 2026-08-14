@@ -33,6 +33,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import jakarta.inject.Scope;
 import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
@@ -70,8 +71,11 @@ public final class PythonScriptElement extends AbstractPythonElement implements 
                 enclosedElement.hasStereotype(AnnotationUtil.QUALIFIER) ||
                 enclosedElement.hasStereotype(Executable.class)) {
                 // make bean.
-                // Mark pooled to opt the script into pooled stub generation
-                annotate("io.micronaut.context.python.scope.ContextPooled");
+                // Mark pooled to opt the script into pooled stub generation unless
+                // the module already declares an explicit/default scope.
+                if (!hasStereotype(Scope.class)) {
+                    annotate("io.micronaut.context.python.scope.ContextPooled");
+                }
                 annotate(Bean.class);
                 applyTypeLevelDefaultAnnotations(enclosedElement);
             }

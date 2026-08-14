@@ -1,0 +1,7 @@
+JUnit 5 tests can be written as Python modules by declaring `MicronautTest()` at module level. Injected module attributes are available through the generated test object, and helper functions can use a `self` receiver.
+
+Functions whose names start with `test` are automatically exposed as JUnit 5 test methods. An explicit `@Test` decorator remains supported when a different test naming style is needed.
+
+snippet::example.ModuleSpec[tags="module-test", indent=0, title="JUnit 5 module test"]
+
+The generated Java test class carries the runtime `MicronautTest` and `Test` annotations required by the JUnit 5 and Micronaut test extensions. The synthetic `self` parameter is omitted from the Java method signature and is supplied automatically when the Python function is invoked.

@@ -28,7 +28,8 @@ public class ControllerScriptElementProcessor implements PythonScriptElementProc
 
     @Override
     public void process(ClassElement classElement, MemberElement memberElement) {
-        if (memberElement.hasStereotype("io.micronaut.http.annotation.HttpMethodMapping")) {
+        if (!classElement.hasAnnotation("io.micronaut.http.annotation.Controller")
+            && memberElement.hasStereotype("io.micronaut.http.annotation.HttpMethodMapping")) {
             classElement.annotate("io.micronaut.http.annotation.Controller");
         }
     }
