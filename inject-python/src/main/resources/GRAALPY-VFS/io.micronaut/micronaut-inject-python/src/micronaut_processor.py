@@ -354,7 +354,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                                 self.current_class = self.current_class.withConstructor(func_def)
                             else:
                                 self.current_class = self.current_class.withFunction(func_def)
-                        elif self.current_class is None and node.name != 'micronaut_annotation':
+                        elif self.current_class is None and not was_in_function and node.name != 'micronaut_annotation':
                             if self._is_script_function(node):
                                 self._handle_script_function(func_def)
                             else:
