@@ -46,7 +46,7 @@ public class SimpleRequestWithCorsNotEnabledTest {
     private static final String PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH = "micronaut.server.cors.localhost-pass-through";
     private static final String ENDPOINTS_REFRESH_ENABLED = "endpoints.refresh.enabled";
     private static final String ENDPOINTS_REFRESH_SENSITIVE = "endpoints.refresh.sensitive";
-    private Map<String, Object> BASE_CONFIG = Map.of(
+    private static final Map<String, Object> BASE_CONFIG = Map.of(
         ENDPOINTS_REFRESH_ENABLED, StringUtils.TRUE,
         ENDPOINTS_REFRESH_SENSITIVE, StringUtils.FALSE);
 
