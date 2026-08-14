@@ -52,9 +52,9 @@ public class CorsSimpleRequestTest {
     private static final String SPECNAME = "CorsSimpleRequestTest";
     private static final String PROPERTY_MICRONAUT_SERVER_CORS_ENABLED = "micronaut.server.cors.enabled";
     private static final String PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH = "micronaut.server.cors.localhost-pass-through";
-    public static final String ENDPOINTS_REFRESH_ENABLED = "endpoints.refresh.enabled";
-    public static final String ENDPOINTS_REFRESH_SENSITIVE = "endpoints.refresh.sensitive";
-    Map<String, Object> BASE_CONFIG = Map.of(ENDPOINTS_REFRESH_ENABLED, StringUtils.TRUE, ENDPOINTS_REFRESH_SENSITIVE, StringUtils.FALSE, PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE);
+    private static final String ENDPOINTS_REFRESH_ENABLED = "endpoints.refresh.enabled";
+    private static final String ENDPOINTS_REFRESH_SENSITIVE = "endpoints.refresh.sensitive";
+    private Map<String, Object> BASE_CONFIG = Map.of(ENDPOINTS_REFRESH_ENABLED, StringUtils.TRUE, ENDPOINTS_REFRESH_SENSITIVE, StringUtils.FALSE, PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE);
 
     /**
      * @see <a href="https://github.com/micronaut-projects/micronaut-core/security/advisories/GHSA-583g-g682-crxf">GHSA-583g-g682-crxf</a>
