@@ -49,7 +49,9 @@ public record PythonEnvironment(
         scripts = Collections.unmodifiableMap(scripts.entrySet()
         .stream()
             .filter(entry ->
-                !entry.getValue().functions().isEmpty() || !entry.getValue().attributes().isEmpty()
+                !entry.getValue().functions().isEmpty()
+                    || !entry.getValue().attributes().isEmpty()
+                    || !entry.getValue().decorators().isEmpty()
             )
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
         decorators = Collections.unmodifiableMap(decorators);

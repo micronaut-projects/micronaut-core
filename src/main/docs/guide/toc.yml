@@ -337,6 +337,9 @@ languageSupport:
     typeOrdering: Type Ordering and Forward References
     standardTypes: Standard Library Type Conversions
     keywords: Python Keywords in Java APIs
+    moduleScripts:
+      title: Module Scripts
+      testing: JUnit 5 Module Tests
     graalTools: GraalPy Tools
     asyncAwait:
       title: Async/Await

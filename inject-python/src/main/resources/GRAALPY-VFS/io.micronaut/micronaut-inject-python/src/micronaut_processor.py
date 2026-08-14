@@ -153,6 +153,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.current_script = None
         self.current_script_attributes = []
         self.current_script_functions = []
+        self.current_script_function_candidates = []
+        self.current_script_decorators = []
         self.script_name = file_name
 
     def _resolve_top_level_import(self, module_name, imported_name):
@@ -352,8 +354,11 @@ class MicronautAstVisitor(ast.NodeVisitor):
                                 self.current_class = self.current_class.withConstructor(func_def)
                             else:
                                 self.current_class = self.current_class.withFunction(func_def)
-                        elif self.current_class is None and self._is_script_function(node):
-                            self._handle_script_function(func_def)
+                        elif self.current_class is None and node.name != 'micronaut_annotation':
+                            if self._is_script_function(node):
+                                self._handle_script_function(func_def)
+                            else:
+                                self.current_script_function_candidates.append(func_def)
                         return super().visit(node)
                 finally:
                     self.in_function = was_in_function
@@ -456,6 +461,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 # Handle potential field docstrings - string literals that follow attribute assignments
                 if self.current_class is not None and self.last_attribute is not None:
                     self._handle_field_docstring(node)
+                elif self.current_class is None and not self.in_function:
+                    self._handle_script_annotation(node)
                 return node
             case ast.Module():
                 # Process the module and create script element if we have script-level constructs
@@ -465,15 +472,36 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 )
                 result = super().visit(node)
 
-                # Create script element if we have collected script attributes or functions
-                if self.current_script_attributes or self.current_script_functions:
-                    script_def = ScriptDef(self.script_name, self.package_name, self.current_script_functions, self.current_script_attributes, None)
+                # A MicronautTest module owns all of its top-level functions. Other
+                # scripts retain the existing decorated-function-only behavior.
+                micronaut_test_decorator = next(
+                    (decorator for decorator in self.current_script_decorators
+                     if decorator.annotationName() == "io.micronaut.test.extensions.junit5.annotation.MicronautTest"),
+                    None
+                )
+                script_functions = list(self.current_script_functions)
+                if micronaut_test_decorator is not None:
+                    script_functions.extend(self.current_script_function_candidates)
+
+                # Create script element if we have collected script attributes,
+                # functions, or module-level annotations.
+                if self.current_script_attributes or script_functions or self.current_script_decorators:
+                    script_def = ScriptDef(
+                        self.script_name,
+                        self.package_name,
+                        script_functions,
+                        self.current_script_attributes,
+                        None,
+                        self.current_script_decorators
+                    )
                     self.callback.apply(script_def)
 
                     # Reset script state
                     self.current_script = None
                     self.current_script_attributes = []
                     self.current_script_functions = []
+                    self.current_script_function_candidates = []
+                    self.current_script_decorators = []
 
                 return result
             case _:
@@ -990,6 +1018,39 @@ class MicronautAstVisitor(ast.NodeVisitor):
         """
         # Add the function to the script
         self.current_script_functions.append(func_def)
+
+    def _handle_script_annotation(self, node):
+        """Collect a resolvable annotation invocation used as a module annotation."""
+        if not isinstance(getattr(node, "value", None), ast.Call):
+            return
+        decorator = decorator_to_function(self, node.value)
+        if decorator is None or not self._is_annotation_type(decorator):
+            return
+        self.current_script_decorators.append(decorator)
+
+    def _is_annotation_type(self, decorator):
+        annotation_name = decorator.annotationName()
+        if any(known.annotationName() == annotation_name for known in self.known_decorators.values()):
+            return True
+        if annotation_name in getattr(self, "python_annotation_decorators", set()):
+            return True
+        if decorator.name() in getattr(self, "python_annotation_decorators", set()):
+            return True
+        if annotation_name in self.imported_types.values():
+            package_name = annotation_name.rsplit(".", 1)[0] if "." in annotation_name else ""
+            if package_name.endswith(".annotation") or package_name in (
+                "jakarta.inject",
+                "javax.inject",
+                "org.junit.jupiter.api",
+            ):
+                return True
+        if self.visitor_context is None:
+            return False
+        try:
+            class_element = self.visitor_context.getClassElement(annotation_name).orElse(None)
+            return class_element is not None and class_element_is_annotation_type(class_element)
+        except Exception:
+            return False
 
     def _is_enum_class(self, node):
         """

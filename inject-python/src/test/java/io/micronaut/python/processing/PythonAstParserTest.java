@@ -42,6 +42,7 @@ import io.micronaut.python.processing.visitor.PythonEnumElement;
 import io.micronaut.python.processing.visitor.PythonFieldElement;
 import io.micronaut.python.processing.visitor.PythonMethodElement;
 import io.micronaut.python.processing.visitor.PythonParameterElement;
+import io.micronaut.python.processing.visitor.ScriptDef;
 import io.micronaut.sourcegen.model.EnumDef;
 import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -135,6 +136,62 @@ public class PythonAstParserTest {
             assertTrue(environment.decorators().containsKey(Singleton.class.getName()));
             assertTrue(environment.decorators().containsKey(Scope.class.getName()));
             assertTrue(environment.decorators().containsKey(Named.class.getName()));
+        }
+    }
+
+    @Test
+    void parsesModuleLevelAnnotationInvocationsIntoScriptMetadata() {
+        try (PythonEnvironment environment = new PythonAstParser().parse("""
+            def micronaut_annotation(name):
+                return lambda func: func
+
+            @micronaut_annotation("ModuleMarker")
+            def ModuleMarker(value):
+                return lambda target: target
+
+            @micronaut_annotation("Get")
+            def Get(value):
+                return lambda target: target
+
+            ModuleMarker("/module")
+
+            @Get("/")
+            def root() -> str:
+                ModuleMarker("/inside-function")
+                return "ok"
+            """, "example")) {
+            ScriptDef script = environment.scripts().get("example.Unknown");
+            assertNotNull(script);
+            assertEquals(1, script.decorators().size());
+            assertEquals("example.ModuleMarker", script.decorators().getFirst().annotationName());
+            assertEquals("/module", script.decorators().getFirst().members().get("value").asString());
+            assertEquals(1, script.functions().size());
+
+            try (PythonProcessingEnvironment processingEnvironment = new PythonProcessingEnvironment(environment)) {
+                ClassElement scriptElement = processingEnvironment.scripts().get("example.Unknown");
+                assertNotNull(scriptElement);
+                assertTrue(scriptElement.hasAnnotation("example.ModuleMarker"));
+                assertEquals("/module", scriptElement.stringValue("example.ModuleMarker", "value").orElseThrow());
+            }
+        }
+    }
+
+    @Test
+    void parsesImportedMicronautAnnotationsAtModuleLevel() {
+        try (PythonEnvironment environment = new PythonAstParser().parse("""
+            from micronaut.test.extensions.junit5.annotation import MicronautTest
+
+            MicronautTest()
+
+            value: int = 1
+
+            def test_root(self) -> None:
+                pass
+            """, "example")) {
+            ScriptDef script = environment.scripts().get("example.Unknown");
+            assertNotNull(script);
+            assertEquals("io.micronaut.test.extensions.junit5.annotation.MicronautTest", script.decorators().getFirst().annotationName());
+            assertEquals("test_root", script.functions().getFirst().name());
         }
     }
 

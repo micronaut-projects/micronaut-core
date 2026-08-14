@@ -35,6 +35,7 @@ import java.util.Objects;
  * @param functions The functions defined at module level.
  * @param attributes The attributes defined at module level.
  * @param documentation The script documentation string.
+ * @param decorators The annotations invoked at module level.
  */
 @Experimental
 public record ScriptDef(
@@ -42,7 +43,8 @@ public record ScriptDef(
     String packageName,
     List<FunctionDef> functions,
     List<AttributeDef> attributes,
-    String documentation
+    String documentation,
+    List<DecoratorDef> decorators
 ) implements ElementDef {
 
     public ScriptDef {
@@ -55,10 +57,32 @@ public record ScriptDef(
         } else {
             attributes = attributes.stream().filter(ad -> ad.typeName() != null).toList();
         }
+        if (decorators == null) {
+            decorators = List.of();
+        } else {
+            decorators = List.copyOf(decorators);
+        }
+    }
+
+    /**
+     * Backwards-compatible constructor for scripts without module annotations.
+     *
+     * @param name The script name
+     * @param packageName The package name
+     * @param functions The functions
+     * @param attributes The attributes
+     * @param documentation The documentation
+     */
+    public ScriptDef(String name,
+                     String packageName,
+                     List<FunctionDef> functions,
+                     List<AttributeDef> attributes,
+                     String documentation) {
+        this(name, packageName, functions, attributes, documentation, List.of());
     }
 
     public ScriptDef(String name) {
-        this(name, "", List.of(), List.of(), null);
+        this(name, "", List.of(), List.of(), null, List.of());
     }
 
     public ScriptDef withFunction(FunctionDef function) {
@@ -70,7 +94,8 @@ public record ScriptDef(
             packageName,
             functions,
             attributes,
-            documentation
+            documentation,
+            decorators
         );
     }
 
@@ -81,7 +106,7 @@ public record ScriptDef(
         }
         List<AttributeDef> attributes = new ArrayList<>(this.attributes);
         attributes.add(attribute);
-        return new ScriptDef(name, packageName, functions, attributes, documentation);
+        return new ScriptDef(name, packageName, functions, attributes, documentation, decorators);
     }
 
     public String qualifiedName() {
