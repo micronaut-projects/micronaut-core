@@ -1028,6 +1028,14 @@ class MicronautAstVisitor(ast.NodeVisitor):
             imported_name = self.imported_types.get(node.value.func.id)
             if imported_name is not None:
                 decorator = DecoratorDef(node.value.func.id, imported_name, None, {}, [])
+        if decorator is not None and decorator.annotationName() == "MicronautTest":
+            decorator = DecoratorDef(
+                decorator.name(),
+                "io.micronaut.test.extensions.junit5.annotation.MicronautTest",
+                decorator.repeatedName(),
+                decorator.members(),
+                decorator.stereotypes()
+            )
         if decorator is None or not self._is_annotation_type(decorator):
             return
         self.current_script_decorators.append(decorator)
