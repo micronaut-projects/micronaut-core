@@ -6,6 +6,7 @@ plugins {
 dependencies {
     implementation(projects.micronautHttpServerTck)
     implementation(projects.micronautJacksonDatabind)
+    implementation(projects.micronautManagement)
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(projects.micronautHttpClient)
     testImplementation(libs.junit.platform.engine)
