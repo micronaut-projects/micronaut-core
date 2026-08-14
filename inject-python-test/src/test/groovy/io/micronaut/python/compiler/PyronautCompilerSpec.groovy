@@ -479,6 +479,39 @@ def test_root(self):
         tempDir.deleteDir()
     }
 
+    def "test multiple module scripts in one package generate distinct stubs"() {
+        given:
+        def sourceDir = File.createTempDir("pyronaut-test-multiple-scripts", "")
+        def packageDir = new File(sourceDir, "example")
+        packageDir.mkdirs()
+        ["First.py", "Second.py"].each { fileName ->
+            new File(packageDir, fileName).text = '''
+from micronaut.context.annotation import Executable
+
+@Executable
+def ping() -> str:
+    return "pong"
+'''
+        }
+        def targetDir = File.createTempDir("pyronaut-test-multiple-scripts-target", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(sourceDir.absolutePath)
+            .targetDir(targetDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        new File(targetDir, "example/First.java").exists()
+        new File(targetDir, "example/Second.java").exists()
+        !new File(targetDir, "python/Script.java").exists()
+
+        cleanup:
+        sourceDir.deleteDir()
+        targetDir.deleteDir()
+    }
+
     def "test repeatable annotation transformation"() {
         given:
         def pythonCode = '''
