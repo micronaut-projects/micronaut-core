@@ -442,6 +442,43 @@ class MultipleTestSpec:
         tempDir.deleteDir()
     }
 
+    def "test module-level MicronautTest generates an unpooled annotated stub"() {
+        given:
+        def pythonCode = '''
+from micronaut.test.extensions.junit5.annotation import MicronautTest
+
+MicronautTest()
+
+def client_for(self):
+    return self.client
+
+def test_root(self):
+    pass
+'''
+        def tempDir = File.createTempDir("pyronaut-test-module-junit-stub", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+
+        then:
+        def generated = new File(tempDir, "python/Script.java")
+        generated.exists()
+        def javaCode = generated.text
+        javaCode.contains('@io.micronaut.test.extensions.junit5.annotation.MicronautTest')
+        javaCode.contains('@org.junit.jupiter.api.Test\n  public void test_root()')
+        !javaCode.contains('PooledValueCoercible')
+        !javaCode.contains('findPooledScript')
+        !javaCode.contains('invokePooledScript')
+        !javaCode.contains('public Object decorator(')
+
+        cleanup:
+        tempDir.deleteDir()
+    }
+
     def "test repeatable annotation transformation"() {
         given:
         def pythonCode = '''
