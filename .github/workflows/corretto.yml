@@ -17,7 +17,7 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           sudo apt-get clean
           df -h
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Set up JDK
         uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5
         with:
