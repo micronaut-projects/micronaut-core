@@ -83,6 +83,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.generated_decorator_code = {}
         self.java_class_imports = {}
         self.java_interface_names = set()
+        self.java_class_elements = {}
         self.java_keyword_method_aliases = {}
         self.java_keyword_safe_imports = set()
         self.validation_errors = []
@@ -311,6 +312,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                 base
                 for base in node.bases
                 if not self._is_java_interface_base(base)
+                and not self._is_java_throwable_base(base)
             ]
             if len(node.bases) != original_base_count:
                 node.keywords = [
@@ -561,6 +563,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         return False
 
     def _track_java_class(self, variable_name: str, class_element):
+        self.java_class_elements[variable_name] = class_element
         try:
             if class_element.isInterface():
                 self.java_interface_names.add(variable_name)
@@ -602,6 +605,39 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                     return False
         base_name = self._base_name(base)
         return base_name in self.java_interface_names
+
+    def _is_java_throwable_base(self, base: ast.AST) -> bool:
+        """Strip Java Throwable bases from native runtime bytecode.
+
+        GraalPy native cannot create a Python subclass of a concrete Java
+        Throwable. The compile-time model still keeps the Java base so
+        Micronaut metadata and handler matching remain unchanged; only the
+        executable runtime class is made a regular Python exception.
+        """
+        base_name = self._base_name(base)
+        if not base_name:
+            return False
+        class_element = self.java_class_elements.get(base_name)
+        if class_element is None:
+            class_name = self._java_type_name(base)
+            if class_name:
+                class_element = self.callback_get_class_element(class_name)
+        if class_element is None:
+            return False
+        try:
+            if class_element.isAssignable("java.lang.Throwable"):
+                return True
+        except Exception:
+            pass
+        try:
+            return class_element.getName() in {
+                "java.lang.Throwable",
+                "java.lang.Exception",
+                "java.lang.RuntimeException",
+                "java.lang.Error",
+            }
+        except Exception:
+            return False
 
     def _java_type_name(self, node: ast.AST) -> Optional[str]:
         if not isinstance(node, ast.Call):
