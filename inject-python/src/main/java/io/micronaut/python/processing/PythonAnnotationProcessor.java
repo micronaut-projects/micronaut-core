@@ -966,11 +966,20 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             writePythonToVfs(filesList, initFilePath, initContent.toString(), originatingElement);
         }
 
-        // Write fileslist.txt
+            // Write fileslist.txt
         javaVisitorContext.visitMetaInfFile(APPLICATION_PATH + "fileslist.txt", originatingElement)
             .ifPresent(generatedFile -> {
+                java.util.Set<String> entries = new java.util.TreeSet<>();
+                try {
+                    CharSequence existing = generatedFile.getTextContent();
+                    if (existing != null) {
+                        entries.addAll(existing.toString().lines().toList());
+                    }
+                } catch (IOException ignored) {
+                    // The file may not exist yet during the first processing round.
+                }
+                entries.addAll(filesList.toString().lines().toList());
                 try (var writer = generatedFile.openWriter()) {
-                    List<String> entries = filesList.toString().lines().sorted().toList();
                     if (!entries.isEmpty()) {
                         writer.write(String.join("\n", entries));
                         writer.write('\n');
