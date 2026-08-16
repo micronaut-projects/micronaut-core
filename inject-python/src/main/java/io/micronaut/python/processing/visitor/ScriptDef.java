@@ -16,7 +16,6 @@
 package io.micronaut.python.processing.visitor;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.naming.NameUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -112,11 +111,43 @@ public record ScriptDef(
     public String qualifiedName() {
         String n = name;
         if (n.endsWith(".py")) {
-            n = NameUtils.capitalize(name.substring(0, name.length() - 3));
+            n = toJavaClassName(name.substring(0, name.length() - 3));
         } else if (name.equals("Unnamed")) {
             n = "Script";
         }
         return packageName + "." + n;
+    }
+
+    /**
+     * Converts a Python module name into the Java simple name used for its generated stub.
+     * Separators and underscores are treated as word boundaries, and names beginning with a
+     * digit are prefixed with an underscore.
+     *
+     * @param moduleName The Python module name without the {@code .py} suffix
+     * @return A valid Java class name
+     */
+    public static String toJavaClassName(String moduleName) {
+        Objects.requireNonNull(moduleName, "moduleName");
+        StringBuilder result = new StringBuilder();
+        boolean capitalize = true;
+        for (int i = 0; i < moduleName.length(); i++) {
+            char c = moduleName.charAt(i);
+            if (c == '_') {
+                capitalize = true;
+                continue;
+            }
+            if (!Character.isJavaIdentifierPart(c)) {
+                result.append('X').append(Integer.toHexString(c)).append('X');
+                capitalize = true;
+                continue;
+            }
+            if (result.isEmpty() && !Character.isJavaIdentifierStart(c)) {
+                result.append('_');
+            }
+            result.append(capitalize ? Character.toUpperCase(c) : c);
+            capitalize = false;
+        }
+        return result.isEmpty() ? "Script" : result.toString();
     }
 
     @Override

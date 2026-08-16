@@ -22,11 +22,26 @@ import io.micronaut.data.model.Association
 import io.micronaut.data.model.runtime.RuntimePersistentEntity
 import io.micronaut.data.intercept.annotation.DataMethod
 import io.micronaut.python.processing.PythonAnnotationProcessor
+import io.micronaut.python.processing.visitor.ScriptDef
 import org.graalvm.polyglot.PolyglotException
 import org.graalvm.polyglot.Value
 import spock.lang.Specification
 
 class PyronautCompilerSpec extends Specification {
+
+    def "test Python module names normalize to generated Java class names"() {
+        expect:
+        ScriptDef.toJavaClassName("test_main") == "TestMain"
+        ScriptDef.toJavaClassName("test-two") == "TestX2dXTwo"
+        ScriptDef.toJavaClassName("123_test") == "_123Test"
+        ScriptDef.toJavaClassName("test_two") != ScriptDef.toJavaClassName("test-two")
+
+        when:
+        ScriptDef.toJavaClassName(null)
+
+        then:
+        thrown(NullPointerException)
+    }
 
     def "test buildClassLoader with pythonCode"() {
         given:
@@ -478,6 +493,7 @@ def test_root(self):
         javaCode.contains('import org.junit.jupiter.api.BeforeEach;')
         javaCode.contains('@BeforeEach')
         javaCode.contains('@Test')
+        compiler.buildClassLoader().loadClass('python.Script') != null
         !javaCode.contains('PooledValueCoercible')
         !javaCode.contains('findPooledScript')
         !javaCode.contains('invokePooledScript')
@@ -485,6 +501,61 @@ def test_root(self):
 
         cleanup:
         tempDir.deleteDir()
+    }
+
+    def "test file-backed module-level JUnit test is loadable"() {
+        given:
+        def sourceDir = File.createTempDir("pyronaut-test-file-backed-module", "")
+        new File(sourceDir, "main.py").text = '''
+class Application:
+    pass
+'''
+        new File(sourceDir, "test_main.py").text = '''
+from micronaut.test.extensions.junit5.annotation import MicronautTest
+
+MicronautTest()
+
+def test_root(self):
+    pass
+'''
+        new File(sourceDir, "test_two.py").text = '''
+from micronaut.test.extensions.junit5.annotation import MicronautTest
+
+MicronautTest()
+
+def test_other(self):
+    pass
+'''
+        def targetDir = File.createTempDir("pyronaut-test-file-backed-module-target", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(sourceDir.absolutePath)
+            .targetDir(targetDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = compiler.buildClassLoader()
+
+        then:
+        def testMainJava = new File(targetDir, "python/TestMain.java").text
+        def testTwoJava = new File(targetDir, "python/TestTwo.java").text
+        testMainJava.contains('@MicronautTest')
+        testMainJava.contains('@Test')
+        testMainJava.contains('@PythonModule')
+        testMainJava.contains('moduleName = "test_main.py"')
+        testMainJava.contains('packageName = "python"')
+        testTwoJava.contains('@MicronautTest')
+        testTwoJava.contains('@Test')
+        testTwoJava.contains('@PythonModule')
+        testTwoJava.contains('moduleName = "test_two.py"')
+        testTwoJava.contains('packageName = "python"')
+        classLoader.loadClass("python.Application") != null
+        classLoader.loadClass("python.TestMain") != null
+        classLoader.loadClass("python.TestTwo") != null
+
+        cleanup:
+        sourceDir.deleteDir()
+        targetDir.deleteDir()
     }
 
     def "test multiple module scripts in one package generate distinct stubs"() {
