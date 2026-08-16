@@ -36,6 +36,7 @@ import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
@@ -260,7 +261,9 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
         }
         // toByteBuf consumes each ReadBuffer, so if extraction fails partway, the ByteBufs
         // already extracted have no owner anymore and must be released explicitly here.
-        List<ByteBuf> components = new ArrayList<>();
+        List<ByteBuf> components = buffers instanceof Collection<?> collection
+            ? new ArrayList<>(collection.size())
+            : new ArrayList<>();
         try {
             for (ReadBuffer buffer : buffers) {
                 components.add(toByteBuf(buffer));

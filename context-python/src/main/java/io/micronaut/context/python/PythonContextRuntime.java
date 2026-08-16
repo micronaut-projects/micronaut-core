@@ -324,12 +324,9 @@ public final class PythonContextRuntime {
             try {
                 ctx.enter();
                 entered = true;
-            } catch (IllegalStateException e) {
-                // Values can expose the current context through Context.get(), which cannot be
-                // entered explicitly. The operation is already running inside that context.
-                if (e.getMessage() == null || !e.getMessage().contains("received using Context.get() cannot be entered")) {
-                    throw e;
-                }
+            } catch (IllegalStateException ignored) {
+                // Context.get() exposes a non-enterable view while guest code is executing. In
+                // that case the operation is already running in the required context.
             }
             return operation.call();
         } finally {
