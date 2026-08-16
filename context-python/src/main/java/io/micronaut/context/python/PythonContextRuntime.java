@@ -319,9 +319,23 @@ public final class PythonContextRuntime {
     private static <T, X extends Throwable> T runWithExecutionFrame(Context ctx, ExecutionFrame frame, CallableOp<T, X> operation) throws X {
         frame.contexts.add(ctx);
         enterExecution(ctx);
+        boolean entered = false;
         try {
+            try {
+                ctx.enter();
+                entered = true;
+            } catch (IllegalStateException e) {
+                // Values can expose the current context through Context.get(), which cannot be
+                // entered explicitly. The operation is already running inside that context.
+                if (e.getMessage() == null || !e.getMessage().contains("received using Context.get() cannot be entered")) {
+                    throw e;
+                }
+            }
             return operation.call();
         } finally {
+            if (entered) {
+                ctx.leave();
+            }
             exitExecutionFrame(ctx, frame);
         }
     }
