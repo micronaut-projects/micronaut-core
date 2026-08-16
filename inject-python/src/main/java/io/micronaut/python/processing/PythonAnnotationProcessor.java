@@ -91,6 +91,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private boolean processAggregatingVisitors = true;
     private Path outputDirectory;
     private PythonProcessingSession processingSession;
+    private final Set<String> applicationFilesListEntries = new java.util.TreeSet<>();
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -969,19 +970,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             // Write fileslist.txt
         javaVisitorContext.visitMetaInfFile(APPLICATION_PATH + "fileslist.txt", originatingElement)
             .ifPresent(generatedFile -> {
-                java.util.Set<String> entries = new java.util.TreeSet<>();
-                try {
-                    CharSequence existing = generatedFile.getTextContent();
-                    if (existing != null) {
-                        entries.addAll(existing.toString().lines().toList());
-                    }
-                } catch (IOException ignored) {
-                    // The file may not exist yet during the first processing round.
-                }
-                entries.addAll(filesList.toString().lines().toList());
+                applicationFilesListEntries.addAll(filesList.toString().lines().toList());
                 try (var writer = generatedFile.openWriter()) {
-                    if (!entries.isEmpty()) {
-                        writer.write(String.join("\n", entries));
+                    if (!applicationFilesListEntries.isEmpty()) {
+                        writer.write(String.join("\n", applicationFilesListEntries));
                         writer.write('\n');
                     }
                 } catch (IOException e) {
