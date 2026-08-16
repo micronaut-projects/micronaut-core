@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -57,6 +58,19 @@ public class NettyReadBufferTest extends AbstractReadBufferTest {
             assertEquals(count * chunk, composed.readable());
         } finally {
             composed.close();
+        }
+    }
+
+    @Test
+    void composeWithNonCollectionIterable() {
+        NettyReadBufferFactory factory = NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT);
+        List<ReadBuffer> parts = List.of(
+            factory.adapt(new byte[]{1, 2, 3}),
+            factory.adapt(new byte[]{4, 5, 6})
+        );
+        Iterable<ReadBuffer> iterable = () -> parts.iterator();
+        try (ReadBuffer composed = factory.compose(iterable)) {
+            assertArrayEquals(new byte[]{1, 2, 3, 4, 5, 6}, composed.toArray());
         }
     }
 
