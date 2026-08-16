@@ -614,14 +614,13 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         Micronaut metadata and handler matching remain unchanged; only the
         executable runtime class is made a regular Python exception.
         """
-        base_name = self._base_name(base)
-        if not base_name:
-            return False
-        class_element = self.java_class_elements.get(base_name)
+        class_name = self._java_type_name(base)
+        class_element = self.callback_get_class_element(class_name) if class_name else None
         if class_element is None:
-            class_name = self._java_type_name(base)
-            if class_name:
-                class_element = self.callback_get_class_element(class_name)
+            base_name = self._base_name(base)
+            if not base_name:
+                return False
+            class_element = self.java_class_elements.get(base_name)
         if class_element is None:
             return False
         try:
@@ -1504,6 +1503,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             class_element = self.callback_get_class_element(f'{java_module}.{alias.name}')
             if class_element and not self._is_annotation_class(class_element):
                 variable_name = alias.asname if alias.asname else alias.name
+                self._track_java_class(variable_name, class_element)
                 self.java_runtime_names.add(variable_name)
                 try:
                     if class_element.isInterface():
