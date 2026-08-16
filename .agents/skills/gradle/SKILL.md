@@ -63,6 +63,9 @@ For dependency-intelligence tasks (version freshness, stability, release cadence
 - **Binary compatibility**: keep baseline discovery and accepted API changes explicit; never silently suppress regressions.
 - **Docs/quality**: treat root-only aggregator plugins and docs pipelines as first-class checks.
 - **Layering**: prefer convention plugin changes (`buildSrc`) over duplicating logic in many module build files.
+- **Python submodules**: when running tests in any Python submodule, always pass
+  `-Ppython-ci` to enable the Python CI/test configuration (for example,
+  `./gradlew -Ppython-ci :<python-module>:test`).
 
 ### 4) Verify before completion
 

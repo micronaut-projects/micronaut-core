@@ -217,7 +217,8 @@ public final class PythonAstParser {
                     String packageName = getPackageNameOfSource(srcDir, source);
                     bindings.putMember("src", source.getCharacters());
                     bindings.putMember("package_name", packageName);
-                    bindings.putMember("file_name", "Unnamed");
+                    String fileName = source.getName();
+                    bindings.putMember("file_name", fileName == null || fileName.isBlank() ? "Unnamed" : fileName);
                     bindings.putMember("visitor_context", visitorContext);
                     bindings.putMember("src_root", srcDir);
                     context.eval(Source.create(

@@ -81,6 +81,7 @@ import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
 import io.micronaut.python.processing.visitor.PythonClassElement;
 import io.micronaut.python.processing.visitor.PythonMethodElement;
 import io.micronaut.python.processing.visitor.PythonScriptElement;
+import io.micronaut.python.processing.visitor.ScriptDef;
 import io.micronaut.sourcegen.generator.SourceGenerator;
 import io.micronaut.sourcegen.generator.SourceGenerators;
 import io.micronaut.sourcegen.model.ClassDef;
@@ -115,6 +116,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final ClassTypeDef PYTHON_CONTEXT_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime");
     public static final ClassTypeDef PYTHON_CLASS_REFERENCE = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime.PythonClassReference");
     public static final ClassTypeDef PYTHON_CLASS_ANNOTATION = ClassTypeDef.of("io.micronaut.context.python.annotation.PythonClass");
+    public static final ClassTypeDef PYTHON_MODULE_ANNOTATION = ClassTypeDef.of("io.micronaut.context.python.annotation.PythonModule");
     public static final ClassTypeDef POLYGLOT_VALUE_CONVERTER = ClassTypeDef.of("io.micronaut.context.python.PolyglotValueConverter");
     public static final String GENERATOR_NAME = "python";
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
@@ -2282,6 +2284,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
             var builder = ClassDef.builder(scriptElement.getPackageName() + "." + scriptElement.getSimpleName())
                 .addModifiers(Modifier.PUBLIC);
+            ScriptDef scriptDef = scriptElement.getNativeType();
+            builder.addAnnotation(AnnotationDef.builder(PYTHON_MODULE_ANNOTATION)
+                .addMember("moduleName", scriptDef.name())
+                .addMember("packageName", scriptElement.getPackageName())
+                .build());
             builder.addAnnotation(Vetoed.class);
             copyAnnotations(scriptElement, builder, ANNOTATION_PACKAGES_TO_COPY, context);
             builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
