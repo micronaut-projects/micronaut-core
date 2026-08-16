@@ -17,6 +17,7 @@ package io.micronaut.python.compiler
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.GraalPyContextFactory
+import io.micronaut.context.python.PythonContextRuntime
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.data.model.Association
 import io.micronaut.data.model.runtime.RuntimePersistentEntity
@@ -556,6 +557,52 @@ def test_other(self):
         cleanup:
         sourceDir.deleteDir()
         targetDir.deleteDir()
+    }
+
+    def "test file-backed module-level JUnit test can be instantiated from python source directory classloader"() {
+        given:
+        def sourceDir = File.createTempDir("pyronaut-test-direct-module", "")
+        new File(sourceDir, "main.py").text = '''
+def root():
+    return "World"
+'''
+        new File(sourceDir, "test_main.py").text = '''
+from typing import Annotated
+
+from jakarta.inject import Inject
+from micronaut.context import ApplicationContext
+from micronaut.test.extensions.junit5.annotation import MicronautTest
+
+MicronautTest()
+
+context: Annotated[ApplicationContext, Inject]
+
+def test_root():
+    pass
+'''
+        def compiler = PyronautCompiler.builder()
+            .pythonSrc(sourceDir.absolutePath)
+            .compilePythonBytecode(true)
+            .build()
+
+        when:
+        def classLoader = compiler.buildClassLoader()
+        def context = GraalPyContextFactory.bootstrapReusableContext(classLoader)
+        def testClass = classLoader.loadClass("python.TestMain")
+        def constructor = testClass.getDeclaredConstructor()
+        constructor.accessible = true
+        def testInstance = constructor.newInstance()
+
+        then:
+        testInstance != null
+
+        cleanup:
+        if (context != null) {
+            PythonContextRuntime.setReuseContext(false)
+            PythonContextRuntime.resetContext()
+            context.close(true)
+        }
+        sourceDir.deleteDir()
     }
 
     def "test multiple module scripts in one package generate distinct stubs"() {
@@ -1853,7 +1900,7 @@ def delete(id: int) -> None:
         def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
 
         then:
-        classLoader.loadClass('example.micronaut.Genre_controller') != null
+        classLoader.loadClass('example.micronaut.GenreController') != null
 
         cleanup:
         tempSrcDir.deleteDir()
