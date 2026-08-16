@@ -17,6 +17,7 @@ package io.micronaut.python.compiler;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.version.VersionUtils;
+import io.micronaut.python.processing.visitor.ScriptDef;
 
 import java.io.File;
 import java.io.IOException;
@@ -765,7 +766,7 @@ final class IncrementalCompilation {
         }
         String fileName = Path.of(relativePath).getFileName().toString();
         String scriptName = fileName.substring(0, fileName.length() - ".py".length());
-        types.add(packageName + '.' + capitalize(scriptName));
+        types.add(packageName + '.' + ScriptDef.toJavaClassName(scriptName));
         return Set.copyOf(types);
     }
 
@@ -775,13 +776,6 @@ final class IncrementalCompilation {
             return "python";
         }
         return relativePath.substring(0, separator).replace('/', '.');
-    }
-
-    private static String capitalize(String value) {
-        if (value.isEmpty()) {
-            return value;
-        }
-        return Character.toUpperCase(value.charAt(0)) + value.substring(1);
     }
 
     private Map<String, SourceState> assignOutputs(Map<String, SourceState> sources,
