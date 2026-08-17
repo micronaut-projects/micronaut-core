@@ -49,6 +49,7 @@ import java.util.function.Predicate;
  */
 @Internal
 final class ServiceScanner<S> {
+    private static final String GRAALVM_IMAGESINGLETONS_ENABLED = "micronaut.graalvm.imagesingletons.enabled";
     private final ClassLoader classLoader;
     private final String serviceName;
     private final Predicate<String> lineCondition;
@@ -71,6 +72,9 @@ final class ServiceScanner<S> {
 
     @SuppressWarnings("java:S1181")
     private static boolean hasImageSingletons() {
+        if ("false".equalsIgnoreCase(System.getProperty(GRAALVM_IMAGESINGLETONS_ENABLED))) {
+            return false;
+        }
         try {
             //noinspection ConstantValue
             return ImageSingletons.class != null;

@@ -1,6 +1,7 @@
 package io.micronaut.core.io.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.lang.module.Configuration;
 import java.lang.module.ModuleFinder;
@@ -61,5 +62,20 @@ public class SoftServiceLoaderTest {
             SoftServiceLoader.StaticDefinition.of(PackagePrivateConstructorService.class.getName(), PackagePrivateConstructorService.class);
 
         assertEquals("fallback", serviceDefinition.load().value());
+    }
+
+    @Test
+    void imageSingletonsLookupCanBeDisabled() {
+        String previous = System.getProperty("micronaut.graalvm.imagesingletons.enabled");
+        try {
+            System.setProperty("micronaut.graalvm.imagesingletons.enabled", "false");
+            assertNull(ServiceScanner.findStaticServiceDefinitions());
+        } finally {
+            if (previous == null) {
+                System.clearProperty("micronaut.graalvm.imagesingletons.enabled");
+            } else {
+                System.setProperty("micronaut.graalvm.imagesingletons.enabled", previous);
+            }
+        }
     }
 }
