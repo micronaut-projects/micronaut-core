@@ -307,7 +307,7 @@ public class PythonAstParserTest {
             """);
 
         assertTrue(result.code().contains("class OutOfStockException(RuntimeException)"));
-        assertTrue(result.runtimeCode().contains("class OutOfStockException:"));
+        assertTrue(result.runtimeCode().contains("class OutOfStockException(Exception)"));
         assertFalse(result.runtimeCode().contains("class OutOfStockException(RuntimeException)"));
         assertTrue(parser.requiresRuntimeBytecode(result));
 
@@ -321,7 +321,7 @@ public class PythonAstParserTest {
             """);
 
         assertTrue(javaTypeResult.code().contains("class OutOfStockException(RuntimeException)"));
-        assertTrue(javaTypeResult.runtimeCode().contains("class OutOfStockException:"));
+        assertTrue(javaTypeResult.runtimeCode().contains("class OutOfStockException(Exception)"));
         assertFalse(javaTypeResult.runtimeCode().contains("class OutOfStockException(RuntimeException)"));
         assertTrue(parser.requiresRuntimeBytecode(javaTypeResult));
     }

@@ -308,12 +308,21 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             self.all_class_names.append(node.name)
         if self.strip_java_interface_bases and node.bases:
             original_base_count = len(node.bases)
-            node.bases = [
-                base
-                for base in node.bases
-                if not self._is_java_interface_base(base)
-                and not self._is_java_throwable_base(base)
-            ]
+            runtime_bases = []
+            replaced_throwable = False
+            for base in node.bases:
+                if self._is_java_interface_base(base):
+                    continue
+                if self._is_java_throwable_base(base):
+                    if not replaced_throwable:
+                        runtime_bases.append(ast.copy_location(
+                            ast.Name(id='Exception', ctx=ast.Load()),
+                            base
+                        ))
+                        replaced_throwable = True
+                    continue
+                runtime_bases.append(base)
+            node.bases = runtime_bases
             if len(node.bases) != original_base_count:
                 node.keywords = [
                     keyword
