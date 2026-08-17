@@ -103,7 +103,7 @@ public final class NativeImageUtils {
      */
     @SuppressWarnings("java:S1181")
     public static boolean hasImageSingletons() {
-        if ("false".equalsIgnoreCase(System.getProperty(GRAALVM_IMAGESINGLETONS_ENABLED))) {
+        if (StringUtils.FALSE.equalsIgnoreCase(System.getProperty(GRAALVM_IMAGESINGLETONS_ENABLED))) {
             return false;
         }
         try {
