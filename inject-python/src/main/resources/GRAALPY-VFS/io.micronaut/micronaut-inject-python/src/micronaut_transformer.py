@@ -83,6 +83,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.generated_decorator_code = {}
         self.java_class_imports = {}
         self.java_interface_names = set()
+        self.java_class_elements = {}
         self.java_keyword_method_aliases = {}
         self.java_keyword_safe_imports = set()
         self.validation_errors = []
@@ -91,6 +92,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.all_class_names = []
         self.class_depth = 0
         self.function_depth = 0
+        self.uses_builtin_exception = False
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         """
@@ -193,8 +195,18 @@ class MicronautTransformer(ast.NodeTransformer):
         if self.strip_java_interface_bases:
             self._ensure_future_annotations(node)
 
+        if self.uses_builtin_exception and not any(
+            isinstance(statement, ast.Import)
+            and any(alias.name == 'builtins' and alias.asname is None for alias in statement.names)
+            for statement in node.body
+        ):
+            node.body.insert(
+                self._generated_code_insert_index(node),
+                ast.Import(names=[ast.alias(name='builtins', asname=None)])
+            )
+
         # Add generated code at the beginning
-        if self.transformed_code or self.java_type_assignments or self.has_java_import:
+        if self.transformed_code or self.java_type_assignments or self.has_java_import or self.uses_builtin_exception:
             # Create AST nodes for the generated code
             generated_nodes = []
 
@@ -307,11 +319,32 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             self.all_class_names.append(node.name)
         if self.strip_java_interface_bases and node.bases:
             original_base_count = len(node.bases)
-            node.bases = [
-                base
+            runtime_bases = []
+            replaced_throwable = False
+            has_python_exception_base = any(
+                isinstance(base, ast.Name)
+                and base.id == 'Exception'
+                and not self._is_java_throwable_base(base)
                 for base in node.bases
-                if not self._is_java_interface_base(base)
-            ]
+            )
+            for base in node.bases:
+                if self._is_java_interface_base(base):
+                    continue
+                if self._is_java_throwable_base(base):
+                    if not replaced_throwable and not has_python_exception_base:
+                        runtime_bases.append(ast.copy_location(
+                            ast.Attribute(
+                                value=ast.Name(id='builtins', ctx=ast.Load()),
+                                attr='Exception',
+                                ctx=ast.Load()
+                            ),
+                            base
+                        ))
+                        replaced_throwable = True
+                        self.uses_builtin_exception = True
+                    continue
+                runtime_bases.append(base)
+            node.bases = runtime_bases
             if len(node.bases) != original_base_count:
                 node.keywords = [
                     keyword
@@ -561,6 +594,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         return False
 
     def _track_java_class(self, variable_name: str, class_element):
+        self.java_class_elements[variable_name] = class_element
         try:
             if class_element.isInterface():
                 self.java_interface_names.add(variable_name)
@@ -602,6 +636,38 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                     return False
         base_name = self._base_name(base)
         return base_name in self.java_interface_names
+
+    def _is_java_throwable_base(self, base: ast.AST) -> bool:
+        """Strip Java Throwable bases from native runtime bytecode.
+
+        GraalPy native cannot create a Python subclass of a concrete Java
+        Throwable. The compile-time model still keeps the Java base so
+        Micronaut metadata and handler matching remain unchanged; only the
+        executable runtime class is made a regular Python exception.
+        """
+        class_name = self._java_type_name(base)
+        class_element = self.callback_get_class_element(class_name) if class_name else None
+        if class_element is None:
+            base_name = self._base_name(base)
+            if not base_name:
+                return False
+            class_element = self.java_class_elements.get(base_name)
+        if class_element is None:
+            return False
+        try:
+            if class_element.isAssignable("java.lang.Throwable"):
+                return True
+        except Exception:
+            pass
+        try:
+            return class_element.getName() in {
+                "java.lang.Throwable",
+                "java.lang.Exception",
+                "java.lang.RuntimeException",
+                "java.lang.Error",
+            }
+        except Exception:
+            return False
 
     def _java_type_name(self, node: ast.AST) -> Optional[str]:
         if not isinstance(node, ast.Call):
@@ -1429,7 +1495,17 @@ class MicronautRuntimeTransformer(MicronautTransformer):
         if self._has_java_annotations(node):
             self._ensure_future_annotations(node)
 
-        if not (self.transformed_code or self.java_type_assignments):
+        if self.uses_builtin_exception and not any(
+            isinstance(statement, ast.Import)
+            and any(alias.name == 'builtins' and alias.asname is None for alias in statement.names)
+            for statement in node.body
+        ):
+            node.body.insert(
+                self._generated_code_insert_index(node),
+                ast.Import(names=[ast.alias(name='builtins', asname=None)])
+            )
+
+        if not (self.transformed_code or self.java_type_assignments or self.uses_builtin_exception):
             return node
 
         generated_nodes = []
@@ -1468,6 +1544,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             class_element = self.callback_get_class_element(f'{java_module}.{alias.name}')
             if class_element and not self._is_annotation_class(class_element):
                 variable_name = alias.asname if alias.asname else alias.name
+                self._track_java_class(variable_name, class_element)
                 self.java_runtime_names.add(variable_name)
                 try:
                     if class_element.isInterface():

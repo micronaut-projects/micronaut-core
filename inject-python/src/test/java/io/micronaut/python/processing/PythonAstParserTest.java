@@ -273,6 +273,86 @@ public class PythonAstParserTest {
     }
 
     @Test
+    void testRuntimeTransformStripsConcreteJavaThrowableBases() {
+        PythonAstParser parser = new PythonAstParser();
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1
+                    && "java.lang.RuntimeException".equals(args[0])) {
+                    return Optional.of(ClassElement.of(java.lang.RuntimeException.class));
+                }
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1
+                    && "java.lang.Exception".equals(args[0])) {
+                    return Optional.of(ClassElement.of(Exception.class));
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+
+        PythonAstParser.TransformResult result = parser.transform(visitorContext, """
+            from java.lang import RuntimeException
+
+            class OutOfStockException(RuntimeException):
+                pass
+            """);
+
+        assertTrue(result.code().contains("class OutOfStockException(RuntimeException)"));
+        assertTrue(result.runtimeCode().contains("class OutOfStockException(builtins.Exception)"));
+        assertFalse(result.runtimeCode().contains("class OutOfStockException(RuntimeException)"));
+        assertTrue(parser.requiresRuntimeBytecode(result));
+
+        PythonAstParser.TransformResult javaTypeResult = parser.transform(visitorContext, """
+            import java
+
+            RuntimeException = java.type("java.lang.RuntimeException")
+
+            class OutOfStockException(RuntimeException):
+                pass
+            """);
+
+        assertTrue(javaTypeResult.code().contains("class OutOfStockException(RuntimeException)"));
+        assertTrue(javaTypeResult.runtimeCode().contains("class OutOfStockException(builtins.Exception)"));
+        assertFalse(javaTypeResult.runtimeCode().contains("class OutOfStockException(RuntimeException)"));
+        assertTrue(parser.requiresRuntimeBytecode(javaTypeResult));
+
+        PythonAstParser.TransformResult duplicateExceptionResult = parser.transform(visitorContext, """
+            from java.lang import RuntimeException
+
+            class OutOfStockException(Exception, RuntimeException):
+                pass
+            """);
+
+        assertTrue(duplicateExceptionResult.runtimeCode().contains("class OutOfStockException(Exception)"));
+        assertFalse(duplicateExceptionResult.runtimeCode().contains("class OutOfStockException(Exception, Exception)"));
+        assertTrue(parser.requiresRuntimeBytecode(duplicateExceptionResult));
+
+        PythonAstParser.TransformResult shadowedExceptionResult = parser.transform(visitorContext, """
+            from java.lang import Exception
+
+            class OutOfStockException(Exception):
+                pass
+            """);
+
+        assertTrue(shadowedExceptionResult.runtimeCode().contains("import builtins"));
+        assertTrue(shadowedExceptionResult.runtimeCode().contains("class OutOfStockException(builtins.Exception)"));
+        assertTrue(parser.requiresRuntimeBytecode(shadowedExceptionResult));
+    }
+
+    @Test
     void testTransformKeepsFutureImportsBeforeGeneratedCode() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
