@@ -92,6 +92,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.all_class_names = []
         self.class_depth = 0
         self.function_depth = 0
+        self.uses_builtin_exception = False
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         """
@@ -194,8 +195,18 @@ class MicronautTransformer(ast.NodeTransformer):
         if self.strip_java_interface_bases:
             self._ensure_future_annotations(node)
 
+        if self.uses_builtin_exception and not any(
+            isinstance(statement, ast.Import)
+            and any(alias.name == 'builtins' and alias.asname is None for alias in statement.names)
+            for statement in node.body
+        ):
+            node.body.insert(
+                self._generated_code_insert_index(node),
+                ast.Import(names=[ast.alias(name='builtins', asname=None)])
+            )
+
         # Add generated code at the beginning
-        if self.transformed_code or self.java_type_assignments or self.has_java_import:
+        if self.transformed_code or self.java_type_assignments or self.has_java_import or self.uses_builtin_exception:
             # Create AST nodes for the generated code
             generated_nodes = []
 
@@ -310,16 +321,27 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             original_base_count = len(node.bases)
             runtime_bases = []
             replaced_throwable = False
+            has_python_exception_base = any(
+                isinstance(base, ast.Name)
+                and base.id == 'Exception'
+                and not self._is_java_throwable_base(base)
+                for base in node.bases
+            )
             for base in node.bases:
                 if self._is_java_interface_base(base):
                     continue
                 if self._is_java_throwable_base(base):
-                    if not replaced_throwable:
+                    if not replaced_throwable and not has_python_exception_base:
                         runtime_bases.append(ast.copy_location(
-                            ast.Name(id='Exception', ctx=ast.Load()),
+                            ast.Attribute(
+                                value=ast.Name(id='builtins', ctx=ast.Load()),
+                                attr='Exception',
+                                ctx=ast.Load()
+                            ),
                             base
                         ))
                         replaced_throwable = True
+                        self.uses_builtin_exception = True
                     continue
                 runtime_bases.append(base)
             node.bases = runtime_bases
@@ -1473,7 +1495,17 @@ class MicronautRuntimeTransformer(MicronautTransformer):
         if self._has_java_annotations(node):
             self._ensure_future_annotations(node)
 
-        if not (self.transformed_code or self.java_type_assignments):
+        if self.uses_builtin_exception and not any(
+            isinstance(statement, ast.Import)
+            and any(alias.name == 'builtins' and alias.asname is None for alias in statement.names)
+            for statement in node.body
+        ):
+            node.body.insert(
+                self._generated_code_insert_index(node),
+                ast.Import(names=[ast.alias(name='builtins', asname=None)])
+            )
+
+        if not (self.transformed_code or self.java_type_assignments or self.uses_builtin_exception):
             return node
 
         generated_nodes = []

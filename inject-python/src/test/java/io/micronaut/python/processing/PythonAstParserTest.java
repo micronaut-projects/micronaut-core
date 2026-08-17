@@ -283,6 +283,10 @@ public class PythonAstParserTest {
                     && "java.lang.RuntimeException".equals(args[0])) {
                     return Optional.of(ClassElement.of(java.lang.RuntimeException.class));
                 }
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1
+                    && "java.lang.Exception".equals(args[0])) {
+                    return Optional.of(ClassElement.of(Exception.class));
+                }
                 if ("getClassElements".equals(method.getName())) {
                     return ClassElement.ZERO_CLASS_ELEMENTS;
                 }
@@ -307,7 +311,7 @@ public class PythonAstParserTest {
             """);
 
         assertTrue(result.code().contains("class OutOfStockException(RuntimeException)"));
-        assertTrue(result.runtimeCode().contains("class OutOfStockException(Exception)"));
+        assertTrue(result.runtimeCode().contains("class OutOfStockException(builtins.Exception)"));
         assertFalse(result.runtimeCode().contains("class OutOfStockException(RuntimeException)"));
         assertTrue(parser.requiresRuntimeBytecode(result));
 
@@ -321,9 +325,31 @@ public class PythonAstParserTest {
             """);
 
         assertTrue(javaTypeResult.code().contains("class OutOfStockException(RuntimeException)"));
-        assertTrue(javaTypeResult.runtimeCode().contains("class OutOfStockException(Exception)"));
+        assertTrue(javaTypeResult.runtimeCode().contains("class OutOfStockException(builtins.Exception)"));
         assertFalse(javaTypeResult.runtimeCode().contains("class OutOfStockException(RuntimeException)"));
         assertTrue(parser.requiresRuntimeBytecode(javaTypeResult));
+
+        PythonAstParser.TransformResult duplicateExceptionResult = parser.transform(visitorContext, """
+            from java.lang import RuntimeException
+
+            class OutOfStockException(Exception, RuntimeException):
+                pass
+            """);
+
+        assertTrue(duplicateExceptionResult.runtimeCode().contains("class OutOfStockException(Exception)"));
+        assertFalse(duplicateExceptionResult.runtimeCode().contains("class OutOfStockException(Exception, Exception)"));
+        assertTrue(parser.requiresRuntimeBytecode(duplicateExceptionResult));
+
+        PythonAstParser.TransformResult shadowedExceptionResult = parser.transform(visitorContext, """
+            from java.lang import Exception
+
+            class OutOfStockException(Exception):
+                pass
+            """);
+
+        assertTrue(shadowedExceptionResult.runtimeCode().contains("import builtins"));
+        assertTrue(shadowedExceptionResult.runtimeCode().contains("class OutOfStockException(builtins.Exception)"));
+        assertTrue(parser.requiresRuntimeBytecode(shadowedExceptionResult));
     }
 
     @Test
