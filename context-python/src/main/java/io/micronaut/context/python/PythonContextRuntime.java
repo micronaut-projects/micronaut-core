@@ -319,9 +319,20 @@ public final class PythonContextRuntime {
     private static <T, X extends Throwable> T runWithExecutionFrame(Context ctx, ExecutionFrame frame, CallableOp<T, X> operation) throws X {
         frame.contexts.add(ctx);
         enterExecution(ctx);
+        boolean entered = false;
         try {
+            try {
+                ctx.enter();
+                entered = true;
+            } catch (IllegalStateException ignored) {
+                // Context.get() exposes a non-enterable view while guest code is executing. In
+                // that case the operation is already running in the required context.
+            }
             return operation.call();
         } finally {
+            if (entered) {
+                ctx.leave();
+            }
             exitExecutionFrame(ctx, frame);
         }
     }
