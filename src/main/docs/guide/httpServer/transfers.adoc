@@ -36,7 +36,7 @@ public StreamedFile download() {
 
 The server supports returning `304` (Not Modified) responses if the files being transferred have not changed, and the request contains the appropriate header. In addition, if the client accepts encoded responses, the Micronaut framework encodes the file if appropriate. Encoding happens if the file is text-based and larger than 1KB by default. The threshold at which data is encoded is configurable. See the server configuration reference for details.
 
-TIP: To use a custom data source to send data through an input stream, construct a link:{jdkapi}/java.base/java/io/PipedInputStream.html[PipedInputStream] and link:{jdkapi}/java.base/java/io/PipedOutputStream.html[PipedOutputStream] to write data from the output stream to the input. Make sure to do the work on a separate thread so the file can be returned immediately.
+WARNING: Avoid using link:{jdkapi}/java.base/java/io/PipedInputStream.html[PipedInputStream] / link:{jdkapi}/java.base/java/io/PipedOutputStream.html[PipedOutputStream] as the backing source for `StreamedFile` or other `InputStream`-based HTTP responses. `PipedInputStream` tracks the liveness of the reader and writer threads and can report a broken pipe when the response is consumed on short-lived threads. This is especially relevant when the `blocking` executor uses virtual threads. Prefer a stable stream source such as a file, URL, or a reactive `Publisher` response. If you must use piped streams, make sure both ends stay bound to long-lived platform threads for the lifetime of the transfer.
 
 == Sending Reactive Streams as File Downloads
 Micronaut also supports returning *reactive streams* (e.g., `Flux`, `Flowable`,
