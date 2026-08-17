@@ -16,6 +16,7 @@
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.NativeImageUtils;
 import org.jspecify.annotations.Nullable;
 import org.graalvm.nativeimage.ImageSingletons;
 
@@ -49,7 +50,6 @@ import java.util.function.Predicate;
  */
 @Internal
 final class ServiceScanner<S> {
-    private static final String GRAALVM_IMAGESINGLETONS_ENABLED = "micronaut.graalvm.imagesingletons.enabled";
     private final ClassLoader classLoader;
     private final String serviceName;
     private final Predicate<String> lineCondition;
@@ -63,24 +63,10 @@ final class ServiceScanner<S> {
     }
 
     static ServiceScanner.@Nullable ExclusiveStaticServiceDefinitions findStaticServiceDefinitions() {
-        if (hasImageSingletons()) {
+        if (NativeImageUtils.hasImageSingletons()) {
             return ImageSingletons.contains(ExclusiveStaticServiceDefinitions.class) ? ImageSingletons.lookup(ExclusiveStaticServiceDefinitions.class) : null;
         } else {
             return null;
-        }
-    }
-
-    @SuppressWarnings("java:S1181")
-    private static boolean hasImageSingletons() {
-        if ("false".equalsIgnoreCase(System.getProperty(GRAALVM_IMAGESINGLETONS_ENABLED))) {
-            return false;
-        }
-        try {
-            //noinspection ConstantValue
-            return ImageSingletons.class != null;
-        } catch (Throwable e) {
-            // not present or not a GraalVM JDK
-            return false;
         }
     }
 

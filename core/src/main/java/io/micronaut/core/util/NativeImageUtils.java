@@ -16,6 +16,7 @@
 package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Internal;
+import org.graalvm.nativeimage.ImageSingletons;
 
 /**
  * Utility class to retrieve information about the context in which code gets executed.
@@ -54,6 +55,8 @@ public final class NativeImageUtils {
      */
     public static final boolean JFR_AVAILABLE = !inImageCode();
 
+    private static final String GRAALVM_IMAGESINGLETONS_ENABLED = "micronaut.graalvm.imagesingletons.enabled";
+
     private NativeImageUtils() {
     }
 
@@ -85,5 +88,30 @@ public final class NativeImageUtils {
      */
     public static boolean inImageBuildtimeCode() {
         return PROPERTY_IMAGE_CODE_VALUE_BUILDTIME.equals(System.getProperty(PROPERTY_IMAGE_CODE_KEY));
+    }
+
+    /**
+     * Checks whether GraalVM {@link ImageSingletons} APIs are available and enabled.
+     *
+     * <p>When {@code micronaut.graalvm.imagesingletons.enabled} is set to
+     * {@code false}, this method returns {@code false} without attempting to
+     * access the {@link ImageSingletons} class. This is useful for runtimes
+     * where the class is available but its methods are not reachable from
+     * interpreted code.</p>
+     *
+     * @return {@code true} if ImageSingletons are available and enabled
+     */
+    @SuppressWarnings("java:S1181")
+    public static boolean hasImageSingletons() {
+        if ("false".equalsIgnoreCase(System.getProperty(GRAALVM_IMAGESINGLETONS_ENABLED))) {
+            return false;
+        }
+        try {
+            //noinspection ConstantValue
+            return ImageSingletons.class != null;
+        } catch (Throwable e) {
+            // not present or not a GraalVM JDK
+            return false;
+        }
     }
 }

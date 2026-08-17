@@ -1,6 +1,7 @@
 package io.micronaut.core.io.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.lang.module.Configuration;
@@ -13,6 +14,7 @@ import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.core.io.service.SoftServiceLoader.ServiceCollector;
 
 public class SoftServiceLoaderTest {
@@ -70,6 +72,7 @@ public class SoftServiceLoaderTest {
         try {
             System.setProperty("micronaut.graalvm.imagesingletons.enabled", "false");
             assertNull(ServiceScanner.findStaticServiceDefinitions());
+            assertFalse(NativeImageUtils.hasImageSingletons());
         } finally {
             if (previous == null) {
                 System.clearProperty("micronaut.graalvm.imagesingletons.enabled");
