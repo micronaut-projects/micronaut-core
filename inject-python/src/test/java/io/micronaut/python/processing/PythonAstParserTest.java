@@ -281,7 +281,7 @@ public class PythonAstParserTest {
             (proxy, method, args) -> {
                 if ("getClassElement".equals(method.getName()) && args != null && args.length == 1
                     && "java.lang.RuntimeException".equals(args[0])) {
-                    return Optional.of(ClassElement.of(RuntimeException.class));
+                    return Optional.of(ClassElement.of(java.lang.RuntimeException.class));
                 }
                 if ("getClassElements".equals(method.getName())) {
                     return ClassElement.ZERO_CLASS_ELEMENTS;
