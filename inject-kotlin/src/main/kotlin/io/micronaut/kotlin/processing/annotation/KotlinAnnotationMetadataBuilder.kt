@@ -46,8 +46,6 @@ import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.visitor.VisitorContext
-import io.micronaut.kotlin.processing.getBinaryName
-import io.micronaut.kotlin.processing.getClassDeclaration
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.annotation.Repeatable
 import java.lang.annotation.RetentionPolicy
@@ -59,30 +57,8 @@ internal class KotlinAnnotationMetadataBuilder(
     private val visitorContext: KotlinVisitorContext
 ) : AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
 
-    companion object {
-        private fun getTypeForAnnotation(annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): KSClassDeclaration {
-            return visitorContext.annotationTypeCache.getOrPut(annotationMirror) {
-                resolveTypeForAnnotation(annotationMirror, visitorContext)
-            }
-        }
-
-        private fun resolveTypeForAnnotation(
-            annotationMirror: KSAnnotation,
-            visitorContext: KotlinVisitorContext
-        ): KSClassDeclaration {
-            val annotationType = annotationMirror.annotationType.resolve()
-            val annotationDeclaration = annotationType.declaration
-            return annotationDeclaration.getClassDeclaration(visitorContext)
-        }
-
-        fun getAnnotationTypeName(resolver: Resolver, annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): String {
-            val type = getTypeForAnnotation(annotationMirror, visitorContext)
-            return type.getBinaryName(resolver, visitorContext)
-        }
-    }
-
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSAnnotated {
-        return KotlinAnnotationType(annotationMirror, Companion.getTypeForAnnotation(annotationMirror, visitorContext))
+        return KotlinAnnotationType(annotationMirror, visitorContext.getTypeForAnnotation(annotationMirror))
     }
 
     override fun hasAnnotation(element: KSAnnotated, annotation: Class<out Annotation>): Boolean {
@@ -111,7 +87,7 @@ internal class KotlinAnnotationMetadataBuilder(
     }
 
     override fun getAnnotationTypeName(annotationMirror: KSAnnotation): String {
-        return Companion.getAnnotationTypeName(resolver, annotationMirror, visitorContext)
+        return visitorContext.getAnnotationTypeName(annotationMirror)
     }
 
     override fun getElementName(element: KSAnnotated): String {
@@ -387,7 +363,7 @@ internal class KotlinAnnotationMetadataBuilder(
         if (annotationValue.isEmpty()) {
             val arrayType = type.resolve()
             if (arrayType.declaration.qualifiedName?.asString() == "kotlin.Array") {
-                val className = arrayType.arguments[0].type!!.resolve().declaration.getBinaryName(resolver, visitorContext);
+                val className = visitorContext.getBinaryName(arrayType.arguments[0].type!!.resolve().declaration)
                 val optionalClassName = findJavaClass(className)
                 if (optionalClassName.isPresent) {
                     valueType = optionalClassName.get() as Class<Any>
@@ -437,10 +413,10 @@ internal class KotlinAnnotationMetadataBuilder(
             annotated = annotated.type
         }
         val binaryName = if (annotated is KSClassDeclaration) {
-            annotated.getBinaryName(resolver, visitorContext)
+            visitorContext.getBinaryName(annotated)
         } else {
-            val classDeclaration = annotated.getClassDeclaration(visitorContext)
-            classDeclaration.getBinaryName(resolver, visitorContext)
+            val classDeclaration = visitorContext.getClassDeclaration(annotated)
+            visitorContext.getBinaryName(classDeclaration)
         }
         return if (binaryName != Object::javaClass.name) {
             binaryName
@@ -451,7 +427,7 @@ internal class KotlinAnnotationMetadataBuilder(
 
     override fun readAnnotationRawValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
         val map = mutableMapOf<KSDeclaration, Any>()
-        val declaration = annotationMirror.annotationType.resolve().declaration.getClassDeclaration(visitorContext)
+        val declaration = visitorContext.getClassDeclaration(annotationMirror.annotationType.resolve().declaration)
         declaration.getAllProperties().forEach { prop ->
             val argument = annotationMirror.arguments.find { it.name == prop.simpleName }
             if (argument?.value != null && !argument.isDefault()) {
@@ -503,30 +479,13 @@ internal class KotlinAnnotationMetadataBuilder(
     }
 
     override fun getRepeatableName(annotationMirror: KSAnnotation): String? {
-        val repeatableContainer =
-            getRepeatableContainerNameForType(annotationMirror.annotationType.getClassDeclaration(visitorContext))
+        val classDeclaration = visitorContext.getClassDeclaration(annotationMirror.annotationType)
+        val repeatableContainer = getRepeatableContainerNameForType(classDeclaration)
         return repeatableContainer
     }
 
     override fun getRepeatableContainerNameForType(annotationType: KSAnnotated): String? =
-        visitorContext.repeatableContainerCache.getOrPut(annotationType) {
-            computeRepeatableContainerNameForType(annotationType)
-        }
-
-    private fun computeRepeatableContainerNameForType(annotationType: KSAnnotated): String? {
-        val name = Repeatable::class.java.name
-        val repeatable = annotationType.annotations.find {
-            it.annotationType.resolve().declaration.qualifiedName?.asString() == name
-        }
-        if (repeatable != null) {
-            val value = repeatable.arguments.find { it.name?.asString() == "value" }?.value
-            if (value != null) {
-                val declaration = (value as KSType).declaration.getClassDeclaration(visitorContext)
-                return declaration.getBinaryName(resolver, visitorContext)
-            }
-        }
-        return null
-    }
+        visitorContext.getRepeatableContainerNameForType(annotationType)
 
     override fun findRepeatableContainerNameForType(annotationName: String): String? {
         val container = super.findRepeatableContainerNameForType(annotationName)
@@ -651,7 +610,7 @@ internal class KotlinAnnotationMetadataBuilder(
             declaration.classKind == ClassKind.ENUM_CLASS ||
             declaration.classKind == ClassKind.ANNOTATION_CLASS
         ) {
-            return AnnotationClassValue<Any>(declaration.getBinaryName(resolver, visitorContext))
+            return AnnotationClassValue<Any>(visitorContext.getBinaryName(declaration))
         }
         throw IllegalStateException("Unknown KSClassDeclaration annotation element: $declaration ${declaration.classKind}")
     }

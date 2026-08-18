@@ -19,9 +19,7 @@ import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
-import io.micronaut.kotlin.processing.getBinaryName
 
-@OptIn(KspExperimental::class)
 internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNativeElement>(
     nativeType: T,
     private val accessor: KSPropertyAccessor,
@@ -31,7 +29,7 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
     visitorContext: KotlinVisitorContext,
 ) : AbstractKotlinMethodElement<T>(
     nativeType,
-    accessor.getBinaryName(visitorContext),
+    visitorContext.getBinaryName(accessor),
     owningType,
     elementAnnotationMetadataFactory,
     visitorContext

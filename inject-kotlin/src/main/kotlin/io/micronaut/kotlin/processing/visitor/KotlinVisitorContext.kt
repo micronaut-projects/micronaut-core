@@ -17,6 +17,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getClassDeclarationByName
+import com.google.devtools.ksp.getJavaClassByName
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
@@ -24,12 +25,20 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSNode
+import com.google.devtools.ksp.symbol.KSPropertyAccessor
+import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.KSTypeAlias
+import com.google.devtools.ksp.symbol.KSTypeArgument
+import com.google.devtools.ksp.symbol.KSTypeParameter
+import com.google.devtools.ksp.symbol.KSTypeReference
+import com.google.devtools.ksp.symbol.KSValueParameter
+import com.google.devtools.ksp.symbol.Origin
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
-import io.micronaut.core.reflect.ClassUtils
-import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory
@@ -43,7 +52,9 @@ import io.micronaut.kotlin.processing.KotlinNativeElementsHelper
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
 import io.micronaut.kotlin.processing.annotation.KotlinAnnotationMetadataBuilder
 import io.micronaut.kotlin.processing.annotation.KotlinElementAnnotationMetadataFactory
+import org.objectweb.asm.Type
 import java.io.*
+import java.lang.annotation.Repeatable
 import java.net.URI
 import java.nio.file.Files
 import java.util.*
@@ -84,9 +95,29 @@ internal class KotlinVisitorContext(
      * module, against 161,699 for KSTypeImpl). These live on the visitor context because it is
      * rebuilt per round, which is exactly the lifetime of the symbols they hold.
      */
-    val binaryNameCache: MutableMap<KSDeclaration, String> = HashMap()
-    val annotationTypeCache: MutableMap<KSAnnotation, KSClassDeclaration> = HashMap()
-    val repeatableContainerCache: MutableMap<KSAnnotated, String?> = HashMap()
+    private val binaryNameCache: MutableMap<KSDeclaration, String> = HashMap()
+    private val annotationTypeCache: MutableMap<KSAnnotation, KSClassDeclaration> = HashMap()
+    private val repeatableContainerCache: MutableMap<KSAnnotated, String?> = HashMap()
+
+    fun getRepeatableContainerNameForType(annotationType: KSAnnotated): String? =
+        repeatableContainerCache.getOrPut(annotationType) {
+            computeRepeatableContainerNameForType(annotationType)
+        }
+
+    private fun computeRepeatableContainerNameForType(annotationType: KSAnnotated): String? {
+        val name = Repeatable::class.java.name
+        val repeatable = annotationType.annotations.find {
+            it.annotationType.resolve().declaration.qualifiedName?.asString() == name
+        }
+        if (repeatable != null) {
+            val value = repeatable.arguments.find { it.name?.asString() == "value" }?.value
+            if (value != null) {
+                val declaration = getClassDeclaration((value as KSType).declaration)
+                return getBinaryName(declaration)
+            }
+        }
+        return null
+    }
 
     /*
      * The Resolver calls left uncached after the first pass. A CPU profile of :app:kspKotlin showed
@@ -96,8 +127,140 @@ internal class KotlinVisitorContext(
      * KotlinClassElement.isAssignable, 2.2% via getClassElement, plus getAnnotationMirror). Both are
      * pure functions of a declaration or a name.
      */
-    val jvmNameCache: MutableMap<KSAnnotated, String> = HashMap()
-    internal val classByNameCache: MutableMap<String, KSClassDeclaration?> = HashMap()
+    private val jvmNameCache: MutableMap<KSAnnotated, String?> = HashMap()
+    private val classByNameCache: MutableMap<String, KSClassDeclaration?> = HashMap()
+
+    fun getBinaryName(function: KSFunctionDeclaration): String {
+        val binaryName = jvmNameCache.getOrPut(function) {
+            resolver.getJvmName(function)
+        }
+
+        return requireNotNull(binaryName) { "A JVM name for the function [$function] cannot be resolved." }
+    }
+
+    fun getBinaryName(property: KSPropertyAccessor): String {
+        val binaryName = jvmNameCache.getOrPut(property) {
+            resolver.getJvmName(property)
+        }
+
+        return requireNotNull(binaryName) { "A JVM name for the property [$property] cannot be resolved." }
+    }
+
+    fun getBinaryName(declaration: KSDeclaration) =
+        binaryNameCache.getOrPut(declaration) { computeBinaryName(declaration) }
+
+    private fun computeBinaryName(decl: KSDeclaration): String {
+        var declaration = decl
+        if (declaration is KSFunctionDeclaration) {
+            val parent = declaration.parentDeclaration
+            if (parent != null) {
+                declaration = parent
+            }
+        }
+        val binaryName = if (declaration.qualifiedName != null) resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString() else null
+        if (binaryName != null) {
+            return binaryName
+        }
+        if (declaration.qualifiedName == null) {
+            return "java.lang.Object" // Anonymous
+        }
+        val classDeclaration = getClassDeclaration(declaration)
+        val qn = classDeclaration.qualifiedName
+        if (qn != null) {
+            val asString = resolver.mapKotlinNameToJava(qn)?.asString()
+            if (asString != null) {
+                return asString
+            }
+        }
+        if (declaration is KSClassDeclaration) {
+            val qualifiedName = declaration.qualifiedName
+            if (qualifiedName != null && qualifiedName.asString() == "kotlin.Unit") {
+                return "kotlin.Unit"
+            }
+            val signature = resolver.mapToJvmSignature(declaration)
+            if (signature != null) {
+                return Type.getType(signature).className
+            }
+        }
+        if (declaration is KSTypeAlias) {
+            return declaration.name.asString()
+        }
+        return if (declaration.origin != Origin.SYNTHETIC) {
+            computeName(declaration)
+        } else {
+            declaration.simpleName.asString()
+        }
+    }
+
+    private fun computeName(declaration: KSDeclaration): String {
+        val className = StringBuilder(declaration.packageName.asString())
+        val hierarchy = mutableListOf(declaration)
+        var parentDeclaration = declaration.parentDeclaration
+        while (parentDeclaration is KSClassDeclaration) {
+            hierarchy.add(0, parentDeclaration)
+            parentDeclaration = parentDeclaration.parentDeclaration
+        }
+        hierarchy.joinTo(className, "$", ".")
+        return className.toString()
+    }
+
+    internal fun getClassDeclaration(annotated: KSAnnotated) : KSClassDeclaration {
+        when (annotated) {
+            is KSType -> {
+                return getClassDeclaration(annotated.declaration)
+            }
+            is KSClassDeclaration -> {
+                return annotated
+            }
+            is KSTypeReference -> {
+                return getClassDeclaration(annotated.resolve().declaration)
+            }
+            is KSTypeParameter -> {
+                return resolveDeclaration(annotated.bounds.firstOrNull()?.resolve()?.declaration)
+            }
+            is KSTypeArgument -> {
+                return resolveDeclaration(annotated.type?.resolve()?.declaration)
+            }
+            is KSTypeAlias -> {
+                val declaration = annotated.type.resolve().declaration
+                return getClassDeclaration(declaration)
+            }
+            is KSValueParameter -> {
+                val p = annotated.parent
+                if (p is KSDeclaration) {
+                    return getClassDeclaration(p)
+                } else {
+                    return resolver.getJavaClassByName(Object::class.java.name)!!
+                }
+            }
+            is KSFunctionDeclaration -> {
+                val parentDeclaration = annotated.parentDeclaration
+                if (parentDeclaration != null) {
+                    return getClassDeclaration(parentDeclaration)
+                }
+                return resolver.getJavaClassByName(Object::class.java.name)!!
+            }
+            is KSPropertyDeclaration -> {
+                val parentDeclaration = annotated.parentDeclaration
+                if (parentDeclaration != null) {
+                    return getClassDeclaration(parentDeclaration)
+                }
+                return resolver.getJavaClassByName(Object::class.java.name)!!
+            }
+            else -> {
+                return resolver.getJavaClassByName(Object::class.java.name)!!
+            }
+        }
+    }
+
+    @OptIn(KspExperimental::class)
+    private fun resolveDeclaration(declaration: KSDeclaration?): KSClassDeclaration {
+        return if (declaration is KSClassDeclaration) {
+            declaration
+        } else {
+            resolver.getJavaClassByName(Object::class.java.name)!!
+        }
+    }
 
     /** Memoized [Resolver.getClassDeclarationByName]. */
     fun classDeclarationByName(name: String): KSClassDeclaration? =
@@ -186,13 +349,7 @@ internal class KotlinVisitorContext(
             .filterIsInstance<KSClassDeclaration>()
             .filter { declaration ->
                 stereotypes.isEmpty() || declaration.annotations.any { ann ->
-                    stereotypes.contains(
-                        KotlinAnnotationMetadataBuilder.getAnnotationTypeName(
-                            resolver,
-                            ann,
-                            this
-                        )
-                    )
+                    stereotypes.contains(getAnnotationTypeName(ann))
                 }
             }
             .map { declaration ->
@@ -200,6 +357,25 @@ internal class KotlinVisitorContext(
             }
             .toList()
             .toTypedArray()
+    }
+
+    fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSClassDeclaration {
+        return annotationTypeCache.getOrPut(annotationMirror) {
+            resolveTypeForAnnotation(annotationMirror)
+        }
+    }
+
+    private fun resolveTypeForAnnotation(
+        annotationMirror: KSAnnotation,
+    ): KSClassDeclaration {
+        val annotationType = annotationMirror.annotationType.resolve()
+        val annotationDeclaration = annotationType.declaration
+        return getClassDeclaration(annotationDeclaration)
+    }
+
+    fun getAnnotationTypeName(annotationMirror: KSAnnotation): String {
+        val type = getTypeForAnnotation(annotationMirror)
+        return getBinaryName(type)
     }
 
     override fun getServiceEntries(): MutableMap<String, MutableSet<String>> {
