@@ -23,14 +23,12 @@ import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import org.objectweb.asm.Type
 
 @OptIn(KspExperimental::class)
-internal fun KSFunctionDeclaration.getBinaryName(resolver: Resolver): String {
-    return resolver.getJvmName(this)!!
-}
+internal fun KSFunctionDeclaration.getBinaryName(visitorContext: KotlinVisitorContext): String =
+    visitorContext.jvmNameCache.getOrPut(this) { visitorContext.resolver.getJvmName(this)!! }
 
 @OptIn(KspExperimental::class)
-internal fun KSPropertyAccessor.getBinaryName(resolver: Resolver): String {
-    return resolver.getJvmName(this)!!
-}
+internal fun KSPropertyAccessor.getBinaryName(visitorContext: KotlinVisitorContext): String =
+    visitorContext.jvmNameCache.getOrPut(this) { visitorContext.resolver.getJvmName(this)!! }
 
 
 internal fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: KotlinVisitorContext): String =

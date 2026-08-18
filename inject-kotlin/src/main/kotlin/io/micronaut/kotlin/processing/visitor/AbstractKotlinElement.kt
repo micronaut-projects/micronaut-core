@@ -489,8 +489,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             }
 
             else -> {
-                val objectType =
-                    visitorContext.resolver.getClassDeclarationByName(Object::class.java.name)!!
+                val objectType = visitorContext.classDeclarationByName(Object::class.java.name)!!
                 newKotlinClassElement(objectType, parentTypeArguments, visitedTypes)
             }
         }

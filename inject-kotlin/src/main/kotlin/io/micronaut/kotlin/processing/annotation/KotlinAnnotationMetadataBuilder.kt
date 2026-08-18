@@ -15,7 +15,6 @@
  */
 package io.micronaut.kotlin.processing.annotation
 
-import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.isDefault
 import com.google.devtools.ksp.processing.Resolver
@@ -554,7 +553,7 @@ internal class KotlinAnnotationMetadataBuilder(
             .or { ClassUtils.forName(className, visitorContext::class.java.classLoader) }
 
     override fun getAnnotationMirror(annotationName: String): Optional<KSAnnotated> {
-        return Optional.ofNullable(resolver.getClassDeclarationByName(annotationName))
+        return Optional.ofNullable(visitorContext.classDeclarationByName(annotationName))
     }
 
     override fun getAnnotationMember(annotationElement: KSAnnotated, member: CharSequence): KSAnnotated? {

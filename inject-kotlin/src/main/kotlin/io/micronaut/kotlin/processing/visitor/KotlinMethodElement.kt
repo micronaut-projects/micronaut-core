@@ -32,7 +32,7 @@ internal open class KotlinMethodElement(
     visitorContext: KotlinVisitorContext
 ) : AbstractKotlinMethodElement<KotlinMethodNativeElement>(
     KotlinMethodNativeElement(declaration),
-    declaration.getBinaryName(visitorContext.resolver),
+    declaration.getBinaryName(visitorContext),
     owningType,
     elementAnnotationMetadataFactory,
     visitorContext

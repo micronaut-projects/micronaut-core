@@ -563,7 +563,7 @@ internal open class KotlinClassElement(
         if (internalName == type) {
             return true // Same type
         }
-        val otherDeclaration = visitorContext.resolver.getClassDeclarationByName(type)
+        val otherDeclaration = visitorContext.classDeclarationByName(type)
         if (otherDeclaration != null) {
             if (declaration == otherDeclaration) {
                 return true
@@ -742,7 +742,7 @@ internal open class KotlinClassElement(
                 return element.simpleName.asString()
             }
             if (element is KSFunctionDeclaration) {
-                return element.getBinaryName(visitorContext.resolver)
+                return element.getBinaryName(visitorContext)
             }
             if (element is KSDeclaration) {
                 return element.getBinaryName(visitorContext.resolver, visitorContext)

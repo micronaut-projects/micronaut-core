@@ -55,6 +55,9 @@ internal class KotlinVisitorContext(
     var resolver: Resolver
 ) : VisitorContext {
 
+    init {
+    }
+
     private val visitorAttributes: MutableConvertibleValues<Any> = MutableConvertibleValuesMap()
     private val elementFactory: KotlinElementFactory = KotlinElementFactory(this)
     private val outputVisitor = KotlinOutputVisitor(environment, this)
@@ -85,6 +88,23 @@ internal class KotlinVisitorContext(
     val annotationTypeCache: MutableMap<KSAnnotation, KSClassDeclaration> = HashMap()
     val repeatableContainerCache: MutableMap<KSAnnotated, String?> = HashMap()
 
+    /*
+     * The Resolver calls left uncached after the first pass. A CPU profile of :app:kspKotlin showed
+     * every remaining hot path bottoming out in KaFirSessionProvider.getAnalysisSession, reached
+     * through these two: Resolver.getJvmName (1.8% of the build, via the getBinaryName overloads
+     * for functions and property accessors) and Resolver.getClassDeclarationByName (1.26% via
+     * KotlinClassElement.isAssignable, 2.2% via getClassElement, plus getAnnotationMirror). Both are
+     * pure functions of a declaration or a name.
+     */
+    val jvmNameCache: MutableMap<KSAnnotated, String> = HashMap()
+    internal val classByNameCache: MutableMap<String, KSClassDeclaration?> = HashMap()
+
+    /** Memoized [Resolver.getClassDeclarationByName]. */
+    fun classDeclarationByName(name: String): KSClassDeclaration? =
+        classByNameCache.getOrPut(name) {
+            resolver.getClassDeclarationByName(name)
+        }
+
     val extraOpenAnnotations: Array<String> by lazy {
         var allOpenAnnotations = environment.options["kotlin.allopen.annotations"]
         if (allOpenAnnotations.isNullOrEmpty()) {
@@ -97,6 +117,17 @@ internal class KotlinVisitorContext(
     }
 
     fun updateResolver(resolver: Resolver) {
+        // A new resolver means a new round and a new Analysis API session, and this context is
+        // reused across that boundary rather than rebuilt. Every memo below holds symbols from the
+        // old session, so they must go: reading one afterwards throws
+        // KaInvalidLifetimeOwnerAccessException ("PSI has changed since creation"). The
+        // node-keyed memos would merely miss, since the nodes are new objects, but classByNameCache
+        // is keyed on a String and would hit and hand back a dead declaration.
+        binaryNameCache.clear()
+        annotationTypeCache.clear()
+        repeatableContainerCache.clear()
+        jvmNameCache.clear()
+        classByNameCache.clear()
         this.resolver = resolver
         annotationMetadataBuilder.resolver = resolver
         nativeElementsHelper.resolver = resolver
@@ -135,9 +166,9 @@ internal class KotlinVisitorContext(
     }
 
     override fun getClassElement(name: String): Optional<ClassElement> {
-        var declaration = resolver.getClassDeclarationByName(name)
+        var declaration = classDeclarationByName(name)
         if (declaration == null) {
-            declaration = resolver.getClassDeclarationByName(
+            declaration = classDeclarationByName(
                 name.replace(".$", ".")
                     .replace('$', '.')
             )

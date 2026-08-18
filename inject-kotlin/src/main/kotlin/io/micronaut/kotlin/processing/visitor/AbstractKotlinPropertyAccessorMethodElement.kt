@@ -31,7 +31,7 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
     visitorContext: KotlinVisitorContext,
 ) : AbstractKotlinMethodElement<T>(
     nativeType,
-    accessor.getBinaryName(visitorContext.resolver),
+    accessor.getBinaryName(visitorContext),
     owningType,
     elementAnnotationMetadataFactory,
     visitorContext
