@@ -62,6 +62,24 @@ final class PyronautCompilerTest {
     }
 
     @Test
+    void compilesPythonMethodsReturningHttpResponseSubtypes(@TempDir Path sourceDirectory) throws Exception {
+        Files.writeString(sourceDirectory.resolve("responses.py"), """
+            from micronaut.http import MutableHttpResponse
+
+            class Responses:
+                def response(self) -> MutableHttpResponse:
+                    return None
+            """);
+
+        ClassLoader classLoader = PyronautCompiler.builder()
+            .pythonSrc(sourceDirectory.toString())
+            .build()
+            .buildClassLoader();
+
+        assertNotNull(classLoader.loadClass("pyronaut_application.PyronautMain"));
+    }
+
+    @Test
     void optionallyIncludesPythonBytecodeInTheInMemoryVfs() throws Exception {
         ClassLoader classLoader = PyronautCompiler.builder()
             .pythonCode("answer = 42")

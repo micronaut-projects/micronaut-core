@@ -3871,12 +3871,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             yield RUNTIME_UTIL
                                 .invokeStatic("convertHttpResponse", ClassTypeDef.OBJECT,
                                     invokedValue, CLASS_OBJECT)
-                                .cast(ClassTypeDef.of(HTTP_RESPONSE));
+                                .cast(ClassTypeDef.of(returnType));
                         }
                         yield RUNTIME_UTIL
                             .invokeStatic("convertHttpResponse", ClassTypeDef.OBJECT,
                                 invokedValue, toClassExpression(bodyType))
-                            .cast(ClassTypeDef.of(HTTP_RESPONSE));
+                            .cast(ClassTypeDef.of(returnType));
                     } else {
                         if (isGeneratedWrapperType(allClasses, returnType)) {
                             yield javaClassType(returnType)
