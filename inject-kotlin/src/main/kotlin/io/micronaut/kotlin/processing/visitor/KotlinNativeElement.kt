@@ -32,7 +32,9 @@ import io.micronaut.core.reflect.ReflectionUtils.findMethod
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
+import java.lang.reflect.Method
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 @Internal
 open class KotlinNativeElement(
@@ -66,29 +68,24 @@ open class KotlinNativeElement(
         /**
          * Memo for the reflective unwrap lookup below.
          *
-         * An allocation profile of :app:kspKotlin (async-profiler, alloc engine) put 41.9% of all
-         * allocation in java.lang.reflect.Method and 44.1% of it behind
-         * ReflectionUtils.findMethod — the single largest source in the build, and GC accounted for
-         * 38% of wall clock. Each findMethod call walks Class.getDeclaredMethods, which copies the
-         * whole Method array, and this runs up to three times per native element constructed.
-         *
          * The result is a pure function of the class, so cache it. Keyed on Class and held
          * statically because the mapping never changes; that pins the KSP implementation classes,
          * which the companion's own descriptorWithSourceClass fields already do.
          */
-        private val unwrapMethodCache = java.util.concurrent.ConcurrentHashMap<Class<*>, Optional<java.lang.reflect.Method>>()
+        private val unwrapMethodCache = ConcurrentHashMap<Class<*>, Optional<Method>>()
 
-        private fun unwrapMethodFor(javaClass: Class<*>, kind: String): java.lang.reflect.Method? =
+        private fun unwrapMethodFor(javaClass: Class<*>, kind: String): Method? =
             unwrapMethodCache.computeIfAbsent(javaClass) {
-                Optional.ofNullable(
-                    findMethod(javaClass, "getKt$kind")
-                        .orElseGet {
-                            findMethod(javaClass, "getPsi").orElseGet {
-                                findMethod(javaClass, "getDescriptor").orElse(null)
-                            }
-                        }
-                )
-            }.orElse(null)
+                findMethodFor(javaClass, kind)
+            }
+            .orElse(null)
+
+        private fun findMethodFor(javaClass: Class<*>, kind: String): Optional<Method> =
+            findMethod(javaClass, "getKt$kind").or {
+                findMethod(javaClass, "getPsi").or {
+                    findMethod(javaClass, "getDescriptor")
+                }
+            }
 
         fun resolveKotlinNativeType(nativeType: Any): Any {
 
@@ -107,12 +104,7 @@ open class KotlinNativeElement(
             val javaClass = nativeType.javaClass
             val method = unwrapMethodFor(javaClass, kind)
 
-            val unwrapped = if (method != null && method.canAccess(nativeType)) {
-                method.invoke(nativeType)
-            } else {
-                null
-            }
-
+            val unwrapped = method?.takeIf { it.canAccess(nativeType) }?.invoke(nativeType)
             if (unwrapped != null) {
                 return extractNativeElement(unwrapped)
             }
