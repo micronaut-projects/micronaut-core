@@ -54,16 +54,18 @@ open class KotlinNativeElement(
     companion object Helper {
 
         private val classLoader = Helper::class.java.classLoader
-        private val descriptorWithSourceClass = ClassUtils.forName(
-            "org.jetbrains.kotlin.descriptors.DeclarationDescriptorWithSource",
-            classLoader
-        )
-        private val descriptorWithSourceGetSourceMethod = if (descriptorWithSourceClass.isEmpty) Optional.empty() else findMethod(descriptorWithSourceClass.get(), "getSource")
-        private val javaSourceElementCLass = ClassUtils.forName(
-            "org.jetbrains.kotlin.load.java.sources.JavaSourceElement",
-            classLoader
-        )
-        private val javaSourceElementGetJavaElementMethod = if (javaSourceElementCLass.isEmpty) Optional.empty() else findMethod(javaSourceElementCLass.get(), "getJavaElement")
+
+        private val descriptorWithSourceClass =
+            ClassUtils.forName("org.jetbrains.kotlin.descriptors.DeclarationDescriptorWithSource", classLoader)
+
+        private val descriptorWithSourceGetSourceMethod =
+            descriptorWithSourceClass.flatMap { findMethod(it, "getSource") }
+
+        private val javaSourceElementCLass =
+            ClassUtils.forName("org.jetbrains.kotlin.load.java.sources.JavaSourceElement", classLoader)
+
+        private val javaSourceElementGetJavaElementMethod =
+            javaSourceElementCLass.flatMap { findMethod(it, "getJavaElement") }
 
         /**
          * Memo for the reflective unwrap lookup below.
@@ -76,16 +78,13 @@ open class KotlinNativeElement(
 
         private fun unwrapMethodFor(javaClass: Class<*>, kind: String): Method? =
             unwrapMethodCache.computeIfAbsent(javaClass) {
-                findMethodFor(javaClass, kind)
-            }
-            .orElse(null)
-
-        private fun findMethodFor(javaClass: Class<*>, kind: String): Optional<Method> =
-            findMethod(javaClass, "getKt$kind").or {
-                findMethod(javaClass, "getPsi").or {
-                    findMethod(javaClass, "getDescriptor")
+                findMethod(javaClass, "getKt$kind").or {
+                    findMethod(javaClass, "getPsi").or {
+                        findMethod(javaClass, "getDescriptor")
+                    }
                 }
             }
+            .orElse(null)
 
         fun resolveKotlinNativeType(nativeType: Any): Any {
 
