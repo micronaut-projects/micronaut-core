@@ -110,8 +110,8 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
                 ) {
                     IntRange range = parseRangeHeader(rangeHeader, fileLength);
                     if (range != null // A server that supports range requests MAY ignore or reject a Range header field that contains an invalid ranges-specifier (Section 14.1.1)
-                        && range.firstPos < range.lastPos // A server that supports range requests MAY ignore a Range header field when the selected representation has no content (i.e., the selected representation's data is of zero length).
-                        && range.firstPos < fileLength
+                        && range.firstPos <= range.lastPos
+                        && range.firstPos < fileLength // A server that supports range requests MAY ignore a Range header field when the selected representation has no content (i.e., the selected representation's data is of zero length).
                         && range.lastPos < fileLength
                     ) {
                         position = range.firstPos;
@@ -172,7 +172,14 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
         String from = value.substring(equalsIdx + 1, minusIdx).trim();
         String to = value.substring(minusIdx + 1).trim();
         try {
-            long fromPosition = from.isEmpty() ? 0 : Long.parseLong(from);
+            if (from.isEmpty()) {
+                long suffixLength = Long.parseLong(to);
+                if (suffixLength < 1 || contentLength < 1) {
+                    return null;
+                }
+                return new IntRange(Math.max(contentLength - suffixLength, 0), contentLength - 1);
+            }
+            long fromPosition = Long.parseLong(from);
             long toPosition = to.isEmpty() ? contentLength - 1 : Long.parseLong(to);
             return new IntRange(fromPosition, toPosition);
         } catch (NumberFormatException e) {
