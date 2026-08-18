@@ -35,6 +35,7 @@ import io.micronaut.inject.ast.MethodElement
 import java.lang.reflect.Method
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import javax.naming.spi.Resolver
 
 @Internal
 open class KotlinNativeElement(
@@ -42,14 +43,11 @@ open class KotlinNativeElement(
     val owner: KotlinNativeElement?,
     internal val kotlinNativeType: Any
 ) {
+    constructor(element: KSAnnotated) :
+            this(element, null, resolveKotlinNativeType(element))
 
-    constructor(element: KSAnnotated) : this(element, null, resolveKotlinNativeType(element))
-
-    constructor(element: KSAnnotated, owner: KotlinNativeElement? = null) : this(
-        element,
-        owner,
-        resolveKotlinNativeType(element)
-    )
+    constructor(element: KSAnnotated, owner: KotlinNativeElement? = null) :
+            this(element, owner, resolveKotlinNativeType(element))
 
     companion object Helper {
 
