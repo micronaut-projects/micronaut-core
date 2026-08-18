@@ -343,6 +343,21 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                         replaced_throwable = True
                         self.uses_builtin_exception = True
                     continue
+                java_class_name = self._java_class_name(base)
+                if java_class_name:
+                    node.body.insert(0, ast.Raise(
+                        exc=ast.Call(
+                            func=ast.Name(id='RuntimeError', ctx=ast.Load()),
+                            args=[ast.Constant(
+                                f"Native Python mode does not support Python class [{node.name}] "
+                                f"extending Java class [{java_class_name}]; "
+                                "use composition or a Java interface instead."
+                            )],
+                            keywords=[]
+                        ),
+                        cause=None
+                    ))
+                    continue
                 runtime_bases.append(base)
             node.bases = runtime_bases
             if len(node.bases) != original_base_count:
@@ -668,6 +683,19 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             }
         except Exception:
             return False
+
+    def _java_class_name(self, base: ast.AST) -> Optional[str]:
+        class_name = self._java_type_name(base)
+        class_element = self.callback_get_class_element(class_name) if class_name else None
+        if class_element is None:
+            base_name = self._base_name(base)
+            class_element = self.java_class_elements.get(base_name) if base_name else None
+        if class_element is None:
+            return None
+        try:
+            return None if class_element.isInterface() or class_element.isAbstract() else class_element.getName()
+        except Exception:
+            return None
 
     def _java_type_name(self, node: ast.AST) -> Optional[str]:
         if not isinstance(node, ast.Call):

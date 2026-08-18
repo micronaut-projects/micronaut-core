@@ -353,6 +353,60 @@ public class PythonAstParserTest {
     }
 
     @Test
+    void testRuntimeTransformDiagnosesConcreteJavaClassInheritance() {
+        PythonAstParser parser = new PythonAstParser();
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1) {
+                    return switch ((String) args[0]) {
+                        case "java.lang.Thread" -> Optional.of(ClassElement.of(Thread.class));
+                        case "java.lang.Runnable" -> Optional.of(ClassElement.of(Runnable.class));
+                        default -> Optional.empty();
+                    };
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+
+        PythonAstParser.TransformResult result = parser.transform(visitorContext, """
+            from java.lang import Thread
+
+            class Worker(Thread):
+                pass
+            """);
+
+        assertTrue(result.code().contains("class Worker(Thread)"));
+        assertTrue(result.runtimeCode().contains("Native Python mode does not support Python class [Worker]"));
+        assertTrue(result.runtimeCode().contains("Java class [java.lang.Thread]"));
+        assertTrue(parser.requiresRuntimeBytecode(result));
+
+        PythonAstParser.TransformResult interfaceResult = parser.transform(visitorContext, """
+            from java.lang import Runnable
+
+            class Worker(Runnable):
+                pass
+            """);
+
+        assertFalse(interfaceResult.runtimeCode().contains("does not support Python class"));
+        assertTrue(interfaceResult.runtimeCode().contains("class Worker:"));
+        assertTrue(parser.requiresRuntimeBytecode(interfaceResult));
+    }
+
+    @Test
     void testTransformKeepsFutureImportsBeforeGeneratedCode() {
         PythonAstParser pythonProcessor = new PythonAstParser();
         VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
