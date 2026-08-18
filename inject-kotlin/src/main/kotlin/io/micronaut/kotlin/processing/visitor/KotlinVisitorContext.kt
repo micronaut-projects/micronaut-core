@@ -100,7 +100,7 @@ internal class KotlinVisitorContext(
     private val repeatableContainerCache: MutableMap<KSAnnotated, String?> = HashMap()
 
     fun getRepeatableContainerNameForType(annotationType: KSAnnotated): String? =
-        repeatableContainerCache.getOrPut(annotationType) {
+        repeatableContainerCache.getOrCache(annotationType) {
             computeRepeatableContainerNameForType(annotationType)
         }
 
@@ -131,7 +131,7 @@ internal class KotlinVisitorContext(
     private val classByNameCache: MutableMap<String, KSClassDeclaration?> = HashMap()
 
     fun getBinaryName(function: KSFunctionDeclaration): String {
-        val binaryName = jvmNameCache.getOrPut(function) {
+        val binaryName = jvmNameCache.getOrCache(function) {
             resolver.getJvmName(function)
         }
 
@@ -139,7 +139,7 @@ internal class KotlinVisitorContext(
     }
 
     fun getBinaryName(property: KSPropertyAccessor): String {
-        val binaryName = jvmNameCache.getOrPut(property) {
+        val binaryName = jvmNameCache.getOrCache(property) {
             resolver.getJvmName(property)
         }
 
@@ -264,9 +264,19 @@ internal class KotlinVisitorContext(
 
     /** Memoized [Resolver.getClassDeclarationByName]. */
     fun classDeclarationByName(name: String): KSClassDeclaration? =
-        classByNameCache.getOrPut(name) {
+        classByNameCache.getOrCache(name) {
             resolver.getClassDeclarationByName(name)
         }
+
+    private inline fun <K, V : Any> MutableMap<K, V?>.getOrCache(key: K, block: () -> V?): V? {
+        if (containsKey(key)) {
+            return get(key)
+        }
+
+        val value = block()
+        this[key] = value
+        return value
+    }
 
     val extraOpenAnnotations: Array<String> by lazy {
         var allOpenAnnotations = environment.options["kotlin.allopen.annotations"]
@@ -359,15 +369,12 @@ internal class KotlinVisitorContext(
             .toTypedArray()
     }
 
-    fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSClassDeclaration {
-        return annotationTypeCache.getOrPut(annotationMirror) {
+    fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSClassDeclaration =
+        annotationTypeCache.getOrPut(annotationMirror) {
             resolveTypeForAnnotation(annotationMirror)
         }
-    }
 
-    private fun resolveTypeForAnnotation(
-        annotationMirror: KSAnnotation,
-    ): KSClassDeclaration {
+    private fun resolveTypeForAnnotation(annotationMirror: KSAnnotation): KSClassDeclaration {
         val annotationType = annotationMirror.annotationType.resolve()
         val annotationDeclaration = annotationType.declaration
         return getClassDeclaration(annotationDeclaration)
