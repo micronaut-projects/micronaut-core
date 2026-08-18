@@ -33,8 +33,11 @@ internal fun KSPropertyAccessor.getBinaryName(resolver: Resolver): String {
 }
 
 
+internal fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: KotlinVisitorContext): String =
+    visitorContext.binaryNameCache.getOrPut(this) { computeBinaryName(resolver, visitorContext) }
+
 @OptIn(KspExperimental::class)
-internal fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: KotlinVisitorContext): String {
+private fun KSDeclaration.computeBinaryName(resolver: Resolver, visitorContext: KotlinVisitorContext): String {
     var declaration = this
     if (declaration is KSFunctionDeclaration) {
         val parent = declaration.parentDeclaration

@@ -20,7 +20,10 @@ import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSNode
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
@@ -60,6 +63,27 @@ internal class KotlinVisitorContext(
     private val expressionCompilationContextFactory = DefaultExpressionCompilationContextFactory(this)
     val nativeElementsHelper = KotlinNativeElementsHelper(resolver)
     var aggregating: Boolean = false
+
+    /*
+     * Memos for the three call sites that between them drive 91% of all KSP type resolutions.
+     *
+     * Every KSTypeReference.resolve() allocates a fresh KaType, which KSP wraps in a fresh
+     * KSTypeImpl and retains for the rest of the round — its memo is keyed on object identity and
+     * the Analysis API does not intern types, so it never hits. Measured on a generated 40-element
+     * module: 545,280 resolutions, all of them from micronaut frames, against 884 distinct types.
+     * The split was getBinaryName 205,184, getTypeForAnnotation 202,368 and
+     * getRepeatableContainerNameForType 89,600.
+     *
+     * All three are pure functions of a declaration or an annotation, so asking once per round is
+     * equivalent to asking every time. Keying on the KSP node is sound here, unlike keying on a
+     * type: declarations and annotations are memoized on the underlying KaSymbol, which the
+     * Analysis API does intern (KSClassDeclarationImpl's cache peaks at 272 entries for this
+     * module, against 161,699 for KSTypeImpl). These live on the visitor context because it is
+     * rebuilt per round, which is exactly the lifetime of the symbols they hold.
+     */
+    val binaryNameCache: MutableMap<KSDeclaration, String> = HashMap()
+    val annotationTypeCache: MutableMap<KSAnnotation, KSClassDeclaration> = HashMap()
+    val repeatableContainerCache: MutableMap<KSAnnotated, String?> = HashMap()
 
     val extraOpenAnnotations: Array<String> by lazy {
         var allOpenAnnotations = environment.options["kotlin.allopen.annotations"]

@@ -62,8 +62,20 @@ internal class KotlinAnnotationMetadataBuilder(
 
     companion object {
         private fun getTypeForAnnotation(annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): KSClassDeclaration {
-            return annotationMirror.annotationType.resolve().declaration.getClassDeclaration(visitorContext)
+            return visitorContext.annotationTypeCache.getOrPut(annotationMirror) {
+                resolveTypeForAnnotation(annotationMirror, visitorContext)
+            }
         }
+
+        private fun resolveTypeForAnnotation(
+            annotationMirror: KSAnnotation,
+            visitorContext: KotlinVisitorContext
+        ): KSClassDeclaration {
+            val annotationType = annotationMirror.annotationType.resolve()
+            val annotationDeclaration = annotationType.declaration
+            return annotationDeclaration.getClassDeclaration(visitorContext)
+        }
+
         fun getAnnotationTypeName(resolver: Resolver, annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): String {
             val type = getTypeForAnnotation(annotationMirror, visitorContext)
             return type.getBinaryName(resolver, visitorContext)
@@ -497,7 +509,12 @@ internal class KotlinAnnotationMetadataBuilder(
         return repeatableContainer
     }
 
-    override fun getRepeatableContainerNameForType(annotationType: KSAnnotated): String? {
+    override fun getRepeatableContainerNameForType(annotationType: KSAnnotated): String? =
+        visitorContext.repeatableContainerCache.getOrPut(annotationType) {
+            computeRepeatableContainerNameForType(annotationType)
+        }
+
+    private fun computeRepeatableContainerNameForType(annotationType: KSAnnotated): String? {
         val name = Repeatable::class.java.name
         val repeatable = annotationType.annotations.find {
             it.annotationType.resolve().declaration.qualifiedName?.asString() == name
