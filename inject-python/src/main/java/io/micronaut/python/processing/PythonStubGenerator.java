@@ -773,8 +773,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
                         final boolean isAbstractIntroNoArg = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
                         builder.addMethod(constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
-                            if (isJunit5Test || isIntrospectedBean) {
+                            if (isJunit5Test) {
                                 return StatementDef.multi();
+                            } else if (isIntrospectedBean) {
+                                ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME
+                                    .invokeStatic(isAbstractIntroNoArg ? "newIntroduction" : "newInstance", POLYGLOT_VALUE,
+                                        List.of(pythonClassReference(element, pythonClassReference))
+                                    );
+                                return aThis.invokeConstructor(pythonInstance);
                             } else {
                                 ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME
                                     .invokeStatic(isAbstractIntroNoArg ? "newIntroduction" : "newInstance", POLYGLOT_VALUE,
