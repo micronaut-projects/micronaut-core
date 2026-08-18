@@ -17,6 +17,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyGetter
@@ -62,6 +63,33 @@ open class KotlinNativeElement(
         )
         private val javaSourceElementGetJavaElementMethod = if (javaSourceElementCLass.isEmpty) Optional.empty() else findMethod(javaSourceElementCLass.get(), "getJavaElement")
 
+        /**
+         * Memo for the reflective unwrap lookup below.
+         *
+         * An allocation profile of :app:kspKotlin (async-profiler, alloc engine) put 41.9% of all
+         * allocation in java.lang.reflect.Method and 44.1% of it behind
+         * ReflectionUtils.findMethod — the single largest source in the build, and GC accounted for
+         * 38% of wall clock. Each findMethod call walks Class.getDeclaredMethods, which copies the
+         * whole Method array, and this runs up to three times per native element constructed.
+         *
+         * The result is a pure function of the class, so cache it. Keyed on Class and held
+         * statically because the mapping never changes; that pins the KSP implementation classes,
+         * which the companion's own descriptorWithSourceClass fields already do.
+         */
+        private val unwrapMethodCache = java.util.concurrent.ConcurrentHashMap<Class<*>, Optional<java.lang.reflect.Method>>()
+
+        private fun unwrapMethodFor(javaClass: Class<*>, kind: String): java.lang.reflect.Method? =
+            unwrapMethodCache.computeIfAbsent(javaClass) {
+                Optional.ofNullable(
+                    findMethod(javaClass, "getKt$kind")
+                        .orElseGet {
+                            findMethod(javaClass, "getPsi").orElseGet {
+                                findMethod(javaClass, "getDescriptor").orElse(null)
+                            }
+                        }
+                )
+            }.orElse(null)
+
         fun resolveKotlinNativeType(nativeType: Any): Any {
 
             val kind: String = when (nativeType) {
@@ -77,23 +105,21 @@ open class KotlinNativeElement(
             }
 
             val javaClass = nativeType.javaClass
-            val method = findMethod(javaClass, "getKt$kind")
-                .orElseGet {
-                    findMethod(javaClass, "getPsi").orElseGet {
-                        findMethod(javaClass, "getDescriptor").orElse(null)
-                    }
-                }
+            val method = unwrapMethodFor(javaClass, kind)
 
-            return if (method != null && method.canAccess(nativeType)) {
-                extractNativeElement(
-                    method.invoke(nativeType)
-                )
+            val unwrapped = if (method != null && method.canAccess(nativeType)) {
+                method.invoke(nativeType)
             } else {
-                extractNativeElement(
-                    nativeType
-                )
+                null
             }
+
+            if (unwrapped != null) {
+                return extractNativeElement(unwrapped)
+            }
+
+            return extractNativeElement(nativeType)
         }
+
 
         private fun extractNativeElement(descriptor: Any) : Any {
             try {
@@ -141,6 +167,17 @@ internal class KotlinClassNativeElement(
         }
     }
 
+    /**
+     * [owner] is part of the identity by design, and must stay that way.
+     *
+     * It makes this element unique per *use site*, which is what lets a `TypeElementVisitor`
+     * annotate a type at one site without the annotation leaking to every other mention of that
+     * type — the purpose of `AbstractAnnotationMetadataBuilder.MUTATED_ANNOTATION_METADATA`.
+     * Dropping it deduplicates the cache (`kotlin.String` is otherwise rebuilt once per parameter
+     * that mentions it, 520 times over a 40-element module) but breaks
+     * `ClassElementSpec."test type annotations cache"` and the three `Annotate*Spec` tests, which
+     * assert exactly that isolation.
+     */
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is KotlinClassNativeElement) return false
@@ -286,5 +323,3 @@ class KotlinSimplePropertyNativeElement(
         return "KotlinSimplePropertyNativeElement(declaration=$declaration)"
     }
 }
-
-
