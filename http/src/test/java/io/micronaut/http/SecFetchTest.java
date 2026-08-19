@@ -56,4 +56,15 @@ class SecFetchTest {
 
         assertEquals(new SecFetch(Site.SAME_ORIGIN, Mode.CORS, Destination.JSON, false), request.getSecFetch());
     }
+
+    @Test
+    void invalidUserHeaderValueMakesFetchMetadataUnknown() {
+        HttpRequest<?> request = HttpRequest.GET("/")
+            .header(HttpHeaders.SEC_FETCH_SITE, Site.SAME_ORIGIN.toString())
+            .header(HttpHeaders.SEC_FETCH_MODE, Mode.CORS.toString())
+            .header(HttpHeaders.SEC_FETCH_DEST, Destination.JSON.toString())
+            .header(HttpHeaders.SEC_FETCH_USER, "?0");
+
+        assertNull(SecFetch.of(request));
+    }
 }
