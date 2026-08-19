@@ -16,6 +16,7 @@
 package io.micronaut.context.visitor;
 
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -36,6 +37,7 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
@@ -131,7 +133,8 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
 
         Set<MemberElement> processed = new HashSet<>();
 
-        classElement.getBeanProperties()
+        classElement.getBeanProperties(PropertyElementQuery.of(classElement)
+                .visibility(BeanProperties.Visibility.ANY))
             .forEach(propertyElement -> {
                 if (propertyElement.hasStereotype(ConfigurationBuilder.class)) {
                     Optional<MethodElement> readMethod = propertyElement.getReadMethod();

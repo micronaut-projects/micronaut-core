@@ -106,6 +106,35 @@ class Buckets {
         ((Map) entryProps2.get('region')).get('type') == 'string'
     }
 
+    void "test each property schema ignores inaccessible inherited explicit properties"() {
+        when:
+        String schema = readSchemaFile(this, 'test.Props', '''
+package test;
+
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.core.annotation.Introspected;
+
+@EachProperty("props")
+class Props extends ParentProps {
+    private String name;
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+}
+
+class ParentProps {
+    @Introspected.Property(accessKind = Introspected.Property.Access.READ)
+    protected String inaccessible;
+}
+''')
+
+        then:
+        def m = readSchema('test.Props', schema)
+        Map entry = ((Map) m.get('$defs')).get('Entry')
+        Map properties = entry.get('properties')
+        properties.get('name').type == 'string'
+    }
+
     void "test nested configuration properties produce separate schema files"() {
         when:
         String schemaOuter = readSchemaFile(this, 'test.Outer', '''
