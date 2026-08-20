@@ -24,7 +24,9 @@ dependencies {
             type = "pom"
         }
     }
-    api(libs.managed.graalpy.embedding)
+    api(libs.managed.graalpy.embedding) {
+        exclude(group = "org.graalvm.python", module = "python-bouncycastle-support")
+    }
     api(libs.managed.polyglot.tools) {
         artifact {
             type = "pom"
