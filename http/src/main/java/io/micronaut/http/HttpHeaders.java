@@ -386,6 +386,34 @@ public interface HttpHeaders extends Headers {
     String SAVE_DATA = "Save-Data";
 
     /**
+     * {@code "Sec-Fetch-Dest"}.
+     *
+     * @since 5.1.12
+     */
+    String SEC_FETCH_DEST = "Sec-Fetch-Dest";
+
+    /**
+     * {@code "Sec-Fetch-Mode"}.
+     *
+     * @since 5.1.12
+     */
+    String SEC_FETCH_MODE = "Sec-Fetch-Mode";
+
+    /**
+     * {@code "Sec-Fetch-Site"}.
+     *
+     * @since 5.1.12
+     */
+    String SEC_FETCH_SITE = "Sec-Fetch-Site";
+
+    /**
+     * {@code "Sec-Fetch-User"}.
+     *
+     * @since 5.1.12
+     */
+    String SEC_FETCH_USER = "Sec-Fetch-User";
+
+    /**
      * {@code "Sec-WebSocket-Key1"}.
      */
     String SEC_WEBSOCKET_KEY1 = "Sec-WebSocket-Key1";
@@ -592,6 +620,10 @@ public interface HttpHeaders extends Headers {
         RETRY_AFTER,
         RTT,
         SAVE_DATA,
+        SEC_FETCH_DEST,
+        SEC_FETCH_MODE,
+        SEC_FETCH_SITE,
+        SEC_FETCH_USER,
         SEC_WEBSOCKET_KEY1,
         SEC_WEBSOCKET_KEY2,
         SEC_WEBSOCKET_LOCATION,
