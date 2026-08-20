@@ -434,6 +434,8 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             }
         } else if (bindingResult.isPresentAndSatisfied()) {
             value = bindingResult.get();
+        } else if (argument.isNullable() && bindingResult.isSatisfied()) {
+            value = null;
         } else {
             return false;
         }
