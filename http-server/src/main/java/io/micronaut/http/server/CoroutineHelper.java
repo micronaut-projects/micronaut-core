@@ -25,6 +25,7 @@ import jakarta.inject.Singleton;
 import reactor.util.context.ContextView;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Coroutines helper.
@@ -45,5 +46,9 @@ public final class CoroutineHelper {
 
     public void setupCoroutineContext(HttpRequest<?> httpRequest, ContextView contextView, PropagatedContext propagatedContext) {
         ContinuationArgumentBinder.setupCoroutineContext(httpRequest, contextView, propagatedContext, coroutineContextFactories);
+    }
+
+    public void setupCoroutineContext(HttpRequest<?> httpRequest, ContextView contextView, PropagatedContext propagatedContext, ExecutorService executorService) {
+        ContinuationArgumentBinder.setupCoroutineContext(httpRequest, contextView, propagatedContext, coroutineContextFactories, executorService);
     }
 }

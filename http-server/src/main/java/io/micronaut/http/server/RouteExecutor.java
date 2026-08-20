@@ -431,12 +431,18 @@ public final class RouteExecutor {
         ExecutionFlow<HttpResponse<?>> executeMethodResponseFlow;
         if (executorService != null) {
             if (routeInfo.isSuspended()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
-                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView, propagatedContext));
-                        return Mono.from(
-                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
-                        );
-                    }));
+                executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(
+                    applyExecutorToPublisher(
+                        Mono.deferContextual(contextView -> {
+                            coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView, propagatedContext, executorService));
+                            return Mono.from(
+                                ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
+                            );
+                        }),
+                        executorService,
+                        propagatedContext
+                    )
+                );
             } else if (routeInfo.isReactive()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request));
             } else {
