@@ -111,13 +111,6 @@ Common sequence in Micronaut repositories:
 ./gradlew docs
 ```
 
-When running tests for any Python submodule, always add the `-Ppython-ci` project
-property so the Python test configuration is enabled. For example:
-
-```bash
-./gradlew -Ppython-ci :<python-module>:test
-```
-
 For API-affecting changes, also run if configured in the repository:
 
 ```bash

@@ -50,14 +50,14 @@ jobs:
           unset JAVA_HOME
           export PATH=$(echo "$PATH" | tr ':' '\n' | grep -v '/usr/lib/jvm' | paste -sd:)
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: "🔧 Setup GraalVM CE"
-        uses: graalvm/setup-graalvm@5298d94fb55a4f185c602eeac5de1b553882abe2 # v1
+      - name: Pre-Build Steps
+        uses: micronaut-projects/github-actions/graalvm/pre-build@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
+        id: pre-build
         with:
-          distribution: 'graalvm'
-          java-version: ${{ matrix.java }}
-          version: '25.1'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          native-image-job-reports: true
+          java: ${{ matrix.java }}
+          distribution: ${{ matrix.distribution }}
+          nativeTestTask: ${{ matrix.native_test_task }}
+          gradle-java: '25'
       - name: Build Steps
         uses: micronaut-projects/github-actions/graalvm/build@5f587657fc12601ab92d64d077f99a54c3cbdf78 # master
         id: build
