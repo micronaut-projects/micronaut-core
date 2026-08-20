@@ -41,7 +41,7 @@ dependencies {
     testImplementation("io.micronaut.serde:micronaut-serde-api") {
         exclude(group = "io.micronaut")
     }
-    testImplementation("jakarta.data:jakarta.data-api:1.1.0-M1")
+    testImplementation("jakarta.data:jakarta.data-api:1.1.0-M3")
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(projects.micronautHttpClient)
     testImplementation(projects.micronautJacksonDatabind)

@@ -49,7 +49,7 @@ dependencies {
     }
     testImplementation("io.micronaut.sql:micronaut-jdbc-hikari")
     testImplementation("com.h2database:h2")
-    testImplementation("jakarta.data:jakarta.data-api:1.1.0-M1")
+    testImplementation("jakarta.data:jakarta.data-api:1.1.0-M3")
     testImplementation(libs.managed.snakeyaml)
 }
 
