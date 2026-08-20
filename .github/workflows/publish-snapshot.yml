@@ -22,14 +22,12 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
-      - name: "🔧 Setup GraalVM CE"
-        uses: graalvm/setup-graalvm@5298d94fb55a4f185c602eeac5de1b553882abe2 # v1
+      - name: Set up JDK
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
-          distribution: 'graalvm'
-          java-version: ${{ matrix.java }}
-          version: '25.1'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          native-image-job-reports: true
+          distribution: 'temurin'
+          java-version: |
+            25
       - name: Publish to Sonatype Snapshots
         if: success()
         env:
