@@ -24,6 +24,8 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.memo.AbstractMemoizer;
+import io.micronaut.core.util.memo.MemoizerNamespace;
 import io.micronaut.core.value.OptionalValues;
 
 import java.lang.annotation.Annotation;
@@ -58,7 +60,7 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
  * @author graemerocher
  * @since 1.3.0
  */
-public final class AnnotationMetadataHierarchy implements AnnotationMetadata, EnvironmentAnnotationMetadata, Iterable<AnnotationMetadata> {
+public final class AnnotationMetadataHierarchy extends AbstractMemoizer<AnnotationMetadata> implements AnnotationMetadata, EnvironmentAnnotationMetadata, Iterable<AnnotationMetadata> {
     /**
      * Constant to represent an empty hierarchy.
      */
@@ -104,6 +106,11 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         System.arraycopy(existing, 0, hierarchy, 0, existing.length);
         hierarchy[0] = newChild;
         delegateDeclaredToAllElements = false;
+    }
+
+    @Override
+    protected @NonNull MemoizerNamespace<AnnotationMetadata> getMemoizerNamespace() {
+        return MEMOIZER_NAMESPACE;
     }
 
     @Override

@@ -22,6 +22,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.memo.Memoizer;
+import io.micronaut.core.util.memo.MemoizerNamespace;
 import io.micronaut.core.value.OptionalValues;
 
 import java.lang.annotation.Annotation;
@@ -55,11 +57,16 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface AnnotationMetadata extends AnnotationSource {
+public interface AnnotationMetadata extends AnnotationSource, Memoizer<AnnotationMetadata> {
     /**
      * A constant for representing empty metadata.
      */
     AnnotationMetadata EMPTY_METADATA = new EmptyAnnotationMetadata();
+
+    /**
+     * Namespace to use for memoized field access. See {@link Memoizer}.
+     */
+    MemoizerNamespace<AnnotationMetadata> MEMOIZER_NAMESPACE = MemoizerNamespace.create();
 
     /**
      * The default {@code value()} member.
