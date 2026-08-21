@@ -675,7 +675,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                             .invoke(COPY_BEAN_CONTEXT_FOR_LAZY_PROXY_TARGET_METHOD, aThis.field(proxyBeanDefinitionField))
                     )
                 ));
-                proxyBuilder.addMethod(getLazyProxyTargetToStringMethod());
+                if (shouldGenerateLazyProxyTargetToStringMethod(interceptedMethods)) {
+                    proxyBuilder.addMethod(getLazyProxyTargetToStringMethod());
+                }
             } else {
                 if (hotswap) {
                     proxyBuilder.addSuperinterface(TypeDef.parameterized(HotSwappableInterceptedProxy.class, targetType));
@@ -931,6 +933,15 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private MethodDef getLazyProxyTargetToStringMethod() {
         return MethodDef.override(METHOD_OBJECT_TO_STRING)
             .build((aThis, methodParameters) -> aThis.invoke(METHOD_INTERCEPTED_TARGET).invoke(METHOD_OBJECT_TO_STRING).returning());
+    }
+
+    private static boolean isToStringMethod(MethodElement methodElement) {
+        return methodElement.getName().equals(METHOD_OBJECT_TO_STRING.getName()) && methodElement.getParameters().length == 0;
+    }
+
+    private boolean shouldGenerateLazyProxyTargetToStringMethod(List<MethodElement> interceptedMethods) {
+        return interceptedMethods.stream().noneMatch(AopProxyWriter::isToStringMethod)
+            && targetType.getMethods().stream().noneMatch(method -> method.isFinal() && isToStringMethod(method));
     }
 
     private MethodDef getCacheLazyTargetInterceptedTargetMethod(FieldDef targetField,
