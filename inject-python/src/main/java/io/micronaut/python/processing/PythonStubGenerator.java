@@ -706,6 +706,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 arguments
                                             )
                                         ));
+                                    } else {
+                                        // Parameterized introspected beans can still use configuration-builder
+                                        // injection after construction. Initialize the Python backing value before
+                                        // the generated bean definition invokes those setters.
+                                        assignments.add(aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(
+                                            PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                                                isAbstractIntroCtor ? "newIntroduction" : "newInstance",
+                                                POLYGLOT_VALUE,
+                                                List.of(pythonClassReference(element, pythonClassReference))
+                                            )
+                                        ));
                                     }
                                     for (int i = 0; i < parameters.length; i++) {
                                         @NonNull ParameterElement parameter = parameters[i];

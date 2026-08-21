@@ -80,6 +80,34 @@ final class PyronautCompilerTest {
     }
 
     @Test
+    void compilesParameterizedIntrospectedPythonConfigurationBean(@TempDir Path sourceDirectory) throws Exception {
+        Files.writeString(sourceDirectory.resolve("team_configuration.py"), """
+            from dataclasses import dataclass, field
+            from typing import Annotated
+
+            from micronaut.context.annotation import ConfigurationBuilder, ConfigurationProperties
+
+            @ConfigurationProperties("team")
+            @dataclass(init=False)
+            class TeamConfiguration:
+                name: str | None = None
+                player_names: list[str] = field(default_factory=list)
+                builder: Annotated[object, ConfigurationBuilder(prefixes="with_", configurationPrefix="team-admin")] = field(init=False)
+
+                def __init__(self, name: str | None = None, player_names: list[str] | None = None):
+                    self.name = name
+                    self.player_names = player_names or []
+        """);
+
+        ClassLoader classLoader = PyronautCompiler.builder()
+            .pythonSrc(sourceDirectory.toString())
+            .build()
+            .buildClassLoader();
+
+        assertNotNull(classLoader.loadClass("pyronaut_application.TeamConfiguration"));
+    }
+
+    @Test
     void optionallyIncludesPythonBytecodeInTheInMemoryVfs() throws Exception {
         ClassLoader classLoader = PyronautCompiler.builder()
             .pythonCode("answer = 42")
