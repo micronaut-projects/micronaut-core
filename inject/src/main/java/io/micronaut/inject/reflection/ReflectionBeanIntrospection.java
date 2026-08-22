@@ -314,8 +314,8 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         Map<String, PropertyMembers> members = propertyMembers;
         for (Class<?> type = beanType; type != null && type != Object.class; type = type.getSuperclass()) {
             for (Method method : type.getDeclaredMethods()) {
-                if (!Modifier.isPublic(method.getModifiers()) || Modifier.isStatic(method.getModifiers())
-                    || method.isSynthetic() || method.isBridge()) {
+                // an accessor of any visibility is a member of the property: what it declares holds
+                if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || method.isBridge()) {
                     continue;
                 }
                 String name = method.getName();
