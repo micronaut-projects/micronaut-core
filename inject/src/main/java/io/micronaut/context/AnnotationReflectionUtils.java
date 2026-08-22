@@ -18,7 +18,7 @@ package io.micronaut.context;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.inject.annotation.ReflectionAnnotationMetadataBuilder;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -31,8 +31,11 @@ import java.lang.reflect.AnnotatedParameterizedType;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.AnnotatedWildcardType;
 import java.lang.reflect.Array;
+import java.lang.reflect.Executable;
+import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -95,6 +98,99 @@ public final class AnnotationReflectionUtils {
      * @param superType The supertype that we want to get the type information for
      * @return The annotated generic supertype, with the same raw type as {@code superType}
      */
+    /**
+     * Converts an annotated type to an {@link Argument}: the raw type, the type arguments recursively, and the
+     * type-use annotations of each level as metadata built by
+     * {@link io.micronaut.inject.annotation.ReflectionAnnotationMetadataBuilder}.
+     *
+     * @param annotatedType The annotated type
+     * @return The argument
+     * @since 5.1
+     */
+    public static Argument<?> argumentOf(AnnotatedType annotatedType) {
+        return toArgument(null, annotatedType, Map.of());
+    }
+
+    /**
+     * Converts an annotated type to a named {@link Argument}.
+     *
+     * @param name          The name of the argument, can be {@code null}
+     * @param annotatedType The annotated type
+     * @return The argument
+     * @since 5.1
+     */
+    public static Argument<?> argumentOf(@Nullable String name, AnnotatedType annotatedType) {
+        return toArgument(name, annotatedType, Map.of());
+    }
+
+    /**
+     * Converts a parameter to an {@link Argument} named after it, whose metadata holds the annotations of the
+     * parameter and the type-use annotations of its type.
+     *
+     * @param parameter The parameter
+     * @return The argument
+     * @since 5.1
+     */
+    public static Argument<?> argumentOf(Parameter parameter) {
+        return withElementAnnotations(toArgument(parameter.getName(), parameter.getAnnotatedType(), Map.of()), parameter);
+    }
+
+    /**
+     * Converts a field to an {@link Argument} named after it, whose metadata holds the annotations of the
+     * field and the type-use annotations of its type.
+     *
+     * @param field The field
+     * @return The argument
+     * @since 5.1
+     */
+    public static Argument<?> argumentOf(Field field) {
+        return withElementAnnotations(toArgument(field.getName(), field.getAnnotatedType(), Map.of()), field);
+    }
+
+    /**
+     * Converts the parameters of a method or constructor to {@link Argument}s.
+     *
+     * @param executable The method or constructor
+     * @return The arguments, in the order of the parameters
+     * @since 5.1
+     */
+    public static Argument<?>[] argumentsOf(Executable executable) {
+        Parameter[] parameters = executable.getParameters();
+        if (parameters.length == 0) {
+            return Argument.ZERO_ARGUMENTS;
+        }
+        Argument<?>[] arguments = new Argument[parameters.length];
+        for (int i = 0; i < parameters.length; i++) {
+            arguments[i] = argumentOf(parameters[i]);
+        }
+        return arguments;
+    }
+
+    /**
+     * Converts the return type of a method to an {@link Argument} carrying the type-use annotations of the
+     * return type. The annotations of the method itself belong to the method, not to its return type.
+     *
+     * @param method The method
+     * @return The argument
+     * @since 5.1
+     */
+    public static Argument<?> returnArgumentOf(Method method) {
+        return toArgument(null, method.getAnnotatedReturnType(), Map.of());
+    }
+
+    private static Argument<?> withElementAnnotations(Argument<?> argument, AnnotatedElement element) {
+        AnnotationMetadata own = ReflectionAnnotationMetadataBuilder.build(element);
+        if (own == AnnotationMetadata.EMPTY_METADATA) {
+            return argument;
+        }
+        return Argument.of(
+            argument.getType(),
+            argument.getName(),
+            combine(argument.getAnnotationMetadata(), own),
+            argument.getTypeParameters()
+        );
+    }
+
     @Nullable
     private static AnnotatedType findAnnotatedSupertype(AnnotatedType subType, Class<?> superType) {
         Class<?> raw = getRawType(subType.getType());
@@ -179,27 +275,7 @@ public final class AnnotationReflectionUtils {
     }
 
     private static AnnotationMetadata annotationMetadataOf(AnnotatedElement annotatedElement) {
-        Annotation[] annotations = annotatedElement.getAnnotations();
-        if (annotations.length == 0) {
-            return AnnotationMetadata.EMPTY_METADATA;
-        }
-        MutableAnnotationMetadata mutableAnnotationMetadata = new MutableAnnotationMetadata();
-        for (Annotation annotation : annotations) {
-            Map<CharSequence, Object> values = new LinkedHashMap<>();
-            Class<? extends Annotation> annotationType = annotation.annotationType();
-            Method[] methods = annotationType.getMethods();
-            for (Method method : methods) {
-                if (!method.getDeclaringClass().equals(annotationType)) {
-                    continue;
-                }
-                Object value = ReflectionUtils.invokeMethod(annotation, method);
-                if (value != null) {
-                    values.put(method.getName(), value);
-                }
-            }
-            mutableAnnotationMetadata.addAnnotation(annotationType.getName(), values);
-        }
-        return mutableAnnotationMetadata;
+        return ReflectionAnnotationMetadataBuilder.build(annotatedElement);
     }
 
     /**

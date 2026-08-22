@@ -355,7 +355,14 @@ public final class AnnotationMetadataSupport {
     static Optional<Class<? extends Annotation>> getAnnotationType(String name, ClassLoader classLoader) {
         final Class<? extends Annotation> type = ANNOTATION_TYPES.get(name);
         if (type != null) {
-            return Optional.of(type);
+            if (type.getClassLoader() == null || type.getClassLoader() == classLoader) {
+                return Optional.of(type);
+            }
+            // the registered type was loaded by another class loader: the caller's loader may define its own
+            // copy — a child-first deployment loader does — and that copy is the one the caller compares with
+            @SuppressWarnings("unchecked") final Class<? extends Annotation> own =
+                (Class<? extends Annotation>) ClassUtils.forName(name, classLoader).orElse(null);
+            return Optional.of(own != null && Annotation.class.isAssignableFrom(own) ? own : type);
         } else {
             // last resort, try dynamic load, shouldn't normally happen.
             @SuppressWarnings("unchecked") final Class<? extends Annotation> aClass =
