@@ -666,8 +666,16 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             this.field = members.field();
             this.getter = members.getter();
             this.setter = members.setter();
+            // a member of a type that is not public is reachable all the same: what it declares is what the
+            // property carries, and the accessor is the only way to the value
             if (field != null) {
                 field.trySetAccessible();
+            }
+            if (getter != null) {
+                getter.trySetAccessible();
+            }
+            if (setter != null) {
+                setter.trySetAccessible();
             }
         }
 
