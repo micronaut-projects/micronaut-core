@@ -33,19 +33,23 @@ EngineBuilder = java.type("io.micronaut.python.annotation.processing.test.Config
 @Introspected
 @dataclass(init=False)
 class TeamConfiguration:
+    name: str = field(default="default")
     builder: Annotated[EngineBuilder, ConfigurationBuilder(prefixes=["with"])] = field(init=False)
 
-    def __init__(self):
+    def __init__(self, name: str):
+        self.name = name
         self.builder = Engine.builder()
 '''
 
         when:
         def context = buildContext(pythonCode, false, [
+                "team.name": "Micronaut",
                 "team.manufacturer": "Toyota"
         ])
         def configuration = getBean(context, "python.TeamConfiguration")
 
         then:
+        configuration.name == "Micronaut"
         configuration.builder.build().manufacturer == "Toyota"
 
         cleanup:

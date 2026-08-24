@@ -700,7 +700,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance)
                                             );
                                         }
-                                        return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, pythonValueFinal);
+                                        return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, pythonValueFinal, extendsPythonClass);
                                     }
                                     List<StatementDef> assignments = new ArrayList<>();
                                     if (constructorParametersBackedByFields) {
@@ -751,7 +751,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         arguments
                                     );
                                     if (isIntrospectedBean && !extendsHostClass) {
-                                        return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, pythonValueFinal);
+                                        return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, pythonValueFinal, extendsPythonClass);
                                     } else if (extendsPythonClass) {
                                         return aThis.superRef().invokeSuperConstructor(pythonInstance);
                                     } else if (extendsHostClass) {
@@ -794,7 +794,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance)
                                     );
                                 }
-                                return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, pythonValueFinal);
+                                return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, pythonValueFinal, extendsPythonClass);
                             } else if (isIntrospectedBean) {
                                 // Keep ordinary introspected beans lazy; resolving their Python class here
                                 // would break beans whose Python constructor requires arguments.
@@ -3959,9 +3959,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ExpressionDef value,
         List<PropertyElement> beanProperties,
         Map<String, FieldDef> propertyFields,
-        @Nullable FieldDef pythonValueField
+        @Nullable FieldDef pythonValueField,
+        boolean extendsPythonClass
     ) {
         List<StatementDef> statements = new ArrayList<>();
+        if (extendsPythonClass) {
+            statements.add(aThis.superRef().invokeSuperConstructor(value));
+        }
         if (pythonValueField != null) {
             statements.add(aThis.field(pythonValueField).assign(value));
         }
