@@ -36,15 +36,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.BlockingDeque;
+import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -67,13 +69,16 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     private final HostAccess hostAccess;
     private final ApplicationContext applicationContext;
     private final GraalPyContextConfiguration contextConfiguration;
-    private final long warnThresholdMs;
+    private final @Nullable Duration warnThreshold;
 
     private final Context primaryContext;
-    private final BlockingDeque<Context> pooledQueue = new LinkedBlockingDeque<>();
-    private final List<Context> pooledContexts = new ArrayList<>();
+
+    private @Nullable Thread creatingContext = null;
+    private final Queue<Context> pooledQueue = new ArrayDeque<>();
+    private final List<Context> pooledContexts = new CopyOnWriteArrayList<>();
     private final Map<PythonEventLoop, Context> eventLoopContexts = new ConcurrentHashMap<>();
     private final Map<Context, Map<String, Value>> cache = new ConcurrentHashMap<>();
+
     private final Map<String, Map<String, Object>> scriptInjections = new ConcurrentHashMap<>();
     private final Map<String, java.util.Set<String>> asyncScriptInjections = new ConcurrentHashMap<>();
 
@@ -108,7 +113,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         this.applicationContext = applicationContext;
         this.contextConfiguration = contextConfiguration;
         int configuredPoolSize = configuration.size();
-        this.warnThresholdMs = configuration.warnWaitMs();
+        this.warnThreshold = configuration.warnWait();
         this.targetSize = configuration.enabled() ? (configuredPoolSize > 0 ? configuredPoolSize : computeDefaultSize()) : 0;
     }
 
@@ -156,30 +161,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return A pooled context ready for exclusive use by the caller
      */
     Context borrow() {
-        long waitedMs = 0L;
-        try {
-            while (true) {
-                Context ctx = pooledQueue.pollFirst();
-                if (ctx != null) {
-                    if (waitedMs >= warnThresholdMs && LOG.isWarnEnabled()) {
-                        LOG.warn("Borrowed context after waiting {} ms (pool size: {}, queue: {})", waitedMs, size.get(), pooledQueue.size());
-                    }
-                    return ctx;
-                }
-                ctx = createBorrowedPooledContext();
-                if (ctx != null) {
-                    return ctx;
-                }
-                Thread.sleep(100);
-                waitedMs += 100;
-                if (warnThresholdMs > 0 && waitedMs % warnThresholdMs == 0 && LOG.isWarnEnabled()) {
-                    LOG.warn("No available Python contexts; waiting {} ms so far (pool target: {}, current: {}, queue: {})", waitedMs, targetSize, size.get(), pooledQueue.size());
-                }
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException(e);
-        }
+        return borrow0(true);
     }
 
     /**
@@ -191,7 +173,10 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         if (closed) {
             return;
         }
-        pooledQueue.addLast(c);
+        synchronized (this) {
+            pooledQueue.add(c);
+            notify();
+        }
     }
 
     int pooledContextCount() {
@@ -199,7 +184,9 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     }
 
     int availableContextCount() {
-        return pooledQueue.size();
+        synchronized (this) {
+            return pooledQueue.size();
+        }
     }
 
     @Override
@@ -289,7 +276,10 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return A context-local class value
      */
     Value getAnyClass(PythonContextRuntime.PythonClassReference classReference) {
-        Context c = pooledQueue.peekFirst();
+        Context c;
+        synchronized (this) {
+            c = pooledQueue.peek();
+        }
         if (c == null) {
             c = primaryContext;
         }
@@ -317,7 +307,10 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @return A context-local script value
      */
     Value getAnyScript(String packageName, String scriptName) {
-        Context c = pooledQueue.peekFirst();
+        Context c;
+        synchronized (this) {
+            c = pooledQueue.peek();
+        }
         if (c == null) {
             c = primaryContext;
         }
@@ -423,26 +416,77 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         if (existing != null) {
             return existing;
         }
-        synchronized (eventLoopContexts) {
-            existing = eventLoopContexts.get(eventLoop);
-            if (existing != null) {
-                return existing;
+        return eventLoopContexts.computeIfAbsent(eventLoop, _ -> borrow0(false));
+    }
+
+    /**
+     * @param pooled When {@code true}, this context should be counted towards {@link #size} and
+     *               included in {@link #pooledContexts}.
+     */
+    private Context borrow0(boolean pooled) {
+        long start = System.nanoTime();
+        long lastWarned = start;
+        boolean interrupted = false;
+        try {
+            synchronized (this) {
+                while (true) {
+                    Context polled = pooledQueue.poll();
+                    if (polled != null) {
+                        if (!pooled) {
+                            size.decrementAndGet();
+                            pooledContexts.remove(polled);
+                        }
+                        return polled;
+                    }
+                    if (creatingContext == null && (!pooled || size.get() < targetSize)) {
+                        // we can create a context.
+                        creatingContext = Thread.currentThread();
+                        break;
+                    }
+                    try {
+                        // another thread is creating a context, wait for it or wait for the queue to get a new item.
+                        if (warnThreshold == null || !warnThreshold.isPositive() || !LOG.isWarnEnabled()) {
+                            wait();
+                        } else {
+                            long now = System.nanoTime();
+                            Duration timeUntilWarn = Duration.ofNanos(lastWarned + warnThreshold.toNanos() - now);
+                            if (!timeUntilWarn.isPositive()) {
+                                LOG.warn("No available Python contexts; waiting {} so far (pool target: {}, current: {}, queue: {})", Duration.ofNanos(now - start), targetSize, size.get(), pooledQueue.size());
+                                lastWarned = now;
+                                timeUntilWarn = warnThreshold;
+                            }
+                            wait(timeUntilWarn.toMillis(), timeUntilWarn.toNanosPart() % 1_000_000);
+                        }
+                    } catch (InterruptedException e) {
+                        interrupted = true;
+                    }
+                    // we were notified, retry polling
+                }
             }
-            Context created = pooledQueue.pollFirst();
-            if (created != null) {
-                pooledContexts.remove(created);
-                size.decrementAndGet();
-            } else {
-                created = createContext();
+            assert creatingContext == Thread.currentThread();
+            try {
+                Context created = createBorrowedPooledContext(pooled);
+                if (created == null) {
+                    throw new IllegalStateException("Pool closed");
+                }
+                return created;
+            } finally {
+                synchronized (this) {
+                    creatingContext = null;
+                    notify();
+                }
             }
-            eventLoopContexts.put(eventLoop, created);
-            cache.put(created, new ConcurrentHashMap<>());
-            return created;
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
-    private synchronized @Nullable Context createBorrowedPooledContext() {
-        if (closed || size.get() >= targetSize) {
+    private @Nullable Context createBorrowedPooledContext(boolean pooled) {
+        assert Thread.currentThread() == creatingContext;
+
+        if (closed) {
             return null;
         }
         if (LOG.isDebugEnabled()) {
@@ -465,13 +509,17 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
             }
             return null;
         }
-        pooledContexts.add(c);
         cache.put(c, new ConcurrentHashMap<>());
-        size.incrementAndGet();
+        if (pooled) {
+            pooledContexts.add(c);
+            size.incrementAndGet();
+        }
         return c;
     }
 
     private Context createContext() {
+        assert Thread.currentThread() == creatingContext;
+
         try {
             return GraalPyContextFactory.buildContext(
                 hostAccess,
@@ -482,10 +530,6 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         } catch (IOException e) {
             throw new ApplicationStartupException("Failed to create Python context: " + e.getMessage(), e);
         }
-    }
-
-    private List<Context> snapshot() {
-        return new ArrayList<>(pooledContexts);
     }
 
     private List<Context> snapshotIncludingPrimary() {
@@ -558,17 +602,26 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     @Override
     public CompletionStage<?> shutdownGracefully() {
         if (gracefulShutdownStarted.compareAndSet(false, true)) {
-            closed = true;
-            PythonContextRuntime.onNoActiveExecutions(snapshotIncludingPrimary(), () -> gracefulShutdown.complete(null));
+            List<Context> contexts;
+            synchronized (this) {
+                closed = true;
+                notifyAll();
+                contexts = snapshotIncludingPrimary();
+            }
+            PythonContextRuntime.onNoActiveExecutions(contexts, () -> gracefulShutdown.complete(null));
         }
         return gracefulShutdown;
     }
 
     private void closePool() {
-        closed = true;
-        List<Context> snapshot = snapshot();
-        pooledContexts.removeAll(snapshot);
-        pooledQueue.removeAll(snapshot);
+        List<Context> snapshot;
+        synchronized (this) {
+            closed = true;
+            notifyAll();
+            snapshot = new ArrayList<>(pooledContexts);
+            pooledContexts.removeAll(snapshot);
+            pooledQueue.removeAll(snapshot);
+        }
         List<Context> eventLoopSnapshot = new ArrayList<>(eventLoopContexts.values());
         eventLoopContexts.clear();
         cache.clear();
