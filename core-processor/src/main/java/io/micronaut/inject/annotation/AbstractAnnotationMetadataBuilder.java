@@ -86,6 +86,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final List<AnnotationRemapper> ALL_ANNOTATION_REMAPPERS = new ArrayList<>(5);
     private static final Map<Object, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
+    private static final String ALIAS_FOR_MEMBER = "member";
 
     static {
         ClassLoader classLoader = resolveServiceClassLoader();
@@ -673,7 +674,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             Object annotationValue = entry.getValue();
             if (aliasForValues.isPresent()) {
                 AnnotationValue<AliasFor> aliasFor = aliasForValues.get();
-                Optional<String> aliasMember = aliasFor.stringValue("member");
+                Optional<String> aliasMember = aliasFor.stringValue(ALIAS_FOR_MEMBER);
                 Optional<String> aliasAnnotation = aliasFor.stringValue("annotation");
                 Optional<String> aliasAnnotationName = aliasFor.stringValue("annotationName");
                 if (aliasMember.isPresent() && !(aliasAnnotation.isPresent() || aliasAnnotationName.isPresent())) {
@@ -839,7 +840,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                         List<IntroducedAlias> introducedAnnotations) {
         Optional<String> aliasAnnotation = aliasForAnnotation.stringValue("annotation");
         Optional<String> aliasAnnotationName = aliasForAnnotation.stringValue("annotationName");
-        Optional<String> aliasMember = aliasForAnnotation.stringValue("member");
+        Optional<String> aliasMember = aliasForAnnotation.stringValue(ALIAS_FOR_MEMBER);
 
         if (aliasAnnotation.isPresent() || aliasAnnotationName.isPresent()) {
             if (aliasMember.isPresent()) {
@@ -1155,9 +1156,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         } else if (annotationValue.getAnnotationName().equals(AliasFor.class.getName())) {
             AnnotationValue<AliasFor> aliasFor = (AnnotationValue<AliasFor>) annotationValue;
-            if (aliasFor.stringValue("member").isEmpty()) {
+            if (aliasFor.stringValue(ALIAS_FOR_MEMBER).isEmpty()) {
                 // Default to the name of the annotated member, which the transformer cannot know
-                aliasFor = aliasFor.mutate().member("member", getAnnotationMemberName(annotationMember)).build();
+                aliasFor = aliasFor.mutate().member(ALIAS_FOR_MEMBER, getAnnotationMemberName(annotationMember)).build();
             }
             aliases.add(aliasFor);
         }
@@ -1508,12 +1509,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     continue;
                 }
                 T member = getAnnotationMember(annotationType, key);
-                if (member == null || !hasAnnotations(member)) {
-                    continue;
-                }
-                for (AnnotationValue<AliasFor> aliasFor : getMemberAliases(annotationType, member)) {
-                    if (aliasFor.booleanValue("applyDefault").orElse(false)) {
-                        processAnnotationAlias(newValues, defaultValue, aliasFor, introducedAnnotations);
+                if (member != null && hasAnnotations(member)) {
+                    for (AnnotationValue<AliasFor> aliasFor : getMemberAliases(annotationType, member)) {
+                        if (aliasFor.booleanValue("applyDefault").orElse(false)) {
+                            processAnnotationAlias(newValues, defaultValue, aliasFor, introducedAnnotations);
+                        }
                     }
                 }
             }
@@ -2059,6 +2059,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * An annotation introduced by an alias, together with the occurrence index of the aliased
      * repeatable annotation ({@link AliasFor#index()}).
      */
+    @SuppressWarnings("java:S6206") // cannot be a record: ProcessedAnnotation is an inner class of the generic builder and unavailable in a static context
     private final class IntroducedAlias {
         private final ProcessedAnnotation annotation;
         private final int index;
