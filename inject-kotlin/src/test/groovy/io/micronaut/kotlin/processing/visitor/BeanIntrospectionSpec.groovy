@@ -2562,4 +2562,76 @@ class MyMessage: Message()
         then:
         noExceptionThrown()
     }
+
+    void "every declared constructor is described including secondary constructors"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(constructors = true)
+class Order(val name: String, val quantity: Int) {
+    constructor() : this("none", 0)
+    constructor(name: String) : this(name, 0)
+}
+''')
+
+        then:
+        introspection.getConstructors().size() == 3
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+        introspection.getConstructors()*.arguments*.length.toSorted() == [0, 1, 2]
+    }
+
+    void "instantiating through a described constructor works"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(constructors = true)
+class Order(val name: String) {
+    constructor() : this("none")
+}
+''')
+        def order = introspection.getConstructors().find { it.arguments.length == 1 }.instantiate("abc")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(order) == "abc"
+    }
+
+    void "a data class describes its constructor"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(constructors = true)
+data class Order(val name: String, val quantity: Int)
+''')
+
+        then:
+        introspection.getConstructors().size() == 1
+        introspection.getConstructors()[0].arguments.length == 2
+    }
+
+    void "an introspection that did not ask for constructors keeps describing one"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Order(val name: String) {
+    constructor() : this("none")
+}
+''')
+
+        then:
+        introspection.getConstructors().size() == 1
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+    }
 }

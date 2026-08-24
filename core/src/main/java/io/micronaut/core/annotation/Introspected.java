@@ -206,6 +206,20 @@ public @interface Introspected {
     IntrospectionBuilder builder() default @IntrospectionBuilder();
 
     /**
+     * Whether every declared constructor of the type should be described by the introspection and
+     * exposed via {@link io.micronaut.core.beans.BeanIntrospection#getConstructors()}, including
+     * each constructor's annotation metadata and the annotation metadata of its parameters.
+     *
+     * <p>The default is {@code false} so that only the constructor used to instantiate beans is
+     * described. Individual constructors can also be opted in by annotating them with
+     * {@code io.micronaut.context.annotation.Executable}.</p>
+     *
+     * @return True if all declared constructors should be described
+     * @since 5.2.0
+     */
+    boolean constructors() default false;
+
+    /**
      * Configuration for an introspection builder.
      */
     @Documented

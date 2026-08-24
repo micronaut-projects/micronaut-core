@@ -33,6 +33,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumConstantElement;
@@ -98,6 +99,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
     private static final String FIELD_CONSTRUCTOR_ARGUMENTS = "$CONSTRUCTOR_ARGUMENTS";
     private static final String FIELD_BEAN_PROPERTIES_REFERENCES = "$PROPERTIES_REFERENCES";
     private static final String FIELD_BEAN_METHODS_REFERENCES = "$METHODS_REFERENCES";
+    private static final String FIELD_BEAN_CONSTRUCTORS_REFERENCES = "$CONSTRUCTORS_REFERENCES";
     private static final String FIELD_ENUM_CONSTANTS_REFERENCES = "$ENUM_CONSTANTS_REFERENCES";
     private static final java.lang.reflect.Method FIND_PROPERTY_BY_INDEX_METHOD =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getPropertyByIndex", int.class);
@@ -135,6 +137,24 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         Argument[].class,
         AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
         AbstractInitializableBeanIntrospection.BeanMethodRef[].class
+    );
+
+    private static final java.lang.reflect.Constructor<?> INTROSPECTION_SUPER_CONSTRUCTOR_WITH_CONSTRUCTORS = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractInitializableBeanIntrospectionAndReference.class,
+        Class.class,
+        AnnotationMetadata.class,
+        AnnotationMetadata.class,
+        Argument[].class,
+        AbstractInitializableBeanIntrospection.BeanPropertyRef[].class,
+        AbstractInitializableBeanIntrospection.BeanMethodRef[].class,
+        AbstractInitializableBeanIntrospection.BeanConstructorRef[].class
+    );
+
+    private static final java.lang.reflect.Constructor<?> BEAN_CONSTRUCTOR_REF_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractInitializableBeanIntrospection.BeanConstructorRef.class,
+        AnnotationMetadata.class,
+        Argument[].class,
+        int.class
     );
 
     private static final java.lang.reflect.Constructor<?> ENUM_INTROSPECTION_SUPER_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
@@ -184,6 +204,16 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         "hasConstructor"
     );
 
+    private static final java.lang.reflect.Method INSTANTIATE_CONSTRUCTOR_INTERNAL_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        AbstractInitializableBeanIntrospection.class,
+        "instantiateConstructorInternal", int.class, Object[].class
+    );
+
+    private static final java.lang.reflect.Method UNKNOWN_DISPATCH_AT_INDEX_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        AbstractInitializableBeanIntrospection.class,
+        "unknownDispatchAtIndexException", int.class
+    );
+
     private final String introspectionName;
     private final ClassTypeDef introspectionTypeDef;
     private final Map<AnnotationWithValue, String> indexByAnnotationAndValue = new HashMap<>(2);
@@ -196,6 +226,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
 
     private final List<BeanPropertyData> beanProperties = new ArrayList<>();
     private final List<BeanMethodData> beanMethods = new ArrayList<>();
+    private final List<MethodElement> declaredConstructors = new ArrayList<>();
 
     private final DispatchWriter dispatchWriter;
     private final EvaluatedExpressionProcessor evaluatedExpressionProcessor;
@@ -671,6 +702,34 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         } else {
             beanMethodsField = null;
         }
+        FieldDef beanConstructorsField;
+        List<MethodElement> orderedDeclaredConstructors = isEnum ? List.of() : getOrderedDeclaredConstructors();
+        if (!orderedDeclaredConstructors.isEmpty()) {
+            ClassTypeDef beanConstructorRefType = ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanConstructorRef.class);
+            List<ExpressionDef> constructorsExpressions = new ArrayList<>();
+            for (int i = 0; i < orderedDeclaredConstructors.size(); i++) {
+                MethodElement declaredConstructor = orderedDeclaredConstructors.get(i);
+                int constructorIndex = i;
+                MethodDef metadataMethod = MethodDef.builder("$constructor$" + constructorIndex + "$metadata")
+                    .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+                    .returns(beanConstructorRefType)
+                    .build((aThis, methodParameters) -> newBeanConstructorRef(declaredConstructor, constructorIndex, loadClassValueExpressionFn).returning());
+                classDefBuilder.addMethod(metadataMethod);
+                constructorsExpressions.add(thisType.invokeStatic(metadataMethod));
+            }
+            beanConstructorsField = FieldDef.builder(FIELD_BEAN_CONSTRUCTORS_REFERENCES, AbstractInitializableBeanIntrospection.BeanConstructorRef[].class)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+                .initializer(
+                    beanConstructorRefType.array()
+                        .instantiate(
+                            constructorsExpressions
+                        )
+                )
+                .build();
+            classDefBuilder.addField(beanConstructorsField);
+        } else {
+            beanConstructorsField = null;
+        }
         if (isEnum) {
             enumsField = FieldDef.builder(FIELD_ENUM_CONSTANTS_REFERENCES, AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef[].class)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
@@ -748,11 +807,18 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                     if (enumsField != null) {
                         values.add(introspectionTypeDef.getStaticField(enumsField));
                         return aThis.superRef().invokeConstructor(ENUM_INTROSPECTION_SUPER_CONSTRUCTOR, values);
+                    } else if (beanConstructorsField != null) {
+                        values.add(introspectionTypeDef.getStaticField(beanConstructorsField));
+                        return aThis.superRef().invokeConstructor(INTROSPECTION_SUPER_CONSTRUCTOR_WITH_CONSTRUCTORS, values);
                     } else {
                         return aThis.superRef().invokeConstructor(INTROSPECTION_SUPER_CONSTRUCTOR, values);
                     }
                 })
         );
+
+        if (!orderedDeclaredConstructors.isEmpty()) {
+            classDefBuilder.addMethod(getInstantiateConstructorMethod(orderedDeclaredConstructors));
+        }
 
         MethodDef dispatchOneMethod = dispatchWriter.buildDispatchOneMethod();
         if (dispatchOneMethod != null) {
@@ -965,6 +1031,95 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         throw new IllegalStateException("Property not found: " + propertyName + " " + beanClassElement.getName());
     }
 
+    /**
+     * Orders the visited declared constructors so that the constructor described by
+     * {@link BeanIntrospection#getConstructor()} comes first, per the contract of
+     * {@link BeanIntrospection#getConstructors()}.
+     */
+    private List<MethodElement> getOrderedDeclaredConstructors() {
+        if (declaredConstructors.isEmpty()) {
+            return List.of();
+        }
+        List<MethodElement> ordered = new ArrayList<>(declaredConstructors);
+        MethodElement instantiatingConstructor = constructor != null ? constructor : defaultConstructor;
+        if (instantiatingConstructor != null) {
+            MethodElement match = instantiatingConstructor instanceof ConstructorElement
+                ? ordered.stream().filter(candidate -> isSameConstructor(candidate, instantiatingConstructor)).findFirst().orElse(null)
+                : null;
+            if (match != null) {
+                ordered.remove(match);
+                ordered.add(0, match);
+            } else {
+                // a static creator, or a constructor that was not visited as a declared one
+                ordered.add(0, instantiatingConstructor);
+            }
+        }
+        return ordered;
+    }
+
+    private static boolean isSameConstructor(MethodElement a, MethodElement b) {
+        if (a == b) {
+            return true;
+        }
+        ParameterElement[] parameters1 = a.getParameters();
+        ParameterElement[] parameters2 = b.getParameters();
+        if (parameters1.length != parameters2.length) {
+            return false;
+        }
+        for (int i = 0; i < parameters1.length; i++) {
+            if (!parameters1[i].getType().getName().equals(parameters2[i].getType().getName())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private ExpressionDef newBeanConstructorRef(MethodElement declaredConstructor,
+                                                int constructorIndex,
+                                                Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        return ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanConstructorRef.class)
+            .instantiate(
+                BEAN_CONSTRUCTOR_REF_CONSTRUCTOR,
+
+                // 1: annotation metadata
+                getAnnotationMetadataExpression(declaredConstructor.getAnnotationMetadata(), loadClassValueExpressionFn),
+                // 2: arguments
+                ArrayUtils.isEmpty(declaredConstructor.getParameters()) ? ExpressionDef.nullValue() : ArgumentExpUtils.pushBuildArgumentsForMethod(
+                    annotationMetadata,
+                    declaredConstructor.getOwningType(),
+                    introspectionTypeDef,
+                    Arrays.asList(declaredConstructor.getParameters()),
+                    loadClassValueExpressionFn
+                ),
+                // 3: instantiate dispatch index
+                ExpressionDef.constant(constructorIndex)
+            );
+    }
+
+    private MethodDef getInstantiateConstructorMethod(List<MethodElement> orderedDeclaredConstructors) {
+        return MethodDef.override(INSTANTIATE_CONSTRUCTOR_INTERNAL_METHOD)
+            .build((aThis, methodParameters) -> {
+                Map<ExpressionDef.Constant, StatementDef> switchCases = new LinkedHashMap<>();
+                for (int i = 0; i < orderedDeclaredConstructors.size(); i++) {
+                    MethodElement declaredConstructor = orderedDeclaredConstructors.get(i);
+                    List<StatementDef> statements = new ArrayList<>();
+                    List<ExpressionDef> values = IntStream.range(0, declaredConstructor.getParameters().length)
+                        .<ExpressionDef>mapToObj(index -> methodParameters.get(1).arrayElement(index))
+                        .toList();
+                    statements.add(
+                        MethodGenUtils.invokeBeanConstructor(ClassElement.of(introspectionName), declaredConstructor, true, values, statements)
+                            .returning()
+                    );
+                    switchCases.put(ExpressionDef.constant(i), StatementDef.multi(statements));
+                }
+                return methodParameters.get(0).asStatementSwitch(
+                    TypeDef.OBJECT,
+                    switchCases,
+                    aThis.invoke(UNKNOWN_DISPATCH_AT_INDEX_METHOD, methodParameters.get(0)).doThrow()
+                );
+            });
+    }
+
     private MethodDef getInstantiateMethod(MethodElement constructor, Method method) {
         return MethodDef.override(method)
             .build((aThis, methodParameters) -> {
@@ -1032,6 +1187,17 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
      */
     void visitDefaultConstructor(MethodElement constructor) {
         this.defaultConstructor = constructor;
+        processConstructorEvaluatedMetadata(constructor);
+    }
+
+    /**
+     * Visit a declared constructor that should be described by the introspection and exposed via
+     * {@link BeanIntrospection#getConstructors()}.
+     *
+     * @param constructor The constructor
+     */
+    void visitDeclaredConstructor(MethodElement constructor) {
+        declaredConstructors.add(constructor);
         processConstructorEvaluatedMetadata(constructor);
     }
 

@@ -37,6 +37,7 @@ import jakarta.validation.Constraint
 import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
 import spock.lang.Issue
 
@@ -6189,6 +6190,166 @@ class SharedBuilder {
 
         cleanup:
         context?.close()
+    }
+
+    void "every declared constructor is described"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotNull;
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+    Order(@NotNull String name) {}
+    Order(String name, int quantity) {}
+}
+''')
+
+        when:
+        def constructors = introspection.getConstructors()
+
+        then:
+        constructors.size() == 3
+        // getConstructor() first, per the contract
+        constructors[0].arguments.length == introspection.constructor.arguments.length
+        constructors*.arguments*.length.toSorted() == [0, 1, 2]
+    }
+
+    void "a constructor carries the annotations of its parameters"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import java.util.List;
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+    Order(@NotNull String name, List<@Valid Line> lines) {}
+}
+
+class Line {}
+''')
+
+        when:
+        def constructor = introspection.getConstructors().find { it.arguments.length == 2 }
+
+        then:
+        constructor.arguments[0].annotationMetadata.hasAnnotation(NotNull)
+        constructor.arguments[1].typeParameters[0].annotationMetadata.hasAnnotation('jakarta.validation.Valid')
+    }
+
+    void "a constructor carries its own annotations"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+    @Deprecated Order(String name) {}
+}
+''')
+
+        expect:
+        introspection.getConstructors().find { it.arguments.length == 1 }.annotationMetadata.hasAnnotation(Deprecated)
+    }
+
+    void "an introspection that did not ask for constructors keeps describing one"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Order {
+    Order() {}
+    Order(String name) {}
+}
+''')
+
+        expect:
+        introspection.getConstructors().size() == 1
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+    }
+
+    void "a constructor annotated as executable is described"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+class Order {
+    Order() {}
+    @Executable Order(String name) {}
+    Order(String name, int quantity) {}
+}
+''')
+
+        when:
+        def constructors = introspection.getConstructors()
+
+        then:
+        // the bean instantiating constructor, plus the one asked for by @Executable
+        constructors.size() == 2
+        constructors[0].arguments.length == introspection.constructor.arguments.length
+        constructors[1].arguments.length == 1
+    }
+
+    void "instantiating through a described constructor works"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(constructors = true)
+class Order {
+    final String name;
+    Order() { this.name = "none"; }
+    Order(String name) { this.name = name; }
+    public String getName() { return name; }
+}
+''')
+
+        when:
+        def order = introspection.getConstructors().find { it.arguments.length == 1 }.instantiate("abc")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(order) == "abc"
+    }
+
+    void "type level executable does not sweep in every constructor"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+@Executable
+class Order {
+    Order() {}
+    Order(String name) {}
+    Order(String name, int quantity) {}
+}
+''')
+
+        expect:
+        introspection.getConstructors().size() == 1
     }
 
     @Override

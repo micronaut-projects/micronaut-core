@@ -171,6 +171,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     getExternalPropertyElementQuery(element, ce, ignoreSettersWithDifferingType),
                     ce,
                     writer,
+                    isDescribeConstructors(ce, introspected),
                     context
                 );
             });
@@ -203,6 +204,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                             getExternalPropertyElementQuery(element, classElement, ignoreSettersWithDifferingType),
                             classElement,
                             writer,
+                            isDescribeConstructors(classElement, introspected),
                             context);
                     }
                 }
@@ -230,8 +232,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     context
                 );
             }
-            processElement(metadata, indexedAnnotations, element, writer, ignoreSettersWithDifferingType, context);
+            processElement(metadata, indexedAnnotations, element, writer, ignoreSettersWithDifferingType, isDescribeConstructors(element, introspected), context);
         }
+    }
+
+    private static boolean isDescribeConstructors(ClassElement ce, AnnotationValue<Introspected> introspected) {
+        return ce.findAnnotation(Introspected.class).orElse(introspected).booleanValue("constructors").orElse(false);
     }
 
     private void processBuilderDefinition(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected, int index, String targetPackage, boolean useLongBuilderName) {
@@ -387,6 +393,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 ClassElement ce,
                                 BeanIntrospectionWriter writer,
                                 boolean ignoreSettersWithDifferingType,
+                                boolean describeConstructors,
                                 VisitorContext visitorContext) {
 
         processElement(metadata,
@@ -394,6 +401,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             PropertyElementQuery.of(ce).ignoreSettersWithDifferingType(ignoreSettersWithDifferingType),
             ce,
             writer,
+            describeConstructors,
             visitorContext
         );
     }
@@ -507,6 +515,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 PropertyElementQuery propertyElementQuery,
                                 ClassElement ce,
                                 BeanIntrospectionWriter writer,
+                                boolean describeConstructors,
                                 VisitorContext context) {
         if (isAlreadyWritten(ce, writer)) {
             processed.add(ce.getName());
@@ -522,6 +531,14 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             }
         });
         ce.getDefaultConstructor().ifPresent(writer::visitDefaultConstructor);
+
+        if (!ce.isEnum()) {
+            for (MethodElement declaredConstructor : ce.getEnclosedElements(ElementQuery.CONSTRUCTORS)) {
+                if (describeConstructors || declaredConstructor.hasDeclaredStereotype(Executable.class)) {
+                    writer.visitDeclaredConstructor(declaredConstructor);
+                }
+            }
+        }
 
         for (PropertyElement beanProperty : beanProperties) {
             if (beanProperty.isExcluded()) {

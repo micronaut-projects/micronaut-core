@@ -38,6 +38,28 @@ public abstract class AbstractInitializableBeanIntrospectionAndReference<B> exte
         super(beanType, annotationMetadata, constructorAnnotationMetadata, constructorArguments, propertiesRefs, methodsRefs);
     }
 
+    /**
+     * Constructor variant used by generated introspections that describe all of their declared constructors.
+     *
+     * @param beanType The bean type
+     * @param annotationMetadata The annotation metadata
+     * @param constructorAnnotationMetadata The constructor annotation metadata
+     * @param constructorArguments The constructor arguments
+     * @param propertiesRefs The property references
+     * @param methodsRefs The method references
+     * @param constructorsRefs The declared constructor references, the bean instantiating constructor first
+     * @since 5.2.0
+     */
+    protected AbstractInitializableBeanIntrospectionAndReference(Class<B> beanType,
+                                                                 AnnotationMetadata annotationMetadata,
+                                                                 AnnotationMetadata constructorAnnotationMetadata,
+                                                                 Argument<?>[] constructorArguments,
+                                                                 BeanPropertyRef<Object>[] propertiesRefs,
+                                                                 BeanMethodRef<Object>[] methodsRefs,
+                                                                 BeanConstructorRef<B>[] constructorsRefs) {
+        super(beanType, annotationMetadata, constructorAnnotationMetadata, constructorArguments, propertiesRefs, methodsRefs, constructorsRefs);
+    }
+
     @Override
     public BeanIntrospection<B> load() {
         return this;

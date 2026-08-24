@@ -88,8 +88,13 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     private final List<BeanMethod<B, Object>> beanMethodsList;
     private final StringIntMap beanPropertyIndex;
 
+    private final BeanConstructorRef<B> @Nullable [] constructorsRefs;
+
     @Nullable
     private BeanConstructor<B> beanConstructor;
+
+    @Nullable
+    private List<BeanConstructor<B>> beanConstructorsList;
 
     @Nullable
     private IntrospectionBuilderData builderData;
@@ -100,6 +105,29 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                                                      @Nullable Argument<?>[] constructorArguments,
                                                      @Nullable BeanPropertyRef<Object>[] propertiesRefs,
                                                      @Nullable BeanMethodRef<Object>[] methodsRefs) {
+        this(beanType, annotationMetadata, constructorAnnotationMetadata, constructorArguments, propertiesRefs, methodsRefs, null);
+    }
+
+    /**
+     * Constructor variant used by generated introspections that describe all of their declared constructors.
+     *
+     * @param beanType The bean type
+     * @param annotationMetadata The annotation metadata
+     * @param constructorAnnotationMetadata The constructor annotation metadata
+     * @param constructorArguments The constructor arguments
+     * @param propertiesRefs The property references
+     * @param methodsRefs The method references
+     * @param constructorsRefs The declared constructor references, the bean instantiating constructor first
+     * @since 5.2.0
+     */
+    protected AbstractInitializableBeanIntrospection(Class<B> beanType,
+                                                     @Nullable AnnotationMetadata annotationMetadata,
+                                                     @Nullable AnnotationMetadata constructorAnnotationMetadata,
+                                                     @Nullable Argument<?>[] constructorArguments,
+                                                     @Nullable BeanPropertyRef<Object>[] propertiesRefs,
+                                                     @Nullable BeanMethodRef<Object>[] methodsRefs,
+                                                     BeanConstructorRef<B> @Nullable [] constructorsRefs) {
+        this.constructorsRefs = constructorsRefs;
         this.beanType = beanType;
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
         this.constructorAnnotationMetadata = constructorAnnotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(constructorAnnotationMetadata);
@@ -870,6 +898,39 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             };
         }
         return beanConstructor;
+    }
+
+    @Override
+    public List<BeanConstructor<B>> getConstructors() {
+        if (constructorsRefs == null) {
+            return List.of(getConstructor());
+        }
+        List<BeanConstructor<B>> constructors = beanConstructorsList;
+        if (constructors == null) {
+            List<BeanConstructor<B>> newConstructors = new ArrayList<>(constructorsRefs.length);
+            for (BeanConstructorRef<B> constructorRef : constructorsRefs) {
+                newConstructors.add(new BeanConstructorImpl(constructorRef));
+            }
+            constructors = Collections.unmodifiableList(newConstructors);
+            beanConstructorsList = constructors;
+        }
+        return constructors;
+    }
+
+    /**
+     * Reflection free instantiation implementation for a declared constructor described by
+     * {@link #getConstructors()}. Generated introspections override this method with a switch
+     * over the described constructors.
+     *
+     * @param index     The constructor index
+     * @param arguments The arguments
+     * @return The bean
+     * @since 5.2.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected B instantiateConstructorInternal(int index, @Nullable Object @Nullable [] arguments) {
+        throw unknownDispatchAtIndexException(index);
     }
 
     @Override
@@ -1800,6 +1861,57 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     }
 
     /**
+     * Implementation of {@link BeanConstructor} that is using {@link BeanConstructorRef} and constructor dispatch.
+     */
+    private final class BeanConstructorImpl implements BeanConstructor<B> {
+
+        private final BeanConstructorRef<B> ref;
+
+        private BeanConstructorImpl(BeanConstructorRef<B> ref) {
+            this.ref = ref;
+        }
+
+        @Override
+        public Class<B> getDeclaringBeanType() {
+            return beanType;
+        }
+
+        @Override
+        public Argument<?>[] getArguments() {
+            return ref.arguments;
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return ref.annotationMetadata;
+        }
+
+        @Override
+        public B instantiate(@Nullable Object... parameterValues) {
+            ArgumentUtils.requireNonNull("parameterValues", parameterValues);
+            Argument<?>[] arguments = ref.arguments;
+            if (arguments.length != parameterValues.length) {
+                throw new InstantiationException("Argument count [" + parameterValues.length + "] doesn't match required argument count: " + arguments.length);
+            }
+            for (int i = 0; i < arguments.length; i++) {
+                Argument<?> argument = arguments[i];
+                final Object specified = parameterValues[i];
+                if (specified == null) {
+                    if (argument.isDeclaredNullable()) {
+                        continue;
+                    } else {
+                        throw new InstantiationException("Null argument specified for [" + argument.getName() + "]. If this argument is allowed to be null annotate it with @Nullable");
+                    }
+                }
+                if (!ReflectionUtils.getWrapperType(argument.getType()).isInstance(specified)) {
+                    throw new InstantiationException("Invalid argument [" + specified + "] specified for argument: " + argument);
+                }
+            }
+            return instantiateConstructorInternal(ref.instantiateIndex, parameterValues);
+        }
+    }
+
+    /**
      * Implementation of {@link BeanMethod} that is using {@link BeanMethodRef} and method dispatch.
      *
      * @param <P> The property type
@@ -1960,6 +2072,29 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             this.annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
             this.arguments = arguments;
             this.methodIndex = methodIndex;
+        }
+    }
+
+    /**
+     * Bean constructor compile-time data container.
+     *
+     * @param <B> The bean type.
+     * @since 5.2.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    public static final class BeanConstructorRef<B> {
+        final AnnotationMetadata annotationMetadata;
+        final Argument<?>[] arguments;
+
+        final int instantiateIndex;
+
+        public BeanConstructorRef(@Nullable AnnotationMetadata annotationMetadata,
+                                  Argument<?> @Nullable [] arguments,
+                                  int instantiateIndex) {
+            this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
+            this.arguments = arguments == null ? Argument.ZERO_ARGUMENTS : arguments;
+            this.instantiateIndex = instantiateIndex;
         }
     }
 
