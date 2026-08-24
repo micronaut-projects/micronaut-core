@@ -430,7 +430,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     if (!isJunit5Test && !extendsHostClass) {
                         if (isIntrospectedBean) {
-                            builder.addMethod(
+                        builder.addMethod(
                                 MethodDef.constructor()
                                     .addModifiers(Modifier.PUBLIC)
                                     .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
@@ -698,12 +698,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             List<ExpressionDef> superArguments = superConstructorArguments(superType, parameters, methodParameters);
                                             return StatementDef.multi(
                                                 aThis.superRef().invokeSuperConstructor(superArguments),
-                                                aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance)
+                                                initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, pythonValueFinal, false)
                                             );
                                         }
                                         return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, pythonValueFinal, extendsPythonClass);
                                     }
                                     List<StatementDef> assignments = new ArrayList<>();
+                                    if (extendsHostClass) {
+                                        assignments.add(aThis.superRef().invokeSuperConstructor(superConstructorArguments(superType, parameters, methodParameters)));
+                                    }
                                     if (constructorParametersBackedByFields) {
                                         // Ordinary field-backed introspected beans must not invoke a Python
                                         // constructor whose parameters are supplied by Micronaut.
@@ -792,7 +795,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 if (extendsHostClass) {
                                     return StatementDef.multi(
                                         aThis.superRef().invokeSuperConstructor(superConstructorArguments(superType, new ParameterElement[0], methodParameters)),
-                                        aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance)
+                                        initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, pythonValueFinal, false)
                                     );
                                 }
                                 return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, pythonValueFinal, extendsPythonClass);
