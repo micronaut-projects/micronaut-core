@@ -88,7 +88,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     private final List<BeanMethod<B, Object>> beanMethodsList;
     private final StringIntMap beanPropertyIndex;
 
-    private final BeanConstructorRef<B> @Nullable [] constructorsRefs;
+    private final BeanConstructorRef @Nullable [] constructorsRefs;
 
     @Nullable
     private BeanConstructor<B> beanConstructor;
@@ -126,7 +126,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                                                      @Nullable Argument<?>[] constructorArguments,
                                                      @Nullable BeanPropertyRef<Object>[] propertiesRefs,
                                                      @Nullable BeanMethodRef<Object>[] methodsRefs,
-                                                     BeanConstructorRef<B> @Nullable [] constructorsRefs) {
+                                                     BeanConstructorRef @Nullable [] constructorsRefs) {
         this.constructorsRefs = constructorsRefs;
         this.beanType = beanType;
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
@@ -908,7 +908,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         List<BeanConstructor<B>> constructors = beanConstructorsList;
         if (constructors == null) {
             List<BeanConstructor<B>> newConstructors = new ArrayList<>(constructorsRefs.length);
-            for (BeanConstructorRef<B> constructorRef : constructorsRefs) {
+            for (BeanConstructorRef constructorRef : constructorsRefs) {
                 newConstructors.add(new BeanConstructorImpl(constructorRef));
             }
             constructors = Collections.unmodifiableList(newConstructors);
@@ -1865,9 +1865,9 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     private final class BeanConstructorImpl implements BeanConstructor<B> {
 
-        private final BeanConstructorRef<B> ref;
+        private final BeanConstructorRef ref;
 
-        private BeanConstructorImpl(BeanConstructorRef<B> ref) {
+        private BeanConstructorImpl(BeanConstructorRef ref) {
             this.ref = ref;
         }
 
@@ -2083,7 +2083,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      */
     @Internal
     @UsedByGeneratedCode
-    public static final class BeanConstructorRef<B> {
+    public static final class BeanConstructorRef {
         final AnnotationMetadata annotationMetadata;
         final Argument<?>[] arguments;
 

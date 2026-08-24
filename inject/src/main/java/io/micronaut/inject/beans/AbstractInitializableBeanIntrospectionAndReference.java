@@ -56,7 +56,7 @@ public abstract class AbstractInitializableBeanIntrospectionAndReference<B> exte
                                                                  Argument<?>[] constructorArguments,
                                                                  BeanPropertyRef<Object>[] propertiesRefs,
                                                                  BeanMethodRef<Object>[] methodsRefs,
-                                                                 BeanConstructorRef<B>[] constructorsRefs) {
+                                                                 BeanConstructorRef[] constructorsRefs) {
         super(beanType, annotationMetadata, constructorAnnotationMetadata, constructorArguments, propertiesRefs, methodsRefs, constructorsRefs);
     }
 

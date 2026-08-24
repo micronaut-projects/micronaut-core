@@ -101,6 +101,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
     private static final String FIELD_BEAN_METHODS_REFERENCES = "$METHODS_REFERENCES";
     private static final String FIELD_BEAN_CONSTRUCTORS_REFERENCES = "$CONSTRUCTORS_REFERENCES";
     private static final String FIELD_ENUM_CONSTANTS_REFERENCES = "$ENUM_CONSTANTS_REFERENCES";
+    private static final String METADATA_METHOD_SUFFIX = "$metadata";
     private static final java.lang.reflect.Method FIND_PROPERTY_BY_INDEX_METHOD =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getPropertyByIndex", int.class);
 
@@ -638,7 +639,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             ClassTypeDef beanPropertyRefType = ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyRef.class);
             List<ExpressionDef> propsExpressions = new ArrayList<>();
             for (BeanPropertyData beanProperty : beanProperties) {
-                MethodDef metadataMethod = MethodDef.builder("$property$" + beanProperty.name + "$metadata")
+                MethodDef metadataMethod = MethodDef.builder("$property$" + beanProperty.name + METADATA_METHOD_SUFFIX)
                     .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
                     .returns(beanPropertyRefType)
                     .build((aThis, methodParameters) -> {
@@ -677,7 +678,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                 while (!usedNames.add(methodName)) {
                     methodName += index++;
                 }
-                MethodDef metadataMethod = MethodDef.builder("$method$" + methodName + "$metadata")
+                MethodDef metadataMethod = MethodDef.builder("$method$" + methodName + METADATA_METHOD_SUFFIX)
                     .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
                     .returns(beanMethodRefType)
                     .build((aThis, methodParameters) -> newBeanMethodRef(beanMethod, loadClassValueExpressionFn).returning());
@@ -710,7 +711,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             for (int i = 0; i < orderedDeclaredConstructors.size(); i++) {
                 MethodElement declaredConstructor = orderedDeclaredConstructors.get(i);
                 int constructorIndex = i;
-                MethodDef metadataMethod = MethodDef.builder("$constructor$" + constructorIndex + "$metadata")
+                MethodDef metadataMethod = MethodDef.builder("$constructor$" + constructorIndex + METADATA_METHOD_SUFFIX)
                     .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
                     .returns(beanConstructorRefType)
                     .build((aThis, methodParameters) -> newBeanConstructorRef(declaredConstructor, constructorIndex, loadClassValueExpressionFn).returning());
@@ -806,12 +807,12 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
 
                     if (enumsField != null) {
                         values.add(introspectionTypeDef.getStaticField(enumsField));
-                        return aThis.superRef().invokeConstructor(ENUM_INTROSPECTION_SUPER_CONSTRUCTOR, values);
+                        return aThis.superRef().invokeSuperConstructor(ENUM_INTROSPECTION_SUPER_CONSTRUCTOR, values);
                     } else if (beanConstructorsField != null) {
                         values.add(introspectionTypeDef.getStaticField(beanConstructorsField));
-                        return aThis.superRef().invokeConstructor(INTROSPECTION_SUPER_CONSTRUCTOR_WITH_CONSTRUCTORS, values);
+                        return aThis.superRef().invokeSuperConstructor(INTROSPECTION_SUPER_CONSTRUCTOR_WITH_CONSTRUCTORS, values);
                     } else {
-                        return aThis.superRef().invokeConstructor(INTROSPECTION_SUPER_CONSTRUCTOR, values);
+                        return aThis.superRef().invokeSuperConstructor(INTROSPECTION_SUPER_CONSTRUCTOR, values);
                     }
                 })
         );
