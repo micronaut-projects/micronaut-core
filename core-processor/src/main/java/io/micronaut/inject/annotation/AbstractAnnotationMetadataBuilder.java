@@ -1083,7 +1083,77 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         aliasForValues.get(),
                         introducedAnnotations
                 );
+            } else {
+                for (AnnotationValue<AliasFor> aliasFor : getTransformedAliasForValues(annotationMember)) {
+                    processAnnotationAlias(
+                            annotationValues,
+                            annotationValue,
+                            aliasFor,
+                            introducedAnnotations
+                    );
+                }
             }
+        }
+    }
+
+    /**
+     * Allows member annotations without a compile-time dependency on Micronaut (e.g. an annotation like
+     * {@code jakarta.validation.OverridesAttribute}) to act as an {@link AliasFor} by running the
+     * registered {@link AnnotationTransformer}s over the annotations declared on the annotation member.
+     * Any {@link AliasFor} or {@link Aliases} values produced by a transformer are treated as if they
+     * were declared on the member directly. A produced {@link AliasFor} without a {@code member} value
+     * defaults to the name of the annotated member.
+     *
+     * @param annotationMember The annotation member
+     * @return The alias values produced by transformers, or an empty list
+     */
+    private List<AnnotationValue<AliasFor>> getTransformedAliasForValues(T annotationMember) {
+        List<? extends A> memberAnnotations = getAnnotationsForType(annotationMember);
+        if (memberAnnotations.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<AnnotationValue<AliasFor>> aliases = null;
+        for (A memberAnnotation : memberAnnotations) {
+            String annotationName = getAnnotationTypeName(memberAnnotation);
+            List<AnnotationTransformer<Annotation>> transformers = getAnnotationTransformers(annotationName);
+            if (CollectionUtils.isEmpty(transformers)) {
+                continue;
+            }
+            AnnotationValue<Annotation> memberAnnotationValue =
+                    (AnnotationValue<Annotation>) createAnnotationValue(annotationMember, memberAnnotation).getAnnotationValue();
+            for (AnnotationTransformer<Annotation> transformer : transformers) {
+                boolean transformed = false;
+                for (AnnotationValue<?> transformedValue : transformer.transform(memberAnnotationValue, getVisitorContext())) {
+                    if (transformedValue == memberAnnotationValue) {
+                        continue;
+                    }
+                    transformed = true;
+                    if (aliases == null) {
+                        aliases = new ArrayList<>(3);
+                    }
+                    collectAliasForValues(aliases, annotationMember, transformedValue);
+                }
+                if (transformed) {
+                    // The annotation was replaced, don't apply the remaining transformers to the original value
+                    break;
+                }
+            }
+        }
+        return aliases == null ? Collections.emptyList() : aliases;
+    }
+
+    private void collectAliasForValues(List<AnnotationValue<AliasFor>> aliases, T annotationMember, AnnotationValue<?> annotationValue) {
+        if (annotationValue.getAnnotationName().equals(Aliases.class.getName())) {
+            for (AnnotationValue<AliasFor> aliasFor : annotationValue.<AliasFor>getAnnotations(AnnotationMetadata.VALUE_MEMBER)) {
+                collectAliasForValues(aliases, annotationMember, aliasFor);
+            }
+        } else if (annotationValue.getAnnotationName().equals(AliasFor.class.getName())) {
+            AnnotationValue<AliasFor> aliasFor = (AnnotationValue<AliasFor>) annotationValue;
+            if (aliasFor.stringValue("member").isEmpty()) {
+                // Default to the name of the annotated member, which the transformer cannot know
+                aliasFor = aliasFor.mutate().member("member", getAnnotationMemberName(annotationMember)).build();
+            }
+            aliases.add(aliasFor);
         }
     }
 
