@@ -709,10 +709,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 arguments
                                             )
                                         ));
-                                    } else if (hasConfigurationBuilderProperty) {
-                                        // Parameterized introspected beans can still use configuration-builder
-                                        // injection after construction. Initialize the Python backing value before
-                                        // the generated bean definition invokes those setters.
+                                    } else if (hasConfigurationBuilderProperty || constructorParametersBackedByFields) {
+                                        // Parameterized introspected beans receive property injection after
+                                        // construction. Initialize the Python backing value before generated
+                                        // bean definitions invoke those setters, including Serdeable/dataclass
+                                        // configuration beans whose builder metadata is not retained on the
+                                        // bean property.
                                         assignments.add(aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(
                                             PYTHON_CONTEXT_RUNTIME.invokeStatic(
                                                 NEW_UNINITIALIZED_INSTANCE,

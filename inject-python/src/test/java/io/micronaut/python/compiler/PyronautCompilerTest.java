@@ -109,6 +109,7 @@ final class PyronautCompilerTest {
                     self.player_names = player_names or []
         """.indent(-4));
 
+        Path outputDirectory = sourceDirectory.resolve("output");
         ClassLoader classLoader = PyronautCompiler.builder()
             .pythonSrc(sourceDirectory.toString())
             .build()
@@ -117,6 +118,14 @@ final class PyronautCompilerTest {
         // Compilation must complete for the parameterized configuration shape;
         // the generated application entry point is the stable in-memory output.
         assertNotNull(classLoader.loadClass("pyronaut_application.PyronautMain"));
+
+        PyronautCompiler.builder()
+            .pythonSrc(sourceDirectory.toString())
+            .targetDir(outputDirectory.toFile())
+            .build()
+            .compile();
+        String generated = Files.readString(outputDirectory.resolve("example/micronaut/TeamConfiguration.java"));
+        assertTrue(generated.contains("PythonContextRuntime.newUninitializedInstance"));
     }
 
     @Test
