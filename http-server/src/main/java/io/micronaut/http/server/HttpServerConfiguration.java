@@ -23,6 +23,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.context.ServerContextPathProvider;
+import io.micronaut.http.server.cors.CrossOriginEmbedderPolicy;
+import io.micronaut.http.server.cors.CrossOriginResourcePolicy;
 import io.micronaut.http.server.cors.CorsOriginConfiguration;
 import io.micronaut.http.server.util.locale.HttpLocaleResolutionConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -899,6 +901,8 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
         private boolean enabled = DEFAULT_ENABLED;
         private boolean singleHeader = DEFAULT_SINGLE_HEADER;
         private boolean localhostPassThrough = DEFAULT_LOCALHOST_PASS_THROUGH;
+        private @Nullable CrossOriginEmbedderPolicy crossOriginEmbedderPolicy;
+        private @Nullable CrossOriginResourcePolicy crossOriginResourcePolicy;
 
         private Map<String, CorsOriginConfiguration> configurations = Collections.emptyMap();
 
@@ -974,6 +978,43 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
          */
         public void setSingleHeader(boolean singleHeader) {
             this.singleHeader = singleHeader;
+        }
+
+        /**
+         * @return The Cross-Origin-Embedder-Policy header value, or {@code null} if not configured
+         * @since 5.2.0
+         */
+        @Nullable
+        public CrossOriginEmbedderPolicy getCrossOriginEmbedderPolicy() {
+            return crossOriginEmbedderPolicy;
+        }
+
+        /**
+         * Sets the Cross-Origin-Embedder-Policy header value.
+         *
+         * @param crossOriginEmbedderPolicy The Cross-Origin-Embedder-Policy header value
+         * @since 5.2.0
+         */
+        public void setCrossOriginEmbedderPolicy(@Nullable CrossOriginEmbedderPolicy crossOriginEmbedderPolicy) {
+            this.crossOriginEmbedderPolicy = crossOriginEmbedderPolicy;
+        }
+
+        /**
+         * @return The Cross-Origin-Resource-Policy header value, or {@code null} if not configured
+         * @since 5.2.0
+         */
+        public @Nullable CrossOriginResourcePolicy getCrossOriginResourcePolicy() {
+            return crossOriginResourcePolicy;
+        }
+
+        /**
+         * Sets the Cross-Origin-Resource-Policy header value.
+         *
+         * @param crossOriginResourcePolicy The Cross-Origin-Resource-Policy header value
+         * @since 5.2.0
+         */
+        public void setCrossOriginResourcePolicy(@Nullable CrossOriginResourcePolicy crossOriginResourcePolicy) {
+            this.crossOriginResourcePolicy = crossOriginResourcePolicy;
         }
     }
 

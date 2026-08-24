@@ -1,0 +1,12 @@
+To configure the https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html#cross-origin-embedder-policy-coep[Cross-Origin-Embedder-Policy (COEP)] response header, set the `cross-origin-embedder-policy` option. <<corsConfiguration, CORS>> does not need to be enabled.
+
+.Example COEP Configuration
+[configuration]
+----
+micronaut:
+  server:
+    cors:
+      cross-origin-embedder-policy: require-corp
+----
+
+The supported values are `unsafe-none`, `require-corp`, and `credentialless`.

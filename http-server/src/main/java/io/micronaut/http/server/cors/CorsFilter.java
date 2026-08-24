@@ -51,6 +51,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -65,6 +66,8 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK;
+import static io.micronaut.http.HttpHeaders.CROSS_ORIGIN_EMBEDDER_POLICY;
+import static io.micronaut.http.HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY;
 import static io.micronaut.http.HttpHeaders.ORIGIN;
 import static io.micronaut.http.HttpHeaders.VARY;
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
@@ -175,6 +178,8 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             }
             decorateResponseWithHeaders(request, response, corsOriginConfiguration);
         }
+        setCrossOriginEmbedderPolicy(corsConfiguration, response);
+        setCrossOriginResourcePolicy(corsConfiguration, response);
     }
 
     /**
@@ -293,6 +298,48 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (config.isAllowPrivateNetwork()) {
             response.header(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK, StringUtils.TRUE);
         }
+    }
+
+    /**
+     * Sets the Cross-Origin-Embedder-Policy header from the CORS configuration when it is not already present.
+     *
+     * @param corsConfiguration CORS Configuration
+     * @param response The {@link MutableHttpResponse} object
+     * @since 5.2.0
+     */
+    protected void setCrossOriginEmbedderPolicy(HttpServerConfiguration.CorsConfiguration corsConfiguration, MutableHttpResponse<?> response) {
+        Supplier<@Nullable String> headerValueSupplier = new Supplier<>() {
+            @Override
+            public @Nullable String get() {
+                CrossOriginEmbedderPolicy value = corsConfiguration.getCrossOriginEmbedderPolicy();
+                if (value != null) {
+                    return value.toString();
+                }
+                return null;
+            }
+        };
+        populateResponseHttpHeaderIfNotSet(CROSS_ORIGIN_EMBEDDER_POLICY, headerValueSupplier, response);
+    }
+
+    /**
+     * Sets the Cross-Origin-Resource-Policy header from the CORS configuration when it is not already present.
+     *
+     * @param corsConfiguration CORS Configuration
+     * @param response The {@link MutableHttpResponse} object
+     * @since 5.2.0
+     */
+    protected void setCrossOriginResourcePolicy(HttpServerConfiguration.CorsConfiguration corsConfiguration, MutableHttpResponse<?> response) {
+        Supplier<@Nullable String> headerValueSupplier = new Supplier<>() {
+            @Override
+            public @Nullable String get() {
+                CrossOriginResourcePolicy value = corsConfiguration.getCrossOriginResourcePolicy();
+                if (value != null) {
+                    return value.toString();
+                }
+                return null;
+            }
+        };
+        populateResponseHttpHeaderIfNotSet(CROSS_ORIGIN_RESOURCE_POLICY, headerValueSupplier, response);
     }
 
     /**
@@ -525,5 +572,17 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             methods.add(HttpMethod.GET);
         }
         return methods;
+    }
+
+    private static void populateResponseHttpHeaderIfNotSet(String headerName,
+                                                           Supplier<@Nullable String> headerValueSupplier,
+                                                           MutableHttpResponse<?> response) {
+        if (response.getHeaders().contains(headerName)) {
+            return;
+        }
+        var value = headerValueSupplier.get();
+        if (value != null) {
+            response.header(headerName, value);
+        }
     }
 }

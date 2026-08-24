@@ -205,6 +205,8 @@ httpServer:
     nettyClientPipeline: Configuring the Netty Client Pipeline
     nettyServerPipeline: Configuring the Netty Server Pipeline
     listener: Advanced Listener Configuration
+    corsCrossOriginEmbedderPolicy: Cross-Origin-Embedder-Policy
+    corsCrossOriginResourcePolicy: Cross-Origin-Resource-Policy
     cors:
       title: Configuring CORS
       annotationBasedCors: Annotation-based CORS Configuration
