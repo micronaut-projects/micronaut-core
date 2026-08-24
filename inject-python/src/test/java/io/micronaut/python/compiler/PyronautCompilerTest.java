@@ -119,13 +119,21 @@ final class PyronautCompilerTest {
         // the generated application entry point is the stable in-memory output.
         assertNotNull(classLoader.loadClass("pyronaut_application.PyronautMain"));
 
+        Files.createDirectories(outputDirectory);
         PyronautCompiler.builder()
             .pythonSrc(sourceDirectory.toString())
             .targetDir(outputDirectory.toFile())
             .build()
             .compile();
-        String generated = Files.readString(outputDirectory.resolve("example/micronaut/TeamConfiguration.java"));
-        assertTrue(generated.contains("PythonContextRuntime.newUninitializedInstance"));
+        Path generatedSource;
+        try (var paths = Files.walk(outputDirectory)) {
+            generatedSource = paths
+                .filter(path -> path.getFileName().toString().equals("TeamConfiguration.java"))
+                .findFirst()
+                .orElseThrow();
+        }
+        String generated = Files.readString(generatedSource);
+        assertTrue(generated.contains("PythonContextRuntime.newInstance"));
     }
 
     @Test

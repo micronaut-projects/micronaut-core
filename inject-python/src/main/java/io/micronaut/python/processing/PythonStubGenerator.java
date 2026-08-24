@@ -709,12 +709,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 arguments
                                             )
                                         ));
-                                    } else if (hasConfigurationBuilderProperty || constructorParametersBackedByFields) {
-                                        // Parameterized introspected beans receive property injection after
-                                        // construction. Initialize the Python backing value before generated
-                                        // bean definitions invoke those setters, including Serdeable/dataclass
-                                        // configuration beans whose builder metadata is not retained on the
-                                        // bean property.
+                                    } else if (hasConfigurationBuilderProperty) {
+                                        // Configuration builders are initialized by the Python constructor before
+                                        // Micronaut applies the generated builder setters.
+                                        assignments.add(aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(
+                                            PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                                                isAbstractIntroCtor ? "newIntroduction" : "newInstance",
+                                                POLYGLOT_VALUE,
+                                                List.of(pythonClassReference(element, pythonClassReference))
+                                            )
+                                        ));
+                                    } else if (constructorParametersBackedByFields) {
+                                        // Ordinary field-backed introspected beans must not invoke a Python
+                                        // constructor whose parameters are supplied by Micronaut.
                                         assignments.add(aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(
                                             PYTHON_CONTEXT_RUNTIME.invokeStatic(
                                                 NEW_UNINITIALIZED_INSTANCE,
