@@ -450,6 +450,259 @@ class OverridesTest {
             metadata.intValue('addann.SizeLike', 'min').getAsInt() == 5
     }
 
+    void 'test recursive composition mirroring the TCK FrenchZipcode shape'() {
+        given:
+            def definition = buildBeanDefinition('addann.OverridesTest', '''
+package addann;
+
+import io.micronaut.annotation.mapping.MyOverrides;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Executable;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Repeatable(SizeLikeList.class)
+@interface SizeLike {
+    int min() default 0;
+    int max() default 100;
+    String message() default "size";
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface SizeLikeList {
+    SizeLike[] value();
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Repeatable(PatternLikeList.class)
+@interface PatternLike {
+    String regexp();
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface PatternLikeList {
+    PatternLike[] value();
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface NotNullLike {
+    String message() default "notNull";
+}
+
+@NotNullLike
+@SizeLike(min = 1)
+@Retention(RetentionPolicy.RUNTIME)
+@interface NotEmptyLike {
+}
+
+@NotEmptyLike
+@SizeLike
+@PatternLike(regexp = ".....")
+@PatternLike(regexp = "bar")
+@Retention(RetentionPolicy.RUNTIME)
+@interface FrenchZip {
+
+    @MyOverrides(constraint = SizeLike.class, name = "min")
+    @MyOverrides(constraint = SizeLike.class, name = "max")
+    int size() default 5;
+
+    @MyOverrides(constraint = SizeLike.class, name = "message")
+    String sizeMessage() default "french size";
+
+    @MyOverrides(constraint = PatternLike.class, name = "regexp", constraintIndex = 1)
+    String regex() default "\\\\d*";
+}
+
+@Bean
+class OverridesTest {
+
+    @FrenchZip
+    @Executable
+    public String getValue() {
+        return "";
+    }
+}
+''')
+            def metadata = definition.getRequiredMethod("getValue").getAnnotationMetadata()
+
+        when:
+            def patternType = (Class) definition.getClass().getClassLoader().loadClass('addann.PatternLike')
+            def sizeType = (Class) definition.getClass().getClassLoader().loadClass('addann.SizeLike')
+            def patterns = metadata.getAnnotationValuesByType(patternType)
+            def sizes = metadata.getAnnotationValuesByType(sizeType)
+
+        then: 'the composition is recursive: stereotypes of composed annotations are present'
+            metadata.hasStereotype('addann.NotEmptyLike')
+            metadata.hasStereotype('addann.NotNullLike')
+
+        and: 'the constraintIndex override only touches the selected occurrence'
+            patterns.size() == 2
+            patterns[0].stringValue('regexp').get() == '.....'
+            patterns[1].stringValue('regexp').get() == '\\d*'
+
+        and: 'each nesting level keeps its own occurrence of the repeatable annotation'
+            sizes.size() == 2
+
+        and: 'the overrides only apply to the occurrence declared on the composing annotation'
+            def direct = sizes.find { it.intValue('min').orElse(-1) == 5 }
+            def nested = sizes.find { it.intValue('min').orElse(-1) == 1 }
+            direct != null
+            nested != null
+            direct.intValue('max').getAsInt() == 5
+            direct.stringValue('message').get() == 'french size'
+            nested.intValue('max').isEmpty()
+            nested.stringValue('message').isEmpty()
+    }
+
+    void 'test overriding a member of a composed annotation cascades through its alias chain'() {
+        given:
+            def definition = buildBeanDefinition('addann.OverridesTest', '''
+package addann;
+
+import io.micronaut.annotation.mapping.MyOverrides;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Executable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface SizeLike {
+    int min() default 0;
+}
+
+@SizeLike(min = 10)
+@Retention(RetentionPolicy.RUNTIME)
+@interface ComposedSize {
+
+    @MyOverrides(constraint = SizeLike.class)
+    int min() default 5;
+}
+
+@ComposedSize
+@Retention(RetentionPolicy.RUNTIME)
+@interface OuterComposed {
+
+    @MyOverrides(constraint = ComposedSize.class, name = "min")
+    int outerMin() default 7;
+}
+
+@Bean
+class OverridesTest {
+
+    @OuterComposed
+    @Executable
+    public String getValue() {
+        return "";
+    }
+}
+''')
+            def metadata = definition.getRequiredMethod("getValue").getAnnotationMetadata()
+
+        expect: 'the override lands on the directly composed annotation'
+            metadata.intValue('addann.ComposedSize', 'min').getAsInt() == 7
+
+        and: 'the overridden member has its own alias, so the override cascades into the nested annotation'
+            metadata.intValue('addann.SizeLike', 'min').getAsInt() == 7
+    }
+
+    void 'test overriding a class typed member'() {
+        given:
+            def definition = buildBeanDefinition('addann.OverridesTest', '''
+package addann;
+
+import io.micronaut.annotation.mapping.MyOverrides;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Executable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface MarkerLike {
+    Class<?> type() default Object.class;
+    String message() default "marker";
+}
+
+@MarkerLike
+@Retention(RetentionPolicy.RUNTIME)
+@interface ComposedMarker {
+
+    @MyOverrides(constraint = MarkerLike.class, name = "type")
+    Class<?> markerType() default String.class;
+}
+
+@Bean
+class OverridesTest {
+
+    @ComposedMarker(markerType = Integer.class)
+    @Executable
+    public String getValue() {
+        return "";
+    }
+}
+''')
+            def metadata = definition.getRequiredMethod("getValue").getAnnotationMetadata()
+
+        expect:
+            metadata.classValue('addann.MarkerLike', 'type').get() == Integer
+    }
+
+    void 'test occurrence indexes count direct annotations and container values in declaration order'() {
+        given:
+            def definition = buildBeanDefinition('addann.OverridesTest', '''
+package addann;
+
+import io.micronaut.annotation.mapping.MyOverrides;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Executable;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Repeatable(PatternLikeList.class)
+@interface PatternLike {
+    String regexp();
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface PatternLikeList {
+    PatternLike[] value();
+}
+
+@PatternLike(regexp = "direct")
+@PatternLikeList({ @PatternLike(regexp = "c0"), @PatternLike(regexp = "c1") })
+@Retention(RetentionPolicy.RUNTIME)
+@interface MixedComposed {
+
+    @MyOverrides(constraint = PatternLike.class, name = "regexp", constraintIndex = 2)
+    String regex() default "over";
+}
+
+@Bean
+class OverridesTest {
+
+    @MixedComposed
+    @Executable
+    public String getValue() {
+        return "";
+    }
+}
+''')
+            def metadata = definition.getRequiredMethod("getValue").getAnnotationMetadata()
+
+        when:
+            def patternType = (Class) definition.getClass().getClassLoader().loadClass('addann.PatternLike')
+            def patterns = metadata.getAnnotationValuesByType(patternType)
+
+        then: 'a direct annotation and container values are indexed together in declaration order'
+            patterns.size() == 3
+            patterns[0].stringValue('regexp').get() == 'direct'
+            patterns[1].stringValue('regexp').get() == 'c0'
+            patterns[2].stringValue('regexp').get() == 'over'
+    }
+
     static class MyOverridesTransformer implements TypedAnnotationTransformer<MyOverrides> {
 
         @Override
