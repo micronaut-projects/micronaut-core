@@ -6527,6 +6527,286 @@ class Order {
         described.getConstructors()[1].arguments.length == 2
     }
 
+    void "a described constructor preserves annotation values and stereotypes"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import static java.lang.annotation.ElementType.CONSTRUCTOR;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Retention(RUNTIME)
+@interface Marker {}
+
+@Marker
+@Retention(RUNTIME)
+@Target(CONSTRUCTOR)
+@interface OrderCreator {
+    String value();
+    int max() default 5;
+}
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+
+    @OrderCreator(value = "explicit", max = 10)
+    Order(String name) {}
+
+    @OrderCreator("only-value")
+    Order(String name, int quantity) {}
+}
+''')
+
+        when:
+        def oneArg = introspection.getConstructors().find { it.arguments.length == 1 }
+        def twoArg = introspection.getConstructors().find { it.arguments.length == 2 }
+
+        then: 'explicitly set members keep their values'
+        oneArg.annotationMetadata.hasAnnotation('test.OrderCreator')
+        oneArg.annotationMetadata.stringValue('test.OrderCreator').get() == 'explicit'
+        oneArg.annotationMetadata.intValue('test.OrderCreator', 'max').getAsInt() == 10
+
+        and: 'a member set on one constructor is not seen on the other'
+        twoArg.annotationMetadata.stringValue('test.OrderCreator').get() == 'only-value'
+        twoArg.annotationMetadata.intValue('test.OrderCreator', 'max').isEmpty()
+
+        and: 'meta annotations are resolved as stereotypes'
+        oneArg.annotationMetadata.hasStereotype('test.Marker')
+        twoArg.annotationMetadata.hasStereotype('test.Marker')
+    }
+
+    void "a described constructor carries the same metadata the constructor path already produced"() {
+        given: 'the same annotated constructor, once as the only described one and once as a described set'
+        def source = '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.Size;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import static java.lang.annotation.ElementType.CONSTRUCTOR;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Retention(RUNTIME)
+@interface Marker {}
+
+@Marker
+@Retention(RUNTIME)
+@Target(CONSTRUCTOR)
+@interface OrderCreator {
+    String value();
+    int max() default 5;
+}
+
+@Introspected(%s)
+class Order {
+    @OrderCreator(value = "explicit", max = 10)
+    public Order(@Size(min = 1, max = 10) String name) {}
+}
+'''
+        def baseline = buildBeanIntrospection('test.Order', String.format(source, ''))
+        def described = buildBeanIntrospection('test.Order', String.format(source, 'constructors = true'))
+
+        expect: 'the described constructor reports exactly what getConstructor() reports'
+        def expected = baseline.constructor.annotationMetadata
+        def actual = described.getConstructors()[0].annotationMetadata
+
+        actual.stringValue('test.OrderCreator') == expected.stringValue('test.OrderCreator')
+        actual.intValue('test.OrderCreator', 'max') == expected.intValue('test.OrderCreator', 'max')
+        actual.hasStereotype('test.Marker') == expected.hasStereotype('test.Marker')
+        actual.annotationNames.toSorted() == expected.annotationNames.toSorted()
+
+        and: 'and so do its parameters'
+        described.getConstructors()[0].arguments[0].annotationMetadata.intValue(Size, "min") ==
+            baseline.constructorArguments[0].annotationMetadata.intValue(Size, "min")
+        described.getConstructors()[0].arguments[0].annotationMetadata.intValue(Size, "max") ==
+            baseline.constructorArguments[0].annotationMetadata.intValue(Size, "max")
+
+        and: 'sanity: the values really are there rather than both being empty'
+        actual.stringValue('test.OrderCreator').get() == 'explicit'
+        described.getConstructors()[0].arguments[0].annotationMetadata.intValue(Size, "max").getAsInt() == 10
+    }
+
+    void "annotations on one described constructor do not leak onto another"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Retention(RUNTIME)
+@interface First {}
+
+@Retention(RUNTIME)
+@interface Second {}
+
+@Introspected(constructors = true)
+class Order {
+    @First
+    Order() {}
+
+    @Second
+    Order(String name) {}
+
+    Order(String name, int quantity) {}
+}
+''')
+
+        when:
+        def noArg = introspection.getConstructors().find { it.arguments.length == 0 }
+        def oneArg = introspection.getConstructors().find { it.arguments.length == 1 }
+        def twoArg = introspection.getConstructors().find { it.arguments.length == 2 }
+
+        then: 'each constructor carries only its own annotations'
+        noArg.annotationMetadata.hasAnnotation('test.First')
+        !noArg.annotationMetadata.hasAnnotation('test.Second')
+
+        oneArg.annotationMetadata.hasAnnotation('test.Second')
+        !oneArg.annotationMetadata.hasAnnotation('test.First')
+
+        and: 'an unannotated constructor carries neither'
+        !twoArg.annotationMetadata.hasAnnotation('test.First')
+        !twoArg.annotationMetadata.hasAnnotation('test.Second')
+    }
+
+    void "a described constructor does not inherit the annotations of its declaring type"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Retention(RUNTIME)
+@interface OnType {}
+
+@Retention(RUNTIME)
+@interface OnConstructor {}
+
+@OnType
+@Introspected(constructors = true)
+class Order {
+    @OnConstructor
+    Order() {}
+
+    Order(String name) {}
+}
+''')
+
+        expect: 'the type level annotation is not reported on the constructors'
+        introspection.getConstructors().every { !it.annotationMetadata.hasAnnotation('test.OnType') }
+        !introspection.getConstructors()[0].annotationMetadata.hasStereotype(Introspected)
+
+        and: 'the constructor level one still is'
+        introspection.getConstructors().find { it.arguments.length == 0 }
+            .annotationMetadata.hasAnnotation('test.OnConstructor')
+    }
+
+    void "a described constructor preserves the annotation values of its parameters"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+
+    Order(@Size(min = 1, max = 10) String name, @Min(5) int quantity) {}
+}
+''')
+
+        when:
+        def constructor = introspection.getConstructors().find { it.arguments.length == 2 }
+
+        then: 'each parameter keeps its own annotation and its member values'
+        constructor.arguments[0].annotationMetadata.intValue(Size, "min").getAsInt() == 1
+        constructor.arguments[0].annotationMetadata.intValue(Size, "max").getAsInt() == 10
+        constructor.arguments[1].annotationMetadata.intValue(Min).getAsInt() == 5
+
+        and: 'stereotypes of the parameter annotations are resolved'
+        constructor.arguments[0].annotationMetadata.hasStereotype(Constraint)
+        constructor.arguments[1].annotationMetadata.hasStereotype(Constraint)
+
+        and: 'annotations do not leak between parameters'
+        !constructor.arguments[0].annotationMetadata.hasAnnotation(Min)
+        !constructor.arguments[1].annotationMetadata.hasAnnotation(Size)
+    }
+
+    void "a described constructor preserves type use annotations on parameter type arguments"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.Min;
+import java.util.List;
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+
+    Order(List<@Min(10) Long> quantities) {}
+}
+''')
+
+        when:
+        def typeArgument = introspection.getConstructors()
+            .find { it.arguments.length == 1 }
+            .arguments[0].typeParameters[0]
+
+        then:
+        typeArgument.annotationMetadata.hasAnnotation(Min)
+        typeArgument.annotationMetadata.intValue(Min).getAsInt() == 10
+        typeArgument.annotationMetadata.hasStereotype(Constraint)
+    }
+
+    void "a constructor described via @Executable preserves its other annotations"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import jakarta.validation.constraints.Size;
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Retention(RUNTIME)
+@interface OrderCreator {
+    String value() default "fallback";
+}
+
+@Introspected
+class Order {
+    Order() {}
+
+    @Executable
+    @OrderCreator("named")
+    Order(@Size(max = 3) String name) {}
+}
+''')
+
+        when:
+        def constructor = introspection.getConstructors().find { it.arguments.length == 1 }
+
+        then: 'the gating annotation is preserved alongside the others'
+        constructor.annotationMetadata.hasAnnotation(Executable)
+        constructor.annotationMetadata.stringValue('test.OrderCreator').get() == 'named'
+        constructor.arguments[0].annotationMetadata.intValue(Size, "max").getAsInt() == 3
+    }
+
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
