@@ -86,7 +86,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final List<AnnotationRemapper> ALL_ANNOTATION_REMAPPERS = new ArrayList<>(5);
     private static final Map<Object, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
-    private static final Map<String, List<AnnotationValue<AliasFor>>> APPLY_DEFAULT_MEMBER_ALIASES = new HashMap<>(20);
 
     static {
         ClassLoader classLoader = resolveServiceClassLoader();
@@ -1502,15 +1501,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         // using the member's default value (e.g. jakarta.validation.OverridesAttribute semantics)
         Map<CharSequence, Object> defaultValues = annotationValue.getDefaultValues();
         if (defaultValues != null && !defaultValues.isEmpty()) {
-            String annotationName = annotationValue.getAnnotationName();
             for (Map.Entry<CharSequence, Object> entry : defaultValues.entrySet()) {
                 CharSequence key = entry.getKey();
                 Object defaultValue = entry.getValue();
                 if (defaultValue == null || newValues.containsKey(key)) {
                     continue;
                 }
-                for (AnnotationValue<AliasFor> aliasFor : getApplyDefaultAliases(annotationType, annotationName, key.toString())) {
-                    processAnnotationAlias(newValues, defaultValue, aliasFor, introducedAnnotations);
+                T member = getAnnotationMember(annotationType, key);
+                if (member == null || !hasAnnotations(member)) {
+                    continue;
+                }
+                for (AnnotationValue<AliasFor> aliasFor : getMemberAliases(annotationType, member)) {
+                    if (aliasFor.booleanValue("applyDefault").orElse(false)) {
+                        processAnnotationAlias(newValues, defaultValue, aliasFor, introducedAnnotations);
+                    }
                 }
             }
         }
@@ -1520,36 +1524,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return processedAnnotation;
         }
         return processedAnnotation.mutateAnnotationValue(builder -> builder.members(newValues));
-    }
-
-    /**
-     * Resolves the aliases of the given member that are marked with {@code applyDefault = true} and
-     * so apply even when the member is not explicitly set. The result is cached per annotation
-     * member, as it only depends on the annotation type's declaration.
-     *
-     * @param annotationType The annotation type element
-     * @param annotationName The annotation type name
-     * @param memberName The member name
-     * @return The aliases applying to the member's default value
-     */
-    private List<AnnotationValue<AliasFor>> getApplyDefaultAliases(T annotationType, String annotationName, String memberName) {
-        String key = annotationName + '#' + memberName;
-        List<AnnotationValue<AliasFor>> cached = APPLY_DEFAULT_MEMBER_ALIASES.get(key);
-        if (cached != null) {
-            return cached;
-        }
-        List<AnnotationValue<AliasFor>> result = new ArrayList<>(2);
-        T member = getAnnotationMember(annotationType, memberName);
-        if (member != null) {
-            for (AnnotationValue<AliasFor> aliasFor : getMemberAliases(annotationType, member)) {
-                if (aliasFor.booleanValue("applyDefault").orElse(false)) {
-                    result.add(aliasFor);
-                }
-            }
-        }
-        List<AnnotationValue<AliasFor>> finalResult = result.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(result);
-        APPLY_DEFAULT_MEMBER_ALIASES.put(key, finalResult);
-        return finalResult;
     }
 
     private List<AnnotationValue<AliasFor>> getMemberAliases(T originatingElement, T annotationMember) {
@@ -1868,7 +1842,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @Internal
     public static void clearCaches() {
         ANNOTATION_DEFAULTS.clear();
-        APPLY_DEFAULT_MEMBER_ALIASES.clear();
     }
 
     /**
