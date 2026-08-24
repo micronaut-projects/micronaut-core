@@ -692,8 +692,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             builder.addMethod(
                             constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                                 if (isIntrospectedBean && (constructorParametersBackedByFields || hasDynamicBeanProperties)) {
-                                    if (hasConfigurationBuilderProperty) {
+                                    if (hasConfigurationBuilderProperty || hasDynamicBeanProperties) {
                                         List<ExpressionDef> arguments = new ArrayList<>(List.of(pythonClassReference(element, pythonClassReference)));
+                                        if (hasDefaultedConstructorParameters) {
+                                            arguments.add(ExpressionDef.constant(requiredConstructorParameterCount));
+                                        }
                                         for (int i = 0; i < parameters.length; i++) {
                                             @NonNull ParameterElement parameter = parameters[i];
                                             VariableDef.MethodParameter methodParameter = methodParameters.get(i);
@@ -702,10 +705,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
                                         }
                                         ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                                            isAbstractIntroCtor ? "newIntroduction" : "newInstance",
+                                            constructorFactoryMethod(isAbstractIntroCtor, hasDefaultedConstructorParameters),
                                             POLYGLOT_VALUE,
                                             arguments
                                         );
+                                        if (extendsHostClass) {
+                                            List<ExpressionDef> superArguments = superConstructorArguments(superType, parameters, methodParameters);
+                                            return StatementDef.multi(
+                                                aThis.superRef().invokeSuperConstructor(superArguments),
+                                                aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance)
+                                            );
+                                        }
                                         return aThis.invokeConstructor(pythonInstance);
                                     }
                                     List<StatementDef> assignments = new ArrayList<>();
@@ -788,14 +798,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         builder.addMethod(constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                             if (isJunit5Test) {
                                 return StatementDef.multi();
-                            } else if (isIntrospectedBean) {
-                                return aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(
-                                    PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                                        NEW_UNINITIALIZED_INSTANCE,
-                                        POLYGLOT_VALUE,
-                                        List.of(pythonClassReference(element, pythonClassReference))
-                                    )
+                            } else if (isIntrospectedBean && hasConfigurationBuilderProperty) {
+                                ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                                    isAbstractIntroNoArg ? "newIntroduction" : "newInstance",
+                                    POLYGLOT_VALUE,
+                                    List.of(pythonClassReference(element, pythonClassReference))
                                 );
+                                if (extendsHostClass) {
+                                    return StatementDef.multi(
+                                        aThis.superRef().invokeSuperConstructor(superConstructorArguments(superType, new ParameterElement[0], methodParameters)),
+                                        aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance)
+                                    );
+                                }
+                                return aThis.invokeConstructor(pythonInstance);
+                            } else if (isIntrospectedBean) {
+                                // Keep ordinary introspected beans lazy; resolving their Python class here
+                                // would break beans whose Python constructor requires arguments.
+                                return StatementDef.multi();
                             } else {
                                 ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME
                                     .invokeStatic(isAbstractIntroNoArg ? "newIntroduction" : "newInstance", POLYGLOT_VALUE,

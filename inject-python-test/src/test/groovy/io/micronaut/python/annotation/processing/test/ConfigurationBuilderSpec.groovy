@@ -17,6 +17,41 @@ package io.micronaut.python.annotation.processing.test
 
 class ConfigurationBuilderSpec extends AbstractPythonTypeElementSpec {
 
+    void "test parameterized configuration builder initializes an init false field"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass, field
+from typing import Annotated
+import java
+from micronaut.context.annotation import ConfigurationBuilder, ConfigurationProperties
+from micronaut.core.annotation import Introspected
+
+Engine = java.type("io.micronaut.python.annotation.processing.test.ConfigBuilderEngine")
+EngineBuilder = java.type("io.micronaut.python.annotation.processing.test.ConfigBuilderEngine$Builder")
+
+@ConfigurationProperties("team")
+@Introspected
+@dataclass(init=False)
+class TeamConfiguration:
+    builder: Annotated[EngineBuilder, ConfigurationBuilder(prefixes=["with"])] = field(init=False)
+
+    def __init__(self):
+        self.builder = Engine.builder()
+'''
+
+        when:
+        def context = buildContext(pythonCode, false, [
+                "team.manufacturer": "Toyota"
+        ])
+        def configuration = getBean(context, "python.TeamConfiguration")
+
+        then:
+        configuration.builder.build().manufacturer == "Toyota"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test configuration builder writes to Java builder attribute"() {
         given:
         def pythonCode = '''
