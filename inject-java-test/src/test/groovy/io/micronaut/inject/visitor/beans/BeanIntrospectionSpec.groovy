@@ -6352,6 +6352,181 @@ class Order {
         introspection.getConstructors().size() == 1
     }
 
+    void "@Executable on a secondary constructor does not change the constructor beans are built with"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+class Order {
+    private final String name;
+
+    public Order() { this.name = "default-ctor"; }
+
+    @Executable
+    public Order(String name) { this.name = name; }
+
+    public String getName() { return name; }
+}
+''')
+
+        expect: 'the default constructor is still the one that builds beans'
+        introspection.constructor.arguments.length == 0
+        introspection.constructorArguments.length == 0
+        introspection.getRequiredProperty("name", String).get(introspection.instantiate()) == "default-ctor"
+
+        and: 'it is still described first, and the @Executable one is described too'
+        introspection.getConstructors().size() == 2
+        introspection.getConstructors()[0].arguments.length == 0
+        introspection.getConstructors()[1].arguments.length == 1
+    }
+
+    void "@Executable on a non-primary constructor does not change the primary constructor"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+class Order {
+    private final String name;
+    private final int quantity;
+
+    public Order(String name) { this.name = name; this.quantity = 0; }
+
+    @Executable
+    public Order(String name, int quantity) { this.name = name; this.quantity = quantity; }
+
+    public String getName() { return name; }
+    public int getQuantity() { return quantity; }
+}
+''')
+
+        expect: 'the first public constructor is still the primary one'
+        introspection.constructor.arguments.length == 1
+        introspection.constructorArguments.length == 1
+        introspection.getRequiredProperty("quantity", int).get(introspection.instantiate("abc")) == 0
+
+        and: 'the primary constructor is described first even though the other one asked to be described'
+        introspection.getConstructors()[0].arguments.length == 1
+    }
+
+    void "@Executable on a constructor does not override an explicit @Creator"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Creator;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+class Order {
+    private final String name;
+    private final int quantity;
+
+    @Executable
+    public Order(String name, int quantity) { this.name = name; this.quantity = quantity; }
+
+    @Creator
+    public Order(String name) { this.name = name; this.quantity = 42; }
+
+    public String getName() { return name; }
+    public int getQuantity() { return quantity; }
+}
+''')
+
+        expect: '@Creator still wins as the bean instantiating constructor'
+        introspection.constructor.arguments.length == 1
+        introspection.getRequiredProperty("quantity", int).get(introspection.instantiate("abc")) == 42
+
+        and: 'and is described first'
+        introspection.getConstructors()[0].arguments.length == 1
+    }
+
+    void "constructors = true does not change the constructor beans are built with"() {
+        given: 'the same type built with and without the member'
+        def source = '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(%s)
+class Order {
+    private final String name;
+    private final int quantity;
+
+    // declared first, but not public, so not the primary constructor
+    Order(String name, int quantity) { this.name = name; this.quantity = quantity; }
+
+    public Order() { this.name = "default-ctor"; this.quantity = 0; }
+    public Order(String name) { this.name = name; this.quantity = 0; }
+
+    public String getName() { return name; }
+    public int getQuantity() { return quantity; }
+}
+'''
+        def baseline = buildBeanIntrospection('test.Order', String.format(source, ''))
+        def described = buildBeanIntrospection('test.Order', String.format(source, 'constructors = true'))
+
+        expect: 'the instantiating constructor is unchanged'
+        described.constructor.arguments.length == baseline.constructor.arguments.length
+        described.constructorArguments.length == baseline.constructorArguments.length
+        described.isBuildable() == baseline.isBuildable()
+
+        and: 'instantiate() still runs the same constructor'
+        described.getRequiredProperty("name", String).get(described.instantiate()) ==
+            baseline.getRequiredProperty("name", String).get(baseline.instantiate())
+        described.getRequiredProperty("name", String).get(described.instantiate()) == "default-ctor"
+
+        and: 'only the described set grew'
+        baseline.getConstructors().size() == 1
+        described.getConstructors().size() == 3
+        described.getConstructors()[0].arguments.length == baseline.constructor.arguments.length
+    }
+
+    void "constructors = true does not change a primary constructor that takes arguments"() {
+        given:
+        def source = '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(%s)
+class Order {
+    private final String name;
+    private final int quantity;
+
+    // declared first, but not public, so not the primary constructor
+    Order(String name, int quantity) { this.name = name; this.quantity = quantity; }
+
+    public Order(String name) { this.name = name; this.quantity = 7; }
+
+    public String getName() { return name; }
+    public int getQuantity() { return quantity; }
+}
+'''
+        def baseline = buildBeanIntrospection('test.Order', String.format(source, ''))
+        def described = buildBeanIntrospection('test.Order', String.format(source, 'constructors = true'))
+
+        expect: 'the same single-argument constructor still builds beans'
+        baseline.constructor.arguments.length == 1
+        described.constructor.arguments.length == 1
+        described.getRequiredProperty("quantity", int).get(described.instantiate("abc")) ==
+            baseline.getRequiredProperty("quantity", int).get(baseline.instantiate("abc"))
+        described.getRequiredProperty("quantity", int).get(described.instantiate("abc")) == 7
+
+        and: 'and is described first, ahead of the constructor declared before it'
+        described.getConstructors().size() == 2
+        described.getConstructors()[0].arguments.length == 1
+        described.getConstructors()[1].arguments.length == 2
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
