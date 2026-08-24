@@ -301,7 +301,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     List<PropertyElement> beanProperties = element.getBeanProperties();
                     boolean hasDynamicBeanProperties = beanProperties.stream().anyMatch(PythonStubGenerator::isDynamicBeanProperty);
                     boolean hasConfigurationBuilderProperty = beanProperties.stream()
-                        .anyMatch(property -> property.hasAnnotation(ANN_CONFIGURATION_BUILDER));
+                        .anyMatch(PythonStubGenerator::isConfigurationBuilderProperty);
                     if (!isIntrospectedBean
                         && !isPythonDataclass(element)
                         && !hasConfigurationInjectConstructor(element)
@@ -3255,6 +3255,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static boolean isDynamicBeanProperty(PropertyElement beanProperty) {
         return beanProperty.getReadMethod().filter(method -> !method.isSynthetic()).isPresent()
             || beanProperty.getWriteMethod().filter(method -> !method.isSynthetic()).isPresent();
+    }
+
+    private static boolean isConfigurationBuilderProperty(PropertyElement property) {
+        return property.hasAnnotation(ANN_CONFIGURATION_BUILDER)
+            || property.getReadMethod().map(method -> method.hasAnnotation(ANN_CONFIGURATION_BUILDER)).orElse(false)
+            || property.getWriteMethod().map(method -> method.hasAnnotation(ANN_CONFIGURATION_BUILDER)).orElse(false);
     }
 
     private static MethodElement resolveDeclaredBridgeMethod(ClassElement element, MethodElement interfaceMethod) {
