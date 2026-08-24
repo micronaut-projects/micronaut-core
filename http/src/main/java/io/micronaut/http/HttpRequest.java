@@ -230,6 +230,18 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
+     * Gets the Fetch Metadata request headers.
+     *
+     * @return The Fetch Metadata, or {@code null} if the request does not contain
+     * all recognized Fetch Metadata headers
+     * @see SecFetch
+     * @since 5.1.12
+     */
+    default @Nullable SecFetch getSecFetch() {
+        return SecFetch.of(getHeaders());
+    }
+
+    /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI.
      *
      * @param uri The URI
