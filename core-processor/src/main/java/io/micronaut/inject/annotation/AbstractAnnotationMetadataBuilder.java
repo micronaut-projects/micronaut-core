@@ -86,6 +86,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final List<AnnotationRemapper> ALL_ANNOTATION_REMAPPERS = new ArrayList<>(5);
     private static final Map<Object, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
+    private static final Map<String, List<AnnotationValue<AliasFor>>> APPLY_DEFAULT_MEMBER_ALIASES = new HashMap<>(20);
 
     static {
         ClassLoader classLoader = resolveServiceClassLoader();
@@ -836,7 +837,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private void processAnnotationAlias(Map<CharSequence, Object> annotationValues,
                                         Object annotationValue,
                                         AnnotationValue<AliasFor> aliasForAnnotation,
-                                        List<ProcessedAnnotation> introducedAnnotations) {
+                                        List<IntroducedAlias> introducedAnnotations) {
         Optional<String> aliasAnnotation = aliasForAnnotation.stringValue("annotation");
         Optional<String> aliasAnnotationName = aliasForAnnotation.stringValue("annotationName");
         Optional<String> aliasMember = aliasForAnnotation.stringValue("member");
@@ -847,15 +848,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 aliasedAnnotation = aliasAnnotation.orElseGet(aliasAnnotationName::get);
                 String aliasedMemberName = aliasMember.get();
                 if (annotationValue != null) {
+                    int aliasIndex = aliasForAnnotation.intValue("index").orElse(-1);
                     ProcessedAnnotation newAnnotation = toProcessedAnnotation(
                             AnnotationValue.builder(aliasedAnnotation, getRetentionPolicy(aliasedAnnotation))
                                     .members(Collections.singletonMap(aliasedMemberName, annotationValue))
                                     .build()
                     );
-                    introducedAnnotations.add(newAnnotation);
+                    introducedAnnotations.add(new IntroducedAlias(newAnnotation, aliasIndex));
                     ProcessedAnnotation newNewAnnotation = processAliases(newAnnotation, introducedAnnotations);
                     if (newNewAnnotation != newAnnotation) {
-                        introducedAnnotations.set(introducedAnnotations.indexOf(newAnnotation), newNewAnnotation);
+                        for (int i = 0; i < introducedAnnotations.size(); i++) {
+                            if (introducedAnnotations.get(i).getAnnotation() == newAnnotation) {
+                                introducedAnnotations.set(i, new IntroducedAlias(newNewAnnotation, aliasIndex));
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -1063,7 +1070,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                        Map<CharSequence, Object> annotationValues,
                                        T annotationMember,
                                        Object annotationValue,
-                                       List<ProcessedAnnotation> introducedAnnotations) {
+                                       List<IntroducedAlias> introducedAnnotations) {
         Optional<AnnotationValue<Aliases>> aliases = getAnnotationValues(originatingElement, annotationMember, Aliases.class);
         if (aliases.isPresent()) {
             for (AnnotationValue<AliasFor> av : aliases.get().<AliasFor>getAnnotations(AnnotationMetadata.VALUE_MEMBER)) {
@@ -1252,39 +1259,24 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         processedAnnotation = addDefaults(processedAnnotation);
         // Check if the annotation has the stereotypes set manually, before adding alias stereotypes
         boolean stereotypesProvided = annotationValue.getStereotypes() != null;
-        // First we need to process aliases, those contribute stereotypes with higher priority
-        processedAnnotation = processAliases(context, processedAnnotation);
+        // First we need to process aliases; those either override declared stereotype members
+        // or contribute stereotypes with higher priority
+        List<IntroducedAlias> introducedAliases = new ArrayList<>(3);
+        processedAnnotation = processAliases(processedAnnotation, introducedAliases);
 
         // The next invocation will invoke current method recursively till the stereotypes are processed.
         // That will build an annotation value tree with annotations and it's stereotypes.
-        processedAnnotation = addStereotypes(context, processedAnnotation, stereotypesProvided);
+        processedAnnotation = addStereotypes(context, processedAnnotation, stereotypesProvided, introducedAliases);
         // Next step is transforming, starting from the stereotypes moving up in the hierarchy.
         return transform(context, processedAnnotation)
                 .flatMap(this::flattenRepeatable)
                 .map(this::addDefaults);
     }
 
-    private ProcessedAnnotation processAliases(ProcessingContext context,
-                                               ProcessedAnnotation processedAnnotation) {
-        // Aliases produces by the annotations are added to the stereotypes collection
-        List<ProcessedAnnotation> introducedAliasForAnnotations = new ArrayList<>();
-        ProcessedAnnotation newAnn = processAliases(processedAnnotation, introducedAliasForAnnotations);
-        if (!introducedAliasForAnnotations.isEmpty()) {
-            newAnn = newAnn.mutateAnnotationValue(builder ->
-                    builder.stereotypes(
-                                    introducedAliasForAnnotations.stream()
-                                            .flatMap(a -> processAnnotation(context, a))
-                                            .<AnnotationValue<?>>map(ProcessedAnnotation::getAnnotationValue)
-                                            .toList()
-                            )
-            );
-        }
-        return newAnn;
-    }
-
     private ProcessedAnnotation addStereotypes(ProcessingContext context,
                                                ProcessedAnnotation processedAnnotation,
-                                               boolean stereotypesProvided) {
+                                               boolean stereotypesProvided,
+                                               List<IntroducedAlias> introducedAliases) {
         List<ProcessedAnnotation> stereotypes = Collections.emptyList();
         if (processedAnnotation.getAnnotationValue().getStereotypes() != null) {
             stereotypes = processedAnnotation.getAnnotationValue().getStereotypes().stream()
@@ -1314,6 +1306,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 extractedStereotypes.stream()
             ).toList();
         }
+        if (!introducedAliases.isEmpty()) {
+            stereotypes = applyIntroducedAliases(context, stereotypes, introducedAliases);
+        }
         List<ProcessedAnnotation> addedStereotypes = getAddedStereotypes(context, processedAnnotation.annotationType);
         if (!addedStereotypes.isEmpty()) {
             stereotypes = CollectionUtils.concat(stereotypes, addedStereotypes);
@@ -1322,6 +1317,50 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return processedAnnotation.mutateAnnotationValue(builder ->
             builder.replaceStereotypes(finalStereotypes.stream().<AnnotationValue<?>>map(ProcessedAnnotation::getAnnotationValue).toList())
         );
+    }
+
+    /**
+     * Reconciles annotations introduced by aliases with the declared stereotypes. An alias whose
+     * target annotation is declared as a stereotype overrides the declared member values — for a
+     * repeatable target the occurrence selected by {@link AliasFor#index()} (all occurrences by
+     * default). Aliases whose target is not declared contribute new stereotypes with higher
+     * priority, as before.
+     *
+     * @param context The processing context
+     * @param stereotypes The declared stereotypes
+     * @param introducedAliases The annotations introduced by aliases
+     * @return The reconciled stereotypes
+     */
+    private List<ProcessedAnnotation> applyIntroducedAliases(ProcessingContext context,
+                                                             List<ProcessedAnnotation> stereotypes,
+                                                             List<IntroducedAlias> introducedAliases) {
+        List<ProcessedAnnotation> result = new ArrayList<>(stereotypes);
+        List<ProcessedAnnotation> unmatched = new ArrayList<>(introducedAliases.size());
+        for (IntroducedAlias alias : introducedAliases) {
+            AnnotationValue<?> aliasValue = alias.getAnnotation().getAnnotationValue();
+            String targetName = aliasValue.getAnnotationName();
+            List<Integer> occurrences = new ArrayList<>(2);
+            for (int i = 0; i < result.size(); i++) {
+                if (result.get(i).getAnnotationValue().getAnnotationName().equals(targetName)) {
+                    occurrences.add(i);
+                }
+            }
+            if (occurrences.isEmpty()) {
+                unmatched.add(alias.getAnnotation());
+            } else if (alias.getIndex() < 0) {
+                for (int position : occurrences) {
+                    result.set(position, result.get(position).mutateAnnotationValue(builder -> builder.members(aliasValue.getValues())));
+                }
+            } else if (alias.getIndex() < occurrences.size()) {
+                int position = occurrences.get(alias.getIndex());
+                result.set(position, result.get(position).mutateAnnotationValue(builder -> builder.members(aliasValue.getValues())));
+            }
+            // An index outside the declared occurrences has no target and the alias is dropped
+        }
+        if (!unmatched.isEmpty()) {
+            result.addAll(0, unmatched.stream().flatMap(a -> processAnnotation(context, a)).toList());
+        }
+        return result;
     }
 
     private ProcessedAnnotation addDefaults(ProcessedAnnotation processedAnnotation) {
@@ -1437,7 +1476,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private ProcessedAnnotation processAliases(ProcessedAnnotation processedAnnotation,
-                                               List<ProcessedAnnotation> introducedAnnotations) {
+                                               List<IntroducedAlias> introducedAnnotations) {
         T annotationType = processedAnnotation.getAnnotationType();
         if (annotationType == null) {
             return processedAnnotation;
@@ -1459,11 +1498,70 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         }
 
+        // Aliases marked with `applyDefault` also apply when the member is not explicitly set,
+        // using the member's default value (e.g. jakarta.validation.OverridesAttribute semantics)
+        Map<CharSequence, Object> defaultValues = annotationValue.getDefaultValues();
+        if (defaultValues != null && !defaultValues.isEmpty()) {
+            String annotationName = annotationValue.getAnnotationName();
+            for (Map.Entry<CharSequence, Object> entry : defaultValues.entrySet()) {
+                CharSequence key = entry.getKey();
+                Object defaultValue = entry.getValue();
+                if (defaultValue == null || newValues.containsKey(key)) {
+                    continue;
+                }
+                for (AnnotationValue<AliasFor> aliasFor : getApplyDefaultAliases(annotationType, annotationName, key.toString())) {
+                    processAnnotationAlias(newValues, defaultValue, aliasFor, introducedAnnotations);
+                }
+            }
+        }
+
         // @AliasFor can modify the annotation values by aliasing to a member from the same annotation
         if (newValues.equals(annotationValue.getValues())) {
             return processedAnnotation;
         }
         return processedAnnotation.mutateAnnotationValue(builder -> builder.members(newValues));
+    }
+
+    /**
+     * Resolves the aliases of the given member that are marked with {@code applyDefault = true} and
+     * so apply even when the member is not explicitly set. The result is cached per annotation
+     * member, as it only depends on the annotation type's declaration.
+     *
+     * @param annotationType The annotation type element
+     * @param annotationName The annotation type name
+     * @param memberName The member name
+     * @return The aliases applying to the member's default value
+     */
+    private List<AnnotationValue<AliasFor>> getApplyDefaultAliases(T annotationType, String annotationName, String memberName) {
+        String key = annotationName + '#' + memberName;
+        List<AnnotationValue<AliasFor>> cached = APPLY_DEFAULT_MEMBER_ALIASES.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        List<AnnotationValue<AliasFor>> result = new ArrayList<>(2);
+        T member = getAnnotationMember(annotationType, memberName);
+        if (member != null) {
+            for (AnnotationValue<AliasFor> aliasFor : getMemberAliases(annotationType, member)) {
+                if (aliasFor.booleanValue("applyDefault").orElse(false)) {
+                    result.add(aliasFor);
+                }
+            }
+        }
+        List<AnnotationValue<AliasFor>> finalResult = result.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(result);
+        APPLY_DEFAULT_MEMBER_ALIASES.put(key, finalResult);
+        return finalResult;
+    }
+
+    private List<AnnotationValue<AliasFor>> getMemberAliases(T originatingElement, T annotationMember) {
+        Optional<AnnotationValue<Aliases>> aliases = getAnnotationValues(originatingElement, annotationMember, Aliases.class);
+        if (aliases.isPresent()) {
+            return aliases.get().getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+        }
+        Optional<AnnotationValue<AliasFor>> aliasFor = getAnnotationValues(originatingElement, annotationMember, AliasFor.class);
+        if (aliasFor.isPresent()) {
+            return List.of(aliasFor.get());
+        }
+        return getTransformedAliasForValues(annotationMember);
     }
 
     private void addAnnotation(MutableAnnotationMetadata mutableAnnotationMetadata,
@@ -1770,6 +1868,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @Internal
     public static void clearCaches() {
         ANNOTATION_DEFAULTS.clear();
+        APPLY_DEFAULT_MEMBER_ALIASES.clear();
     }
 
     /**
@@ -1981,6 +2080,28 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return annotationValue;
         }
 
+    }
+
+    /**
+     * An annotation introduced by an alias, together with the occurrence index of the aliased
+     * repeatable annotation ({@link AliasFor#index()}).
+     */
+    private final class IntroducedAlias {
+        private final ProcessedAnnotation annotation;
+        private final int index;
+
+        private IntroducedAlias(ProcessedAnnotation annotation, int index) {
+            this.annotation = annotation;
+            this.index = index;
+        }
+
+        public ProcessedAnnotation getAnnotation() {
+            return annotation;
+        }
+
+        public int getIndex() {
+            return index;
+        }
     }
 
     /**
