@@ -122,6 +122,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
     private static final String PUBLISHER = "org.reactivestreams.Publisher";
     private static final String ANN_CONFIGURATION_BUILDER = "io.micronaut.context.annotation.ConfigurationBuilder";
+    private static final String NEW_UNINITIALIZED_INSTANCE = "newUninitializedInstance";
     private static final String ANN_CONFIGURATION_INJECT = "io.micronaut.context.annotation.ConfigurationInject";
     private static final String ANN_CONFIGURATION_READER = "io.micronaut.context.annotation.ConfigurationReader";
     private static final String ANN_ANNOTATION_EXPRESSION_CONTEXT = "io.micronaut.context.annotation.AnnotationExpressionContext";
@@ -299,6 +300,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     List<PropertyElement> beanProperties = element.getBeanProperties();
                     boolean hasDynamicBeanProperties = beanProperties.stream().anyMatch(PythonStubGenerator::isDynamicBeanProperty);
+                    boolean hasConfigurationBuilderProperty = beanProperties.stream()
+                        .anyMatch(property -> property.hasAnnotation(ANN_CONFIGURATION_BUILDER));
                     if (!isIntrospectedBean
                         && !isPythonDataclass(element)
                         && !hasConfigurationInjectConstructor(element)
@@ -561,7 +564,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         );
                                     } else {
                                         reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                                            "newUninitializedInstance",
+                                            NEW_UNINITIALIZED_INSTANCE,
                                             POLYGLOT_VALUE,
                                             List.of(
                                                 pythonClassReference(element, pythonClassReference)
@@ -690,7 +693,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                                 if (isIntrospectedBean && (constructorParametersBackedByFields || hasDynamicBeanProperties)) {
                                     List<StatementDef> assignments = new ArrayList<>();
-                                    if (hasDynamicBeanProperties) {
+                                    if (hasDynamicBeanProperties && hasConfigurationBuilderProperty) {
                                         List<ExpressionDef> arguments = new ArrayList<>(List.of(pythonClassReference(element, pythonClassReference)));
                                         for (int i = 0; i < parameters.length; i++) {
                                             @NonNull ParameterElement parameter = parameters[i];
@@ -706,13 +709,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 arguments
                                             )
                                         ));
-                                    } else {
+                                    } else if (hasConfigurationBuilderProperty) {
                                         // Parameterized introspected beans can still use configuration-builder
                                         // injection after construction. Initialize the Python backing value before
                                         // the generated bean definition invokes those setters.
                                         assignments.add(aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(
                                             PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                                                isAbstractIntroCtor ? "newIntroduction" : "newInstance",
+                                                NEW_UNINITIALIZED_INSTANCE,
                                                 POLYGLOT_VALUE,
                                                 List.of(pythonClassReference(element, pythonClassReference))
                                             )
@@ -754,7 +757,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         POLYGLOT_VALUE,
                                         arguments
                                     );
-                                    if (isIntrospectedBean) {
+                                    if (isIntrospectedBean && !extendsHostClass) {
                                         return aThis.invokeConstructor(pythonInstance);
                                     } else if (extendsPythonClass) {
                                         return aThis.superRef().invokeSuperConstructor(pythonInstance);
@@ -787,11 +790,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             if (isJunit5Test) {
                                 return StatementDef.multi();
                             } else if (isIntrospectedBean) {
-                                ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME
-                                    .invokeStatic(isAbstractIntroNoArg ? "newIntroduction" : "newInstance", POLYGLOT_VALUE,
+                                return aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(
+                                    PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                                        NEW_UNINITIALIZED_INSTANCE,
+                                        POLYGLOT_VALUE,
                                         List.of(pythonClassReference(element, pythonClassReference))
-                                    );
-                                return aThis.invokeConstructor(pythonInstance);
+                                    )
+                                );
                             } else {
                                 ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME
                                     .invokeStatic(isAbstractIntroNoArg ? "newIntroduction" : "newInstance", POLYGLOT_VALUE,
