@@ -689,11 +689,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         final int requiredConstructorParameterCount = requiredConstructorParameterCount(parameters);
                         final boolean hasDefaultedConstructorParameters = requiredConstructorParameterCount < parameters.length;
                         final boolean constructorParametersBackedByFields = constructorParametersBackedByFields(parameters, propertyFields);
-                        builder.addMethod(
+                            builder.addMethod(
                             constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                                 if (isIntrospectedBean && (constructorParametersBackedByFields || hasDynamicBeanProperties)) {
-                                    List<StatementDef> assignments = new ArrayList<>();
-                                    if (hasDynamicBeanProperties && hasConfigurationBuilderProperty) {
+                                    if (hasConfigurationBuilderProperty) {
                                         List<ExpressionDef> arguments = new ArrayList<>(List.of(pythonClassReference(element, pythonClassReference)));
                                         for (int i = 0; i < parameters.length; i++) {
                                             @NonNull ParameterElement parameter = parameters[i];
@@ -702,24 +701,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             int lastArgIndex = arguments.size() - 1;
                                             arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
                                         }
-                                        assignments.add(aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(
-                                            PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                                                isAbstractIntroCtor ? "newIntroduction" : "newInstance",
-                                                POLYGLOT_VALUE,
-                                                arguments
-                                            )
-                                        ));
-                                    } else if (hasConfigurationBuilderProperty) {
-                                        // Configuration builders are initialized by the Python constructor before
-                                        // Micronaut applies the generated builder setters.
-                                        assignments.add(aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(
-                                            PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                                                isAbstractIntroCtor ? "newIntroduction" : "newInstance",
-                                                POLYGLOT_VALUE,
-                                                List.of(pythonClassReference(element, pythonClassReference))
-                                            )
-                                        ));
-                                    } else if (constructorParametersBackedByFields) {
+                                        ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                                            isAbstractIntroCtor ? "newIntroduction" : "newInstance",
+                                            POLYGLOT_VALUE,
+                                            arguments
+                                        );
+                                        return aThis.invokeConstructor(pythonInstance);
+                                    }
+                                    List<StatementDef> assignments = new ArrayList<>();
+                                    if (constructorParametersBackedByFields) {
                                         // Ordinary field-backed introspected beans must not invoke a Python
                                         // constructor whose parameters are supplied by Micronaut.
                                         assignments.add(aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(
