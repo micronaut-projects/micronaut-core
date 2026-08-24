@@ -121,6 +121,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String GENERATOR_NAME = "python";
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
     private static final String PUBLISHER = "org.reactivestreams.Publisher";
+    private static final String GET_MEMBER = "getMember";
     private static final String ANN_CONFIGURATION_BUILDER = "io.micronaut.context.annotation.ConfigurationBuilder";
     private static final String NEW_UNINITIALIZED_INSTANCE = "newUninitializedInstance";
     private static final String ANN_CONFIGURATION_INJECT = "io.micronaut.context.annotation.ConfigurationInject";
@@ -2822,7 +2823,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .addModifiers(Modifier.PUBLIC)
                 .returns(TypeDef.STRING)
                 .build((aThis, parameters) -> aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
-                    .invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant("value"))
+                    .invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant("value"))
                     .invoke("asString", TypeDef.STRING)
                     .returning()));
         }
@@ -3649,7 +3650,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> {
             var invokedValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).invoke(
-                "getMember",
+                GET_MEMBER,
                 POLYGLOT_VALUE,
                 ExpressionDef.constant(beanProperty.getName())
             );
@@ -3771,7 +3772,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> {
             var invokedValue = aThis.field(pythonValue).invoke(
-                "getMember",
+                GET_MEMBER,
                 POLYGLOT_VALUE,
                 ExpressionDef.constant(beanProperty.getName())
             );
@@ -3987,7 +3988,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 continue;
             }
             ExpressionDef.InvokeInstanceMethod has = value.invoke("hasMember", TypeDef.Primitive.BOOLEAN, ExpressionDef.constant(beanProperty.getName()));
-            ExpressionDef.InvokeInstanceMethod member = value.invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(beanProperty.getName()));
+            ExpressionDef.InvokeInstanceMethod member = value.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(beanProperty.getName()));
             ExpressionDef valueExpression = convertValueForType(beanProperty.getGenericType(), member);
             statements.add(isCollectionLike(beanProperty.getGenericType())
                 ? aThis.field(field).assign(valueExpression)
