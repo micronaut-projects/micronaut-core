@@ -444,23 +444,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             } else if (pythonValueFinal != null) {
                                                 assigns.add(aThis.field(pythonValueFinal).assign(val));
                                             }
-                                            for (PropertyElement beanProperty : beanProperties) {
-                                                FieldDef field = propertyFields.get(beanProperty.getName());
-                                                if (field == null) {
-                                                    continue;
-                                                }
-                                                ExpressionDef.InvokeInstanceMethod has = val.invoke("hasMember", TypeDef.Primitive.BOOLEAN, ExpressionDef.constant(beanProperty.getName()));
-                                                ExpressionDef.InvokeInstanceMethod member = val.invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(beanProperty.getName()));
-                                                ExpressionDef valueExpr = convertValueForType(beanProperty.getGenericType(), member);
-                                                if (isCollectionLike(beanProperty.getGenericType())) {
-                                                    assigns.add(aThis.field(field).assign(valueExpr));
-                                                } else {
-                                                    assigns.add(has.isTrue().doIfElse(
-                                                        aThis.field(field).assign(valueExpr),
-                                                        StatementDef.multi()
-                                                    ));
-                                                }
-                                            }
+                                            assigns.addAll(polyglotValuePropertyAssignments(aThis, val, beanProperties, propertyFields));
                                             return StatementDef.multi(assigns);
                                         })
                                     ));
@@ -3982,19 +3966,30 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             statements.add(aThis.field(pythonValueField).assign(value));
         }
         ExpressionDef storedValue = pythonValueField == null ? value : aThis.field(pythonValueField);
+        statements.addAll(polyglotValuePropertyAssignments(aThis, storedValue, beanProperties, propertyFields));
+        return StatementDef.multi(statements);
+    }
+
+    private List<StatementDef> polyglotValuePropertyAssignments(
+        VariableDef.This aThis,
+        ExpressionDef value,
+        List<PropertyElement> beanProperties,
+        Map<String, FieldDef> propertyFields
+    ) {
+        List<StatementDef> statements = new ArrayList<>();
         for (PropertyElement beanProperty : beanProperties) {
             FieldDef field = propertyFields.get(beanProperty.getName());
             if (field == null) {
                 continue;
             }
-            ExpressionDef member = storedValue.invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(beanProperty.getName()));
-            ExpressionDef converted = convertValueForType(beanProperty.getGenericType(), member);
-            ExpressionDef hasMember = storedValue.invoke("hasMember", TypeDef.Primitive.BOOLEAN, ExpressionDef.constant(beanProperty.getName()));
+            ExpressionDef.InvokeInstanceMethod has = value.invoke("hasMember", TypeDef.Primitive.BOOLEAN, ExpressionDef.constant(beanProperty.getName()));
+            ExpressionDef.InvokeInstanceMethod member = value.invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(beanProperty.getName()));
+            ExpressionDef valueExpression = convertValueForType(beanProperty.getGenericType(), member);
             statements.add(isCollectionLike(beanProperty.getGenericType())
-                ? aThis.field(field).assign(converted)
-                : hasMember.isTrue().doIf(aThis.field(field).assign(converted)));
+                ? aThis.field(field).assign(valueExpression)
+                : has.isTrue().doIfElse(aThis.field(field).assign(valueExpression), StatementDef.multi()));
         }
-        return StatementDef.multi(statements);
+        return statements;
     }
 
     private static ExpressionDef convertNullableValue(ExpressionDef value, ExpressionDef nonNullValue) {
