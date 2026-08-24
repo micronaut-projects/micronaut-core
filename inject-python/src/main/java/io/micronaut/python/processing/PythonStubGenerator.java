@@ -716,7 +716,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance)
                                             );
                                         }
-                                        return aThis.invokeConstructor(pythonInstance);
+                                        return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, pythonValueFinal);
                                     }
                                     List<StatementDef> assignments = new ArrayList<>();
                                     if (constructorParametersBackedByFields) {
@@ -767,7 +767,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         arguments
                                     );
                                     if (isIntrospectedBean && !extendsHostClass) {
-                                        return aThis.invokeConstructor(pythonInstance);
+                                        return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, pythonValueFinal);
                                     } else if (extendsPythonClass) {
                                         return aThis.superRef().invokeSuperConstructor(pythonInstance);
                                     } else if (extendsHostClass) {
@@ -810,7 +810,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(pythonInstance)
                                     );
                                 }
-                                return aThis.invokeConstructor(pythonInstance);
+                                return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, pythonValueFinal);
                             } else if (isIntrospectedBean) {
                                 // Keep ordinary introspected beans lazy; resolving their Python class here
                                 // would break beans whose Python constructor requires arguments.
@@ -3968,6 +3968,33 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .doIf(ExpressionDef.nullValue().returning()),
             thisType.instantiate(value).returning()
         );
+    }
+
+    private StatementDef initializeFromPolyglotValue(
+        VariableDef.This aThis,
+        ExpressionDef value,
+        List<PropertyElement> beanProperties,
+        Map<String, FieldDef> propertyFields,
+        @Nullable FieldDef pythonValueField
+    ) {
+        List<StatementDef> statements = new ArrayList<>();
+        if (pythonValueField != null) {
+            statements.add(aThis.field(pythonValueField).assign(value));
+        }
+        ExpressionDef storedValue = pythonValueField == null ? value : aThis.field(pythonValueField);
+        for (PropertyElement beanProperty : beanProperties) {
+            FieldDef field = propertyFields.get(beanProperty.getName());
+            if (field == null) {
+                continue;
+            }
+            ExpressionDef member = storedValue.invoke("getMember", POLYGLOT_VALUE, ExpressionDef.constant(beanProperty.getName()));
+            ExpressionDef converted = convertValueForType(beanProperty.getGenericType(), member);
+            ExpressionDef hasMember = storedValue.invoke("hasMember", TypeDef.Primitive.BOOLEAN, ExpressionDef.constant(beanProperty.getName()));
+            statements.add(isCollectionLike(beanProperty.getGenericType())
+                ? aThis.field(field).assign(converted)
+                : hasMember.isTrue().doIf(aThis.field(field).assign(converted)));
+        }
+        return StatementDef.multi(statements);
     }
 
     private static ExpressionDef convertNullableValue(ExpressionDef value, ExpressionDef nonNullValue) {

@@ -26,6 +26,7 @@ class Person:
         assertGeneratedSourceContains(pythonCode, """
   @JsonCreator
   public Person(@JsonProperty("name") String name, @JsonProperty("age") int age, @JsonProperty("address") Address address) {
+    this.graalpyInternalValue = PythonContextRuntime.newUninitializedInstance(Person.__PYTHON_CLASS_REFERENCE);
     this.name = name;
     this.age = age;
     this.address = address;
