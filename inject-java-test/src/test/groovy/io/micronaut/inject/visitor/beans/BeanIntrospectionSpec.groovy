@@ -6807,6 +6807,137 @@ class Order {
     }
 
 
+    void "a constructor described via @Executable does not become a bean method"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+class Order {
+    Order() {}
+
+    @Executable
+    Order(String name) {}
+}
+''')
+
+        expect: 'the constructor is described as a constructor'
+        introspection.getConstructors().size() == 2
+
+        and: 'and does not show up among the bean methods'
+        introspection.getBeanMethods().isEmpty()
+        introspection.getBeanMethods().every { it.name != '<init>' }
+    }
+
+    void "constructors = true does not add anything to the bean methods"() {
+        given: 'the same type built with and without the member'
+        def source = '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected(%s)
+class Order {
+    private String name;
+
+    Order() {}
+    Order(String name) { this.name = name; }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    @Executable
+    public String describe() { return "order:" + name; }
+}
+'''
+        def baseline = buildBeanIntrospection('test.Order', String.format(source, ''))
+        def described = buildBeanIntrospection('test.Order', String.format(source, 'constructors = true'))
+
+        expect: 'the bean methods are untouched'
+        described.getBeanMethods().size() == baseline.getBeanMethods().size()
+        described.getBeanMethods()*.name.toSorted() == baseline.getBeanMethods()*.name.toSorted()
+        described.getBeanMethods()*.name == ['describe']
+
+        and: 'only the described constructors grew'
+        baseline.getConstructors().size() == 1
+        described.getConstructors().size() == 2
+
+        and: 'a bean method still works on an instance built through a described constructor'
+        described.getBeanMethods()[0].invoke(
+            described.getConstructors().find { it.arguments.length == 1 }.instantiate("abc")
+        ) == 'order:abc'
+    }
+
+    void "an @Executable method does not become a described constructor"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+    Order(String name) {}
+
+    @Executable
+    public String describe() { return "described"; }
+
+    @Executable
+    public String describe(String prefix) { return prefix; }
+}
+''')
+
+        expect: 'the constructors are exactly the declared ones, not the methods'
+        introspection.getConstructors().size() == 2
+        introspection.getConstructors()*.arguments*.length.toSorted() == [0, 1]
+
+        and: 'the methods are exactly the executable ones'
+        introspection.getBeanMethods()*.name.toSorted() == ['describe', 'describe']
+    }
+
+    void "an @Executable constructor and an @Executable method land in their own buckets"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+class Order {
+    private String name;
+
+    Order() {}
+
+    @Executable
+    Order(String name) { this.name = name; }
+
+    public String getName() { return name; }
+
+    @Executable
+    public String describe() { return "order:" + name; }
+}
+''')
+
+        expect: 'the constructor bucket holds only constructors'
+        introspection.getConstructors().size() == 2
+        introspection.getConstructors().every { it.declaringBeanType.simpleName == 'Order' }
+
+        and: 'the method bucket holds only the method'
+        introspection.getBeanMethods().size() == 1
+        introspection.getBeanMethods()[0].name == 'describe'
+
+        and: 'both are usable through their own API'
+        introspection.getConstructors().find { it.arguments.length == 1 }.instantiate("abc") != null
+        introspection.getBeanMethods()[0].invoke(introspection.instantiate()) == 'order:null'
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {

@@ -502,5 +502,39 @@ class MyBean  {
         definition != null
         definition.findMethod("run").isPresent()
     }
-}
 
+    void "test @Executable on a constructor does not produce an executable method"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.ExecutableConstructorBean','''\
+package test;
+
+import io.micronaut.context.annotation.Executable;
+import jakarta.inject.Singleton;
+
+@Singleton
+class ExecutableConstructorBean {
+
+    private final String name;
+
+    @Executable
+    ExecutableConstructorBean() {
+        this.name = "none";
+    }
+
+    @Executable
+    public String describe() {
+        return name;
+    }
+}
+''')
+        expect: 'the executable method is the method, not the constructor'
+        definition != null
+        definition.executableMethods.size() == 1
+        definition.executableMethods[0].methodName == 'describe'
+
+        and: 'no executable method was produced for the constructor'
+        definition.executableMethods.every { it.methodName != '<init>' }
+        definition.findMethod('<init>').isEmpty()
+        definition.findMethod('describe').isPresent()
+    }
+}
