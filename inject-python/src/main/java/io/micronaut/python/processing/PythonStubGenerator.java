@@ -450,7 +450,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         })
                                     ));
                         } else {
-                            builder.addMethod(
+                        builder.addMethod(
                                 MethodDef.constructor()
                                     .addModifiers(Modifier.PUBLIC)
                                     .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
@@ -3966,16 +3966,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         @Nullable FieldDef pythonValueField,
         boolean extendsPythonClass
     ) {
-        List<StatementDef> statements = new ArrayList<>();
-        if (extendsPythonClass) {
-            statements.add(aThis.superRef().invokeSuperConstructor(value));
-        }
-        if (pythonValueField != null) {
-            statements.add(aThis.field(pythonValueField).assign(value));
-        }
-        ExpressionDef storedValue = pythonValueField == null ? value : aThis.field(pythonValueField);
-        statements.addAll(polyglotValuePropertyAssignments(aThis, storedValue, beanProperties, propertyFields));
-        return StatementDef.multi(statements);
+        return value.newLocal("pythonInstance", pythonInstance -> {
+            List<StatementDef> statements = new ArrayList<>();
+            if (extendsPythonClass) {
+                statements.add(aThis.superRef().invokeSuperConstructor(pythonInstance));
+            }
+            if (pythonValueField != null) {
+                statements.add(aThis.field(pythonValueField).assign(pythonInstance));
+            }
+            ExpressionDef storedValue = pythonValueField == null ? pythonInstance : aThis.field(pythonValueField);
+            statements.addAll(polyglotValuePropertyAssignments(aThis, storedValue, beanProperties, propertyFields));
+            return StatementDef.multi(statements);
+        });
     }
 
     private List<StatementDef> polyglotValuePropertyAssignments(
