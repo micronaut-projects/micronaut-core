@@ -701,6 +701,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private final List<MethodDefinition<ClassElement, MethodElement>> postConstructMethods = new ArrayList<>();
     private final List<MethodDefinition<ClassElement, MethodElement>> preDestroyMethods = new ArrayList<>();
     private final List<FieldDefinition<ClassElement, FieldElement>> allFields = new ArrayList<>();
+    private boolean inheritedMethodDefinitions;
 
     private final List<InjectCommand> injectCommands = new ArrayList<>();
 
@@ -893,7 +894,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     @Override
     public BeanDefinitionWriter addPostConstruct(MethodDefinition<ClassElement, MethodElement> methodDefinition) {
-        allMethods.add(methodDefinition);
+        addInjectionMethod(methodDefinition);
         postConstructMethods.add(methodDefinition);
         postProcessMethod(methodDefinition);
         return this;
@@ -901,17 +902,42 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     @Override
     public BeanDefinitionWriter addPreDestroy(MethodDefinition<ClassElement, MethodElement> methodDefinition) {
-        allMethods.add(methodDefinition);
+        addInjectionMethod(methodDefinition);
         preDestroyMethods.add(methodDefinition);
         postProcessMethod(methodDefinition);
         return this;
+    }
+
+    /**
+     * Inherits the injection method definitions of the super bean definition.
+     *
+     * <p>A definition that extends another one reuses the method references of its super definition
+     * at runtime, so the local definitions have to mirror the super ones for the generated indexes
+     * to resolve the correct arguments.</p>
+     *
+     * @param parent The super bean definition writer
+     */
+    public void inheritMethodDefinitions(BeanDefinitionWriter parent) {
+        if (!allMethods.isEmpty()) {
+            throw new IllegalStateException("Cannot inherit the method definitions of " + parent + " after methods have been added to " + this);
+        }
+        allMethods.addAll(parent.allMethods);
+        inheritedMethodDefinitions = true;
+    }
+
+    private void addInjectionMethod(MethodDefinition<ClassElement, MethodElement> methodDefinition) {
+        if (inheritedMethodDefinitions) {
+            // the definitions are already present at the index of the super definition
+            return;
+        }
+        allMethods.add(methodDefinition);
     }
 
     @Override
     public BeanDefinitionWriter addMethodInjection(MethodDefinition<ClassElement, MethodElement> methodDefinition) {
         injectCommands.add(new InjectMethod(methodDefinition));
         if (shouldKeepInjectionPoint(methodDefinition.annotationMetadata())) {
-            allMethods.add(methodDefinition);
+            addInjectionMethod(methodDefinition);
         }
         postProcessMethod(methodDefinition);
         return this;
@@ -1119,6 +1145,13 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
      */
     public List<MethodDefinition<ClassElement, MethodElement>> getPostConstructMethods() {
         return postConstructMethods;
+    }
+
+    /**
+     * @return The pre destroy method definitions scheduled for invocation
+     */
+    public List<MethodDefinition<ClassElement, MethodElement>> getPreDestroyMethods() {
+        return preDestroyMethods;
     }
 
     /**

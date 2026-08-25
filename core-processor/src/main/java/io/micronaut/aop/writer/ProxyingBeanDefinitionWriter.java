@@ -327,7 +327,11 @@ public abstract class ProxyingBeanDefinitionWriter implements ElementProxyBuilde
     }
 
     protected final void processAlreadyVisitedMethods(BeanDefinitionWriter parent) {
+        // the proxy definition extends the parent definition and reuses its method references,
+        // so the inherited lifecycle methods have to keep the indexes of the parent
+        proxyBeanDefinitionWriter.inheritMethodDefinitions(parent);
         parent.getPostConstructMethods().forEach(proxyBeanDefinitionWriter::addPostConstruct);
+        parent.getPreDestroyMethods().forEach(proxyBeanDefinitionWriter::addPreDestroy);
     }
 
     @Override
