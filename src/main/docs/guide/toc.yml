@@ -51,6 +51,7 @@ ioc:
     introspectedAccessorsStyle: Use @Introspected with @AccessorsStyle
     accessKind: Bean Fields
     introspectedProperty: Explicit Bean Properties
+    propertyMembers: Bean Property Members
     atCreator: Constructor Methods
     staticAtCreator: Static Creator Methods
     introspectionConstructors: Describing Constructors

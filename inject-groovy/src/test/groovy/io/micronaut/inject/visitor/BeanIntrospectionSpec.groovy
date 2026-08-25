@@ -22,6 +22,8 @@ import spock.util.environment.RestoreSystemProperties
 
 import jakarta.validation.constraints.Size
 
+import java.lang.annotation.ElementType
+
 @RestoreSystemProperties
 class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
 
@@ -2645,6 +2647,29 @@ class Test extends MySuperclass {
 
         and: 'the package private superclass property is introspected, as we are in the same package'
         introspection.getProperty("packagePrivateProperty").orElse(null)
+    }
+
+    void "test property members"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Person', '''
+package test
+
+
+@Introspected(members = true)
+class Person {
+
+    @NotNull
+    String name
+}
+''')
+        def members = introspection.getProperty("name").get().members
+
+        expect: "only the field is listed, the Groovy generated accessors are synthetic"
+        members*.name == ["name"]
+        members*.elementType == [ElementType.FIELD]
+        members[0].annotationMetadata.hasAnnotation(NotNull)
+        members[0].readable
+        members[0].read(introspection.instantiate()) == null
     }
 
     void "every declared constructor is described"() {

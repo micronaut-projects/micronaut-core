@@ -25,6 +25,7 @@ import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.BeanPropertyMember;
 import io.micronaut.core.beans.BeanReadProperty;
 import io.micronaut.core.beans.BeanWriteProperty;
 import io.micronaut.core.beans.UnsafeBeanInstantiationIntrospection;
@@ -48,6 +49,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
 import java.lang.annotation.Annotation;
+import java.lang.annotation.ElementType;
 import java.lang.reflect.Method;
 import java.util.AbstractCollection;
 import java.util.ArrayList;
@@ -1414,6 +1416,8 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         final BeanPropertyRef<P> ref;
         private final Class<?> typeOrWrapperType;
         private final AnnotationMetadata annotationMetadata;
+        @Nullable
+        private volatile List<BeanPropertyMember<B, ?>> members;
 
         private BeanPropertyImpl(BeanPropertyRef<P> ref) {
             this.ref = ref;
@@ -1606,12 +1610,100 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
+        public List<BeanPropertyMember<B, ?>> getMembers() {
+            BeanPropertyMemberRef[] memberRefs = ref.members;
+            if (memberRefs == null || memberRefs.length == 0) {
+                return Collections.emptyList();
+            }
+            List<BeanPropertyMember<B, ?>> members = this.members;
+            if (members == null) {
+                List<BeanPropertyMember<B, ?>> newMembers = new ArrayList<>(memberRefs.length);
+                for (BeanPropertyMemberRef memberRef : memberRefs) {
+                    newMembers.add(new BeanPropertyMemberImpl<>(memberRef));
+                }
+                members = Collections.unmodifiableList(newMembers);
+                this.members = members;
+            }
+            return members;
+        }
+
+        @Override
         public String toString() {
             return "BeanProperty{" +
                     "beanType=" + beanType +
                     ", type=" + ref.argument.getType() +
                     ", name='" + ref.argument.getName() + '\'' +
                     '}';
+        }
+    }
+
+    /**
+     * Implementation of {@link BeanPropertyMember} that is using {@link BeanPropertyMemberRef} and method dispatch.
+     *
+     * @param <P> The member type
+     */
+    private final class BeanPropertyMemberImpl<P> implements BeanPropertyMember<B, P> {
+
+        private final BeanPropertyMemberRef ref;
+        private final AnnotationMetadata annotationMetadata;
+
+        private BeanPropertyMemberImpl(BeanPropertyMemberRef ref) {
+            this.ref = ref;
+            this.annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(ref.argument().getAnnotationMetadata());
+        }
+
+        @Override
+        public String getName() {
+            return ref.name();
+        }
+
+        @Override
+        public ElementType getElementType() {
+            return ref.elementType();
+        }
+
+        @Override
+        public Class<?> getDeclaringType() {
+            return ref.declaringType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Argument<P> asArgument() {
+            return (Argument<P>) ref.argument();
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return annotationMetadata;
+        }
+
+        @Override
+        public boolean isReadable() {
+            return ref.readMethodIndex() != -1;
+        }
+
+        @Nullable
+        @Override
+        public P read(B bean) {
+            ArgumentUtils.requireNonNull("bean", bean);
+            if (!beanType.isInstance(bean)) {
+                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
+            }
+            if (!isReadable()) {
+                throw new UnsupportedOperationException("Cannot read from the property member: " + getName());
+            }
+            return dispatchOne(ref.readMethodIndex(), bean, null);
+        }
+
+        @Override
+        public String toString() {
+            return "BeanPropertyMember{" +
+                "beanType=" + beanType +
+                ", elementType=" + ref.elementType() +
+                ", declaringType=" + ref.declaringType() +
+                ", name='" + ref.name() + '\'' +
+                '}';
         }
     }
 
@@ -2016,6 +2108,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         final Argument<P> readArgument;
         @Nullable
         final Argument<P> writeArgument;
+        final BeanPropertyMemberRef @Nullable [] members;
 
         public BeanPropertyRef(Argument<P> argument,
                                int getMethodIndex,
@@ -2034,6 +2127,18 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                                int withMethodIndex,
                                boolean readyOnly,
                                boolean mutable) {
+            this(argument, readArgument, writeArgument, getMethodIndex, setMethodIndex, withMethodIndex, readyOnly, mutable, null);
+        }
+
+        public BeanPropertyRef(Argument<P> argument,
+                               @Nullable Argument<P> readArgument,
+                               @Nullable Argument<P> writeArgument,
+                               int getMethodIndex,
+                               int setMethodIndex,
+                               int withMethodIndex,
+                               boolean readyOnly,
+                               boolean mutable,
+                               BeanPropertyMemberRef @Nullable [] members) {
             this.argument = argument;
             this.getMethodIndex = getMethodIndex;
             this.setMethodIndex = setMethodIndex;
@@ -2043,7 +2148,27 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             this.writeOnly = getMethodIndex == -1 && (setMethodIndex != -1 || withMethodIndex != -1);
             this.writeArgument = writeArgument == null && (setMethodIndex != -1 || withMethodIndex != -1) ? argument : writeArgument;
             this.readArgument = readArgument == null && (getMethodIndex != -1) ? argument : readArgument;
+            this.members = members;
         }
+    }
+
+    /**
+     * Bean property member compile-time data container.
+     *
+     * @param elementType    The kind of the member, either {@link ElementType#FIELD} or {@link ElementType#METHOD}
+     * @param declaringType  The type declaring the member
+     * @param name           The name of the member
+     * @param argument       The type of the member including its own annotation metadata
+     * @param readMethodIndex The dispatch index used to read the member, or {@code -1} if it cannot be read
+     * @since 5.2.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    public record BeanPropertyMemberRef(ElementType elementType,
+                                        Class<?> declaringType,
+                                        String name,
+                                        Argument<?> argument,
+                                        int readMethodIndex) {
     }
 
     /**

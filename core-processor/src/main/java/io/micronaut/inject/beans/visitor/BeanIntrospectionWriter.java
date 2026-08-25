@@ -68,6 +68,7 @@ import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
 import javax.lang.model.element.Modifier;
+import java.lang.annotation.ElementType;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -207,6 +208,28 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         int.class,
         boolean.class,
         boolean.class
+    );
+
+    private static final java.lang.reflect.Constructor<?> BEAN_PROPERTY_REF_WITH_MEMBERS_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractInitializableBeanIntrospection.BeanPropertyRef.class,
+        Argument.class,
+        Argument.class,
+        Argument.class,
+        int.class,
+        int.class,
+        int.class,
+        boolean.class,
+        boolean.class,
+        AbstractInitializableBeanIntrospection.BeanPropertyMemberRef[].class
+    );
+
+    private static final java.lang.reflect.Constructor<?> BEAN_PROPERTY_MEMBER_REF_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
+        AbstractInitializableBeanIntrospection.BeanPropertyMemberRef.class,
+        ElementType.class,
+        Class.class,
+        String.class,
+        Argument.class,
+        int.class
     );
 
     private static final java.lang.reflect.Method INSTANTIATE_METHOD = ReflectionUtils.getRequiredMethod(
@@ -378,6 +401,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
      * @param writeMember The write member
      * @param writeType   The write type
      * @param isReadOnly  Is read only
+     * @param members     The individual members the property is composed of, empty if not requested
      */
     void visitProperty(
         ClassElement type,
@@ -387,7 +411,8 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
         @Nullable MemberElement writeMember,
         @Nullable ClassElement readType,
         @Nullable ClassElement writeType,
-        boolean isReadOnly) {
+        boolean isReadOnly,
+        List<PropertyMemberDef> members) {
         this.evaluatedExpressionProcessor.processEvaluatedExpressions(genericType.getAnnotationMetadata(), beanClassElement);
         int readDispatchIndex = -1;
         if (readMember != null) {
@@ -462,8 +487,42 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             readDispatchIndex,
             writeDispatchIndex,
             withMethodIndex,
-            isReadOnly
+            isReadOnly,
+            visitPropertyMembers(members, readMember, readDispatchIndex)
         ));
+    }
+
+    private List<BeanPropertyMemberData> visitPropertyMembers(List<PropertyMemberDef> members,
+                                                              @Nullable MemberElement readMember,
+                                                              int readDispatchIndex) {
+        if (members.isEmpty()) {
+            return List.of();
+        }
+        List<BeanPropertyMemberData> result = new ArrayList<>(members.size());
+        for (PropertyMemberDef propertyMember : members) {
+            MemberElement member = propertyMember.member();
+            this.evaluatedExpressionProcessor.processEvaluatedExpressions(propertyMember.type().getAnnotationMetadata(), beanClassElement);
+            int memberReadDispatchIndex;
+            if (member.equals(readMember)) {
+                // Reuse the accessor that was already generated for reading the property
+                memberReadDispatchIndex = readDispatchIndex;
+            } else if (member instanceof FieldElement fieldElement) {
+                memberReadDispatchIndex = dispatchWriter.addGetField(fieldElement);
+            } else if (member instanceof MethodElement methodElement && methodElement.getParameters().length == 0) {
+                memberReadDispatchIndex = dispatchWriter.addMethod(beanClassElement, methodElement, true);
+            } else {
+                // A write method cannot be read
+                memberReadDispatchIndex = -1;
+            }
+            result.add(new BeanPropertyMemberData(
+                member instanceof FieldElement ? ElementType.FIELD : ElementType.METHOD,
+                member.getDeclaringType(),
+                member.getName(),
+                propertyMember.type(),
+                memberReadDispatchIndex
+            ));
+        }
+        return result;
     }
 
     /**
@@ -553,8 +612,22 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                 loadClassValueExpressionFn
             );
         }
+        if (beanPropertyData.members.isEmpty()) {
+            return beanPropertyRefDef.instantiate(
+                BEAN_PROPERTY_REF_CONSTRUCTOR,
+
+                mainArgument,
+                readArgument == null ? ExpressionDef.nullValue() : readArgument,
+                writeArgument == null ? ExpressionDef.nullValue() : writeArgument,
+                ExpressionDef.constant(beanPropertyData.getDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.setDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.withMethodDispatchIndex),
+                ExpressionDef.constant(beanPropertyData.isReadOnly),
+                ExpressionDef.constant(mutable)
+            );
+        }
         return beanPropertyRefDef.instantiate(
-            BEAN_PROPERTY_REF_CONSTRUCTOR,
+            BEAN_PROPERTY_REF_WITH_MEMBERS_CONSTRUCTOR,
 
             mainArgument,
             readArgument == null ? ExpressionDef.nullValue() : readArgument,
@@ -563,8 +636,42 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             ExpressionDef.constant(beanPropertyData.setDispatchIndex),
             ExpressionDef.constant(beanPropertyData.withMethodDispatchIndex),
             ExpressionDef.constant(beanPropertyData.isReadOnly),
-            ExpressionDef.constant(mutable)
+            ExpressionDef.constant(mutable),
+            ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyMemberRef.class)
+                .array()
+                .instantiate(
+                    beanPropertyData.members.stream()
+                        .map(member -> newBeanPropertyMemberRef(beanPropertyData.name, member, loadClassValueExpressionFn))
+                        .toList()
+                )
         );
+    }
+
+    private ExpressionDef newBeanPropertyMemberRef(String propertyName,
+                                                   BeanPropertyMemberData member,
+                                                   Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        return ClassTypeDef.of(AbstractInitializableBeanIntrospection.BeanPropertyMemberRef.class)
+            .instantiate(
+                BEAN_PROPERTY_MEMBER_REF_CONSTRUCTOR,
+
+                // 1: element type
+                ClassTypeDef.of(ElementType.class).getStaticField(member.elementType.name(), TypeDef.of(ElementType.class)),
+                // 2: declaring type
+                ExpressionDef.constant(ClassTypeDef.of(member.declaringType)),
+                // 3: member name
+                ExpressionDef.constant(member.name),
+                // 4: argument
+                ArgumentExpUtils.pushCreateArgument(
+                    annotationMetadata,
+                    beanClassElement,
+                    introspectionTypeDef,
+                    propertyName,
+                    member.type,
+                    loadClassValueExpressionFn
+                ),
+                // 5: read dispatch index
+                ExpressionDef.constant(member.readDispatchIndex)
+            );
     }
 
     private ExpressionDef newBeanMethodRef(BeanMethodData beanMethodData, Function<String, ExpressionDef> loadClassValueExpressionFn) {
@@ -1644,6 +1751,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
      * @param setDispatchIndex
      * @param withMethodDispatchIndex
      * @param isReadOnly
+     * @param members
      */
     private record BeanPropertyData(String name,
                                     ClassElement type,
@@ -1652,7 +1760,31 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                                     int getDispatchIndex,
                                     int setDispatchIndex,
                                     int withMethodDispatchIndex,
-                                    boolean isReadOnly) {
+                                    boolean isReadOnly,
+                                    List<BeanPropertyMemberData> members) {
+    }
+
+    /**
+     * A member of a property to be included in the introspection.
+     *
+     * @param member The field, read method or write method
+     * @param type   The type of the member carrying the member's own annotation metadata
+     */
+    record PropertyMemberDef(MemberElement member, ClassElement type) {
+    }
+
+    /**
+     * @param elementType       The kind of the member
+     * @param declaringType     The type declaring the member
+     * @param name              The name of the member
+     * @param type              The type of the member carrying the member's own annotation metadata
+     * @param readDispatchIndex The dispatch index to read the member, or -1
+     */
+    private record BeanPropertyMemberData(ElementType elementType,
+                                          ClassElement declaringType,
+                                          String name,
+                                          ClassElement type,
+                                          int readDispatchIndex) {
     }
 
     /**

@@ -32,6 +32,7 @@ import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.ImportedClass;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.processing.ProcessingException;
@@ -48,6 +49,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -143,6 +145,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             Arrays.stream(introspected.stringValues("classNames"))
         ).toList();
         final boolean metadata = introspected.booleanValue("annotationMetadata").orElse(true);
+        final boolean members = metadata && introspected.booleanValue("members").orElse(false);
         final Set<String> includedAnnotations = CollectionUtils.setOf(introspected.stringValues("includedAnnotations"));
         final Set<AnnotationValue<Annotation>> indexedAnnotations = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
         final String targetPackage = introspected.stringValue("targetPackage").orElse(element.getPackageName());
@@ -167,6 +170,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
                 processElement(
                     metadata,
+                    members,
                     indexedAnnotations,
                     getExternalPropertyElementQuery(element, ce, ignoreSettersWithDifferingType),
                     ce,
@@ -200,6 +204,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
 
                         processElement(metadata,
+                            members,
                             indexedAnnotations,
                             getExternalPropertyElementQuery(element, classElement, ignoreSettersWithDifferingType),
                             classElement,
@@ -232,7 +237,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     context
                 );
             }
-            processElement(metadata, indexedAnnotations, element, writer, ignoreSettersWithDifferingType, isDescribeConstructors(element, introspected), context);
+            processElement(metadata, members, indexedAnnotations, element, writer, ignoreSettersWithDifferingType, isDescribeConstructors(element, introspected), context);
         }
     }
 
@@ -389,6 +394,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     }
 
     private void processElement(boolean metadata,
+                                boolean members,
                                 Set<AnnotationValue<Annotation>> indexedAnnotations,
                                 ClassElement ce,
                                 BeanIntrospectionWriter writer,
@@ -397,6 +403,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 VisitorContext visitorContext) {
 
         processElement(metadata,
+            members,
             indexedAnnotations,
             PropertyElementQuery.of(ce).ignoreSettersWithDifferingType(ignoreSettersWithDifferingType),
             ce,
@@ -511,6 +518,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     }
 
     private void processElement(boolean metadata,
+                                boolean members,
                                 Set<AnnotationValue<Annotation>> indexedAnnotations,
                                 PropertyElementQuery propertyElementQuery,
                                 ClassElement ce,
@@ -559,7 +567,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 beanProperty.getWriteMember().orElse(null),
                 beanProperty.getReadType().map(t -> t.withAnnotationMetadata(annotationMetadata)).orElse(null),
                 beanProperty.getWriteType().map(t -> t.withAnnotationMetadata(annotationMetadata)).orElse(null),
-                beanProperty.isReadOnly()
+                beanProperty.isReadOnly(),
+                members ? resolvePropertyMembers(beanProperty) : List.of()
             );
 
             for (AnnotationValue<?> indexedAnnotation : indexedAnnotations) {
@@ -590,6 +599,61 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             return hierarchy.merge();
         }
         return annotationMetadata;
+    }
+
+    /**
+     * Resolves the individual members (the field, the read method and the write method) a property is composed of,
+     * each with its own type and its own annotation metadata.
+     *
+     * @param beanProperty The property
+     * @return The members, in field, read method, write method order
+     */
+    private List<BeanIntrospectionWriter.PropertyMemberDef> resolvePropertyMembers(PropertyElement beanProperty) {
+        List<BeanIntrospectionWriter.PropertyMemberDef> members = new ArrayList<>(3);
+        beanProperty.getField().ifPresent(field ->
+            members.add(new BeanIntrospectionWriter.PropertyMemberDef(
+                field,
+                field.getGenericType().withAnnotationMetadata(memberAnnotationMetadata(field, field.getType()))
+            ))
+        );
+        beanProperty.getReadMethod()
+            .filter(method -> !method.isSynthetic())
+            .ifPresent(method ->
+                members.add(new BeanIntrospectionWriter.PropertyMemberDef(
+                    method,
+                    method.getGenericReturnType().withAnnotationMetadata(
+                        memberAnnotationMetadata(method.getMethodAnnotationMetadata(), method.getReturnType())
+                    )
+                ))
+            );
+        beanProperty.getWriteMethod()
+            .filter(method -> !method.isSynthetic() && method.getParameters().length == 1)
+            .ifPresent(method -> {
+                ParameterElement parameter = method.getParameters()[0];
+                members.add(new BeanIntrospectionWriter.PropertyMemberDef(
+                    method,
+                    parameter.getGenericType().withAnnotationMetadata(
+                        memberAnnotationMetadata(method.getMethodAnnotationMetadata(), parameter.getType())
+                    )
+                ));
+            });
+        return members;
+    }
+
+    /**
+     * Combines the annotation metadata declared on the member itself with the type annotations of the member's type,
+     * mirroring how the annotation metadata of the merged property is assembled.
+     *
+     * @param memberAnnotationMetadata The annotation metadata of the member
+     * @param type                     The type of the member
+     * @return The combined annotation metadata
+     */
+    private AnnotationMetadata memberAnnotationMetadata(AnnotationMetadata memberAnnotationMetadata, ClassElement type) {
+        AnnotationMetadata typeAnnotationMetadata = type.getTypeAnnotationMetadata();
+        if (typeAnnotationMetadata.isEmpty()) {
+            return mergeAnnotations(memberAnnotationMetadata);
+        }
+        return new AnnotationMetadataHierarchy(true, memberAnnotationMetadata, typeAnnotationMetadata).merge();
     }
 
     private void addExecutableMethods(ClassElement ce, BeanIntrospectionWriter writer, List<PropertyElement> beanProperties) {
