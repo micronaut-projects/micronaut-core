@@ -291,7 +291,9 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
                 // Configuration beans are validated at the startup and don't require validation advice
                 beanDefinitionWriter.setRequiresPostConstructBeanValidation(true);
             } else {
-                for (MethodElement methodElement : target.getEnclosedElements(ElementQuery.ALL_METHODS.annotated(am -> am.hasAnnotation(ANN_REQUIRES_VALIDATION)))) {
+                // NOTE: the method's annotation metadata combines the class and the method annotations,
+                // only the methods that declare `@RequiresValidation` themselves should get the validation advice
+                for (MethodElement methodElement : target.getEnclosedElements(ElementQuery.ALL_METHODS.annotated(am -> am.hasDeclaredAnnotation(ANN_REQUIRES_VALIDATION)))) {
                     methodElement.annotate(ANN_VALIDATED);
                 }
             }

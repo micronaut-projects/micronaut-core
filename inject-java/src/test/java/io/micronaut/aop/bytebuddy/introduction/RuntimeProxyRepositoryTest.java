@@ -7,6 +7,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,7 +44,10 @@ class RuntimeProxyRepositoryTest {
     void testMethodsCount() {
         try (ApplicationContext context = ApplicationContext.run(Map.of("spec.name", "RuntimeProxyTest"))) {
             Collection<ExecutableMethod<CustomCrudRepo, ?>> executableMethods = context.getBeanDefinition(CustomCrudRepo.class).getExecutableMethods();
-            assertEquals(1, executableMethods.size());
+            // `findById` is implemented by the introduction advice, `findByIdWithDefault` is intercepted by the type level around advice
+            assertEquals(2, executableMethods.size());
+            assertEquals(List.of("findById", "findByIdWithDefault"),
+                executableMethods.stream().map(ExecutableMethod::getName).sorted().toList());
         }
     }
 }
