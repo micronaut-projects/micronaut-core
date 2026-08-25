@@ -307,19 +307,12 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      * @param response The {@link MutableHttpResponse} object
      * @since 5.2.0
      */
-    protected void setCrossOriginEmbedderPolicy(HttpServerConfiguration.CorsConfiguration corsConfiguration, MutableHttpResponse<?> response) {
-        Supplier<@Nullable String> headerValueSupplier = new Supplier<>() {
-            @Override
-            public @Nullable String get() {
-                CrossOriginEmbedderPolicy value = corsConfiguration.getCrossOriginEmbedderPolicy();
-                if (value != null) {
-                    return value.toString();
-                }
-                return null;
-            }
-        };
-        populateResponseHttpHeaderIfNotSet(CROSS_ORIGIN_EMBEDDER_POLICY, headerValueSupplier, response);
-    }
+protected void setCrossOriginEmbedderPolicy(HttpServerConfiguration.CorsConfiguration corsConfiguration, MutableHttpResponse<?> response) {
+    populateResponseHttpHeaderIfNotSet(CROSS_ORIGIN_EMBEDDER_POLICY, () -> {
+        CrossOriginEmbedderPolicy value = corsConfiguration.getCrossOriginEmbedderPolicy();
+        return value == null ? null : value.toString();
+    }, response);
+}
 
     /**
      * Sets the Cross-Origin-Resource-Policy header from the CORS configuration when it is not already present.
