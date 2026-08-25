@@ -3966,11 +3966,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         @Nullable FieldDef pythonValueField,
         boolean extendsPythonClass
     ) {
+        if (extendsPythonClass) {
+            List<StatementDef> statements = new ArrayList<>();
+            statements.add(aThis.superRef().invokeSuperConstructor(value));
+            ExpressionDef storedValue = aThis.superRef().invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
+            if (pythonValueField != null) {
+                statements.add(aThis.field(pythonValueField).assign(storedValue));
+                storedValue = aThis.field(pythonValueField);
+            }
+            statements.addAll(polyglotValuePropertyAssignments(aThis, storedValue, beanProperties, propertyFields));
+            return StatementDef.multi(statements);
+        }
         return value.newLocal("pythonInstance", pythonInstance -> {
             List<StatementDef> statements = new ArrayList<>();
-            if (extendsPythonClass) {
-                statements.add(aThis.superRef().invokeSuperConstructor(pythonInstance));
-            }
             if (pythonValueField != null) {
                 statements.add(aThis.field(pythonValueField).assign(pythonInstance));
             }
