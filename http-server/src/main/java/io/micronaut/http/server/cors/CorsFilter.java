@@ -116,14 +116,19 @@ public class CorsFilter implements Ordered, ConditionalFilter {
 
     @Override
     public boolean isEnabled(HttpRequest<?> request) {
-        String origin = request.getOrigin().orElse(null);
-        if (origin == null) {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present. Proceeding with the request.");
-            }
-            return false;
+        if (request.getOrigin().isPresent()) {
+            return true;
         }
-        return true;
+        if (corsConfiguration.getCrossOriginEmbedderPolicy() != null) {
+            return true;
+        }
+        if (corsConfiguration.getCrossOriginResourcePolicy() != null) {
+            return true;
+        }
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present and micronaut.cors.cross-origin-embedder-policy micronaut.cors.cross-origin-resource-policy not set. Proceeding with the request.");
+        }
+        return false;
     }
 
     @PreMatching
