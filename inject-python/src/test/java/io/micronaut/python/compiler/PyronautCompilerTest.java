@@ -80,6 +80,64 @@ final class PyronautCompilerTest {
     }
 
     @Test
+    void compilesParameterizedIntrospectedPythonConfigurationBean(@TempDir Path sourceDirectory) throws Exception {
+        Files.writeString(sourceDirectory.resolve("team_configuration.py"), """
+            from dataclasses import dataclass, field
+            from typing import Annotated
+
+            from micronaut.context.annotation import ConfigurationBuilder, ConfigurationProperties
+            from micronaut.core.annotation import Introspected
+
+            @Introspected
+            class TeamBuilder:
+                value: str | None = None
+
+                def with_name(self, value: str):
+                    self.value = value
+                    return self
+
+            @ConfigurationProperties("team")
+            @Introspected
+            @dataclass(init=False)
+            class TeamConfiguration:
+                name: str | None = None
+                player_names: list[str] = field(default_factory=list)
+                builder: Annotated[TeamBuilder, ConfigurationBuilder(prefixes="with_", configurationPrefix="team-admin")] = field(init=False)
+
+                def __init__(self, name: str | None = None, player_names: list[str] | None = None):
+                    self.name = name
+                    self.player_names = player_names or []
+                    self.builder = TeamBuilder()
+        """.indent(-4));
+
+        Path outputDirectory = sourceDirectory.resolve("output");
+        ClassLoader classLoader = PyronautCompiler.builder()
+            .pythonSrc(sourceDirectory.toString())
+            .build()
+            .buildClassLoader();
+
+        // Compilation must complete for the parameterized configuration shape;
+        // the generated application entry point is the stable in-memory output.
+        assertNotNull(classLoader.loadClass("pyronaut_application.PyronautMain"));
+
+        Files.createDirectories(outputDirectory);
+        PyronautCompiler.builder()
+            .pythonSrc(sourceDirectory.toString())
+            .targetDir(outputDirectory.toFile())
+            .build()
+            .compile();
+        Path generatedSource;
+        try (var paths = Files.walk(outputDirectory)) {
+            generatedSource = paths
+                .filter(path -> path.getFileName().toString().equals("TeamConfiguration.java"))
+                .findFirst()
+                .orElseThrow();
+        }
+        String generated = Files.readString(generatedSource);
+        assertTrue(generated.contains("PythonContextRuntime.newInstance"));
+    }
+
+    @Test
     void optionallyIncludesPythonBytecodeInTheInMemoryVfs() throws Exception {
         ClassLoader classLoader = PyronautCompiler.builder()
             .pythonCode("answer = 42")
