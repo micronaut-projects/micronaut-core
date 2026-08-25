@@ -182,13 +182,13 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
-        return getDeclaredMethodAnnotationMetadata();
+        return getOwnMethodAnnotationMetadata();
     }
 
     @Override
     public ElementAnnotationMetadata getMethodAnnotationMetadata() {
         if (resolvedMergedMethodAnnotationMetadata == null) {
-            ElementAnnotationMetadata declaredMethodAnnotationMetadata = getDeclaredMethodAnnotationMetadata();
+            ElementAnnotationMetadata declaredMethodAnnotationMetadata = getOwnMethodAnnotationMetadata();
             AnnotationMetadata inheritedAnnotationMetadata = getInheritedMethodAnnotationMetadata();
             if (inheritedAnnotationMetadata.isEmpty()) {
                 resolvedMergedMethodAnnotationMetadata = declaredMethodAnnotationMetadata;
@@ -258,7 +258,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         return metadata;
     }
 
-    private ElementAnnotationMetadata getDeclaredMethodAnnotationMetadata() {
+    private ElementAnnotationMetadata getOwnMethodAnnotationMetadata() {
         return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
     }
 
