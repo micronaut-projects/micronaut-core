@@ -221,10 +221,11 @@ public interface HttpHeaders extends Headers {
      */
     String CONTENT_RANGE = "Content-Range";
 
-    /**
-     * {@code "Content-Security-Policy"}.
-     */
-    String CONTENT_SECURITY_POLICY = "Content-Security-Policy";
+/**
+ * {@code "Content-Security-Policy"}.
+ * @since 5.2.0
+ */
+String CONTENT_SECURITY_POLICY = "Content-Security-Policy";
 
     /**
      * {@code "Content-Security-Policy-Report-Only"}.
