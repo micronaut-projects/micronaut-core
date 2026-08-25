@@ -41,17 +41,17 @@ public enum CrossOriginEmbedderPolicy {
      * @return The matching policy, or {@code null} if there is no match
      * @since 5.2.0
      */
-public static @Nullable CrossOriginEmbedderPolicy of(@Nullable String value) {
-    if (value == null) {
+    public static @Nullable CrossOriginEmbedderPolicy of(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        for (CrossOriginEmbedderPolicy policy : values()) {
+            if (policy.value.equals(value)) {
+                return policy;
+            }
+        }
         return null;
     }
-    for (CrossOriginEmbedderPolicy policy : values()) {
-        if (policy.value.equals(value)) {
-            return policy;
-        }
-    }
-    return null;
-}
 
     /**
      * @return The Cross-Origin-Embedder-Policy header value
