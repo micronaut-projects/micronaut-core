@@ -125,9 +125,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (corsConfiguration.getCrossOriginResourcePolicy() != null) {
             return true;
         }
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present and micronaut.cors.cross-origin-embedder-policy micronaut.cors.cross-origin-resource-policy not set. Proceeding with the request.");
-        }
+            LOG.trace("Http Header {} not present and micronaut.server.cors.cross-origin-embedder-policy and micronaut.server.cors.cross-origin-resource-policy not set. Proceeding with the request.", ORIGIN);
         return false;
     }
 
