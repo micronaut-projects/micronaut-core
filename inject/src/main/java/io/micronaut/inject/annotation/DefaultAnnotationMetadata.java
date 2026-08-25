@@ -166,15 +166,55 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Override
     public AnnotationMetadata getDeclaredMetadata() {
+        if (isDeclaredOnly()) {
+            return this;
+        }
         return new DefaultAnnotationMetadata(
                 this.declaredAnnotations,
                 this.declaredStereotypes,
-                null,
-                null,
-                annotationsByStereotype,
-                hasPropertyExpressions,
-                hasEvaluatedExpressions
+                this.declaredStereotypes,
+                this.declaredAnnotations,
+                declaredAnnotationsByStereotype(),
+                hasPropertyExpressions(),
+                hasEvaluatedExpressions()
         );
+    }
+
+    /**
+     * @return True if this metadata only contains what the element declares
+     */
+    private boolean isDeclaredOnly() {
+        return declaredAnnotations == allAnnotations && declaredStereotypes == allStereotypes;
+    }
+
+    /**
+     * Narrows {@link #annotationsByStereotype} to the annotations that are declared, so that a declared only
+     * view doesn't report the stereotypes of the annotations it doesn't contain.
+     *
+     * @return The annotations by stereotype of the declared annotations
+     */
+    @Nullable
+    Map<String, List<String>> declaredAnnotationsByStereotype() {
+        if (annotationsByStereotype == null || annotationsByStereotype.isEmpty()) {
+            return annotationsByStereotype;
+        }
+        Map<String, List<String>> result = new LinkedHashMap<>(annotationsByStereotype.size());
+        for (Map.Entry<String, List<String>> e : annotationsByStereotype.entrySet()) {
+            List<String> declared = null;
+            for (String annotation : e.getValue()) {
+                if ((declaredAnnotations != null && declaredAnnotations.containsKey(annotation))
+                        || (declaredStereotypes != null && declaredStereotypes.containsKey(annotation))) {
+                    if (declared == null) {
+                        declared = new ArrayList<>(e.getValue().size());
+                    }
+                    declared.add(annotation);
+                }
+            }
+            if (declared != null) {
+                result.put(e.getKey(), declared);
+            }
+        }
+        return result.isEmpty() ? null : result;
     }
 
     @Override
