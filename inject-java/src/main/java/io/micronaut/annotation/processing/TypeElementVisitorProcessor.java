@@ -290,11 +290,19 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 List<JavaClassElement> javaClassElements = elements.stream()
                     .map(typeElement -> elementFactory.newSourceClassElement(typeElement, elementAnnotationMetadataFactory))
                     .collect(Collectors.toCollection(() -> new ArrayList<>(elements.size())));
-                List<ClassElement> extraClasses = new ArrayList<>();
+                // Imported elements can be discovered more than once: by several importing types, or by a
+                // type that is itself already part of this round. Visiting the same class twice would
+                // generate the same metadata twice, so only the newly discovered ones are added.
+                var visitedClassNames = javaClassElements.stream()
+                    .map(ClassElement::getName)
+                    .collect(Collectors.toCollection(HashSet::new));
                 for (JavaClassElement javaClassElement : new ArrayList<>(javaClassElements)) {
                     try {
-                        extraClasses.addAll(VisitorUtils.collectImportedElements(javaClassElement, javaVisitorContext));
-                        javaClassElements.addAll((Collection) extraClasses);
+                        for (ClassElement importedElement : VisitorUtils.collectImportedElements(javaClassElement, javaVisitorContext)) {
+                            if (importedElement instanceof JavaClassElement importedClassElement && visitedClassNames.add(importedElement.getName())) {
+                                javaClassElements.add(importedClassElement);
+                            }
+                        }
                     } catch (PostponeToNextRoundException e) {
                         javaClassElements.remove(javaClassElement);
                         postponeElement(javaClassElement, e.getNativeErrorElement(), e);

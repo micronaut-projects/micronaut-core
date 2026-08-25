@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing.test;
 
 
 import javax.annotation.processing.Filer;
+import javax.annotation.processing.FilerException;
 import javax.lang.model.element.Element;
 import javax.tools.FileObject;
 import javax.tools.ForwardingJavaFileManager;
@@ -39,9 +40,11 @@ import java.io.Writer;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -55,6 +58,7 @@ import java.util.function.Function;
 @SuppressWarnings("all")
 final class InMemoryJavaFileManager extends ForwardingJavaFileManager<JavaFileManager> implements Filer {
     private final Map<URI, JavaFileObject> inMemoryFileObjects = new LinkedHashMap<>();
+    private final Set<URI> createdResources = new HashSet<>();
 
     InMemoryJavaFileManager(JavaFileManager fileManager) {
         super(fileManager);
@@ -164,6 +168,12 @@ final class InMemoryJavaFileManager extends ForwardingJavaFileManager<JavaFileMa
 
     @Override
     public FileObject createResource(Location location, CharSequence pkg, CharSequence relativeName, Element... originatingElements) throws IOException {
+        // The real javac Filer refuses to create the same resource twice in one compilation. Mirror that
+        // here so tests catch metadata being generated twice instead of silently overwriting it.
+        URI uri = uriForFileObject(StandardLocation.CLASS_OUTPUT, pkg.toString(), relativeName.toString());
+        if (!createdResources.add(uri)) {
+            throw new FilerException("Attempt to reopen a file for path " + uri.getPath());
+        }
         return getFileForOutput(StandardLocation.CLASS_OUTPUT, pkg.toString(), relativeName.toString(), null);
     }
 
