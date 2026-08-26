@@ -25,6 +25,7 @@ import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
@@ -37,6 +38,7 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
@@ -91,6 +93,7 @@ import java.util.concurrent.CompletionStage;
 @Internal
 public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter implements GracefulShutdownCapable {
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
+    private static final String DECOMPRESSOR_HANDLER = "decompressor";
 
     private final RequestHandler requestHandler;
 
@@ -428,18 +431,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     decompressionChannel = null;
                 } else if (HttpHeaderValues.GZIP.contentEqualsIgnoreCase(contentEncoding) ||
                     HttpHeaderValues.X_GZIP.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
-                        ctx.channel().config(), ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP));
+                    decompressionChannel = newDecompressionChannel(
+                        ZlibCodecFactory.newZlibDecoder(ZlibWrapper.GZIP, maxZlibAllocation()));
                 } else if (HttpHeaderValues.DEFLATE.contentEqualsIgnoreCase(contentEncoding) ||
                     HttpHeaderValues.X_DEFLATE.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
-                        ctx.channel().config(), ZlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE));
+                    decompressionChannel = newDecompressionChannel(
+                        ZlibCodecFactory.newZlibDecoder(ZlibWrapper.ZLIB_OR_NONE, maxZlibAllocation()));
                 } else if (Brotli.isAvailable() && HttpHeaderValues.BR.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
-                        ctx.channel().config(), new BrotliDecoder());
+                    decompressionChannel = newDecompressionChannel(new BrotliDecoder());
                 } else if (HttpHeaderValues.SNAPPY.contentEqualsIgnoreCase(contentEncoding)) {
-                    decompressionChannel = new EmbeddedChannel(ctx.channel().id(), ctx.channel().metadata().hasDisconnect(),
-                        ctx.channel().config(), new SnappyFrameDecoder());
+                    decompressionChannel = newDecompressionChannel(new SnappyFrameDecoder());
                 } else {
                     decompressionChannel = null;
                 }
@@ -476,6 +477,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     inboundHandler.read(new DefaultLastHttpContent(((FullHttpRequest) request).content()));
                 }
             }
+        }
+
+        private EmbeddedChannel newDecompressionChannel(ChannelHandler decompressor) {
+            EmbeddedChannel channel = new EmbeddedChannel(ctx.channel().id(),
+                ctx.channel().metadata().hasDisconnect(), ctx.channel().config());
+            channel.pipeline().addLast(DECOMPRESSOR_HANDLER, decompressor);
+            return channel;
+        }
+
+        private int maxZlibAllocation() {
+            long maxBufferSize = bodySizeLimits.maxBufferSize();
+            if (maxBufferSize == Long.MAX_VALUE || maxBufferSize > Integer.MAX_VALUE) {
+                return 0;
+            }
+            return (int) Math.max(1, maxBufferSize);
         }
 
         private static String getContentEncoding(HttpHeaders headers) {
@@ -516,9 +532,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private HttpRequest request;
         private OutboundAccessImpl outboundAccess;
         private final List<HttpContent> buffer = new ArrayList<>();
+        private long receivedLength;
+        private boolean failed;
 
         void init(HttpRequest request, OutboundAccessImpl outboundAccess) {
             assert buffer.isEmpty();
+            assert receivedLength == 0;
+            assert !failed;
             this.request = request;
             this.outboundAccess = outboundAccess;
         }
@@ -527,6 +547,30 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void read(Object message) {
             HttpContent content = (HttpContent) message;
             if (content.content().isReadable()) {
+                if (failed) {
+                    content.release();
+                    return;
+                }
+                int readableBytes = content.content().readableBytes();
+                if (bodySizeLimits.maxBodySize() != Long.MAX_VALUE &&
+                    readableBytes > bodySizeLimits.maxBodySize() - receivedLength) {
+                    boolean last = content instanceof LastHttpContent;
+                    long actualLength = receivedLength > Long.MAX_VALUE - readableBytes ?
+                        Long.MAX_VALUE : receivedLength + readableBytes;
+                    ContentLengthExceededException failure =
+                        new ContentLengthExceededException(bodySizeLimits.maxBodySize(), actualLength);
+                    failed = true;
+                    content.release();
+                    if (inboundHandler instanceof DecompressingInboundHandler decompressing) {
+                        decompressing.dispose();
+                    }
+                    handleUpstreamError(failure);
+                    if (last) {
+                        inboundHandler.read(LastHttpContent.EMPTY_LAST_CONTENT);
+                    }
+                    return;
+                }
+                receivedLength += readableBytes;
                 buffer.add(content);
             } else {
                 content.release();
@@ -547,6 +591,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     fullBody = composite;
                 }
                 buffer.clear();
+                receivedLength = 0;
                 HttpRequest request = this.request;
                 this.request = null;
                 OutboundAccess outboundAccess = this.outboundAccess;
@@ -580,6 +625,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 streamingInboundHandler.read(content);
             }
             buffer.clear();
+            receivedLength = 0;
+            failed = false;
 
             if (inboundHandler == this) {
                 inboundHandler = streamingInboundHandler;
@@ -596,6 +643,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 content.release();
             }
             buffer.clear();
+            receivedLength = 0;
+            failed = false;
         }
     }
 
@@ -743,13 +792,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             try {
                 channel.writeInbound(compressed);
                 if (last) {
-                    channel.finish();
+                    if (channel.isOpen()) {
+                        channel.finish();
+                    }
                 }
             } catch (DecompressionException e) {
+                dispose();
                 delegate.handleUpstreamError(e);
-                channel.releaseInbound();
                 if (last) {
-                    // need to handle the last content
                     inboundHandler.read(LastHttpContent.EMPTY_LAST_CONTENT);
                 }
                 return;
@@ -761,6 +811,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         void dispose() {
+            if (channel.pipeline().context(DECOMPRESSOR_HANDLER) != null) {
+                // Removing the handler cancels any decompression currently in progress.
+                channel.pipeline().remove(DECOMPRESSOR_HANDLER);
+            }
+            if (!channel.isOpen()) {
+                return;
+            }
             try {
                 channel.finishAndReleaseAll();
             } catch (DecompressionException ignored) {
