@@ -41,7 +41,7 @@ public class BinaryChatServerWebSocket {
         }
     }
 
-    @OnMessage
+    @OnMessage(maxPayloadLength = 32)
     public void onMessage(
             String topic,
             String username,
