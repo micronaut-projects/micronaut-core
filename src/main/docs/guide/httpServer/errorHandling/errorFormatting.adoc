@@ -2,4 +2,17 @@ Micronaut produces error response bodies via beans of type api:http.server.excep
 
 The default response body is link:https://github.com/blongden/vnd.error[vnd.error], however you can create your own implementation of type api:http.server.exceptions.response.ErrorResponseProcessor[] to control the responses.
 
+For unhandled exceptions, the default error response does not include the exception message.
+This avoids exposing implementation details to HTTP clients while the exception remains available in server logs.
+To include these messages for compatibility or debugging, set `micronaut.server.error-response-include-message` to `always`.
+The supported values are `never` (the default), `always`, and `on-param`. The `on-param` value includes the message when the request has a `message` query parameter whose value is not `false`.
+Enabling this option may expose sensitive implementation details and is not recommended for production environments.
+
+[source,yaml]
+----
+micronaut:
+  server:
+    error-response-include-message: always
+----
+
 If customization of the response other than items related to the errors is desired, the exception handler that is handling the exception needs to be overridden.

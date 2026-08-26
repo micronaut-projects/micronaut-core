@@ -63,6 +63,11 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 class ErrorSpec extends AbstractMicronautSpec {
 
+    @Override
+    Map<String, Object> getConfiguration() {
+        super.getConfiguration() << ['micronaut.server.error-response-include-message': 'always']
+    }
+
     void "test 500 server error"() {
         given:
         HttpResponse response = Flux.from(rxClient.exchange(

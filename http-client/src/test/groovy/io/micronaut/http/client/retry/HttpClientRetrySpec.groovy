@@ -39,7 +39,9 @@ import spock.lang.Specification
 class HttpClientRetrySpec extends Specification {
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    ApplicationContext context = ApplicationContext.run([
+            'micronaut.server.error-response-include-message': 'always'
+    ])
 
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()

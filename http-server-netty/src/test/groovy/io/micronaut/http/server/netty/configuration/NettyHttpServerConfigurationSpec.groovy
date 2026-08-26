@@ -72,6 +72,13 @@ class NettyHttpServerConfigurationSpec extends Specification {
         'read-idle-timeout'  | 'readIdleTimeout'  | '15s' | Duration.ofSeconds(15)
         'write-idle-timeout' | 'writeIdleTimeout' | '15s' | Duration.ofSeconds(15)
         'idle-timeout'       | 'idleTimeout'      | '-1s' | Duration.ofSeconds(-1)
+        'error-response-include-message' | 'errorResponseIncludeMessage' | 'always' | HttpServerConfiguration.ErrorResponseIncludeMessageMode.ALWAYS
+        'error-response-include-message' | 'errorResponseIncludeMessage' | 'on-param' | HttpServerConfiguration.ErrorResponseIncludeMessageMode.ON_PARAM
+    }
+
+    void "error response message inclusion defaults to never"() {
+        expect:
+        new HttpServerConfiguration().errorResponseIncludeMessage == HttpServerConfiguration.ErrorResponseIncludeMessageMode.NEVER
     }
 
     @Unroll

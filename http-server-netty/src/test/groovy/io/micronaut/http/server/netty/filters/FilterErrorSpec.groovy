@@ -128,7 +128,10 @@ class FilterErrorSpec extends Specification {
     }
 
     void "test filter throwing exception handled by exception handler throwing exception"() {
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FilterErrorSpec.simpleName + '3'])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': FilterErrorSpec.simpleName + '3',
+                'micronaut.server.error-response-include-message': 'always'
+        ])
         def ctx = server.applicationContext
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
         ExceptionException filter = ctx.getBean(ExceptionException)

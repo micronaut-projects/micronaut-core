@@ -30,6 +30,7 @@ import java.time.Duration
 @MicronautTest
 @Property(name = "micronaut.http.client.read-idle-timeout", value = "10s")
 @Property(name = "micronaut.http.client.log-level", value = "TRACE")
+@Property(name = "micronaut.server.error-response-include-message", value = "always")
 class ProxyRequestSpec extends Specification {
     @Inject
     @Client("/")

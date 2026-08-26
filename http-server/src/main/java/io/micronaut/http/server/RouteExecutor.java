@@ -24,9 +24,11 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -302,13 +304,29 @@ public final class RouteExecutor {
         MutableHttpResponse<?> mutableHttpResponse = errorResponseProcessor.processResponse(
                 ErrorContext.builder(httpRequest)
                         .cause(cause)
-                        .errorMessage("Internal Server Error: " + cause.getMessage())
+                        .exceptionMessage(cause.getMessage())
+                        .errorMessage(shouldIncludeErrorResponseMessage(httpRequest)
+                                ? "Internal Server Error: " + cause.getMessage()
+                                : "Internal Server Error")
                         .build(), response);
         applyConfiguredHeaders(mutableHttpResponse.getHeaders());
         if (!mutableHttpResponse.getContentType().isPresent() && httpRequest.getMethod() != HttpMethod.HEAD) {
             return mutableHttpResponse.contentType(MediaType.APPLICATION_JSON_TYPE);
         }
         return mutableHttpResponse;
+    }
+
+    private boolean shouldIncludeErrorResponseMessage(HttpRequest<?> httpRequest) {
+        HttpServerConfiguration.ErrorResponseIncludeMessageMode mode = serverConfiguration.getErrorResponseIncludeMessage();
+        if (mode == HttpServerConfiguration.ErrorResponseIncludeMessageMode.ALWAYS) {
+            return true;
+        }
+        if (mode == HttpServerConfiguration.ErrorResponseIncludeMessageMode.ON_PARAM) {
+            HttpParameters parameters = httpRequest.getParameters();
+            return parameters.names().contains("message")
+                    && !StringUtils.FALSE.equalsIgnoreCase(parameters.get("message"));
+        }
+        return false;
     }
 
     /**
