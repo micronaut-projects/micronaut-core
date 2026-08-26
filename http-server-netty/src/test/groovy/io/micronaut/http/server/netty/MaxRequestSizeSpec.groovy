@@ -57,9 +57,28 @@ import spock.lang.PendingFeature
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.zip.GZIPOutputStream
 
 class MaxRequestSizeSpec extends Specification {
+
+    void "test compressed request size is limited during decompression"() {
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.maxRequestSize': '10KB'])
+        HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
+
+        when:
+        client.toBlocking().retrieve(HttpRequest.POST('/test-max-size/text', gzip(new byte[20 * 1024]))
+                .header(HttpHeaderNames.CONTENT_ENCODING, HttpHeaderValues.GZIP)
+                .contentType(MediaType.TEXT_PLAIN_TYPE))
+
+        then:
+        thrown(Exception)
+
+        cleanup:
+        client.close()
+        embeddedServer.close()
+    }
 
     void "test max request size default processor"() {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.maxRequestSize': '10KB'])
@@ -430,6 +449,14 @@ class MaxRequestSizeSpec extends Specification {
         responses.forEach(r -> r.release())
         channel.close()
         embeddedServer.close()
+    }
+
+    private static byte[] gzip(byte[] content) {
+        def output = new ByteArrayOutputStream()
+        new GZIPOutputStream(output).withCloseable { stream ->
+            stream.write(content)
+        }
+        output.toByteArray()
     }
 
     @Controller("/test-max-size")

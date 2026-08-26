@@ -300,9 +300,15 @@ final class HttpPipelineBuilder {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new MicronautFlowControlHandler());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy()));
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR,
+                    new HttpContentDecompressor(maxDecompressionAllocation()));
 
             insertMicronautHandlers();
+        }
+
+        private int maxDecompressionAllocation() {
+            long maxRequestSize = server.getServerConfiguration().getMaxRequestSize();
+            return (int) Math.min(Integer.MAX_VALUE, Math.max(1, maxRequestSize));
         }
 
         /**
