@@ -18,6 +18,7 @@ import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.http.server.annotation.PreMatching
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
+import groovy.json.JsonSlurper
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
 import spock.lang.Retry
@@ -85,7 +86,11 @@ class MalformedUriSpec extends Specification {
         def result = ((HttpURLConnection) connection).errorStream.text
 
         then:
-        result == '{"message":"Request Entity Too Large","_links":{"self":{"href":"/malformed-proxy/xyz","templated":false}},"_embedded":{"errors":[{"message":"Request Entity Too Large"}]}}'
+        new JsonSlurper().parseText(result) == [
+                message  : 'Request Entity Too Large',
+                _links   : [self: [href: '/malformed-proxy/xyz', templated: false]],
+                _embedded: [errors: [[message: 'Request Entity Too Large']]]
+        ]
         !filter.filterCalled
         !newFilter.preMatchingCalled
     }
