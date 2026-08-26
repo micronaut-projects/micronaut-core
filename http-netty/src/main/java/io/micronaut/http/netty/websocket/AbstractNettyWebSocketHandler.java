@@ -41,12 +41,14 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketPongMessage;
 import io.micronaut.websocket.WebSocketSession;
+import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.bind.WebSocketState;
 import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
@@ -57,6 +59,7 @@ import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
+import io.netty.util.concurrent.ScheduledFuture;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +72,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -102,7 +106,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final WebSocketSessionRepository webSocketSessionRepository;
     protected final ConversionService conversionService;
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    private final AtomicBoolean closeInitiated = new AtomicBoolean(false);
     private final AtomicReference<CompositeByteBuf> frameBuffer = new AtomicReference<>();
+    private final int maxPayloadLength;
 
     /**
      * Default constructor.
@@ -137,6 +143,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         this.originatingRequest = request;
         this.messageHandler = webSocketBean.messageMethod().orElse(null);
         this.pongHandler = webSocketBean.pongMethod().orElse(null);
+        this.maxPayloadLength = messageHandler == null ? 65536 : messageHandler.intValue(OnMessage.class, "maxPayloadLength").orElse(65536);
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.webSocketVersion = version;
         this.conversionService = conversionService;
@@ -206,6 +213,14 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        if (!ctx.executor().inEventLoop()) {
+            ctx.executor().execute(() -> handleException(ctx, cause));
+            return;
+        }
+        handleException(ctx, cause);
+    }
+
+    private void handleException(ChannelHandlerContext ctx, Throwable cause) {
         cleanupBuffer();
         forwardErrorToUser(ctx, e -> handleUnexpected(ctx, e), cause);
     }
@@ -308,6 +323,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param msg The frame
      */
     protected void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame msg) {
+        if (closeInitiated.get()) {
+            return;
+        }
         if (msg instanceof TextWebSocketFrame || msg instanceof BinaryWebSocketFrame || msg instanceof ContinuationWebSocketFrame) {
 
             if (messageHandler == null) {
@@ -325,6 +343,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 if (WebSocketFrame.class.isAssignableFrom(bodyArgument.getType())) {
                     data = msg.retain();
                 } else {
+                    CompositeByteBuf buffered = frameBuffer.get();
+                    int bufferedLength = buffered == null ? 0 : buffered.readableBytes();
+                    if ((long) bufferedLength + msg.content().readableBytes() > maxPayloadLength) {
+                        rejectTooLargeMessage(ctx);
+                        return;
+                    }
                     ByteBuf msgContent = msg.content().retain();
                     if (!msg.isFinalFragment()) {
                         frameBuffer.updateAndGet((buffer) -> {
@@ -618,6 +642,22 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         final CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(code, reason);
         ctx.channel().writeAndFlush(closeFrame)
                      .addListener(future -> handleCloseReason(ctx, new CloseReason(code, reason), false));
+    }
+
+    private void rejectTooLargeMessage(ChannelHandlerContext ctx) {
+        if (closeInitiated.compareAndSet(false, true)) {
+            cleanupBuffer();
+            ctx.channel().config().setAutoRead(false);
+            getSession().markClosing();
+            CloseReason closeReason = CloseReason.MESSAGE_TO_BIG;
+            ScheduledFuture<?> closeTimeout = ctx.executor().schedule((Runnable) ctx::close, 1, TimeUnit.SECONDS);
+            ctx.channel().writeAndFlush(new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason()))
+                    .addListener(ChannelFutureListener.CLOSE)
+                    .addListener(future -> {
+                        closeTimeout.cancel(false);
+                        handleCloseReason(ctx, closeReason, false);
+                    });
+        }
     }
 
     private void cleanupBuffer() {

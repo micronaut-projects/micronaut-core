@@ -65,6 +65,7 @@ public class NettyWebSocketSession implements WebSocketSession {
     private final HttpRequest<?> request;
     private final String protocolVersion;
     private final boolean isSecure;
+    private volatile boolean closing;
     private final MutableConvertibleValues<Object> attributes;
     private final WebSocketMessageEncoder messageEncoder;
 
@@ -108,7 +109,11 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public boolean isOpen() {
-        return channel.isOpen() && channel.isActive();
+        return !closing && channel.isOpen() && channel.isActive();
+    }
+
+    void markClosing() {
+        closing = true;
     }
 
     @Override
