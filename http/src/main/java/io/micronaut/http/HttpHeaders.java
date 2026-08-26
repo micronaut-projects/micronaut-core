@@ -230,6 +230,8 @@ public interface HttpHeaders extends Headers {
 
     /**
      * {@code "Content-Security-Policy-Report-Only"}.
+     *
+     * @since 5.2.0
      */
     String CONTENT_SECURITY_POLICY_REPORT_ONLY = "Content-Security-Policy-Report-Only";
 
