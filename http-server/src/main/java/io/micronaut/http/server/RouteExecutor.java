@@ -32,9 +32,11 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -213,7 +215,10 @@ public final class RouteExecutor {
             mutableHttpResponse = errorResponseProcessor.processResponse(
                 ErrorContext.builder(httpRequest)
                     .cause(cause)
-                    .errorMessage("Internal Server Error: " + cause.getMessage())
+                    .exceptionMessage(cause.getMessage())
+                    .errorMessage(shouldIncludeErrorResponseMessage(httpRequest)
+                        ? "Internal Server Error: " + cause.getMessage()
+                        : "Internal Server Error")
                     .build(), mutableHttpResponse);
         } catch (Exception e) {
             logException(e);
@@ -223,6 +228,17 @@ public final class RouteExecutor {
             return mutableHttpResponse.contentType(MediaType.APPLICATION_JSON_TYPE);
         }
         return mutableHttpResponse;
+    }
+
+    private boolean shouldIncludeErrorResponseMessage(HttpRequest<?> httpRequest) {
+        return switch (serverConfiguration.getErrorResponseIncludeMessage()) {
+            case NEVER -> false;
+            case ALWAYS -> true;
+            case ON_PARAM -> {
+                HttpParameters parameters = httpRequest.getParameters();
+                yield parameters.names().contains("message") && !StringUtils.FALSE.equalsIgnoreCase(parameters.get("message"));
+            }
+        };
     }
 
     /**

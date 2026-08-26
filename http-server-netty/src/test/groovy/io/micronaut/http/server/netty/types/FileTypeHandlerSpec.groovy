@@ -53,6 +53,11 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         tempFile
     }
 
+    @Override
+    Map<String, Object> getConfiguration() {
+        super.getConfiguration() << ['micronaut.server.error-response-include-message': 'always']
+    }
+
     void "test returning a file from a controller"() {
         when:
         def response = httpClient.toBlocking().exchange('/test/html', String)

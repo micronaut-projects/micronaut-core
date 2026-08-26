@@ -114,6 +114,12 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     public static final boolean DEFAULT_LOG_HANDLED_EXCEPTIONS = false;
 
     /**
+     * The default value for including exception messages in error responses.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final ErrorResponseIncludeMessageMode DEFAULT_ERROR_RESPONSE_INCLUDE_MESSAGE = ErrorResponseIncludeMessageMode.NEVER;
+
+    /**
      * The default value for enabling dual protocol (http/https).
      */
     @SuppressWarnings("WeakerAccess")
@@ -152,6 +158,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private String serverHeader;
     private boolean dateHeader = DEFAULT_DATEHEADER;
     private boolean logHandledExceptions = DEFAULT_LOG_HANDLED_EXCEPTIONS;
+    private ErrorResponseIncludeMessageMode errorResponseIncludeMessage = DEFAULT_ERROR_RESPONSE_INCLUDE_MESSAGE;
     private HostResolutionConfiguration hostResolution;
     private HttpLocaleResolutionConfigurationProperties localeResolution;
     private String clientAddressHeader;
@@ -331,6 +338,16 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public boolean isLogHandledExceptions() {
         return logHandledExceptions;
+    }
+
+    /**
+     * Returns when unhandled exception messages should be included in error responses.
+     *
+     * @return When unhandled exception messages should be included
+     * @since 4.10.27
+     */
+    public ErrorResponseIncludeMessageMode getErrorResponseIncludeMessage() {
+        return errorResponseIncludeMessage;
     }
 
     /**
@@ -521,6 +538,17 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public void setLogHandledExceptions(boolean logHandledExceptions) {
         this.logHandledExceptions = logHandledExceptions;
+    }
+
+    /**
+     * Sets when unhandled exception messages should be included in error responses.
+     * Default value ({@value #DEFAULT_ERROR_RESPONSE_INCLUDE_MESSAGE}).
+     *
+     * @param errorResponseIncludeMessage When unhandled exception messages should be included
+     * @since 4.10.27
+     */
+    public void setErrorResponseIncludeMessage(ErrorResponseIncludeMessageMode errorResponseIncludeMessage) {
+        this.errorResponseIncludeMessage = errorResponseIncludeMessage;
     }
 
     /**
@@ -921,6 +949,26 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         public void setSingleHeader(boolean singleHeader) {
             this.singleHeader = singleHeader;
         }
+    }
+
+    /**
+     * When to include unhandled exception messages in error responses.
+     *
+     * @since 4.10.27
+     */
+    public enum ErrorResponseIncludeMessageMode {
+        /**
+         * Never include the exception message.
+         */
+        NEVER,
+        /**
+         * Always include the exception message.
+         */
+        ALWAYS,
+        /**
+         * Include the exception message when the {@code message} request parameter is present and not {@code false}.
+         */
+        ON_PARAM
     }
 
     /**

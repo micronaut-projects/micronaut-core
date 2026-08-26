@@ -59,7 +59,10 @@ class StreamPostSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'StreamPostSpec'])
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'StreamPostSpec',
+            'micronaut.server.error-response-include-message': 'always'
+    ])
 
     @Shared
     ApplicationContext context = embeddedServer.applicationContext
