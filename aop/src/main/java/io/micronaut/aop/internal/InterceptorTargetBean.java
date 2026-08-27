@@ -32,6 +32,21 @@ import java.util.Set;
 /**
  * Resolves {@link InterceptorTarget} from the active interceptor resolution path.
  *
+ * <p>This manually implemented prototype bean definition is registered as built-in AOP infrastructure. When an
+ * interceptor constructor requests {@link InterceptorTarget}, it reads the root definition from the current
+ * {@link BeanResolutionContext}. The root represents the intercepted bean being built, while the current path segment
+ * identifies the interceptor whose dependency is being resolved. The resulting descriptor captures only the target
+ * {@link BeanDefinition}; it does not retain or expose a target instance.</p>
+ *
+ * <p>The path is validated before producing a descriptor: the current declaring bean must implement
+ * {@link Interceptor}, and it must be different from the root target definition. Consequently, an application cannot
+ * inject {@code InterceptorTarget} into an arbitrary bean or resolve it directly from the bean context. Invalid use
+ * fails immediately with {@link BeanInstantiationException} instead of returning ambiguous target metadata.</p>
+ *
+ * <p>The definition is also added explicitly to the Java, Groovy, Kotlin, and Python in-memory compiler bean sets so
+ * compile-time framework tests and embedded compiler environments observe the same built-in behavior as a packaged
+ * application.</p>
+ *
  * @author Denis Stepanov
  * @since 5.2.0
  */
