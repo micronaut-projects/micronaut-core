@@ -26,7 +26,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.InstantiatableBeanDefinition;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
@@ -65,14 +64,16 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
      * own, which is the behaviour of a bean that declares no interceptor binding at all.</p>
      *
      * @param resolutionContext The resolution context
-     * @param constructor       The constructor, whose metadata may carry bindings the type does not
+     * @param constructor       The constructor, whose metadata is this bean's combined with the constructor's
      * @return The interceptors, or {@code null} when the bean binds none
      * @since 5.2.0
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     default @Nullable List<BeanRegistration<Interceptor<T, T>>> resolveInterceptors(BeanResolutionContext resolutionContext,
                                                                                    AnnotationMetadataProvider constructor) {
-        AnnotationMetadata metadata = new AnnotationMetadataHierarchy(getAnnotationMetadata(), constructor.getAnnotationMetadata());
+        // The constructor already exposes this bean's metadata combined with the constructor's, so use it rather
+        // than building a second hierarchy around it on every bean creation.
+        AnnotationMetadata metadata = constructor.getAnnotationMetadata();
         if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
             return null;
         }
