@@ -22,9 +22,15 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.InstantiatableBeanDefinition;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -46,6 +52,36 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
      */
     @Nullable Object[] resolveInstantiationValues(BeanResolutionContext resolutionContext, BeanContext context);
 
+    /**
+     * Resolves the interceptors that construction, post-construct and pre-destroy interception of this bean all
+     * select from.
+     *
+     * <p>The qualifier is built from the bean's own annotation metadata, so it covers every {@code @InterceptorBinding}
+     * the bean declares whatever kind each was declared for. That makes the result a superset of what any one phase
+     * needs; each interception point filters it again by its own binding and kind. Resolving once is what lets a
+     * non-singleton interceptor be shared by every phase of one bean.</p>
+     *
+     * <p>Override to supply the set another way. Returning {@code null} leaves each interception point to resolve its
+     * own, which is the behaviour of a bean that declares no interceptor binding at all.</p>
+     *
+     * @param resolutionContext The resolution context
+     * @param constructor       The constructor, whose metadata may carry bindings the type does not
+     * @return The interceptors, or {@code null} when the bean binds none
+     * @since 5.2.0
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    default @Nullable List<BeanRegistration<Interceptor<T, T>>> resolveInterceptors(BeanResolutionContext resolutionContext,
+                                                                                   AnnotationMetadataProvider constructor) {
+        AnnotationMetadata metadata = new AnnotationMetadataHierarchy(getAnnotationMetadata(), constructor.getAnnotationMetadata());
+        if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
+            return null;
+        }
+        return new ArrayList(resolutionContext.getBeanRegistrations(
+            Interceptor.ARGUMENT,
+            Qualifiers.byInterceptorBinding(metadata)
+        ));
+    }
+
     @Override
     default T instantiate(BeanResolutionContext resolutionContext, BeanContext context) {
         InterceptedConstructor<T> constructor = new InterceptedConstructor<>(this, resolutionContext, context);
@@ -54,8 +90,7 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
         Object[] values = resolveInstantiationValues(resolutionContext, context);
         // One resolution for construction, post-construct and pre-destroy rather than one per interception point, so a
         // non-singleton interceptor is shared by every phase of this bean.
-        List<BeanRegistration<Interceptor<T, T>>> interceptors =
-            SharedInterceptorRegistrations.resolve(resolutionContext, this, constructor);
+        List<BeanRegistration<Interceptor<T, T>>> interceptors = resolveInterceptors(resolutionContext, constructor);
         SharedInterceptorRegistrations.push(resolutionContext, this, interceptors);
         try {
             return ConstructorInterceptorChain.instantiate(

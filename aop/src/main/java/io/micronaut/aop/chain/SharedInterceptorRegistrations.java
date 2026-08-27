@@ -16,26 +16,19 @@
 package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.InterceptorKind;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.List;
 
 /**
- * Shares one interceptor resolution between the construction and the post-construct interception of a bean.
+ * Carries the interceptors resolved for a bean from its construction to its post-construct interception.
  *
  * <p>The scenario this exists for is a bean whose advice is declared with {@code @AroundConstruct} and lifecycle
  * interceptor bindings but no {@code @Around}, so no proxy is generated and there is no instance field in which to
@@ -73,53 +66,6 @@ public final class SharedInterceptorRegistrations {
     private static final String ATTRIBUTE = "io.micronaut.aop.sharedInterceptorRegistrations";
 
     private SharedInterceptorRegistrations() {
-    }
-
-    /**
-     * Resolves the interceptor registrations that a bean's construction, post-construct and pre-destroy interception
-     * can all select from.
-     *
-     * <p>The binding is the union of the {@code AROUND_CONSTRUCT}, {@code POST_CONSTRUCT} and {@code PRE_DESTROY}
-     * bindings declared by the bean, so the result is a superset of what any one phase needs. Widening cannot
-     * over-apply an interceptor: every interception point filters this set again by its own binding and kind before
-     * building a chain. It does mean an interceptor bound only to {@code @PreDestroy} is created while the bean is
-     * created rather than when it is destroyed, which is what allows the same instance to serve both.</p>
-     *
-     * <p>Returns {@code null} for a bean that declares none of those bindings, for example a bean with only
-     * {@code @Around} advice, so that such beans resolve exactly as they did before.</p>
-     *
-     * <p>A bean that gets a proxy never reaches this: its proxy is handed the same union as a constructor argument,
-     * qualified at compile time by {@code AopProxyWriter}, and
-     * {@code ProxyInterceptedBeanDefinition#instantiate} takes the registrations from there. The two encode one rule
-     * on either side of compilation, so a change to the kinds merged here belongs in that writer as well.</p>
-     *
-     * @param resolutionContext The resolution context
-     * @param definition        The bean definition
-     * @param constructor       The constructor metadata, or {@code null}
-     * @param <T>               The bean type
-     * @return The resolved registrations, or {@code null} when the bean declares no lifecycle-related binding
-     * @since 5.2.0
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public static <T> @Nullable List<BeanRegistration<Interceptor<T, T>>> resolve(BeanResolutionContext resolutionContext,
-                                                                                 BeanDefinition<?> definition,
-                                                                                 @Nullable AnnotationMetadataProvider constructor) {
-        AnnotationMetadata definitionMetadata = definition.getAnnotationMetadata();
-        AnnotationMetadata constructorMetadata = constructor == null
-            ? definitionMetadata
-            : new AnnotationMetadataHierarchy(definitionMetadata, constructor.getAnnotationMetadata());
-
-        Collection<AnnotationValue<?>> binding = new ArrayList<>();
-        binding.addAll(AbstractInterceptorChain.resolveInterceptorValues(constructorMetadata, InterceptorKind.AROUND_CONSTRUCT));
-        binding.addAll(AbstractInterceptorChain.resolveInterceptorValues(definitionMetadata, InterceptorKind.POST_CONSTRUCT));
-        binding.addAll(AbstractInterceptorChain.resolveInterceptorValues(definitionMetadata, InterceptorKind.PRE_DESTROY));
-        if (binding.isEmpty()) {
-            return null;
-        }
-        return new ArrayList(resolutionContext.getBeanRegistrations(
-            Interceptor.ARGUMENT,
-            Qualifiers.byInterceptorBindingValues(binding)
-        ));
     }
 
     /**
