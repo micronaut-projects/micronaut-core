@@ -48,7 +48,11 @@ public abstract class BeanDefinitionCreatorFactory {
 
     private static <R> List<R> produceInternal(ClassElement classElement, ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilder, VisitorContext visitorContext) {
         boolean isAbstract = classElement.isAbstract();
-        boolean isIntroduction = isIntroduction(classElement);
+        // An interceptor declares @InterceptorBinding(kind = INTRODUCTION) to state which advice it implements,
+        // not to request advice for itself. Without the same guard that isAopProxyType applies, the interceptor is
+        // compiled into its own introduction proxy that carries the target's lifecycle bindings, and resolving
+        // interceptors for that proxy finds the proxy again and recurses until the stack is exhausted.
+        boolean isIntroduction = !classElement.isAssignable(Interceptor.class) && isIntroduction(classElement);
         if (ConfigurationReaderBeanElementCreator.isConfigurationProperties(classElement)) {
             if (classElement.isInterface()) {
                 return new IntroductionInterfaceBeanElementCreator<>(classElement, visitorContext, beanDefinitionBuilder).build();
