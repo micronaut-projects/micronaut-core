@@ -17,6 +17,7 @@ package io.micronaut.python.compiler;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.aop.internal.InterceptorRegistryBean;
+import io.micronaut.aop.internal.InterceptorTargetBean;
 import io.micronaut.context.BeanDefinitionsProvider;
 import io.micronaut.context.DefaultBeanDefinitionsProvider;
 import io.micronaut.context.event.ApplicationEventPublisherFactory;
@@ -108,6 +109,7 @@ public final class InMemoryBeanDefinitionsProvider implements BeanDefinitionsPro
     private List<BeanDefinitionReference<?>> getBuiltInBeanReferences() {
         return List.of(
                 new InterceptorRegistryBean(),
+                new InterceptorTargetBean(),
                 new BeanProviderDefinition(),
                 new JakartaProviderBeanDefinition(),
                 new ApplicationEventPublisherFactory<>()

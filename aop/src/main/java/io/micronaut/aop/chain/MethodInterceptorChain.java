@@ -21,6 +21,7 @@ import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.aop.internal.InterceptorRegistrationProvider;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
@@ -255,10 +256,15 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         final AnnotationMetadata annotationMetadata = interceptedMethod.getAnnotationMetadata();
         final Collection<AnnotationValue<?>> binding = resolveInterceptorValues(annotationMetadata, kind);
 
-        final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = resolutionContext.getBeanRegistrations(
-            Interceptor.ARGUMENT,
-            Qualifiers.byInterceptorBindingValues(binding)
-        );
+        final Collection<BeanRegistration<Interceptor<?, ?>>> resolved;
+        if (bean instanceof InterceptorRegistrationProvider provider) {
+            resolved = provider.$getInterceptorRegistrations();
+        } else {
+            resolved = resolutionContext.getBeanRegistrations(
+                Interceptor.ARGUMENT,
+                Qualifiers.byInterceptorBindingValues(binding)
+            );
+        }
         final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
         final Interceptor[] resolvedInterceptors = interceptorRegistry
             .resolveInterceptors(

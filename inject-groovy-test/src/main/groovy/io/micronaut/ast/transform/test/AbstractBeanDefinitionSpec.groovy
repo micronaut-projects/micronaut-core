@@ -17,6 +17,7 @@ package io.micronaut.ast.transform.test
 
 import groovy.transform.CompileStatic
 import io.micronaut.aop.internal.InterceptorRegistryBean
+import io.micronaut.aop.internal.InterceptorTargetBean
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.ast.groovy.visitor.GroovyElementFactory
@@ -291,6 +292,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
                     .collect(Collectors.toList())
             return references + (includeAllBeans ? new DefaultBeanDefinitionsProvider().provide(it) : [
                     new InterceptorRegistryBean(),
+                    new InterceptorTargetBean(),
                     new BeanProviderDefinition(),
                     new ApplicationEventPublisherFactory<>()
             ])
