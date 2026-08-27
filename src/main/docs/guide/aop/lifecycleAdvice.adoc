@@ -42,3 +42,7 @@ snippet::io.micronaut.docs.aop.lifecycle.ProductInterceptors[tags="method-interc
 <1> A new ann:aop.InterceptorBean[] is defined that is a api:aop.MethodInterceptor[]
 <2> `@PostConstruct` interception is handled
 <3> `@PreDestroy` interception is handled
+
+An interceptor bound to these lifecycle kinds is a singleton by default, and one instance is then shared by every bean
+it is applied to. To give each intercepted bean its own interceptor, so that state set up in `@PostConstruct` is still
+available in `@PreDestroy`, see <<interceptorLifecycle, Interceptor Life Cycle>>.
