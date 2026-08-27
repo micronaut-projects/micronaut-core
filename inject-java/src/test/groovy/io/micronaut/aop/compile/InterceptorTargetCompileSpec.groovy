@@ -5,6 +5,73 @@ import io.micronaut.context.ApplicationContext
 
 class InterceptorTargetCompileSpec extends AbstractTypeElementSpec {
 
+    void 'test lifecycle infrastructure preserves the user interface as the primary proxy interface'() {
+        given:
+        ApplicationContext context = buildContext('''
+package targetscopeinterface;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+
+@Singleton
+@TrackedIntroduction
+interface MyApi {
+    String name();
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@Introduction
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@interface TrackedIntroduction {
+}
+
+@Prototype
+@InterceptorBinding(value = TrackedIntroduction.class, kind = InterceptorKind.INTRODUCTION)
+@InterceptorBinding(value = TrackedIntroduction.class, kind = InterceptorKind.POST_CONSTRUCT)
+class IntroductionInterceptor implements Interceptor<Object, Object> {
+    static int instances;
+    static Class<?> targetType;
+    static int postConstructCalls;
+    static int introductionCalls;
+
+    IntroductionInterceptor(InterceptorTarget target) {
+        instances++;
+        targetType = target.getType();
+    }
+
+    @Override
+    public Object intercept(InvocationContext<Object, Object> context) {
+        InterceptorKind kind = ((MethodInvocationContext<?, ?>) context).getKind();
+        if (kind == InterceptorKind.POST_CONSTRUCT) {
+            postConstructCalls++;
+            return context.proceed();
+        }
+        introductionCalls++;
+        return "target";
+    }
+}
+''')
+        Class<?> interceptorType = context.classLoader.loadClass('targetscopeinterface.IntroductionInterceptor')
+        Class<?> targetType = context.classLoader.loadClass('targetscopeinterface.MyApi')
+
+        when:
+        def bean = context.getBean(targetType)
+
+        then:
+        bean.class.interfaces.first() == targetType
+        bean.name() == 'target'
+        interceptorType.instances == 1
+        interceptorType.targetType == targetType
+        interceptorType.postConstructCalls == 1
+        interceptorType.introductionCalls == 1
+
+        cleanup:
+        context.close()
+    }
+
     void 'test prototype interceptor is created once per target and reused for its lifecycle'() {
         given:
         ApplicationContext context = buildContext('''

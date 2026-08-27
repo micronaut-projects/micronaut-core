@@ -513,7 +513,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
             interceptorRegistrationsField = retainedRegistrationsField;
             proxyBuilder.addField(retainedRegistrationsField);
-            proxyBuilder.addSuperinterface(TypeDef.of(InterceptorRegistrationProvider.class));
             proxyBuilder.addMethod(MethodDef.override(GET_INTERCEPTOR_REGISTRATIONS_METHOD)
                 .build((aThis, methodParameters) -> aThis.field(retainedRegistrationsField).returning()));
         } else {
@@ -593,6 +592,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         }
 
         proxyBuilder.addSuperinterface(TypeDef.of(isIntroduction ? Introduced.class : Intercepted.class));
+        if (interceptorRegistrationsField != null) {
+            // Keep internal infrastructure interfaces after the user-facing proxy interfaces. Some code uses the
+            // first implemented interface to identify an interface proxy's user type.
+            proxyBuilder.addSuperinterface(TypeDef.of(InterceptorRegistrationProvider.class));
+        }
 
         addConstructor(proxyBuilder, classTargetType, targetField, interceptorsField, interceptorRegistrationsField, proxyMethodsField, interceptedMethods);
 
