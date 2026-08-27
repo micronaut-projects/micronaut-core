@@ -2786,6 +2786,19 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         return isInterceptedLifeCycleByType(this.annotationMetadata, "POST_CONSTRUCT");
     }
 
+    /**
+     * Whether this bean definition generates intercepted post-construct or pre-destroy handling.
+     *
+     * <p>AOP proxy generation uses this result to add lifecycle-only interceptor candidates to the proxy constructor
+     * and retain their registrations for the target lifecycle. Keeping this decision here ensures registration
+     * retention follows the same proxy-target, factory, and interceptor-bean rules as lifecycle method generation.</p>
+     *
+     * @return {@code true} if this definition intercepts either lifecycle phase
+     */
+    public boolean hasInterceptedLifecycle() {
+        return isPostConstructIntercepted() || isPreDestroyIntercepted();
+    }
+
     private static MethodDefinition<ClassElement, MethodElement> createMethodDefinition(ClassElement beanType,
                                                                                         MethodElement methodElement,
                                                                                         AnnotationMetadata annotationMetadata,

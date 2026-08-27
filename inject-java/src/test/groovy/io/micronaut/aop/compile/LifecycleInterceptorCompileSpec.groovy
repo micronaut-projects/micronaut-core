@@ -3,12 +3,12 @@ package io.micronaut.aop.compile
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 
-class InterceptorTargetCompileSpec extends AbstractTypeElementSpec {
+class LifecycleInterceptorCompileSpec extends AbstractTypeElementSpec {
 
     void 'test lifecycle infrastructure preserves the user interface as the primary proxy interface'() {
         given:
         ApplicationContext context = buildContext('''
-package targetscopeinterface;
+package lifecycleinterface;
 
 import io.micronaut.aop.*;
 import io.micronaut.context.annotation.Prototype;
@@ -33,13 +33,11 @@ interface MyApi {
 @InterceptorBinding(value = TrackedIntroduction.class, kind = InterceptorKind.POST_CONSTRUCT)
 class IntroductionInterceptor implements Interceptor<Object, Object> {
     static int instances;
-    static Class<?> targetType;
     static int postConstructCalls;
     static int introductionCalls;
 
-    IntroductionInterceptor(InterceptorTarget target) {
+    IntroductionInterceptor() {
         instances++;
-        targetType = target.getType();
     }
 
     @Override
@@ -54,8 +52,8 @@ class IntroductionInterceptor implements Interceptor<Object, Object> {
     }
 }
 ''')
-        Class<?> interceptorType = context.classLoader.loadClass('targetscopeinterface.IntroductionInterceptor')
-        Class<?> targetType = context.classLoader.loadClass('targetscopeinterface.MyApi')
+        Class<?> interceptorType = context.classLoader.loadClass('lifecycleinterface.IntroductionInterceptor')
+        Class<?> targetType = context.classLoader.loadClass('lifecycleinterface.MyApi')
 
         when:
         def bean = context.getBean(targetType)
@@ -64,7 +62,6 @@ class IntroductionInterceptor implements Interceptor<Object, Object> {
         bean.class.interfaces.first() == targetType
         bean.name() == 'target'
         interceptorType.instances == 1
-        interceptorType.targetType == targetType
         interceptorType.postConstructCalls == 1
         interceptorType.introductionCalls == 1
 
@@ -75,7 +72,7 @@ class IntroductionInterceptor implements Interceptor<Object, Object> {
     void 'test prototype interceptor is created once per target and reused for its lifecycle'() {
         given:
         ApplicationContext context = buildContext('''
-package targetscope;
+package lifecycleretention;
 
 import io.micronaut.aop.*;
 import io.micronaut.context.annotation.Prototype;
@@ -102,12 +99,10 @@ import java.util.*;
 class TrackingInterceptor implements Interceptor<Object, Object> {
     static int instances;
     static final List<String> events = new ArrayList<>();
-    static Class<?> targetType;
 
     private final int id = ++instances;
 
-    TrackingInterceptor(InterceptorTarget target) {
-        targetType = target.getType();
+    TrackingInterceptor() {
         events.add(id + ":CREATE");
     }
 
@@ -149,15 +144,14 @@ class MyBean {
     }
 }
 ''')
-        Class<?> interceptorType = context.classLoader.loadClass('targetscope.TrackingInterceptor')
-        Class<?> targetType = context.classLoader.loadClass('targetscope.MyBean')
+        Class<?> interceptorType = context.classLoader.loadClass('lifecycleretention.TrackingInterceptor')
+        Class<?> targetType = context.classLoader.loadClass('lifecycleretention.MyBean')
 
         when:
         def bean = context.getBean(targetType)
 
-        then: 'the interceptor is created with the target before construction and reused for post construct'
+        then: 'the interceptor is created before construction and reused for post construct'
         interceptorType.instances == 1
-        interceptorType.targetType == targetType
         interceptorType.events == [
             '1:CREATE',
             '1:AROUND_CONSTRUCT',
@@ -183,6 +177,153 @@ class MyBean {
             'TARGET_PRE_DESTROY',
             '1:INTERCEPTOR_DESTROY'
         ]
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test lifecycle-only prototype interceptor is retained when around advice uses a different binding'() {
+        given:
+        ApplicationContext context = buildContext('''
+package lifecyclebindings;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@Around
+@AroundConstruct
+@interface WorkAdvice {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
+@interface LifecycleAdvice {
+}
+
+@Prototype
+@InterceptorBinding(value = LifecycleAdvice.class, kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(value = LifecycleAdvice.class, kind = InterceptorKind.PRE_DESTROY)
+class LifecycleInterceptor implements Interceptor<Object, Object> {
+    static int instances;
+    static final List<String> events = new ArrayList<>();
+    private final int id = ++instances;
+
+    LifecycleInterceptor() {
+        events.add(id + ":CREATE");
+    }
+
+    @Override
+    public Object intercept(InvocationContext<Object, Object> context) {
+        InterceptorKind kind = ((MethodInvocationContext<?, ?>) context).getKind();
+        events.add(id + ":" + kind);
+        return context.proceed();
+    }
+
+    @PreDestroy
+    void destroy() {
+        events.add(id + ":DESTROY");
+    }
+}
+
+@Singleton
+@WorkAdvice
+@LifecycleAdvice
+class MyBean {
+    @PostConstruct
+    void init() {
+        LifecycleInterceptor.events.add("TARGET_POST_CONSTRUCT");
+    }
+
+    @PreDestroy
+    void close() {
+        LifecycleInterceptor.events.add("TARGET_PRE_DESTROY");
+    }
+}
+''')
+        Class<?> interceptorType = context.classLoader.loadClass('lifecyclebindings.LifecycleInterceptor')
+        Class<?> targetType = context.classLoader.loadClass('lifecyclebindings.MyBean')
+
+        when:
+        context.getBean(targetType)
+
+        then:
+        interceptorType.instances == 1
+        interceptorType.events == ['1:CREATE', '1:POST_CONSTRUCT', 'TARGET_POST_CONSTRUCT']
+
+        when:
+        context.stop()
+
+        then:
+        interceptorType.events[-3..-1] == ['1:PRE_DESTROY', 'TARGET_PRE_DESTROY', '1:DESTROY']
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test each prototype target receives a different prototype interceptor'() {
+        given:
+        ApplicationContext context = buildContext('''
+package lifecycleprototypes;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import java.lang.annotation.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@Around
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@interface Tracked {
+}
+
+@Prototype
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.AROUND)
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.POST_CONSTRUCT)
+class TrackingInterceptor implements Interceptor<Object, Object> {
+    static int instances;
+    private final int id = ++instances;
+
+    @Override
+    public Object intercept(InvocationContext<Object, Object> context) {
+        Object result = context.proceed();
+        if (((MethodInvocationContext<?, ?>) context).getKind() == InterceptorKind.POST_CONSTRUCT) {
+            ((MyBean) context.getTarget()).interceptorId = id;
+        }
+        return result;
+    }
+}
+
+@Prototype
+@Tracked
+class MyBean {
+    int interceptorId;
+
+    int interceptorId() {
+        return interceptorId;
+    }
+}
+''')
+        Class<?> interceptorType = context.classLoader.loadClass('lifecycleprototypes.TrackingInterceptor')
+        Class<?> targetType = context.classLoader.loadClass('lifecycleprototypes.MyBean')
+
+        when:
+        def first = context.getBean(targetType)
+        def second = context.getBean(targetType)
+
+        then:
+        !first.is(second)
+        first.interceptorId() == 1
+        second.interceptorId() == 2
+        interceptorType.instances == 2
 
         cleanup:
         context.close()

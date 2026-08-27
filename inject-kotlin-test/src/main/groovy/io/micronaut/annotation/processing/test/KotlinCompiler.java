@@ -25,7 +25,6 @@ import com.tschuchort.compiletesting.Ksp2Kt;
 import com.tschuchort.compiletesting.KspKt;
 import com.tschuchort.compiletesting.SourceFile;
 import io.micronaut.aop.internal.InterceptorRegistryBean;
-import io.micronaut.aop.internal.InterceptorTargetBean;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanDefinitionsProvider;
@@ -361,7 +360,6 @@ public class KotlinCompiler {
                     beanDefinitions.addAll(new DefaultBeanDefinitionsProvider().provide(classLoader));
                 } else {
                     beanDefinitions.add(new InterceptorRegistryBean());
-                    beanDefinitions.add(new InterceptorTargetBean());
                     beanDefinitions.add(new BeanProviderDefinition());
                     beanDefinitions.add(new ApplicationEventPublisherFactory<>());
                 }

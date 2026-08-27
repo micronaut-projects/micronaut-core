@@ -253,13 +253,12 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> interceptedMethod,
         T1 bean,
         InterceptorKind kind) {
-        final AnnotationMetadata annotationMetadata = interceptedMethod.getAnnotationMetadata();
-        final Collection<AnnotationValue<?>> binding = resolveInterceptorValues(annotationMetadata, kind);
-
         final Collection<BeanRegistration<Interceptor<?, ?>>> resolved;
         if (bean instanceof InterceptorRegistrationProvider provider) {
             resolved = provider.$getInterceptorRegistrations();
         } else {
+            final AnnotationMetadata annotationMetadata = interceptedMethod.getAnnotationMetadata();
+            final Collection<AnnotationValue<?>> binding = resolveInterceptorValues(annotationMetadata, kind);
             resolved = resolutionContext.getBeanRegistrations(
                 Interceptor.ARGUMENT,
                 Qualifiers.byInterceptorBindingValues(binding)

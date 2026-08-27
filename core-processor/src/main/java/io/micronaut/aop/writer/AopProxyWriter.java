@@ -506,15 +506,18 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         proxyBuilder.addField(interceptorsField);
 
         FieldDef interceptorRegistrationsField;
-        if (hasLifecycleInterceptorBinding()) {
-            FieldDef retainedRegistrationsField = FieldDef.builder(FIELD_INTERCEPTOR_REGISTRATIONS, List.class)
+        if (proxyBeanDefinitionWriter.hasInterceptedLifecycle()) {
+            interceptorRegistrationsField = FieldDef.builder(FIELD_INTERCEPTOR_REGISTRATIONS, List.class)
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
                 .build();
 
-            interceptorRegistrationsField = retainedRegistrationsField;
-            proxyBuilder.addField(retainedRegistrationsField);
+            proxyBuilder.addField(interceptorRegistrationsField);
             proxyBuilder.addMethod(MethodDef.override(GET_INTERCEPTOR_REGISTRATIONS_METHOD)
-                .build((aThis, methodParameters) -> aThis.field(retainedRegistrationsField).returning()));
+                .build((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).returning()));
+
+            AnnotationMetadata annotationMetadata = targetType.getAnnotationMetadata();
+            visitInterceptorBinding(InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.POST_CONSTRUCT));
+            visitInterceptorBinding(InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.PRE_DESTROY));
         } else {
             interceptorRegistrationsField = null;
         }
@@ -616,12 +619,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         if (interfaceNames.add(interfaceType.getName())) {
             interfaces.add(interfaceType);
         }
-    }
-
-    private boolean hasLifecycleInterceptorBinding() {
-        AnnotationMetadata annotationMetadata = targetType.getAnnotationMetadata();
-        return InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.POST_CONSTRUCT).length > 0
-            || InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.PRE_DESTROY).length > 0;
     }
 
     private void addConstructor(ClassDef.ClassDefBuilder proxyBuilder,
