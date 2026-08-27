@@ -673,6 +673,79 @@ class MyBean {
         context.close()
     }
 
+    void 'test a proxy with constructor advice reuses the list it was constructed with for every phase'() {
+        given:
+        ApplicationContext context = buildContext('''
+package reuse.ctorproxy;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Around
+@AroundConstruct
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
+@interface Tracked {
+}
+
+class Seen {
+    static final Map<String, Object> BY_KIND = new LinkedHashMap<>();
+    static int instances;
+}
+
+@Prototype
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.AROUND)
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.AROUND_CONSTRUCT)
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.PRE_DESTROY)
+class TrackingInterceptor implements Interceptor<Object, Object> {
+    TrackingInterceptor() { Seen.instances++; }
+
+    @Override
+    public Object intercept(InvocationContext<Object, Object> context) {
+        String kind = context instanceof ConstructorInvocationContext
+            ? "AROUND_CONSTRUCT"
+            : ((MethodInvocationContext<?, ?>) context).getKind().name();
+        Seen.BY_KIND.put(kind, this);
+        return context.proceed();
+    }
+}
+
+@Singleton
+@Tracked
+class MyBean {
+    @PostConstruct void init() {}
+    String work() { return "done"; }
+    @PreDestroy void close() {}
+}
+''')
+        Class<?> seen = context.classLoader.loadClass('reuse.ctorproxy.Seen')
+
+        when:
+        def bean = context.getBean(context.classLoader.loadClass('reuse.ctorproxy.MyBean'))
+        bean.work()
+        def registrations = io.micronaut.aop.Intercepted.getMethod('$interceptorRegistrations').invoke(bean)
+        context.stop()
+
+        then: 'one interceptor is resolved for the bean and used by every phase'
+        seen.instances == 1
+        seen.BY_KIND.keySet() as List == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT', 'AROUND', 'PRE_DESTROY']
+
+        and: 'constructor interception used the very instance the proxy retains, so nothing was resolved twice'
+        registrations.size() == 1
+        seen.BY_KIND.values().every { it.is(registrations[0].bean) }
+
+        cleanup:
+        context.close()
+    }
+
     void 'test singleton interceptors are unaffected'() {
         given:
         ApplicationContext context = buildContext('''

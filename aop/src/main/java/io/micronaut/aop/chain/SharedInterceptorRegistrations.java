@@ -88,11 +88,17 @@ public final class SharedInterceptorRegistrations {
      * <p>Returns {@code null} for a bean that declares none of those bindings, for example a bean with only
      * {@code @Around} advice, so that such beans resolve exactly as they did before.</p>
      *
+     * <p>A bean that gets a proxy never reaches this: its proxy is handed the same union as a constructor argument,
+     * qualified at compile time by {@code AopProxyWriter}, and
+     * {@code ProxyInterceptedBeanDefinition#instantiate} takes the registrations from there. The two encode one rule
+     * on either side of compilation, so a change to the kinds merged here belongs in that writer as well.</p>
+     *
      * @param resolutionContext The resolution context
      * @param definition        The bean definition
      * @param constructor       The constructor metadata, or {@code null}
      * @param <T>               The bean type
      * @return The resolved registrations, or {@code null} when the bean declares no lifecycle-related binding
+     * @since 5.2.0
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static <T> @Nullable List<BeanRegistration<Interceptor<T, T>>> resolve(BeanResolutionContext resolutionContext,
@@ -129,6 +135,7 @@ public final class SharedInterceptorRegistrations {
      * @param resolutionContext The resolution context
      * @param definition        The definition being instantiated
      * @param registrations     The registrations
+     * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
     public static void push(BeanResolutionContext resolutionContext,
@@ -155,6 +162,7 @@ public final class SharedInterceptorRegistrations {
      * @param resolutionContext The resolution context
      * @param definition        The definition being instantiated
      * @param registrations     The registrations that were pushed
+     * @since 5.2.0
      */
     public static void pop(BeanResolutionContext resolutionContext,
                            BeanDefinition<?> definition,
@@ -174,6 +182,7 @@ public final class SharedInterceptorRegistrations {
      * @param resolutionContext The resolution context
      * @param definition        The definition being initialized
      * @return The registrations, or {@code null} when this initialization is not nested in that construction
+     * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
     public static @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> peek(BeanResolutionContext resolutionContext,

@@ -2824,6 +2824,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
      * interceptor for the same target.</p>
      *
      * @return {@code true} if this definition intercepts either lifecycle phase
+     * @since 5.2.0
      */
     public boolean hasInterceptedLifecycle() {
         return isPostConstructIntercepted() || isPreDestroyIntercepted();

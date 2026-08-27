@@ -1223,6 +1223,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param registration  The registration of the bean being destroyed
      * @param beanToDestroy The bean
      * @param <T>           The bean type
+     * @since 5.2.0
      */
     private <T> void disposeBean(DisposableBeanDefinition<T> definition,
                                  BeanRegistration<T> registration,

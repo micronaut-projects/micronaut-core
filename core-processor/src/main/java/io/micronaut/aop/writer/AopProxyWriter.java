@@ -516,6 +516,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             // The constructor argument is qualified by the accumulated around/introduction bindings only. Widen it
             // with the lifecycle bindings so the retained list is a superset of what lifecycle interception needs,
             // otherwise a lifecycle interceptor bound by a different annotation would be dropped.
+            // This is the compile-time half of the same rule SharedInterceptorRegistrations#resolve applies at
+            // runtime for beans that get no proxy: whatever a bean binds for construction, post-construct and
+            // pre-destroy is resolved as one set. Keep the two in step.
             AnnotationMetadata targetAnnotationMetadata = targetType.getAnnotationMetadata();
             visitInterceptorBinding(InterceptedMethodUtil.resolveInterceptorBinding(targetAnnotationMetadata, InterceptorKind.POST_CONSTRUCT));
             visitInterceptorBinding(InterceptedMethodUtil.resolveInterceptorBinding(targetAnnotationMetadata, InterceptorKind.PRE_DESTROY));

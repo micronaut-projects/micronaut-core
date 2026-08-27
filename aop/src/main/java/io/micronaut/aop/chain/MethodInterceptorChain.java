@@ -386,6 +386,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * @param resolutionContext The resolution context
      * @param binding           The binding of the interception point
      * @return The interceptor registrations to select from
+     * @since 5.2.0
      */
     private static Collection<BeanRegistration<Interceptor<?, ?>>> resolveLifecycleInterceptors(
         BeanResolutionContext resolutionContext,
@@ -419,6 +420,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      *
      * @param resolutionContext The resolution context
      * @return The reusable interceptor registrations, never {@code null}
+     * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
     private static List<BeanRegistration<Interceptor<?, ?>>> findExistingInterceptors(BeanResolutionContext resolutionContext) {
