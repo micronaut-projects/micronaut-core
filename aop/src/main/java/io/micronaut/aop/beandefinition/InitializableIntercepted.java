@@ -15,12 +15,16 @@
  */
 package io.micronaut.aop.beandefinition;
 
+import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.chain.MethodInterceptorChain;
+import io.micronaut.aop.chain.SharedInterceptorRegistrations;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.InitializingBeanDefinition;
 
+import java.util.Collection;
 import java.util.Objects;
 
 /**
@@ -35,12 +39,14 @@ public interface InitializableIntercepted<T> extends InitializingBeanDefinition<
 
     @Override
     default T initialize(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+        Collection<BeanRegistration<Interceptor<?, ?>>> shared = SharedInterceptorRegistrations.peek(resolutionContext, this);
         return Objects.requireNonNull(MethodInterceptorChain.initialize(
             resolutionContext,
             context,
             this,
             new InitializableInterceptedMethod<>(this, resolutionContext, context, bean),
-            bean
+            bean,
+            shared
         ));
     }
 

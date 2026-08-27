@@ -15,7 +15,12 @@
  */
 package io.micronaut.aop;
 
+import io.micronaut.context.BeanRegistration;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.inject.proxy.InterceptedBean;
+
+import java.util.List;
 
 /**
  * An interface implemented by generated proxy classes.
@@ -24,4 +29,39 @@ import io.micronaut.inject.proxy.InterceptedBean;
  * @since 1.0
  */
 public interface Intercepted extends InterceptedBean {
+
+    /**
+     * The interceptor registrations that were resolved for this proxy.
+     *
+     * <p>The scenario this exists for is an advised bean that also declares lifecycle advice:</p>
+     *
+     * <pre>{@code
+     * @Retention(RUNTIME)
+     * @Around
+     * @InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+     * @InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
+     * @interface Tracked {}
+     *
+     * @Singleton @Tracked
+     * class MyBean { @PostConstruct void init() {} @PreDestroy void close() {} }
+     * }</pre>
+     *
+     * <p>The proxy constructor is given the registrations that match the target's bindings and keeps them, so
+     * post-construct and pre-destroy interception select from the same set the proxy already uses for its methods,
+     * and a {@code @Prototype} interceptor is one instance for the whole life of one target. Destruction in
+     * particular has no other route to them: it runs with a fresh resolution context, and the proxy instance is the
+     * only thing that survives from creation to destruction.</p>
+     *
+     * <p>Proxies whose target declares no lifecycle binding, and proxies generated before this existed, keep the
+     * empty default; the runtime then resolves interceptors by binding as it always did.</p>
+     *
+     * @return The retained interceptor registrations, never {@code null}
+     * @since 5.2.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    @SuppressWarnings("checkstyle:MethodName")
+    default List<BeanRegistration<Interceptor<?, ?>>> $interceptorRegistrations() {
+        return List.of();
+    }
 }

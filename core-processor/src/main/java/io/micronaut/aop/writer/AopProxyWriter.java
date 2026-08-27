@@ -184,6 +184,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
     private static final Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", InterceptorRegistry.class, ExecutableMethod.class, List.class);
 
+    private static final Method GET_INTERCEPTOR_REGISTRATIONS_METHOD = ReflectionUtils.getRequiredInternalMethod(Intercepted.class, "$interceptorRegistrations");
+
     private static final Constructor<?> CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class, Object[].class).orElseThrow(() ->
         new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
     );
@@ -206,6 +208,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     );
 
     private static final String FIELD_INTERCEPTORS = "$interceptors";
+    private static final String FIELD_INTERCEPTOR_REGISTRATIONS = "$interceptorRegistrations";
     private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
     private static final String FIELD_BEAN_QUALIFIER = "$beanQualifier";
     private static final String FIELD_PROXY_METHODS = "$proxyMethods";
@@ -501,6 +504,25 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         proxyBuilder.addField(interceptorsField);
 
+        FieldDef interceptorRegistrationsField;
+        if (proxyBeanDefinitionWriter.hasInterceptedLifecycle()) {
+            interceptorRegistrationsField = FieldDef.builder(FIELD_INTERCEPTOR_REGISTRATIONS, List.class)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+                .build();
+            proxyBuilder.addField(interceptorRegistrationsField);
+            proxyBuilder.addMethod(MethodDef.override(GET_INTERCEPTOR_REGISTRATIONS_METHOD)
+                .build((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).returning()));
+
+            // The constructor argument is qualified by the accumulated around/introduction bindings only. Widen it
+            // with the lifecycle bindings so the retained list is a superset of what lifecycle interception needs,
+            // otherwise a lifecycle interceptor bound by a different annotation would be dropped.
+            AnnotationMetadata targetAnnotationMetadata = targetType.getAnnotationMetadata();
+            visitInterceptorBinding(InterceptedMethodUtil.resolveInterceptorBinding(targetAnnotationMetadata, InterceptorKind.POST_CONSTRUCT));
+            visitInterceptorBinding(InterceptedMethodUtil.resolveInterceptorBinding(targetAnnotationMetadata, InterceptorKind.PRE_DESTROY));
+        } else {
+            interceptorRegistrationsField = null;
+        }
+
         FieldDef proxyMethodsField = FieldDef.builder(FIELD_PROXY_METHODS, ExecutableMethod[].class)
             .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
             .build();
@@ -575,7 +597,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         proxyBuilder.addSuperinterface(TypeDef.of(isIntroduction ? Introduced.class : Intercepted.class));
 
-        addConstructor(proxyBuilder, classTargetType, targetField, interceptorsField, proxyMethodsField, interceptedMethods);
+        addConstructor(proxyBuilder, classTargetType, targetField, interceptorsField, interceptorRegistrationsField, proxyMethodsField, interceptedMethods);
 
         List<OutputObjectDef> classes = new ArrayList<>();
         classes.add(new OutputObjectDef(proxyBuilder.build(), null, originatingElements));
@@ -599,10 +621,16 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                                 ClassTypeDef targetType,
                                 @Nullable FieldDef targetField,
                                 FieldDef interceptorsField,
+                                @Nullable FieldDef interceptorRegistrationsField,
                                 FieldDef proxyMethodsField,
                                 List<MethodElement> interceptedMethods) {
 
         List<MethodDef.MethodBodyBuilder> bodyBuilders = new ArrayList<>();
+        if (interceptorRegistrationsField != null) {
+            bodyBuilders.add((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).assign(
+                methodParameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
+            ));
+        }
 
         if (isProxyTarget) {
 

@@ -1177,7 +1177,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
         if (definition instanceof DisposableBeanDefinition) {
             try {
-                ((DisposableBeanDefinition<T>) definition).dispose(this, beanToDestroy);
+                disposeBean((DisposableBeanDefinition<T>) definition, registration, beanToDestroy);
             } catch (Exception e) {
                 if (LOG.isWarnEnabled()) {
                     LOG.warn("Error disposing bean [{}]... Continuing...", beanToDestroy, e);
@@ -1204,6 +1204,40 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
 
         triggerBeanDestroyedListeners(definition, beanToDestroy);
+    }
+
+    /**
+     * Disposes of the bean, exposing the registrations it owns so that {@code @PreDestroy} advice can reuse
+     * interceptor instances that were already created for the same bean.
+     *
+     * <p>The scenario is a bean with lifecycle advice but no around proxy, so it has no instance field in which
+     * interceptor registrations could have been retained. A bean is destroyed long after it was created and with a
+     * fresh resolution context, so without this the pre-destroy advice would resolve a new interceptor and a
+     * {@code @Prototype} interceptor could not release the state it set up in {@code @PostConstruct}.</p>
+     *
+     * <p>The registrations are already in hand here: they are the dependents this method's caller destroys once the
+     * bean has been disposed of. Beans that own no dependents, which includes every prototype created through
+     * {@code createBean} and destroyed through {@code destroyBean(Object)}, take the plain path.</p>
+     *
+     * @param definition    The disposable definition
+     * @param registration  The registration of the bean being destroyed
+     * @param beanToDestroy The bean
+     * @param <T>           The bean type
+     */
+    private <T> void disposeBean(DisposableBeanDefinition<T> definition,
+                                 BeanRegistration<T> registration,
+                                 T beanToDestroy) {
+        List<BeanRegistration<?>> dependents = registration instanceof DependentBeanProvider provider
+            ? provider.dependentBeans()
+            : Collections.emptyList();
+        if (dependents.isEmpty()) {
+            definition.dispose(this, beanToDestroy);
+            return;
+        }
+        try (DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, definition)) {
+            resolutionContext.setAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS, dependents);
+            definition.dispose(resolutionContext, this, beanToDestroy);
+        }
     }
 
     /**

@@ -17,6 +17,7 @@ package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.chain.ConstructorInterceptorChain;
+import io.micronaut.aop.chain.SharedInterceptorRegistrations;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -63,14 +64,28 @@ public interface ParameterizedInterceptedBeanDefinition<T>
     @Override
     default T doInstantiate(BeanResolutionContext resolutionContext, BeanContext context, Map<String, Object> requiredArgumentValues) {
         @Nullable Object[] values = resolveInstantiationValues(resolutionContext, context, requiredArgumentValues);
-        return ConstructorInterceptorChain.instantiate(
-            resolutionContext,
-            context,
-            resolveInterceptors(resolutionContext, context, values),
-            this,
-            new InterceptedParametrizedConstructor<>(this, resolutionContext, context),
-            values
-        );
+        InterceptedParametrizedConstructor<T> constructor = new InterceptedParametrizedConstructor<>(this, resolutionContext, context);
+        List<BeanRegistration<Interceptor<T, T>>> declared = resolveInterceptors(resolutionContext, context, values);
+        if (declared != null) {
+            // An explicitly supplied set is bound for construction only, so it is used here but not shared with the
+            // post-construct interception of this bean, which may bind interceptors this set does not contain.
+            return ConstructorInterceptorChain.instantiate(resolutionContext, context, declared, this, constructor, values);
+        }
+        List<BeanRegistration<Interceptor<T, T>>> interceptors =
+            SharedInterceptorRegistrations.resolve(resolutionContext, this, constructor);
+        SharedInterceptorRegistrations.push(resolutionContext, this, interceptors);
+        try {
+            return ConstructorInterceptorChain.instantiate(
+                resolutionContext,
+                context,
+                interceptors,
+                this,
+                constructor,
+                values
+            );
+        } finally {
+            SharedInterceptorRegistrations.pop(resolutionContext, this, interceptors);
+        }
     }
 
     /**
