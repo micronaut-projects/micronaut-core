@@ -44,7 +44,7 @@ class ThirdPartyClientFilterSpec: StringSpec() {
         "a client filter is applied to the request and adds the authorization header" {
             val bintrayService = embeddedServer.applicationContext.getBean(BintrayService::class.java)
 
-            result = bintrayService.fetchRepositories().blockFirst().body()
+            result = bintrayService.fetchRepositories().blockFirst()!!.body()
 
             val encoded = Base64.getEncoder().encodeToString("$username:$token".toByteArray())
             val expected = "Basic $encoded"
