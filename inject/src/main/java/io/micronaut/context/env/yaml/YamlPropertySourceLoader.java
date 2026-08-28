@@ -81,7 +81,7 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
         }
     }
 
-    private static class Wrapper {
+    private static final class Wrapper {
         // in nested class to prevent NCDFE
 
         private static Iterable<Object> loadObjects(InputStream input) {

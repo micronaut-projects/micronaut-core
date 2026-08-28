@@ -16,7 +16,7 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValuesMap;
@@ -45,6 +45,7 @@ public class NettyHttpParameters implements MutableHttpParameters {
 
     private final LinkedHashMap<CharSequence, List<String>> valuesMap;
     private final ConvertibleMultiValuesMap<String> values;
+    @Nullable
     private final BiConsumer<CharSequence, List<String>> onChange;
 
     /**
@@ -79,6 +80,7 @@ public class NettyHttpParameters implements MutableHttpParameters {
     }
 
     @Override
+    @Nullable
     public String get(CharSequence name) {
         return values.get(name);
     }

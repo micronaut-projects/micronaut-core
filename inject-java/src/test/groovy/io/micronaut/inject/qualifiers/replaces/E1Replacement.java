@@ -16,9 +16,11 @@
 package io.micronaut.inject.qualifiers.replaces;
 
 import io.micronaut.context.annotation.Replaces;
+import io.micronaut.context.annotation.Requires;
 
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "ReplacesSpec")
 @Singleton
 @Replaces(bean = E.class, named = "E1")
 public class E1Replacement implements E {

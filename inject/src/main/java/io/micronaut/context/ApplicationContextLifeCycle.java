@@ -14,26 +14,21 @@
  * limitations under the License.
  */
 package io.micronaut.context;
-
-import io.micronaut.core.annotation.NonNull;
-
 /**
  * An interface for classes that manage the {@link ApplicationContext} life cycle and shut it down when the class is shutdown.
  *
  * @param <T> The concrete type
  */
-public interface ApplicationContextLifeCycle<T extends ApplicationContextLifeCycle> extends ApplicationContextProvider, LifeCycle {
+public interface ApplicationContextLifeCycle<T extends ApplicationContextLifeCycle<T>> extends ApplicationContextProvider, LifeCycle<T> {
 
     @SuppressWarnings("unchecked")
     @Override
-    @NonNull
     default T start() {
         return (T) this;
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    @NonNull
     default T stop() {
         ApplicationContext applicationContext = getApplicationContext();
         if (applicationContext != null && applicationContext.isRunning()) {

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.web.router;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -35,7 +33,6 @@ public interface MethodBasedRouteInfo<T, R> extends RouteInfo<R> {
      */
     MethodExecutionHandle<T, R> getTargetMethod();
 
-    @NonNull
     String[] getArgumentNames();
 
     RequestArgumentBinder<Object>[] resolveArgumentBinders(RequestBinderRegistry requestBinderRegistry);

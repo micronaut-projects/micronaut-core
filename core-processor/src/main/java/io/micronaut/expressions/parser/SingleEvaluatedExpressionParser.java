@@ -54,6 +54,7 @@ import io.micronaut.expressions.parser.token.Token;
 import io.micronaut.expressions.parser.token.TokenType;
 import io.micronaut.expressions.parser.token.Tokenizer;
 import io.micronaut.sourcegen.model.ExpressionDef.ComparisonOperation.OpType;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -114,6 +115,7 @@ import static io.micronaut.sourcegen.model.ExpressionDef.MathBinaryOperation.OpT
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
+@NullUnmarked
 @Internal
 public final class SingleEvaluatedExpressionParser implements EvaluatedExpressionParser {
     private final Tokenizer tokenizer;
@@ -507,16 +509,28 @@ public final class SingleEvaluatedExpressionParser implements EvaluatedExpressio
         }
 
         List<String> parts = new ArrayList<>();
-        parts.add(eat(IDENTIFIER).value());
+        parts.add(typeIdentifierPart().value());
         while (lookahead != null && lookahead.type() == DOT) {
             eat(DOT);
-            parts.add(eat(IDENTIFIER).value());
+            parts.add(typeIdentifierPart().value());
         }
 
         if (wrapped) {
             eat(R_PAREN);
         }
         return new TypeIdentifier(String.join(".", parts));
+    }
+
+    private Token typeIdentifierPart() {
+        if (lookahead == null) {
+            throw new ExpressionParsingException("Unexpected end of input. Expected: 'IDENTIFIER'");
+        }
+        if (!lookahead.type().isOneOf(IDENTIFIER, ENVIRONMENT)) {
+            throw new ExpressionParsingException("Unexpected token: " + lookahead.value() + ". Expected: 'IDENTIFIER'");
+        }
+        Token token = lookahead;
+        lookahead = tokenizer.getNextToken();
+        return token;
     }
 
     // ParenthesizedExpression

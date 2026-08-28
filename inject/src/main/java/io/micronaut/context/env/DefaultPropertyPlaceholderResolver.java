@@ -15,8 +15,9 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.context.env.exp.RandomPropertyExpressionResolver;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
@@ -50,11 +51,17 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     public static final String SUFFIX = "}";
 
     private static final Pattern ESCAPE_SEQUENCE = Pattern.compile("(.+)?:`([^`]+?)`");
+    private static final List<PropertyExpressionResolver> DEFAULT_EXPRESSION_RESOLVERS = List.of(
+        new RandomPropertyExpressionResolver()
+    );
     private static final char COLON = ':';
 
     private final PropertyResolver environment;
     private final ConversionService conversionService;
     private final String prefix;
+    @Nullable
+    private final ClassLoader classLoader;
+    @Nullable
     private Collection<PropertyExpressionResolver> expressionResolvers;
 
     /**
@@ -62,9 +69,19 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      * @param conversionService The conversion service
      */
     public DefaultPropertyPlaceholderResolver(PropertyResolver environment, ConversionService conversionService) {
+        this(environment, conversionService, null);
+    }
+
+    /**
+     * @param environment The property resolver for the environment
+     * @param conversionService The conversion service
+     * @param classLoader The class loader to use for expression resolver service loading
+     */
+    public DefaultPropertyPlaceholderResolver(PropertyResolver environment, ConversionService conversionService, @Nullable ClassLoader classLoader) {
         this.environment = environment;
         this.conversionService = conversionService;
         this.prefix = PREFIX;
+        this.classLoader = classLoader;
     }
 
     private Collection<PropertyExpressionResolver> getExpressionResolvers() {
@@ -73,8 +90,9 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             synchronized (this) { // double check
                 exResolvers = this.expressionResolvers;
                 if (exResolvers == null) {
-                    exResolvers = new ArrayList<>();
-                    ClassLoader classLoader = (environment instanceof Environment e) ? e.getClassLoader() : environment.getClass().getClassLoader();
+                    exResolvers = new ArrayList<>(DEFAULT_EXPRESSION_RESOLVERS);
+                    ClassLoader classLoader = this.classLoader != null ? this.classLoader :
+                        (environment instanceof Environment e) ? e.getClassLoader() : environment.getClass().getClassLoader();
                     SoftServiceLoader.load(PropertyExpressionResolver.class, classLoader).collectAll(exResolvers);
                     this.expressionResolvers = exResolvers;
                 }
@@ -113,7 +131,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     public Object resolveRequiredPlaceholdersObject(String str) throws ConfigurationException {
         List<Segment> segments = buildSegments(str);
         if (segments.size() == 1) {
-            return segments.get(0).getValue(Object.class);
+            return segments.getFirst().getValue(Object.class);
         }
         return resolveRequiredPlaceholdersString(segments);
     }
@@ -130,7 +148,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     public <T> T resolveRequiredPlaceholder(String str, Class<T> type) throws ConfigurationException {
         List<Segment> segments = buildSegments(str);
         if (segments.size() == 1) {
-            return segments.get(0).getValue(type);
+            return segments.getFirst().getValue(type);
         } else {
             throw new ConfigurationException("Cannot convert a multi segment placeholder to a specified type");
         }
@@ -140,7 +158,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     public <T> Optional<T> resolveOptionalPlaceholder(String str, Class<T> type) throws ConfigurationException {
         List<Segment> segments = buildSegments(str, false);
         if (segments.size() == 1) {
-            return segments.get(0).findValue(type);
+            return segments.getFirst().findValue(type);
         } else {
             return Optional.empty();
         }
@@ -354,6 +372,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
         private final String placeholder;
         private final List<String> expressions = new ArrayList<>();
+        @Nullable
         private String defaultValue;
 
         /**

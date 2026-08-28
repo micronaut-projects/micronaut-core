@@ -18,9 +18,11 @@ package io.micronaut.inject.writer;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.TypeInformation;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataGenUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -54,6 +56,7 @@ import java.util.function.Function;
  * @author Denis Stepanov
  * @since 4.8
  */
+@NullUnmarked
 @Internal
 public final class ArgumentExpUtils {
 
@@ -118,6 +121,21 @@ public final class ArgumentExpUtils {
         AnnotationMetadata.class,
         Class[].class
     );
+
+    private static final Method METHOD_ARGUMENT_GET_TYPE = ReflectionUtils.getRequiredInternalMethod(
+        TypeInformation.class,
+        "getType"
+    );
+
+    /**
+     * Extract the argument's type.
+     *
+     * @param argument The argument expression
+     * @return The type expression
+     */
+    public static ExpressionDef getTypeExp(ExpressionDef argument) {
+        return argument.invoke(METHOD_ARGUMENT_GET_TYPE);
+    }
 
     /**
      * Creates an argument.

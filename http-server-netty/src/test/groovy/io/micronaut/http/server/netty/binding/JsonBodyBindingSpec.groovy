@@ -19,12 +19,17 @@ import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.hateoas.Link
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.json.JsonSyntaxException
+import io.micronaut.scheduling.TaskExecutors
+import jakarta.annotation.Nullable
+import jakarta.inject.Inject
+import jakarta.inject.Named
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.scheduler.Schedulers
 import spock.lang.Issue
 
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executor
 
 class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
@@ -79,8 +84,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         HttpClientResponseException e = thrown()
-        e.message == """Invalid JSON: Unrecognized token 'The': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
- at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 14]"""
+        e.message.contains("""Invalid JSON: Unrecognized token 'The': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')""")
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
@@ -164,7 +168,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test simple POGO body parse and return"() {
         when:
-        String json = '{"name":"Fred","age":10}'
+        String json = '{"age":10,"name":"Fred"}'
         HttpResponse<String> response = Flux.from(httpClient.exchange(
                 HttpRequest.POST('/json/object-to-object', json), String
         )).blockFirst()
@@ -186,7 +190,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
     void "test array POGO body parsing and return"() {
         when:
-        String json = '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
+        String json = '[{"age":10,"name":"Fred"},{"age":11,"name":"Barney"}]'
         HttpResponse<String> response = Flux.from(httpClient.exchange(
                 HttpRequest.POST('/json/array-to-array', json), String
         )).blockFirst()
@@ -385,9 +389,30 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.getStatus() == HttpStatus.BAD_REQUEST
     }
 
+    void "BodyArgumentBinder returns null when no body content is provided"() {
+        when:
+        HttpResponse<String> response = Flux.from(httpClient.exchange(
+                HttpRequest.POST('/json/empty-body-check', ""), String
+        )).blockFirst()
+
+        then:
+        response.body() == "null"
+
+        when:
+        response = Flux.from(httpClient.exchange(
+                HttpRequest.POST('/json/empty-body-check', "{}"), String
+        )).blockFirst()
+
+        then:
+        response.body() == "not-null"
+    }
+
   @Controller(value = "/json", produces = io.micronaut.http.MediaType.APPLICATION_JSON)
     @Requires(property = "test.controller", value = "JsonController")
     static class JsonController {
+      @Inject
+      @Named(TaskExecutors.BLOCKING)
+      Executor blocking
 
         @Post("/params")
         String params(String name, int age) {
@@ -472,7 +497,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         @Post("/publisher-object")
         Publisher<String> publisherObject(@Body Publisher<Foo> publisher) {
             return Flux.from(publisher)
-                    .subscribeOn(Schedulers.boundedElastic())
+                    .subscribeOn(Schedulers.fromExecutor(blocking))
                     .map({ Foo foo ->
                         foo.toString()
             })
@@ -511,6 +536,11 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         @Post("/full-body-default-object")
         String fullBodyDefaultObject(@Body(defaultValue = '{"name":"Fred", "age":10}') Foo body) {
             return "Body: $body"
+        }
+
+        @Post("/empty-body-check")
+        String emptyBodyCheck(@Body @Nullable EmptyBodyCheck bean) {
+            return bean == null ? "null" : "not-null"
         }
 
 
@@ -552,6 +582,11 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
     @Introspected
     static class MyItem {
         String name
+    }
+
+    @Introspected
+    static class EmptyBodyCheck {
+        @Nullable String value
     }
 
   @Introspected

@@ -17,10 +17,10 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
@@ -40,7 +40,9 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
 
     private final ClassElement type;
     private final String name;
+    @Nullable
     private final AccessKind readAccessKind;
+    @Nullable
     private final AccessKind writeAccessKind;
     private final ClassElement owningElement;
     @Nullable
@@ -49,34 +51,54 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
     private final MethodElement setter;
     @Nullable
     private final FieldElement field;
+    @Nullable
+    private final MemberElement sourceMember;
+    @Nullable
+    private final AnnotationMetadata propertyComponentAnnotationMetadata;
     private final boolean excluded;
+    private final boolean constructorWriteAccess;
     private final PropertyElementAnnotationMetadata annotationMetadata;
     @Nullable
     private final String doc;
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     JavaPropertyElement(ClassElement owningElement,
                         ClassElement type,
                         @Nullable MethodElement getter,
                         @Nullable MethodElement setter,
                         @Nullable FieldElement field,
+                        @Nullable MemberElement sourceMember,
+                        @Nullable AnnotationMetadata propertyComponentAnnotationMetadata,
                         ElementAnnotationMetadataFactory annotationMetadataFactory,
                         String name,
-                        AccessKind readAccessKind,
-                        AccessKind writeAccessKind,
+                        @Nullable AccessKind readAccessKind,
+                        @Nullable AccessKind writeAccessKind,
                         boolean excluded,
+                        boolean constructorWriteAccess,
                         JavaVisitorContext visitorContext,
                         @Nullable String doc) {
-        super(selectNativeType(getter, setter, field), annotationMetadataFactory, visitorContext);
+        super(selectNativeType(getter, setter, field, sourceMember), annotationMetadataFactory, visitorContext);
         this.type = type;
         this.getter = getter;
         this.setter = setter;
         this.field = field;
+        this.sourceMember = sourceMember;
+        this.propertyComponentAnnotationMetadata = propertyComponentAnnotationMetadata;
         this.name = name;
         this.readAccessKind = readAccessKind;
         this.writeAccessKind = writeAccessKind;
         this.owningElement = owningElement;
         this.excluded = excluded;
-        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, false);
+        this.constructorWriteAccess = constructorWriteAccess;
+        this.annotationMetadata = new PropertyElementAnnotationMetadata(
+            this,
+            annotationMethod(getter, sourceMember),
+            setter,
+            annotationField(field, sourceMember),
+            null,
+            propertyComponentAnnotationMetadata,
+            false
+        );
         this.doc = doc;
     }
 
@@ -89,17 +111,39 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
 
     @Override
     public Optional<AnnotationMetadata> getReadTypeAnnotationMetadata() {
+        if (readAccessKind == null) {
+            return Optional.empty();
+        }
         return Optional.of(annotationMetadata.getReadAnnotationMetadata());
     }
 
     @Override
     public Optional<AnnotationMetadata> getWriteTypeAnnotationMetadata() {
+        if (writeAccessKind == null && !constructorWriteAccess) {
+            return Optional.empty();
+        }
         return Optional.of(annotationMetadata.getWriteAnnotationMetadata());
     }
 
     @Override
     protected AbstractJavaElement copyThis() {
-        return new JavaPropertyElement(owningElement, type, getter, setter, field, elementAnnotationMetadataFactory, name, readAccessKind, writeAccessKind, excluded, visitorContext, doc);
+        return new JavaPropertyElement(
+            owningElement,
+            type,
+            getter,
+            setter,
+            field,
+            sourceMember,
+            propertyComponentAnnotationMetadata,
+            elementAnnotationMetadataFactory,
+            name,
+            readAccessKind,
+            writeAccessKind,
+            excluded,
+            constructorWriteAccess,
+            visitorContext,
+            doc
+        );
     }
 
     @Override
@@ -107,9 +151,10 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
         return (PropertyElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
-    private static JavaNativeElement selectNativeType(MethodElement getter,
-                                                      MethodElement setter,
-                                                      FieldElement field) {
+    private static JavaNativeElement selectNativeType(@Nullable MethodElement getter,
+                                                      @Nullable MethodElement setter,
+                                                      @Nullable FieldElement field,
+                                                      @Nullable MemberElement sourceMember) {
         if (getter != null) {
             return (JavaNativeElement) getter.getNativeType();
         }
@@ -119,7 +164,32 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
         if (field != null) {
             return (JavaNativeElement) field.getNativeType();
         }
+        if (sourceMember != null) {
+            return (JavaNativeElement) sourceMember.getNativeType();
+        }
         throw new IllegalStateException();
+    }
+
+    @Nullable
+    private static MethodElement annotationMethod(@Nullable MethodElement getter, @Nullable MemberElement sourceMember) {
+        if (getter != null) {
+            return getter;
+        }
+        if (sourceMember instanceof MethodElement methodElement) {
+            return methodElement;
+        }
+        return null;
+    }
+
+    @Nullable
+    private static FieldElement annotationField(@Nullable FieldElement field, @Nullable MemberElement sourceMember) {
+        if (field != null) {
+            return field;
+        }
+        if (sourceMember instanceof FieldElement fieldElement) {
+            return fieldElement;
+        }
+        return null;
     }
 
     @Override
@@ -133,12 +203,12 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
     }
 
     @Override
-    public @NonNull ClassElement getType() {
+    public ClassElement getType() {
         return type;
     }
 
     @Override
-    public @NonNull ClassElement getGenericType() {
+    public ClassElement getGenericType() {
         return type; // Already generic
     }
 
@@ -149,12 +219,53 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
 
     @Override
     public Optional<MethodElement> getWriteMethod() {
+        if (writeAccessKind != AccessKind.METHOD) {
+            return Optional.empty();
+        }
         return Optional.ofNullable(setter);
     }
 
     @Override
     public Optional<MethodElement> getReadMethod() {
+        if (readAccessKind != AccessKind.METHOD) {
+            return Optional.empty();
+        }
         return Optional.ofNullable(getter);
+    }
+
+    @Override
+    public Optional<? extends MemberElement> getReadMember() {
+        if (readAccessKind == null) {
+            return Optional.empty();
+        }
+        return PropertyElement.super.getReadMember();
+    }
+
+    @Override
+    public Optional<ClassElement> getReadType() {
+        if (readAccessKind == null) {
+            return Optional.empty();
+        }
+        return PropertyElement.super.getReadType();
+    }
+
+    @Override
+    public Optional<? extends MemberElement> getWriteMember() {
+        if (writeAccessKind == null) {
+            return Optional.empty();
+        }
+        return PropertyElement.super.getWriteMember();
+    }
+
+    @Override
+    public Optional<ClassElement> getWriteType() {
+        if (constructorWriteAccess) {
+            return Optional.of(type);
+        }
+        if (writeAccessKind == null) {
+            return Optional.empty();
+        }
+        return PropertyElement.super.getWriteType();
     }
 
     @Override
@@ -173,7 +284,7 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return name;
     }
 
@@ -184,16 +295,22 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
 
     @Override
     public AccessKind getReadAccessKind() {
-        return readAccessKind;
+        return readAccessKind == null ? AccessKind.METHOD : readAccessKind;
     }
 
     @Override
     public AccessKind getWriteAccessKind() {
-        return writeAccessKind;
+        return writeAccessKind == null ? AccessKind.METHOD : writeAccessKind;
     }
 
     @Override
     public boolean isReadOnly() {
+        if (constructorWriteAccess) {
+            return false;
+        }
+        if (writeAccessKind == null) {
+            return true;
+        }
         return switch (writeAccessKind) {
             case METHOD -> setter == null;
             case FIELD -> field == null || field.isFinal();
@@ -202,6 +319,9 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
 
     @Override
     public boolean isWriteOnly() {
+        if (readAccessKind == null) {
+            return true;
+        }
         return switch (readAccessKind) {
             case METHOD -> getter == null;
             case FIELD -> field == null;
@@ -218,6 +338,9 @@ final class JavaPropertyElement extends AbstractJavaMemberElement implements Pro
         }
         if (setter != null) {
             return setter.getDeclaringType();
+        }
+        if (sourceMember != null) {
+            return sourceMember.getDeclaringType();
         }
         throw new IllegalStateException();
     }

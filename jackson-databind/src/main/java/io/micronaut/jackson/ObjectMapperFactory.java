@@ -16,43 +16,45 @@
 package io.micronaut.jackson;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.TSFBuilder;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.KeyDeserializer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
-import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
-import com.fasterxml.jackson.databind.deser.std.StringDeserializer;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Type;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.serialize.MicronautDeserializers;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.core.json.JsonFactoryBuilder;
+import tools.jackson.databind.DefaultTyping;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JacksonModule;
+import tools.jackson.databind.KeyDeserializer;
+import tools.jackson.databind.PropertyNamingStrategy;
+import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.deser.ValueDeserializerModifier;
+import tools.jackson.databind.deser.jdk.StringDeserializer;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.jsontype.DefaultBaseTypeLimitingValidator;
+import tools.jackson.databind.module.SimpleModule;
+import tools.jackson.databind.ser.ValueSerializerModifier;
 
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.TimeZone;
 
 /**
- * Factory bean for creating the Jackson {@link com.fasterxml.jackson.databind.ObjectMapper}.
+ * Factory bean for creating the Jackson {@link tools.jackson.databind.ObjectMapper}.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -67,26 +69,24 @@ public class ObjectMapperFactory {
     public static final String MICRONAUT_MODULE = "micronaut";
 
     @Inject
-    protected ConversionService conversionService;
-
-    @Inject
+    @Nullable
     protected BeanContext beanContext;
 
     @Inject
     // have to be fully qualified due to JDK Module type
-    protected com.fasterxml.jackson.databind.Module[] jacksonModules = new com.fasterxml.jackson.databind.Module[0];
+    protected JacksonModule[] jacksonModules = new JacksonModule[0];
 
     @Inject
-    protected JsonSerializer[] serializers = new JsonSerializer[0];
+    protected ValueSerializer[] serializers = new ValueSerializer[0];
 
     @Inject
-    protected JsonDeserializer[] deserializers = new JsonDeserializer[0];
+    protected ValueDeserializer[] deserializers = new ValueDeserializer[0];
 
     @Inject
-    protected BeanSerializerModifier[] beanSerializerModifiers = new BeanSerializerModifier[0];
+    protected ValueSerializerModifier[] beanSerializerModifiers = new ValueSerializerModifier[0];
 
     @Inject
-    protected BeanDeserializerModifier[] beanDeserializerModifiers = new BeanDeserializerModifier[0];
+    protected ValueDeserializerModifier[] beanDeserializerModifiers = new ValueDeserializerModifier[0];
 
     @Inject
     protected KeyDeserializer[] keyDeserializers = new KeyDeserializer[0];
@@ -101,8 +101,8 @@ public class ObjectMapperFactory {
     @Singleton
     @BootstrapContextCompatible
     public JsonFactory jsonFactory(JacksonConfiguration jacksonConfiguration) {
-        final TSFBuilder<?, ?> jsonFactoryBuilder = JsonFactory.builder();
-        jacksonConfiguration.getFactorySettings().forEach(jsonFactoryBuilder::configure);
+        final JsonFactoryBuilder jsonFactoryBuilder = JsonFactory.builder();
+        jacksonConfiguration.getJsonFactoryFeatures().forEach(jsonFactoryBuilder::configure);
         return jsonFactoryBuilder.build();
     }
 
@@ -112,7 +112,7 @@ public class ObjectMapperFactory {
      * @param serializers The serializers
      * @since 4.0
      */
-    public void setSerializers(JsonSerializer... serializers) {
+    public void setSerializers(ValueSerializer... serializers) {
         this.serializers = serializers;
     }
 
@@ -122,39 +122,52 @@ public class ObjectMapperFactory {
      * @param deserializers The deserializers
      * @since 4.0
      */
-    public void setDeserializers(JsonDeserializer... deserializers) {
+    public void setDeserializers(ValueDeserializer... deserializers) {
         this.deserializers = deserializers;
     }
 
     /**
-     * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
+     * Builds the core Jackson {@link JsonMapper} from a {@link JsonMapper.Builder}.
      *
-     * @param jacksonConfiguration The configuration
-     * @param jsonFactory The JSON factory
-     * @return The {@link ObjectMapper}
+     * @param jsonMapperBuilder JsonMapper Builder
+     * @return The {@link JsonMapper}
      */
     @Singleton
     @Primary
     @Named("json")
     @BootstrapContextCompatible
-    public ObjectMapper objectMapper(@Nullable JacksonConfiguration jacksonConfiguration,
-                                     @Nullable JsonFactory jsonFactory) {
-        ObjectMapper objectMapper = jsonFactory != null ? new ObjectMapper(jsonFactory) : new ObjectMapper();
+    public JsonMapper jsonMapper(JsonMapper.Builder jsonMapperBuilder) {
+        return jsonMapperBuilder.build();
+    }
 
-        final boolean hasConfiguration = jacksonConfiguration != null;
-        if (!hasConfiguration || jacksonConfiguration.isModuleScan()) {
-            objectMapper.findAndRegisterModules();
+    /**
+     * Builds the core Jackson {@link JsonMapper.Builder} from the optional configuration and {@link JsonFactory}.
+     *
+     * @param jacksonConfiguration The configuration
+     * @param jsonFactory The JSON factory
+     * @return The {@link JsonMapper.Builder}
+     */
+    @BootstrapContextCompatible
+    @Prototype
+    public JsonMapper.Builder jsonMapperBuilder(@Nullable JacksonConfiguration jacksonConfiguration,
+                                   @Nullable JsonFactory jsonFactory) {
+        JsonMapper.Builder builder = jsonFactory != null ? JsonMapper.builder(jsonFactory) : JsonMapper.builder();
+
+        if (jacksonConfiguration == null || jacksonConfiguration.isModuleScan()) {
+            builder.findAndAddModules();
         }
-        objectMapper.registerModules(jacksonModules);
+        builder.addModules(jacksonModules);
         if (beanContext != null) {
-            objectMapper.setTypeFactory(objectMapper.getTypeFactory().withClassLoader(beanContext.getClassLoader()));
+            builder.typeFactory(builder.typeFactory().withClassLoader(beanContext.getClassLoader()));
         }
 
         SimpleModule module = new SimpleModule(MICRONAUT_MODULE);
-        module.setDeserializers(new MicronautDeserializers(conversionService));
+        if (beanContext != null) {
+            module.setDeserializers(new MicronautDeserializers(beanContext.getConversionService()));
+        }
 
-        for (JsonSerializer serializer : serializers) {
-            Class<? extends JsonSerializer> type = serializer.getClass();
+        for (ValueSerializer serializer : serializers) {
+            Class<? extends ValueSerializer> type = serializer.getClass();
             Type annotation = type.getAnnotation(Type.class);
             if (annotation != null) {
                 Class<?>[] value = annotation.value();
@@ -171,8 +184,8 @@ public class ObjectMapperFactory {
             }
         }
 
-        for (JsonDeserializer deserializer : deserializers) {
-            Class<? extends JsonDeserializer> type = deserializer.getClass();
+        for (ValueDeserializer deserializer : deserializers) {
+            Class<? extends ValueDeserializer> type = deserializer.getClass();
             Type annotation = type.getAnnotation(Type.class);
             if (annotation != null) {
                 Class<?>[] value = annotation.value();
@@ -185,10 +198,11 @@ public class ObjectMapperFactory {
             }
         }
 
-        if (hasConfiguration && jacksonConfiguration.isTrimStrings()) {
+        if (jacksonConfiguration != null && jacksonConfiguration.isTrimStrings()) {
             module.addDeserializer(String.class, new StringDeserializer() {
                 @Override
-                public String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+                @Nullable
+                public String deserialize(JsonParser p, DeserializationContext ctxt) {
                     String value = super.deserialize(p, ctxt);
                     return StringUtils.trimToNull(value);
                 }
@@ -205,53 +219,63 @@ public class ObjectMapperFactory {
                 }
             }
         }
-        objectMapper.registerModule(module);
+        builder.addModule(module);
 
-        for (BeanSerializerModifier beanSerializerModifier : beanSerializerModifiers) {
-            objectMapper.setSerializerFactory(
-                objectMapper.getSerializerFactory().withSerializerModifier(
+        for (ValueSerializerModifier beanSerializerModifier : beanSerializerModifiers) {
+            builder.serializerFactory(
+                builder.serializerFactory().withSerializerModifier(
                     beanSerializerModifier
                 ));
         }
 
-        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+        builder.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
             .configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
             .configure(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS, true);
 
-        if (hasConfiguration) {
+        if (jacksonConfiguration != null) {
 
-            ObjectMapper.DefaultTyping defaultTyping = jacksonConfiguration.getDefaultTyping();
+            DefaultTyping defaultTyping = jacksonConfiguration.getDefaultTyping();
             if (defaultTyping != null) {
-                objectMapper.activateDefaultTyping(objectMapper.getPolymorphicTypeValidator(), defaultTyping);
+                builder.activateDefaultTyping(new DefaultBaseTypeLimitingValidator(), defaultTyping);
             }
 
             JsonInclude.Include include = jacksonConfiguration.getSerializationInclusion();
             if (include != null) {
-                objectMapper.setSerializationInclusion(include);
+                builder.changeDefaultPropertyInclusion(oldInclude -> oldInclude.withValueInclusion(include).withContentInclusion(include));
             }
             String dateFormat = jacksonConfiguration.getDateFormat();
             if (dateFormat != null) {
-                objectMapper.setDateFormat(new SimpleDateFormat(dateFormat));
+                builder.defaultDateFormat(new SimpleDateFormat(dateFormat));
             }
             Locale locale = jacksonConfiguration.getLocale();
             if (locale != null) {
-                objectMapper.setLocale(locale);
+                builder.defaultLocale(locale);
             }
             TimeZone timeZone = jacksonConfiguration.getTimeZone();
             if (timeZone != null) {
-                objectMapper.setTimeZone(timeZone);
+                builder.defaultTimeZone(timeZone);
             }
             PropertyNamingStrategy propertyNamingStrategy = jacksonConfiguration.getPropertyNamingStrategy();
             if (propertyNamingStrategy != null) {
-                objectMapper.setPropertyNamingStrategy(propertyNamingStrategy);
+                builder.propertyNamingStrategy(propertyNamingStrategy);
             }
 
-            jacksonConfiguration.getSerializationSettings().forEach(objectMapper::configure);
-            jacksonConfiguration.getDeserializationSettings().forEach(objectMapper::configure);
-            jacksonConfiguration.getMapperSettings().forEach(objectMapper::configure);
-            jacksonConfiguration.getParserSettings().forEach(objectMapper::configure);
-            jacksonConfiguration.getGeneratorSettings().forEach(objectMapper::configure);
+            jacksonConfiguration.getStreamReadFeatures().forEach(builder::configure);
+            jacksonConfiguration.getStreamWriteFeatures().forEach(builder::configure);
+            jacksonConfiguration.getMapperFeatures().forEach(builder::configure);
+            jacksonConfiguration.getJsonReadFeatures().forEach(builder::configure);
+            jacksonConfiguration.getJsonWriteFeatures().forEach(builder::configure);
+            jacksonConfiguration.getDateTimeFeatures().forEach(builder::configure);
+            jacksonConfiguration.getEnumFeatures().forEach(builder::configure);
+            jacksonConfiguration.getJsonNodeFeatures().forEach(builder::configure);
+            jacksonConfiguration.getDeserializationFeatures().forEach(builder::configure);
+            jacksonConfiguration.getSerializationFeatures().forEach(builder::configure);
         }
-        return objectMapper;
+
+        if (jacksonConfiguration == null || jacksonConfiguration.isJackson2DatabindAnnotationSupport()) {
+            Jackson2AnnotationSupport.installJackson2Introspector(builder);
+        }
+
+        return builder;
     }
 }

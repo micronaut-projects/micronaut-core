@@ -16,13 +16,14 @@
 package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -42,7 +43,7 @@ final class ImperativeExecutionFlowImpl implements ImperativeExecutionFlow<Objec
     @Nullable
     private Map<String, Object> context;
 
-    <T> ImperativeExecutionFlowImpl(T value, Throwable error) {
+    <T> ImperativeExecutionFlowImpl(@Nullable T value, @Nullable Throwable error) {
         this.value = value;
         this.error = error;
     }
@@ -149,4 +150,10 @@ final class ImperativeExecutionFlowImpl implements ImperativeExecutionFlow<Objec
         return CompletableFuture.completedFuture(value);
     }
 
+    @Override
+    public void cancel(Consumer<Object> discard) {
+        if (value != null) {
+            discard.accept(value);
+        }
+    }
 }

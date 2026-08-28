@@ -16,7 +16,7 @@
 package io.micronaut.core.propagation;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,6 +24,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -39,20 +41,135 @@ import java.util.stream.Stream;
 @Internal
 final class PropagatedContextImpl implements PropagatedContext {
 
-    static final PropagatedContextImpl EMPTY = new PropagatedContextImpl(new PropagatedContextElement[0], false);
+    static final PropagatedContextImpl EMPTY = new PropagatedContextImpl(new PropagatedContextElement[0], false, false);
 
-    private static final Scope CLEANUP = ThreadContext::remove;
-
-    private final PropagatedContextElement[] elements;
-    private final boolean containsThreadElements;
+    final PropagatedContextElement[] elements;
+    final boolean containsThreadElements;
+    final boolean containsScopedValueElements;
 
     private PropagatedContextImpl(PropagatedContextElement[] elements) {
-        this(elements, containsThreadElements(elements));
+        this(elements, containsThreadElements(elements), containsScopedValueElements(elements));
     }
 
-    private PropagatedContextImpl(PropagatedContextElement[] elements, boolean containsThreadElements) {
+    private PropagatedContextImpl(PropagatedContextElement[] elements, boolean containsThreadElements, boolean containsScopedValueElements) {
         this.elements = elements;
         this.containsThreadElements = containsThreadElements;
+        this.containsScopedValueElements = containsScopedValueElements;
+    }
+
+    @Override
+    public boolean isBound() {
+        return getOrNull() == this;
+    }
+
+    @Override
+    public <V> V propagate(Supplier<V> supplier) {
+        return switch (PropagatedContextConfiguration.get()) {
+            case SCOPED_VALUE -> {
+                if (ScopedValues.get() == this) {
+                    yield supplier.get();
+                } else {
+                    Supplier<V> originalSupplier = supplier;
+                    Supplier<V> delegate = originalSupplier;
+                    if (containsThreadElements) {
+                        PropagatedContextImpl self = this;
+                        delegate = new Supplier<V>() {
+                            @Override
+                            public V get() {
+                                ThreadState[] threadStates = updateThreadState(self);
+                                try {
+                                    return originalSupplier.get();
+                                } finally {
+                                    restoreState(threadStates);
+                                }
+                            }
+                        };
+                    }
+                    yield ScopedValues.propagate(this, delegate);
+                }
+            }
+            case THREAD_LOCAL -> ThreadContext.propagate(this, supplier);
+        };
+    }
+
+    @Override
+    public <V> V propagateCall(Callable<V> callable) throws Exception {
+        return switch (PropagatedContextConfiguration.get()) {
+            case SCOPED_VALUE -> {
+                if (ScopedValues.get() == this) {
+                    yield callable.call();
+                } else {
+                    Callable<V> originalCallable = callable;
+                    Callable<V> delegate = originalCallable;
+                    if (containsThreadElements) {
+                        PropagatedContextImpl self = this;
+                        delegate = new Callable<V>() { // Keep lambda for performance reasons
+                            @Override
+                            public V call() throws Exception {
+                                ThreadState[] threadStates = updateThreadState(self);
+                                try {
+                                    return originalCallable.call();
+                                } finally {
+                                    restoreState(threadStates);
+                                }
+                            }
+                        };
+                    }
+                    yield ScopedValues.propagate(this, delegate);
+                }
+            }
+            case THREAD_LOCAL -> ThreadContext.propagate(this, callable);
+        };
+    }
+
+    @Override
+    public void propagate(Runnable runnable) {
+        PropagatedContextConfiguration.Mode mode = PropagatedContextConfiguration.get();
+        switch (mode) {
+            case SCOPED_VALUE -> {
+                if (ScopedValues.get() == this) {
+                    runnable.run();
+                } else {
+                    Runnable originalRunnable = runnable;
+                    Runnable delegate = originalRunnable;
+                    if (containsThreadElements) {
+                        PropagatedContextImpl self = this;
+                        delegate = new Runnable() { // Keep lambda for performance reasons
+                            @Override
+                            public void run() {
+                                ThreadState[] threadStates = updateThreadState(self);
+                                try {
+                                    originalRunnable.run();
+                                } finally {
+                                    restoreState(threadStates);
+                                }
+                            }
+                        };
+                    }
+                    ScopedValues.propagate(this, delegate);
+                }
+            }
+            case THREAD_LOCAL -> ThreadContext.propagate(this, runnable);
+            default -> throw new IllegalStateException("Unsupported propagation mode: " + mode);
+        }
+    }
+
+    @Override
+    public <V> Callable<V> wrap(Callable<V> callable) {
+        PropagatedContext propagatedContext = this;
+        return () -> propagatedContext.propagateCall(callable);
+    }
+
+    @Override
+    public <V> Supplier<V> wrap(Supplier<V> supplier) {
+        PropagatedContext propagatedContext = this;
+        return () -> propagatedContext.propagate(supplier);
+    }
+
+    @Override
+    public Runnable wrap(Runnable runnable) {
+        PropagatedContext propagatedContext = this;
+        return () -> propagatedContext.propagate(runnable);
     }
 
     private static boolean containsThreadElements(PropagatedContextElement[] elements) {
@@ -64,37 +181,68 @@ final class PropagatedContextImpl implements PropagatedContext {
         return false;
     }
 
-    private static boolean isThreadElement(PropagatedContextElement element) {
+    static boolean isThreadElement(PropagatedContextElement element) {
         return element instanceof ThreadPropagatedContextElement;
     }
 
+    private static boolean containsScopedValueElements(PropagatedContextElement[] elements) {
+        for (PropagatedContextElement element : elements) {
+            if (isScopedValueElement(element)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean isScopedValueElement(PropagatedContextElement element) {
+        return element instanceof ScopedValuePropagatedContextElement;
+    }
+
     public static boolean exists() {
-        PropagatedContextImpl propagatedContext = ThreadContext.get();
+        PropagatedContext propagatedContext = getOrNull();
         if (propagatedContext == null) {
             return false;
         }
-        return propagatedContext.elements.length != 0;
+        return !propagatedContext.isEmpty();
     }
 
-    public static PropagatedContextImpl get() {
-        PropagatedContextImpl propagatedContext = ThreadContext.get();
+    @Override
+    public boolean isEmpty() {
+        return elements.length == 0;
+    }
+
+    @Nullable
+    public static PropagatedContext getOrNull() {
+        return switch (PropagatedContextConfiguration.get()) {
+            case SCOPED_VALUE -> ScopedValues.get();
+            case THREAD_LOCAL -> ThreadContext.get();
+        };
+    }
+
+    public static PropagatedContext get() {
+        PropagatedContext propagatedContext = getOrNull();
         if (propagatedContext == null) {
-            throw new IllegalStateException("No active propagation context!");
+            throw new IllegalStateException("No context is present");
         }
         return propagatedContext;
+    }
+
+    public static PropagatedContext getOrEmpty() {
+        PropagatedContext propagatedContext = getOrNull();
+        return propagatedContext == null ? EMPTY : propagatedContext;
     }
 
     public static Optional<PropagatedContext> find() {
-        return Optional.ofNullable(ThreadContext.get());
+        return Optional.ofNullable(getOrNull());
     }
 
-    @NonNull
-    public static PropagatedContextImpl getOrEmpty() {
-        PropagatedContextImpl propagatedContext = ThreadContext.get();
-        if (propagatedContext == null) {
-            return EMPTY;
-        }
-        return propagatedContext;
+    @Override
+    public Scope propagate() {
+        return switch (PropagatedContextConfiguration.get()) {
+            case THREAD_LOCAL -> ThreadContext.propagate(ThreadContext.get(), this);
+            case SCOPED_VALUE ->
+                throw new IllegalStateException("Scope propagation requires thread-local support. Set 'micronaut.propagation' to 'thread-local'.");
+        };
     }
 
     @Override
@@ -102,7 +250,9 @@ final class PropagatedContextImpl implements PropagatedContext {
         PropagatedContextElement[] newElements = new PropagatedContextElement[elements.length + 1];
         System.arraycopy(elements, 0, newElements, 0, elements.length);
         newElements[newElements.length - 1] = element;
-        return new PropagatedContextImpl(newElements, containsThreadElements || isThreadElement(element));
+        return new PropagatedContextImpl(newElements,
+            containsThreadElements || isThreadElement(element),
+            containsScopedValueElements || isScopedValueElement(element));
     }
 
     @Override
@@ -160,6 +310,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         return element;
     }
 
+    @Nullable
     private <T extends PropagatedContextElement> T findElement(Class<T> elementType) {
         for (int i = elements.length - 1; i >= 0; i--) {
             PropagatedContextElement element = elements[i];
@@ -175,52 +326,11 @@ final class PropagatedContextImpl implements PropagatedContext {
         return new ArrayList<>(Arrays.asList(elements));
     }
 
-    @Override
-    public Scope propagate() {
-        PropagatedContextImpl prevCtx = ThreadContext.get();
-        Scope restore;
-        if (prevCtx == null && elements.length == 0) {
-            return CLEANUP;
-        } else if (prevCtx == null) {
-            restore = CLEANUP;
-        } else { // elements.length == 0
-            restore = new Scope() { // Keep the anonymous class to avoid lambda in hot path
-                @Override
-                public void close() {
-                    ThreadContext.set(prevCtx);
-                }
-            };
-            if (elements.length == 0) {
-                ThreadContext.remove();
-                return restore;
-            }
-        }
-
-        PropagatedContextImpl ctx = this;
-        ThreadContext.set(ctx);
-        if (containsThreadElements) {
-            ThreadState[] threadState = ctx.updateThreadState();
-            return new Scope() { // Keep the anonymous class to avoid lambda in hot path
-                @Override
-                public void close() {
-                    ctx.restoreState(threadState);
-                    if (prevCtx == null) {
-                        ThreadContext.remove();
-                    } else {
-                        ThreadContext.set(prevCtx);
-                    }
-                }
-            };
-        }
-        return restore;
-    }
-
-    private ThreadState[] updateThreadState() {
-        ThreadState[] threadState = new ThreadState[elements.length];
+    static ThreadState[] updateThreadState(PropagatedContextImpl propagatedContext) {
+        ThreadState[] threadState = new ThreadState[propagatedContext.elements.length];
         int index = 0;
-        for (PropagatedContextElement element : elements) {
-            if (isThreadElement(element)) {
-                ThreadPropagatedContextElement<Object> threadPropagatedContextElement = (ThreadPropagatedContextElement<Object>) element;
+        for (PropagatedContextElement element : propagatedContext.elements) {
+            if (element instanceof ThreadPropagatedContextElement threadPropagatedContextElement) {
                 Object state = threadPropagatedContextElement.updateThreadContext();
                 threadState[index++] = new ThreadState(threadPropagatedContextElement, state);
             }
@@ -228,7 +338,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         return threadState;
     }
 
-    private void restoreState(ThreadState[] threadState) {
+    static void restoreState(@Nullable ThreadState[] threadState) {
         for (int i = threadState.length - 1; i >= 0; i--) {
             ThreadState s = threadState[i];
             if (s != null) {
@@ -237,7 +347,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         }
     }
 
-    private record ThreadState(ThreadPropagatedContextElement<Object> element, Object state) {
+    record ThreadState(ThreadPropagatedContextElement<Object> element, @Nullable Object state) {
 
         void restore() {
             element.restoreThreadContext(state);

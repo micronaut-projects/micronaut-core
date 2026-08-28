@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.http.context;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpRequest;
@@ -51,10 +49,21 @@ public final class ServerRequestContext {
      * @param request  The request
      * @param runnable The runnable
      */
-    public static void with(@Nullable HttpRequest<?> request, @NonNull Runnable runnable) {
-        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate()) {
-            runnable.run();
+    public static void with(@Nullable HttpRequest<?> request, Runnable runnable) {
+        propagatedContextWithRequest(request).propagate(runnable);
+    }
+
+    private static PropagatedContext propagatedContextWithRequest(@Nullable HttpRequest<?> request) {
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        if (request == null) {
+            Optional<ServerHttpRequestContext> serverHttpRequestContext = propagatedContext.find(ServerHttpRequestContext.class);
+            if (serverHttpRequestContext.isPresent()) {
+                propagatedContext = propagatedContext.minus(serverHttpRequestContext.get());
+            }
+        } else {
+            propagatedContext = propagatedContext.plus(new ServerHttpRequestContext(request));
         }
+        return propagatedContext;
     }
 
     /**
@@ -64,7 +73,7 @@ public final class ServerRequestContext {
      * @param runnable The runnable
      * @return The newly instrumented runnable
      */
-    public static Runnable instrument(@Nullable HttpRequest<?> request, @NonNull Runnable runnable) {
+    public static Runnable instrument(HttpRequest<?> request, Runnable runnable) {
         return () -> with(request, runnable);
     }
 
@@ -76,10 +85,8 @@ public final class ServerRequestContext {
      * @param <T>      The return type of the callable
      * @return The return value of the callable
      */
-    public static <T> T with(@Nullable HttpRequest<?> request, @NonNull Supplier<T> supplier) {
-        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate()) {
-            return supplier.get();
-        }
+    public static <T> T with(@Nullable HttpRequest<?> request, Supplier<T> supplier) {
+        return propagatedContextWithRequest(request).propagate(supplier);
     }
 
     /**
@@ -91,10 +98,8 @@ public final class ServerRequestContext {
      * @return The return value of the callable
      * @throws Exception If the callable throws an exception
      */
-    public static <T> T with(@Nullable HttpRequest<?> request, @NonNull Callable<T> callable) throws Exception {
-        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate()) {
-            return callable.call();
-        }
+    public static <T> T with(@Nullable HttpRequest<?> request, Callable<T> callable) throws Exception {
+        return propagatedContextWithRequest(request).propagateCall(callable);
     }
 
     /**
@@ -116,8 +121,7 @@ public final class ServerRequestContext {
      * @since 4.8.0
      */
     @SuppressWarnings("unchecked")
-    @NonNull
-    public static <T> Optional<HttpRequest<T>> currentRequest(@NonNull ContextView context) {
+    public static <T> Optional<HttpRequest<T>> currentRequest(ContextView context) {
         return ReactorPropagation.findPropagatedContext(context)
             .flatMap(ctx -> ctx.find(ServerHttpRequestContext.class))
             .map(e -> (HttpRequest<T>) e.httpRequest())

@@ -16,6 +16,7 @@
 package io.micronaut.core.cli;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,10 +37,10 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 @Internal
 class DefaultCommandLine implements CommandLine {
 
-    private Properties systemProperties = new Properties();
-    private LinkedHashMap<String, Object> undeclaredOptions = new LinkedHashMap<>();
-    private LinkedHashMap<Option, Object> declaredOptions = new LinkedHashMap<>();
-    private List<String> remainingArgs = new ArrayList<>();
+    private final Properties systemProperties = new Properties();
+    private final LinkedHashMap<String, Object> undeclaredOptions = new LinkedHashMap<>();
+    private final LinkedHashMap<Option, Object> declaredOptions = new LinkedHashMap<>();
+    private final List<String> remainingArgs = new ArrayList<>();
     private String[] rawArguments = EMPTY_STRING_ARRAY;
 
     @Override
@@ -73,6 +74,7 @@ class DefaultCommandLine implements CommandLine {
     }
 
     @Override
+    @Nullable
     public Object optionValue(String name) {
         Option opt = new Option(name, null);
         if (declaredOptions.containsKey(opt)) {
@@ -90,7 +92,7 @@ class DefaultCommandLine implements CommandLine {
     }
 
     @Override
-    public Map.Entry<String, Object> lastOption() {
+    public Map. @Nullable Entry<String, Object> lastOption() {
         final Iterator<Map.Entry<String, Object>> i = undeclaredOptions.entrySet().iterator();
         while (i.hasNext()) {
             Map.Entry<String, Object> next = i.next();

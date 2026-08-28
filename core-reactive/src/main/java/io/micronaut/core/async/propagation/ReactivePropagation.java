@@ -16,7 +16,6 @@
 package io.micronaut.core.async.propagation;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.propagation.PropagatedContext;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -50,11 +49,15 @@ public final class ReactivePropagation {
             return propagate(propagatedContext, corePublisher);
         }
         return subscriber -> {
-            try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                actual.subscribe(propagate(propagatedContext, subscriber));
+            Subscriber<? super T> wrappedSubscriber = propagate(propagatedContext, subscriber);
+            if (propagatedContext.isBound()) {
+                actual.subscribe(wrappedSubscriber);
+            } else {
+                propagatedContext.propagate(() -> actual.subscribe(wrappedSubscriber));
             }
         };
     }
+
     /**
      * Creates propagation context aware {@link Publisher}.
      *
@@ -67,9 +70,13 @@ public final class ReactivePropagation {
     public static <T> Publisher<T> propagate(PropagatedContext propagatedContext, CorePublisher<T> actual) {
         return new CorePublisher<>() {
             @Override
-            public void subscribe(@NonNull CoreSubscriber<? super T> subscriber) {
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                    actual.subscribe(propagate(propagatedContext, subscriber));
+            public void subscribe(CoreSubscriber<? super T> subscriber) {
+                @SuppressWarnings("unchecked")
+                CoreSubscriber<? super T> wrappedSubscriber = (CoreSubscriber<? super T>) propagate(propagatedContext, subscriber);
+                if (propagatedContext.isBound()) {
+                    actual.subscribe(wrappedSubscriber);
+                } else {
+                    propagatedContext.propagate(() -> actual.subscribe(wrappedSubscriber));
                 }
             }
 
@@ -79,8 +86,11 @@ public final class ReactivePropagation {
                     subscribe(coreSubscriber);
                     return;
                 }
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                    actual.subscribe(propagate(propagatedContext, subscriber));
+                Subscriber<? super T> wrappedSubscriber = propagate(propagatedContext, subscriber);
+                if (propagatedContext.isBound()) {
+                    actual.subscribe(wrappedSubscriber);
+                } else {
+                    propagatedContext.propagate(() -> actual.subscribe(wrappedSubscriber));
                 }
             }
         };
@@ -97,7 +107,6 @@ public final class ReactivePropagation {
     public static <T> Subscriber<T> propagate(PropagatedContext propagatedContext, Subscriber<T> actual) {
         return new CoreSubscriber<>() {
 
-            @NonNull
             @Override
             public Context currentContext() {
                 Context ctx;
@@ -110,30 +119,38 @@ public final class ReactivePropagation {
             }
 
             @Override
-            public void onSubscribe(@NonNull Subscription s) {
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+            public void onSubscribe(Subscription s) {
+                if (propagatedContext.isBound()) {
                     actual.onSubscribe(s);
+                } else {
+                    propagatedContext.propagate(() -> actual.onSubscribe(s));
                 }
             }
 
             @Override
             public void onNext(T t) {
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                if (propagatedContext.isBound()) {
                     actual.onNext(t);
+                } else {
+                    propagatedContext.propagate(() -> actual.onNext(t));
                 }
             }
 
             @Override
             public void onError(Throwable t) {
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                if (propagatedContext.isBound()) {
                     actual.onError(t);
+                } else {
+                    propagatedContext.propagate(() -> actual.onError(t));
                 }
             }
 
             @Override
             public void onComplete() {
-                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
+                if (propagatedContext.isBound()) {
                     actual.onComplete();
+                } else {
+                    propagatedContext.propagate(actual::onComplete);
                 }
             }
         };

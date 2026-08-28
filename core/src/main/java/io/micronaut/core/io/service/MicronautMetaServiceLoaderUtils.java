@@ -16,9 +16,10 @@
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.IOUtils;
+import io.micronaut.core.util.ExceptionUtils;
+import io.micronaut.core.io.service.ServiceScanner.ExclusiveStaticServiceDefinitions;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -57,6 +58,7 @@ public final class MicronautMetaServiceLoaderUtils {
     private static final MethodHandles.Lookup LOOKUP = MethodHandles.publicLookup();
     private static final MethodType VOID_TYPE = MethodType.methodType(void.class);
 
+    @Nullable
     private static volatile CacheEntry cacheEntry;
 
     /**
@@ -68,9 +70,8 @@ public final class MicronautMetaServiceLoaderUtils {
      * @param <S>          The service type
      * @return the result
      */
-    @NonNull
-    public static <S> List<S> findMetaMicronautServiceEntries(@NonNull ClassLoader classLoader,
-                                                              @NonNull Class<S> serviceClass,
+    public static <S> List<S> findMetaMicronautServiceEntries(ClassLoader classLoader,
+                                                              Class<S> serviceClass,
                                                               @Nullable Predicate<S> predicate) {
         SoftServiceLoader.StaticServiceLoader<S> staticServiceLoader = (SoftServiceLoader.StaticServiceLoader<S>) SoftServiceLoader.STATIC_SERVICES.get(serviceClass.getName());
         if (staticServiceLoader != null) {
@@ -86,11 +87,16 @@ public final class MicronautMetaServiceLoaderUtils {
      * @param classLoader The classloader
      * @param serviceName The service name
      * @return The entries
-     * @throws IOException
+     * @throws IOException The exception
      */
-    @NonNull
-    public static Set<String> findMicronautMetaServiceEntries(@NonNull ClassLoader classLoader,
-                                                              @NonNull String serviceName) throws IOException {
+    public static Set<String> findMicronautMetaServiceEntries(ClassLoader classLoader, String serviceName) throws IOException {
+        ExclusiveStaticServiceDefinitions staticDefinitions = ServiceScanner.findStaticServiceDefinitions();
+        if (staticDefinitions != null) {
+            Set<String> serviceEntries = staticDefinitions.serviceTypeMap().get(serviceName);
+            if (serviceEntries != null) {
+                return serviceEntries;
+            }
+        }
         CacheEntry ce = cacheEntry;
         if (ce == null || ce.classLoader != classLoader) {
             ce = new CacheEntry(classLoader, findAllMicronautMetaServices(classLoader));
@@ -106,12 +112,7 @@ public final class MicronautMetaServiceLoaderUtils {
      * @return the all entries
      * @throws IOException
      */
-    @NonNull
-    public static Map<String, Set<String>> findAllMicronautMetaServices(@NonNull ClassLoader classLoader) throws IOException {
-        final ServiceScanner.StaticServiceDefinitions ssd = ServiceScanner.findStaticServiceDefinitions();
-        if (ssd != null) {
-            return ssd.serviceTypeMap();
-        }
+    public static Map<String, Set<String>> findAllMicronautMetaServices(ClassLoader classLoader) throws IOException {
         List<URI> resourceDefs = IOUtils.getResources(classLoader, MICRONAUT_SERVICES_PATH);
         if (resourceDefs.isEmpty()) {
             return Map.of();
@@ -121,6 +122,7 @@ public final class MicronautMetaServiceLoaderUtils {
 
         FileVisitor<Path> visitor = new FileVisitor<>() {
 
+            @Nullable
             private Set<String> definitions;
 
             @Override
@@ -146,7 +148,9 @@ public final class MicronautMetaServiceLoaderUtils {
                 if (fileName.startsWith(".")) {
                     return FileVisitResult.CONTINUE;
                 }
-                definitions.add(fileName.toString());
+                if (definitions != null) {
+                    definitions.add(fileName.toString());
+                }
                 return FileVisitResult.SKIP_SUBTREE;
             }
 
@@ -182,6 +186,7 @@ public final class MicronautMetaServiceLoaderUtils {
         return services;
     }
 
+    @Nullable
     private static <S> S instantiate(String className, ClassLoader classLoader) {
         try {
             @SuppressWarnings("unchecked") final Class<S> loadedClass =
@@ -189,16 +194,12 @@ public final class MicronautMetaServiceLoaderUtils {
             // MethodHandler should more performant than the basic reflection
             return (S) LOOKUP.findConstructor(loadedClass, VOID_TYPE).invoke();
         } catch (NoClassDefFoundError | ClassNotFoundException | NoSuchMethodException |
-                 IllegalAccessException e) {
+                 IllegalAccessException | IllegalAccessError e) {
             // Ignore
             return null;
         } catch (Throwable e) {
-            return sneakyThrow(e);
+            return ExceptionUtils.sneakyThrow(e);
         }
-    }
-
-    private static <T extends Throwable, R> R sneakyThrow(Throwable t) throws T {
-        throw (T) t;
     }
 
     /**
@@ -211,11 +212,12 @@ public final class MicronautMetaServiceLoaderUtils {
 
         private final ClassLoader classLoader;
         private final String serviceName;
+        @Nullable
         private final Predicate<S> predicate;
         private final List<RecursiveActionValuesCollector<S>> tasks = new ArrayList<>();
         private int size;
 
-        MicronautServiceCollector(ClassLoader classLoader, String serviceName, Predicate<S> predicate) {
+        MicronautServiceCollector(ClassLoader classLoader, String serviceName, @Nullable Predicate<S> predicate) {
             this.classLoader = classLoader;
             this.serviceName = serviceName;
             this.predicate = predicate;
@@ -282,11 +284,14 @@ public final class MicronautMetaServiceLoaderUtils {
 
         private final ClassLoader classLoader;
         private final String className;
+        @Nullable
         private final Predicate<S> predicate;
+        @Nullable
         private S result;
+        @Nullable
         private Throwable throwable;
 
-        public ServiceInstanceLoader(ClassLoader classLoader, String className, Predicate<S> predicate) {
+        public ServiceInstanceLoader(ClassLoader classLoader, String className, @Nullable Predicate<S> predicate) {
             this.classLoader = classLoader;
             this.className = className;
             this.predicate = predicate;

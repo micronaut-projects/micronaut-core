@@ -19,11 +19,8 @@ import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
-import io.micronaut.kotlin.processing.getBinaryName
-import java.util.function.Function
 import java.util.stream.Collectors
 
-@OptIn(KspExperimental::class)
 internal open class KotlinMethodElement(
     owningType: KotlinClassElement,
     override val declaration: KSFunctionDeclaration,
@@ -32,7 +29,7 @@ internal open class KotlinMethodElement(
     visitorContext: KotlinVisitorContext
 ) : AbstractKotlinMethodElement<KotlinMethodNativeElement>(
     KotlinMethodNativeElement(declaration),
-    declaration.getBinaryName(visitorContext.resolver),
+    visitorContext.getBinaryName(declaration),
     owningType,
     elementAnnotationMetadataFactory,
     visitorContext
@@ -61,14 +58,24 @@ internal open class KotlinMethodElement(
 
     override val resolvedParameters: List<ParameterElement> by lazy {
         presetParameters
-            ?: declaration.parameters.map {
-                KotlinParameterElement(
-                    null,
-                    this,
-                    it,
-                    elementAnnotationMetadataFactory,
-                    visitorContext
-                )
+            ?: buildList {
+                declaration.extensionReceiver?.let { extensionReceiver ->
+                    add(
+                        ParameterElement.of(
+                            newClassElement(nativeType, extensionReceiver.resolve(), emptyMap()),
+                            "\$this"
+                        )
+                    )
+                }
+                addAll(declaration.parameters.map {
+                    KotlinParameterElement(
+                        null,
+                        this@KotlinMethodElement,
+                        it,
+                        elementAnnotationMetadataFactory,
+                        visitorContext
+                    )
+                })
             }
     }
 

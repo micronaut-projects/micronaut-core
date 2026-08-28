@@ -15,10 +15,12 @@
  */
 package io.micronaut.inject;
 
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.NextMajorVersion;
+import io.micronaut.core.util.CollectionUtils;
 
-import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -40,8 +42,7 @@ public interface ExecutableMethodsDefinition<T> {
      * @param <R>           The return type
      * @return An optional {@link ExecutableMethod}
      */
-    @NonNull
-    <R> Optional<ExecutableMethod<T, R>> findMethod(@NonNull String name, @NonNull Class<?>... argumentTypes);
+    <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class<?>... argumentTypes);
 
     /**
      * Finds possible methods for the given method name.
@@ -50,14 +51,41 @@ public interface ExecutableMethodsDefinition<T> {
      * @param <R>  The return type
      * @return The possible methods
      */
-    @NonNull
-    <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(@NonNull String name);
-
+    <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name);
 
     /**
      * @return The {@link ExecutableMethod} instances for this definition
      */
-    @NonNull
-    Collection<ExecutableMethod<T, ?>> getExecutableMethods();
+    List<ExecutableMethod<T, ?>> getExecutableMethods();
+
+    /**
+     * By default, when the {@link io.micronaut.context.BeanContext} is started, the
+     * {@link BeanDefinition#getExecutableMethods()} are not processed by registered
+     * {@link io.micronaut.context.processor.ExecutableMethodProcessor} instances unless this method returns true.
+     *
+     * @return Whether the bean definition requires method processing
+     * @see io.micronaut.context.annotation.Executable#processOnStartup()
+     * @since 5.1.0
+     */
+    default boolean requiresMethodProcessing() {
+        for (ExecutableMethod<T, ?> executableMethod : getExecutableMethods()) {
+            if (executableMethod.isTrue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Retrieves an {@link ExecutableMethod} from the collection of executable methods by the specified index.
+     *
+     * @param index The index of the {@link ExecutableMethod} to retrieve
+     * @return The {@link ExecutableMethod} at the specified index
+     */
+    @NextMajorVersion("Remove default method in v6")
+    default <R> ExecutableMethod<T, R> getExecutableMethodByIndex(int index) {
+        List<ExecutableMethod<T, ?>> executableMethods = CollectionUtils.iterableToList(getExecutableMethods());
+        return (ExecutableMethod<T, R>) executableMethods.get(index);
+    }
 
 }

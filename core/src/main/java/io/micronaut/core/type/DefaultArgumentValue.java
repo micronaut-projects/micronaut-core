@@ -17,8 +17,7 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Map;
@@ -32,15 +31,16 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-class DefaultArgumentValue<V> implements ArgumentValue<V> {
+sealed class DefaultArgumentValue<V> implements ArgumentValue<V> permits DefaultMutableArgumentValue {
     private final Argument<V> argument;
+    @Nullable
     private final V value;
 
     /**
      * @param argument The argument
      * @param value    The value
      */
-    DefaultArgumentValue(Argument<V> argument, V value) {
+    DefaultArgumentValue(Argument<V> argument, @Nullable V value) {
         this.argument = argument;
         this.value = value;
     }
@@ -61,7 +61,7 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     }
 
     @Override
-    public Argument[] getTypeParameters() {
+    public Argument<?>[] getTypeParameters() {
         return argument.getTypeParameters();
     }
 
@@ -70,25 +70,26 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
         return argument.getTypeVariables();
     }
 
+    @Nullable
     @Override
     public V getValue() {
         return value;
     }
 
     @Override
-    public <T extends Annotation> T synthesize(Class<T> annotationClass) {
+    public @Nullable <T extends Annotation> T synthesize(Class<T> annotationClass) {
         return argument.synthesize(annotationClass);
     }
 
     @Nullable
     @Override
-    public <T extends Annotation> T synthesize(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+    public <T extends Annotation> T synthesize(Class<T> annotationClass, String sourceAnnotation) {
         return argument.synthesize(annotationClass, sourceAnnotation);
     }
 
     @Nullable
     @Override
-    public <T extends Annotation> T synthesizeDeclared(@NonNull Class<T> annotationClass, @NonNull String sourceAnnotation) {
+    public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass, String sourceAnnotation) {
         return argument.synthesizeDeclared(annotationClass, sourceAnnotation);
     }
 

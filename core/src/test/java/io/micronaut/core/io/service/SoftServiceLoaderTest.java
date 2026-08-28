@@ -1,6 +1,8 @@
 package io.micronaut.core.io.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.lang.module.Configuration;
 import java.lang.module.ModuleFinder;
@@ -12,9 +14,24 @@ import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.core.io.service.SoftServiceLoader.ServiceCollector;
 
 public class SoftServiceLoaderTest {
+
+    interface TestService {
+        String value();
+    }
+
+    static final class PackagePrivateConstructorService implements TestService {
+        PackagePrivateConstructorService() {
+        }
+
+        @Override
+        public String value() {
+            return "fallback";
+        }
+    }
 
     @Test
     void findServicesUsingJrtScheme() {
@@ -38,6 +55,30 @@ public class SoftServiceLoaderTest {
         }
         finally {
             Thread.currentThread().setContextClassLoader(oldLoader);
+        }
+    }
+
+    @Test
+    void staticDefinitionFallsBackToReflectionWhenMethodHandleCannotAccessConstructor() {
+        SoftServiceLoader.StaticDefinition<PackagePrivateConstructorService> serviceDefinition =
+            SoftServiceLoader.StaticDefinition.of(PackagePrivateConstructorService.class.getName(), PackagePrivateConstructorService.class);
+
+        assertEquals("fallback", serviceDefinition.load().value());
+    }
+
+    @Test
+    void imageSingletonsLookupCanBeDisabled() {
+        String previous = System.getProperty("micronaut.graalvm.imagesingletons.enabled");
+        try {
+            System.setProperty("micronaut.graalvm.imagesingletons.enabled", "false");
+            assertNull(ServiceScanner.findStaticServiceDefinitions());
+            assertFalse(NativeImageUtils.hasImageSingletons());
+        } finally {
+            if (previous == null) {
+                System.clearProperty("micronaut.graalvm.imagesingletons.enabled");
+            } else {
+                System.setProperty("micronaut.graalvm.imagesingletons.enabled", previous);
+            }
         }
     }
 }

@@ -18,7 +18,7 @@ package io.micronaut.http.netty.channel;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.netty.channel.Channel;
 import io.netty.channel.IoHandlerFactory;
@@ -87,7 +87,7 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
-    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, Channel parent, int fd) {
+    public Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, @Nullable Channel parent, int fd) {
         if (parent != null) {
             LOG.warn("epoll does not support FD-based channels with a parent channel. This may cause issues with HTTP2.");
         }

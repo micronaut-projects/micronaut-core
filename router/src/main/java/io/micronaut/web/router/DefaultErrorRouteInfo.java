@@ -16,8 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ObjectUtils;
@@ -67,7 +66,7 @@ public final class DefaultErrorRouteInfo<T, R> extends DefaultRequestMatcher<T, 
     }
 
     @Override
-    public Class<?> originatingType() {
+    public @Nullable Class<?> originatingType() {
         return originatingType;
     }
 
@@ -77,7 +76,7 @@ public final class DefaultErrorRouteInfo<T, R> extends DefaultRequestMatcher<T, 
     }
 
     @Override
-    public Optional<RouteMatch<R>> match(Class<?> originatingClass, Throwable exception) {
+    public Optional<RouteMatch<R>> match(@Nullable Class<?> originatingClass, Throwable exception) {
         if (originatingClass == originatingType && exceptionType.isInstance(exception)) {
             return Optional.of(new ErrorRouteMatch<>(exception, this, conversionService));
         }
@@ -93,8 +92,7 @@ public final class DefaultErrorRouteInfo<T, R> extends DefaultRequestMatcher<T, 
     }
 
     @Override
-    @NonNull
-    public HttpStatus findStatus(HttpStatus defaultStatus) {
+    public HttpStatus findStatus(@Nullable HttpStatus defaultStatus) {
         return super.findStatus(defaultStatus == null ? HttpStatus.INTERNAL_SERVER_ERROR : defaultStatus);
     }
 

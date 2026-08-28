@@ -15,7 +15,7 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.exceptions.UriSyntaxException;
@@ -43,7 +43,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     @Override
-    default HttpResponse<B> setAttribute(CharSequence name, Object value) {
+    default HttpResponse<B> setAttribute(CharSequence name, @Nullable Object value) {
         return (HttpResponse<B>) HttpMessage.super.setAttribute(name, value);
     }
 

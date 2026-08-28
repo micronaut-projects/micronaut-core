@@ -36,11 +36,15 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public @interface Fallback {
 
     /**
+     * Returns the exception types to include, which defaults to all.
+     *
      * @return The exception types to include (defaults to all)
      */
     Class<? extends Throwable>[] includes() default {};
 
     /**
+     * Returns the exception types to exclude, which defaults to none.
+     *
      * @return The exception types to exclude (defaults to none)
      */
     Class<? extends Throwable>[] excludes() default {};

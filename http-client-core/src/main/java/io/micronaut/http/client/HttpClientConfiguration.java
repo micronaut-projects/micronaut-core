@@ -18,8 +18,8 @@ package io.micronaut.http.client;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.Toggleable;
@@ -40,11 +40,13 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -116,6 +118,12 @@ public abstract class HttpClientConfiguration {
     public static final boolean DEFAULT_FOLLOW_REDIRECTS = true;
 
     /**
+     * The default maximum number of redirects to follow.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_REDIRECTS = 5;
+
+    /**
      * The default value.
      */
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
@@ -134,52 +142,90 @@ public abstract class HttpClientConfiguration {
 
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
+    @Nullable
     private Integer numOfThreads = null;
 
     /**
      * The thread factory to use for creating threads.
      */
+    @Nullable
     private Class<? extends ThreadFactory> threadFactory;
 
+    @Nullable
     private Duration connectTimeout;
 
+    @Nullable
     private Duration connectTtl;
 
+    @Nullable
     private Duration readTimeout = Duration.ofSeconds(DEFAULT_READ_TIMEOUT_SECONDS);
 
+    @Nullable
     private Duration requestTimeout = null;
 
+    @Nullable
     private Duration readIdleTimeout = Duration.of(DEFAULT_READ_IDLE_TIMEOUT_MINUTES, ChronoUnit.MINUTES);
 
+    @Nullable
     private Duration connectionPoolIdleTimeout = DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS == 0 ? null : Duration.ofSeconds(DEFAULT_CONNECTION_POOL_IDLE_TIMEOUT_SECONDS);
 
+    @Nullable
     private Duration shutdownQuietPeriod = Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS);
 
+    @Nullable
     private Duration shutdownTimeout = Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS);
 
     private int maxContentLength = DEFAULT_MAX_CONTENT_LENGTH;
 
     private int maxHeaderSize = DEFAULT_MAX_HEADER_SIZE;
 
+    private int maxInitialLineLength = DEFAULT_MAX_INITIAL_LINE_LENGTH;
+
+    private int maxChunkSize = DEFAULT_MAX_CHUNK_SIZE;
+
     private Proxy.Type proxyType = Proxy.Type.DIRECT;
 
+    @Nullable
     private SocketAddress proxyAddress;
 
+    @Nullable
     private String proxyUsername;
 
+    @Nullable
     private String proxyPassword;
 
+    @Nullable
     private ProxySelector proxySelector;
 
     private Charset defaultCharset = StandardCharsets.UTF_8;
 
     private boolean followRedirects = DEFAULT_FOLLOW_REDIRECTS;
 
+    private Set<String> redirectAlwaysFilteredHeaders = new LinkedHashSet<>(Set.of(
+        HttpHeaders.HOST,
+        HttpHeaders.CONNECTION
+    ));
+
+    private Set<String> redirectAdditionalNonPreserveBodyFilteredHeaders = new LinkedHashSet<>(Set.of(
+        HttpHeaders.CONTENT_LENGTH,
+        HttpHeaders.CONTENT_TYPE,
+        HttpHeaders.TRANSFER_ENCODING
+    ));
+
+    private Set<String> redirectCrossOriginFilteredHeaders = new LinkedHashSet<>(Set.of(
+        HttpHeaders.AUTHORIZATION,
+        HttpHeaders.PROXY_AUTHORIZATION,
+        HttpHeaders.COOKIE
+    ));
+
+    private int maxRedirects = DEFAULT_MAX_REDIRECTS;
+
     private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
     private boolean decompressionEnabled = true;
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
 
+    @Nullable
     private String loggerName;
 
     private String eventLoopGroup = "default";
@@ -195,6 +241,7 @@ public abstract class HttpClientConfiguration {
         HttpVersionSelection.ALPN_HTTP_1
     );
 
+    @Nullable
     private LogLevel logLevel;
 
     private boolean allowBlockEventLoop = DEFAULT_ALLOW_BLOCK_EVENT_LOOP;
@@ -204,6 +251,7 @@ public abstract class HttpClientConfiguration {
     @Nullable
     private String addressResolverGroupName = null;
 
+    @Nullable
     private String pcapLoggingPathPattern = null;
 
     /**
@@ -215,7 +263,7 @@ public abstract class HttpClientConfiguration {
     /**
      * @param applicationConfiguration The application configuration
      */
-    public HttpClientConfiguration(ApplicationConfiguration applicationConfiguration) {
+    public HttpClientConfiguration(@Nullable ApplicationConfiguration applicationConfiguration) {
         if (applicationConfiguration != null) {
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
         }
@@ -226,7 +274,7 @@ public abstract class HttpClientConfiguration {
      *
      * @param copy The client configuration to copy settings from
      */
-    public HttpClientConfiguration(HttpClientConfiguration copy) {
+    public HttpClientConfiguration(@Nullable HttpClientConfiguration copy) {
         if (copy != null) {
             this.channelOptions = copy.channelOptions;
             this.numOfThreads = copy.numOfThreads;
@@ -236,10 +284,16 @@ public abstract class HttpClientConfiguration {
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
             this.eventLoopGroup = copy.eventLoopGroup;
             this.followRedirects = copy.followRedirects;
+            this.redirectAlwaysFilteredHeaders = copy.redirectAlwaysFilteredHeaders;
+            this.redirectAdditionalNonPreserveBodyFilteredHeaders = copy.redirectAdditionalNonPreserveBodyFilteredHeaders;
+            this.redirectCrossOriginFilteredHeaders = copy.redirectCrossOriginFilteredHeaders;
+            this.maxRedirects = copy.maxRedirects;
             this.logLevel = copy.logLevel;
             this.loggerName = copy.loggerName;
             this.maxContentLength = copy.maxContentLength;
             this.maxHeaderSize = copy.maxHeaderSize;
+            this.maxInitialLineLength = copy.maxInitialLineLength;
+            this.maxChunkSize = copy.maxChunkSize;
             this.proxyAddress = copy.proxyAddress;
             this.proxyPassword = copy.proxyPassword;
             this.proxySelector = copy.proxySelector;
@@ -264,6 +318,7 @@ public abstract class HttpClientConfiguration {
      * {@link #alpnModes}.
      */
     @Deprecated
+    @Nullable
     public HttpVersion getHttpVersion() {
         return httpVersion;
     }
@@ -312,7 +367,7 @@ public abstract class HttpClientConfiguration {
     /**
      * @param eventLoopGroup Sets the event loop group to use for the client.
      */
-    public void setEventLoopGroup(@NonNull String eventLoopGroup) {
+    public void setEventLoopGroup(String eventLoopGroup) {
         ArgumentUtils.requireNonNull("eventLoopGroup", eventLoopGroup);
         this.eventLoopGroup = eventLoopGroup;
     }
@@ -420,6 +475,76 @@ public abstract class HttpClientConfiguration {
      */
     public void setFollowRedirects(boolean followRedirects) {
         this.followRedirects = followRedirects;
+    }
+
+    /**
+     * @return Header names that are always filtered for redirects.
+     * By default this includes {@code Host} and {@code Connection}.
+     */
+    public Set<String> getRedirectAlwaysFilteredHeaders() {
+        return Collections.unmodifiableSet(redirectAlwaysFilteredHeaders);
+    }
+
+    /**
+     * Sets the header names that are always filtered for redirects.
+     *
+     * @param redirectAlwaysFilteredHeaders The always-filtered redirect header list
+     */
+    public void setRedirectAlwaysFilteredHeaders(Set<String> redirectAlwaysFilteredHeaders) {
+        this.redirectAlwaysFilteredHeaders = redirectAlwaysFilteredHeaders == null ? new LinkedHashSet<>() : new LinkedHashSet<>(redirectAlwaysFilteredHeaders);
+    }
+
+    /**
+     * @return Additional header names filtered for redirects that do not preserve the request body.
+     * These headers are filtered in addition to {@link #getRedirectAlwaysFilteredHeaders()}.
+     */
+    public Set<String> getRedirectAdditionalNonPreserveBodyFilteredHeaders() {
+        return Collections.unmodifiableSet(redirectAdditionalNonPreserveBodyFilteredHeaders);
+    }
+
+    /**
+     * Sets the additional header names filtered for redirects that do not preserve the request body.
+     * These headers are filtered in addition to {@link #getRedirectAlwaysFilteredHeaders()}.
+     *
+     * @param redirectAdditionalNonPreserveBodyFilteredHeaders The additional non-preserve-body redirect header filter list
+     */
+    public void setRedirectAdditionalNonPreserveBodyFilteredHeaders(Set<String> redirectAdditionalNonPreserveBodyFilteredHeaders) {
+        this.redirectAdditionalNonPreserveBodyFilteredHeaders = redirectAdditionalNonPreserveBodyFilteredHeaders == null ? new LinkedHashSet<>() : new LinkedHashSet<>(redirectAdditionalNonPreserveBodyFilteredHeaders);
+    }
+
+    /**
+     * @return Header names that are additionally filtered for cross-origin redirects.
+     * By default this includes {@code Authorization}, {@code Proxy-Authorization}, and {@code Cookie}.
+     */
+    public Set<String> getRedirectCrossOriginFilteredHeaders() {
+        return Collections.unmodifiableSet(redirectCrossOriginFilteredHeaders);
+    }
+
+    /**
+     * Sets the header names that are additionally filtered for cross-origin redirects.
+     *
+     * @param redirectCrossOriginFilteredHeaders The cross-origin redirect header filter list
+     */
+    public void setRedirectCrossOriginFilteredHeaders(Set<String> redirectCrossOriginFilteredHeaders) {
+        this.redirectCrossOriginFilteredHeaders = redirectCrossOriginFilteredHeaders == null ? new LinkedHashSet<>() : new LinkedHashSet<>(redirectCrossOriginFilteredHeaders);
+    }
+
+    /**
+     * The maximum number of redirects to follow.
+     *
+     * @return The maximum number of redirects
+     */
+    public int getMaxRedirects() {
+        return maxRedirects;
+    }
+
+    /**
+     * Sets the maximum number of redirects to follow. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_REDIRECTS}).
+     *
+     * @param maxRedirects The maximum number of redirects
+     */
+    public void setMaxRedirects(int maxRedirects) {
+        this.maxRedirects = maxRedirects;
     }
 
     /**
@@ -673,12 +798,52 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * [available in the Netty HTTP client].
+     *
+     * @return The maximum initial line length the client can handle
+     * @since 5.0.0
+     */
+    public int getMaxInitialLineLength() {
+        return maxInitialLineLength;
+    }
+
+    /**
+     * [available in the Netty HTTP client].
+     *
+     * @return The maximum chunk size the client can handle
+     * @since 5.0.0
+     */
+    public int getMaxChunkSize() {
+        return maxChunkSize;
+    }
+
+    /**
      * Sets the maximum header size the client can handle. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_HEADER_SIZE}).
      *
      * @param maxHeaderSize The maximum header size the client can handle
      */
     public void setMaxHeaderSize(@ReadableBytes int maxHeaderSize) {
         this.maxHeaderSize = maxHeaderSize;
+    }
+
+    /**
+     * Sets the maximum initial line length the client can handle. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_INITIAL_LINE_LENGTH}).
+     *
+     * @param maxInitialLineLength The maximum initial line length the client can handle
+     * @since 5.0.0
+     */
+    public void setMaxInitialLineLength(@ReadableBytes int maxInitialLineLength) {
+        this.maxInitialLineLength = maxInitialLineLength;
+    }
+
+    /**
+     * Sets the maximum chunk size the client can handle. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_CHUNK_SIZE}).
+     *
+     * @param maxChunkSize The maximum chunk size the client can handle
+     * @since 5.0.0
+     */
+    public void setMaxChunkSize(@ReadableBytes int maxChunkSize) {
+        this.maxChunkSize = maxChunkSize;
     }
 
     /**
@@ -811,7 +976,6 @@ public abstract class HttpClientConfiguration {
      * @return The plaintext connection mode.
      * @since 4.0.0
      */
-    @NonNull
     public HttpVersionSelection.PlaintextMode getPlaintextMode() {
         return plaintextMode;
     }
@@ -824,7 +988,7 @@ public abstract class HttpClientConfiguration {
      * @param plaintextMode The plaintext connection mode.
      * @since 4.0.0
      */
-    public void setPlaintextMode(@NonNull HttpVersionSelection.PlaintextMode plaintextMode) {
+    public void setPlaintextMode(HttpVersionSelection.PlaintextMode plaintextMode) {
         this.plaintextMode = Objects.requireNonNull(plaintextMode, "plaintextMode");
     }
 
@@ -838,7 +1002,6 @@ public abstract class HttpClientConfiguration {
      * @return The supported ALPN protocols.
      * @since 4.0.0
      */
-    @NonNull
     public List<String> getAlpnModes() {
         return alpnModes;
     }
@@ -852,7 +1015,7 @@ public abstract class HttpClientConfiguration {
      * @param alpnModes The supported ALPN protocols.
      * @since 4.0.0
      */
-    public void setAlpnModes(@NonNull List<String> alpnModes) {
+    public void setAlpnModes(List<String> alpnModes) {
         this.alpnModes = Objects.requireNonNull(alpnModes, "alpnModes");
     }
 
@@ -889,7 +1052,6 @@ public abstract class HttpClientConfiguration {
      * @return The DNS resolution mode
      * @since 4.6.0
      */
-    @NonNull
     public DnsResolutionMode getDnsResolutionMode() {
         return dnsResolutionMode;
     }
@@ -901,7 +1063,7 @@ public abstract class HttpClientConfiguration {
      * @param dnsResolutionMode The DNS resolution mode
      * @since 4.6.0
      */
-    public void setDnsResolutionMode(@NonNull DnsResolutionMode dnsResolutionMode) {
+    public void setDnsResolutionMode(DnsResolutionMode dnsResolutionMode) {
         this.dnsResolutionMode = dnsResolutionMode;
     }
 
@@ -933,8 +1095,7 @@ public abstract class HttpClientConfiguration {
      * @return The HTTP/2 configuration.
      * @since 4.6.0
      */
-    @Nullable
-    public HttpClientConfiguration.Http2ClientConfiguration getHttp2Configuration() {
+    public HttpClientConfiguration.@Nullable Http2ClientConfiguration getHttp2Configuration() {
         return null;
     }
 
@@ -945,6 +1106,7 @@ public abstract class HttpClientConfiguration {
      * @return The path pattern, or {@code null} if logging is disabled.
      */
     @Internal
+    @Nullable
     public String getPcapLoggingPathPattern() {
         return pcapLoggingPathPattern;
     }
@@ -983,14 +1145,13 @@ public abstract class HttpClientConfiguration {
 
         private int maxPendingAcquires = Integer.MAX_VALUE;
 
+        @Nullable
         private Duration acquireTimeout;
 
         private boolean enabled = DEFAULT_ENABLED;
 
-        @NonNull
         private HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality connectionLocality = ConnectionLocality.PREFERRED;
 
-        @NonNull
         private PoolVersion version = PoolVersion.V4_9;
 
         /**
@@ -1139,7 +1300,7 @@ public abstract class HttpClientConfiguration {
          * @return The locality configuration
          * @since 4.8.0
          */
-        public @NonNull HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality getConnectionLocality() {
+        public HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality getConnectionLocality() {
             return connectionLocality;
         }
 
@@ -1150,7 +1311,7 @@ public abstract class HttpClientConfiguration {
          * @param connectionLocality The locality configuration
          * @since 4.8.0
          */
-        public void setConnectionLocality(@NonNull HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality connectionLocality) {
+        public void setConnectionLocality(HttpClientConfiguration.ConnectionPoolConfiguration.ConnectionLocality connectionLocality) {
             this.connectionLocality = connectionLocality;
         }
 
@@ -1160,7 +1321,7 @@ public abstract class HttpClientConfiguration {
          *
          * @return The pool version
          */
-        public @NonNull PoolVersion getVersion() {
+        public PoolVersion getVersion() {
             return version;
         }
 
@@ -1170,7 +1331,7 @@ public abstract class HttpClientConfiguration {
          *
          * @param version The pool version
          */
-        public void setVersion(@NonNull PoolVersion version) {
+        public void setVersion(PoolVersion version) {
             this.version = version;
         }
 
@@ -1274,11 +1435,42 @@ public abstract class HttpClientConfiguration {
          */
         public static final String PREFIX = "http2";
 
+        /**
+         * The default max header list size in bytes.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final int DEFAULT_MAX_HEADER_LIST_SIZE = 8192;
+
+        @Nullable
         private Duration pingIntervalRead = null;
 
+        @Nullable
         private Duration pingIntervalWrite = null;
 
+        @Nullable
         private Duration pingIntervalIdle = null;
+
+        private int maxHeaderListSize = DEFAULT_MAX_HEADER_LIST_SIZE;
+
+        /**
+         * Default constructor.
+         */
+        public Http2ClientConfiguration() {
+        }
+
+        /**
+         * Copy constructor.
+         *
+         * @param copy The HTTP/2 configuration to copy
+         */
+        protected Http2ClientConfiguration(@Nullable Http2ClientConfiguration copy) {
+            if (copy != null) {
+                this.pingIntervalRead = copy.pingIntervalRead;
+                this.pingIntervalWrite = copy.pingIntervalWrite;
+                this.pingIntervalIdle = copy.pingIntervalIdle;
+                this.maxHeaderListSize = copy.maxHeaderListSize;
+            }
+        }
 
         /**
          * For HTTP/2 connections, the interval from the last inbound message to when an automated ping
@@ -1341,6 +1533,25 @@ public abstract class HttpClientConfiguration {
          */
         public void setPingIntervalIdle(@Nullable Duration pingIntervalIdle) {
             this.pingIntervalIdle = pingIntervalIdle;
+        }
+
+        /**
+         * [available in the Netty HTTP client].
+         *
+         * @return The maximum allowed compressed header list size (in bytes) after decompression
+         * using HPACK (the HTTP/2 header compression algorithm).
+         */
+        public int getMaxHeaderListSize() {
+            return maxHeaderListSize;
+        }
+
+        /**
+         * Sets the maximum header list size the client can handle. Default value ({@value io.micronaut.http.client.HttpClientConfiguration.Http2ClientConfiguration#DEFAULT_MAX_HEADER_LIST_SIZE}).
+         *
+         * @param maxHeaderListSize The maximum header list size the client can handle
+         */
+        public void setMaxHeaderListSize(@ReadableBytes int maxHeaderListSize) {
+            this.maxHeaderListSize = maxHeaderListSize;
         }
     }
 

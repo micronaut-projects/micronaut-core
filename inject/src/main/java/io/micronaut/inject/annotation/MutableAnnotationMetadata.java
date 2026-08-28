@@ -20,8 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
@@ -137,7 +136,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
         }
         if (annotationRepeatableContainer != null) {
-            cloned.annotationRepeatableContainer = new HashMap<>(annotationRepeatableContainer);
+            cloned.annotationRepeatableContainer = new LinkedHashMap<>(annotationRepeatableContainer);
         }
         if (sourceRetentionAnnotations != null) {
             cloned.sourceRetentionAnnotations = new HashSet<>(sourceRetentionAnnotations);
@@ -153,9 +152,8 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         return cloned;
     }
 
-    @NonNull
     @Override
-    public Map<CharSequence, Object> getDefaultValues(@NonNull String annotation) {
+    public Map<CharSequence, Object> getDefaultValues(String annotation) {
         Map<CharSequence, Object> values = super.getDefaultValues(annotation);
         if (!values.isEmpty() || annotationDefaultValues == null) {
             return values;
@@ -184,12 +182,12 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             if (v instanceof CharSequence) {
                 return v.toString().contains(DefaultPropertyPlaceholderResolver.PREFIX);
             } else if (v instanceof String[] strings) {
-                return Arrays.stream(strings).anyMatch(s -> s.contains(DefaultPropertyPlaceholderResolver.PREFIX));
+                return Arrays.stream(strings).anyMatch(s -> s != null && s.contains(DefaultPropertyPlaceholderResolver.PREFIX));
             } else if (v instanceof AnnotationValue<?> annotationValue) {
                 return hasPropertyExpressions(annotationValue.getValues());
             } else if (v instanceof AnnotationValue<?>[] annotationValues) {
                 if (annotationValues.length > 0) {
-                    return Arrays.stream(annotationValues).anyMatch(av -> hasPropertyExpressions(av.getValues()));
+                    return Arrays.stream(annotationValues).anyMatch(av -> av != null && hasPropertyExpressions(av.getValues()));
                 } else {
                     return false;
                 }
@@ -564,7 +562,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     @SuppressWarnings("java:S2259") // false positive
     private void addAnnotation(String annotation,
                                Map<CharSequence, Object> values,
-                               Map<String, Map<CharSequence, Object>> declaredAnnotations,
+                               @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
                                Map<String, Map<CharSequence, Object>> allAnnotations,
                                boolean isDeclared,
                                RetentionPolicy retentionPolicy) {
@@ -618,7 +616,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private Map<String, Map<CharSequence, Object>> getAllStereotypes() {
         Map<String, Map<CharSequence, Object>> stereotypes = this.allStereotypes;
         if (stereotypes == null) {
-            stereotypes = new HashMap<>(3);
+            stereotypes = new LinkedHashMap<>(3);
             this.allStereotypes = stereotypes;
         }
         return stereotypes;
@@ -628,7 +626,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private Map<String, Map<CharSequence, Object>> getDeclaredStereotypesInternal() {
         Map<String, Map<CharSequence, Object>> stereotypes = this.declaredStereotypes;
         if (stereotypes == null) {
-            stereotypes = new HashMap<>(3);
+            stereotypes = new LinkedHashMap<>(3);
             this.declaredStereotypes = stereotypes;
         }
         return stereotypes;
@@ -638,7 +636,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private Map<String, Map<CharSequence, Object>> getAllAnnotations() {
         Map<String, Map<CharSequence, Object>> annotations = this.allAnnotations;
         if (annotations == null) {
-            annotations = new HashMap<>(3);
+            annotations = new LinkedHashMap<>(3);
             this.allAnnotations = annotations;
         }
         return annotations;
@@ -648,7 +646,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private Map<String, Map<CharSequence, Object>> getDeclaredAnnotationsInternal() {
         Map<String, Map<CharSequence, Object>> annotations = this.declaredAnnotations;
         if (annotations == null) {
-            annotations = new HashMap<>(3);
+            annotations = new LinkedHashMap<>(3);
             this.declaredAnnotations = annotations;
         }
         return annotations;
@@ -662,7 +660,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private Map<String, List<String>> getAnnotationsByStereotypeInternal() {
         Map<String, List<String>> annotations = this.annotationsByStereotype;
         if (annotations == null) {
-            annotations = new HashMap<>(3);
+            annotations = new LinkedHashMap<>(3);
             this.annotationsByStereotype = annotations;
         }
         return annotations;
@@ -676,14 +674,14 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         hasEvaluatedExpressions = computeHasEvaluatedExpressions(annotationValue.getValues(), retentionPolicy);
 
         if (annotationRepeatableContainer == null) {
-            annotationRepeatableContainer = new HashMap<>(2);
+            annotationRepeatableContainer = new LinkedHashMap<>(2);
         }
         annotationRepeatableContainer.put(annotationValue.getAnnotationName(), repeatableAnnotationContainer);
         if (retentionPolicy == RetentionPolicy.SOURCE) {
             addSourceRetentionAnnotation(repeatableAnnotationContainer);
         }
 
-        Map<CharSequence, Object> values = allAnnotations.computeIfAbsent(repeatableAnnotationContainer, s -> new HashMap<>());
+        Map<CharSequence, Object> values = allAnnotations.computeIfAbsent(repeatableAnnotationContainer, s -> new LinkedHashMap<>());
         Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
         if (v != null) {
             if (v.getClass().isArray()) {
@@ -912,7 +910,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         if (target instanceof MutableAnnotationMetadata damTarget && source instanceof MutableAnnotationMetadata damSource) {
             if (damSource.annotationRepeatableContainer != null && !damSource.annotationRepeatableContainer.isEmpty()) {
                 if (damTarget.annotationRepeatableContainer == null) {
-                    damTarget.annotationRepeatableContainer = new HashMap<>(damSource.annotationRepeatableContainer);
+                    damTarget.annotationRepeatableContainer = new LinkedHashMap<>(damSource.annotationRepeatableContainer);
                 } else {
                     damTarget.annotationRepeatableContainer.putAll(damSource.annotationRepeatableContainer);
                 }
@@ -959,12 +957,12 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
      * @param predicate The predicate
      * @param <A>       The annotation
      */
-    public <A extends Annotation> void removeAnnotationIf(@NonNull Predicate<AnnotationValue<A>> predicate) {
+    public <A extends Annotation> void removeAnnotationIf(Predicate<AnnotationValue<A>> predicate) {
         removeAnnotationsIf(predicate, this.declaredAnnotations);
         removeAnnotationsIf(predicate, this.allAnnotations);
     }
 
-    private <A extends Annotation> void removeAnnotationsIf(@NonNull Predicate<AnnotationValue<A>> predicate, Map<String, Map<CharSequence, Object>> annotations) {
+    private <A extends Annotation> void removeAnnotationsIf(Predicate<AnnotationValue<A>> predicate, @Nullable Map<String, Map<CharSequence, Object>> annotations) {
         if (annotations == null) {
             return;
         }
@@ -1069,6 +1067,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     @Override
+    @Nullable
     protected String findRepeatableAnnotationContainerInternal(String annotation) {
         if (annotationRepeatableContainer != null) {
             String repeatedName = annotationRepeatableContainer.get(annotation);
@@ -1091,6 +1090,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 return hasEvaluatedExpressions(av.getValues());
             } else if (value instanceof AnnotationValue[] avArray) {
                 return Arrays.stream(avArray)
+                           .filter(av -> av != null)
                            .map(AnnotationValue::getValues)
                            .anyMatch(this::hasEvaluatedExpressions);
             } else {

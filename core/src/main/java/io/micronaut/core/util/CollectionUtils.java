@@ -15,8 +15,8 @@
  */
 package io.micronaut.core.util;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionService;
 
@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.SequencedCollection;
+import java.util.SequencedSet;
 import java.util.Set;
 
 /**
@@ -180,6 +182,7 @@ public class CollectionUtils {
      * @param map The map
      * @return True if it is empty or null
      */
+    @Contract("null -> true")
     public static boolean isEmpty(@Nullable Map map) {
         return map == null || map.isEmpty();
     }
@@ -190,6 +193,7 @@ public class CollectionUtils {
      * @param map The map
      * @return True if it is not null and not empty
      */
+    @Contract("null -> false")
     public static boolean isNotEmpty(@Nullable Map map) {
         return map != null && !map.isEmpty();
     }
@@ -200,6 +204,7 @@ public class CollectionUtils {
      * @param collection The collection
      * @return True if it is empty or null
      */
+    @Contract("null -> true")
     public static boolean isEmpty(@Nullable Collection collection) {
         return collection == null || collection.isEmpty();
     }
@@ -210,6 +215,7 @@ public class CollectionUtils {
      * @param collection The collection
      * @return True if it is not null and not empty
      */
+    @Contract("null -> false")
     public static boolean isNotEmpty(@Nullable Collection collection) {
         return collection != null && !collection.isEmpty();
     }
@@ -229,10 +235,16 @@ public class CollectionUtils {
         if (iterableType.equals(Set.class)) {
             return Optional.of(new HashSet<>(collection));
         }
+        if (iterableType.equals(SequencedSet.class)) {
+            return Optional.of(new LinkedHashSet<>(collection));
+        }
         if (iterableType.equals(Queue.class)) {
             return Optional.of(new LinkedList<>(collection));
         }
         if (iterableType.equals(List.class)) {
+            return Optional.of(new ArrayList<>(collection));
+        }
+        if (iterableType.equals(SequencedCollection.class)) {
             return Optional.of(new ArrayList<>(collection));
         }
         if (!iterableType.isInterface()) {
@@ -304,7 +316,7 @@ public class CollectionUtils {
      * @param <T>         The type
      * @return The set
      */
-    public static @NonNull <T> Iterable<T> enumerationToIterable(@Nullable Enumeration<T> enumeration) {
+    public static <T> Iterable<T> enumerationToIterable(@Nullable Enumeration<T> enumeration) {
         if (enumeration == null) {
             return Collections.emptyList();
         }
@@ -432,7 +444,7 @@ public class CollectionUtils {
      * @param <T> The generic type
      * @return A non-null unmodifiable list
      */
-    public static @NonNull <T> List<T> unmodifiableList(@Nullable List<T> list) {
+    public static <T> List<T> unmodifiableList(@Nullable List<T> list) {
         if (isEmpty(list)) {
             return Collections.emptyList();
         }
@@ -446,9 +458,8 @@ public class CollectionUtils {
      * @param <T> The generic type
      * @return The last element of a collection or null
      */
-    public static @Nullable <T> T last(@NonNull Collection<T> collection) {
-        if (collection instanceof List) {
-            List<T> list = (List<T>) collection;
+    public static @Nullable <T> T last(Collection<T> collection) {
+        if (collection instanceof List<T> list) {
             final int s = list.size();
             if (s > 0) {
                 return list.get(s - 1);
@@ -486,8 +497,7 @@ public class CollectionUtils {
      * @return The enum set
      * @since 4.6
      */
-    @NonNull
-    public static <E extends Enum<E>> EnumSet<E> enumSet(@NonNull E... enums) {
+    public static <E extends Enum<E>> EnumSet<E> enumSet(E... enums) {
         if (enums.length == 0) {
             throw new IllegalStateException("At least one item is required!");
         }

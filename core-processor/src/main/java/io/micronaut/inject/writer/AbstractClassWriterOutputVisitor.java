@@ -18,12 +18,18 @@ package io.micronaut.inject.writer;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.Element;
+import org.jspecify.annotations.Nullable;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Abstract implementation of the {@link ClassWriterOutputVisitor} interface that deals with service descriptors in a
@@ -131,11 +137,14 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
         }
     }
 
-    private boolean isNotEclipseNotFound(Throwable e) {
-        if (isWriteOnFinish) {
+    private boolean isNotEclipseNotFound(@Nullable Throwable e) {
+        if (isWriteOnFinish || e == null) {
             return false;
         }
         String message = e.getMessage();
+        if (message == null) {
+            return false;
+        }
         return !message.contains("does not exist") || !e.getClass().getName().startsWith("org.eclipse");
     }
 }

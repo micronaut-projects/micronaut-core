@@ -16,20 +16,12 @@
 package io.micronaut.jackson.databind;
 
 import com.fasterxml.jackson.annotation.JsonView;
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.Module;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
-import com.fasterxml.jackson.databind.ObjectWriter;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.jackson.JacksonConfiguration;
@@ -48,8 +40,19 @@ import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.exc.StreamReadException;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JacksonModule;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectReader;
+import tools.jackson.databind.ObjectWriter;
+import tools.jackson.databind.cfg.MapperBuilder;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -76,11 +79,15 @@ public final class JacksonDatabindMapper implements JsonMapper {
     private final ObjectMapper objectMapper;
     private final JsonStreamConfig config;
     private final JsonNodeTreeCodec treeCodec;
+    @Nullable
     private final ObjectReader specializedReader;
+    @Nullable
     private final ObjectWriter specializedWriter;
     private final boolean allowViews;
 
+    @Nullable
     private TypeCache<ObjectReader> cachedReader;
+    @Nullable
     private TypeCache<ObjectWriter> cachedWriter;
 
     @Internal
@@ -94,8 +101,8 @@ public final class JacksonDatabindMapper implements JsonMapper {
         this.objectMapper = objectMapper;
         this.allowViews = allowViews;
         this.config = JsonStreamConfig.DEFAULT
-            .withUseBigDecimalForFloats(objectMapper.getDeserializationConfig().isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS))
-            .withUseBigIntegerForInts(objectMapper.getDeserializationConfig().isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS));
+            .withUseBigDecimalForFloats(objectMapper.deserializationConfig().isEnabled(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS))
+            .withUseBigIntegerForInts(objectMapper.deserializationConfig().isEnabled(DeserializationFeature.USE_BIG_INTEGER_FOR_INTS));
         this.treeCodec = JsonNodeTreeCodec.getInstance().withConfig(config);
         this.specializedReader = null;
         this.specializedWriter = null;
@@ -115,11 +122,20 @@ public final class JacksonDatabindMapper implements JsonMapper {
         this.allowViews = allowViews;
     }
 
+    private JacksonDatabindMapper(JacksonDatabindMapper from, ObjectReader reader, ObjectWriter writer) {
+        this.objectMapper = from.objectMapper;
+        this.config = from.config;
+        this.treeCodec = from.treeCodec;
+        this.specializedReader = reader;
+        this.specializedWriter = writer;
+        this.allowViews = from.allowViews;
+    }
+
     private static ObjectMapper createDefaultMapper() {
         var objectMapperFactory = new ObjectMapperFactory();
         objectMapperFactory.setDeserializers(new JsonNodeDeserializer());
         objectMapperFactory.setSerializers(new JsonNodeSerializer());
-        return objectMapperFactory.objectMapper(null, null);
+        return objectMapperFactory.jsonMapperBuilder(null, null).build();
     }
 
     @Internal
@@ -128,7 +144,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
-    public @NonNull JsonMapper createSpecific(@NonNull Argument<?> type) {
+    public JsonMapper createSpecific(Argument<?> type) {
         JacksonDatabindMapper jacksonDatabindMapper = new JacksonDatabindMapper(this, type, allowViews);
         if (allowViews) {
             Class<?> viewClass = type.getAnnotationMetadata().classValue(JsonView.class).orElse(null);
@@ -139,7 +155,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
         return jacksonDatabindMapper;
     }
 
-    private ObjectReader createReader(@NonNull Argument<?> type) {
+    private ObjectReader createReader(Argument<?> type) {
         if (specializedReader != null) {
             return specializedReader;
         }
@@ -157,7 +173,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
         return reader;
     }
 
-    private ObjectWriter createWriter(@NonNull Argument<?> type) {
+    private ObjectWriter createWriter(Argument<?> type) {
         if (specializedWriter != null) {
             return specializedWriter;
         }
@@ -176,112 +192,134 @@ public final class JacksonDatabindMapper implements JsonMapper {
     }
 
     @Override
-    public <T> T readValueFromTree(@NonNull JsonNode tree, @NonNull Argument<T> type) throws IOException {
+    @Nullable
+    public <T> T readValueFromTree(JsonNode tree, Argument<T> type) throws IOException {
         return createReader(type).readValue(treeAsTokens(tree));
     }
 
     @Override
-    public @NonNull JsonNode writeValueToTree(@Nullable Object value) throws IOException {
+    public JsonNode writeValueToTree(@Nullable Object value) throws IOException {
         TreeGenerator treeGenerator = treeCodec.createTreeGenerator();
-        treeGenerator.setCodec(objectMapper);
         objectMapper.writeValue(treeGenerator, value);
         return treeGenerator.getCompletedValue();
     }
 
-    @NonNull
     @Override
-    public <T> JsonNode writeValueToTree(@NonNull Argument<T> type, T value) throws IOException {
+    public <T> JsonNode writeValueToTree(Argument<T> type, @Nullable T value) throws IOException {
         TreeGenerator treeGenerator = treeCodec.createTreeGenerator();
-        treeGenerator.setCodec(objectMapper);
         createWriter(type).writeValue(treeGenerator, value);
         return treeGenerator.getCompletedValue();
     }
 
     @Override
-    public <T> T readValue(@NonNull InputStream inputStream, @NonNull Argument<T> type) throws IOException {
+    @Nullable
+    public <T> T readValue(InputStream inputStream, Argument<T> type) throws IOException {
         try {
             return createReader(type).readValue(inputStream);
-        } catch (JsonParseException pe) {
+        } catch (StreamReadException pe) {
             throw new JsonSyntaxException(pe);
         }
     }
 
     @Override
-    public <T> T readValue(byte @NonNull [] byteArray, @NonNull Argument<T> type) throws IOException {
+    @Nullable
+    public <T> T readValue(byte[] byteArray, Argument<T> type) throws IOException {
         try {
             return createReader(type).readValue(byteArray);
-        } catch (JsonParseException pe) {
+        } catch (StreamReadException pe) {
             throw new JsonSyntaxException(pe);
         }
     }
 
     @Override
-    public <T> T readValue(@NonNull ByteBuffer<?> byteBuffer, @NonNull Argument<T> type) throws IOException {
-        try (JsonParser parser = JacksonCoreParserFactory.createJsonParser(objectMapper.getFactory(), byteBuffer)) {
+    @Nullable
+    public <T> T readValue(ByteBuffer<?> byteBuffer, Argument<T> type) throws IOException {
+        try (JsonParser parser = JacksonCoreParserFactory.createJsonParser((JsonFactory) objectMapper.tokenStreamFactory(), objectMapper._deserializationContext(), byteBuffer)) {
             return createReader(type).readValue(parser);
-        } catch (JsonParseException pe) {
+        } catch (StreamReadException pe) {
             throw new JsonSyntaxException(pe);
         }
     }
 
     @Override
-    public void writeValue(@NonNull OutputStream outputStream, @Nullable Object object) throws IOException {
-        objectMapper.writeValue(outputStream, object);
+    @Nullable
+    public <T> T readValue(ReadBuffer readBuffer, Argument<T> type) throws IOException {
+        try {
+            ObjectReader reader = createReader(type);
+            Optional<T> direct = readBuffer.useFastHeapBuffer(bb -> Optional.ofNullable(reader.readValue(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining())));
+            //noinspection OptionalAssignedToNull (intentional)
+            if (direct != null) {
+                return direct.orElse(null);
+            }
+
+            return reader.readValue(readBuffer.toInputStream());
+        } catch (StreamReadException pe) {
+            throw new JsonSyntaxException(pe);
+        }
     }
 
     @Override
-    public <T> void writeValue(@NonNull OutputStream outputStream, @NonNull Argument<T> type, T object) throws IOException {
+    public void writeValue(OutputStream outputStream, @Nullable Object object) throws IOException {
+        if (specializedWriter != null) {
+            specializedWriter.writeValue(outputStream, object);
+        } else {
+            objectMapper.writeValue(outputStream, object);
+        }
+    }
+
+    @Override
+    public <T> void writeValue(OutputStream outputStream, Argument<T> type, @Nullable T object) throws IOException {
         createWriter(type).writeValue(outputStream, object);
     }
 
     @Override
     public byte[] writeValueAsBytes(@Nullable Object object) throws IOException {
+        if (specializedWriter != null) {
+            return specializedWriter.writeValueAsBytes(object);
+        }
         return objectMapper.writeValueAsBytes(object);
     }
 
     @Override
-    public <T> byte[] writeValueAsBytes(@NonNull Argument<T> type, T object) throws IOException {
+    public <T> byte[] writeValueAsBytes(Argument<T> type, @Nullable T object) throws IOException {
         return createWriter(type).writeValueAsBytes(object);
     }
 
     @Override
-    public void updateValueFromTree(Object value, @NonNull JsonNode tree) throws IOException {
+    public void updateValueFromTree(Object value, JsonNode tree) throws IOException {
         objectMapper.readerForUpdating(value).readValue(treeAsTokens(tree));
     }
 
     @Override
-    public @NonNull JsonMapper cloneWithFeatures(@NonNull JsonFeatures features) {
+    public JsonMapper cloneWithFeatures(JsonFeatures features) {
         JacksonFeatures jacksonFeatures = (JacksonFeatures) features;
 
-        ObjectMapper objectMapper = this.objectMapper.copy();
-        jacksonFeatures.getDeserializationFeatures().forEach(objectMapper::configure);
-        jacksonFeatures.getSerializationFeatures().forEach(objectMapper::configure);
-        for (Class<? extends Module> moduleClass : jacksonFeatures.getAdditionalModules()) {
-            objectMapper.registerModule(InstantiationUtils.instantiate(moduleClass));
+        MapperBuilder<?, ?> builder = objectMapper.rebuild();
+        jacksonFeatures.getDeserializationFeatures().forEach(builder::configure);
+        jacksonFeatures.getSerializationFeatures().forEach(builder::configure);
+        for (Class<? extends JacksonModule> moduleClass : jacksonFeatures.getAdditionalModules()) {
+            builder.addModule(InstantiationUtils.instantiate(moduleClass));
         }
 
-        return new JacksonDatabindMapper(objectMapper, allowViews);
+        return new JacksonDatabindMapper(builder.build(), allowViews);
     }
 
-    @NonNull
     @Override
-    public JsonMapper cloneWithViewClass(@NonNull Class<?> viewClass) {
-        ObjectMapper objectMapper = this.objectMapper.copy();
-        objectMapper.setConfig(objectMapper.getSerializationConfig().withView(viewClass));
-        objectMapper.setConfig(objectMapper.getDeserializationConfig().withView(viewClass));
+    public JsonMapper cloneWithViewClass(Class<?> viewClass) {
+        ObjectReader reader = objectMapper.readerWithView(viewClass);
+        ObjectWriter writer = objectMapper.writerWithView(viewClass);
 
-        return new JacksonDatabindMapper(objectMapper, allowViews);
+        return new JacksonDatabindMapper(this, reader, writer);
     }
 
-    @NonNull
     @Override
     public JsonStreamConfig getStreamConfig() {
         return config;
     }
 
     @Override
-    public @NonNull Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
-        return new JacksonCoreProcessor(streamArray, objectMapper.getFactory(), config) {
+    public Processor<byte[], JsonNode> createReactiveParser(Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
+        return new JacksonCoreProcessor(streamArray, objectMapper.tokenStreamFactory(), config) {
             @Override
             public void subscribe(Subscriber<? super JsonNode> downstreamSubscriber) {
                 onSubscribe.accept(this);
@@ -290,17 +328,15 @@ public final class JacksonDatabindMapper implements JsonMapper {
         };
     }
 
-    @NonNull
     @Override
-    public Optional<JsonFeatures> detectFeatures(@NonNull AnnotationMetadata annotations) {
+    public Optional<JsonFeatures> detectFeatures(AnnotationMetadata annotations) {
         return Optional.ofNullable(annotations.getAnnotation(io.micronaut.jackson.annotation.JacksonFeatures.class))
             .map(JacksonFeatures::fromAnnotation);
     }
 
-    private JsonParser treeAsTokens(@NonNull JsonNode tree) {
-        JsonParser parser = treeCodec.treeAsTokens(tree);
-        parser.setCodec(objectMapper);
-        return parser;
+    private JsonParser treeAsTokens(JsonNode tree) {
+        DeserializationContext context = objectMapper._deserializationContext(); // Not supposed to be used technically
+        return treeCodec.treeAsTokens(tree, context);
     }
 
     private record TypeCache<T>(Argument<?> type, T cachedValue) {

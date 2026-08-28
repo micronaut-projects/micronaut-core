@@ -6,11 +6,11 @@ dependencies {
     api(projects.micronautCore)
     api(projects.micronautInject)
     api(libs.managed.netty.buffer)
-    compileOnly(libs.graal)
+    compileOnly(libs.managed.graalvm.nativeimage)
 
     annotationProcessor(projects.micronautInjectJava)
 
-    testRuntimeOnly(projects.micronautHttpTck) // leak detection module
+    testRuntimeOnly(libs.micronaut.test.netty.leak)
 }
 
 tasks {

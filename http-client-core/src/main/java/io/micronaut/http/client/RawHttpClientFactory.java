@@ -16,8 +16,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 
@@ -37,7 +36,6 @@ public interface RawHttpClientFactory {
      * @param url The base URL
      * @return The client
      */
-    @NonNull
     default RawHttpClient createRawClient(@Nullable URI url) {
         return createRawClient(url, new DefaultHttpClientConfiguration());
     }
@@ -50,6 +48,5 @@ public interface RawHttpClientFactory {
      * @param configuration the client configuration
      * @return The client
      */
-    @NonNull
-    RawHttpClient createRawClient(@Nullable URI url, @NonNull HttpClientConfiguration configuration);
+    RawHttpClient createRawClient(@Nullable URI url, HttpClientConfiguration configuration);
 }

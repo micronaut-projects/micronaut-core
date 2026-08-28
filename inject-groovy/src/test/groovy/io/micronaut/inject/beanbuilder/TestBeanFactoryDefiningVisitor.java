@@ -1,7 +1,7 @@
 package io.micronaut.inject.beanbuilder;
 
 import io.micronaut.context.annotation.Prototype;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;

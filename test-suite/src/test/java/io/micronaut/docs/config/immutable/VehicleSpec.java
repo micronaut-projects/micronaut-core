@@ -17,8 +17,9 @@ package io.micronaut.docs.config.immutable;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.exceptions.DependencyInjectionException;
-import io.micronaut.core.util.CollectionUtils;
 import org.junit.jupiter.api.Test;
+
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,7 +30,8 @@ class VehicleSpec {
     @Test
     void testStartVehicle() {
         // tag::start[]
-        ApplicationContext applicationContext = ApplicationContext.run(CollectionUtils.mapOf(
+        ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "spec.name", "VehicleImmutableSpec",
                 "my.engine.cylinders", "8",
                 "my.engine.crank-shaft.rod-length", "7.0"
         ));
@@ -44,8 +46,9 @@ class VehicleSpec {
 
     @Test
     void testStartWithInvalidValue() {
-        try (ApplicationContext applicationContext = ApplicationContext.run(CollectionUtils.mapOf(
-                "my.engine.cylinders", "-10",
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "spec.name", "VehicleImmutableSpec",
+            "my.engine.cylinders", "-10",
                 "my.engine.crank-shaft.rod-length", "7.0"
         ))) {
             applicationContext.getBean(Vehicle.class);

@@ -16,6 +16,7 @@
 package io.micronaut.discovery.config;
 
 import io.micronaut.core.util.Toggleable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -44,6 +45,7 @@ public abstract class ConfigDiscoveryConfiguration implements Toggleable {
     public static final boolean DEFAULT_ENABLED = true;
 
     private boolean enabled = DEFAULT_ENABLED;
+    @Nullable
     private String path;
     private Format format = Format.NATIVE;
 
@@ -74,7 +76,7 @@ public abstract class ConfigDiscoveryConfiguration implements Toggleable {
     /**
      * @param path The path to store the configuration
      */
-    public void setPath(String path) {
+    public void setPath(@Nullable String path) {
         this.path = path;
     }
 

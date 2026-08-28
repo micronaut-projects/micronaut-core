@@ -17,7 +17,7 @@ package io.micronaut.http.sse;
 
 import io.micronaut.core.util.ArgumentUtils;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 
 /**
@@ -57,22 +57,22 @@ public interface Event<T> {
     /**
      * @return The ID of the event, or null if there is no ID
      */
-    String getId();
+    @Nullable String getId();
 
     /**
      * @return The name of the event
      */
-    String getName();
+    @Nullable String getName();
 
     /**
      * @return A comment for the event, or null if there is no comment
      */
-    String getComment();
+    @Nullable String getComment();
 
     /**
      * @return The duration to retry
      */
-    Duration getRetry();
+    @Nullable Duration getRetry();
 
     /**
      * Sets the retry duration.
@@ -127,7 +127,6 @@ public interface Event<T> {
      * @return The event instance
      */
     static <ET> Event<ET> of(Event event, ET data) {
-        ArgumentUtils.check("data", data).notNull();
         return new DefaultEvent<>(data)
             .id(event.getId())
             .comment(event.getComment())

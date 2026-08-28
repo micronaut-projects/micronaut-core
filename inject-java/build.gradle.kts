@@ -48,9 +48,10 @@ dependencies {
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.javax.annotation.api)
     testImplementation(libs.javax.inject)
-    testImplementation(libs.graal)
+    testImplementation(libs.managed.graalvm.nativeimage)
     testImplementation(libs.managed.snakeyaml)
     testImplementation(libs.managed.jspecify)
+    testImplementation(libs.bytebuddy)
     testRuntimeOnly(libs.jakarta.el.impl)
     testRuntimeOnly(libs.jakarta.el)
 }
@@ -66,3 +67,7 @@ tasks.withType<Test>().configureEach {
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 //compileTestGroovy.groovyOptions.fork = true
+
+micronautBuild {
+    binaryCompatibility.enabledAfter("5.0.0")
+}

@@ -17,12 +17,14 @@ package io.micronaut.inject.context.processor;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.inject.BeanDefinition;
 
 import java.util.HashSet;
 import java.util.Set;
 
+@Requires(property = "spec.name", value = "BeanDefinitionProcessorSpec")
 @Context
 public class ProcessedAnnotationProcessor implements BeanDefinitionProcessor<ProcessedAnnotation> {
     private Set<BeanDefinition<?>> beans = new HashSet<>();
@@ -32,7 +34,7 @@ public class ProcessedAnnotationProcessor implements BeanDefinitionProcessor<Pro
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, BeanContext object) {
+    public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
         beans.add(beanDefinition);
     }
 

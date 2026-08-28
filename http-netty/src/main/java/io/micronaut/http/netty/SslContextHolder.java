@@ -16,10 +16,12 @@
 package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
 import io.netty.util.ReferenceCountUtil;
+
+import java.util.Objects;
 
 /**
  * Holder for Netty SSL context instances for TCP ({@link SslContext}) and QUIC/HTTP3
@@ -62,6 +64,6 @@ public record SslContextHolder(
     }
 
     public QuicSslContext quicSslContext() {
-        return (QuicSslContext) quicSslContextObject;
+        return (QuicSslContext) Objects.requireNonNull(quicSslContextObject);
     }
 }

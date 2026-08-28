@@ -1,8 +1,41 @@
+import io.micronaut.build.docs.PublishGuideTask
+import org.gradle.api.tasks.PathSensitivity
+
 plugins {
     id "io.micronaut.build.internal.parent"
     id "io.micronaut.build.internal.dependency-updates"
     id "io.micronaut.build.internal.version-catalog-updates"
     id "io.micronaut.build.internal.convention-quality"
+    alias(libs.plugins.managed.kotlin.jvm) apply false
+    alias(libs.plugins.managed.kotlin.allopen) apply false
+    alias(libs.plugins.managed.kotlin.kapt) apply false
+    alias(libs.plugins.managed.kotlin.noarg) apply false
+    alias(libs.plugins.managed.ksp) apply false
+}
+
+repositories {
+    mavenCentral()
+}
+
+def languageSnippetSources = files(
+        fileTree("test-suite/src/test/java") {
+            include "**/*.java"
+        },
+        fileTree("test-suite-groovy/src/test/groovy") {
+            include "**/*.groovy"
+        },
+        fileTree("test-suite-kotlin/src/test/kotlin") {
+            include "**/*.kt"
+        },
+        fileTree("test-suite-python/src/test/python") {
+            include "**/*.py"
+        }
+)
+
+tasks.withType(PublishGuideTask).configureEach {
+    inputs.files(languageSnippetSources)
+            .withPropertyName("languageSnippetSources")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 tasks.named("updateVersionCatalogs") {
@@ -15,9 +48,17 @@ tasks.named("updateVersionCatalogs") {
     ignoredModules.add("com.github.ben-manes.caffeine:caffeine")
 }
 
+def pythonProjects = [
+        ":micronaut-inject-python",
+        ":micronaut-inject-python-test",
+        ":micronaut-context-python",
+        ":micronaut-context-python-netty",
+        ":test-suite-python"
+]
+
 if (System.getenv("SONAR_TOKEN") != null) {
-    // deprecated and compile time only classes excluded from coverage
-    def coverageExcludes = [
+    // deprecated and compile time only classes excluded from analysis
+    def analysisExcludes = [
         "**/StreamSoftServiceLoader.java",
         "**/ServiceDescriptionProcessor.java",
         "**/GraalReflectionConfigurer.java",
@@ -30,10 +71,15 @@ if (System.getenv("SONAR_TOKEN") != null) {
         "**/test/support/**",
         "**/micronaut/annotation/processing/test/**"
     ]
+    // Python module tests run in a separate CI workflow without Sonar coverage collection.
+    def pythonCoverageExcludes = pythonProjects.collect {
+        "${project(it).projectDir.name}/**/*"
+    }
     sonarqube {
         skipProject = project.name.contains("test")
         properties {
-            property "sonar.exclusions", coverageExcludes.join(",")
+            property "sonar.exclusions", analysisExcludes.join(",")
+            property "sonar.coverage.exclusions", pythonCoverageExcludes.join(",")
         }
     }
 }
@@ -43,4 +89,14 @@ configurations.jacocoAggregation.dependencies.removeIf {
 }
 configurations.javadocAggregatorBase.dependencies.removeIf {
     it instanceof ProjectDependency && it.path.startsWith(":test-")
+}
+
+if (!providers.gradleProperty("python-ci").isPresent()) {
+    subprojects { project ->
+        if (project.path in pythonProjects) {
+            project.tasks.withType(Test).configureEach {
+                enabled = false
+            }
+        }
+    }
 }

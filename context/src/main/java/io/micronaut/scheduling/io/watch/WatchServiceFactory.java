@@ -15,7 +15,11 @@
  */
 package io.micronaut.scheduling.io.watch;
 
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.util.StringUtils;
 import org.slf4j.Logger;
@@ -24,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.WatchService;
+import java.util.Objects;
 
 /**
  * A factory that creates the default watch service.
@@ -51,7 +56,7 @@ public class WatchServiceFactory {
     @Requires(property = FileWatchConfiguration.PATHS)
     @Primary
     public WatchService watchService() throws IOException {
-        String name = CachedEnvironment.getProperty("os.name").toLowerCase();
+        String name = Objects.requireNonNullElse(CachedEnvironment.getProperty("os.name"), "unknown").toLowerCase();
         boolean isMacOS = "Mac OS X".equalsIgnoreCase(name) || "Darwin".equalsIgnoreCase(name);
         if (isMacOS) {
             LOG.warn("Using default File WatchService on OS X is slow. Consider adding 'io.micronaut:micronaut-runtime-osx' dependencies to use native file watch");

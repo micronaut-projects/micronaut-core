@@ -20,9 +20,9 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.ResourceResolver;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.io.InputStream;
@@ -38,27 +38,31 @@ import java.security.KeyStore;
 @BootstrapContextCompatible
 public final class ResourceCertificateProvider implements CertificateProvider {
     private final String name;
-    private final @NonNull KeyStore ks;
+    private final KeyStore ks;
 
     ResourceCertificateProvider(
-        @NonNull Config config,
-        @NonNull ResourceResolver resourceLoader
+        Config config,
+        ResourceResolver resourceLoader
     ) throws Exception {
         name = config.name;
         byte[] bytes;
-        try (InputStream stream = resourceLoader.getResourceAsStream(config.getResource()).orElseThrow(() -> new ConfigurationException("Resource unavailable: " + config.getResource()))) {
+        String res = config.getResource();
+        if (res == null) {
+            throw new ConfigurationException("Missing resource for certificate provider");
+        }
+        try (InputStream stream = resourceLoader.getResourceAsStream(res).orElseThrow(() -> new ConfigurationException("Resource unavailable: " + res))) {
             bytes = stream.readAllBytes();
         }
         ks = FileCertificateProvider.load(config, bytes, null);
     }
 
     @Override
-    public @NonNull Publisher<@NonNull KeyStore> getKeyStore() {
+    public Publisher<KeyStore> getKeyStore() {
         return Publishers.just(ks);
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return name;
     }
 
@@ -68,9 +72,10 @@ public final class ResourceCertificateProvider implements CertificateProvider {
     @EachProperty(CONFIG_PREFIX + ".resource")
     @BootstrapContextCompatible
     public static final class Config extends AbstractCertificateFileConfig {
+        @Nullable
         private String resource;
 
-        public Config(@Parameter @NonNull String name) {
+        public Config(@Parameter String name) {
             super(name);
         }
 
@@ -80,7 +85,7 @@ public final class ResourceCertificateProvider implements CertificateProvider {
          * properties in {@link AbstractCertificateFileConfig} (e.g. {@code format}, {@code password}).
          * @return the resource location of the certificate material
          */
-        public @NonNull String getResource() {
+        public @Nullable String getResource() {
             return resource;
         }
 
@@ -90,7 +95,7 @@ public final class ResourceCertificateProvider implements CertificateProvider {
          * properties in {@link AbstractCertificateFileConfig} (e.g. {@code format}, {@code password}).
          * @param resource the resource location of the certificate material
          */
-        public void setResource(@NonNull String resource) {
+        public void setResource(String resource) {
             this.resource = resource;
         }
     }

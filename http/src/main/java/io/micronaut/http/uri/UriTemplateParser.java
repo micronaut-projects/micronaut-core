@@ -17,6 +17,7 @@ package io.micronaut.http.uri;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -260,7 +261,7 @@ final class UriTemplateParser {
      * @param modifier The modifier
      * @param explode  Is exploded
      */
-    public record Variable(String name, String modifier, boolean explode) {
+    public record Variable(String name, @Nullable String modifier, boolean explode) {
     }
 
     /**

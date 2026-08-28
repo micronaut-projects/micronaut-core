@@ -32,4 +32,5 @@ public interface AdvisedBeanType<T> extends BeanType<T> {
      * @return The target type
      */
     Class<? super T> getInterceptedType();
+
 }

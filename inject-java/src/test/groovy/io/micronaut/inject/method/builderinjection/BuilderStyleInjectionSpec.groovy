@@ -16,7 +16,7 @@
 package io.micronaut.inject.method.builderinjection
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.BeanContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
 import spock.lang.Issue
@@ -51,7 +51,7 @@ class Test {
 
 
         when:
-        def context = new DefaultBeanContext()
+        def context = BeanContext.build()
         def url = new URL("http://localhost")
         context.registerSingleton(url)
         def test = ((InstantiatableBeanDefinition)definition).instantiate(context)
@@ -106,7 +106,7 @@ class TestConfig {
 
 
         when:
-        def context = new DefaultBeanContext()
+        def context = BeanContext.build()
         def url = new URL("http://localhost")
         context.registerSingleton(url)
         def test = ((InstantiatableBeanDefinition)definition).instantiate(context)

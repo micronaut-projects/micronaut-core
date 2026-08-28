@@ -18,7 +18,7 @@ package io.micronaut.json.codec;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.json.JsonMapper;
@@ -54,6 +54,7 @@ public class JsonMediaTypeCodec extends MapperMediaTypeCodec {
         MediaType.APPLICATION_JSON_PATCH_TYPE,
         MediaType.APPLICATION_JSON_MERGE_PATCH_TYPE,
         MediaType.APPLICATION_JSON_PROBLEM_TYPE,
+        MediaType.APPLICATION_SCIM_JSON_TYPE,
         MediaType.APPLICATION_JSON_SCHEMA_TYPE
     );
 

@@ -15,13 +15,12 @@
  */
 package io.micronaut.jackson.serialize;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.SerializationContext;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import jakarta.inject.Singleton;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -32,15 +31,15 @@ import java.util.Map;
  * @since 1.0
  */
 @Singleton
-public class ConvertibleMultiValuesSerializer extends JsonSerializer<ConvertibleMultiValues<?>> {
+public class ConvertibleMultiValuesSerializer extends ValueSerializer<ConvertibleMultiValues<?>> {
 
     @Override
-    public boolean isEmpty(SerializerProvider provider, ConvertibleMultiValues<?> value) {
+    public boolean isEmpty(SerializationContext provider, ConvertibleMultiValues<?> value) {
         return value.isEmpty();
     }
 
     @Override
-    public void serialize(ConvertibleMultiValues<?> value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+    public void serialize(ConvertibleMultiValues<?> value, JsonGenerator gen, SerializationContext serializers) {
         gen.writeStartObject();
 
         for (Map.Entry<String, ? extends List<?>> entry : value) {
@@ -48,14 +47,14 @@ public class ConvertibleMultiValuesSerializer extends JsonSerializer<Convertible
             List<?> v = entry.getValue();
             int len = v.size();
             if (len > 0) {
-                gen.writeFieldName(fieldName);
                 if (len == 1) {
-                    serializers.defaultSerializeValue(v.get(0), gen);
+                    serializers.defaultSerializeProperty(fieldName, v.get(0), gen);
                 } else {
+                    gen.writeName(fieldName);
                     gen.writeStartArray();
 
                     for (Object o : v) {
-                        serializers.defaultSerializeValue(o, gen);
+                        serializers.writeValue(gen, o);
                     }
                     gen.writeEndArray();
                 }

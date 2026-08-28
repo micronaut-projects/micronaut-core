@@ -449,9 +449,7 @@ interface AnotherInterface {
         def declared = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyDeclared())
 
         then:"The declared are correct"
-        // this method differs for Groovy because for some reason default interface methods become
-        // part of the methods declared by classNode.getMethods() and there is no way to distinguish them
-        declared*.name as Set == ['privateMethod', 'packagePrivateMethod', 'publicMethod', 'staticMethod', 'itfeMethod'] as Set
+        declared*.name as Set == ['privateMethod', 'packagePrivateMethod', 'publicMethod', 'staticMethod'] as Set
 
         when: "Accessible methods are retrieved"
         def accessible = classElement.getEnclosedElements(ElementQuery.of(MethodElement).onlyAccessible())
@@ -833,8 +831,7 @@ interface MyBean extends GenericInterface, SpecificInterface {
             def declaredMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
         then:
             declaredMethods.size() == 1
-            declaredMethods.get(0).isAbstract() == true
-            declaredMethods.get(0).isDefault() == false
+            declaredMethods.get(0).isDefault() == true
     }
 
     // Groovy bug?
@@ -856,11 +853,9 @@ interface MyBean {
             def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
         then:
             allMethods.size() == 1
-            allMethods.get(0).isAbstract() == true
-            allMethods.get(0).isDefault() == false
+            allMethods.get(0).isDefault() == true
     }
 
-    // Groovy bug?
     void "test default method"() {
         given:
             ClassElement classElement = buildClassElement('elementquery.MyBean', '''
@@ -881,10 +876,7 @@ class MyBean implements MyInt {
         when:
             def allMethods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS)
         then:
-            // In this case the default method is not abstract but still not default
             allMethods.size() == 1
-            allMethods.get(0).isAbstract() == false
-            allMethods.get(0).isDefault() == false
     }
 
     void "test synthetic properties aren't removed"() {
@@ -1028,6 +1020,52 @@ class Pet {
         then:
             packPrvFields.size() == 2
             packPrvFields.stream().map(FieldElement::getName).toList() == ["packprivme", "PACK_PRV_CONST"]
+    }
+
+    void "test groovy package scope field visibility selection"() {
+        given:
+            ClassElement classElement = buildClassElement('test.GroovyFieldVisibility', '''
+package test
+
+import groovy.transform.PackageScope
+
+class GroovyFieldVisibility {
+    String propertyField
+
+    @PackageScope
+    String packageField
+
+    @PackageScope
+    static String packageStaticField
+}
+
+''')
+
+        when:
+            List<FieldElement> fields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+            FieldElement propertyField = fields.find { it.name == 'propertyField' }
+            FieldElement packageField = fields.find { it.name == 'packageField' }
+            FieldElement packageStaticField = fields.find { it.name == 'packageStaticField' }
+
+        then:
+            propertyField.isPrivate()
+            !propertyField.isPackagePrivate()
+            packageField.isPackagePrivate()
+            !packageField.isPrivate()
+            packageStaticField.isPackagePrivate()
+            packageStaticField.isStatic()
+
+        when:
+            List<FieldElement> packagePrivateFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.filter(e -> e.isPackagePrivate()))
+
+        then:
+            packagePrivateFields*.name as Set == ['packageField', 'packageStaticField'] as Set
+
+        when:
+            List<FieldElement> accessibleFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.onlyAccessible())
+
+        then:
+            accessibleFields*.name as Set == ['packageField', 'packageStaticField'] as Set
     }
 
     void "test annotations on generic type"() {

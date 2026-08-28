@@ -20,8 +20,7 @@ import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.conditions.MatchesDynamicCondition;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
@@ -39,33 +38,34 @@ import java.util.Map;
  */
 public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends AbstractInitializableBeanDefinition<T> implements BeanDefinitionReference<T> {
 
+    @Nullable
     private final Throwable failedInitialization;
-    private final Condition[] preLoadConditions;
-    private final Condition[] postLoadConditions;
+    private final Condition @Nullable[] preLoadConditions;
+    private final Condition @Nullable [] postLoadConditions;
 
     protected AbstractInitializableBeanDefinitionAndReference(Class<T> beanType,
                                                               @Nullable MethodOrFieldReference constructor,
                                                               @Nullable AnnotationMetadata annotationMetadata,
-                                                              @Nullable MethodReference[] methodInjection,
-                                                              @Nullable FieldReference[] fieldInjection,
-                                                              @Nullable AnnotationReference[] annotationInjection,
+                                                              MethodReference @Nullable [] methodInjection,
+                                                              FieldReference @Nullable [] fieldInjection,
+                                                              AnnotationReference @Nullable [] annotationInjection,
                                                               @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
-                                                              @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
-                                                              @NonNull PrecalculatedInfo precalculatedInfo) {
+                                                              Map<String, Argument<?> @Nullable []> typeArgumentsMap,
+                                                              PrecalculatedInfo precalculatedInfo) {
         this(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap, precalculatedInfo, null, null, null);
     }
 
     protected AbstractInitializableBeanDefinitionAndReference(Class<T> beanType,
                                                               @Nullable MethodOrFieldReference constructor,
                                                               @Nullable AnnotationMetadata annotationMetadata,
-                                                              @Nullable MethodReference[] methodInjection,
-                                                              @Nullable FieldReference[] fieldInjection,
-                                                              @Nullable AnnotationReference[] annotationInjection,
+                                                              MethodReference @Nullable [] methodInjection,
+                                                              FieldReference @Nullable [] fieldInjection,
+                                                              AnnotationReference @Nullable [] annotationInjection,
                                                               @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
-                                                              @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
-                                                              @NonNull PrecalculatedInfo precalculatedInfo,
-                                                              @Nullable Condition[] preLoadConditions,
-                                                              @Nullable Condition[] postLoadConditions,
+                                                              Map<String, Argument<?> @Nullable []> typeArgumentsMap,
+                                                              PrecalculatedInfo precalculatedInfo,
+                                                              Condition @Nullable [] preLoadConditions,
+                                                              Condition @Nullable [] postLoadConditions,
                                                               @Nullable Throwable failedInitialization) {
         super(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap, precalculatedInfo);
         this.failedInitialization = failedInitialization;
@@ -81,12 +81,13 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
      * @param preCheck          if it's a pre-load / post-load
      * @return true if enabled
      */
-    public final boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext, boolean preCheck) {
+    public final boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext, boolean preCheck) {
         if (preLoadConditions != null && postLoadConditions != null) {
-            DefaultBeanContext defaultBeanContext = (DefaultBeanContext) context;
             DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(
-                defaultBeanContext,
-                this, resolutionContext);
+                context,
+                this,
+                resolutionContext
+            );
             boolean matches;
             if (preCheck) {
                 matches = matches(conditionContext, preLoadConditions);
@@ -96,7 +97,7 @@ public abstract class AbstractInitializableBeanDefinitionAndReference<T> extends
             if (matches) {
                 return true;
             }
-            onFail(conditionContext, defaultBeanContext);
+            onFail(conditionContext, context);
             return false;
         }
         if (preCheck) {

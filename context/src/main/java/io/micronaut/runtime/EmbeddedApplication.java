@@ -33,8 +33,7 @@ import io.micronaut.context.env.Environment;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface EmbeddedApplication<T extends EmbeddedApplication> extends ApplicationContextLifeCycle<T> {
-
+public interface EmbeddedApplication<T extends EmbeddedApplication<T>> extends ApplicationContextLifeCycle<T> {
 
     /**
      * @return The {@link ApplicationContext} for the server

@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 /**
- * Micronaut core argument types.
+ * Micronaut core type, argument, and builder abstractions.
  *
  * @author graemerocher
  * @since 1.0
  */
+@NullMarked
 package io.micronaut.core.type;
 
+import org.jspecify.annotations.NullMarked;

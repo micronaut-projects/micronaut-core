@@ -16,7 +16,7 @@
 package io.micronaut.http.client.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.ServiceInstance;
@@ -152,6 +152,22 @@ class RedirectTest {
 
     @ParameterizedTest(name = "blocking={0}")
     @ValueSource(booleans = {true, false})
+    void redirectLoopReturnsRedirectResponseWhenRedirectsDisabled(boolean blocking) throws IOException {
+        asserts(SPEC_NAME,
+            Map.of(
+                BLOCKING_CLIENT_PROPERTY, blocking,
+                "micronaut.http.client.follow-redirects", false
+            ),
+            HttpRequest.GET("/redirect/redirect-loop").header("X-Redirect-Count", "0"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.MOVED_PERMANENTLY)
+                .assertResponse(response -> assertEquals("1", response.header("X-Redirect-Count")))
+                .build())
+        );
+    }
+
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
     @SuppressWarnings("java:S3655")
     void hostHeaderIsCorrectForRedirect(boolean blocking) throws IOException {
         try (ServerUnderTest otherServer = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, Collections.singletonMap("redirect.server", "true"))) {
@@ -215,6 +231,15 @@ class RedirectTest {
         @Get("/redirect-host")
         HttpResponse<?> redirectHost(@Header String redirect) {
             return HttpResponse.redirect(URI.create(redirect));
+        }
+
+        @Get("/redirect-loop")
+        HttpResponse<?> redirectLoop(@Header(name = "X-Redirect-Count", defaultValue = "0") int redirectCount) {
+            if (redirectCount >= 5) {
+                return HttpResponse.ok(Integer.toString(redirectCount));
+            }
+            return HttpResponse.redirect(URI.create("/redirect/redirect-loop"))
+                .header("X-Redirect-Count", Integer.toString(redirectCount + 1));
         }
 
         @Get("/direct")

@@ -452,6 +452,34 @@ interface SomeInt {
         itfeMethod.invoke(bean) == true
     }
 
+    void "test generate bean method for kotlin extension function"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.ExtensionMethodTest', '''
+package test
+
+import io.micronaut.context.annotation.Executable
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class ExtensionMethodTest {
+    @Executable
+    fun Int.addOne(): Int {
+        return this + 1
+    }
+}
+''')
+
+        when:
+        Collection<BeanMethod> beanMethods = introspection.getBeanMethods()
+        def addOne = beanMethods.find { it.name == 'addOne' }
+        def bean = introspection.instantiate()
+
+        then:
+        beanMethods*.name.contains('addOne')
+        addOne instanceof ExecutableMethod
+        addOne.invoke(bean, 1) == 2
+    }
+
     void "test custom with prefix"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('customwith.CopyMe', '''\
@@ -1839,6 +1867,51 @@ enum class Test(val number: Int) {
 
         then:
         thrown(ClassNotFoundException)
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12443")
+    void "test introspection getter for primitive override of Any uses boxed JVM signature"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.CmdIntPayload', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+interface InboundCommand {
+    val payload: Any?
+}
+
+@Introspected
+data class CmdIntPayload(
+    override val payload: Int
+) : InboundCommand
+''')
+
+        expect:
+        introspection != null
+        introspection.getRequiredProperty("payload", int).get(introspection.instantiate(123)) == 123
+    }
+
+    void "test basic enum bean properties"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.MyEnum', '''
+package test
+
+import io.micronaut.core.annotation.*
+
+@Introspected
+enum class MyEnum {
+    A, B, C;
+}
+''')
+
+        expect:
+            introspection != null
+            introspection.beanProperties.size() == 0
+
+        when:
+            introspection.instantiate("A")
+
+        then:
+            noExceptionThrown()
     }
 
     void "test instantiating an enum"() {

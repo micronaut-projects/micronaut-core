@@ -1,6 +1,6 @@
 package io.micronaut.context
 
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.Nullable
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
@@ -42,9 +42,10 @@ class AnnotationReflectionUtilsSpec extends Specification {
 
         then:
             argument.type == Consumer
-            argument.annotationMetadata.annotationNames.isEmpty()
+            argument.annotationMetadata.annotationNames.size() == 1
+            argument.annotationMetadata.annotationNames[0] == "io.micronaut.context.MyTypeUseAnnotation"
             argument.getTypeVariable("T").get().type == String
-            argument.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
+            argument.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
     }
 
     void "test generic 2"() {
@@ -59,7 +60,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             argumentAbstractConsumer.type == AbstractConsumer
             argumentAbstractConsumer.annotationMetadata.annotationNames.isEmpty()
             argumentAbstractConsumer.getTypeVariable("T").get().type == String
-            argumentAbstractConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
+            argumentAbstractConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
 
         when:
             def argumentConsumer = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), Consumer)
@@ -68,7 +69,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             argumentConsumer.type == Consumer
             argumentConsumer.annotationMetadata.annotationNames.isEmpty()
             argumentConsumer.getTypeVariable("T").get().type == String
-            argumentConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
+            argumentConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
     }
 
     void "test generic 3"() {
@@ -82,7 +83,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             argumentConsumer.type == Consumer
             argumentConsumer.annotationMetadata.annotationNames.toList() == ["io.micronaut.context.MyTypeUseAnnotation"]
             argumentConsumer.getTypeVariable("T").get().type == String
-            argumentConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
+            argumentConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
 
         when:
             def argumentAbstractConsumer = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), AbstractConsumer)
@@ -90,7 +91,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             argumentAbstractConsumer.type == AbstractConsumer
             argumentAbstractConsumer.annotationMetadata.annotationNames.isEmpty()
             argumentAbstractConsumer.getTypeVariable("T").get().type == String
-            argumentAbstractConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
+            argumentAbstractConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
 
         when:
             def argumentAbstractConsumer2 = AnnotationReflectionUtils.resolveGenericToArgument(consumer.getClass(), AbstractConsumer2)
@@ -98,7 +99,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             argumentAbstractConsumer2.type == AbstractConsumer2
             argumentAbstractConsumer2.annotationMetadata.annotationNames.isEmpty()
             argumentAbstractConsumer2.getTypeVariable("T").get().type == String
-            argumentAbstractConsumer2.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
+            argumentAbstractConsumer2.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
     }
 
     void "test generic 4"() {
@@ -117,7 +118,7 @@ class AnnotationReflectionUtilsSpec extends Specification {
             argument.type == BiFunction
             argument.annotationMetadata.annotationNames.isEmpty()
             argument.getTypeVariable("T").get().type == String
-            argument.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.core.annotation.Nullable"]
+            argument.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
             argument.getTypeVariable("U").get().type == Integer
             argument.getTypeVariable("U").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.context.MyTypeUseAnnotation"]
             argument.getTypeVariable("R").get().type == Long

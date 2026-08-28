@@ -22,6 +22,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -38,7 +39,7 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param cause             The throwable
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, Throwable cause) {
-        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, !(cause instanceof BeanInstantiationException) ? cause.getMessage() : null, false), cause);
+        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, messageForCause(cause), false), cause);
     }
 
     /**
@@ -47,7 +48,7 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param cause             The throwable
      */
     public DependencyInjectionException(BeanResolutionContext resolutionContext, Argument argument, Throwable cause) {
-        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, argument, !(cause instanceof BeanInstantiationException) ? cause.getMessage() : null, false), cause);
+        super(resolutionContext, MessageUtils.buildMessage(resolutionContext, argument, messageForCause(cause), false), cause);
     }
 
     /**
@@ -55,7 +56,7 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param message           The message
      * @param cause             The throwable
      */
-    public DependencyInjectionException(BeanResolutionContext resolutionContext, String message, Throwable cause) {
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, @Nullable String message, Throwable cause) {
         super(resolutionContext, MessageUtils.buildMessage(resolutionContext, message), cause);
     }
 
@@ -63,7 +64,7 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param resolutionContext The resolution context
      * @param message           The message
      */
-    public DependencyInjectionException(BeanResolutionContext resolutionContext, String message) {
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, @Nullable String message) {
         super(resolutionContext, MessageUtils.buildMessage(resolutionContext, message, false));
     }
 
@@ -72,7 +73,7 @@ public class DependencyInjectionException extends BeanCreationException {
      * @param argument          The argument
      * @param message           The message
      */
-    public DependencyInjectionException(BeanResolutionContext resolutionContext, Argument argument, String message) {
+    public DependencyInjectionException(BeanResolutionContext resolutionContext, Argument argument, @Nullable String message) {
         super(resolutionContext, MessageUtils.buildMessage(resolutionContext, argument, message, false));
     }
 
@@ -298,4 +299,26 @@ public class DependencyInjectionException extends BeanCreationException {
             return "Error resolving property value [" + property + "]. Property doesn't exist";
         }
     }
+
+    private static @Nullable String messageForCause(Throwable cause) {
+        if (cause instanceof BeanInstantiationException) {
+            return nestedNonBeanCreationMessage(cause.getCause());
+        }
+        return cause.getMessage();
+    }
+
+    private static @Nullable String nestedNonBeanCreationMessage(@Nullable Throwable cause) {
+        Throwable current = cause;
+        while (current != null) {
+            if (!(current instanceof BeanCreationException)) {
+                String message = current.getMessage();
+                if (message != null && !message.isBlank()) {
+                    return message;
+                }
+            }
+            current = current.getCause();
+        }
+        return null;
+    }
+
 }

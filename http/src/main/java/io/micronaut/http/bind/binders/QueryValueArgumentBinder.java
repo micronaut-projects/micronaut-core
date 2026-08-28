@@ -16,7 +16,8 @@
 package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.Introspected;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.bind.annotation.AbstractArgumentBinder;
@@ -153,6 +154,11 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
                                       Argument<T> argument) {
         Optional<BeanIntrospection<T>> introspectionOpt = BeanIntrospector.SHARED.findIntrospection(argument.getType());
         if (introspectionOpt.isEmpty()) {
+            // If bindPojo couldn't bind, propagate error from bindSimple if exists
+            if (context.hasErrors()) {
+                Optional<ConversionError> error = context.getLastError();
+                return propagateConversionError(error);
+            }
             return BindingResult.unsatisfied();
         }
 
@@ -162,8 +168,11 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
 
         for (int index = 0; index < builderArguments.length; index++) {
             Argument<?> builderArg = builderArguments[index];
-            String propertyName = builderArg.getName();
+            String propertyName = builderArg.getAnnotationMetadata().stringValue(Introspected.Property.class, AnnotationMetadata.VALUE_MEMBER).orElse(builderArg.getName());
             List<String> values = parameters.getAll(propertyName);
+            if (values.isEmpty() && !propertyName.equals(builderArg.getName())) {
+                values = parameters.getAll(builderArg.getName());
+            }
             boolean hasNoValue = values.isEmpty();
             @Nullable String defaultValue = hasNoValue ? builderArg
                 .getAnnotationMetadata()
@@ -178,25 +187,47 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
                     introspectionBuilder.with(index, rawArg, converted.get());
                 } catch (Exception e) {
                     context.reject(builderArg, e);
-                    return BindingResult.unsatisfied();
+                    return propagateConversionError(context.getLastError());
                 }
             } else if (conversionContext.hasErrors()) {
                 ConversionError conversionError = conversionContext.getLastError().orElse(null);
                 if (conversionError != null) {
                     Exception cause = conversionError.getCause();
                     context.reject(builderArg, cause);
-                    return BindingResult.unsatisfied();
+                    return propagateConversionError(context.getLastError());
                 }
             }
         }
 
         try {
             T instance = introspectionBuilder.build();
+
+            if (instance == null) {
+                if (argument.isNullable()) {
+                    return BindingResult.empty();
+                }
+
+                return BindingResult.unsatisfied();
+            }
+
             return () -> Optional.of(instance);
         } catch (Exception e) {
-            context.reject(argument, e);
             return BindingResult.unsatisfied();
         }
+    }
+
+    private BindingResult<T> propagateConversionError(Optional<ConversionError> conversionError) {
+        return new BindingResult<T>() {
+            @Override
+            public Optional<T> getValue() {
+                return Optional.empty();
+            }
+
+            @Override
+            public List<ConversionError> getConversionErrors() {
+                return conversionError.map(List::of).orElseGet(List::of);
+            }
+        };
     }
 
     @Override

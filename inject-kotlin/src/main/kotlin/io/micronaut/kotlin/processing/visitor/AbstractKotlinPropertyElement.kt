@@ -58,6 +58,7 @@ internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
             setter.orElse(null),
             field.orElse(null),
             constructorParameter.orElse(null),
+            null,
             true
         )
     }
@@ -66,8 +67,8 @@ internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
         resolveDeclaringType(declaration, owningType)
     }
 
-    override fun overrides(overridden: PropertyElement?): Boolean {
-        if (overridden == null || overridden !is AbstractKotlinPropertyElement<*>) {
+    override fun overrides(overridden: PropertyElement): Boolean {
+        if (overridden !is AbstractKotlinPropertyElement<*>) {
             return false
         }
         val nativeType = nativeType.element
@@ -80,9 +81,8 @@ internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
         return false
     }
 
-    override fun getDocumentation(parse: Boolean): Optional<String> {
-        return Optional.ofNullable(declaration.docString)
-    }
+    override fun getDocumentation(parse: Boolean): Optional<String> =
+        documentationText(declaration.docString, parse)
 
     override fun getWriteTypeAnnotationMetadata(): Optional<AnnotationMetadata> {
         return Optional.of(annotationMetadata.writeAnnotationMetadata)

@@ -1,9 +1,8 @@
 package io.micronaut.http.client
 
-import groovy.test.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.util.StringUtils
 import io.micronaut.discovery.ServiceInstance
@@ -17,6 +16,7 @@ import io.micronaut.http.annotation.Produces
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
+import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -50,7 +50,6 @@ class ClientRedirectSpec extends Specification {
         response.body() == "It works!"
     }
 
-    @NotYetImplemented
     void "test - client: full uri, redirect: relative"() {
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/redirect-relative', String)

@@ -17,8 +17,10 @@ package io.micronaut.inject.qualifiers.replaces;
 
 import io.micronaut.context.annotation.Replaces;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "ReplacesSpec")
 @Singleton
 @Replaces(IntroductionA.class)
 public class IntroductionReplacement implements IntroductionOperations {

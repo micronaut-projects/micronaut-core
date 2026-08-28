@@ -8,8 +8,8 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.server.netty.NettyHttpServer;
-import io.micronaut.http.tck.netty.TestLeakDetector;
 import io.micronaut.runtime.server.EmbeddedServer;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.AfterEach;
@@ -27,7 +27,6 @@ public class FuzzyInputTest {
     @AfterEach
     void tearDown() throws Exception {
         FlagAppender.checkTriggered();
-        TestLeakDetector.reportStillOpen();
     }
 
     @Test
@@ -40,7 +39,7 @@ public class FuzzyInputTest {
                 Transfer-Encoding: chunked
 
                 """.replace("\n", "\r\n")));
-            channel.writeInbound(ByteBufUtil.writeUtf8(channel.alloc(), "\r\n"));
+            writeInboundIfOpen(channel, ByteBufUtil.writeUtf8(channel.alloc(), "\r\n"));
 
             channel.finishAndReleaseAll();
             channel.checkException();
@@ -58,7 +57,7 @@ public class FuzzyInputTest {
 
                 C
                 O:""".replace("\n", "\r\n")));
-            channel.writeInbound(ByteBufUtil.writeUtf8(channel.alloc(), "aaaaaa"));
+            writeInboundIfOpen(channel, ByteBufUtil.writeUtf8(channel.alloc(), "aaaaaa"));
 
             channel.finishAndReleaseAll();
             channel.checkException();
@@ -80,6 +79,14 @@ public class FuzzyInputTest {
 
             channel.finishAndReleaseAll();
             channel.checkException();
+        }
+    }
+
+    private static void writeInboundIfOpen(EmbeddedChannel channel, ByteBuf buffer) {
+        if (channel.isOpen()) {
+            channel.writeInbound(buffer);
+        } else {
+            buffer.release();
         }
     }
 

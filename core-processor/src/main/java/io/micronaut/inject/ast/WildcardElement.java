@@ -16,9 +16,10 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Represents a wildcard, for example {@code List<?>}. For compatibility, this wildcard acts like its first upper bound when used as a
@@ -34,15 +35,35 @@ public interface WildcardElement extends GenericElement {
      * @return The upper bounds of this wildcard. Never empty. To match this wildcard, a type must be assignable to all
      * upper bounds (must extend all upper bounds).
      */
-    @NonNull
     List<? extends ClassElement> getUpperBounds();
 
     /**
      * @return The lower bounds of this wildcard. May be empty. To match this wildcard, a type must be assignable from
      * all lower bounds (must be a supertype of all lower bounds).
      */
-    @NonNull
     List<? extends ClassElement> getLowerBounds();
+
+    /**
+     * Checks whether this wildcard has an explicitly declared upper bound.
+     *
+     * @return Whether this wildcard has an explicitly declared upper bound.
+     * @since 5.1.0
+     */
+    @Experimental
+    default boolean hasExplicitUpperBound() {
+        return isBounded() && getLowerBounds().isEmpty();
+    }
+
+    /**
+     * Checks whether this wildcard has an explicitly declared lower bound.
+     *
+     * @return Whether this wildcard has an explicitly declared lower bound.
+     * @since 5.1.0
+     */
+    @Experimental
+    default boolean hasExplicitLowerBound() {
+        return !getLowerBounds().isEmpty();
+    }
 
     /**
      * Is bounded wildcard - not "{@code < ? >}".
@@ -60,8 +81,8 @@ public interface WildcardElement extends GenericElement {
      * @param <T> The class element type
      * @return the most upper type
      */
-    @NonNull
-    static <T extends ClassElement> T findUpperType(@NonNull List<T> bounds1, @NonNull List<T> bounds2) {
+    @Nullable
+    static <T extends ClassElement> T findUpperType(List<T> bounds1, List<T> bounds2) {
         T upper = null;
         for (T lowerBound : bounds2) {
             if (upper == null || lowerBound.isAssignable(upper)) {
@@ -74,5 +95,16 @@ public interface WildcardElement extends GenericElement {
             }
         }
         return upper;
+    }
+
+    /**
+     * Find the most upper type.
+     * @param bounds1 The bounds 1
+     * @param bounds2 The bounds 2
+     * @param <T> The class element type
+     * @return the most upper type
+     */
+    static <T extends ClassElement> T findUpperTypeRequired(List<T> bounds1, List<T> bounds2) {
+        return Objects.requireNonNull(findUpperType(bounds1, bounds2), "No upper bound found");
     }
 }

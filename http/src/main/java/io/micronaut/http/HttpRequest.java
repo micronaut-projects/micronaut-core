@@ -15,9 +15,8 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.cookie.Cookies;
+import org.jspecify.annotations.Nullable;
 
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
@@ -53,25 +52,26 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     /**
      * @return The {@link Cookies} instance
      */
-    @NonNull Cookies getCookies();
+    Cookies getCookies();
 
     /**
      * @return The HTTP parameters contained with the URI query string
      */
-    @NonNull HttpParameters getParameters();
+    HttpParameters getParameters();
 
     /**
      * @return The request method
      */
-    @NonNull HttpMethod getMethod();
+    HttpMethod getMethod();
 
     /**
      * @return The full request URI
      */
-    @NonNull URI getUri();
+    URI getUri();
 
     /**
      * Returns a new request object that allows mutation.
+     *
      * @return The mutable request
      * @since 2.0.0
      */
@@ -99,7 +99,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      *
      * @return The name of the method (same as {@link HttpMethod} value for standard http methods).
      */
-    default @NonNull String getMethodName() {
+    default String getMethodName() {
         return getMethod().name();
     }
 
@@ -109,7 +109,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The principal
      * @since 1.0.4
      */
-    default @NonNull Optional<Principal> getUserPrincipal() {
+    default Optional<Principal> getUserPrincipal() {
         return getAttribute(HttpAttributes.PRINCIPAL, Principal.class);
     }
 
@@ -117,11 +117,11 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * The user principal stored within the request.
      *
      * @param principalType The principal type
+     * @param <T>           The principal type
      * @return The principal
-     * @param <T> The principal type
      * @since 1.0.4
      */
-    default @NonNull <T extends Principal> Optional<T> getUserPrincipal(Class<T> principalType) {
+    default <T extends Principal> Optional<T> getUserPrincipal(Class<T> principalType) {
         return getAttribute(HttpAttributes.PRINCIPAL, principalType);
     }
 
@@ -142,21 +142,21 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     /**
      * @return Get the raw, percent-encoded path without any parameters
      */
-    default @NonNull String getPath() {
+    default String getPath() {
         return getUri().getRawPath();
     }
 
     /**
      * @return Obtain the remote address
      */
-    default @NonNull InetSocketAddress getRemoteAddress() {
+    default InetSocketAddress getRemoteAddress() {
         return getServerAddress();
     }
 
     /**
      * @return Obtain the server address
      */
-    default @NonNull InetSocketAddress getServerAddress() {
+    default InetSocketAddress getServerAddress() {
         String host = getUri().getHost();
         int port = getUri().getPort();
         return new InetSocketAddress(host != null ? host : "localhost", port > -1 ? port : 80);
@@ -179,7 +179,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     @Override
-    default HttpRequest<B> setAttribute(CharSequence name, Object value) {
+    default HttpRequest<B> setAttribute(CharSequence name, @Nullable Object value) {
         return (HttpRequest<B>) HttpMessage.super.setAttribute(name, value);
     }
 
@@ -227,6 +227,18 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     default Optional<String> getOrigin() {
         return getHeaders().getOrigin();
+    }
+
+    /**
+     * Gets the Fetch Metadata request headers.
+     *
+     * @return The Fetch Metadata, or {@code null} if the request does not contain
+     * all recognized Fetch Metadata headers
+     * @see SecFetch
+     * @since 5.1.12
+     */
+    default @Nullable SecFetch getSecFetch() {
+        return SecFetch.of(getHeaders());
     }
 
     /**
@@ -381,6 +393,35 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#QUERY} request for the given URI.
+     *
+     * @param uri  The URI
+     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON})
+     * @param <T>  The body type
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     * @since 5.2.0
+     */
+    static <T> MutableHttpRequest<T> QUERY(URI uri, T body) {
+        return QUERY(uri.toString(), body);
+    }
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#QUERY} request for the given URI.
+     *
+     * @param uri  The URI
+     * @param body The body of the request (content type defaults to {@link MediaType#APPLICATION_JSON})
+     * @param <T>  The body type
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     * @since 5.2.0
+     */
+    static <T> MutableHttpRequest<T> QUERY(String uri, T body) {
+        Objects.requireNonNull(uri, "Argument [uri] is required");
+        return HttpRequestFactory.INSTANCE.query(uri, body);
+    }
+
+    /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI.
      *
      * @param uri  The URI
@@ -389,7 +430,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
-    static <T> MutableHttpRequest<T> DELETE(URI uri, T body) {
+    static <T> MutableHttpRequest<T> DELETE(URI uri, @Nullable T body) {
         return DELETE(uri.toString(), body);
     }
 
@@ -402,7 +443,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return The {@link MutableHttpRequest} instance
      * @see HttpRequestFactory
      */
-    static <T> MutableHttpRequest<T> DELETE(String uri, T body) {
+    static <T> MutableHttpRequest<T> DELETE(String uri, @Nullable T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         return HttpRequestFactory.INSTANCE.delete(uri, body);
     }
@@ -416,7 +457,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @see HttpRequestFactory
      */
     static <T> MutableHttpRequest<T> DELETE(String uri) {
-        return DELETE(uri, null);
+        return DELETE(uri, (T) null);
     }
 
     /**
@@ -428,7 +469,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @see HttpRequestFactory
      */
     static <T> MutableHttpRequest<T> DELETE(URI uri) {
-        return DELETE(uri.toString(), null);
+        return DELETE(uri.toString(), (T) null);
     }
 
     /**
@@ -447,9 +488,9 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     /**
      * Create a new {@link MutableHttpRequest} for the given method and URI.
      *
-     * @param httpMethod The method
-     * @param uri        The URI
-     * @param <T>        The Http request type
+     * @param httpMethod     The method
+     * @param uri            The URI
+     * @param <T>            The Http request type
      * @param httpMethodName Method name - for standard http methods is equal to {@link HttpMethod#name()}
      * @return The request
      */
@@ -462,6 +503,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
 
     /**
      * Returns a mutable request based on this request.
+     *
      * @return the mutable request
      * @since 4.7
      */

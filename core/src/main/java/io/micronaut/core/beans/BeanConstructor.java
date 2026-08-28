@@ -16,9 +16,9 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Described;
 import io.micronaut.core.type.Argument;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -36,26 +36,25 @@ public interface BeanConstructor<T> extends AnnotationMetadataProvider, Describe
      *
      * @return The underlying bean type
      */
-    @NonNull Class<T> getDeclaringBeanType();
+    Class<T> getDeclaringBeanType();
 
     /**
      * @return The constructor argument types.
      */
-    @NonNull Argument<?>[] getArguments();
+    Argument<?>[] getArguments();
 
     /**
      * Instantiate an instance.
      * @param parameterValues The parameter values
      * @return The instance, never null.
      */
-    @NonNull T instantiate(Object... parameterValues);
+    T instantiate(@Nullable Object... parameterValues);
 
     /**
      * The description of the constructor.
      * @return The description
      */
     @Override
-    @NonNull
     default String getDescription() {
         return getDescription(true);
     }
@@ -66,7 +65,6 @@ public interface BeanConstructor<T> extends AnnotationMetadataProvider, Describe
      * @return The description
      */
     @Override
-    @NonNull
     default String getDescription(boolean simple) {
         String args = Arrays.stream(getArguments())
                 .map(arg -> arg.getTypeString(simple) + " " + arg.getName())

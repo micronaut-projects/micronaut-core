@@ -16,8 +16,7 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -34,7 +33,7 @@ import java.util.concurrent.CompletableFuture;
  * @since 4.5.0
  */
 @Internal
-public abstract class InternalByteBody implements ByteBody {
+public abstract non-sealed class InternalByteBody implements ByteBody {
     private static final String TRACK_OPERATIONS_PROPERTY = ByteBody.class.getName() + ".trackOperations";
     private static final boolean TRACK_OPERATIONS = Boolean.getBoolean(TRACK_OPERATIONS_PROPERTY);
 
@@ -64,7 +63,6 @@ public abstract class InternalByteBody implements ByteBody {
      *
      * @return A flow that completes when all bytes are available
      */
-    @NonNull
     public abstract ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow();
 
     @Override
@@ -73,14 +71,14 @@ public abstract class InternalByteBody implements ByteBody {
     }
 
     @Override
-    public @NonNull Publisher<byte[]> toByteArrayPublisher() {
+    public Publisher<byte[]> toByteArrayPublisher() {
         return Flux.from(toReadBufferPublisher())
             .doOnDiscard(ReadBuffer.class, ReadBuffer::close)
             .map(ReadBuffer::toArray);
     }
 
     @Override
-    public abstract @NonNull Publisher<ReadBuffer> toReadBufferPublisher();
+    public abstract Publisher<ReadBuffer> toReadBufferPublisher();
 
     /**
      * Throw the standard "already claimed" error and attach stored traces when tracking is enabled.

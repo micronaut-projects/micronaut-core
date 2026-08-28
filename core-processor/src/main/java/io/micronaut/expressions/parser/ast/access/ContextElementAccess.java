@@ -16,7 +16,6 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.context.ExpressionEvaluationContext;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
@@ -27,8 +26,10 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 
 import static java.util.Collections.emptyList;
 
@@ -49,6 +50,7 @@ public final class ContextElementAccess extends ExpressionNode {
 
     private final String name;
 
+    @Nullable
     private ExpressionNode contextOperation;
 
     public ContextElementAccess(String name) {
@@ -57,7 +59,7 @@ public final class ContextElementAccess extends ExpressionNode {
 
     @Override
     protected ExpressionDef generateExpression(ExpressionCompilationContext ctx) {
-        return contextOperation.compile(ctx);
+        return Objects.requireNonNull(contextOperation).compile(ctx);
     }
 
     @Override
@@ -66,7 +68,7 @@ public final class ContextElementAccess extends ExpressionNode {
     }
 
     @Override
-    public TypeDef doResolveType(@NonNull ExpressionVisitorContext ctx) {
+    public TypeDef doResolveType(ExpressionVisitorContext ctx) {
         return resolveContextOperation(ctx).resolveType(ctx);
     }
 

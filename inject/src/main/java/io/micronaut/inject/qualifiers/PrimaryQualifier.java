@@ -18,6 +18,7 @@ package io.micronaut.inject.qualifiers;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.QualifiedBeanType;
 
 /**
  * A qualifier to look up a primary bean.
@@ -38,13 +39,18 @@ public final class PrimaryQualifier<T> extends FilteringQualifier<T> {
 
     @Override
     public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
-        if (!QualifierUtils.matchType(beanType, candidate)) {
-            return false;
-        }
-        if (QualifierUtils.matchAny(beanType, candidate)) {
+        if (candidate.isPrimary() || QualifierUtils.match(candidate, this)) {
             return true;
         }
-        return candidate.isPrimary() || QualifierUtils.matchByCandidateName(candidate, beanType, Qualifier.PRIMARY);
+        return QualifierUtils.matchByCandidateName(candidate, beanType, Qualifier.PRIMARY);
+    }
+
+    @Override
+    public boolean doesQualify(Class<T> beanType, QualifiedBeanType<T> candidate) {
+        if (candidate.isPrimary() || QualifierUtils.matchQualified(candidate, this)) {
+            return true;
+        }
+        return QualifierUtils.matchByCandidateName(candidate, beanType, Qualifier.PRIMARY);
     }
 
     @Override

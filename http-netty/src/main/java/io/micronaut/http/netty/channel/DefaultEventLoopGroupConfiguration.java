@@ -18,8 +18,7 @@ package io.micronaut.http.netty.channel;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.util.StringUtils;
 
@@ -38,10 +37,13 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
 
     private final int numThreads;
     private final double threadCoreRatio;
+    @Nullable
     private final Integer ioRatio;
     private final boolean preferNativeTransport;
+    @Nullable
     private final List<String> transport;
     private final String name;
+    @Nullable
     private final String executor;
     private final Duration shutdownQuietPeriod;
     private final Duration shutdownTimeout;
@@ -181,11 +183,10 @@ public class DefaultEventLoopGroupConfiguration implements EventLoopGroupConfigu
     }
 
     @Override
-    public @NonNull List<String> getTransport() {
+    public List<String> getTransport() {
         return transport == null ? EventLoopGroupConfiguration.super.getTransport() : transport;
     }
 
-    @NonNull
     @Override
     public String getName() {
         return name;

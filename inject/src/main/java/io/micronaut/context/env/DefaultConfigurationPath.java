@@ -17,17 +17,18 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyCatalog;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanDefinition;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
@@ -53,6 +54,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
+    @Nullable
     public ConfigurationPath parent() {
         int i = list.size();
         if (i > 1) {
@@ -65,7 +67,6 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         return null;
     }
 
-    @NonNull
     @Override
     public ConfigurationPath copy() {
         DefaultConfigurationPath newPath = new DefaultConfigurationPath();
@@ -75,13 +76,11 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         return newPath;
     }
 
-    @NonNull
     @Override
     public String prefix() {
         return computedPrefix;
     }
 
-    @NonNull
     @Override
     public String path() {
         ConfigurationSegment segment = peekLast();
@@ -93,6 +92,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
+    @Nullable
     public String primary() {
         ConfigurationSegment segment = peekLast();
         if (segment != null) {
@@ -106,13 +106,13 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         return !list.isEmpty();
     }
 
-    @NonNull
     @Override
     public String resolveValue(String value) {
         return value.replace(path(), prefix());
     }
 
     @Override
+    @Nullable
     public Class<?> configurationType() {
         ConfigurationSegment segment = peekLast();
         if (segment != null) {
@@ -122,6 +122,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
+    @Nullable
     public String name() {
         ConfigurationSegment segment = peekLast();
         if (segment != null) {
@@ -142,13 +143,13 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         return -1;
     }
 
-    @NonNull
     @Override
     public PropertyCatalog propertyCatalog() {
         return propertyCatalog;
     }
 
     @Override
+    @Nullable
     public String simpleName() {
         ConfigurationSegment segment = peekLast();
         if (segment != null) {
@@ -158,7 +159,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
-    public void traverseResolvableSegments(@NonNull PropertyResolver propertyResolver, @NonNull Consumer<ConfigurationPath> callback) {
+    public void traverseResolvableSegments(PropertyResolver propertyResolver, Consumer<ConfigurationPath> callback) {
         if (hasDynamicSegments) {
             // match a path pattern like foo.*.bar.*
             Collection<List<String>> variableValues = propertyResolver.getPropertyPathMatches(path());
@@ -207,6 +208,19 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         switch (kind) {
             case MAP -> {
                 Collection<String> entries = propertyResolver.getPropertyEntries(thisPath.prefix(), thisPath.propertyCatalog());
+                if (entries.isEmpty() && thisPath.propertyCatalog() == PropertyCatalog.NORMALIZED) {
+                    Collection<String> generatedEntries = propertyResolver.getPropertyEntries(thisPath.prefix(), PropertyCatalog.GENERATED);
+                    if (!generatedEntries.isEmpty()) {
+                        Collection<String> filteredEntries = new LinkedList<>();
+                        String prefix = thisPath.prefix();
+                        for (String key : generatedEntries) {
+                            if (!propertyResolver.getPropertyEntries(prefix + '.' + key, PropertyCatalog.GENERATED).isEmpty()) {
+                                filteredEntries.add(key);
+                            }
+                        }
+                        entries = filteredEntries;
+                    }
+                }
                 for (String key : entries) {
                     ConfigurationPath newPath = thisPath.copy();
                     newPath.pushConfigurationSegment(key);
@@ -238,9 +252,8 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         }
     }
 
-    @NonNull
     @Override
-    public ConfigurationSegment.ConfigurationKind kind() {
+    public ConfigurationSegment. ConfigurationKind kind() {
         ConfigurationSegment segment = peekLast();
         if (segment != null) {
             return segment.kind();
@@ -249,6 +262,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
+    @Nullable
     public ConfigurationSegment peekLast() {
         return list.peekLast();
     }
@@ -259,7 +273,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
-    public void pushEachPropertyRoot(@NonNull BeanDefinition<?> beanDefinition) {
+    public void pushEachPropertyRoot(BeanDefinition<?> beanDefinition) {
         if (!beanDefinition.getBeanType().equals(configurationType())) {
 
             if (kind() != ConfigurationSegment.ConfigurationKind.ROOT) {
@@ -300,7 +314,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
-    public void pushConfigurationReader(@NonNull BeanDefinition<?> beanDefinition) {
+    public void pushConfigurationReader(BeanDefinition<?> beanDefinition) {
         if (!beanDefinition.getBeanType().equals(configurationType())) {
 
             if (kind() != ConfigurationSegment.ConfigurationKind.ROOT) {
@@ -330,11 +344,11 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
-    public void pushConfigurationSegment(@NonNull ConfigurationSegment configurationSegment) {
+    public void pushConfigurationSegment(ConfigurationSegment configurationSegment) {
         ConfigurationSegment.ConfigurationKind kind = configurationSegment.kind();
         switch (kind) {
             case NAME ->
-                pushConfigurationSegment(configurationSegment.name());
+                pushConfigurationSegment(Objects.requireNonNull(configurationSegment.name(), "Name cannot be null"));
             case INDEX ->
                 pushConfigurationSegment(configurationSegment.index());
             case ROOT ->
@@ -356,7 +370,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
     }
 
     @Override
-    public void pushConfigurationSegment(@NonNull String name) {
+    public void pushConfigurationSegment(String name) {
         String primary = primary();
         ConfigurationSegment.ConfigurationKind kind = kind();
         String p = switch (kind) {
@@ -442,7 +456,6 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         computedPrefix = str.toString();
     }
 
-    @NonNull
     @Override
     public ConfigurationSegment removeLast() {
         try {
@@ -457,19 +470,22 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         return computedPrefix;
     }
 
-    @NonNull
     @Override
     public Iterator<ConfigurationSegment> iterator() {
         return list.iterator();
     }
 
     record DefaultConfigurationSegment(
+        @Nullable
         Class<?> type,
         String prefix,
         String path,
         ConfigurationKind kind,
+        @Nullable
         String name,
+        @Nullable
         String simpleName,
+        @Nullable
         String primary,
         int index) implements ConfigurationSegment {
 
@@ -483,13 +499,11 @@ final class DefaultConfigurationPath implements ConfigurationPath {
             return prefix.charAt(index);
         }
 
-        @NonNull
         @Override
         public CharSequence subSequence(int start, int end) {
             return prefix.subSequence(start, end);
         }
 
-        @NonNull
         @Override
         public String toString() {
             return prefix;

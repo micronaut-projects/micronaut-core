@@ -23,8 +23,8 @@ import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -437,11 +437,13 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             value.readAccessKind == null ? null : value.getter,
             value.writeAccessKind == null ? null : value.setter,
             value.field,
+            value.propertyAccessMember,
             elementAnnotationMetadataFactory,
             value.propertyName,
-            value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
-            value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
-            value.isExcluded
+            value.readAccessKind == null ? null : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
+            value.writeAccessKind == null ? null : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
+            value.isExcluded,
+            value.constructorWriteAccess
         );
     }
 
@@ -561,11 +563,13 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             value.getter,
             value.setter,
             value.field,
+            value.propertyAccessMember,
             elementAnnotationMetadataFactory,
             value.propertyName,
-            value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
-            value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
-            value.isExcluded
+            value.readAccessKind == null ? null : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
+            value.writeAccessKind == null ? null : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
+            value.isExcluded,
+            value.constructorWriteAccess
         );
         ref.set(propertyElement);
         return propertyElement;
@@ -855,7 +859,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
         private boolean isNonAbstract(ClassNode classNode, MethodNode methodNode) {
             if (methodNode.isDefault()) {
-                return false;
+                // Groovy 4.x used to implement default methods via traits, which caused
+                // MethodNode for default methods on interfaces to have default = false
+                return true;
             }
             if (methodNode.isPrivate() && classNode.isInterface()) {
                 return true;

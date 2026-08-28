@@ -10,6 +10,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -143,6 +144,20 @@ abstract class AbstractReadBufferTest {
     }
 
     @Test
+    public void transferToNio() throws IOException {
+        ByteBuffer nio = ByteBuffer.allocateDirect(3);
+        nio.put((byte) 1);
+        nio.put((byte) 2);
+        nio.put((byte) 3);
+        nio.flip();
+        try (ReadBuffer rb = factory.adapt(nio)) {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            rb.transferTo(baos);
+            assertArrayEquals(new byte[]{1, 2, 3}, baos.toByteArray());
+        }
+    }
+
+    @Test
     public void createEmpty() {
         try (ReadBuffer rb = factory.createEmpty()) {
             assertEquals(0, rb.readable());
@@ -243,6 +258,24 @@ abstract class AbstractReadBufferTest {
         ReadBuffer b = factory.adapt(new byte[]{4, 5, 6});
         try (ReadBuffer composed = factory.compose(List.of(a, b))) {
             assertArrayEquals(new byte[]{1, 2, 3, 4, 5, 6}, composed.toArray());
+        }
+    }
+
+    @Test
+    public void composeManyKeepsContent() {
+        int count = 50;
+        int chunk = 100;
+        byte[] expected = new byte[count * chunk];
+        List<ReadBuffer> parts = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            byte[] part = new byte[chunk];
+            Arrays.fill(part, (byte) i);
+            System.arraycopy(part, 0, expected, i * chunk, chunk);
+            parts.add(factory.adapt(part));
+        }
+        try (ReadBuffer composed = factory.compose(parts)) {
+            assertEquals(expected.length, composed.readable());
+            assertArrayEquals(expected, composed.toArray());
         }
     }
 }

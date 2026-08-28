@@ -5,7 +5,6 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -50,7 +49,9 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
+import io.netty.util.ReferenceCountUtil
 import jakarta.inject.Singleton
+import org.jspecify.annotations.NonNull
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Mono
 import spock.lang.Issue
@@ -77,8 +78,10 @@ class AccessLogSpec extends Specification {
         server.start()
 
         def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+
+        def group = new NioEventLoopGroup(1)
         Bootstrap bootstrap = new Bootstrap()
-                .group(new NioEventLoopGroup(1))
+                .group(group)
                 .channel(NioSocketChannel)
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
@@ -128,7 +131,8 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
-        bootstrap.config().group().shutdownGracefully()
+        ctx.close()
+        group.shutdownGracefully()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -144,8 +148,10 @@ class AccessLogSpec extends Specification {
         server.start()
 
         def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+
+        def group = new NioEventLoopGroup(1)
         Bootstrap bootstrap = new Bootstrap()
-                .group(new NioEventLoopGroup(1))
+                .group(group)
                 .channel(NioSocketChannel)
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
@@ -194,7 +200,8 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
-        bootstrap.config().group().shutdownGracefully()
+        ctx.close()
+        group.shutdownGracefully()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -209,8 +216,10 @@ class AccessLogSpec extends Specification {
         server.start()
 
         def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+
+        def group = new NioEventLoopGroup(1)
         Bootstrap bootstrap = new Bootstrap()
-                .group(new NioEventLoopGroup(1))
+                .group(group)
                 .channel(NioSocketChannel)
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
@@ -272,7 +281,8 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
-        bootstrap.config().group().shutdownGracefully()
+        ctx.close()
+        group.shutdownGracefully()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -314,8 +324,10 @@ class AccessLogSpec extends Specification {
                         ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
                         ApplicationProtocolNames.HTTP_2))
                 .build()
+
+        def group = new NioEventLoopGroup(1)
         Bootstrap bootstrap = new Bootstrap()
-                .group(new NioEventLoopGroup(1))
+                .group(group)
                 .channel(NioSocketChannel)
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
@@ -386,7 +398,9 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
-        bootstrap.config().group().shutdownGracefully()
+        ctx.close()
+        ReferenceCountUtil.release(sslContext)
+        group.shutdownGracefully()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -415,8 +429,9 @@ class AccessLogSpec extends Specification {
         request4.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), ':https')
 
         def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+        def group = new NioEventLoopGroup(1)
         Bootstrap bootstrap = new Bootstrap()
-                .group(new NioEventLoopGroup(1))
+                .group(group)
                 .channel(NioSocketChannel)
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
@@ -484,7 +499,8 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
-        bootstrap.config().group().shutdownGracefully()
+        ctx.close()
+        group.shutdownGracefully()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')
@@ -514,8 +530,10 @@ class AccessLogSpec extends Specification {
         request4.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), ':https')
 
         def responses = new CopyOnWriteArrayList<FullHttpResponse>()
+
+        def group = new NioEventLoopGroup(1)
         Bootstrap bootstrap = new Bootstrap()
-                .group(new NioEventLoopGroup(1))
+                .group(group)
                 .channel(NioSocketChannel)
                 .option(ChannelOption.AUTO_READ, true)
                 .handler(new ChannelInitializer<Channel>() {
@@ -580,7 +598,8 @@ class AccessLogSpec extends Specification {
         responses*.content().forEach(ByteBuf::release)
         server.close()
         channel.close()
-        bootstrap.config().group().shutdownGracefully()
+        ctx.close()
+        group.shutdownGracefully()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6782')

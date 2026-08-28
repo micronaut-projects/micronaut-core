@@ -10,7 +10,7 @@ import spock.lang.Specification
 import java.util.stream.Collectors
 
 class GenericInjectionSpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
+    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(["spec.name": GenericInjectionSpec.simpleName])
 
     void "test narrow injection by generic type"() {
         when:
@@ -49,5 +49,28 @@ class GenericInjectionSpec extends Specification {
         then:
         !bean.is(another)
 
+    }
+
+    void "test narrow injection by generic type with intercepted candidate"() {
+        when:
+        def forestBear = Argument.of(Bear, Forest)
+        def den = context.getBean(ForestDen)
+        def brownBearDefinition = context.getBeanDefinition(BrownBear)
+        def whiteBearDefinition = context.getBeanDefinition(WhiteBear)
+
+        then:
+        den.bear instanceof BrownBear
+        den.fieldBear instanceof BrownBear
+        den.bears*.class == [BrownBear]
+        den.bearProvider.get() instanceof BrownBear
+        context.getBean(forestBear) instanceof BrownBear
+        context.getBeanDefinition(forestBear).beanType == BrownBear
+        context.getBeansOfType(forestBear).toList()*.class == [BrownBear]
+
+        and:
+        brownBearDefinition.isCandidateBean(forestBear)
+        !whiteBearDefinition.isCandidateBean(forestBear)
+        brownBearDefinition.getTypeArguments(Bear)[0].type == Forest
+        whiteBearDefinition.getTypeArguments(Bear)[0].type == Arctic
     }
 }

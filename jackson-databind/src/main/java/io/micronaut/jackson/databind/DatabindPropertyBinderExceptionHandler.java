@@ -15,10 +15,9 @@
  */
 package io.micronaut.jackson.databind;
 
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.exc.InvalidFormatException;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import tools.jackson.databind.DatabindException;
+import tools.jackson.databind.exc.InvalidFormatException;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.naming.NameUtils;
@@ -39,7 +38,7 @@ import java.util.Optional;
 @Singleton
 final class DatabindPropertyBinderExceptionHandler implements JsonBeanPropertyBinderExceptionHandler {
     @Override
-    public Optional<ConversionErrorException> toConversionError(@Nullable Object object, @NonNull Exception e) {
+    public Optional<ConversionErrorException> toConversionError(@Nullable Object object, Exception e) {
         if (e instanceof InvalidFormatException ife) {
             Object originalValue = ife.getValue();
             var conversionError = new ConversionError() {
@@ -54,10 +53,10 @@ final class DatabindPropertyBinderExceptionHandler implements JsonBeanPropertyBi
                 }
             };
             Class<?> type = object != null ? object.getClass() : Object.class;
-            List<JsonMappingException.Reference> path = ife.getPath();
+            List<DatabindException.Reference> path = ife.getPath();
             String name;
             if (!path.isEmpty()) {
-                name = path.get(path.size() - 1).getFieldName();
+                name = path.get(path.size() - 1).getPropertyName();
             } else {
                 name = NameUtils.decapitalize(type.getSimpleName());
             }

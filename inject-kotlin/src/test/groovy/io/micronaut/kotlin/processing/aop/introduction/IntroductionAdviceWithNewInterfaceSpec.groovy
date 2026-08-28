@@ -1,7 +1,6 @@
 package io.micronaut.kotlin.processing.aop.introduction
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
@@ -10,31 +9,6 @@ import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class IntroductionAdviceWithNewInterfaceSpec extends Specification {
-
-
-    void "test introduction closeable"() {
-        when:
-            def context = buildContext('''
-package test
-
-import io.micronaut.kotlin.processing.aop.introduction.*
-import io.micronaut.context.annotation.*
-
-@Stub("test")
-interface MyBean : AutoCloseable  {
-    val foo : String
-}
-
-''', true)
-            def bean = getBean(context, 'test.MyBean')
-
-        then:
-            bean.foo == 'test'
-            bean.close()
-
-        cleanup:
-            context.close()
-    }
 
     void "test configuration advice with Kotlin properties"() {
         when:
@@ -87,6 +61,30 @@ interface MyBean  {
 
         cleanup:
         context.close()
+    }
+
+    void "test introduction closeable"() {
+        when:
+            def context = buildContext('''
+package test
+
+import io.micronaut.kotlin.processing.aop.introduction.*
+import io.micronaut.context.annotation.*
+
+@Stub("test")
+interface MyBean : AutoCloseable  {
+    val foo : String
+}
+
+''', true)
+            def bean = getBean(context, 'test.MyBean')
+
+        then:
+            bean.foo == 'test'
+            bean.close()
+
+        cleanup:
+            context.close()
     }
 
     void "test introduction advice with Kotlin properties"() {
@@ -166,13 +164,13 @@ open class MyBean  {
         ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
-        listenerAdviceInterceptor.recievedMessages.clear()
+        listenerAdviceInterceptor.receivedMessages.clear()
 
         then:"the methods are invocable"
-        listenerAdviceInterceptor.recievedMessages.isEmpty()
+        listenerAdviceInterceptor.receivedMessages.isEmpty()
         instance.getFoo() == "good"
         instance.onApplicationEvent(new Object()) == null
-        !listenerAdviceInterceptor.recievedMessages.isEmpty()
+        !listenerAdviceInterceptor.receivedMessages.isEmpty()
 
         cleanup:
         context.close()
@@ -209,13 +207,13 @@ abstract class MyBean  {
         ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
-        listenerAdviceInterceptor.recievedMessages.clear()
+        listenerAdviceInterceptor.receivedMessages.clear()
 
         then:"the methods are invocable"
-        listenerAdviceInterceptor.recievedMessages.isEmpty()
+        listenerAdviceInterceptor.receivedMessages.isEmpty()
         instance.getFoo() == "good"
         instance.onApplicationEvent(new Object()) == null
-        !listenerAdviceInterceptor.recievedMessages.isEmpty()
+        !listenerAdviceInterceptor.receivedMessages.isEmpty()
 
         cleanup:
         context.close()
@@ -255,15 +253,15 @@ interface MyBean  {
         ApplicationContext context = ApplicationContext.run()
         def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
         ListenerAdviceInterceptor listenerAdviceInterceptor= context.getBean(ListenerAdviceInterceptor)
-        listenerAdviceInterceptor.recievedMessages.clear()
+        listenerAdviceInterceptor.receivedMessages.clear()
 
         then:"the methods are invocable"
-        listenerAdviceInterceptor.recievedMessages.isEmpty()
+        listenerAdviceInterceptor.receivedMessages.isEmpty()
         instance.getFoo() == "good"
         instance.getBar() == null
         instance.onApplicationEvent(new Object()) == null
-        !listenerAdviceInterceptor.recievedMessages.isEmpty()
-        listenerAdviceInterceptor.recievedMessages.size() == 1
+        !listenerAdviceInterceptor.receivedMessages.isEmpty()
+        listenerAdviceInterceptor.receivedMessages.size() == 1
 
         cleanup:
         context.close()

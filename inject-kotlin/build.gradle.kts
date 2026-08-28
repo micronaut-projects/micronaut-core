@@ -1,5 +1,9 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
     id("io.micronaut.build.internal.convention-library")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
     alias(libs.plugins.managed.ksp)
 }
@@ -25,9 +29,13 @@ dependencies {
         exclude(group = "io.micronaut")
     }
 
+    testImplementation(libs.managed.kotlin.compiler.embeddable)
     testImplementation(projects.micronautContext)
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautInjectKotlinTest)
+    testImplementation(projects.micronautHttpValidation)
+    testImplementation(projects.micronautRouter)
+    testImplementation(projects.micronautHttpServer)
     testImplementation(libs.managed.kotlin.stdlib)
     testImplementation(projects.micronautHttpClient)
     testImplementation(libs.managed.jackson.annotations)
@@ -64,7 +72,7 @@ configurations.all {
 }
 
 tasks {
-    withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    withType<KotlinCompile>().configureEach {
         compilerOptions {
             freeCompilerArgs = listOf("-Xjvm-default=all")
         }
@@ -80,14 +88,5 @@ tasks {
         maxHeapSize = "3G"
         forkEvery = 40
         maxParallelForks = 4
-    }
-}
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
-}
-kotlin {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }

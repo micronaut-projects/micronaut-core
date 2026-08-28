@@ -21,8 +21,7 @@ import io.micronaut.context.exceptions.BeanDestructionException;
 import io.micronaut.context.scope.BeanCreationContext;
 import io.micronaut.context.scope.CreatedBean;
 import io.micronaut.context.scope.CustomScope;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
@@ -51,7 +50,7 @@ final class ThreadLocalCustomScope implements CustomScope<ThreadLocal>, LifeCycl
 
     private static final Supplier<Cleaner> LIFECYCLE_CLEANER = SupplierUtil.memoized(Cleaner::create);
 
-    private final java.lang.ThreadLocal<LocalHolder> threadScope = new java.lang.ThreadLocal<>();
+    private final java.lang.ThreadLocal<@Nullable LocalHolder> threadScope = new java.lang.ThreadLocal<>();
     private final Set<Cleaner.Cleanable> toClean = ConcurrentHashMap.newKeySet();
 
     @Override
@@ -129,7 +128,7 @@ final class ThreadLocalCustomScope implements CustomScope<ThreadLocal>, LifeCycl
     }
 
     @Override
-    public @NonNull ThreadLocalCustomScope stop() {
+    public ThreadLocalCustomScope stop() {
         for (Cleaner.Cleanable cleanable : toClean) {
             cleanable.clean();
         }
@@ -138,6 +137,7 @@ final class ThreadLocalCustomScope implements CustomScope<ThreadLocal>, LifeCycl
 
     private final class LocalHolder {
         final Map<BeanIdentifier, CreatedBean<?>> beans = new HashMap<>();
+        @Nullable
         LifecycleBeanHolder lifecycleBeans;
 
         void add(CreatedBean<?> createdBean) {
@@ -166,7 +166,7 @@ final class ThreadLocalCustomScope implements CustomScope<ThreadLocal>, LifeCycl
 
     private final class LifecycleBeanHolder implements Runnable {
         final Set<CreatedBean<?>> lifecycleBeans = new HashSet<>();
-        Cleaner.Cleanable cleanable;
+        Cleaner. @Nullable Cleanable cleanable;
 
         @Override
         public void run() {

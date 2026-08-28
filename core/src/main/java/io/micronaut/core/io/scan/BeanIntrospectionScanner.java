@@ -19,7 +19,6 @@ import java.util.Objects;
 import java.util.stream.Stream;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.util.StringUtils;
 
@@ -28,18 +27,49 @@ import io.micronaut.core.util.StringUtils;
  * instances through the {@link io.micronaut.core.beans.BeanIntrospector} API.
  *
  * @author graemerocher
- * @since 3.0.0
+ * @since 5.2.0
  */
 @Internal
 public class BeanIntrospectionScanner implements AnnotationScanner {
+    private final BeanIntrospector beanIntrospector;
+
+    /**
+     * Creates a scanner that uses the shared bean introspector.
+     *
+     * <p>This preserves the default scanner behavior for callers that do not need
+     * to control the class loader used to resolve bean introspections.</p>
+     */
+    public BeanIntrospectionScanner() {
+        this(BeanIntrospector.SHARED);
+    }
+
+    /**
+     * Creates a scanner that resolves bean introspections from the supplied class loader.
+     *
+     * @param classLoader The class loader to scan for bean introspections
+     * @since 5.2.0
+     */
+    public BeanIntrospectionScanner(ClassLoader classLoader) {
+        this(BeanIntrospector.forClassLoader(classLoader));
+    }
+
+    /**
+     * Creates a scanner that delegates scanning to the supplied introspector.
+     *
+     * @param beanIntrospector The introspector to use when scanning
+     */
+    private BeanIntrospectionScanner(BeanIntrospector beanIntrospector) {
+        this.beanIntrospector = beanIntrospector;
+    }
+
     @Override
-    public @NonNull Stream<Class<?>> scan(@NonNull String annotation, @NonNull String pkg) {
+    public Stream<Class<?>> scan(String annotation, String pkg) {
         Objects.requireNonNull(annotation, "Annotation type cannot be null");
         Objects.requireNonNull(pkg, "Package to scan cannot be null");
 
         if (StringUtils.isNotEmpty(pkg)) {
             final String prefix = pkg + ".";
-            return BeanIntrospector.SHARED
+            return beanIntrospector
                     .findIntrospectedTypes(ref ->
                             ref.getAnnotationMetadata().hasStereotype(annotation) &&
                             ref.isPresent() &&

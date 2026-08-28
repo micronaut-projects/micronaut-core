@@ -17,7 +17,7 @@ package io.micronaut.http.netty.configuration;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.netty.util.ResourceLeakDetector;
 
 /**
@@ -26,18 +26,47 @@ import io.netty.util.ResourceLeakDetector;
  * @author Denis Stepannov
  * @since 2.5.0
  */
-@ConfigurationProperties("netty")
+@ConfigurationProperties(NettyGlobalConfiguration.PREFIX)
 @BootstrapContextCompatible
 public class NettyGlobalConfiguration {
+
+    /**
+     * Prefix for global Netty settings.
+     */
+    public static final String PREFIX = "netty";
+
+    /**
+     * Whether Netty is enabled.
+     */
+    public static final String ENABLED = PREFIX + ".enabled";
 
     private static final boolean DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING = true;
     private static final boolean DEFAULT_THREAD_FACTORY_DAEMON = false;
     private static final int DEFAULT_THREAD_FACTORY_PRIORITY = Thread.NORM_PRIORITY;
 
-    private ResourceLeakDetector.Level resourceLeakDetectorLevel;
+    private boolean nettyEnabled = true;
+    private ResourceLeakDetector. @Nullable Level resourceLeakDetectorLevel;
     private boolean defaultThreadFactoryReactorNonBlocking = DEFAULT_THREAD_FACTORY_REACTOR_NON_BLOCKING;
     private boolean defaultThreadFactoryDaemon = DEFAULT_THREAD_FACTORY_DAEMON;
     private int defaultThreadFactoryPriority = DEFAULT_THREAD_FACTORY_PRIORITY;
+
+    /**
+     * Returns whether Netty is enabled.
+     *
+     * @return Whether Netty is enabled.
+     */
+    public boolean isEnabled() {
+        return nettyEnabled;
+    }
+
+    /**
+     * Sets whether Netty is enabled.
+     *
+     * @param enabled Whether Netty is enabled.
+     */
+    public void setEnabled(boolean enabled) {
+        this.nettyEnabled = enabled;
+    }
 
     /**
      * Sets the resource leak detection level.
@@ -53,8 +82,7 @@ public class NettyGlobalConfiguration {
      *
      * @return the resource leak detection level
      */
-    @Nullable
-    public ResourceLeakDetector.Level getResourceLeakDetectorLevel() {
+    public ResourceLeakDetector.@Nullable Level getResourceLeakDetectorLevel() {
         return resourceLeakDetectorLevel;
     }
 

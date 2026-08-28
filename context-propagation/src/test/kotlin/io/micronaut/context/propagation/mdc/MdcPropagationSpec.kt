@@ -1,5 +1,6 @@
 package io.micronaut.context.propagation.mdc
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.propagation.slf4j.MdcPropagationContext
@@ -41,7 +42,7 @@ class MdcPropagationSpec {
     fun testKotlinPropagation() {
         val embeddedServer = ApplicationContext.run(
             EmbeddedServer::class.java,
-            mapOf("mdc.reactortest.enabled" to "true" as Any)
+            mapOf("mdc.reactortest.enabled" to "true" as Any, "micronaut.propagation" to "thread-local")
         )
         val client = embeddedServer.applicationContext.getBean(HttpClient::class.java)
 
@@ -91,7 +92,7 @@ class NamingController(private val namingService: NamingService) {
 }
 
 @Introspected
-class NameRequestBody(val name: String)
+data class NameRequestBody(@JsonProperty("name") val name: String)
 
 @Requires(property = "mdc.reactortest.enabled")
 @Singleton

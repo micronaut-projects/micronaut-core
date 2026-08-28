@@ -14,7 +14,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 class ExceptionHandlerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
-            ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to ExceptionHandlerSpec::class.simpleName))
+            ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to ExceptionHandlerSpec::class.simpleName as Any))
     )
 
     val client = autoClose(

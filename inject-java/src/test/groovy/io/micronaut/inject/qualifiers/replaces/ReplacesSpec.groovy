@@ -17,16 +17,16 @@ package io.micronaut.inject.qualifiers.replaces
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import spock.lang.Specification
 import io.micronaut.context.env.PropertySource
 /**
  * Created by graemerocher on 26/05/2017.
  */
 class ReplacesSpec extends AbstractTypeElementSpec {
 
-//    @Ignore
     void "test that a bean can be marked to replace another bean"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:"A bean has a dependency on an interface with multiple impls"
         B b = context.getBean(B)
@@ -142,7 +142,7 @@ class A2ConfigProperties extends A1ConfigProperties {
 
     void "test that a bean that has AOP advice applied can be replaced"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         expect:
         context.getBeansOfType(H).size() == 1
@@ -154,7 +154,7 @@ class A2ConfigProperties extends A1ConfigProperties {
 
     void "test that named beans can be replaced"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         expect:
         context.containsBean(E1Replacement)
@@ -172,7 +172,7 @@ class A2ConfigProperties extends A1ConfigProperties {
 
     void "test that qualified beans can be replaced"() {
         given:
-        ApplicationContext context = ApplicationContext.run()
+        ApplicationContext context = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         expect:
         context.containsBean(G1QualifierReplacement)
@@ -191,7 +191,7 @@ class A2ConfigProperties extends A1ConfigProperties {
 
     void "test that introduction advice can be replaced with inheritance"() {
         given:
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:
         IntroductionOperations ops = ctx.getBean(IntroductionOperations)
@@ -207,7 +207,7 @@ class A2ConfigProperties extends A1ConfigProperties {
 
     void "test that introduction advice can be replaced"() {
         given:
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:
         IntroductionB ops = ctx.getBean(IntroductionB)
@@ -223,7 +223,7 @@ class A2ConfigProperties extends A1ConfigProperties {
 
     void "test that classes with around advice can be replaced"() {
         given:
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:
         AroundOps ops = ctx.getBean(AroundOps)
@@ -239,7 +239,7 @@ class A2ConfigProperties extends A1ConfigProperties {
 
     void "test replacing an entire factory"() {
         given:
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:
         C c = ctx.getBean(C)
@@ -253,7 +253,7 @@ class A2ConfigProperties extends A1ConfigProperties {
 
     void "test replacing a factory method"() {
         given:
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:
         D d = ctx.getBean(D)
@@ -267,7 +267,7 @@ class A2ConfigProperties extends A1ConfigProperties {
 
     void "test replacing a bean with AOP bean of the same type"() {
         given:
-        def ctx = ApplicationContext.run()
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'])
 
         when:
         F f = ctx.getBean(F)
@@ -281,7 +281,7 @@ class A2ConfigProperties extends A1ConfigProperties {
 
     void "test replacing a chain of factory methods"() {
         given:
-        def ctx = ApplicationContext.run("factory-replacement-chain")
+        def ctx = ApplicationContext.run(['spec.name':'ReplacesSpec'], "factory-replacement-chain")
 
         when:
         D d = ctx.getBean(D)

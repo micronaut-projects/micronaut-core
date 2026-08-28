@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import kotlin.coroutines.intrinsics.IntrinsicsKt;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * <p>Internal Utility methods for working with Kotlin <code>suspend</code> functions</p>.
@@ -35,6 +35,7 @@ public class KotlinUtils {
      */
     public static final boolean KOTLIN_COROUTINES_SUPPORTED;
 
+    @Nullable
     public static final Object COROUTINE_SUSPENDED;
 
     static {

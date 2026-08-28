@@ -20,6 +20,9 @@
  * @since 1.0
  */
 @Internal
+@NullMarked
 package io.micronaut.aop.chain;
 
+
+import org.jspecify.annotations.NullMarked;
 import io.micronaut.core.annotation.Internal;

@@ -15,8 +15,7 @@
  */
 package io.micronaut.http.client.multipart;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.MediaType;
 
 import java.io.IOException;
@@ -41,13 +40,12 @@ public interface MultipartDataFactory<T> {
      * @param length The length
      * @return The file upload
      */
-    @NonNull T createFileUpload(
-            @NonNull String name,
-            @NonNull String filename,
-            @NonNull MediaType contentType,
-            @Nullable String encoding,
-            @Nullable Charset charset,
-            long length);
+    T createFileUpload(String name,
+                       String filename,
+                       MediaType contentType,
+                       @Nullable String encoding,
+                       @Nullable Charset charset,
+                       long length);
 
     /**
      * Creates an attribute.
@@ -55,7 +53,7 @@ public interface MultipartDataFactory<T> {
      * @param value The value of the attribute
      * @return The attribute
      */
-    @NonNull T createAttribute(@NonNull String name, @NonNull String value);
+    T createAttribute(String name, String value);
 
     /**
      * Sets the content on the file upload object.

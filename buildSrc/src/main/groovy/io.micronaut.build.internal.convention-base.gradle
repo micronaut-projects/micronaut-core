@@ -1,5 +1,8 @@
 import io.micronaut.build.internal.ext.MicronautCoreExtension
 import io.micronaut.build.internal.ext.DefaultMicronautCoreExtension
+import io.micronaut.build.compat.AcceptedApiChangesRule
+import me.champeau.gradle.japicmp.JapicmpTask
+import org.gradle.api.tasks.PathSensitivity
 
 plugins {
     id "io.micronaut.build.internal.common"
@@ -8,6 +11,7 @@ plugins {
 micronautBuild {
     enableBom = false
     enableProcessing = false
+    javaVersion.set(25)
 }
 
 repositories {
@@ -32,6 +36,11 @@ tasks.withType(Test).configureEach {
     jvmArgs "--enable-preview"
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.fork = true
     options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
@@ -45,6 +54,19 @@ tasks.withType(GroovyCompile).configureEach {
     options.compilerArgs.add("-Amicronaut.processing.group=$project.group")
     options.compilerArgs.add("-Amicronaut.processing.module=micronaut-$project.name")
     groovyOptions.forkOptions.memoryMaximumSize = "2g"
+}
+
+tasks.withType(JapicmpTask).configureEach {
+    def acceptedApiChanges = rootProject.layout.projectDirectory.file("config/accepted-api-changes.json")
+    inputs.file(acceptedApiChanges)
+        .withPropertyName("accepted-api-changes-root")
+        .withPathSensitivity(PathSensitivity.NONE)
+    richReport {
+        addViolationTransformer(
+            AcceptedApiChangesRule.class,
+            [(AcceptedApiChangesRule.CHANGES_FILE): acceptedApiChanges.asFile.absolutePath]
+        )
+    }
 }
 
 // This is for reproducible builds

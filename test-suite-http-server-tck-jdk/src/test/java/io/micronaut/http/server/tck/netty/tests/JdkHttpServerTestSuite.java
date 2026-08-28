@@ -1,5 +1,6 @@
 package io.micronaut.http.server.tck.netty.tests;
 
+import org.junit.platform.suite.api.ConfigurationParameter;
 import org.junit.platform.suite.api.ExcludeClassNamePatterns;
 import org.junit.platform.suite.api.ExcludeTags;
 import org.junit.platform.suite.api.SelectPackages;
@@ -15,5 +16,6 @@ import org.junit.platform.suite.api.SuiteDisplayName;
     "io.micronaut.http.server.tck.tests.forms.UploadTest" // multipart
 })
 @ExcludeTags("multipart") // Multipart not supported by HttpClient
+@ConfigurationParameter(key = "junit.jupiter.extensions.autodetection.enabled", value = "true")
 public class JdkHttpServerTestSuite {
 }

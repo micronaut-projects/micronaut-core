@@ -16,7 +16,8 @@
 package io.micronaut.retry.intercept;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.CircuitState;
 import io.micronaut.retry.RetryStateBuilder;
@@ -38,32 +39,37 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author graemerocher
  * @since 1.0
  */
-class CircuitBreakerRetry implements MutableRetryState {
+@Internal
+public class CircuitBreakerRetry implements MutableRetryState {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultRetryInterceptor.class);
 
     private final RetryStateBuilder retryStateBuilder;
     private final long openTimeout;
     private final ExecutableMethod<?, ?> method;
+    @Nullable
     private final ApplicationEventPublisher eventPublisher;
     private final boolean throwWrappedException;
-    private AtomicReference<CircuitState> state = new AtomicReference<>(CircuitState.CLOSED);
+    private final AtomicReference<CircuitState> state = new AtomicReference<>(CircuitState.CLOSED);
+    @Nullable
     private volatile Throwable lastError;
     private volatile long time = System.currentTimeMillis();
     private volatile MutableRetryState childState;
 
     /**
+     * Creates a circuit breaker retry state.
+     *
      * @param openTimeout The circuit open timeout in millis
      * @param childStateBuilder The retry state builder
      * @param method A compile time produced invocation of a method call
      * @param eventPublisher To publish circuit events
      * @param throwWrappedException If {@code true}, the original exception will be wrapped in {@link CircuitOpenException}
      */
-    CircuitBreakerRetry(
-        long openTimeout,
-        RetryStateBuilder childStateBuilder,
-        ExecutableMethod<?, ?> method,
-        ApplicationEventPublisher eventPublisher, boolean throwWrappedException) {
+    public CircuitBreakerRetry(long openTimeout,
+                               RetryStateBuilder childStateBuilder,
+                               ExecutableMethod<?, ?> method,
+                               @Nullable ApplicationEventPublisher eventPublisher,
+                               boolean throwWrappedException) {
 
         this.retryStateBuilder = childStateBuilder;
         this.openTimeout = openTimeout;
@@ -158,6 +164,7 @@ class CircuitBreakerRetry implements MutableRetryState {
     }
 
     @Override
+    @Nullable
     public Class<? extends Throwable> getCapturedException() {
         return childState.getCapturedException();
     }
@@ -168,9 +175,12 @@ class CircuitBreakerRetry implements MutableRetryState {
     }
 
     /**
+     * Returns the current circuit state.
+     *
      * @return The current state
      */
-    CircuitState currentState() {
+    @Nullable
+    public CircuitState currentState() {
         if (state.get() == CircuitState.OPEN) {
             long now = System.currentTimeMillis();
             long timeout = time + openTimeout;

@@ -17,6 +17,7 @@ package io.micronaut.docs.config.itfce;
 
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.bind.annotation.Bindable;
 
 import jakarta.validation.constraints.Min;
@@ -25,6 +26,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.Optional;
 // end::imports[]
 
+@Requires(property = "spec.name", value = "VehicleItfceSpec")
 // tag::class[]
 @ConfigurationProperties("my.engine") // <1>
 public interface EngineConfig {

@@ -129,6 +129,22 @@ The previous example uses the link:{api}/io/micronaut/http/annotation/Get.html[@
 
 NOTE: All the method annotations default to `/`.
 
+== Route Conditions
+
+The api:http.annotation.RouteCondition[] annotation allows you to define a condition that must evaluate to `true` for a route to match a request. The condition is specified as a Micronaut Expression Language (EL) expression and is evaluated at request time.
+
+Within the expression, a `request` variable is available that references the current api:http.HttpRequest[].
+
+This is useful for routing requests based on query parameters, headers, or any other aspect of the request. For example, you can use `@RouteCondition` to route requests to different methods depending on the value of a query parameter:
+
+snippet::io.micronaut.docs.server.routing.RouteConditionController[tags="imports,class", indent=0, title="Route Condition Example"]
+
+<1> The route condition expression evaluates whether the `v` query parameter equals `2`. If it does, the request is routed to `helloV2()`. If not, the route is not matched and the request falls through to `helloV1()`.
+
+NOTE: The api:http.annotation.RouteCondition[] annotation only applies to server-side routes and is ignored when placed on declarative HTTP client routes.
+
+TIP: The `request` variable in the expression is an instance of api:http.HttpRequest[]. You can access headers via `request.headers`, query parameters via `request.parameters`, and other request attributes as needed.
+
 == @Options
 
 <<cors, CORS>> support handles OPTIONS preflight requests. However, if you want to dispatch OPTIONS requests without an Origin HTTP Header, you can enable it via:

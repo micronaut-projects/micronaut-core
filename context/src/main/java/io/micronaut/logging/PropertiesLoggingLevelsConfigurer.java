@@ -16,16 +16,20 @@
 package io.micronaut.logging;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.naming.conventions.StringConvention;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,23 +52,28 @@ import java.util.Map;
 @Requires(beans = Environment.class)
 @Requires(property = PropertiesLoggingLevelsConfigurer.LOGGER_PROPERTY_PREFIX)
 @Internal
-final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListener<RefreshEvent> {
+final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListener<RefreshEvent>, Ordered {
 
     static final String LOGGER_PROPERTY_PREFIX = "logger";
     static final String LOGGER_LEVELS_PROPERTY_PREFIX = LOGGER_PROPERTY_PREFIX + ".levels";
     private static final Logger LOGGER = LoggerFactory.getLogger(PropertiesLoggingLevelsConfigurer.class);
 
     private final Environment environment;
+    private final PropertiesLoggingLevelsConfiguration configuration;
     private final List<LoggingSystem> loggingSystems;
 
     /**
      * Sets log level according to properties.
      *
-     * @param environment   The environment
+     * @param environment The environment
+     * @param configuration The logging levels configuration
      * @param loggingSystems The logging systems
      */
-    PropertiesLoggingLevelsConfigurer(Environment environment, List<LoggingSystem> loggingSystems) {
+    PropertiesLoggingLevelsConfigurer(Environment environment,
+                                      PropertiesLoggingLevelsConfiguration configuration,
+                                      List<LoggingSystem> loggingSystems) {
         this.environment = environment;
+        this.configuration = configuration;
         this.loggingSystems = loggingSystems;
         initLogging();
         configureLogLevels();
@@ -81,25 +90,31 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
         configureLogLevels();
     }
 
+    @Override
+    public int getOrder() {
+        return Ordered.HIGHEST_PRECEDENCE;
+    }
+
     private void initLogging() {
         this.loggingSystems.forEach(LoggingSystem::refresh);
     }
 
     private void configureLogLevels() {
-        // Using raw keys here allows configuring log levels for camelCase package names in application.yml
-        final Map<String, Object> rawProperties = environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX, StringConvention.RAW);
         // Adding the generated properties allows environment variables and system properties to override names in application.yaml
         final Map<String, Object> generatedProperties = environment.getProperties(LOGGER_LEVELS_PROPERTY_PREFIX);
+        final Map<String, LogLevel> levels = configuration.getLevels();
 
-        final Map<String, Object> properties = new HashMap<>(generatedProperties.size() + rawProperties.size(), 1f);
-        properties.putAll(rawProperties);
+        final Map<String, Object> properties = new HashMap<>(generatedProperties.size() + levels.size(), 1f);
+        properties.putAll(levels);
         properties.putAll(generatedProperties);
         properties.forEach(this::configureLogLevelForPrefix);
     }
 
     private void configureLogLevelForPrefix(final String loggerPrefix, final Object levelValue) {
         final LogLevel newLevel;
-        if (levelValue instanceof Boolean boolean1 && !boolean1) {
+        if (levelValue instanceof LogLevel logLevel) {
+            newLevel = logLevel;
+        } else if (levelValue instanceof Boolean booleanValue && !booleanValue) {
             newLevel = LogLevel.OFF; // SnakeYAML converts OFF (without quotations) to a boolean false value, hence we need to handle that here...
         } else {
             newLevel = toLogLevel(levelValue.toString());
@@ -117,6 +132,7 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
         }
     }
 
+    @Nullable
     private static LogLevel toLogLevel(String logLevel) {
         if (StringUtils.isEmpty(logLevel)) {
             return LogLevel.NOT_SPECIFIED;
@@ -128,4 +144,32 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
         }
     }
 
+    /**
+     * Configuration for setting log levels from {@code logger.levels}.
+     */
+    @BootstrapContextCompatible
+    @ConfigurationProperties(LOGGER_PROPERTY_PREFIX)
+    @Internal
+    static final class PropertiesLoggingLevelsConfiguration {
+        @MapFormat(keyFormat = StringConvention.RAW, transformation = MapFormat.MapTransformation.FLAT)
+        private Map<String, LogLevel> levels = Map.of();
+
+        /**
+         * The configured log levels keyed by logger name.
+         *
+         * @return The log levels
+         */
+        public Map<String, LogLevel> getLevels() {
+            return levels;
+        }
+
+        /**
+         * Sets the configured log levels keyed by logger name.
+         *
+         * @param levels The log levels
+         */
+        public void setLevels(@MapFormat(keyFormat = StringConvention.RAW, transformation = MapFormat.MapTransformation.FLAT) Map<String, LogLevel> levels) {
+            this.levels = levels;
+        }
+    }
 }

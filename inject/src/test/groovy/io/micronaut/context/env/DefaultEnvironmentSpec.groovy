@@ -18,34 +18,50 @@ package io.micronaut.context.env
 import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextConfiguration
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
+import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.util.StringUtils
-import io.micronaut.core.version.SemanticVersion
 import spock.lang.Issue
-import spock.lang.Requires
 import spock.lang.Specification
-import spock.util.environment.Jvm
 import spock.util.environment.RestoreSystemProperties
 
-import java.util.concurrent.Executors
+import java.nio.file.Files
+import java.nio.file.Path
+import java.net.URLClassLoader
+import java.util.Comparator
+import java.util.function.Function
 
 /**
  * Created by graemerocher on 12/06/2017.
  */
 @RestoreSystemProperties
-// fails due to https://issues.apache.org/jira/browse/GROOVY-10145
-@Requires({
-    SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
-            !Jvm.current.isJava16Compatible()
-})
 class DefaultEnvironmentSpec extends Specification {
 
-    private static final String GOOGLE_APPENGINE_ENVIRONMENT = "GAE_ENV";
-    private static final String PCF_ENV = "VCAP_SERVICES";
-    private static final String HEROKU_DYNO = "DYNO";
-    private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
+    private static final String GOOGLE_APPENGINE_ENVIRONMENT = "GAE_ENV"
+    private static final String PCF_ENV = "VCAP_SERVICES"
+    private static final String HEROKU_DYNO = "DYNO"
+    private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST"
+
+    void "mapper not reset on refresh"() {
+        given:
+        Environment environment = new DefaultEnvironment({ ["test"] })
+        environment.getConversionService().addConverter(Foo.class, Bar.class, new Function<Foo, Bar>() {
+            @Override
+            Bar apply(Foo foo) {
+                return new Bar(foo.val())
+            }
+        })
+        when:
+        environment.start()
+        then:
+        environment.getConversionService().convert(new Foo("abc"), Bar.class).get().val() == "abc"
+
+        when:
+        environment.refresh()
+        then:
+        environment.getConversionService().convert(new Foo("abc"), Bar.class).get().val() == "abc"
+    }
 
     void "test environment system property resolve"() {
         given:
@@ -69,12 +85,11 @@ class DefaultEnvironmentSpec extends Specification {
         env.getProperty("test.foo", Map.class).get() == [bar: "10", baz: "20"]
     }
 
-    @RestoreSystemProperties
     void "test environment refresh and diff"() {
         given:
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
         System.setProperty("micronaut.bootstrap.name", "custom-bootstrap")
-        DefaultApplicationContext context = new DefaultApplicationContext("test")
+        ApplicationContext context = ApplicationContext.builder("test").build()
         context.start()
 
         when:
@@ -82,39 +97,42 @@ class DefaultEnvironmentSpec extends Specification {
 
         then:
         diff.isEmpty()
+
+        cleanup:
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
     }
 
-    void "test cache related issue when refresh method is executed"() {
+    void "test environment refresh and diff when bootstrap property changed"() {
         given:
-        def propertyMap = ['testPropKey': 'testPropValueOld']
-        def propertySource = new MapPropertySource('CustomPS', propertyMap)
-        def env = new DefaultEnvironment({['test']})
-        env.addPropertySource(propertySource)
-        env.start()
-
-        expect:
-        env.getRequiredProperty("testPropKey", String.class) == 'testPropValueOld'
-
-        and:
-        def testFinished = false
-        def executor = Executors.newSingleThreadExecutor()
-        executor.submit(new Runnable() {
-            @Override
-            void run() {
-                while (!testFinished) {
-                    env.getRequiredProperty("testPropKey", String.class)
-                }
-            }
-        })
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+        System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "ms")
+        Path tempConfigDir = Files.createTempDirectory("micronaut-data-config-")
+        Path tempConfigFile = tempConfigDir.resolve("bootstrap-ms.yml")
+        tempConfigFile.toFile().text = "prop-key: prop-value-1"
 
         when:
-        propertyMap.put('testPropKey', 'testPropValueNew')
-        def diff = env.refreshAndDiff()
-        testFinished = true
+        ApplicationContext applicationContext = ApplicationContext.builder()
+                .overrideConfigLocations("file:" + tempConfigDir)
+                .build()
+                .start()
 
         then:
-        env.getRequiredProperty("testPropKey", String.class) == 'testPropValueNew'
-        diff.get('test-prop-key') == 'testPropValueOld'
+        applicationContext.getRequiredProperty("prop-key", String.class) == "prop-value-1"
+
+        when:
+        Files.deleteIfExists(tempConfigFile)
+        def diff = applicationContext.getEnvironment().refreshAndDiff()
+
+        then:
+        diff.get("prop-key") == "prop-value-1"
+        applicationContext.getProperty("prop-key", String.class).isEmpty()
+
+        cleanup:
+        if (tempConfigDir) {
+            Files.deleteIfExists(tempConfigDir)
+        }
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+        System.clearProperty(Environment.ENVIRONMENTS_PROPERTY)
     }
 
     void "test environment system property refresh"() {
@@ -156,6 +174,25 @@ class DefaultEnvironmentSpec extends Specification {
         !env.activeNames.contains("foo")
         !env.activeNames.contains("x")
         !env.containsProperty("foo")
+    }
+
+    void "test getting environment name from a system property in bootstrap context"() {
+        given:
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
+        System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "k8s")
+
+        when:
+        ApplicationContext applicationContext = ApplicationContext.builder()
+                .build()
+                .start()
+
+        then:
+        applicationContext.getRequiredProperty("test1", String.class) == "test2"
+
+        cleanup:
+        applicationContext.stop()
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
+        System.clearProperty(Environment.ENVIRONMENTS_PROPERTY)
     }
 
     void "test system property source loader"() {
@@ -264,8 +301,8 @@ class DefaultEnvironmentSpec extends Specification {
 
         then: "should throw exception"
         def e = thrown(ConfigurationException)
-        String extension = NameUtils.extension(unsupportedFile.absolutePath);
-        String fileName = NameUtils.filename(unsupportedFile.absolutePath);
+        String extension = NameUtils.extension(unsupportedFile.absolutePath)
+        String fileName = NameUtils.filename(unsupportedFile.absolutePath)
         e.message == "Unsupported properties file format while reading " + fileName + "." + extension + " from " + unsupportedFile.absolutePath
 
         when: "file from system property source loader does not override the key"
@@ -336,7 +373,6 @@ class DefaultEnvironmentSpec extends Specification {
         System.clearProperty("micronaut.config.files")
     }
 
-    @RestoreSystemProperties
     void "test invalid config file location"() {
         when: "loading properties sources from both system properties and environment variables"
         System.setProperty("micronaut.config.files", "/does/not/exist.yaml")
@@ -345,6 +381,267 @@ class DefaultEnvironmentSpec extends Specification {
         then:
         def ex = thrown(ConfigurationException)
         ex.message == "Failed to read configuration file: /does/not/exist.yaml"
+    }
+
+    void "test file config imports support nesting and extensionless probing"() {
+        given:
+        Path root = Files.createTempDirectory("config-import")
+        File main = root.resolve("main.properties").toFile()
+        main.write("micronaut.config.import=file://child\napp.main=main")
+        File child = root.resolve("child.yml").toFile()
+        child.write("""
+app:
+  child: child
+micronaut:
+  config:
+    import: file://sub/grand.properties
+""")
+        Path subDir = Files.createDirectories(root.resolve("sub"))
+        File grand = subDir.resolve("grand.properties").toFile()
+        grand.write("app.grand=grand")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        env.getRequiredProperty("app.main", String) == "main"
+        env.getRequiredProperty("app.child", String) == "child"
+        env.getRequiredProperty("app.grand", String) == "grand"
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        try (def stream = Files.walk(root)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
+    }
+
+    void "test optional config import does not fail when missing"() {
+        given:
+        File main = File.createTempFile("config-import-optional", ".properties")
+        main.write("micronaut.config.import=optional:file://missing.properties\napp.main=main")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        env.getRequiredProperty("app.main", String) == "main"
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        main.delete()
+    }
+
+    void "test required config import still fails after optional miss for same location"() {
+        given:
+        File main = File.createTempFile("config-import-optional-required", ".properties")
+        main.write("micronaut.config.import[0]=optional:file://missing.properties\nmicronaut.config.import[1]=file://missing.properties")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        def e = thrown(ConfigurationException)
+        e.message.contains("Required config import not found")
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        main.delete()
+    }
+
+    void "test required config import fails when missing"() {
+        given:
+        File main = File.createTempFile("config-import-required", ".properties")
+        main.write("micronaut.config.import=file://missing.properties")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        def e = thrown(ConfigurationException)
+        e.message.contains("Required config import not found")
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        main.delete()
+    }
+
+    void "test config import self-import cycle detection"() {
+        given:
+        File main = File.createTempFile("config-import-self-cycle", ".properties")
+        main.write("micronaut.config.import=file://${main.absolutePath}")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        def e = thrown(ConfigurationException)
+        e.message.contains("Cycle detected")
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        main.delete()
+    }
+
+    void "test config import cycle detection"() {
+        given:
+        Path root = Files.createTempDirectory("config-import-cycle")
+        File a = root.resolve("a.properties").toFile()
+        a.write("micronaut.config.import=file://b.properties")
+        File b = root.resolve("b.properties").toFile()
+        b.write("micronaut.config.import=file://a.properties")
+
+        when:
+        System.setProperty("micronaut.config.files", a.absolutePath)
+        new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        def e = thrown(ConfigurationException)
+        e.message.contains("Cycle detected")
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        try (def stream = Files.walk(root)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
+    }
+
+    void "test env protocol config import"() {
+        given:
+        File main = File.createTempFile("config-import-env", ".properties")
+        main.write("micronaut.config.import=env://MY_IMPORT_CONFIG.yml")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = SystemLambda.withEnvironmentVariable("MY_IMPORT_CONFIG.yml", "app:\n  from:\n    env: true\n")
+            .execute(() -> new DefaultEnvironment({ ["test"] }).start())
+
+        then:
+        env.getRequiredProperty("app.from.env", Boolean)
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        main.delete()
+    }
+
+    void "test classpath protocol config import"() {
+        given:
+        File main = File.createTempFile("config-import-classpath", ".properties")
+        main.write("micronaut.config.import=classpath://config-files.yml")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        env.getRequiredProperty("config.prop", String) == "config-files.yml"
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        main.delete()
+    }
+
+    void "test classpath protocol fails when duplicate import resources are found"() {
+        given:
+        Path firstRoot = Files.createTempDirectory("config-import-classpath-dup-first")
+        Path secondRoot = Files.createTempDirectory("config-import-classpath-dup-second")
+        Files.writeString(firstRoot.resolve("duplicate-import.yml"), "app:\n  duplicate: first\n")
+        Files.writeString(secondRoot.resolve("duplicate-import.yml"), "app:\n  duplicate: second\n")
+        URLClassLoader classLoader = new URLClassLoader([firstRoot.toUri().toURL(), secondRoot.toUri().toURL()] as URL[], this.class.classLoader)
+        File main = File.createTempFile("config-import-classpath-dup", ".properties")
+        main.write("micronaut.config.import=classpath://duplicate-import.yml")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        def configuration = [
+            getEnvironments: { ["test"] },
+            getClassLoader : { classLoader }
+        ] as ApplicationContextConfiguration
+        new DefaultEnvironment(configuration).start()
+
+        then:
+        ConfigurationException e = thrown()
+        e.message.contains("Use classpath*:// to load all matches")
+
+        cleanup:
+        classLoader.close()
+        System.clearProperty("micronaut.config.files")
+        main.delete()
+        try (def stream = Files.walk(firstRoot)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
+        try (def stream = Files.walk(secondRoot)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
+    }
+
+    void "test classpath wildcard protocol loads duplicate resources in classpath order"() {
+        given:
+        Path firstRoot = Files.createTempDirectory("config-import-classpath-star-first")
+        Path secondRoot = Files.createTempDirectory("config-import-classpath-star-second")
+        Files.writeString(firstRoot.resolve("duplicate-import.yml"), "app:\n  first: true\n  value: first\n")
+        Files.writeString(secondRoot.resolve("duplicate-import.yml"), "app:\n  second: true\n  value: second\n")
+        URLClassLoader classLoader = new URLClassLoader([firstRoot.toUri().toURL(), secondRoot.toUri().toURL()] as URL[], this.class.classLoader)
+        File main = File.createTempFile("config-import-classpath-star", ".properties")
+        main.write("micronaut.config.import=classpath*://duplicate-import.yml")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        def configuration = [
+            getEnvironments: { ["test"] },
+            getClassLoader : { classLoader }
+        ] as ApplicationContextConfiguration
+        Environment env = new DefaultEnvironment(configuration).start()
+
+        then:
+        env.getRequiredProperty("app.first", Boolean)
+        env.getRequiredProperty("app.second", Boolean)
+        env.getRequiredProperty("app.value", String) == "second"
+
+        cleanup:
+        classLoader.close()
+        System.clearProperty("micronaut.config.files")
+        main.delete()
+        try (def stream = Files.walk(firstRoot)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
+        try (def stream = Files.walk(secondRoot)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
+    }
+
+    void "test configtree protocol config import"() {
+        given:
+        Path root = Files.createTempDirectory("configtree-import")
+        Path nested = Files.createDirectories(root.resolve("db"))
+        Files.writeString(nested.resolve("password"), "secret")
+        File main = File.createTempFile("config-import-configtree", ".properties")
+        main.write("micronaut.config.import=configtree://${root.toString()}")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        env.getRequiredProperty("db.password", String) == "secret"
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        main.delete()
+        try (def stream = Files.walk(root)) {
+            stream.sorted(Comparator.reverseOrder())
+                .forEach(Files::deleteIfExists)
+        }
     }
 
     def "constructor(String... names) should preserve order specified in micronaut.environments system property"() {
@@ -361,7 +658,6 @@ class DefaultEnvironmentSpec extends Specification {
         envNames == ["test", "cloud", "ec2", "foo", "bar", "baz", "x", "y"]
     }
 
-    @RestoreSystemProperties
     void "test environments supplied should be a higher priority than deduced and system property"() {
         when:
         def env = new DefaultEnvironment({ [] })
@@ -403,7 +699,6 @@ class DefaultEnvironmentSpec extends Specification {
     }
     // end::disableEnvDeduction[]
 
-    @RestoreSystemProperties
     void "test disable environment deduction via system property"() {
         when:
         System.setProperty(Environment.CLOUD_PLATFORM_PROPERTY, "GOOGLE_COMPUTE")
@@ -479,7 +774,189 @@ class DefaultEnvironmentSpec extends Specification {
         env.close()
     }
 
-    @RestoreSystemProperties
+    void "test imported file property source is re-read on refresh"() {
+        given:
+        File imported = File.createTempFile("config-import-refresh-child", ".properties")
+        imported.write("app.imported=one")
+        File main = File.createTempFile("config-import-refresh-main", ".properties")
+        main.write("micronaut.config.import=file://${imported.absolutePath}\napp.main=main")
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        ApplicationContext context = ApplicationContext.builder("test").build().start()
+
+        expect:
+        context.getRequiredProperty("app.imported", String) == "one"
+
+        when:
+        imported.write("app.imported=two")
+        def diff = context.getEnvironment().refreshAndDiff()
+
+        then:
+        diff.get("app.imported") == "one"
+        context.getRequiredProperty("app.imported", String) == "two"
+
+        cleanup:
+        context?.close()
+        System.clearProperty("micronaut.config.files")
+        imported?.delete()
+        main?.delete()
+    }
+
+    void "test imported file property source change appears in refresh diff changed set"() {
+        given:
+        File imported = File.createTempFile("config-import-refresh-diff-child", ".properties")
+        imported.write("app.imported=before")
+        File main = File.createTempFile("config-import-refresh-diff-main", ".properties")
+        main.write("micronaut.config.import=file://${imported.absolutePath}\napp.main=main")
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        ApplicationContext context = ApplicationContext.builder("test").build().start()
+
+        expect:
+        context.getRequiredProperty("app.imported", String) == "before"
+
+        when:
+        imported.write("app.imported=after")
+        Map<String, Object> diff = context.getEnvironment().refreshAndDiff()
+
+        then:
+        diff.keySet() == ["app.imported"] as Set
+        diff.get("app.imported") == "before"
+        context.getRequiredProperty("app.imported", String) == "after"
+
+        cleanup:
+        context?.close()
+        System.clearProperty("micronaut.config.files")
+        imported?.delete()
+        main?.delete()
+    }
+
+    void "test imported file property source change appears in refresh diff changed set for run configuration"() {
+        given:
+        File imported = File.createTempFile("config-import-refresh-diff-child", ".properties")
+        imported.write("app.imported=before")
+        ApplicationContext context = ApplicationContext.run(
+                "micronaut.config.import":"file://${imported.absolutePath}",
+                "app.main": "main"
+        )
+
+        expect:
+        context.getRequiredProperty("app.imported", String) == "before"
+
+        when:
+        imported.write("app.imported=after")
+        Map<String, Object> diff = context.getEnvironment().refreshAndDiff()
+
+        then:
+        diff.keySet() == ["app.imported"] as Set
+        diff.get("app.imported") == "before"
+        context.getRequiredProperty("app.imported", String) == "after"
+
+        cleanup:
+        context?.close()
+        imported?.delete()
+    }
+
+    void "test map config import for file provider"() {
+        given:
+        File imported = File.createTempFile("config-import-map-child", ".properties")
+        imported.write("app.imported=map")
+        File main = File.createTempFile("config-import-map-main", ".yml")
+        main.write("""micronaut:
+  config:
+    import:
+      provider: file
+      resource-path: ${imported.absolutePath}
+""")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        env.getRequiredProperty("app.imported", String) == "map"
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        env?.close()
+        imported?.delete()
+        main?.delete()
+    }
+
+    void "test list of map config imports for file provider"() {
+        given:
+        File first = File.createTempFile("config-import-map-list-first", ".properties")
+        first.write("app.first=true")
+        File second = File.createTempFile("config-import-map-list-second", ".properties")
+        second.write("app.second=true")
+        File main = File.createTempFile("config-import-map-list-main", ".yml")
+        main.write("""micronaut:
+  config:
+    import:
+      - provider: file
+        resource-path: ${first.absolutePath}
+      - provider: file
+        resource-path: ${second.absolutePath}
+""")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        Environment env = new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        env.getRequiredProperty("app.first", Boolean)
+        env.getRequiredProperty("app.second", Boolean)
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        env?.close()
+        first?.delete()
+        second?.delete()
+        main?.delete()
+    }
+
+    void "test map config import fails when provider is missing"() {
+        given:
+        File main = File.createTempFile("config-import-map-missing-provider", ".yml")
+        main.write("""micronaut:
+  config:
+    import:
+      resource-path: /tmp/demo.properties
+""")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        ConfigurationException e = thrown()
+        e.message.contains("require non-blank ['provider']")
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        main?.delete()
+    }
+
+    void "test map config import fails when file resource-path is missing"() {
+        given:
+        File main = File.createTempFile("config-import-map-missing-path", ".yml")
+        main.write("""micronaut:
+  config:
+    import:
+      provider: file
+""")
+
+        when:
+        System.setProperty("micronaut.config.files", main.absolutePath)
+        new DefaultEnvironment({ ["test"] }).start()
+
+        then:
+        ConfigurationException e = thrown()
+        e.message.contains("requires ['resource-path']")
+
+        cleanup:
+        System.clearProperty("micronaut.config.files")
+        main?.delete()
+    }
+
     void "test property source order"() {
         when:
         System.setProperty("micronaut.config.files", "classpath:config-files.yml,classpath:config-files2.yml")
@@ -551,7 +1028,6 @@ class DefaultEnvironmentSpec extends Specification {
             applicationContext.stop()
     }
 
-    @RestoreSystemProperties
     void "test custom config locations used in bootstrap environment"() {
         given:
         System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, StringUtils.TRUE)
@@ -562,11 +1038,17 @@ class DefaultEnvironmentSpec extends Specification {
                 .build()
                 .start()
 
+        List<PropertySource> sources = new ArrayList(applicationContext.getEnvironment().getPropertySources())
+        OrderUtil.sort(sources)
         then:
         applicationContext.getRequiredProperty("custom-bootstrap-value", String.class) == "test"
+        sources.collect { [it.name, it.order] } == [
+                ['application', -300], ['bootstrap', -290], ['env', -190], ['system', -90]
+        ]
 
         cleanup:
         applicationContext.stop()
+        System.clearProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY)
     }
 
     void "test custom config locations respect environment order"() {
@@ -921,12 +1403,15 @@ class DefaultEnvironmentSpec extends Specification {
         then: 'the environment is deduced'
         env.activeNames == ["test", Environment.KUBERNETES, Environment.CLOUD] as Set
     }
+
+    static record Foo(String val) {}
+
+    static record Bar(String val) {}
+
     private static Environment startEnv(String files) {
-        new DefaultEnvironment({["test"]}) {
-            @Override
-            protected String readPropertySourceListKeyFromEnvironment() {
-                files
-            }
-        }.start()
+        return SystemLambda.withEnvironmentVariable(StringUtils.convertDotToUnderscore(Environment.PROPERTY_SOURCES_KEY), files)
+                .execute(() -> {
+                    new DefaultEnvironment({ ["test"] }).start()
+                })
     }
 }

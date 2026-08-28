@@ -18,7 +18,12 @@ package io.micronaut.annotation.processing.test;
 
 import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.Reader;
+import java.io.StringReader;
+import java.io.Writer;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.Arrays;

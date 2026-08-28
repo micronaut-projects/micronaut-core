@@ -82,6 +82,12 @@ public interface HttpHeaders extends Headers {
     String ACCEPT_PATCH = "Accept-Patch";
 
     /**
+     * {@code "Accept-Query"}.
+     * @since 5.2.0
+     */
+    String ACCEPT_QUERY = "Accept-Query";
+
+    /**
      * {@code "Access-Control-Allow-Credentials"}.
      */
     String ACCESS_CONTROL_ALLOW_CREDENTIALS = "Access-Control-Allow-Credentials";
@@ -386,6 +392,34 @@ public interface HttpHeaders extends Headers {
     String SAVE_DATA = "Save-Data";
 
     /**
+     * {@code "Sec-Fetch-Dest"}.
+     *
+     * @since 5.1.12
+     */
+    String SEC_FETCH_DEST = "Sec-Fetch-Dest";
+
+    /**
+     * {@code "Sec-Fetch-Mode"}.
+     *
+     * @since 5.1.12
+     */
+    String SEC_FETCH_MODE = "Sec-Fetch-Mode";
+
+    /**
+     * {@code "Sec-Fetch-Site"}.
+     *
+     * @since 5.1.12
+     */
+    String SEC_FETCH_SITE = "Sec-Fetch-Site";
+
+    /**
+     * {@code "Sec-Fetch-User"}.
+     *
+     * @since 5.1.12
+     */
+    String SEC_FETCH_USER = "Sec-Fetch-User";
+
+    /**
      * {@code "Sec-WebSocket-Key1"}.
      */
     String SEC_WEBSOCKET_KEY1 = "Sec-WebSocket-Key1";
@@ -533,6 +567,7 @@ public interface HttpHeaders extends Headers {
         ACCEPT_LANGUAGE,
         ACCEPT_RANGES,
         ACCEPT_PATCH,
+        ACCEPT_QUERY,
         ACCESS_CONTROL_ALLOW_CREDENTIALS,
         ACCESS_CONTROL_ALLOW_HEADERS,
         ACCESS_CONTROL_ALLOW_METHODS,
@@ -592,6 +627,10 @@ public interface HttpHeaders extends Headers {
         RETRY_AFTER,
         RTT,
         SAVE_DATA,
+        SEC_FETCH_DEST,
+        SEC_FETCH_MODE,
+        SEC_FETCH_SITE,
+        SEC_FETCH_USER,
         SEC_WEBSOCKET_KEY1,
         SEC_WEBSOCKET_KEY2,
         SEC_WEBSOCKET_LOCATION,
@@ -658,7 +697,7 @@ public interface HttpHeaders extends Headers {
      * @param name The header name
      * @return The date header as a {@link ZonedDateTime} otherwise if it is not present or cannot be parsed null
      */
-    default ZonedDateTime getDate(CharSequence name) {
+    default @Nullable ZonedDateTime getDate(CharSequence name) {
         return findDate(name).orElse(null);
     }
 
@@ -668,7 +707,7 @@ public interface HttpHeaders extends Headers {
      * @param name The header name
      * @return The date header as a {@link ZonedDateTime} otherwise if it is not present or cannot be parsed null
      */
-    default Integer getInt(CharSequence name) {
+    default @Nullable Integer getInt(CharSequence name) {
         return findInt(name).orElse(null);
     }
 

@@ -15,7 +15,6 @@
  */
 package io.micronaut.buffer.netty;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.core.util.functional.ThrowingConsumer;
@@ -25,14 +24,21 @@ import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.util.ReferenceCountUtil;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
+import java.nio.channels.ScatteringByteChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * Netty-based {@link ReadBufferFactory}. Also has additional utilities for dealing with netty
@@ -54,18 +60,17 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
      * @param allocator The allocator to use
      * @return The buffer factory
      */
-    @NonNull
-    public static NettyReadBufferFactory of(@NonNull ByteBufAllocator allocator) {
+    public static NettyReadBufferFactory of(ByteBufAllocator allocator) {
         return new NettyReadBufferFactory(allocator);
     }
 
     @Override
     public ReadBuffer createEmpty() {
-        return new NettyReadBuffer(Unpooled.EMPTY_BUFFER);
+        return adapt(Unpooled.EMPTY_BUFFER);
     }
 
     @Override
-    public @NonNull ReadBuffer copyOf(@NonNull CharSequence cs, @NonNull Charset charset) {
+    public ReadBuffer copyOf(CharSequence cs, Charset charset) {
         ByteBuf byteBuf = charset == StandardCharsets.UTF_8 ?
             ByteBufUtil.writeUtf8(allocator, cs) :
             ByteBufUtil.encodeString(allocator, CharBuffer.wrap(cs), charset);
@@ -73,7 +78,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public @NonNull ReadBuffer copyOf(@NonNull InputStream stream) throws IOException {
+    public ReadBuffer copyOf(InputStream stream) throws IOException {
         ByteBuf buffer = allocator.buffer();
         boolean free = true;
         try {
@@ -92,7 +97,28 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public @NonNull ReadBuffer copyOf(@NonNull ByteBuffer nioBuffer) {
+    public @Nullable ReadBuffer copyOf(ScatteringByteChannel channel, int n) throws IOException {
+        ByteBuf bb = allocator.buffer(n);
+        int actual;
+        try {
+            actual = bb.writeBytes(channel, n);
+        } catch (Throwable e) {
+            bb.release();
+            throw e;
+        }
+        if (actual < 0) {
+            bb.release();
+            return null;
+        } else if (actual > 0) {
+            return adapt(bb);
+        } else {
+            bb.release();
+            return createEmpty();
+        }
+    }
+
+    @Override
+    public ReadBuffer copyOf(ByteBuffer nioBuffer) {
         ByteBuf bb = allocator.buffer(nioBuffer.remaining());
         boolean done = false;
         try {
@@ -107,13 +133,12 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public @NonNull ReadBuffer adapt(@NonNull ByteBuffer nioBuffer) {
+    public ReadBuffer adapt(ByteBuffer nioBuffer) {
         return adapt(Unpooled.wrappedBuffer(nioBuffer));
     }
 
     @Override
-    @NonNull
-    public ReadBuffer adapt(@NonNull io.micronaut.core.io.buffer.ByteBuffer<?> buffer) {
+    public ReadBuffer adapt(io.micronaut.core.io.buffer.ByteBuffer<?> buffer) {
         if (buffer.asNativeBuffer() instanceof ByteBuf bb) {
             return adapt(bb);
         }
@@ -121,7 +146,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public ReadBuffer adapt(byte @NonNull [] array) {
+    public ReadBuffer adapt(byte[] array) {
         return adapt(Unpooled.wrappedBuffer(array));
     }
 
@@ -134,8 +159,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
      * @param buffer A buffer
      * @return The adapted buffer
      */
-    @NonNull
-    public ReadBuffer adapt(@NonNull ByteBuf buffer) {
+    public ReadBuffer adapt(ByteBuf buffer) {
         return new NettyReadBuffer(buffer);
     }
 
@@ -146,8 +170,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
      * @param readBuffer The buffer to read from
      * @return The read data
      */
-    @NonNull
-    public static ByteBuf toByteBuf(@NonNull ReadBuffer readBuffer) {
+    public static ByteBuf toByteBuf(ReadBuffer readBuffer) {
         if (readBuffer instanceof NettyReadBuffer nrb) {
             return nrb.toByteBuf();
         } else {
@@ -156,7 +179,7 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public @NonNull <T extends Throwable> ReadBuffer buffer(@NonNull ThrowingConsumer<? super OutputStream, T> writer) throws T {
+    public <T extends Throwable> ReadBuffer buffer(ThrowingConsumer<? super OutputStream, T> writer) throws T {
         ByteBuf buf = allocator.buffer();
         boolean release = true;
         try {
@@ -177,8 +200,9 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public @NonNull ReadBufferFactory.BufferingOutputStream outputStreamBuffer() {
+    public ReadBufferFactory. BufferingOutputStream outputStreamBuffer() {
         return new ReadBufferFactory.BufferingOutputStream() {
+            @Nullable
             ByteBufOutputStream out = new ByteBufOutputStream(allocator.buffer());
 
             @Override
@@ -224,15 +248,30 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
     }
 
     @Override
-    public @NonNull ReadBuffer compose(@NonNull Iterable<@NonNull ReadBuffer> buffers) {
-        CompositeByteBuf composite = allocator.compositeBuffer();
+    public ReadBuffer compose(Iterable<ReadBuffer> buffers) {
+        // shortcuts for buffers.size == 0 or 1
+        Iterator<ReadBuffer> itr = buffers.iterator();
+        if (!itr.hasNext()) {
+            return createEmpty();
+        } else {
+            ReadBuffer first = itr.next();
+            if (!itr.hasNext()) {
+                return first;
+            }
+        }
+        // toByteBuf consumes each ReadBuffer, so if extraction fails partway, the ByteBufs
+        // already extracted have no owner anymore and must be released explicitly here.
+        List<ByteBuf> components = buffers instanceof Collection<?> collection
+            ? new ArrayList<>(collection.size())
+            : new ArrayList<>();
         try {
             for (ReadBuffer buffer : buffers) {
-                composite.addComponent(true, toByteBuf(buffer));
+                components.add(toByteBuf(buffer));
             }
-            return adapt(composite);
         } catch (Throwable e) {
-            composite.release();
+            for (ByteBuf component : components) {
+                ReferenceCountUtil.safeRelease(component);
+            }
             for (ReadBuffer buffer : buffers) {
                 try {
                     buffer.close();
@@ -240,6 +279,19 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
                     e.addSuppressed(f);
                 }
             }
+            throw e;
+        }
+        CompositeByteBuf composite = allocator.compositeBuffer();
+        try {
+            // addComponents consolidates at most once, at the end. Adding components one at a time
+            // calls consolidateIfNeeded() after each one, and each consolidation copies everything
+            // accumulated so far, making aggregation O(size^2 / chunkSize). addComponents also
+            // takes ownership of all components, releasing any it did not add, so from here on the
+            // composite is the only thing left to release.
+            composite.addComponents(true, components);
+            return adapt(composite);
+        } catch (Throwable e) {
+            composite.release();
             throw e;
         }
     }

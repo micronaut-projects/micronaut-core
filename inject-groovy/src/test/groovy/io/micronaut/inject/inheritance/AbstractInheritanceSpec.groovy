@@ -18,10 +18,6 @@ package io.micronaut.inject.inheritance
 import groovy.transform.PackageScope
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.BeanDefinition
-import spock.lang.Specification
 
 import jakarta.inject.Inject
 import jakarta.inject.Singleton

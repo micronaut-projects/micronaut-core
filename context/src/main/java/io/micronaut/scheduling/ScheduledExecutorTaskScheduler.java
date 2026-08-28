@@ -15,15 +15,12 @@
  */
 package io.micronaut.scheduling;
 
-import static io.micronaut.core.util.ArgumentUtils.check;
-
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.cron.CronExpression;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -32,6 +29,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+
+import static io.micronaut.core.util.ArgumentUtils.check;
 
 /**
  * Simple abstraction over {@link ScheduledExecutorService}.
@@ -67,14 +66,14 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
     }
 
     @Override
-    public <V> ScheduledFuture<V> schedule(@NonNull String cron, @Nullable String timezoneId, @NonNull Callable<V> command) {
+    public <V> ScheduledFuture<V> schedule(String cron, @Nullable String timezoneId, Callable<V> command) {
         if (StringUtils.isEmpty(cron)) {
             throw new IllegalArgumentException("Blank cron expression not allowed");
         }
         check("command", command).notNull();
 
         ZoneId zoneId;
-        if (timezoneId == null || timezoneId.equals("")) {
+        if (timezoneId == null || timezoneId.isEmpty()) {
             zoneId = ZoneId.systemDefault();
         } else {
             try {
@@ -115,7 +114,7 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
     }
 
     @Override
-    public ScheduledFuture<?> scheduleAtFixedRate(Duration initialDelay, Duration period, Runnable command) {
+    public ScheduledFuture<?> scheduleAtFixedRate(@Nullable Duration initialDelay, Duration period, Runnable command) {
         check("period", period).notNull();
         check("command", command).notNull();
         long initialDelayMillis = initialDelay != null ? initialDelay.toMillis() : 0;
@@ -128,7 +127,7 @@ public class ScheduledExecutorTaskScheduler implements TaskScheduler {
     }
 
     @Override
-    public ScheduledFuture<?> scheduleWithFixedDelay(Duration initialDelay, Duration delay, Runnable command) {
+    public ScheduledFuture<?> scheduleWithFixedDelay(@Nullable Duration initialDelay, Duration delay, Runnable command) {
         check("delay", delay).notNull();
         check("command", command).notNull();
         long initialDelayMillis = initialDelay != null ? initialDelay.toMillis() : 0;

@@ -16,8 +16,7 @@
 package io.micronaut.inject.ast.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -56,7 +55,6 @@ public final class MethodElementAnnotationsHelper {
      * @param presetAnnotationMetadata The preset annotations
      * @return The method annotations
      */
-    @NonNull
     public ElementAnnotationMetadata getMethodAnnotationMetadata(@Nullable AnnotationMetadata presetAnnotationMetadata) {
         if (resolvedMethodAnnotationMetadata == null) {
             if (methodElement instanceof ConstructorElement) {
@@ -75,8 +73,7 @@ public final class MethodElementAnnotationsHelper {
         return resolvedMethodAnnotationMetadata;
     }
 
-    @NonNull
-    private ElementAnnotationMetadata getBuildMutable(@NonNull AnnotationMetadata declaredMetadata) {
+    private ElementAnnotationMetadata getBuildMutable(AnnotationMetadata declaredMetadata) {
         if (declaredMetadata instanceof ElementAnnotationMetadata elementAnnotationMetadata) {
             return elementAnnotationMetadata;
         }
@@ -89,7 +86,6 @@ public final class MethodElementAnnotationsHelper {
      * @param presetAnnotationMetadata The preset annotations
      * @return The annotations
      */
-    @NonNull
     public AnnotationMetadata getAnnotationMetadata(@Nullable AnnotationMetadata presetAnnotationMetadata) {
         if (resolvedAnnotationMetadata == null) {
             if (methodElement instanceof ConstructorElement) {

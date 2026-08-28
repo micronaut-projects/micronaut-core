@@ -1,6 +1,6 @@
 package io.micronaut.docs.server.sse
 
-import io.kotest.assertions.timing.eventually
+import io.kotest.assertions.nondeterministic.eventually
 import io.kotest.matchers.shouldBe
 import io.kotest.core.spec.style.StringSpec
 import io.micronaut.context.ApplicationContext
@@ -8,7 +8,6 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.sse.SseClient
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
-import org.opentest4j.AssertionFailedError
 import reactor.core.publisher.Flux
 
 import java.util.ArrayList
@@ -33,7 +32,7 @@ class HeadlineControllerSpec: StringSpec() {
                 events.add(it)
             }
 
-            eventually(2.toDuration(DurationUnit.SECONDS), AssertionFailedError::class) {
+            eventually(2.toDuration(DurationUnit.SECONDS)) {
                 events.size shouldBe 2
                 events[0].data.title shouldBe "Micronaut 1.0 Released"
                 events[0].data.description shouldBe "Come and get it"

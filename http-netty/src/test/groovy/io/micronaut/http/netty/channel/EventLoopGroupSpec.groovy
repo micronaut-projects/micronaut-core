@@ -1,7 +1,6 @@
 package io.micronaut.http.netty.channel
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.netty.buffer.PooledByteBufAllocator
@@ -147,7 +146,7 @@ class EventLoopGroupSpec extends Specification {
 
     void "test configure shutdown for default event loop groups"() {
         given:
-        ApplicationContext context = new DefaultApplicationContext("test")
+        ApplicationContext context = ApplicationContext.builder("test").build()
         context.environment.addPropertySource(PropertySource.of("test",
                 [
                     'micronaut.netty.event-loops.default.shutdown-quiet-period' : '1ms',
@@ -166,7 +165,7 @@ class EventLoopGroupSpec extends Specification {
 
     void "test configure shutdown for other event loop groups"() {
         given:
-        ApplicationContext context = new DefaultApplicationContext("test")
+        ApplicationContext context = ApplicationContext.builder("test").build()
         context.environment.addPropertySource(PropertySource.of("test",
                 [
                     'micronaut.netty.event-loops.one.shutdown-quiet-period' : '10ms',

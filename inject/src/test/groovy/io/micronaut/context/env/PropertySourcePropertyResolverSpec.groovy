@@ -18,17 +18,20 @@ package io.micronaut.context.env
 import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
 import io.micronaut.core.value.MapPropertyResolver
+import io.micronaut.core.value.PropertyCatalog
 import io.micronaut.core.value.PropertyResolver
 import io.micronaut.core.value.ValueException
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -36,6 +39,40 @@ import java.util.concurrent.atomic.AtomicBoolean
  * @since 1.0
  */
 class PropertySourcePropertyResolverSpec extends Specification {
+
+    void "placeholder lookup does not retain a missing value observed during catalog reinitialization"() {
+        given:
+        PropertySource source = PropertySource.of("test", ["test.value": "resolved"])
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(source)
+        DefaultPropertyPlaceholderResolver placeholders = new DefaultPropertyPlaceholderResolver(resolver, ConversionService.SHARED)
+        CountDownLatch catalogCleared = new CountDownLatch(1)
+        CountDownLatch lookupCompleted = new CountDownLatch(1)
+        Thread refreshThread = Thread.start {
+            resolver.reset()
+            catalogCleared.countDown()
+            assert lookupCompleted.await(10, TimeUnit.SECONDS)
+            resolver.addPropertySource(source)
+        }
+
+        when: "a request observes the empty catalog between reset and its reinitialization"
+        ConfigurationException missingDuringRefresh
+        try {
+            assert catalogCleared.await(10, TimeUnit.SECONDS)
+            try {
+                placeholders.resolveRequiredPlaceholders('${test.value}')
+                throw new AssertionError("Expected placeholder resolution to fail while the catalog is empty")
+            } catch (ConfigurationException e) {
+                missingDuringRefresh = e
+            }
+        } finally {
+            lookupCompleted.countDown()
+            refreshThread.join(10_000)
+        }
+        then: "the negative lookup must not survive once the catalog has been rebuilt"
+        !refreshThread.alive
+        missingDuringRefresh.message == 'Could not resolve placeholder ${test.value}'
+        placeholders.resolveRequiredPlaceholders('${test.value}') == "resolved"
+    }
 
     @Unroll
     void "test resolve property #property matches for pattern #pattern"() {
@@ -90,6 +127,18 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperties("camelCase", StringConvention.RAW) == ['fooBar': 'xxx',
                                                                       'URL'   : "http://localhost"]
         resolver.getProperty("camelCase.URL", URL).get() == new URL("http://localhost")
+    }
+
+    void "test resolve property entries for env key with hyphenated prefix"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [MICRONAUT_OBJECT_STORAGE_ORACLE_CLOUD_DEFAULT_BUCKET: 'bucket'], PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE)
+        )
+        Set<String> generatedEntries = resolver.getPropertyEntries("micronaut.object-storage.oracle-cloud", PropertyCatalog.GENERATED)
+
+        expect:
+        generatedEntries.contains('default')
+        resolver.getPropertyEntries("micronaut.object-storage.oracle-cloud").isEmpty()
     }
 
     @Unroll
@@ -744,6 +793,38 @@ class PropertySourcePropertyResolverSpec extends Specification {
         closed.get()
     }
 
+    void "test expression resolver services are loaded from configured classloader"() {
+        given:
+        java.nio.file.Path servicesRoot = java.nio.file.Files.createTempDirectory("property-expression-services")
+        java.nio.file.Path serviceFile = servicesRoot.resolve("META-INF/services/io.micronaut.context.env.PropertyExpressionResolver")
+        java.nio.file.Files.createDirectories(serviceFile.parent)
+        java.nio.file.Files.writeString(serviceFile, TestExpressionResolver.name)
+        URLClassLoader classLoader = new URLClassLoader([servicesRoot.toUri().toURL()] as URL[], getClass().classLoader)
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(ConversionService.SHARED, true, classLoader)
+        resolver.addPropertySource(PropertySource.of("test", [foo: '${service.loaded}']))
+
+        expect:
+        resolver.getProperty("foo", String).get() == "loaded"
+
+        cleanup:
+        classLoader.close()
+        servicesRoot.toFile().deleteDir()
+    }
+
     interface PropertyExpressionResolverAutoCloseable extends PropertyExpressionResolver, AutoCloseable {
+    }
+
+    static class TestExpressionResolver implements PropertyExpressionResolver {
+        @Override
+        @NonNull
+        <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
+                                @NonNull ConversionService conversionService,
+                                @NonNull String expression,
+                                @NonNull Class<T> requiredType) {
+            if (expression == "service.loaded") {
+                return conversionService.convert("loaded", requiredType)
+            }
+            Optional.empty()
+        }
     }
 }

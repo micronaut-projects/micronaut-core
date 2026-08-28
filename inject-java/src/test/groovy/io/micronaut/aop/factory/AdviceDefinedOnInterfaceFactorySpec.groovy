@@ -18,8 +18,6 @@ package io.micronaut.aop.factory
 import io.micronaut.context.ApplicationContext
 import org.hibernate.SessionFactory
 import io.micronaut.aop.Intercepted
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers

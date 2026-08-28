@@ -8,12 +8,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.experimental.FieldNameConstants;
-import lombok.extern.jackson.Jacksonized;
+//import lombok.extern.jackson.Jacksonized; TODO: bring back once lombok Jacksonized supports jackson 3
 
 @Getter
 @Builder(toBuilder = true)
 @ToString
-@Jacksonized
+//@Jacksonized TODO: bring back once lombok Jacksonized supports jackson 3
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @EqualsAndHashCode

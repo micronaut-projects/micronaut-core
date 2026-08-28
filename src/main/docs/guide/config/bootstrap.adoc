@@ -6,7 +6,7 @@ The bootstrap context is enabled depending on the following conditions. The cond
 
 - If The api:context.env.Environment#BOOTSTRAP_CONTEXT_PROPERTY[micronaut.bootstrap.context] system property is set, that value determines if the bootstrap context is enabled.
 - If The application context builder option api:context.ApplicationContextBuilder#bootstrapEnvironment[bootstrapEnvironment] is set, that value determines if the bootstrap context is enabled.
-- If a api:context.env.BootstrapPropertySourceLocator[] bean is present the bootstrap context is enabled. Normally this comes from the `micronaut-discovery-client` dependency.
+- If a api:context.env.BootstrapPropertySourceLocator[] bean is present the bootstrap context is enabled. Normally this comes from the `micronaut-discovery-client` dependency. If you provide a custom api:discovery.config.ConfigurationClient[] for distributed configuration, make sure that dependency is present so the bootstrap/distributed configuration infrastructure is loaded.
 
 Configuration properties that must be present before application context configuration properties are resolved, for example when using distributed configuration, are stored in a bootstrap configuration file. Once it is determined the bootstrap context is enabled (as described above), the bootstrap configuration files are read using the same rules as regular application configuration.
 See the <<propertySource, property source>> documentation for the details. The only difference is the prefix (`bootstrap` instead of `application`).
@@ -22,3 +22,5 @@ See the <<distributedConfiguration, distributed configuration>> section of the d
 === Bootstrap Context Beans
 
 In order for a bean to be resolvable in the bootstrap context it must be annotated with ann:context.annotation.BootstrapContextCompatible[]. If any given bean is not annotated then it will not be able to be resolved in the bootstrap context. Typically, any bean that is participating in the process of retrieving distributed configuration needs to be annotated.
+
+For example, if you implement custom distributed configuration that is resolved during bootstrap, any supporting beans it depends on must be bootstrap-compatible, and the application must include the discovery client infrastructure, typically by adding the `io.micronaut.discovery:micronaut-discovery-client` dependency.

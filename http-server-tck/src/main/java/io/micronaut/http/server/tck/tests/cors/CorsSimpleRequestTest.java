@@ -17,15 +17,9 @@ package io.micronaut.http.server.tck.tests.cors;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
-import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Post;
-import io.micronaut.http.annotation.Status;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.server.tck.CorsAssertion;
 import io.micronaut.http.tck.AssertionUtils;
@@ -33,13 +27,13 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.RequestSupplier;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -58,6 +52,12 @@ public class CorsSimpleRequestTest {
     private static final String SPECNAME = "CorsSimpleRequestTest";
     private static final String PROPERTY_MICRONAUT_SERVER_CORS_ENABLED = "micronaut.server.cors.enabled";
     private static final String PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH = "micronaut.server.cors.localhost-pass-through";
+    private static final String ENDPOINTS_REFRESH_ENABLED = "endpoints.refresh.enabled";
+    private static final String ENDPOINTS_REFRESH_SENSITIVE = "endpoints.refresh.sensitive";
+    private static final Map<String, Object> BASE_CONFIG = Map.of(
+        ENDPOINTS_REFRESH_ENABLED, StringUtils.TRUE,
+        ENDPOINTS_REFRESH_SENSITIVE, StringUtils.FALSE,
+        PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE);
 
     /**
      * @see <a href="https://github.com/micronaut-projects/micronaut-core/security/advisories/GHSA-583g-g682-crxf">GHSA-583g-g682-crxf</a>
@@ -76,7 +76,7 @@ public class CorsSimpleRequestTest {
     @Tag("multipart")
     void corsSimpleRequestNotAllowedForLocalhostAndAny() throws IOException {
         asserts(SPECNAME,
-            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            BASE_CONFIG,
             createRequest("https://foo.com"),
             CorsSimpleRequestTest::isForbidden
         );
@@ -91,11 +91,10 @@ public class CorsSimpleRequestTest {
     @Test
     @Tag("multipart")
     void corsSimpleRequestAllowedForLocalhostAndAnyWhenSpecificallyTurnedOff() throws IOException {
+        Map<String, Object> config = new HashMap<>(BASE_CONFIG);
+        config.put(PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH, StringUtils.TRUE);
         asserts(SPECNAME,
-            Map.of(
-                PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE,
-                PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH, StringUtils.TRUE
-            ),
+            config,
             createRequest("https://foo.com"),
             CorsSimpleRequestTest::isSuccessful
         );
@@ -118,7 +117,7 @@ public class CorsSimpleRequestTest {
     @Tag("multipart")
     void corsSimpleRequestNotAllowedFor127AndAny() throws IOException {
         asserts(SPECNAME,
-            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            BASE_CONFIG,
             createRequestFor("127.0.0.1", "https://foo.com"),
             CorsSimpleRequestTest::isForbidden
         );
@@ -132,7 +131,7 @@ public class CorsSimpleRequestTest {
     @Tag("multipart")
     void corsSimpleRequestAllowedForLocalhostAndOriginLocalhost() throws IOException {
         asserts(SPECNAME,
-            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            BASE_CONFIG,
             createRequest("http://localhost:8000"),
             CorsSimpleRequestTest::isSuccessful
         );
@@ -147,7 +146,7 @@ public class CorsSimpleRequestTest {
     @Tag("multipart")
     void corsSimpleRequestAllowedForLocalhostAnd127Origin() throws IOException {
         asserts(SPECNAME,
-            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            BASE_CONFIG,
             createRequestFor("localhost", "http://127.0.0.1:8000"),
             CorsSimpleRequestTest::isSuccessful
         );
@@ -162,7 +161,7 @@ public class CorsSimpleRequestTest {
     @Tag("multipart")
     void corsSimpleRequestFailsForLocalhostAndSpoofed127Origin() throws IOException {
         asserts(SPECNAME,
-            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            BASE_CONFIG,
             createRequestFor("localhost", "http://127.0.0.1.hac0r.com:8000"),
             CorsSimpleRequestTest::isForbidden
         );
@@ -177,7 +176,7 @@ public class CorsSimpleRequestTest {
     @Tag("multipart")
     void corsSimpleRequestAllowedFor127RequestAndLocalhostOrigin() throws IOException {
         asserts(SPECNAME,
-            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            BASE_CONFIG,
             createRequestFor("127.0.0.1", "http://localhost:8000"),
             CorsSimpleRequestTest::isSuccessful
         );
@@ -190,11 +189,10 @@ public class CorsSimpleRequestTest {
     @Test
     @Tag("multipart")
     void corsSimpleRequestForLocalhostCanBeAllowedViaConfiguration() throws IOException {
+        Map<String, Object> config = new HashMap<>(BASE_CONFIG);
+        config.put("micronaut.server.cors.configurations.foo.allowed-origins", Collections.singletonList("https://foo.com"));
         asserts(SPECNAME,
-            Map.of(
-                PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE,
-                "micronaut.server.cors.configurations.foo.allowed-origins", Collections.singletonList("https://foo.com")
-            ),
+            config,
             createRequest("https://foo.com"),
             CorsSimpleRequestTest::isSuccessfulCorsAssertion
         );
@@ -208,11 +206,10 @@ public class CorsSimpleRequestTest {
     // "https://github.com/micronaut-projects/micronaut-core/issues/9423")
     @Tag("multipart")
     void corsSimpleRequestForLocalhostCanBeAllowedViaRegexConfiguration() throws IOException {
+        Map<String, Object> config = new HashMap<>(BASE_CONFIG);
+        config.put("micronaut.server.cors.configurations.foo.allowed-origins-regex", Collections.singletonList("^http(|s):\\/\\/foo\\.com$"));
         asserts(SPECNAME,
-            Map.of(
-                PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE,
-                "micronaut.server.cors.configurations.foo.allowed-origins-regex", Collections.singletonList("^http(|s):\\/\\/foo\\.com$")
-            ),
+            config,
             createRequest("https://foo.com"),
             CorsSimpleRequestTest::isSuccessfulCorsAssertion
         );
@@ -226,11 +223,10 @@ public class CorsSimpleRequestTest {
     // "https://github.com/micronaut-projects/micronaut-core/issues/9423")
     @Tag("multipart")
     void corsSimpleRequestForLocalhostForbiddenViaRegexConfiguration() throws IOException {
+        Map<String, Object> config = new HashMap<>(BASE_CONFIG);
+        config.put("micronaut.server.cors.configurations.foo.allowed-origins-regex", Collections.singletonList("^http(|s):\\/\\/foo\\.com$"));
         asserts(SPECNAME,
-            Map.of(
-                PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE,
-                "micronaut.server.cors.configurations.foo.allowed-origins-regex", Collections.singletonList("^http(|s):\\/\\/foo\\.com$")
-            ),
+            config,
             createRequest("https://bar.com"),
             CorsSimpleRequestTest::isForbidden
         );
@@ -243,11 +239,9 @@ public class CorsSimpleRequestTest {
     @Test
     @Tag("multipart")
     void corsSimpleRequestForLocalhostCanBeAllowedViaConfigurationWithRegexToo() throws IOException {
-        Map<String, Object> config = Map.of(
-            PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE,
-            "micronaut.server.cors.configurations.foo.allowed-origins-regex", Collections.singletonList("^http(|s):\\/\\/foo\\.com$"),
-            "micronaut.server.cors.configurations.foo.allowed-origins", Collections.singletonList("https://bar.com")
-        );
+        Map<String, Object> config = new HashMap<>(BASE_CONFIG);
+        config.put("micronaut.server.cors.configurations.foo.allowed-origins-regex", Collections.singletonList("^http(|s):\\/\\/foo\\.com$"));
+        config.put("micronaut.server.cors.configurations.foo.allowed-origins", Collections.singletonList("https://bar.com"));
         assertAll(
             () -> asserts(SPECNAME, config,
                 createRequest("https://foo.com"),
@@ -259,7 +253,7 @@ public class CorsSimpleRequestTest {
                         .status(HttpStatus.OK)
                         .assertResponse(response -> CorsAssertion.builder()
                             .vary("Origin")
-                            .allowCredentials()
+                            .allowCredentials(false)
                             .allowOrigin("https://foo.com")
                             .build()
                             .validate(response))
@@ -276,7 +270,7 @@ public class CorsSimpleRequestTest {
                         .status(HttpStatus.OK)
                         .assertResponse(response -> CorsAssertion.builder()
                             .vary("Origin")
-                            .allowCredentials()
+                            .allowCredentials(false)
                             .allowOrigin("http://foo.com")
                             .build()
                             .validate(response))
@@ -293,7 +287,7 @@ public class CorsSimpleRequestTest {
                         .status(HttpStatus.OK)
                         .assertResponse(response -> CorsAssertion.builder()
                             .vary("Origin")
-                            .allowCredentials()
+                            .allowCredentials(false)
                             .allowOrigin("https://bar.com")
                             .build()
                             .validate(response))
@@ -310,11 +304,10 @@ public class CorsSimpleRequestTest {
     @Test
     @Tag("multipart")
     void corsSimpleRequestForAllowedRegexDoesNotDefaultToAllAllowedorigins() throws IOException {
+        Map<String, Object> config = new HashMap<>(BASE_CONFIG);
+        config.put("micronaut.server.cors.configurations.foo.allowed-origins-regex", Collections.singletonList("^http(|s):\\/\\/foo\\.com$"));
         asserts(SPECNAME,
-            Map.of(
-                PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE,
-                "micronaut.server.cors.configurations.foo.allowed-origins-regex", Collections.singletonList("^http(|s):\\/\\/foo\\.com$")
-            ),
+            config,
             createRequest("https://bar.com"),
             CorsSimpleRequestTest::isForbidden
         );
@@ -357,7 +350,7 @@ public class CorsSimpleRequestTest {
             .status(HttpStatus.OK)
             .assertResponse(response -> CorsAssertion.builder()
                 .vary("Origin")
-                .allowCredentials()
+                .allowCredentials(false)
                 .allowOrigin("https://foo.com")
                 .build()
                 .validate(response))
@@ -380,20 +373,6 @@ public class CorsSimpleRequestTest {
             .header("Referer", origin)
             .header("Accept-Language", "en - GB, en")
             .header("content-length", "140");
-    }
-
-    @Requires(property = "spec.name", value = SPECNAME)
-    @Controller
-    static class RefreshController {
-        @Inject
-        ApplicationEventPublisher<RefreshEvent> refreshEventApplicationEventPublisher;
-
-        @Consumes(MediaType.MULTIPART_FORM_DATA)
-        @Post("/refresh")
-        @Status(HttpStatus.OK)
-        void refresh() {
-            refreshEventApplicationEventPublisher.publishEvent(new RefreshEvent());
-        }
     }
 
     @Requires(property = "spec.name", value = SPECNAME)

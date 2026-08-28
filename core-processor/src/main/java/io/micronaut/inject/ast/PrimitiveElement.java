@@ -15,9 +15,9 @@
  */
 package io.micronaut.inject.ast;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.reflect.ClassUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -27,15 +27,15 @@ import java.util.Optional;
  */
 public final class PrimitiveElement implements ArrayableClassElement {
 
-    public static final PrimitiveElement VOID = new PrimitiveElement("void", null);
-    public static final PrimitiveElement BOOLEAN = new PrimitiveElement("boolean", Boolean.class);
-    public static final PrimitiveElement INT = new PrimitiveElement("int", Integer.class);
-    public static final PrimitiveElement CHAR = new PrimitiveElement("char", Character.class);
-    public static final PrimitiveElement LONG = new PrimitiveElement("long", Long.class);
-    public static final PrimitiveElement FLOAT = new PrimitiveElement("float", Float.class);
-    public static final PrimitiveElement DOUBLE = new PrimitiveElement("double", Double.class);
-    public static final PrimitiveElement SHORT = new PrimitiveElement("short", Short.class);
-    public static final PrimitiveElement BYTE = new PrimitiveElement("byte", Byte.class);
+    public static final PrimitiveElement VOID = new PrimitiveElement(ClassUtils.PRIMITIVE_TYPE_NAME_VOID, null);
+    public static final PrimitiveElement BOOLEAN = new PrimitiveElement(ClassUtils.PRIMITIVE_TYPE_NAME_BOOLEAN, Boolean.class);
+    public static final PrimitiveElement INT = new PrimitiveElement(ClassUtils.PRIMITIVE_TYPE_NAME_INT, Integer.class);
+    public static final PrimitiveElement CHAR = new PrimitiveElement(ClassUtils.PRIMITIVE_TYPE_NAME_CHAR, Character.class);
+    public static final PrimitiveElement LONG = new PrimitiveElement(ClassUtils.PRIMITIVE_TYPE_NAME_LONG, Long.class);
+    public static final PrimitiveElement FLOAT = new PrimitiveElement(ClassUtils.PRIMITIVE_TYPE_NAME_FLOAT, Float.class);
+    public static final PrimitiveElement DOUBLE = new PrimitiveElement(ClassUtils.PRIMITIVE_TYPE_NAME_DOUBLE, Double.class);
+    public static final PrimitiveElement SHORT = new PrimitiveElement(ClassUtils.PRIMITIVE_TYPE_NAME_SHORT, Short.class);
+    public static final PrimitiveElement BYTE = new PrimitiveElement(ClassUtils.PRIMITIVE_TYPE_NAME_BYTE, Byte.class);
     private static final PrimitiveElement[] PRIMITIVES = new PrimitiveElement[] {INT, CHAR, BOOLEAN, LONG, FLOAT, DOUBLE, SHORT, BYTE, VOID};
 
     private final String typeName;
@@ -61,7 +61,7 @@ public final class PrimitiveElement implements ArrayableClassElement {
      * @param annotationMetadata The annotation metadata
      * @param doc                The optional documentation
      */
-    private PrimitiveElement(String name, String boxedTypeName, int arrayDimensions, AnnotationMetadata annotationMetadata, String doc) {
+    private PrimitiveElement(String name, String boxedTypeName, int arrayDimensions, AnnotationMetadata annotationMetadata, @Nullable String doc) {
         this.typeName = name;
         this.arrayDimensions = arrayDimensions;
         this.boxedTypeName = boxedTypeName;
@@ -103,7 +103,6 @@ public final class PrimitiveElement implements ArrayableClassElement {
     }
 
     @Override
-    @NonNull
     public String getName() {
         return typeName;
     }
@@ -118,7 +117,6 @@ public final class PrimitiveElement implements ArrayableClassElement {
         return true;
     }
 
-    @NonNull
     @Override
     public Object getNativeType() {
         throw new UnsupportedOperationException("There is no native types for primitives");
@@ -168,7 +166,7 @@ public final class PrimitiveElement implements ArrayableClassElement {
         return valueOf(name, null);
     }
 
-    public static PrimitiveElement valueOf(String name, String doc) {
+    public static PrimitiveElement valueOf(String name, @Nullable String doc) {
         for (PrimitiveElement element: PRIMITIVES) {
             if (element.getName().equalsIgnoreCase(name)) {
                 if (doc != null) {

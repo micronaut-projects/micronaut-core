@@ -1,5 +1,6 @@
 package io.micronaut.docs.qualifiers.any;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.docs.qualifiers.annotationmember.Engine;
 
 // tag::imports[]
@@ -8,6 +9,7 @@ import io.micronaut.context.annotation.Any;
 import jakarta.inject.Singleton;
 // end::imports[]
 
+@Requires(property = "spec.name", value = "VehicleAnySpec")
 // tag::clazz[]
 @Singleton
 public class Vehicle {

@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-library")
+    id("io.micronaut.build.internal.kotlin-base")
     alias(libs.plugins.managed.kotlin.jvm)
 }
 
@@ -12,9 +13,12 @@ dependencies {
     implementation(libs.managed.reactor)
     compileOnly(libs.managed.kotlinx.coroutines.core)
     compileOnly(libs.managed.kotlinx.coroutines.reactor)
-    compileOnly(libs.managed.netty.pkitesting)
+    compileOnly(libs.managed.netty.pkitesting) {
+        exclude(group = "org.bouncycastle")
+    }
 
     compileOnly(libs.managed.jackson.annotations)
+    compileOnly(libs.managed.jspecify)
 
     testCompileOnly(projects.micronautInjectGroovy)
     testAnnotationProcessor(projects.micronautInjectJava)
@@ -30,9 +34,10 @@ dependencies {
     }
 }
 
-tasks {
-    compileKotlin {
-        kotlinOptions.jvmTarget = "17"
+tasks.withType<Test>().configureEach {
+    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_25)) {
+        // Jazzer 0.24.0 cannot instrument JDK 25 class files (major version 69).
+        exclude("**/MediaTypeFuzzTest.class")
     }
 }
 

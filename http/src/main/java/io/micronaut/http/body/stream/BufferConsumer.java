@@ -16,7 +16,6 @@
 package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.ByteBody;
 
@@ -35,7 +34,7 @@ public interface BufferConsumer {
      *
      * @param rb The buffer
      */
-    void add(@NonNull ReadBuffer rb);
+    void add(ReadBuffer rb);
 
     /**
      * Signal normal completion of the stream.
@@ -65,6 +64,8 @@ public interface BufferConsumer {
          * Signal that we want to start consuming bytes. This is an optional hint to the upstream,
          * the upstream may ignore it and send bytes immediately. This is used for CONTINUE
          * support.
+         * <p>
+         * Must be called exactly once.
          */
         default void start() {
         }

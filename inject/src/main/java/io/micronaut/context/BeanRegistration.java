@@ -16,8 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.scope.CreatedBean;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.CollectionUtils;
@@ -56,8 +55,15 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
         if (bean == null) {
             this.order = beanDefinition == null ? 0 : beanDefinition.getOrder();
         } else {
-            this.order = beanDefinition == null ? OrderUtil.getOrder(bean) : OrderUtil.getOrder(beanDefinition, bean);
+            this.order = beanDefinition == null ? OrderUtil.getOrder(bean) : getOrder(beanDefinition, bean);
         }
+    }
+
+    private static int getOrder(BeanDefinition<?> beanDefinition, Object o) {
+        if (o instanceof Ordered ordered) {
+            return ordered.getOrder();
+        }
+        return beanDefinition.getOrder();
     }
 
     /**
@@ -71,11 +77,10 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @return new bean registration
      * @since 3.5.0
      */
-    @NonNull
-    public static <K> BeanRegistration<K> of(@NonNull BeanContext beanContext,
-                                             @NonNull BeanIdentifier identifier,
-                                             @NonNull BeanDefinition<K> beanDefinition,
-                                             @NonNull K bean) {
+    public static <K> BeanRegistration<K> of(BeanContext beanContext,
+                                             BeanIdentifier identifier,
+                                             BeanDefinition<K> beanDefinition,
+                                             K bean) {
         return of(beanContext, identifier, beanDefinition, bean, null);
     }
 
@@ -91,17 +96,16 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @return new bean registration
      * @since 3.5.0
      */
-    @NonNull
-    public static <K> BeanRegistration<K> of(@NonNull BeanContext beanContext,
-                                             @NonNull BeanIdentifier identifier,
-                                             @NonNull BeanDefinition<K> beanDefinition,
-                                             @NonNull K bean,
+    public static <K> BeanRegistration<K> of(BeanContext beanContext,
+                                             BeanIdentifier identifier,
+                                             BeanDefinition<K> beanDefinition,
+                                             K bean,
                                              @Nullable
                                              List<BeanRegistration<?>> dependents) {
         boolean hasDependents = CollectionUtils.isNotEmpty(dependents);
         if (beanDefinition instanceof DisposableBeanDefinition || bean instanceof LifeCycle || hasDependents) {
             return hasDependents ?
-                new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, dependents) :
+                new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, Objects.requireNonNull(dependents)) :
                 new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean);
         }
         return new BeanRegistration<>(identifier, beanDefinition, bean);
@@ -161,7 +165,6 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
         return beanDefinition;
     }
 
-    @NonNull
     @Override
     public T bean() {
         return bean;
@@ -178,7 +181,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     }
 
     @Override
-    public boolean isEnabled(BeanContext context, BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         return definition().isEnabled(context, resolutionContext);
     }
 

@@ -16,22 +16,23 @@
 package io.micronaut.http.server.netty.websocket;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
+import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.RequestLifecycle;
@@ -57,6 +58,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -65,12 +67,14 @@ import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AsciiString;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -98,9 +102,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     private final NettyEmbeddedServices nettyEmbeddedServices;
     private final ConversionService conversionService;
     private final NettyHttpServerConfiguration serverConfiguration;
+    @Nullable
     private WebSocketServerHandshaker handshaker;
     private boolean cancelUpgrade = false;
 
+    @Nullable
     private RoutingInBoundHandler next;
 
     /**
@@ -124,7 +130,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         this.serverConfiguration = serverConfiguration;
     }
 
-    static boolean isWebSocketUpgrade(@NonNull io.netty.handler.codec.http.HttpRequest request) {
+    static boolean isWebSocketUpgrade(io.netty.handler.codec.http. HttpRequest request) {
         HttpHeaders headers = request.headers();
         if (headers.containsValue(HttpHeaderNames.CONNECTION, HttpHeaderValues.UPGRADE, true)) {
             return headers.containsValue(HttpHeaderNames.UPGRADE, WEB_SOCKET_HEADER_VALUE, true);
@@ -135,36 +141,72 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
     @Override
     public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
         if (isWebSocketUpgrade(request)) {
-            NettyHttpRequest<?> msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+            final NettyHttpRequest<?> msg;
+            try {
+                msg = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
+            } catch (IllegalArgumentException e) {
+                body.close();
+
+                NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
+                    new DefaultHttpRequest(request.protocolVersion(), request.method(), "/"),
+                    NettyByteBodyFactory.empty(),
+                    ctx,
+                    conversionService,
+                    serverConfiguration
+                );
+                outboundAccess.attachment(errorRequest);
+                outboundAccess.closeAfterWrite();
+
+                PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate(() -> {
+                    Throwable cause = e.getCause() == null ? e : e.getCause();
+                    MutableHttpResponse<?> response = routeExecutor.getErrorResponseProcessor().processResponse(
+                        ErrorContext.builder(errorRequest)
+                            .cause(cause)
+                            .errorMessage("Malformed URI")
+                            .build(),
+                        io.micronaut.http.HttpResponse.badRequest()
+                    );
+                    if (response.getContentType().isEmpty() && errorRequest.getMethod() != HttpMethod.HEAD) {
+                        response.contentType(MediaType.APPLICATION_JSON_TYPE);
+                    }
+                    Objects.requireNonNull(next).writeResponse(outboundAccess, errorRequest, response, null);
+                });
+                return;
+            }
 
             Optional<UriRouteMatch<Object, Object>> optionalRoute = router.find(HttpMethod.GET, msg.getPath(), msg)
                 .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
                 .findFirst();
 
             WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, optionalRoute.orElse(null));
-            ExecutionFlow<HttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), () -> {
-                try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(msg)).propagate()) {
-                    return requestLifecycle.handle(msg);
-                }
-            });
+            ExecutionFlow<HttpResponse<?>> responseFlow = ExecutionFlow.async(
+                ctx.channel().eventLoop(),
+                () -> PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(msg))
+                    .propagate(() -> requestLifecycle.handle(msg))
+            );
             responseFlow.onComplete((response, throwable) -> {
-                if (response != null) {
+                if (response == null) {
+                    return;
+                }
+                if (ctx.executor().inEventLoop()) {
                     writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response, outboundAccess);
+                } else {
+                    ctx.executor().execute(() -> writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response, outboundAccess));
                 }
             });
         } else {
-            next.accept(ctx, request, body, outboundAccess);
+            Objects.requireNonNull(next).accept(ctx, request, body, outboundAccess);
         }
     }
 
     @Override
     public void handleUnboundError(Throwable cause) {
-        next.handleUnboundError(cause);
+        Objects.requireNonNull(next).handleUnboundError(cause);
     }
 
     @Override
-    public void responseWritten(Object attachment) {
-        next.responseWritten(attachment);
+    public void responseWritten(@Nullable Object attachment) {
+        Objects.requireNonNull(next).responseWritten(attachment);
     }
 
     private void writeResponse(ChannelHandlerContext ctx,
@@ -195,12 +237,12 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 NettyServerWebSocketHandler webSocketHandler = new NettyServerWebSocketHandler(
                     nettyEmbeddedServices,
                     webSocketSessionRepository,
-                    handshaker,
+                    Objects.requireNonNull(handshaker),
                     webSocketBean,
                     msg,
                     routeMatch,
                     ctx,
-                    serverConfiguration.getThreadSelection(),
+                    serverConfiguration,
                     routeExecutor.getExecutorSelector(),
                     routeExecutor.getCoroutineHelper().orElse(null));
                 pipeline.addBefore(ctx.name(), NettyServerWebSocketHandler.ID, webSocketHandler);
@@ -220,7 +262,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 ctx.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
             }
         } else {
-            next.writeResponse(outboundAccess, msg, actualResponse, null);
+            Objects.requireNonNull(next).writeResponse(outboundAccess, msg, actualResponse, null);
         }
     }
 

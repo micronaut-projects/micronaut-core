@@ -16,8 +16,7 @@
 package io.micronaut.http.ssl;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Named;
 
 /**
@@ -31,20 +30,19 @@ import io.micronaut.core.naming.Named;
 abstract sealed class AbstractCertificateFileConfig implements Named permits FileCertificateProvider.Config, ResourceCertificateProvider.Config {
     final String name;
 
-    @Nullable
-    FileCertificateProvider.Format format;
+    FileCertificateProvider.@Nullable Format format;
     @Nullable
     String password;
 
     /**
      * @param name the configuration name that is used to look up the provider
      */
-    AbstractCertificateFileConfig(@NonNull String name) {
+    AbstractCertificateFileConfig(String name) {
         this.name = name;
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return name;
     }
 
@@ -55,7 +53,7 @@ abstract sealed class AbstractCertificateFileConfig implements Named permits Fil
      *
      * @return the certificate file format or {@code null} to auto-detect
      */
-    public @Nullable FileCertificateProvider.Format getFormat() {
+    public FileCertificateProvider.@Nullable Format getFormat() {
         return format;
     }
 
@@ -66,7 +64,7 @@ abstract sealed class AbstractCertificateFileConfig implements Named permits Fil
      *
      * @param format the certificate file format or {@code null} to auto-detect
      */
-    public void setFormat(@Nullable FileCertificateProvider.Format format) {
+    public void setFormat(FileCertificateProvider.@Nullable Format format) {
         this.format = format;
     }
 

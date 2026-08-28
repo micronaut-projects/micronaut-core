@@ -17,12 +17,13 @@ package io.micronaut.http.server.netty.websocket;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
@@ -35,12 +36,13 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyWebSocketSession;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.CoroutineHelper;
 import io.micronaut.http.server.netty.NettyEmbeddedServices;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
-import io.micronaut.scheduling.executor.ThreadSelection;
+import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
@@ -58,18 +60,22 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleStateEvent;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.context.Context;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -94,9 +100,11 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     @Nullable
     private final CoroutineHelper coroutineHelper;
 
+    @Nullable
     private final Argument<?> bodyArgument;
+    @Nullable
     private final Argument<?> pongArgument;
-    private final ThreadSelection threadSelection;
+    private final ThreadSelectionConfiguration threadSelection;
     private final ExecutorSelector executorSelector;
 
     /**
@@ -109,7 +117,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      * @param request                    The request used to create the websocket
      * @param routeMatch                 The route match
      * @param ctx                        The channel handler context
-     * @param executorSelector
+     * @param executorSelector           The executor selector
      * @param coroutineHelper            Helper for kotlin coroutines
      */
     NettyServerWebSocketHandler(
@@ -120,7 +128,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         HttpRequest<?> request,
         UriRouteMatch<Object, Object> routeMatch,
         ChannelHandlerContext ctx,
-        ThreadSelection threadSelection,
+        ThreadSelectionConfiguration threadSelection,
         ExecutorSelector executorSelector,
         @Nullable CoroutineHelper coroutineHelper) {
         super(
@@ -147,11 +155,11 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             List<Argument<?>> unboundArguments = bound.getUnboundArguments();
 
             if (unboundArguments.size() == 1) {
-                this.bodyArgument = unboundArguments.iterator().next();
+                this.bodyArgument = unboundArguments.getFirst();
             } else {
                 this.bodyArgument = null;
                 if (LOG.isErrorEnabled()) {
-                    LOG.error("WebSocket @OnMessage method " + webSocketBean.getTarget() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 message parameter, but found 2 possible candidates: " + unboundArguments);
+                    LOG.error("WebSocket @OnMessage method {}.{} should define exactly 1 message parameter, but found 2 possible candidates: {}", webSocketBean.getTarget(), messageHandler.getExecutableMethod(), unboundArguments);
                 }
 
                 if (serverSession.isOpen()) {
@@ -165,12 +173,12 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         if (pongHandler != null) {
             BoundExecutable<?, ?> bound = binder.tryBind(pongHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(serverSession, originatingRequest));
             List<Argument<?>> unboundArguments = bound.getUnboundArguments();
-            if (unboundArguments.size() == 1 && unboundArguments.get(0).isAssignableFrom(WebSocketPongMessage.class)) {
-                this.pongArgument = unboundArguments.get(0);
+            if (unboundArguments.size() == 1 && unboundArguments.getFirst().isAssignableFrom(WebSocketPongMessage.class)) {
+                this.pongArgument = unboundArguments.getFirst();
             } else {
                 this.pongArgument = null;
                 if (LOG.isErrorEnabled()) {
-                    LOG.error("WebSocket @OnMessage pong handler method " + webSocketBean.getTarget() + "." + pongHandler.getExecutableMethod() + " should define exactly 1 message parameter assignable from a WebSocketPongMessage, but found: " + unboundArguments);
+                    LOG.error("WebSocket @OnMessage pong handler method {}.{} should define exactly 1 message parameter assignable from a WebSocketPongMessage, but found: {}", webSocketBean.getTarget(), pongHandler.getExecutableMethod(), unboundArguments);
                 }
 
                 if (serverSession.isOpen()) {
@@ -185,12 +193,14 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         this.coroutineHelper = coroutineHelper;
         RouteAttributes.setRouteMatch(request, routeMatch);
 
-        Flux.from(callOpenMethod(ctx)).subscribe(v -> { }, t -> {
-            forwardErrorToUser(ctx, e -> {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + e.getMessage(), e);
-                }
-            }, t);
+        callOpenMethod(ctx).onComplete((v, t) -> {
+            if (t != null) {
+                forwardErrorToUser(ctx, e -> {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + e.getMessage(), e);
+                    }
+                }, t);
+            }
         });
 
         ApplicationEventPublisher<WebSocketSessionOpenEvent> eventPublisher =
@@ -212,12 +222,12 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     public Argument<?> getBodyArgument() {
-        return bodyArgument;
+        return Objects.requireNonNull(bodyArgument);
     }
 
     @Override
     public Argument<?> getPongArgument() {
-        return pongArgument;
+        return Objects.requireNonNull(pongArgument);
     }
 
     @Override
@@ -236,11 +246,13 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     protected NettyWebSocketSession createWebSocketSession(ChannelHandlerContext ctx) {
+        WebSocketSessionRepository requiredWebSocketSessionRepository = Objects.requireNonNull(webSocketSessionRepository);
+
         String id = originatingRequest.getHeaders().get(HttpHeaderNames.SEC_WEBSOCKET_KEY);
         final Channel channel = ctx.channel();
 
         NettyWebSocketSession session = new NettyWebSocketSession(
-                id,
+                Objects.requireNonNull(id),
                 channel,
                 originatingRequest,
                 mediaTypeCodecRegistry,
@@ -258,7 +270,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
             @Override
             public Set<? extends WebSocketSession> getOpenSessions() {
-                return webSocketSessionRepository.getChannelGroup().stream()
+                return requiredWebSocketSessionRepository.getChannelGroup().stream()
                         .flatMap((Function<Channel, Stream<WebSocketSession>>) ch -> {
                             NettyWebSocketSession s = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
                             if (s != null && s.isOpen()) {
@@ -271,7 +283,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             @Override
             public void close(CloseReason closeReason) {
                 super.close(closeReason);
-                webSocketSessionRepository.removeChannel(ctx.channel());
+                requiredWebSocketSessionRepository.removeChannel(ctx.channel());
             }
 
             @Override
@@ -286,13 +298,13 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
         };
 
-        webSocketSessionRepository.addChannel(channel);
+        requiredWebSocketSessionRepository.addChannel(channel);
 
         return session;
     }
 
     @Override
-    protected Publisher<?> instrumentPublisher(ChannelHandlerContext ctx, Object result) {
+    protected Publisher<?> instrumentPublisher(ChannelHandlerContext ctx, @Nullable Object result) {
         Publisher<?> actual = Publishers.convertToPublisher(conversionService, result);
         Publisher<?> traced = (Publisher<Object>) subscriber -> ServerRequestContext.with(originatingRequest,
                                                                                           () -> actual.subscribe(new Subscriber<Object>() {
@@ -332,49 +344,51 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     @Override
-    protected Object invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
+    protected ExecutionFlow<?> invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
         if (coroutineHelper != null) {
             Executable<?, ?> target = boundExecutable.getTarget();
             if (target instanceof ExecutableMethod<?, ?> executableMethod) {
                 if (executableMethod.isSuspend()) {
-                    return Flux.deferContextual(ctx -> {
-                        try {
-                            coroutineHelper.setupCoroutineContext(originatingRequest, ctx, PropagatedContext.getOrEmpty());
+                    try {
+                        coroutineHelper.setupCoroutineContext(originatingRequest, Context.empty(), PropagatedContext.getOrEmpty());
 
-                            Object immediateReturnValue = invokeExecutable0(boundExecutable, messageHandler);
+                        Object immediateReturnValue = invokeExecutable0(boundExecutable, messageHandler);
 
-                            if (KotlinUtils.isKotlinCoroutineSuspended(immediateReturnValue)) {
-                                return Mono.fromCompletionStage(ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(originatingRequest));
-                            } else {
-                                return Mono.empty();
+                        if (KotlinUtils.isKotlinCoroutineSuspended(immediateReturnValue)) {
+                            Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(originatingRequest);
+                            if (supplier == null) {
+                                return ExecutionFlow.empty();
                             }
-                        } catch (Exception e) {
-                            return Flux.error(e);
+                            return CompletableFutureExecutionFlow.just(supplier.get());
+                        } else {
+                            return ExecutionFlow.empty();
                         }
-                    });
+                    } catch (Exception e) {
+                        return ExecutionFlow.error(e);
+                    }
                 }
             }
         }
         return invokeExecutable0(boundExecutable, messageHandler);
     }
 
-    private Object invokeExecutable0(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
-        return this.executorSelector.select(messageHandler.getExecutableMethod(), threadSelection)
-            .map(
-                executorService -> {
-                    ReturnType<?> returnType = messageHandler.getExecutableMethod().getReturnType();
-                    Mono<?> result;
-                    if (returnType.isReactive()) {
-                        result = Mono.from((Publisher<?>) boundExecutable.invoke(messageHandler.getTarget()))
-                                     .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, originatingRequest));
-                    } else if (returnType.isAsync()) {
-                        result = Mono.fromFuture((Supplier<CompletableFuture<?>>) invokeWithContext(boundExecutable, messageHandler));
-                    } else {
-                        result = Mono.fromSupplier(invokeWithContext(boundExecutable, messageHandler));
-                    }
-                    return (Object) result.subscribeOn(Schedulers.fromExecutor(executorService));
-                }
-            ).orElseGet(invokeWithContext(boundExecutable, messageHandler));
+    private ExecutionFlow<?> invokeExecutable0(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
+        Executor executor = executorSelector.selectExecutor(messageHandler.getExecutableMethod(), threadSelection);
+        ReturnType<?> returnType = messageHandler.getExecutableMethod().getReturnType();
+        return ExecutionFlow.async(executor, () -> {
+            Object result = invokeWithContext(boundExecutable, messageHandler).get();
+            if (returnType.isReactive() || Publishers.isConvertibleToPublisher(result)) {
+                return ReactiveExecutionFlow.fromPublisher(Publishers.convertToPublisher(conversionService, result))
+                    .putInContext(ServerRequestContext.KEY, originatingRequest);
+            }
+            if (returnType.isAsync()) {
+                CompletionStage<Object> future = result instanceof CompletionStage<?> stage
+                    ? stage.thenApply(v -> v)
+                    : ((CompletableFuture<?>) result).thenApply(v -> v);
+                return CompletableFutureExecutionFlow.just(future);
+            }
+            return ExecutionFlow.just(result);
+        });
     }
 
     private Supplier<?> invokeWithContext(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
@@ -403,7 +417,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Removing WebSocket Server session: {}", serverSession);
         }
-        webSocketSessionRepository.removeChannel(channel);
+        Objects.requireNonNull(webSocketSessionRepository).removeChannel(channel);
         try {
             nettyEmbeddedServices.getEventPublisher(WebSocketSessionClosedEvent.class)
                     .publishEvent(new WebSocketSessionClosedEvent(serverSession));

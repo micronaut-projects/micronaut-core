@@ -1,7 +1,7 @@
 package io.micronaut.inject.validation;
 
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import jakarta.validation.constraints.PositiveOrZero;
 
 import java.util.Optional;

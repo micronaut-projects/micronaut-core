@@ -16,6 +16,8 @@
 package io.micronaut.docs.config.env;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -74,5 +76,39 @@ class EachPropertyTest {
         assertEquals(5000, beansOfType.get(1).getLimit().intValue());
 
         applicationContext.close();
+    }
+
+    @Test
+    void testEachPropertyHyphenatedPrefixWithEnvironmentKeys() {
+        ApplicationContext applicationContext = ApplicationContext.run(PropertySource.of(
+            "test",
+            Collections.singletonMap("TEST_OBJECT_STORAGE_ONE_URL", "jdbc:mysql://localhost/one"),
+            PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE,
+            PropertySource.Origin.of("test")
+        ));
+
+        Collection<HyphenDataSourceConfiguration> beansOfType = applicationContext.getBeansOfType(HyphenDataSourceConfiguration.class);
+        assertEquals(1, beansOfType.size());
+
+        HyphenDataSourceConfiguration config = applicationContext.getBean(HyphenDataSourceConfiguration.class, Qualifiers.byName("one"));
+        assertEquals(URI.create("jdbc:mysql://localhost/one"), config.getUrl());
+
+        applicationContext.close();
+    }
+
+    @EachProperty("test.object-storage")
+    static final class HyphenDataSourceConfiguration {
+        private URI url;
+
+        HyphenDataSourceConfiguration(@Parameter String ignored) {
+        }
+
+        URI getUrl() {
+            return url;
+        }
+
+        void setUrl(URI url) {
+            this.url = url;
+        }
     }
 }

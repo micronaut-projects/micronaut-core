@@ -22,8 +22,7 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
@@ -90,6 +89,7 @@ public class DefaultNettyEmbeddedServerFactory
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
     private final Map<Class<?>, ApplicationEventPublisher<?>> cachedEventPublishers = new ConcurrentHashMap<>(5);
+    @Nullable
     private final WebSocketUpgradeHandlerFactory webSocketUpgradeHandlerFactory;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private final NettyServerSslFactory sslFactory;
@@ -142,14 +142,12 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
-    @NonNull
-    public NettyEmbeddedServer build(@NonNull NettyHttpServerConfiguration configuration) {
+    public NettyEmbeddedServer build(NettyHttpServerConfiguration configuration) {
         return buildInternal(configuration, false, null);
     }
 
     @Override
-    @NonNull
-    public NettyEmbeddedServer build(@NonNull NettyHttpServerConfiguration configuration, @Nullable ServerSslConfiguration sslConfiguration) {
+    public NettyEmbeddedServer build(NettyHttpServerConfiguration configuration, @Nullable ServerSslConfiguration sslConfiguration) {
         return buildInternal(configuration, false, sslConfiguration);
     }
 
@@ -160,8 +158,7 @@ public class DefaultNettyEmbeddedServerFactory
      */
     @Singleton
     @Primary
-    @NonNull
-    protected NettyEmbeddedServer buildDefaultServer(@NonNull NettyHttpServerConfiguration configuration) {
+    protected NettyEmbeddedServer buildDefaultServer(NettyHttpServerConfiguration configuration) {
         return buildInternal(configuration, true, null);
     }
 
@@ -170,8 +167,7 @@ public class DefaultNettyEmbeddedServerFactory
         return messageBodyHandlerRegistry;
     }
 
-    @NonNull
-    private NettyEmbeddedServer buildInternal(@NonNull NettyHttpServerConfiguration configuration,
+    private NettyEmbeddedServer buildInternal(NettyHttpServerConfiguration configuration,
                                               boolean isDefaultServer,
                                               @Nullable ServerSslConfiguration sslConfiguration) {
         Objects.requireNonNull(configuration, "Netty HTTP server configuration cannot be null");
@@ -192,7 +188,7 @@ public class DefaultNettyEmbeddedServerFactory
         }
     }
 
-    private NettyEmbeddedServices resolveNettyEmbeddedServices(@NonNull NettyHttpServerConfiguration configuration,
+    private NettyEmbeddedServices resolveNettyEmbeddedServices(NettyHttpServerConfiguration configuration,
                                                                @Nullable ServerSslConfiguration sslConfiguration) {
         if (sslConfiguration != null && sslConfiguration.isEnabled()) {
             ServerSslBuilder resolvedSslBuilder;
@@ -261,6 +257,7 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
+    @Nullable
     public ServerSslBuilder getServerSslBuilder() {
         return serverSslBuilder;
     }
@@ -299,12 +296,12 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
-    public Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig) {
+    public Channel getChannelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration workerConfig) {
         return eventLoopGroupFactory.channelInstance(type, workerConfig);
     }
 
     @Override
-    public Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig, Channel parent, int fd) {
+    public Channel getChannelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration workerConfig, @Nullable Channel parent, int fd) {
         return eventLoopGroupFactory.channelInstance(type, workerConfig, parent, fd);
     }
 
@@ -322,13 +319,12 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
-    public @NonNull BeanProvider<CertificateProvider> getCertificateProviders() {
+    public BeanProvider<CertificateProvider> getCertificateProviders() {
         return certificateProviders;
     }
 
     @Override
-    @NonNull
-    public EventLoopGroup createEventLoopGroup(int numThreads, @NonNull ExecutorService executorService, Integer ioRatio) {
+    public EventLoopGroup createEventLoopGroup(int numThreads, ExecutorService executorService, @Nullable Integer ioRatio) {
         return eventLoopGroupFactory.createEventLoopGroup(
                 numThreads,
                 executorService,

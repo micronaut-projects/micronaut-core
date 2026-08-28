@@ -25,6 +25,8 @@ import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -140,7 +142,8 @@ public class DefaultHealthAggregator implements HealthAggregator<HealthResult> {
      * @return A {@link Map} with the results from the health status
      */
     @SuppressWarnings("MagicNumber")
-    protected HealthResult buildResult(HealthStatus status, Object details, HealthLevelOfDetail healthLevelOfDetail) {
+    @NullUnmarked
+    protected HealthResult buildResult(HealthStatus status, @Nullable Object details, HealthLevelOfDetail healthLevelOfDetail) {
         if (healthLevelOfDetail == HealthLevelOfDetail.STATUS) {
             return HealthResult.builder(null, status).build();
         }

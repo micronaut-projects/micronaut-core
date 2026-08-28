@@ -15,7 +15,8 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.uri.UriMatchInfo;
 
 import java.util.Optional;
@@ -28,6 +29,8 @@ import java.util.Optional;
  */
 @SuppressWarnings("removal")
 public final class BasicHttpAttributes {
+    private static final String ROUTE_WAITS_FOR = BasicHttpAttributes.class.getName() + ".ROUTE_WAITS_FOR";
+
     private BasicHttpAttributes() {
     }
 
@@ -47,7 +50,6 @@ public final class BasicHttpAttributes {
      * @param request The request
      * @return The template, if present
      */
-    @NonNull
     public static Optional<String> getUriTemplate(HttpRequest<?> request) {
         return request.getAttribute(HttpAttributes.URI_TEMPLATE, String.class);
     }
@@ -58,7 +60,7 @@ public final class BasicHttpAttributes {
      * @param request     The request
      * @param uriTemplate The template, if present
      */
-    public static void setUriTemplate(@NonNull HttpRequest<?> request, @NonNull String uriTemplate) {
+    public static void setUriTemplate(HttpRequest<?> request, String uriTemplate) {
         request.setAttribute(HttpAttributes.URI_TEMPLATE, uriTemplate);
     }
 
@@ -68,8 +70,39 @@ public final class BasicHttpAttributes {
      * @param request The request
      * @return The client service ID
      */
-    @NonNull
-    public static Optional<String> getServiceId(@NonNull HttpRequest<?> request) {
+    public static Optional<String> getServiceId(HttpRequest<?> request) {
         return request.getAttribute(HttpAttributes.SERVICE_ID, String.class);
+    }
+
+    /**
+     * A condition that must be awaited before executing controllers for the given request. This is
+     * used to delay execution for argument binding.
+     *
+     * @param request The request
+     * @return The condition to wait for
+     */
+    @Experimental
+    public static ExecutionFlow<?> getRouteWaitsFor(HttpRequest<?> request) {
+        @SuppressWarnings("rawtypes")
+        Optional<ExecutionFlow> attr = request.getAttribute(ROUTE_WAITS_FOR, ExecutionFlow.class);
+        return attr.orElseGet(ExecutionFlow::empty);
+    }
+
+    /**
+     * Add a condition that must be awaited before executing controllers for the given request.
+     * This is used to delay execution for argument binding.
+     *
+     * @param request The request
+     * @param flowToAdd The condition to wait for
+     */
+    @Experimental
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public static void addRouteWaitsFor(HttpRequest<?> request, ExecutionFlow<?> flowToAdd) {
+        Optional<ExecutionFlow> attr = request.getAttribute(ROUTE_WAITS_FOR, ExecutionFlow.class);
+        if (attr.isPresent()) {
+            request.setAttribute(ROUTE_WAITS_FOR, attr.get().then(() -> flowToAdd));
+        } else {
+            request.setAttribute(ROUTE_WAITS_FOR, flowToAdd);
+        }
     }
 }

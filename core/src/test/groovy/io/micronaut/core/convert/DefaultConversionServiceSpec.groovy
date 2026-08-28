@@ -7,6 +7,8 @@ import spock.lang.Specification
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.time.DayOfWeek
+import java.util.SequencedCollection
+import java.util.SequencedSet
 /**
  * Created by graemerocher on 12/06/2017.
  */
@@ -92,6 +94,27 @@ class DefaultConversionServiceSpec extends Specification {
         targetType << [File, Date, Integer, BigInteger, Float, Double, Long, Short, Byte, BigDecimal, URL, URI, Locale, UUID, Currency, TimeZone, Charset, Status]
     }
 
+    void "test invalid locale conversion"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        expect:
+        !conversionService.convert("?/", Locale).isPresent()
+    }
+
+    void "test invalid locale convert required"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        when:
+        conversionService.convertRequired("?/", Locale)
+
+        then:
+        def e = thrown(ConversionErrorException)
+        e.conversionError.originalValue.get() == "?/"
+        e.message.contains('Locale part "?/" contains invalid characters')
+    }
+
     void "test convert required"() {
         given:
         ConversionService conversionService = new DefaultMutableConversionService()
@@ -118,5 +141,44 @@ class DefaultConversionServiceSpec extends Specification {
         "1,2"        | Iterable   | [T: Argument.of(Long, 'T')]    | [1l, 2l]
         "1"          | Optional   | [T: Argument.of(Long, 'T')]    | Optional.of(1L)
 
+    }
+
+
+    void "test sequenced collection conversion service with type arguments"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        when:
+        def sequencedSet = conversionService.convert("b,a,b", SequencedSet, ConversionContext.of([E: Argument.of(String, 'E')]))
+        def sequencedCollection = conversionService.convert("1,2,3", SequencedCollection, ConversionContext.of([E: Argument.of(Integer, 'E')]))
+
+        then:
+        sequencedSet.present
+        new ArrayList<>(sequencedSet.get()) == ["b", "a"]
+        sequencedCollection.present
+        new ArrayList<>(sequencedCollection.get()) == [1, 2, 3]
+    }
+
+    void "test conversion service preserves empty string elements for string iterables"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        expect:
+        conversionService.convert(sourceObject, List, ConversionContext.of([E: Argument.of(String, 'E')])).get() == result
+
+        where:
+        sourceObject | result
+        ""           | [""]
+        ","          | ["", ""]
+        "a,,b"       | ["a", "", "b"]
+    }
+
+    void "test conversion service converts char sequence to string"() {
+        given:
+        ConversionService conversionService = new DefaultMutableConversionService()
+
+        expect:
+        conversionService.convert(new StringBuilder("value"), String).get() == "value"
+        conversionService.convert(new StringBuilder(""), String).get() == ""
     }
 }

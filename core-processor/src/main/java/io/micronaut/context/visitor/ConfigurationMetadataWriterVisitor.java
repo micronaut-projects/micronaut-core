@@ -16,6 +16,7 @@
 package io.micronaut.context.visitor;
 
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationInject;
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -27,7 +28,6 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.inject.ast.ClassElement;
@@ -37,6 +37,7 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
@@ -47,6 +48,7 @@ import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -73,7 +75,6 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
 
     private ConfigurationMetadataBuilder metadataBuilder = new ConfigurationMetadataBuilder();
 
-    @NonNull
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.AGGREGATING;
@@ -132,7 +133,8 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
 
         Set<MemberElement> processed = new HashSet<>();
 
-        classElement.getBeanProperties()
+        classElement.getBeanProperties(PropertyElementQuery.of(classElement)
+                .visibility(BeanProperties.Visibility.ANY))
             .forEach(propertyElement -> {
                 if (propertyElement.hasStereotype(ConfigurationBuilder.class)) {
                     Optional<MethodElement> readMethod = propertyElement.getReadMethod();
@@ -177,8 +179,8 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                                     getPropertyDocs(propertyElement),
                                     propertyElement.getAnnotationMetadata().stringValue(Bindable.class, "defaultValue").orElse(null)
                                 );
-                                if (memberElement instanceof MethodElement) {
-                                    annotateProperty(memberElement, metadata.getPath());
+                                if (memberElement instanceof MethodElement methodElement) {
+                                    annotateProperty(methodElement, metadata.getPath());
                                 }
                                 processed.add(memberElement);
                                 propertyElement.getField().ifPresent(processed::add);
@@ -220,6 +222,7 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
         });
     }
 
+    @Nullable
     private String getPropertyDocs(PropertyElement propertyElement) {
         String doc = propertyElement.getDocumentation(true).orElse(null);
         Optional<MethodElement> writeMethod = propertyElement.getWriteMethod();
@@ -234,6 +237,10 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
 
     private void annotateProperty(Element memberElement, String path) {
         memberElement.annotate(Property.class, (builder) -> builder.member("name", path));
+    }
+
+    private void annotateProperty(MethodElement methodElement, String path) {
+        methodElement.getMethodAnnotationMetadata().annotate(Property.class, (builder) -> builder.member("name", path));
     }
 
     private boolean notProcessed(String prop, ClassElement declaringType) {

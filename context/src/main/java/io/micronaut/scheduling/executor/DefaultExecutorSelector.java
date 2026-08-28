@@ -30,7 +30,9 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
@@ -66,21 +68,22 @@ public class DefaultExecutorSelector implements ExecutorSelector {
     }
 
     @Override
-    public Optional<ExecutorService> select(MethodReference<?, ?> method, ThreadSelection threadSelection) {
-        final String name = method.stringValue(EXECUTE_ON).orElse(null);
+    public Optional<ExecutorService> select(@Nullable MethodReference<?, ?> method, ThreadSelection threadSelection) {
+        final String name = method == null ? null : method.stringValue(EXECUTE_ON).orElse(null);
         if (name != null) {
+            MethodReference<?, ?> methodReference = Objects.requireNonNull(method);
             final ExecutorService executorService;
             try {
                 executorService = beanLocator.getBean(ExecutorService.class, Qualifiers.byName(name));
                 return Optional.of(executorService);
             } catch (NoSuchBeanException e) {
                 throw new SchedulerConfigurationException(
-                        method,
+                        methodReference,
                         "No executor configured for name: " + name
                 );
             }
         } else if (threadSelection == ThreadSelection.AUTO) {
-            if (method.hasStereotype(NonBlocking.class)) {
+            if (method == null || method.hasStereotype(NonBlocking.class)) {
                 return Optional.empty();
             } else if (method.hasStereotype(Blocking.class)) {
                 return Optional.of(blockingExecutor.get());

@@ -18,7 +18,7 @@ package io.micronaut.http.client;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import jakarta.inject.Inject;
@@ -54,7 +54,7 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     /**
      * @param connectionPoolConfiguration The connection pool configuration
      * @param applicationConfiguration The application configuration
-     * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2ClientConfiguration , ApplicationConfiguration)} instead.
+     * @deprecated Use {@link #DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2ClientConfiguration, ApplicationConfiguration)} instead.
      */
     @Deprecated(since = "4.3.0")
     public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
@@ -65,7 +65,7 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
      * @param connectionPoolConfiguration The connection pool configuration
      * @param webSocketCompressionConfiguration The WebSocket compression configuration
      * @param applicationConfiguration The application configuration
-     * @deprecated Use {@link DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2ClientConfiguration , ApplicationConfiguration)} instead.
+     * @deprecated Use {@link #DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration, DefaultWebSocketCompressionConfiguration, DefaultHttp2ClientConfiguration, ApplicationConfiguration)} instead.
      */
     @Deprecated(since = "4.6.0")
     public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration,

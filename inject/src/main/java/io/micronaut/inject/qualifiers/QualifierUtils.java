@@ -15,12 +15,14 @@
  */
 package io.micronaut.inject.qualifiers;
 
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Any;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameResolver;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.QualifiedBeanType;
 
 import java.util.AbstractMap;
 import java.util.Map;
@@ -40,27 +42,32 @@ final class QualifierUtils {
     }
 
     /**
-     * Check if provided bean type matches the candidate type.
+     * Check if the candidate is of qualifier {@link Any}.
      *
-     * @param beanType  The bean type
-     * @param candidate The candidate type
      * @param <T>       The type
+     * @param candidate The candidate type
      * @return true if matches
      */
-    static <T> boolean matchType(Class<T> beanType, BeanType<T> candidate) {
-        return candidate.isContainerType() || beanType.isAssignableFrom(beanType);
+    static <T> boolean match(BeanType<T> candidate, Qualifier<T> q) {
+        if (candidate instanceof BeanDefinition<T> beanDefinition) {
+            return matchQualified(beanDefinition, q);
+        }
+        return false;
     }
 
     /**
      * Check if the candidate is of qualifier {@link Any}.
      *
-     * @param beanType  The bean type
-     * @param candidate The candidate type
      * @param <T>       The type
+     * @param candidate The candidate type
      * @return true if matches
      */
-    static <T> boolean matchAny(Class<T> beanType, BeanType<T> candidate) {
-        return beanType != Object.class && candidate.getAnnotationMetadata().hasDeclaredAnnotation(Any.class);
+    static <T> boolean matchQualified(QualifiedBeanType<T> candidate, Qualifier<T> q) {
+        Qualifier<T> qualifier = candidate.getDeclaredQualifier();
+        if (qualifier == null) {
+            return false;
+        }
+        return qualifier.contains(AnyQualifier.INSTANCE) || qualifier.contains(q);
     }
 
     /**
@@ -90,7 +97,7 @@ final class QualifierUtils {
      * @param o2 The annotation object 2
      * @return true if equals
      */
-    public static boolean annotationQualifiersEquals(@NonNull Object o1, @NonNull Object o2) {
+    public static boolean annotationQualifiersEquals(Object o1, Object o2) {
         Map.Entry<String, Map<CharSequence, Object>> val1 = extractAnnotationAndBindingValues(o1);
         if (val1 == null) {
             return false;
@@ -102,19 +109,16 @@ final class QualifierUtils {
         return Objects.equals(val1.getKey(), val2.getKey()) && Objects.equals(val1.getValue(), val2.getValue());
     }
 
-    @Nullable
-    private static Map.Entry<String, Map<CharSequence, Object>> extractAnnotationAndBindingValues(@NonNull Object o) {
-        if (o instanceof NamedAnnotationStereotypeQualifier that) {
+    private static Map.@Nullable Entry<String, Map<CharSequence, Object>> extractAnnotationAndBindingValues(Object o) {
+        if (o instanceof AnnotationStereotypeQualifier<?> that) {
             return new AbstractMap.SimpleEntry<>(that.stereotype, null);
-        } else if (o instanceof AnnotationStereotypeQualifier that) {
-            return new AbstractMap.SimpleEntry<>(that.stereotype.getName(), null);
-        } else if (o instanceof AnnotationMetadataQualifier that) {
+        } else if (o instanceof AnnotationMetadataQualifier<?> that) {
             if (that.qualifierAnn == null) {
                 return new AbstractMap.SimpleEntry<>(that.annotationName, null);
             } else {
                 return new AbstractMap.SimpleEntry<>(that.annotationName, that.qualifierAnn.getValues());
             }
-        } else if (o instanceof AnnotationQualifier that) {
+        } else if (o instanceof AnnotationQualifier<?> that) {
             return new AbstractMap.SimpleEntry<>(that.annotation.annotationType().getName(), null);
         }
         return null;

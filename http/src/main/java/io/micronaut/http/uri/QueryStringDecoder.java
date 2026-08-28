@@ -18,12 +18,22 @@ package io.micronaut.http.uri;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
-import java.nio.charset.*;
-import java.util.*;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CoderResult;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING;
 import static io.micronaut.core.util.StringUtils.SPACE;
@@ -70,8 +80,8 @@ public final class QueryStringDecoder {
     private final int maxParams;
     private final boolean semicolonIsNormalChar;
     private int pathEndIdx;
-    private String path;
-    private Map<String, List<String>> params;
+    private @Nullable String path;
+    private @Nullable Map<String, List<String>> params;
 
     /**
      * Creates a new decoder that decodes the specified URI. The decoder will

@@ -12,6 +12,7 @@ dependencies {
     api(projects.micronautDiscoveryCore)
 
     compileOnly(libs.managed.kotlin.stdlib)
+    compileOnly(libs.managed.kotlinx.coroutines.core)
 
     testImplementation(projects.micronautJacksonDatabind)
 }

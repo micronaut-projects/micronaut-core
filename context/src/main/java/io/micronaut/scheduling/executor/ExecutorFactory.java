@@ -19,12 +19,12 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.micronaut.scheduling.LoomSupport;
 import jakarta.inject.Inject;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +47,7 @@ public class ExecutorFactory implements GracefulShutdownCapable {
 
     private final BeanLocator beanLocator;
     private final ThreadFactory threadFactory;
+    @Nullable
     private List<GracefulShutdownCapable> gracefulShutdownCapable;
 
     /**
@@ -138,7 +139,7 @@ public class ExecutorFactory implements GracefulShutdownCapable {
     }
 
     @Override
-    public @NonNull CompletionStage<?> shutdownGracefully() {
+    public CompletionStage<?> shutdownGracefully() {
         List<GracefulShutdownCapable> copy;
         synchronized (this) {
             if (gracefulShutdownCapable == null) {

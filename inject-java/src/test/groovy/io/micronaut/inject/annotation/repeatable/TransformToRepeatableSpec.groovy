@@ -4,7 +4,7 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.annotation.NamedAnnotationTransformer
 import io.micronaut.inject.visitor.VisitorContext

@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.QualifiedBeanType;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -80,6 +81,18 @@ public interface Qualifier<T> {
     }
 
     /**
+     * Check if the candidate qualifies.
+     *
+     * @param beanType  The bean type
+     * @param candidate The candidate
+     * @return true if matches
+     * @since 5.0
+     */
+    default boolean doesQualify(Class<T> beanType, QualifiedBeanType<T> candidate) {
+        return doesQualify(beanType, (BeanType<T>) candidate);
+    }
+
+    /**
      * Check if at least one candidate qualifies.
      *
      * @param beanType The bean type
@@ -89,6 +102,18 @@ public interface Qualifier<T> {
      */
     default boolean doesQualify(Class<T> beanType, Collection<? extends BeanType<T>> candidates) {
         return reduce(beanType, candidates.stream()).findAny().isPresent();
+    }
+
+    /**
+     * Check if at least one candidate qualifies.
+     *
+     * @param beanType The bean type
+     * @param candidates The candidates
+     * @return true if qualifies
+     * @since 5.0
+     */
+    default boolean doesQualifyQualified(Class<T> beanType, Collection<? extends QualifiedBeanType<T>> candidates) {
+        return doesQualify(beanType, candidates);
     }
 
     /**
@@ -102,5 +127,18 @@ public interface Qualifier<T> {
      */
     default <BT extends BeanType<T>> Collection<BT> filter(Class<T> beanType, Collection<BT> candidates) {
         return reduce(beanType, candidates.stream()).toList();
+    }
+
+    /**
+     * Filter the qualified candidates.
+     *
+     * @param beanType   The bean type
+     * @param candidates The candidates
+     * @param <BT>       The bean type subclass
+     * @return The filtered candidates
+     * @since 5.0.0
+     */
+    default <BT extends QualifiedBeanType<T>> Collection<BT> filterQualified(Class<T> beanType, Collection<BT> candidates) {
+        return filter(beanType, candidates);
     }
 }

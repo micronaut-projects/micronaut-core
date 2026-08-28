@@ -15,9 +15,11 @@
  */
 package io.micronaut.inject.injectionpoint.lazytarget;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.inject.injectionpoint.SomeAnn;
 import jakarta.inject.Inject;
 
+@Requires(property = "spec.name", value = "InjectionPointSpec")
 @CustomScope
 public class ProxiedSomeBeanConsumer {
 

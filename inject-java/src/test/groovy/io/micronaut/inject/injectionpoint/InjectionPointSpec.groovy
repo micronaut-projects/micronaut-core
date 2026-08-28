@@ -9,7 +9,7 @@ import spock.lang.Specification
 class InjectionPointSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext applicationContext =
-            ApplicationContext.run()
+            ApplicationContext.run(['spec.name':'InjectionPointSpec'])
 
     def "void test that the injection point can be used to construct the object"() {
         given:

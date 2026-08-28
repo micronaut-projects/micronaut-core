@@ -17,8 +17,7 @@ package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
@@ -58,13 +57,12 @@ public final class HttpRequestFactory {
     private HttpRequestFactory() {
     }
 
-    @NonNull
     public static <I> HttpRequest.Builder builder(
-        @NonNull URI uri, io.micronaut.http.HttpRequest<I> request,
-        @NonNull HttpClientConfiguration configuration,
+        URI uri, io.micronaut.http.HttpRequest<I> request,
+        HttpClientConfiguration configuration,
         @Nullable Argument<?> bodyType,
         @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
-        @NonNull MessageBodyHandlerRegistry messageBodyHandlerRegistry
+        @Nullable MessageBodyHandlerRegistry messageBodyHandlerRegistry
     ) {
         MutableHttpRequest<I> mutableHttpRequest = request.toMutableRequest();
         final HttpRequest.Builder builder = HttpRequest.newBuilder().uri(uri);
@@ -84,10 +82,10 @@ public final class HttpRequestFactory {
     }
 
     private static <I> HttpRequest.BodyPublisher publisherForRequest(
-        @NonNull MutableHttpRequest<I> request,
+        MutableHttpRequest<I> request,
         @Nullable Argument<?> bodyType,
         @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
-        @NonNull MessageBodyHandlerRegistry messageBodyHandlerRegistry
+        @Nullable MessageBodyHandlerRegistry messageBodyHandlerRegistry
     ) {
         if (request instanceof RawHttpRequestWrapper<?> raw) {
             OptionalLong length = raw.byteBody().expectedLength();
@@ -133,18 +131,20 @@ public final class HttpRequestFactory {
                     return HttpRequest.BodyPublishers.ofByteArray(encoded);
                 }
             }
-            Argument<Object> bodyArgument = bodyType != null && bodyType.isInstance(bodyValue) ? (Argument<Object>) bodyType : Argument.ofInstance(bodyValue);
-            MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.findWriter(bodyArgument, requestContentType).orElse(null);
-            if (messageBodyWriter != null) {
-                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                messageBodyWriter.writeTo(
-                    bodyArgument,
-                    requestContentType,
-                    bodyValue,
-                    request.getHeaders(),
-                    byteArrayOutputStream
-                );
-                return HttpRequest.BodyPublishers.ofByteArray(byteArrayOutputStream.toByteArray());
+            if (messageBodyHandlerRegistry != null) {
+                Argument<Object> bodyArgument = bodyType != null && bodyType.isInstance(bodyValue) ? (Argument<Object>) bodyType : Argument.ofInstance(bodyValue);
+                MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.findWriter(bodyArgument, requestContentType).orElse(null);
+                if (messageBodyWriter != null) {
+                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                    messageBodyWriter.writeTo(
+                        bodyArgument,
+                        requestContentType,
+                        bodyValue,
+                        request.getHeaders(),
+                        byteArrayOutputStream
+                    );
+                    return HttpRequest.BodyPublishers.ofByteArray(byteArrayOutputStream.toByteArray());
+                }
             }
             throw unsupportedBodyType(bodyValue.getClass(), requestContentType.toString());
         }

@@ -14,7 +14,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import kotlin.test.fail
 
-class HeadlineControllerSpec : StringSpec() {
+class HeadlineControllerSpec: StringSpec() {
 
     val embeddedServer = autoClose(
         ApplicationContext.run(EmbeddedServer::class.java)
@@ -28,8 +28,8 @@ class HeadlineControllerSpec : StringSpec() {
         // tag::streamingClient[]
         "test client annotation streaming" {
             val headlineClient = embeddedServer
-                .applicationContext
-                .getBean(HeadlineClient::class.java) // <1>
+                    .applicationContext
+                    .getBean(HeadlineClient::class.java) // <1>
 
             val firstHeadline = headlineClient.streamHeadlines().next() // <2>
 
@@ -42,13 +42,11 @@ class HeadlineControllerSpec : StringSpec() {
 
         "test streaming client" {
             val client = embeddedServer.applicationContext.createBean(
-                StreamingHttpClient::class.java, embeddedServer.url
-            )
+                StreamingHttpClient::class.java, embeddedServer.url)
 
             // tag::streaming[]
             val headlineStream = client.jsonStream(
-                GET<Any>("/streaming/headlines"), Headline::class.java
-            ) // <1>
+                GET<Any>("/streaming/headlines"), Headline::class.java) // <1>
             val future = CompletableFuture<Headline>() // <2>
             headlineStream.subscribe(object : Subscriber<Headline> {
                 override fun onSubscribe(s: Subscription) {

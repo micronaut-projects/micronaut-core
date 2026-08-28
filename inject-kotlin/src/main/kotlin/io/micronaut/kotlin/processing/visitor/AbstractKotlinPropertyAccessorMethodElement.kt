@@ -19,9 +19,7 @@ import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
-import io.micronaut.kotlin.processing.getBinaryName
 
-@OptIn(KspExperimental::class)
 internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNativeElement>(
     nativeType: T,
     private val accessor: KSPropertyAccessor,
@@ -31,7 +29,7 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
     visitorContext: KotlinVisitorContext,
 ) : AbstractKotlinMethodElement<T>(
     nativeType,
-    accessor.getBinaryName(visitorContext.resolver),
+    visitorContext.getBinaryName(accessor),
     owningType,
     elementAnnotationMetadataFactory,
     visitorContext
@@ -59,11 +57,11 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
 
     override fun isPrivate() = visibility == Visibility.PRIVATE
 
-    override fun hides(memberElement: MemberElement?) =
+    override fun hides(memberElement: MemberElement) =
         // not sure how to implement this correctly for Kotlin
         false
 
-    override fun hides(hiddenMethod: MethodElement?) =
+    override fun hides(hiddenMethod: MethodElement) =
         // not sure how to implement this correctly for Kotlin
         false
 

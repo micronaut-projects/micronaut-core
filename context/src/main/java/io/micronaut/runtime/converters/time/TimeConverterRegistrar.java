@@ -23,6 +23,7 @@ import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 
 import java.time.DateTimeException;
 import java.time.Duration;
@@ -50,7 +51,6 @@ import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -120,7 +120,10 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         .appendValue(DAY_OF_MONTH, 2)
         .toFormatter();
 
-    private final Map<String, DateTimeFormatter> formattersCache = new ConcurrentHashMap<>();
+    private static final int MAX_CACHE_SIZE = 100;
+    private final Map<String, DateTimeFormatter> formattersCache = new ConcurrentLinkedHashMap.Builder<String, DateTimeFormatter>()
+        .maximumWeightedCapacity(MAX_CACHE_SIZE)
+        .build();
 
     @NextMajorVersion("Consider deletion of LocalDate and LocalDateTime converters")
     @Override
@@ -194,7 +197,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             try {
                 ZoneId result = ZoneId.of(object.toString());
                 return Optional.of(result);
-            } catch (DateTimeParseException e) {
+            } catch (DateTimeException e) {
                 context.reject(object, e);
                 return Optional.empty();
             }

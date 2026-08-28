@@ -21,14 +21,13 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
@@ -58,7 +57,6 @@ public interface MethodElement extends MemberElement {
      * @return The method annotation metadata
      * @since 4.0.0
      */
-    @NonNull
     default MutableAnnotationMetadataDelegate<AnnotationMetadata> getMethodAnnotationMetadata() {
         return new MutableAnnotationMetadataDelegate<>() {
             @Override
@@ -71,7 +69,6 @@ public interface MethodElement extends MemberElement {
     /**
      * @return The return type of the method
      */
-    @NonNull
     ClassElement getReturnType();
 
     /**
@@ -89,7 +86,6 @@ public interface MethodElement extends MemberElement {
      * @since 4.0.0
      */
     @Experimental
-    @NonNull
     default Map<String, ClassElement> getTypeArguments() {
         Map<String, ClassElement> typeArguments = getDeclaringType().getTypeArguments();
         Map<String, ClassElement> methodTypeArguments = getDeclaredTypeArguments();
@@ -106,7 +102,6 @@ public interface MethodElement extends MemberElement {
      * @since 4.0.0
      */
     @Experimental
-    @NonNull
     default Map<String, ClassElement> getDeclaredTypeArguments() {
         return Collections.emptyMap();
     }
@@ -131,16 +126,48 @@ public interface MethodElement extends MemberElement {
      * @return The {@code throws} types, if any. Never {@code null}.
      * @since 3.1.0
      */
-    @NonNull
-    default ClassElement[] getThrownTypes() {
+    default ClassElement [] getThrownTypes() {
         return ClassElement.ZERO_CLASS_ELEMENTS;
     }
 
     /**
      * @return The method parameters
      */
-    @NonNull
     ParameterElement[] getParameters();
+
+    /**
+     * Return the parameter with the given name or throw if not found.
+     *
+     * @param name The name of the parameter
+     * @return The method parameter with the name supplied
+     * @since 5.1.0
+     */
+    default ParameterElement getParameter(String name) {
+        for (ParameterElement parameter : getParameters()) {
+            if (parameter.getName().equals(name)) {
+                return parameter;
+            }
+        }
+        throw new IllegalStateException("Cannot find the parameter with the name: " + name);
+    }
+
+    /**
+     * Returns the index of the parameter with the supplied name.
+     *
+     * @param name The name of the parameter
+     * @return The parameter index or -1
+     * @since 5.1.0
+     */
+    default int findParameterIndex(String name) {
+        ParameterElement[] parameters = getParameters();
+        for (int i = 0; i < parameters.length; i++) {
+            ParameterElement parameter = parameters[i];
+            if (parameter.getName().equals(name)) {
+                return i;
+            }
+        }
+        return -1;
+    }
 
     /**
      * Takes this method element and transforms into a new method element with the given parameters appended to the existing parameters.
@@ -149,8 +176,7 @@ public interface MethodElement extends MemberElement {
      * @return A new method element
      * @since 2.3.0
      */
-    @NonNull
-    default MethodElement withNewParameters(@NonNull ParameterElement... newParameters) {
+    default MethodElement withNewParameters(ParameterElement... newParameters) {
         return withParameters(ArrayUtils.concat(getParameters(), newParameters));
     }
 
@@ -161,8 +187,7 @@ public interface MethodElement extends MemberElement {
      * @return A new method element
      * @since 4.0.0
      */
-    @NonNull
-    MethodElement withParameters(@NonNull ParameterElement... newParameters);
+    MethodElement withParameters(ParameterElement... newParameters);
 
     /**
      * Returns a new method with a new owning type.
@@ -171,8 +196,7 @@ public interface MethodElement extends MemberElement {
      * @return A new method element
      * @since 4.0.0
      */
-    @NonNull
-    default MethodElement withNewOwningType(@NonNull ClassElement owningType) {
+    default MethodElement withNewOwningType(ClassElement owningType) {
         throw new IllegalStateException("Not supported to change the owning type!");
     }
 
@@ -185,8 +209,7 @@ public interface MethodElement extends MemberElement {
      * @param type The type of the bean
      * @return A bean builder
      */
-    default @NonNull
-    BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+    default BeanElementBuilder addAssociatedBean(ClassElement type) {
         throw new UnsupportedOperationException("Only classes being processed from source code can define associated beans");
     }
 
@@ -196,7 +219,7 @@ public interface MethodElement extends MemberElement {
      * @return The suspend parameters
      * @since 2.3.0
      */
-    default @NonNull ParameterElement[] getSuspendParameters() {
+    default ParameterElement[] getSuspendParameters() {
         return getParameters();
     }
 
@@ -244,7 +267,7 @@ public interface MethodElement extends MemberElement {
      * @return The return type of the method
      * @since 1.1.1
      */
-    default @NonNull ClassElement getGenericReturnType() {
+    default ClassElement getGenericReturnType() {
         return getReturnType();
     }
 
@@ -255,7 +278,7 @@ public interface MethodElement extends MemberElement {
      * @return The method description
      */
     @Override
-    default @NonNull String getDescription(boolean simple) {
+    default String getDescription(boolean simple) {
         String typeString = simple ? getReturnType().getSimpleName() : getReturnType().getName();
         String args = Arrays.stream(getParameters()).map(arg -> simple ? arg.getType().getSimpleName() : arg.getType().getName() + " " + arg.getName()).collect(Collectors.joining(","));
         return typeString + " " + getName() + "(" + args + ")";
@@ -269,7 +292,7 @@ public interface MethodElement extends MemberElement {
      * @since 3.1
      */
     @NextMajorVersion("Review the package-private methods with broken access, those might need to be excluded completely")
-    default boolean overrides(@NonNull MethodElement overridden) {
+    default boolean overrides(MethodElement overridden) {
         if (equals(overridden) || isStatic() || overridden.isStatic() || isPrivate() || overridden.isPrivate()) {
             return false;
         }
@@ -295,7 +318,7 @@ public interface MethodElement extends MemberElement {
     }
 
     @Override
-    default boolean hides(@NonNull MemberElement memberElement) {
+    default boolean hides(MemberElement memberElement) {
         if (memberElement instanceof MethodElement hidden) {
             return hides(hidden);
         }
@@ -309,7 +332,7 @@ public interface MethodElement extends MemberElement {
      * @return true if this member element hides passed field element
      * @since 4.3.0
      */
-    default boolean hides(@NonNull MethodElement hiddenMethod) {
+    default boolean hides(MethodElement hiddenMethod) {
         if (equals(hiddenMethod) || isStatic() || hiddenMethod.isStatic() || hiddenMethod.isPrivate()) {
             return false;
         }
@@ -368,12 +391,12 @@ public interface MethodElement extends MemberElement {
      * @param parameterElements  The parameter elements
      * @return The method element
      */
-    static @NonNull MethodElement of(
-        @NonNull ClassElement declaredType,
-        @NonNull AnnotationMetadata annotationMetadata,
-        @NonNull ClassElement returnType,
-        @NonNull ClassElement genericReturnType,
-        @NonNull String name,
+    static MethodElement of(
+        ClassElement declaredType,
+        AnnotationMetadata annotationMetadata,
+        ClassElement returnType,
+        ClassElement genericReturnType,
+        String name,
         ParameterElement... parameterElements) {
         return new MethodElement() {
 
@@ -382,13 +405,11 @@ public interface MethodElement extends MemberElement {
                 return true;
             }
 
-            @NonNull
             @Override
             public ClassElement getReturnType() {
                 return returnType;
             }
 
-            @NonNull
             @Override
             public ClassElement getGenericReturnType() {
                 return genericReturnType;
@@ -411,7 +432,6 @@ public interface MethodElement extends MemberElement {
                 );
             }
 
-            @NonNull
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
                 return annotationMetadata;
@@ -422,7 +442,6 @@ public interface MethodElement extends MemberElement {
                 return declaredType;
             }
 
-            @NonNull
             @Override
             public String getName() {
                 return name;
@@ -443,10 +462,9 @@ public interface MethodElement extends MemberElement {
                 return true;
             }
 
-            @NonNull
             @Override
             public Object getNativeType() {
-                throw new UnsupportedOperationException("No native method type present");
+                throw new UnsupportedOperationException("No native method type present for: " + this);
             }
 
             @Override
@@ -473,15 +491,15 @@ public interface MethodElement extends MemberElement {
      * @return The method element
      * @since 4.0.0
      */
-    static @NonNull MethodElement of(
-        @NonNull ClassElement owningType,
-        @NonNull ClassElement declaringType,
-        @NonNull AnnotationMetadataProvider methodAnnotationMetadataProvider,
-        @NonNull AnnotationMetadataProvider annotationMetadataProvider,
-        @NonNull AbstractAnnotationMetadataBuilder<?, ?> metadataBuilder,
-        @NonNull ClassElement returnType,
-        @NonNull ClassElement genericReturnType,
-        @NonNull String name,
+    static MethodElement of(
+        ClassElement owningType,
+        ClassElement declaringType,
+        AnnotationMetadataProvider methodAnnotationMetadataProvider,
+        AnnotationMetadataProvider annotationMetadataProvider,
+        AbstractAnnotationMetadataBuilder<?, ?> metadataBuilder,
+        ClassElement returnType,
+        ClassElement genericReturnType,
+        String name,
         boolean isStatic,
         boolean isFinal,
         ParameterElement... parameterElements) {
@@ -495,13 +513,11 @@ public interface MethodElement extends MemberElement {
                 return true;
             }
 
-            @NonNull
             @Override
             public ClassElement getReturnType() {
                 return returnType;
             }
 
-            @NonNull
             @Override
             public ClassElement getGenericReturnType() {
                 return genericReturnType;
@@ -520,13 +536,13 @@ public interface MethodElement extends MemberElement {
                     new AnnotationMetadataProvider() {
                         @Override
                         public AnnotationMetadata getAnnotationMetadata() {
-                            return methodAnnotationMetadata;
+                            return getMethodAnnotationMetadata0();
                         }
                     },
                     new AnnotationMetadataProvider() {
                         @Override
                         public AnnotationMetadata getAnnotationMetadata() {
-                            return annotationMetadata;
+                            return getAnnotationMetadata0();
                         }
                     },
                     metadataBuilder,
@@ -547,6 +563,39 @@ public interface MethodElement extends MemberElement {
                     public AnnotationMetadata getAnnotationMetadata() {
                         return getMethodAnnotationMetadata0();
                     }
+
+                    @SuppressWarnings("java:S1192")
+                    @Override
+                    public <T extends Annotation> AnnotationMetadata annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+                        AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType, metadataBuilder.getRetentionPolicy(annotationType));
+                        //noinspection ConstantConditions
+                        if (consumer != null) {
+                            consumer.accept(builder);
+                            AnnotationValue<T> av = builder.build();
+                            return metadataBuilder.annotate(getAnnotationMetadata(), av);
+                        }
+                        return getAnnotationMetadata();
+                    }
+
+                    @Override
+                    public <T extends Annotation> AnnotationMetadata annotate(AnnotationValue<T> annotationValue) {
+                        return metadataBuilder.annotate(getAnnotationMetadata(), annotationValue);
+                    }
+
+                    @Override
+                    public AnnotationMetadata removeAnnotation(String annotationType) {
+                        return metadataBuilder.removeAnnotation(getAnnotationMetadata(), annotationType);
+                    }
+
+                    @Override
+                    public <T extends Annotation> AnnotationMetadata removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+                        return metadataBuilder.removeAnnotationIf(getAnnotationMetadata(), predicate);
+                    }
+
+                    @Override
+                    public AnnotationMetadata removeStereotype(String annotationType) {
+                        return metadataBuilder.removeStereotype(getAnnotationMetadata(), annotationType);
+                    }
                 };
             }
 
@@ -557,9 +606,12 @@ public interface MethodElement extends MemberElement {
                 return methodAnnotationMetadata;
             }
 
-            @NonNull
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
+                return getAnnotationMetadata0();
+            }
+
+            private AnnotationMetadata getAnnotationMetadata0() {
                 if (annotationMetadata == null) {
                     annotationMetadata = annotationMetadataProvider.getAnnotationMetadata().copyAnnotationMetadata();
                 }
@@ -576,7 +628,6 @@ public interface MethodElement extends MemberElement {
                 return declaringType;
             }
 
-            @NonNull
             @Override
             public String getName() {
                 return name;
@@ -609,7 +660,7 @@ public interface MethodElement extends MemberElement {
 
             @Override
             @SuppressWarnings("java:S1192")
-            public <T extends Annotation> Element annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
+            public <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
                 AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
                 //noinspection ConstantConditions
@@ -633,7 +684,7 @@ public interface MethodElement extends MemberElement {
 
             @Override
             @SuppressWarnings("java:S1192")
-            public Element removeAnnotation(@NonNull String annotationType) {
+            public Element removeAnnotation(String annotationType) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
                 methodAnnotationMetadata = metadataBuilder.removeAnnotation(getMethodAnnotationMetadata0(), annotationType);
                 annotationMetadata = metadataBuilder.removeAnnotation(getAnnotationMetadata(), annotationType);
@@ -641,7 +692,7 @@ public interface MethodElement extends MemberElement {
             }
 
             @Override
-            public <T extends Annotation> Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
+            public <T extends Annotation> Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
                 ArgumentUtils.requireNonNull("predicate", predicate);
                 methodAnnotationMetadata = metadataBuilder.removeAnnotationIf(getMethodAnnotationMetadata0(), predicate);
                 annotationMetadata = metadataBuilder.removeAnnotationIf(getAnnotationMetadata(), predicate);
@@ -651,14 +702,13 @@ public interface MethodElement extends MemberElement {
 
             @Override
             @SuppressWarnings("java:S1192")
-            public Element removeStereotype(@NonNull String annotationType) {
+            public Element removeStereotype(String annotationType) {
                 ArgumentUtils.requireNonNull("annotationType", annotationType);
                 methodAnnotationMetadata = metadataBuilder.removeStereotype(getMethodAnnotationMetadata0(), annotationType);
                 annotationMetadata = metadataBuilder.removeStereotype(getAnnotationMetadata(), annotationType);
                 return this;
             }
 
-            @NonNull
             @Override
             public Object getNativeType() {
                 throw new UnsupportedOperationException("No native method type present");

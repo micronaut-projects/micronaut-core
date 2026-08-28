@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpStatus;
 
 import java.util.Optional;
@@ -79,7 +79,7 @@ public interface StatusRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, Reque
      * @param status The status to match
      * @return The route match
      */
-    Optional<RouteMatch<R>> match(Class<?> originatingClass, HttpStatus status);
+    Optional<RouteMatch<R>> match(@Nullable Class<?> originatingClass, HttpStatus status);
 
     /**
      * Match the given HTTP status.
@@ -88,7 +88,7 @@ public interface StatusRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, Reque
      * @param statusCode The status to match
      * @return The route match
      */
-    default Optional<RouteMatch<R>> match(Class<?> originatingClass, int statusCode) {
+    default Optional<RouteMatch<R>> match(@Nullable Class<?> originatingClass, int statusCode) {
         HttpStatus status;
         try {
             status = HttpStatus.valueOf(statusCode);

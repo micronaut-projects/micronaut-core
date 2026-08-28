@@ -16,8 +16,7 @@
 package io.micronaut.http.ssl;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import org.slf4j.Logger;
@@ -71,11 +70,11 @@ public class SslConfiguration implements Toggleable {
     private KeyConfiguration key = new KeyConfiguration();
     private KeyStoreConfiguration keyStore = new KeyStoreConfiguration();
     private TrustStoreConfiguration trustStore = new TrustStoreConfiguration();
-    private String keyName;
-    private String trustName;
-    private ClientAuthentication clientAuthentication;
-    private String[] ciphers;
-    private String[] protocols;
+    private @Nullable String keyName;
+    private @Nullable String trustName;
+    private @Nullable ClientAuthentication clientAuthentication;
+    private String @Nullable [] ciphers;
+    private String @Nullable [] protocols;
     private String protocol = DEFAULT_PROTOCOL;
     private Duration handshakeTimeout = Duration.ofSeconds(10);
     private boolean preferOpenssl = true;
@@ -207,7 +206,6 @@ public class SslConfiguration implements Toggleable {
     /**
      * @return The timeout for the SSL handshake
      */
-    @NonNull
     public Duration getHandshakeTimeout() {
         return handshakeTimeout;
     }
@@ -309,7 +307,7 @@ public class SslConfiguration implements Toggleable {
     /**
      * @param handshakeTimeout The timeout for the SSL handshake
      */
-    public void setHandshakeTimeout(@NonNull Duration handshakeTimeout) {
+    public void setHandshakeTimeout(Duration handshakeTimeout) {
         this.handshakeTimeout = Objects.requireNonNull(handshakeTimeout, "handshakeTimeout");
     }
 
@@ -376,8 +374,8 @@ public class SslConfiguration implements Toggleable {
 
     public static class KeyConfiguration {
         public static final String PREFIX = "key";
-        private String password;
-        private String alias;
+        private @Nullable String password;
+        private @Nullable String alias;
 
         /**
          * @return The password of the key
@@ -417,12 +415,12 @@ public class SslConfiguration implements Toggleable {
      */
     public static class KeyStoreConfiguration {
         public static final String PREFIX = "key-store";
-        private String path;
-        private String keyPath;
-        private String certificatePath;
-        private String password;
-        private String type;
-        private String provider;
+        private @Nullable String path;
+        private @Nullable String keyPath;
+        private @Nullable String certificatePath;
+        private @Nullable String password;
+        private @Nullable String type;
+        private @Nullable String provider;
 
         /**
          * The path to the key store (typically .jks). Can also point to a PEM file containing
@@ -550,10 +548,10 @@ public class SslConfiguration implements Toggleable {
      */
     public static class TrustStoreConfiguration {
         public static final String PREFIX = "trust-store";
-        private String path;
-        private String password;
-        private String type;
-        private String provider;
+        private @Nullable String path;
+        private @Nullable String password;
+        private @Nullable String type;
+        private @Nullable String provider;
 
         /**
          * The path to the trust store (typically .jks). Can also point to a PEM file containing

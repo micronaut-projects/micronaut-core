@@ -16,7 +16,7 @@
 package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.body.ByteBody;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

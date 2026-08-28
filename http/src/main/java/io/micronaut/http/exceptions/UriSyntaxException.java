@@ -29,6 +29,6 @@ public class UriSyntaxException extends HttpException {
      * @param e The throwable
      */
     public UriSyntaxException(URISyntaxException e) {
-        super(e.getMessage());
+        super(String.valueOf(e.getMessage()));
     }
 }

@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.async.subscriber;
 
+import org.jspecify.annotations.NullUnmarked;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullUnmarked
 public abstract class CompletionAwareSubscriber<T> implements Subscriber<T>, Emitter<T> {
 
     private static final Logger LOG = LoggerFactory.getLogger(CompletionAwareSubscriber.class);

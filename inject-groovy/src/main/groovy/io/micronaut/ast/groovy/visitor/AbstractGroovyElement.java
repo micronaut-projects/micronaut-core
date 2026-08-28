@@ -19,8 +19,8 @@ import groovy.lang.groovydoc.Groovydoc;
 import groovy.transform.PackageScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -370,7 +370,7 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
             }
         }
         if (upperType.isPrimitive()) {
-            // TODO: Support primitives for wildcards (? extends byte[])
+            // Primitive wildcard bounds are not represented as wildcard elements.
             return upperType;
         }
         GroovyNativeElement wildcardNativeElement = new GroovyNativeElement.ClassWithOwner(genericsType.getType(), declaredElement);
@@ -530,4 +530,3 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
     record PlaceholderEntry(AnnotatedNode owner, String placeholderName) {
     }
 }
-

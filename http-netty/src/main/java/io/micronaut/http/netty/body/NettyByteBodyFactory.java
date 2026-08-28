@@ -18,8 +18,6 @@ package io.micronaut.http.netty.body;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.AbstractBodyAdapter;
@@ -37,6 +35,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -50,7 +49,7 @@ import reactor.core.publisher.Flux;
 public final class NettyByteBodyFactory extends ByteBodyFactory {
     private final EventLoop loop;
 
-    public NettyByteBodyFactory(@NonNull Channel channel) {
+    public NettyByteBodyFactory(Channel channel) {
         this(channel.alloc(), channel.eventLoop());
     }
 
@@ -60,18 +59,18 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     }
 
     @Override
-    public @NonNull NettyReadBufferFactory readBufferFactory() {
+    public NettyReadBufferFactory readBufferFactory() {
         return (NettyReadBufferFactory) super.readBufferFactory();
     }
 
     @Override
     public StreamingBody createStreamingBody(BodySizeLimits limits, BufferConsumer.Upstream upstream) {
-        StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, upstream);
+        StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(limits, upstream);
         return new StreamingBody(sb, new StreamingNettyByteBody(sb));
     }
 
     @Override
-    protected AbstractBodyAdapter createBodyAdapter(Publisher<ReadBuffer> publisher, Runnable onDiscard) {
+    protected AbstractBodyAdapter createBodyAdapter(Publisher<ReadBuffer> publisher, @Nullable Runnable onDiscard) {
         return new NettyBodyAdapter(loop, publisher, onDiscard);
     }
 
@@ -79,19 +78,8 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         return adapt(readBufferFactory().adapt(byteBuf));
     }
 
-    public CloseableByteBody createChecked(@NonNull BodySizeLimits bodySizeLimits, @NonNull ByteBuf buf) {
-        // AvailableNettyByteBody does not support exceptions, so if we hit one of the configured
-        // limits, we return a StreamingNettyByteBody instead.
-        int readable = buf.readableBytes();
-        if (readable > bodySizeLimits.maxBodySize() || readable > bodySizeLimits.maxBufferSize()) {
-            BufferConsumer.Upstream upstream = bytesConsumed -> {
-            };
-            StreamingNettyByteBody.SharedBuffer mockBuffer = createStreamingBuffer(bodySizeLimits, upstream);
-            mockBuffer.add(readBufferFactory().adapt(buf)); // this will trigger the exception for exceeded body or buffer size
-            return new StreamingNettyByteBody(mockBuffer);
-        } else {
-            return adapt(buf);
-        }
+    public CloseableByteBody createChecked(BodySizeLimits bodySizeLimits, ByteBuf buf) {
+        return createChecked(bodySizeLimits, readBufferFactory().adapt(buf));
     }
 
     public CloseableByteBody adaptNetty(Publisher<ByteBuf> publisher) {
@@ -126,7 +114,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
 
     @Override
     public StreamingNettyByteBody toStreaming(ByteBody body) {
-        if (body instanceof StreamingNettyByteBody snbb) {
+        if (body instanceof StreamingNettyByteBody snbb && snbb.isCompatible(loop)) {
             return snbb;
         }
         NettyBodyAdapter adapter = new NettyBodyAdapter(loop, body.toReadBufferPublisher(), null);

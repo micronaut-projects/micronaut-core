@@ -16,8 +16,6 @@
 package io.micronaut.http.tck;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-
 import java.util.Map;
 
 /**
@@ -29,8 +27,7 @@ import java.util.Map;
 public class EmbeddedServerUnderTestProvider implements ServerUnderTestProvider {
 
     @Override
-    @NonNull
-    public ServerUnderTest getServer(@NonNull Map<String, Object> properties) {
+    public ServerUnderTest getServer(Map<String, Object> properties) {
         return new EmbeddedServerUnderTest(properties);
     }
 }

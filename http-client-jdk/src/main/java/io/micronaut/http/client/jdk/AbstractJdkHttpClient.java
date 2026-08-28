@@ -19,8 +19,6 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
@@ -50,9 +48,10 @@ import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
-import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.util.HttpHeadersUtil;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,22 +92,28 @@ abstract class AbstractJdkHttpClient {
     public static final String H2C_ERROR_MESSAGE = "H2C is not supported by the JDK HTTP client";
     public static final String H3_ERROR_MESSAGE = "HTTP/3 is not supported by the JDK HTTP client";
     public static final String WEIRD_ALPN_ERROR_MESSAGE = "The only supported ALPN modes are [" + HttpVersionSelection.ALPN_HTTP_1 + "] or [" + HttpVersionSelection.ALPN_HTTP_1 + "," + HttpVersionSelection.ALPN_HTTP_2 + "]";
-
+    @Nullable
     protected final LoadBalancer loadBalancer;
+    @Nullable
     protected final HttpVersionSelection httpVersion;
     protected final HttpClientConfiguration configuration;
+    @Nullable
     protected final String contextPath;
     protected final HttpClient client;
     protected final CookieManager cookieManager;
     protected final RequestBinderRegistry requestBinderRegistry;
+    @Nullable
     protected final String clientId;
     protected final ConversionService conversionService;
     protected final JdkClientSslBuilder sslBuilder;
     protected final Logger log;
+    @Nullable
     protected final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
     protected final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
     protected final CookieDecoder cookieDecoder;
+    @Nullable
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    @Nullable
     protected MessageBodyHandlerRegistry messageBodyHandlerRegistry;
 
     protected AbstractJdkHttpClient(AbstractJdkHttpClient prototype) {
@@ -146,15 +151,19 @@ abstract class AbstractJdkHttpClient {
     @SuppressWarnings({"java:S107", "checkstyle:parameternumber"}) // too many parameters
     protected AbstractJdkHttpClient(
         Logger log,
-        LoadBalancer loadBalancer,
-        HttpVersionSelection httpVersion,
+        @Nullable LoadBalancer loadBalancer,
+        @Nullable HttpVersionSelection httpVersion,
         HttpClientConfiguration configuration,
+        @Nullable
         String contextPath,
         @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
         @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
+        @Nullable
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        @Nullable
         MessageBodyHandlerRegistry messageBodyHandlerRegistry,
         RequestBinderRegistry requestBinderRegistry,
+        @Nullable
         String clientId,
         ConversionService conversionService,
         JdkClientSslBuilder sslBuilder,
@@ -227,14 +236,13 @@ abstract class AbstractJdkHttpClient {
             builder = configureProxy(builder, socketAddress, configuration.getProxyUsername().orElse(null), configuration.getProxyPassword().orElse(null));
         }
 
-        if (configuration.getSslConfiguration() instanceof ClientSslConfiguration clientSslConfiguration) {
-            configureSsl(builder, clientSslConfiguration);
+        if (configuration.getSslConfiguration() instanceof AbstractClientSslConfiguration sslConfiguration) {
+            configureSsl(builder, sslConfiguration);
         }
 
         this.client = builder.build();
     }
 
-    @NonNull
     private static List<HttpFilterResolver.FilterEntry> clientFilterEntries(@Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
                                                                             @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries) {
         if (clientFilterEntries != null) {
@@ -248,9 +256,9 @@ abstract class AbstractJdkHttpClient {
         );
     }
 
-    private static HttpCookie toJdkCookie(@NonNull Cookie cookie,
-                                          @NonNull io.micronaut.http.HttpRequest<?> request,
-                                          @NonNull String host) {
+    private static HttpCookie toJdkCookie(Cookie cookie,
+                                          io.micronaut.http.HttpRequest<?> request,
+                                          String host) {
         HttpCookie newCookie = new HttpCookie(cookie.getName(), cookie.getValue());
         newCookie.setMaxAge(cookie.getMaxAge());
         newCookie.setDomain(host);
@@ -261,8 +269,8 @@ abstract class AbstractJdkHttpClient {
     }
 
     private HttpClient.Builder configureProxy(
-        @NonNull HttpClient.Builder builder,
-        @NonNull SocketAddress address,
+        HttpClient.Builder builder,
+        SocketAddress address,
         @Nullable String username,
         @Nullable String password
     ) {
@@ -285,24 +293,25 @@ abstract class AbstractJdkHttpClient {
         return builder;
     }
 
-    private void configureSsl(HttpClient.Builder builder, ClientSslConfiguration clientSslConfiguration) {
-        sslBuilder.build(clientSslConfiguration).ifPresent(builder::sslContext);
+    private void configureSsl(HttpClient.Builder builder, AbstractClientSslConfiguration sslConfiguration) {
+        sslBuilder.build(sslConfiguration).ifPresent(builder::sslContext);
         SSLParameters sslParameters = new SSLParameters();
-        clientSslConfiguration.getClientAuthentication().ifPresent(a -> {
+        sslConfiguration.getClientAuthentication().ifPresent(a -> {
             if (a == ClientAuthentication.WANT) {
                 sslParameters.setWantClientAuth(true);
             } else if (a == ClientAuthentication.NEED) {
                 sslParameters.setNeedClientAuth(true);
             }
         });
-        clientSslConfiguration.getProtocols().ifPresent(sslParameters::setProtocols);
-        clientSslConfiguration.getCiphers().ifPresent(sslParameters::setCipherSuites);
+        sslConfiguration.getProtocols().ifPresent(sslParameters::setProtocols);
+        sslConfiguration.getCiphers().ifPresent(sslParameters::setCipherSuites);
         builder.sslParameters(sslParameters);
     }
 
     /**
      * @return The {@link MediaTypeCodecRegistry}
      */
+    @Nullable
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
         return mediaTypeCodecRegistry;
     }
@@ -317,6 +326,7 @@ abstract class AbstractJdkHttpClient {
     /**
      * @return The {@link MessageBodyHandlerRegistry}
      */
+    @Nullable
     public MessageBodyHandlerRegistry getMessageBodyHandlerRegistry() {
         return messageBodyHandlerRegistry;
     }
@@ -336,7 +346,7 @@ abstract class AbstractJdkHttpClient {
      * @param <I>      The body type
      * @return A JDK request object
      */
-    protected <I> Mono<HttpRequest> mapToHttpRequest(@NonNull io.micronaut.http.HttpRequest<I> request, @Nullable Argument<?> bodyType) {
+    protected <I> Mono<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<?> bodyType) {
         return resolveRequestUri(request)
             .map(uri -> {
                 cookieDecoder.decode(request).ifPresent(cookies -> cookies.getAll().forEach(cookie -> {
@@ -358,13 +368,21 @@ abstract class AbstractJdkHttpClient {
         return resolveURI(request);
     }
 
+    /**
+     * @param request The request object
+     * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to {@link io.micronaut.http.HttpRequest})
+     */
+    protected Object getLoadBalancerDiscriminator(io.micronaut.http.HttpRequest<?> request) {
+        return request;
+    }
+
     private <I> Mono<URI> resolveURI(io.micronaut.http.HttpRequest<I> request) {
         URI requestURI = request.getUri();
         if (loadBalancer == null) {
             return Mono.error(populateServiceId(new NoHostException("Request URI specifies no host to connect to"), clientId, configuration));
         }
 
-        return Mono.from(loadBalancer.select(request)).map(server -> {
+        return Mono.from(loadBalancer.select(getLoadBalancerDiscriminator(request))).map(server -> {
                 Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
                 if (request instanceof MutableHttpRequest<?> mutableRequest && authInfo.isPresent()) {
                     mutableRequest.getHeaders().auth(authInfo.get());
@@ -387,12 +405,11 @@ abstract class AbstractJdkHttpClient {
      * @param <O>         The body type
      * @return A Micronaut response
      */
-    @NonNull
-    protected <O> HttpResponse<O> response(@NonNull java.net.http.HttpResponse<byte[]> netResponse, @NonNull Argument<O> bodyType) {
+    protected <O> HttpResponse<O> response(java.net.http.HttpResponse<byte[]> netResponse, @Nullable Argument<O> bodyType) {
         return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
     }
 
-    protected <I, O> Flux<HttpResponse<O>> exchangeImpl(@NonNull io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType) {
+    protected <I, O> Flux<HttpResponse<O>> exchangeImpl(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType) {
         var defaultPublisher = responsePublisher(request, bodyType);
         return resolveRequestUri(request)
             .flatMapMany(uri -> applyFilterToResponsePublisher(request, uri, defaultPublisher));
@@ -417,9 +434,7 @@ abstract class AbstractJdkHttpClient {
             @Override
             protected ExecutionFlow<HttpResponse<?>> provideResponse(io.micronaut.http.HttpRequest<?> request, PropagatedContext propagatedContext) {
                 try {
-                    try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
-                        return ReactiveExecutionFlow.fromPublisher((Publisher<HttpResponse<?>>) responsePublisher);
-                    }
+                    return propagatedContext.propagate(() -> ReactiveExecutionFlow.fromPublisher((Publisher<HttpResponse<?>>) responsePublisher));
                 } catch (Throwable e) {
                     return ExecutionFlow.error(e);
                 }
@@ -429,7 +444,7 @@ abstract class AbstractJdkHttpClient {
     }
 
     protected <O> Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher(
-        @NonNull io.micronaut.http.HttpRequest<?> request,
+        io.micronaut.http.HttpRequest<?> request,
         @Nullable Argument<O> bodyType
     ) {
         if (clientId != null && BasicHttpAttributes.getServiceId(request).isEmpty()) {

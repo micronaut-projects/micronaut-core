@@ -16,7 +16,6 @@
 package io.micronaut.kotlin.processing.beans.configproperties.inheritance
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
@@ -29,7 +28,7 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
 
     void "test configuration properties binding"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of(
                 'test',
                 ['foo.bar.port':'8080',
@@ -56,7 +55,7 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
 
     void "test configuration properties binding extending POJO"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of(
                 'test',
                 ['foo.baz.otherProperty':'x',

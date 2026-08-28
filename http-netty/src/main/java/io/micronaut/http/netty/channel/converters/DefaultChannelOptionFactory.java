@@ -42,7 +42,7 @@ public class DefaultChannelOptionFactory implements ChannelOptionFactory {
         if (declaredField.isPresent()) {
             Optional<Class<?>> typeArg = GenericTypeUtils.resolveGenericTypeArgument(declaredField.get());
             if (typeArg.isPresent()) {
-                Optional<Object> converted = (Optional<Object>) env.convert(value, typeArg.get());
+                Optional<Object> converted = (Optional<Object>) env.getConversionService().convert(value, typeArg.get());
                 value = converted.orElse(value);
             }
         }

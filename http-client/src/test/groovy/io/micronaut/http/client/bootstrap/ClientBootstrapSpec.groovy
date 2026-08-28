@@ -29,6 +29,8 @@ class ClientBootstrapSpec extends Specification {
 
         expect:
         beanContext.getRequiredProperty("bootstrap-call", String) == "Hello Bootstrap"
+        def env = beanContext.getEnvironment()
+        env
 
         cleanup:
         beanContext.close()

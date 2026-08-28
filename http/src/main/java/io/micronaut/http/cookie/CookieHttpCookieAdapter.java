@@ -16,8 +16,7 @@
 package io.micronaut.http.cookie;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.net.HttpCookie;
 import java.util.Optional;
 
@@ -31,7 +30,7 @@ class CookieHttpCookieAdapter implements Cookie {
     private static final CookieComparator COMPARATOR = new CookieComparator();
 
     private final HttpCookie httpCookie;
-    private SameSite sameSite = null;
+    private @Nullable SameSite sameSite;
 
     public CookieHttpCookieAdapter(HttpCookie httpCookie) {
         this.httpCookie = httpCookie;
@@ -41,12 +40,12 @@ class CookieHttpCookieAdapter implements Cookie {
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return httpCookie.getName();
     }
 
     @Override
-    public @NonNull String getValue() {
+    public String getValue() {
         return httpCookie.getValue();
     }
 
@@ -76,37 +75,37 @@ class CookieHttpCookieAdapter implements Cookie {
     }
 
     @Override
-    public @NonNull Cookie maxAge(long maxAge) {
+    public Cookie maxAge(long maxAge) {
         httpCookie.setMaxAge(maxAge);
         return this;
     }
 
     @Override
-    public @NonNull Cookie value(@NonNull String value) {
+    public Cookie value(String value) {
         httpCookie.setValue(value);
         return this;
     }
 
     @Override
-    public @NonNull Cookie domain(@Nullable String domain) {
+    public Cookie domain(@Nullable String domain) {
         httpCookie.setDomain(domain);
         return this;
     }
 
     @Override
-    public @NonNull Cookie path(@Nullable String path) {
+    public Cookie path(@Nullable String path) {
         httpCookie.setPath(path);
         return this;
     }
 
     @Override
-    public @NonNull Cookie secure(boolean secure) {
+    public Cookie secure(boolean secure) {
         httpCookie.setSecure(secure);
         return this;
     }
 
     @Override
-    public @NonNull Cookie httpOnly(boolean httpOnly) {
+    public Cookie httpOnly(boolean httpOnly) {
         httpCookie.setHttpOnly(httpOnly);
         return this;
     }
@@ -117,7 +116,7 @@ class CookieHttpCookieAdapter implements Cookie {
     }
 
     @Override
-    public Cookie sameSite(SameSite sameSite) {
+    public Cookie sameSite(@Nullable SameSite sameSite) {
         this.sameSite = sameSite;
         return this;
     }

@@ -16,8 +16,8 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.TypeDef;
@@ -39,12 +39,14 @@ import java.util.stream.Collectors;
  * @author Denis Stepanov
  * @since 4.8
  */
+@NullUnmarked
 @Internal
 public final class GenUtils {
 
     private static final ClassTypeDef MAP_TYPE = ClassTypeDef.of(Map.class);
     private static final ClassTypeDef MAP_ENTRY_TYPE = ClassTypeDef.of(Map.Entry.class);
     private static final ClassTypeDef LIST_TYPE = ClassTypeDef.of(List.class);
+    private static final ClassTypeDef SET_TYPE = ClassTypeDef.of(Set.class);
 
     private GenUtils() {
     }
@@ -59,11 +61,11 @@ public final class GenUtils {
      * @param <T>             The value type
      * @return The expression
      */
-    public static <T> ExpressionDef stringMapOf(@NonNull
+    public static <T> ExpressionDef stringMapOf(
                                                 Map<? extends CharSequence, T> map,
                                                 boolean skipEmpty,
                                                 @Nullable T empty,
-                                                @NonNull Function<T, ExpressionDef> objAsExpression) {
+                                                Function<T, ExpressionDef> objAsExpression) {
         return stringMapOf(map, skipEmpty, empty, null, objAsExpression);
     }
 
@@ -78,13 +80,13 @@ public final class GenUtils {
      * @param <T>             The value type
      * @return The expression
      */
-    public static <T> ExpressionDef stringMapOf(@NonNull
+    public static <T> ExpressionDef stringMapOf(
                                                 Map<? extends CharSequence, T> map,
                                                 boolean skipEmpty,
                                                 @Nullable T empty,
                                                 @Nullable
                                                 Predicate<T> valuePredicate,
-                                                @NonNull Function<T, ExpressionDef> objAsExpression) {
+                                                Function<T, ExpressionDef> objAsExpression) {
         Set<? extends Map.Entry<String, T>> entrySet = map != null ? map.entrySet()
             .stream()
             .filter(e -> !skipEmpty || (e.getKey() != null) && (valuePredicate == null || valuePredicate.test(e.getValue())))
@@ -169,6 +171,41 @@ public final class GenUtils {
                 TypeDef.OBJECT.array().instantiate(values)
             );
         }
+    }
+
+    /**
+     * The set of expression.
+     * @param values The values
+     * @return the expression
+     */
+    public static ExpressionDef setOf(List<ExpressionDef> values) {
+        if (values != null) {
+            values = values.stream().filter(Objects::nonNull).toList();
+        }
+        if (values == null || values.isEmpty()) {
+            return SET_TYPE.invokeStatic("of", SET_TYPE);
+        }
+        if (values.size() < 11) {
+            List<TypeDef> parameterTypes = new ArrayList<>(values.size());
+            for (ExpressionDef ignore : values) {
+                parameterTypes.add(TypeDef.OBJECT);
+            }
+            return SET_TYPE.invokeStatic("of", parameterTypes, SET_TYPE, values);
+        } else {
+            return setOfArray(TypeDef.OBJECT.array().instantiate(values));
+        }
+    }
+
+    /**
+     * The set of expression.
+     * @param array The array
+     * @return the expression
+     */
+    public static ExpressionDef setOfArray(ExpressionDef array) {
+        if (!array.type().isArray()) {
+            throw new IllegalArgumentException("Argument must be an array");
+        }
+        return SET_TYPE.invokeStatic("of", List.of(TypeDef.OBJECT.array()), SET_TYPE, array);
     }
 
 }

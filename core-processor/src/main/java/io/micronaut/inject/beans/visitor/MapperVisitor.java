@@ -17,7 +17,6 @@ package io.micronaut.inject.beans.visitor;
 
 import io.micronaut.context.annotation.Mapper;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -27,6 +26,7 @@ import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -39,6 +39,7 @@ import java.util.Set;
  * @since 4.1.0
  */
 public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
+    @Nullable
     private ClassElement lastClassElement;
 
     @Override
@@ -79,10 +80,9 @@ public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
 
     @SuppressWarnings("java:S1192")
     private void validateMappingAnnotations(MethodElement element, List<AnnotationValue<Mapper.Mapping>> values, ClassElement toType) {
-        @NonNull ParameterElement[] parameters = element.getParameters();
+        ParameterElement[] parameters = element.getParameters();
 
-        for (int i = 0; i < parameters.length; i++) {
-            ParameterElement parameter = parameters[i];
+        for (ParameterElement parameter : parameters) {
             ClassElement fromType = parameter.getGenericType();
             boolean isMap = fromType.isAssignable(Map.class);
 
@@ -152,7 +152,7 @@ public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
     }
 
     @Override
-    public @NonNull VisitorKind getVisitorKind() {
+    public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
     }
 }

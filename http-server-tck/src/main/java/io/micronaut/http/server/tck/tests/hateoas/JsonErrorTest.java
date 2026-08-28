@@ -18,7 +18,10 @@ package io.micronaut.http.server.tck.tests.hateoas;
 import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.hateoas.*;
+import io.micronaut.http.hateoas.GenericResource;
+import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.hateoas.Link;
+import io.micronaut.http.hateoas.Resource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -28,7 +31,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 @SuppressWarnings({

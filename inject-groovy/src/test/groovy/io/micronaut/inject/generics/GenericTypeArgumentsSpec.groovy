@@ -266,7 +266,7 @@ import io.micronaut.context.annotation.*;
 class TestFactory {
 
     @Bean
-    @io.micronaut.aop.interceptors.Mutating
+    @io.micronaut.aop.interceptors.Mutating("foo")
     java.util.function.Function<String, Integer> myFunc() {
         return { String str -> 10 };
     }

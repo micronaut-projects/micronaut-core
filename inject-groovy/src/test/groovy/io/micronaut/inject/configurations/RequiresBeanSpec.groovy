@@ -16,10 +16,6 @@
 package io.micronaut.inject.configurations
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.configurations.requiresbean.RequiresBean
 import io.micronaut.inject.configurations.requirescondition2.TrueLambdaBean
 import io.micronaut.inject.configurations.requiresconditiontrue.TrueBean
@@ -103,7 +99,7 @@ class RequiresBeanSpec extends Specification {
     void "test requires property when present"() {
         given:
         ApplicationContext context = ApplicationContext.run(['dataSource.url':'jdbc::blah'])
-        
+
         expect:
         context.containsBean(RequiresProperty)
 

@@ -15,9 +15,8 @@
  */
 package io.micronaut.core.type;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import org.jspecify.annotations.Nullable;
 
 /**
  * <p>Represents an executable reference. The reference could be implemented via reflection (slow) or via generated
@@ -34,14 +33,14 @@ public interface Executable<T, R> extends AnnotationMetadataProvider {
      * @return The declaring type
      * @since 3.0.0
      */
-    @NonNull Class<T> getDeclaringType();
+    Class<T> getDeclaringType();
 
     /**
      * The required argument types.
      *
      * @return The arguments
      */
-    @NonNull Argument<?>[] getArguments();
+    Argument<?>[] getArguments();
 
     /**
      * Invokes the method.
@@ -50,5 +49,5 @@ public interface Executable<T, R> extends AnnotationMetadataProvider {
      * @param arguments The arguments
      * @return The result
      */
-    @Nullable R invoke(@Nullable T instance, Object... arguments);
+    @Nullable R invoke(T instance, @Nullable Object... arguments);
 }

@@ -15,27 +15,18 @@
  */
 package io.micronaut.jackson.core.env
 
-import io.micronaut.context.env.DefaultEnvironment
+import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
-import io.micronaut.context.env.PropertySourceLoader
-import io.micronaut.core.io.service.ServiceDefinition
-import io.micronaut.core.io.service.SoftServiceLoader
-import io.micronaut.core.reflect.ReflectionUtils
-import io.micronaut.core.version.SemanticVersion
-import spock.lang.Requires
+import io.micronaut.core.io.ResourceLoader
+import io.micronaut.core.io.scan.ClassPathResourceLoader
 import spock.lang.Specification
-import spock.util.environment.Jvm
 
+import java.util.stream.Stream
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-// fails due to https://issues.apache.org/jira/browse/GROOVY-10145
-@Requires({
-    SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
-            !Jvm.current.isJava16Compatible()
-})
 class JsonPropertySourceLoaderSpec extends Specification {
     void "test json env property source loader"() {
         given:
@@ -83,22 +74,31 @@ class JsonPropertySourceLoaderSpec extends Specification {
 
     void "test json property source loader"() {
         given:
-        def serviceDefinition = Mock(ServiceDefinition)
-        serviceDefinition.isPresent() >> true
-        serviceDefinition.load() >> new JsonPropertySourceLoader()
-
-        Environment env = new DefaultEnvironment({ ["test"] }) {
+        GroovyClassLoader gcl = new GroovyClassLoader()
+        gcl.addURL(JsonPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
+        Environment env = Environment.create(new ApplicationContextConfiguration() {
             @Override
-            protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
-                GroovyClassLoader gcl = new GroovyClassLoader()
-                gcl.addURL(JsonPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
-                return new SoftServiceLoader<PropertySourceLoader>(PropertySourceLoader, gcl)
+            List<String> getEnvironments() {
+                return ["test"]
             }
 
             @Override
-            Optional<InputStream> getResourceAsStream(String path) {
-                if(path.endsWith('-test.json')) {
-                    return Optional.of(new ByteArrayInputStream('''\
+            ClassLoader getClassLoader() {
+                return gcl
+            }
+
+            @Override
+            ClassPathResourceLoader getResourceLoader() {
+                return new ClassPathResourceLoader() {
+                    @Override
+                    ClassLoader getClassLoader() {
+                        return gcl
+                    }
+
+                    @Override
+                    Optional<InputStream> getResourceAsStream(String path) {
+                        if(path.endsWith('-test.json')) {
+                            return Optional.of(new ByteArrayInputStream('''\
 { "dataSource":
     { "jmxExport": true,
       "username": "sa",
@@ -106,9 +106,9 @@ class JsonPropertySourceLoaderSpec extends Specification {
     }
 }
 '''.bytes))
-                }
-                else if(path.endsWith("application.json")) {
-                    return Optional.of(new ByteArrayInputStream('''\
+                        }
+                        else if(path.endsWith("application.json")) {
+                            return Optional.of(new ByteArrayInputStream('''\
 { "hibernate":
     { "cache":
         { "queries": false }
@@ -122,11 +122,27 @@ class JsonPropertySourceLoaderSpec extends Specification {
     }
 }
 '''.bytes))
-                }
-                return Optional.empty()
-            }
-        }
+                        }
+                        return Optional.empty()
+                    }
 
+                    @Override
+                    Optional<URL> getResource(String path) {
+                        return Optional.empty()
+                    }
+
+                    @Override
+                    Stream<URL> getResources(String name) {
+                        return Stream.empty()
+                    }
+
+                    @Override
+                    ResourceLoader forBase(String basePath) {
+                        return this
+                    }
+                }
+            }
+        })
 
         when:
         env.start()

@@ -17,9 +17,7 @@ package io.micronaut.kotlin.processing.aop.introduction
 
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
-import io.micronaut.core.annotation.Nullable
 import jakarta.inject.Singleton
-import java.util.HashSet
 
 /**
  * @author graemerocher
@@ -28,21 +26,20 @@ import java.util.HashSet
 @Singleton
 class ListenerAdviceInterceptor : MethodInterceptor<Any, Any> {
 
-    private val recievedMessages: MutableSet<Any> = HashSet()
+    private val receivedMessages: MutableSet<Any> = HashSet()
 
     override fun getOrder(): Int {
         return StubIntroducer.POSITION - 10
     }
 
-    fun getRecievedMessages(): Set<Any> {
-        return recievedMessages
+    fun getReceivedMessages(): Set<Any> {
+        return receivedMessages
     }
 
-    @Nullable
     override fun intercept(context: MethodInvocationContext<Any, Any>): Any? {
         return if (context.methodName == "onApplicationEvent") {
-            val v = context.parameterValues[0]
-            recievedMessages.add(v)
+            val v = context.parameterValues[0]!!
+            receivedMessages.add(v)
             null
         } else {
             context.proceed()

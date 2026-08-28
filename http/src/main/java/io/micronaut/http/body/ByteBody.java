@@ -16,7 +16,6 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
@@ -50,14 +49,13 @@ import java.util.concurrent.CompletableFuture;
  * @since 4.5.0
  */
 @Experimental
-public interface ByteBody {
+public sealed interface ByteBody permits AvailableByteBody, CloseableByteBody, InternalByteBody {
     /**
      * Equivalent to {@code split(SplitBackpressureMode.SLOWEST)}.
      *
      * @return The newly split body. Must be closed by the caller, unless a terminal operation is
      * performed on it
      */
-    @NonNull
     default CloseableByteBody split() {
         return split(SplitBackpressureMode.SLOWEST);
     }
@@ -70,8 +68,7 @@ public interface ByteBody {
      * @return The newly split body. Must be closed by the caller, unless a terminal operation is
      * performed on it
      */
-    @NonNull
-    CloseableByteBody split(@NonNull SplitBackpressureMode backpressureMode);
+    CloseableByteBody split(SplitBackpressureMode backpressureMode);
 
     /**
      * Signal that the upstream may discard any remaining body data. Only if all consumers of the
@@ -83,7 +80,6 @@ public interface ByteBody {
      * @return This body
      */
     @Contract("-> this")
-    @NonNull
     default ByteBody allowDiscard() {
         return this;
     }
@@ -98,7 +94,6 @@ public interface ByteBody {
      *
      * @return The expected length of this body
      */
-    @NonNull
     OptionalLong expectedLength();
 
     /**
@@ -108,7 +103,6 @@ public interface ByteBody {
      *
      * @return The streamed bytes
      */
-    @NonNull
     InputStream toInputStream();
 
     /**
@@ -118,8 +112,7 @@ public interface ByteBody {
      *
      * @return The streamed bytes
      */
-    @NonNull
-    Publisher<byte[]> toByteArrayPublisher();
+    Publisher<byte []> toByteArrayPublisher();
 
     /**
      * Get this body as a reactive stream of {@link ReadBuffer}s. Note that the caller must take
@@ -129,7 +122,6 @@ public interface ByteBody {
      *
      * @return The streamed bytes
      */
-    @NonNull
     default Publisher<ReadBuffer> toReadBufferPublisher() {
         return Flux.from(toByteArrayPublisher()).map(ReadBufferFactory.getJdkFactory()::adapt);
     }
@@ -143,7 +135,6 @@ public interface ByteBody {
      *
      * @return The streamed bytes
      */
-    @NonNull
     default Publisher<ByteBuffer<?>> toByteBufferPublisher() {
         return Flux.from(toReadBufferPublisher()).doOnDiscard(ReadBuffer.class, ReadBuffer::close).map(rb -> {
             try (rb) {
@@ -160,7 +151,6 @@ public interface ByteBody {
      *
      * @return A future that completes when all bytes are available
      */
-    @NonNull
     CompletableFuture<? extends CloseableAvailableByteBody> buffer();
 
     /**
@@ -176,7 +166,6 @@ public interface ByteBody {
      * @return A new {@link CloseableByteBody} with the same content.
      * @since 4.8.0
      */
-    @NonNull
     CloseableByteBody move();
 
     /**

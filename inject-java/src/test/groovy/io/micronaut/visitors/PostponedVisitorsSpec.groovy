@@ -46,7 +46,7 @@ interface GenConstants {}
 package test;
 
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.visitors.Wither;
 import io.micronaut.visitors.Builder;
@@ -80,7 +80,7 @@ public record Walrus (
 package test;
 
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.visitors.IntroductionTest;
 import io.micronaut.visitors.IntroductionTestGen;
 import io.micronaut.aop.InterceptorBean;
@@ -119,7 +119,7 @@ class IntroductionTestInterceptor
 package test;
 
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.visitors.InterfaceGen;
 import io.micronaut.visitors.IntroductionTestGen;
 import io.micronaut.aop.InterceptorBean;

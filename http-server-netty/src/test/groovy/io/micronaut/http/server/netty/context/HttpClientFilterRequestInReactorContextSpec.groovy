@@ -2,7 +2,7 @@ package io.micronaut.http.server.netty.context
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -34,11 +34,13 @@ class HttpClientFilterRequestInReactorContextSpec extends Specification {
     void "HTTP Client filters can access original request via Reactor Context"(String path, String expected) {
         given:
         EmbeddedServer mockServer = ApplicationContext.run(EmbeddedServer, [
-                'spec.name': 'HttpClientFilterRequestInReactorContextSpec.server'
+                'spec.name': 'HttpClientFilterRequestInReactorContextSpec.server',
+                'micronaut.propagation': 'scoped-value',
         ])
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': 'HttpClientFilterRequestInReactorContextSpec',
                 'micronaut.http.services.foo.url': "http://localhost:$mockServer.port",
+                'micronaut.propagation': 'scoped-value',
         ])
         HttpClient httpClient = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.URL)
         BlockingHttpClient client = httpClient.toBlocking()

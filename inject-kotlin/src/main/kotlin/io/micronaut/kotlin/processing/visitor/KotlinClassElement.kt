@@ -16,7 +16,6 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.KspExperimental
-import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getConstructors
 import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.getDeclaredProperties
@@ -44,7 +43,6 @@ import io.micronaut.context.annotation.ConfigurationBuilder
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Creator
-import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.ArrayableClassElement
@@ -64,7 +62,6 @@ import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery
 import io.micronaut.inject.processing.ProcessingException
-import io.micronaut.kotlin.processing.getBinaryName
 import java.util.Optional
 import java.util.function.Function
 import java.util.stream.Stream
@@ -89,6 +86,10 @@ internal open class KotlinClassElement(
 
     val declaration: KSClassDeclaration by lazy {
         nativeType.declaration
+    }
+
+    internal val parsedKDoc: ParsedKDoc by lazy {
+        parseKDoc(declaration.docString ?: "")
     }
 
     val kotlinType: KSType by lazy {
@@ -150,10 +151,10 @@ internal open class KotlinClassElement(
         while (clazz != null) {
             // We need to aggregate all the hierarchy properties because
             // getAllProperties doesn't return correct parent of the property
-            properties.addAll(clazz.getDeclaredSyntheticBeanProperties())
+            properties.addAll(clazz.getDeclaredSyntheticBeanProperties(this))
             clazz.interfaces.forEach {
                 if (it is KotlinClassElement) {
-                    properties.addAll(it.getDeclaredSyntheticBeanProperties())
+                    properties.addAll(it.getDeclaredSyntheticBeanProperties(this))
                 }
             }
 
@@ -183,7 +184,7 @@ internal open class KotlinClassElement(
     }
 
     private val internalName: String by lazy {
-        declaration.getBinaryName(visitorContext.resolver, visitorContext)
+        visitorContext.getBinaryName(declaration)
     }
 
     private val resolvedSuperTypes: Collection<ClassElement> by lazy {
@@ -256,7 +257,7 @@ internal open class KotlinClassElement(
 
     private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
         if (presetAnnotationMetadata != null) {
-            presetAnnotationMetadata
+            presetAnnotationMetadata!!
         } else {
             if (definedType != null) {
                 AnnotationMetadataHierarchy(
@@ -339,7 +340,22 @@ internal open class KotlinClassElement(
 
     override fun getSyntheticBeanProperties() = nativeProperties
 
-    private fun getDeclaredSyntheticBeanProperties() = declaredNativeProperties
+    private fun getDeclaredSyntheticBeanProperties(owningType: KotlinClassElement): List<PropertyElement> {
+        if (owningType == this) {
+            return declaredNativeProperties
+        }
+        return declaration.getDeclaredProperties()
+            .filter { !it.isPrivate() && !hasAnnotation(it, JvmField::class.java) }
+            .map {
+                KotlinPropertyElement(
+                    owningType,
+                    it,
+                    elementAnnotationMetadataFactory,
+                    visitorContext
+                )
+            }
+            .toList()
+    }
 
     override fun getAccessibleStaticCreators(): List<MethodElement> {
         val staticCreators: MutableList<MethodElement> = mutableListOf()
@@ -378,7 +394,7 @@ internal open class KotlinClassElement(
 
     override fun getMethods() = internalMethods
 
-    override fun findMethod(name: String?) = Optional.ofNullable(
+    override fun findMethod(name: String) = Optional.ofNullable(
         internalMethods.firstOrNull { it.name == name }
     )
 
@@ -545,19 +561,13 @@ internal open class KotlinClassElement(
         if (internalName == type) {
             return true // Same type
         }
-        val otherDeclaration = visitorContext.resolver.getClassDeclarationByName(type)
+        val otherDeclaration = visitorContext.classDeclarationByName(type)
         if (otherDeclaration != null) {
             if (declaration == otherDeclaration) {
                 return true
             }
-            val thisFullName = declaration.getBinaryName(
-                visitorContext.resolver,
-                visitorContext
-            )
-            val otherFullName = otherDeclaration.getBinaryName(
-                visitorContext.resolver,
-                visitorContext
-            )
+            val thisFullName = visitorContext.getBinaryName(declaration)
+            val otherFullName = visitorContext.getBinaryName(otherDeclaration)
             if (thisFullName == otherFullName) {
                 return true
             }
@@ -611,8 +621,7 @@ internal open class KotlinClassElement(
         typeVariable
     )
 
-    @NonNull
-    override fun withTypeArguments(@NonNull typeArguments: Collection<ClassElement>): ClassElement? {
+    override fun withTypeArguments(typeArguments: Collection<ClassElement>): ClassElement {
         if (getTypeArguments() == typeArguments) {
             return this
         }
@@ -719,16 +728,15 @@ internal open class KotlinClassElement(
             return false
         }
 
-        @OptIn(KspExperimental::class)
         override fun getElementName(element: KSNode): String {
             if (element is KSPropertyDeclaration) {
                 return element.simpleName.asString()
             }
             if (element is KSFunctionDeclaration) {
-                return element.getBinaryName(visitorContext.resolver)
+                return visitorContext.getBinaryName(element)
             }
             if (element is KSDeclaration) {
-                return element.getBinaryName(visitorContext.resolver, visitorContext)
+                return visitorContext.getBinaryName(element)
             }
             return ""
         }

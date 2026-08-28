@@ -1,8 +1,9 @@
 package io.micronaut.inject.annotation
 
 
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.context.annotation.ConfigurationInject
+import io.micronaut.core.annotation.AccessorsStyle
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.Creator
 import io.micronaut.core.bind.annotation.Bindable
@@ -11,6 +12,8 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.HttpMethodMapping
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.inject.beans.visitor.JsonPOJOBuilderAnnotationMapper
+import io.micronaut.inject.beans.visitor.ToolsJsonPOJOBuilderAnnotationMapper
 import io.micronaut.inject.visitor.VisitorContext
 
 import java.lang.annotation.Annotation
@@ -98,6 +101,32 @@ class Test {
         def annotations = metadata.getAnnotationTypesByStereotype(HttpMethodMapping)
         annotations.size() == 1
         annotations[0] == Get
+    }
+
+    void "test jackson pojo builder annotation mapper maps withPrefix to accessors style"() {
+        given:
+        def annotationBuilder = AnnotationValue.builder(annotationName)
+        if (withPrefix != null) {
+            annotationBuilder.member("withPrefix", withPrefix)
+        }
+
+        when:
+        def mappedAnnotations = mapper.map(annotationBuilder.build(), null)
+        def accessorsStyle = mappedAnnotations[0]
+
+        then:
+        mapper.name == annotationName
+        mappedAnnotations.size() == 1
+        accessorsStyle.annotationName == AccessorsStyle.name
+        accessorsStyle.stringValues("writePrefixes").toList() == [expectedPrefix]
+        accessorsStyle.stringValues("readPrefixes").length == 0
+
+        where:
+        mapper                                      | annotationName                                              | withPrefix | expectedPrefix
+        new JsonPOJOBuilderAnnotationMapper()      | "com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder" | ""         | ""
+        new JsonPOJOBuilderAnnotationMapper()      | "com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder" | null       | "with"
+        new ToolsJsonPOJOBuilderAnnotationMapper() | "tools.jackson.databind.annotation.JsonPOJOBuilder"         | ""         | ""
+        new ToolsJsonPOJOBuilderAnnotationMapper() | "tools.jackson.databind.annotation.JsonPOJOBuilder"         | null       | "with"
     }
 
     @Override

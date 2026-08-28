@@ -17,7 +17,6 @@ package io.micronaut.inject.provider
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.core.type.Argument
@@ -338,7 +337,7 @@ class Test {
 
     void "test Jakarta Provider is triggering containsBean" () {
         given:
-        DefaultApplicationContext context = buildContext('''\
+        ApplicationContext context = buildContext('''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -359,7 +358,7 @@ class Test {
     }
 }
 ''')
-        def containsBeanCacheField = context.getClass().superclass.superclass.declaredFields.find {it.name == "containsBeanCache"}
+        def containsBeanCacheField = context.getClass().superclass.declaredFields.find {it.name == "containsBeanCache"}
         containsBeanCacheField.accessible = true
         Map containsBeanCache = containsBeanCacheField.get(context)
 
@@ -379,7 +378,7 @@ class Test {
 
     void "test BeanProvider is not triggering containsBean" () {
         given:
-        DefaultApplicationContext context = buildContext('''\
+        ApplicationContext context = buildContext('''\
 package test;
 
 import io.micronaut.inject.annotation.*;
@@ -396,7 +395,7 @@ class Test {
     }
 }
 ''')
-        def containsBeanCacheField = context.getClass().superclass.superclass.declaredFields.find {it.name == "containsBeanCache"}
+        def containsBeanCacheField = context.getClass().superclass.declaredFields.find {it.name == "containsBeanCache"}
         containsBeanCacheField.accessible = true
         Map containsBeanCache = containsBeanCacheField.get(context)
 

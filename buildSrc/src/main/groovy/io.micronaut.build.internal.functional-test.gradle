@@ -2,6 +2,7 @@ import groovy.transform.CompileStatic
 
 plugins {
     id 'java-library'
+    id 'io.micronaut.build.internal.java-base'
 }
 
 sourceSets {

@@ -15,18 +15,16 @@
  */
 package io.micronaut.jackson.databind.convert;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.util.CollectionUtils;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.Optional;
 import java.util.Set;
 
@@ -54,8 +52,8 @@ public class ObjectNodeConvertibleValues<V> implements ConvertibleValues<V> {
 
     @Override
     public Set<String> names() {
-        Iterator<String> fieldNames = objectNode.fieldNames();
-        return CollectionUtils.iteratorToSet(fieldNames);
+        Collection<String> propertyNames = objectNode.propertyNames();
+        return (Set<String>) propertyNames;
     }
 
     @Override

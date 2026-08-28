@@ -18,7 +18,7 @@ package io.micronaut.http.client;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.context.ClientContextPathProvider;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
@@ -75,6 +75,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     private String healthCheckUri = DEFAULT_HEALTHCHECKURI;
     private boolean healthCheck = DEFAULT_HEALTHCHECK;
     private Duration healthCheckInterval = Duration.ofSeconds(DEFAULT_HEALTHCHECKINTERVAL_SECONDS);
+    @Nullable
     private String path;
 
     /**
@@ -111,7 +112,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * @param connectionPoolConfiguration The connection pool configuration
      * @param sslConfiguration The SSL configuration
      * @param defaultHttpClientConfiguration The default HTTP client configuration
-     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration , ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
+     * @deprecated Use {@link #ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration, ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
      */
     @Deprecated(since = "4.3.0")
     public ServiceHttpClientConfiguration(
@@ -130,7 +131,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      * @param webSocketCompressionConfiguration The WebSocket compression configuration
      * @param sslConfiguration The SSL configuration
      * @param defaultHttpClientConfiguration The default HTTP client configuration
-     * @deprecated Use {@link ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration , ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
+     * @deprecated Use {@link #ServiceHttpClientConfiguration(String, ServiceConnectionPoolConfiguration, ServiceWebSocketCompressionConfiguration, ServiceHttp2ClientConfiguration, ServiceSslClientConfiguration, HttpClientConfiguration)} instead.
      */
     @Deprecated(since = "4.6.0")
     public ServiceHttpClientConfiguration(
@@ -139,7 +140,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
         @Nullable ServiceSslClientConfiguration sslConfiguration,
         HttpClientConfiguration defaultHttpClientConfiguration) {
-        this(serviceId, connectionPoolConfiguration, webSocketCompressionConfiguration, new ServiceHttp2ClientConfiguration(), sslConfiguration, defaultHttpClientConfiguration);
+        this(serviceId, connectionPoolConfiguration, webSocketCompressionConfiguration, null, sslConfiguration, defaultHttpClientConfiguration);
     }
 
     /**
@@ -157,7 +158,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
             @Parameter String serviceId,
             @Nullable ServiceConnectionPoolConfiguration connectionPoolConfiguration,
             @Nullable ServiceWebSocketCompressionConfiguration webSocketCompressionConfiguration,
-            @Nullable ServiceHttpClientConfiguration.ServiceHttp2ClientConfiguration http2Configuration,
+            ServiceHttpClientConfiguration.@Nullable ServiceHttp2ClientConfiguration http2Configuration,
             @Nullable ServiceSslClientConfiguration sslConfiguration,
             HttpClientConfiguration defaultHttpClientConfiguration) {
         super(defaultHttpClientConfiguration);
@@ -167,7 +168,8 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         }
         this.connectionPoolConfiguration = Objects.requireNonNullElseGet(connectionPoolConfiguration, ServiceConnectionPoolConfiguration::new);
         this.webSocketCompressionConfiguration = Objects.requireNonNullElseGet(webSocketCompressionConfiguration, ServiceWebSocketCompressionConfiguration::new);
-        this.http2Configuration = Objects.requireNonNullElseGet(http2Configuration, ServiceHttp2ClientConfiguration::new);
+        this.http2Configuration = http2Configuration == null ?
+                new ServiceHttp2ClientConfiguration(defaultHttpClientConfiguration) : http2Configuration;
     }
 
     /**
@@ -320,8 +322,23 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     /**
      * The service HTTP/2 configuration.
      */
-    @ConfigurationProperties(WebSocketCompressionConfiguration.PREFIX)
+    @ConfigurationProperties(Http2ClientConfiguration.PREFIX)
     public static class ServiceHttp2ClientConfiguration extends Http2ClientConfiguration {
+        /**
+         * Default constructor.
+         */
+        public ServiceHttp2ClientConfiguration() {
+        }
+
+        /**
+         * Creates a service configuration initialized from the default HTTP client configuration.
+         *
+         * @param defaultConfiguration The default HTTP client configuration
+         */
+        @Inject
+        public ServiceHttp2ClientConfiguration(HttpClientConfiguration defaultConfiguration) {
+            super(defaultConfiguration.getHttp2Configuration());
+        }
     }
 
     /**
@@ -329,6 +346,11 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
      */
     @ConfigurationProperties("ssl")
     public static class ServiceSslClientConfiguration extends AbstractClientSslConfiguration {
+
+        public ServiceSslClientConfiguration() {
+            // Enable by default, like ClientSslConfiguration; otherwise a per-service ssl block leaves SSL disabled.
+            setEnabled(true);
+        }
 
         /**
          * Sets the key configuration.

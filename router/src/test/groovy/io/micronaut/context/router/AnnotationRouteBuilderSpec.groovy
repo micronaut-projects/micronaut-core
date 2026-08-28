@@ -15,7 +15,7 @@
  */
 package io.micronaut.context.router
 
-import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -39,7 +39,7 @@ class AnnotationRouteBuilderSpec extends Specification {
     @Unroll
     void "Test annotation matches #route for arguments #arguments"() {
         given:
-        Router router = new DefaultApplicationContext("test")
+        Router router = ApplicationContext.builder("test").build()
                 .start()
                 .getBean(Router)
 
@@ -58,7 +58,7 @@ class AnnotationRouteBuilderSpec extends Specification {
     }
 
     void "test local status and error routes are both resolved"() {
-        Router router = new DefaultApplicationContext("test")
+        Router router = ApplicationContext.builder("test").build()
                 .start()
                 .getBean(Router)
 

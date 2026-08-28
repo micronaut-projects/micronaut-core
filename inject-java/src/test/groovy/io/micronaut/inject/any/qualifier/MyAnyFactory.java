@@ -5,10 +5,12 @@ import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.naming.Named;
 import jakarta.inject.Singleton;
 
 @Factory
+@Requires(property = "spec.name", value = "AnyQualifierSpec")
 public class MyAnyFactory {
 
     @Any

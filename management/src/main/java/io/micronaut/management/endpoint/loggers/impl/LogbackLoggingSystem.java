@@ -21,8 +21,7 @@ import ch.qos.logback.classic.LoggerContext;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.impl.LogbackUtils;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
@@ -54,7 +53,6 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
     }
 
     @Override
-    @NonNull
     public Collection<LoggerConfiguration> getLoggers() {
         return getLoggerContext()
             .getLoggerList()
@@ -64,7 +62,6 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
     }
 
     @Override
-    @NonNull
     public LoggerConfiguration getLogger(String name) {
         return toLoggerConfiguration(getLoggerContext().getLogger(name));
     }
@@ -109,6 +106,7 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
      * @param logLevel The micronaut {@link io.micronaut.logging.LogLevel} to convert
      * @return The converted logback {@link Level}
      */
+    @Nullable
     private static Level toLevel(LogLevel logLevel) {
         if (logLevel == LogLevel.NOT_SPECIFIED) {
             return null;

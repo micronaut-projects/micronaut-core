@@ -1,6 +1,6 @@
 package io.micronaut.inject.visitor.beans;
 
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.annotation.Introspected;
 
 @Introspected

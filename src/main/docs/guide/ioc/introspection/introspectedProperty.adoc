@@ -1,0 +1,52 @@
+The ann:core.annotation.Introspected.Property[] annotation can be used on an introspected field or method to make that member an explicit bean property.
+This is useful when the member does not follow normal JavaBean getter or setter naming rules, or when the property should expose extra metadata such as an external serialized name.
+
+snippet::io.micronaut.docs.ioc.introspection.Book[tags="imports,class", indent=0]
+
+In the example above, `title()` and `title(String)` are included as read/write bean property accessors even though they are not JavaBean `getTitle` and `setTitle` methods.
+The `author()` method is included as a read-only property because its `accessKind` only contains `Introspected.Property.Access.READ`.
+
+The `value` member is a shorthand for `name`.
+The `name` member represents an external property name and is available through the property annotation metadata.
+It does not change the Micronaut bean property name used with api:core.beans.BeanIntrospection[] lookup methods.
+If both `value` and `name` are declared, they must contain the same value.
+
+snippet::io.micronaut.docs.ioc.introspection.IntrospectedPropertyTest[tags="metadata", indent=0]
+
+The `accessKind` member controls whether the bean property can be read, written, or both:
+
+* `Introspected.Property.Access.READ` allows the property to be read.
+* `Introspected.Property.Access.WRITE` allows the property to be written.
+* The default is both `READ` and `WRITE`.
+
+If both a getter and setter exist, Micronaut can still expose a read/write property. Use `accessKind` when a field or method must restrict one side of access, for example read-only or write-only properties.
+The access declaration applies to the whole bean property. Multiple ann:core.annotation.Introspected.Property[] declarations for the same bean property must declare the same `accessKind`; conflicting declarations are rejected during compilation.
+When ann:core.annotation.Introspected.Property[] is declared on a field that belongs to the same bean property as getter or setter methods, Micronaut uses the normal bean accessor precedence: getter methods are used for reads and setter methods are used for writes when they are present.
+The annotated field still contributes the mapped property metadata and can provide field access when a corresponding getter or setter is absent.
+
+Set `ignoreOtherAccessors` to `true` when the annotated member must be used for its access direction even if another field, getter, or setter exists for the same bean property.
+For example, an annotated field with the default read/write `accessKind` will be used for both reads and writes instead of same-name getter and setter methods.
+
+== Jackson Annotations
+
+When Jackson annotations are present on an introspected type, Micronaut maps the following annotations to ann:core.annotation.Introspected.Property[] at compile time:
+
+* `com.fasterxml.jackson.annotation.JsonProperty`
+* `com.fasterxml.jackson.annotation.JsonGetter`
+* `com.fasterxml.jackson.annotation.JsonSetter`
+
+This means Jackson-style property names are visible through Micronaut bean property annotation metadata, and Jackson-annotated methods that do not follow JavaBean naming rules can still be recognized as bean properties.
+
+snippet::io.micronaut.docs.ioc.introspection.User[tags="imports,class", indent=0]
+
+The `displayName` methods are treated as a bean property, and the external name `display_name` is available from the mapped ann:core.annotation.Introspected.Property[] metadata.
+For `JsonGetter` and `JsonSetter`, read and write availability is determined by the available bean property reader and writer.
+Jackson annotations do not set `ignoreOtherAccessors`, so Micronaut keeps the same accessor precedence as Jackson Databind: getters are preferred for reads and setters are preferred for writes when they exist.
+
+For `JsonProperty`, Micronaut also maps Jackson's `access` member:
+
+* `JsonProperty.Access.READ_ONLY` maps to `Introspected.Property.Access.READ`.
+* `JsonProperty.Access.WRITE_ONLY` maps to `Introspected.Property.Access.WRITE`.
+* `JsonProperty.Access.AUTO` and `JsonProperty.Access.READ_WRITE` map to both read and write access.
+
+Because `accessKind` is property-level, multiple Jackson annotations that map to the same bean property must agree on the mapped access.

@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.server.util;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,9 +50,13 @@ public class ProxyHeaderParser {
     private static final String X_FORWARDED_PORT = "X-Forwarded-Port";
 
     private List<String> forwardedFor = new ArrayList<>();
+    @Nullable
     private String forwardedBy = null;
+    @Nullable
     private String forwardedHost = null;
+    @Nullable
     private String forwardedProto = null;
+    @Nullable
     private Integer forwardedPort = null;
 
     /**
@@ -83,13 +87,7 @@ public class ProxyHeaderParser {
                                 } else if (key.equalsIgnoreCase(PROTO) && forwardedProto == null) {
                                     forwardedProto = value;
                                 } else if (key.equalsIgnoreCase(HOST) && forwardedHost == null) {
-                                    if (value.contains(":")) {
-                                        String[] host = value.split(":");
-                                        forwardedHost = host[0];
-                                        forwardedPort = Integer.valueOf(host[1]);
-                                    } else {
-                                        forwardedHost = value;
-                                    }
+                                    parseForwardedHost(value);
                                 }
                             }
                         }
@@ -121,7 +119,6 @@ public class ProxyHeaderParser {
     /**
      * @return The client addresses
      */
-    @NonNull
     public List<String> getFor() {
         return forwardedFor;
     }
@@ -129,6 +126,7 @@ public class ProxyHeaderParser {
     /**
      * @return The proxy
      */
+    @Nullable
     public String getBy() {
         return forwardedBy;
     }
@@ -136,6 +134,7 @@ public class ProxyHeaderParser {
     /**
      * @return The host
      */
+    @Nullable
     public String getHost() {
         return forwardedHost;
     }
@@ -143,6 +142,7 @@ public class ProxyHeaderParser {
     /**
      * @return The scheme or protocol
      */
+    @Nullable
     public String getScheme() {
         return forwardedProto;
     }
@@ -150,8 +150,57 @@ public class ProxyHeaderParser {
     /**
      * @return The port
      */
+    @Nullable
     public Integer getPort() {
         return forwardedPort;
+    }
+
+    private void parseForwardedHost(String value) {
+        if (value.startsWith("[")) {
+            // IPv6
+            int closingBracketIndex = value.indexOf(']');
+            if (closingBracketIndex == -1) {
+                return;
+            }
+            String host = value.substring(0, closingBracketIndex + 1);
+            if (closingBracketIndex == value.length() - 1) {
+                forwardedHost = host;
+            } else if (value.charAt(closingBracketIndex + 1) == ':') {
+                Integer port = parsePort(value.substring(closingBracketIndex + 2));
+                if (port != null) {
+                    forwardedHost = host;
+                    forwardedPort = port;
+                }
+            }
+        } else {
+            // IPv4
+            int portSeparatorIndex = value.lastIndexOf(':');
+            if (portSeparatorIndex == -1) {
+                forwardedHost = value;
+                return;
+            }
+            if (value.indexOf(':') != portSeparatorIndex) {
+                return;
+            }
+            Integer port = parsePort(value.substring(portSeparatorIndex + 1));
+            if (port != null) {
+                forwardedHost = value.substring(0, portSeparatorIndex);
+                forwardedPort = port;
+            }
+        }
+    }
+
+    @Nullable
+    private Integer parsePort(String value) {
+        try {
+            int port = Integer.parseInt(value);
+            if (port >= 0 && port <= 65535) {
+                return port;
+            }
+        } catch (NumberFormatException ignored) {
+            // Fall through
+        }
+        return null;
     }
 
     private String trimQuotes(String value) {

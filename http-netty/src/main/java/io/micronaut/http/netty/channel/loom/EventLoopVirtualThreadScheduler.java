@@ -16,8 +16,7 @@
 package io.micronaut.http.netty.channel.loom;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.scheduling.LoomSupport;
 import io.netty.util.AttributeMap;
 import io.netty.util.concurrent.EventExecutor;
@@ -39,7 +38,6 @@ public sealed interface EventLoopVirtualThreadScheduler
      *
      * @return The attribute map
      */
-    @NonNull
     AttributeMap attributeMap();
 
     /**
@@ -47,7 +45,6 @@ public sealed interface EventLoopVirtualThreadScheduler
      *
      * @return The event loop
      */
-    @NonNull
     EventExecutor eventLoop();
 
     /**

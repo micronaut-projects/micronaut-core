@@ -79,6 +79,43 @@ class Dao<T> {
         definition.injectedFields.first().asArgument().typeParameters[0].type.simpleName == "User"
     }
 
+    void "test type arguments with proxied inherited fields"() {
+        given:
+        BeanDefinition definition = buildInterceptedBeanDefinition('inheritedproxiedfields.UserDaoClient', '''
+package inheritedproxiedfields;
+
+import io.micronaut.aop.simple.Mutating;
+import jakarta.inject.*;
+
+@Singleton
+@Mutating("test")
+class UserDaoClient extends DaoClient<User> {
+    void test() {
+    }
+}
+
+@Singleton
+class UserDao extends Dao<User> {
+}
+
+class User {
+}
+
+class DaoClient<T> {
+
+    @Inject
+    Dao<T> dao;
+}
+
+class Dao<T> {
+}
+''')
+
+        expect:
+        definition.injectedFields.first().asArgument().typeParameters.length == 1
+        definition.injectedFields.first().asArgument().typeParameters[0].type.simpleName == "User"
+    }
+
     void "test type arguments for exception handler"() {
         given:
         BeanDefinition definition = buildBeanDefinition('exceptionhandler.Test', '''\
@@ -172,9 +209,10 @@ class Test {
         BeanDefinition definition = buildBeanDefinition('test.ConvertibleValuesSerializer', '''
 package test;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.SerializationContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
 
 import jakarta.inject.Singleton;
@@ -184,23 +222,23 @@ import io.micronaut.context.annotation.Executable;
 
 @Singleton
 @Executable
-class ConvertibleValuesSerializer extends JsonSerializer<ConvertibleValues<?>> {
+class ConvertibleValuesSerializer extends ValueSerializer<ConvertibleValues<?>> {
 
     @Override
-    public boolean isEmpty(SerializerProvider provider, ConvertibleValues<?> value) {
+    public boolean isEmpty(SerializationContext provider, ConvertibleValues<?> value) {
         return value.isEmpty();
     }
 
     @Override
-    public void serialize(ConvertibleValues<?> value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+    public void serialize(ConvertibleValues<?> value, JsonGenerator gen, SerializationContext serializers) throws JacksonException {
         gen.writeStartObject();
 
         for (Map.Entry<String, ?> entry : value) {
             String fieldName = entry.getKey();
             Object v = entry.getValue();
             if (v != null) {
-                gen.writeFieldName(fieldName);
-                gen.writeObject(v);
+                gen.writeName(fieldName);
+                gen.writePOJO(v);
             }
         }
         gen.writeEndObject();

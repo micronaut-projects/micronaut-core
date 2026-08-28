@@ -17,9 +17,11 @@ package io.micronaut.inject.injectionpoint.lazytarget;
 
 import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.injectionpoint.SomeAnn;
 
+@Requires(property = "spec.name", value = "InjectionPointSpec")
 @Factory
 public class ProxiedSomeFactory {
 

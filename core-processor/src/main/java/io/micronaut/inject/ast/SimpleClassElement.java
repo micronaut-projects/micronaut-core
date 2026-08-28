@@ -17,10 +17,13 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.Nullable;
 
+import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Internal
 final class SimpleClassElement implements ClassElement {
@@ -28,31 +31,48 @@ final class SimpleClassElement implements ClassElement {
     private final boolean isInterface;
     private final AnnotationMetadata annotationMetadata;
     private final Map<String, ClassElement> typeArguments;
+    private final List<ClassElement> interfaces;
+    @Nullable
+    private final ClassElement superType;
 
     SimpleClassElement(String typeName) {
         this(typeName, false, AnnotationMetadata.EMPTY_METADATA);
     }
 
-    SimpleClassElement(String typeName, boolean isInterface, AnnotationMetadata annotationMetadata) {
-        this(typeName, isInterface, annotationMetadata, Collections.emptyMap());
+    SimpleClassElement(String typeName, boolean isInterface, @Nullable AnnotationMetadata annotationMetadata) {
+        this(typeName, isInterface, annotationMetadata, Collections.emptyMap(), List.of(), null);
     }
 
-    SimpleClassElement(String typeName, boolean isInterface, AnnotationMetadata annotationMetadata, Map<String, ClassElement> typeArguments) {
+    SimpleClassElement(String typeName, boolean isInterface,
+                       @Nullable AnnotationMetadata annotationMetadata,
+                       Map<String, ClassElement> typeArguments,
+                       List<ClassElement> interfaces,
+                       @Nullable ClassElement superType) {
         this.typeName = typeName;
         this.isInterface = isInterface;
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
         this.typeArguments = typeArguments;
+        this.interfaces = interfaces;
+        this.superType = superType;
     }
 
-    @NonNull
+    @Override
+    public Optional<ClassElement> getSuperType() {
+        return Optional.ofNullable(superType);
+    }
+
+    @Override
+    public Collection<ClassElement> getInterfaces() {
+        return interfaces;
+    }
+
     @Override
     public Map<String, ClassElement> getTypeArguments() {
         return this.typeArguments;
     }
 
-    @NonNull
     @Override
-    public Map<String, ClassElement> getTypeArguments(@NonNull String type) {
+    public Map<String, ClassElement> getTypeArguments(String type) {
         if (this.typeName.equals(type)) {
             return this.typeArguments;
         } else {
@@ -90,7 +110,6 @@ final class SimpleClassElement implements ClassElement {
         throw new UnsupportedOperationException("Cannot convert class elements produced by from an array");
     }
 
-    @NonNull
     @Override
     public String getName() {
         return typeName;
@@ -111,9 +130,17 @@ final class SimpleClassElement implements ClassElement {
         return false;
     }
 
-    @NonNull
     @Override
     public Object getNativeType() {
         return typeName;
+    }
+
+    @Override
+    public String toString() {
+        return "SimpleClassElement{" +
+            "isInterface=" + isInterface +
+            ", typeName='" + typeName + '\'' +
+            ", typeArguments=" + typeArguments +
+            '}';
     }
 }

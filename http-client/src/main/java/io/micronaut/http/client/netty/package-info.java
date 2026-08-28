@@ -19,4 +19,10 @@
  * @author Graeme Rocher
  * @since 1.0
  */
+@Configuration
+@RequiresNettyClient
+@NullMarked
 package io.micronaut.http.client.netty;
+
+import io.micronaut.context.annotation.Configuration;
+import org.jspecify.annotations.NullMarked;

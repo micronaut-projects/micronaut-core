@@ -12,10 +12,13 @@ micronautBuild {
 }
 
 dependencies {
+    api(libs.managed.jspecify)
     compileOnly(libs.managed.jakarta.annotation.api)
-    compileOnly(libs.graal)
+    compileOnly(libs.jetbrains.annotations)
+    compileOnly(libs.managed.graalvm.nativeimage)
     compileOnly(libs.managed.kotlin.stdlib)
     compileOnly(libs.managed.netty.common)
+    testImplementation(libs.junit.jupiter.params)
 }
 
 spotless {

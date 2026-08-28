@@ -16,8 +16,7 @@
 package io.micronaut.web.router.version;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpHeaders;
@@ -26,7 +25,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.version.resolution.HeaderVersionResolverConfiguration;
 import io.micronaut.web.router.version.resolution.RequestVersionResolver;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,27 +49,13 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
     private static final Logger LOG = LoggerFactory.getLogger(RouteVersionFilter.class);
 
     private final List<RequestVersionResolver> resolvingStrategies;
-    private final DefaultVersionProvider defaultVersionProvider;
+    private final @Nullable DefaultVersionProvider defaultVersionProvider;
 
     @Nullable
     private final RoutesVersioningConfiguration routesVersioningConfiguration;
 
     @Nullable
     private final HeaderVersionResolverConfiguration headerVersionResolverConfiguration;
-
-
-    /**
-     * Creates a {@link RouteVersionFilter} with a collection of {@link RequestVersionResolver}.
-     *
-     * @param resolvingStrategies A list of {@link RequestVersionResolver} beans to extract version from HTTP request
-     * @param defaultVersionProvider The Default Version Provider
-     * @deprecated Use {@link RouteVersionFilter(List, DefaultVersionProvider, RoutesVersioningConfiguration, HeaderVersionResolverConfiguration)} instead.
-     */
-    @Deprecated
-    public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies,
-                              @Nullable DefaultVersionProvider defaultVersionProvider) {
-        this(resolvingStrategies, defaultVersionProvider, null, null);
-    }
 
     /**
      * Creates a {@link RouteVersionFilter} with a collection of {@link RequestVersionResolver}.
@@ -81,7 +65,6 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
      * @param routesVersioningConfiguration Configuration for routes versioning
      * @param headerVersionResolverConfiguration Configuration for Header Version resolution
      */
-    @Inject
     public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies,
                                          @Nullable DefaultVersionProvider defaultVersionProvider,
                                          @Nullable RoutesVersioningConfiguration routesVersioningConfiguration,
@@ -131,7 +114,7 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
      * @param version The version resolved evaluating the HTTP Request with beans of type {@link RequestVersionResolver}
      * @return {@code true} if no version was resolved from the request
      */
-    protected boolean matchIfRouteIsNotVersioned(@NonNull HttpRequest<?> request,
+    protected boolean matchIfRouteIsNotVersioned(HttpRequest<?> request,
                                                  @Nullable String version) {
         //route is not versioned but request is
         if (version != null) {
@@ -153,9 +136,9 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
      * @param routeVersion The route's version. For example, it could specify by the {@link Version} annotation.
      * @return {@code true} if the resolved version matches the route version or if the resolved version is {@code null}
      */
-    protected boolean matchIfRouteIsVersioned(@NonNull HttpRequest<?> request,
+    protected boolean matchIfRouteIsVersioned(HttpRequest<?> request,
                                               @Nullable String resolvedVersion,
-                                              @NonNull String routeVersion) {
+                                              String routeVersion) {
         //no version found and no default version configured
         if (resolvedVersion == null) {
             if (LOG.isDebugEnabled()) {
@@ -174,8 +157,7 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
      * @param request HTTP Request
      * @return the resolved requested version wrapped in an {@link Optional}
      */
-    @NonNull
-    protected Optional<String> resolveVersion(@NonNull HttpRequest<?> request) {
+    protected Optional<String> resolveVersion(HttpRequest<?> request) {
         return resolvingStrategies.stream()
                 .map(strategy -> strategy.resolve(request).orElse(null))
                 .filter(Objects::nonNull)

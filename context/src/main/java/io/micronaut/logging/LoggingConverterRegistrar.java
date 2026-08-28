@@ -16,9 +16,12 @@
 package io.micronaut.logging;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.CharSequenceToEnumConverter;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
+import io.micronaut.core.util.StringUtils;
+
+import java.util.Locale;
+import java.util.Optional;
 
 /**
  * Logging converters.
@@ -31,6 +34,17 @@ public final class LoggingConverterRegistrar implements TypeConverterRegistrar {
 
     @Override
     public void register(MutableConversionService conversionService) {
-        conversionService.addConverter(CharSequence.class, LogLevel.class, new CharSequenceToEnumConverter<>());
+        conversionService.addConverter(CharSequence.class, LogLevel.class, (object, targetType, context) -> {
+            if (StringUtils.isEmpty(object)) {
+                return Optional.of(LogLevel.NOT_SPECIFIED);
+            }
+            try {
+                return Optional.of(Enum.valueOf(LogLevel.class, object.toString().toUpperCase(Locale.ENGLISH)));
+            } catch (IllegalArgumentException e) {
+                context.reject(object, e);
+                return Optional.empty();
+            }
+        });
+        conversionService.addConverter(Boolean.class, LogLevel.class, value -> value ? null : LogLevel.OFF);
     }
 }

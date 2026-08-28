@@ -16,7 +16,6 @@
 package io.micronaut.http.cookie;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.StringUtils;
 
 import java.net.HttpCookie;
@@ -40,24 +39,31 @@ public final class DefaultServerCookieEncoder implements ServerCookieEncoder {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'");
 
     @Override
-    @NonNull
-    public List<String> encode(@NonNull Cookie... cookies) {
+    public List<String> encode(Cookie... cookies) {
         return Arrays.stream(cookies).map(this::encodeCookie).toList();
     }
 
-    @NonNull
-    private String encodeCookie(@NonNull Cookie cookie) {
+    private String encodeCookie(Cookie cookie) {
+        String name = cookie.getName();
+        String value = cookie.getValue();
+        value = value == null ? "" : value;
+        String path = cookie.getPath();
+        String domain = cookie.getDomain();
+        CookieUtils.verifyCookieName(name);
+        CookieUtils.verifyCookieValue(value);
+        CookieUtils.verifyCookieAttributeValue(Cookie.ATTRIBUTE_PATH, path);
+        CookieUtils.verifyCookieAttributeValue(Cookie.ATTRIBUTE_DOMAIN, domain);
         StringBuilder sb = new StringBuilder();
-        sb.append(cookie.getName()).append(EQUAL).append(cookie.getValue());
+        sb.append(name).append(EQUAL).append(value);
         if (isMaxAgeSet(cookie)) {
             sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_MAX_AGE).append(EQUAL).append(cookie.getMaxAge());
             sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_EXPIRES).append(EQUAL).append(expires(cookie.getMaxAge()));
         }
-        if (StringUtils.isNotEmpty(cookie.getPath())) {
-            sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_PATH).append(EQUAL).append(cookie.getPath());
+        if (StringUtils.isNotEmpty(path)) {
+            sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_PATH).append(EQUAL).append(path);
         }
-        if (StringUtils.isNotEmpty(cookie.getDomain())) {
-            sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_DOMAIN).append(EQUAL).append(cookie.getDomain());
+        if (StringUtils.isNotEmpty(domain)) {
+            sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_DOMAIN).append(EQUAL).append(domain);
         }
         if (cookie.isSecure()) {
             sb.append(SEMICOLON).append(SPACE).append(Cookie.ATTRIBUTE_SECURE);

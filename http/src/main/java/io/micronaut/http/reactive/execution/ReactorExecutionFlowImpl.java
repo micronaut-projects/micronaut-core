@@ -16,8 +16,7 @@
 package io.micronaut.http.reactive.execution;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -51,6 +50,7 @@ import java.util.function.Supplier;
 final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
     private Mono<Object> value;
+    @Nullable
     private List<Subscription> subscriptionsToCancel = new ArrayList<>(1);
 
     <K> ReactorExecutionFlowImpl(Publisher<K> value) {
@@ -79,7 +79,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
         // special subscriber that (a) contains the propagated context and (b) can return an
         // imperative flow if the result is provided immediately in subscribe()
         var s = new CoreSubscriber<T>() {
-            final AtomicReference<ExecutionFlow<T>> flow = new AtomicReference<>();
+            final AtomicReference<@Nullable ExecutionFlow<T>> flow = new AtomicReference<>();
 
             boolean complete = false;
 
@@ -107,16 +107,22 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
                 s.request(Long.MAX_VALUE);
             }
 
-            private void complete(T result) {
+            private void complete(@Nullable T result) {
                 if (!flow.compareAndSet(null, ExecutionFlow.just(result))) {
-                    ((DelayedExecutionFlow<T>) flow.get()).complete(result);
+                    DelayedExecutionFlow<T> delayedFlow = (DelayedExecutionFlow<T>) flow.get();
+                    if (delayedFlow != null) {
+                        delayedFlow.complete(result);
+                    }
                 }
                 complete = true;
             }
 
             private void completeError(Throwable t) {
                 if (!flow.compareAndSet(null, ExecutionFlow.error(t))) {
-                    ((DelayedExecutionFlow<?>) flow.get()).completeExceptionally(t);
+                    DelayedExecutionFlow<?> delayedFlow = (DelayedExecutionFlow<?>) flow.get();
+                    if (delayedFlow != null) {
+                        delayedFlow.completeExceptionally(t);
+                    }
                 }
                 complete = true;
             }
@@ -146,8 +152,10 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
                 }
             }
         };
-        try (PropagatedContext.Scope ignored = propagatedContext.propagate()) {
+        if (propagatedContext.isBound()) {
             publisher.subscribe(s);
+        } else {
+            propagatedContext.propagate(() -> publisher.subscribe(s));
         }
         ExecutionFlow<T> immediate = s.flow.getPlain();
         if (immediate != null) {
@@ -194,7 +202,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     }
 
     @Override
-    public @NonNull ExecutionFlow<Object> putInContextIfAbsent(@NonNull String key, @NonNull Object value) {
+    public ExecutionFlow<Object> putInContextIfAbsent(String key, Object value) {
         this.value = this.value.contextWrite(context -> {
             if (!context.hasKey(key)) {
                 return context.put(key, value);
@@ -220,7 +228,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     }
 
     @Override
-    public void onComplete(BiConsumer<? super Object, Throwable> fn) {
+    public void onComplete(BiConsumer<? super @Nullable Object, @Nullable Throwable> fn) {
         if (value instanceof Fuseable.ScalarCallable callable) {
             Object value;
             try {
@@ -234,7 +242,9 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
         }
         value.subscribe(new CoreSubscriber<>() {
 
+            @Nullable
             Subscription subscription;
+            @Nullable
             Object value;
 
             @Override
@@ -257,7 +267,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
             }
 
             @Override
-            public void onNext(Object v) {
+            public void onNext(@Nullable Object v) {
                 value = v;
             }
 
@@ -274,7 +284,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     }
 
     @Override
-    public void completeTo(CompletableFuture<Object> completableFuture) {
+    public void completeTo(CompletableFuture<@Nullable Object> completableFuture) {
         if (value instanceof Fuseable.ScalarCallable callable) {
             Object value;
             try {
@@ -288,7 +298,9 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
         }
         value.subscribe(new CoreSubscriber<>() {
 
+            @Nullable
             Subscription subscription;
+            @Nullable
             Object value;
 
             @Override
@@ -298,7 +310,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
             }
 
             @Override
-            public void onNext(Object v) {
+            public void onNext(@Nullable Object v) {
                 value = v;
             }
 

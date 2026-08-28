@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.simple;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -48,7 +48,7 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
     private int status = HttpStatus.OK.getCode();
     private String reason = HttpStatus.OK.getReason();
 
-    private Object body;
+    private @Nullable Object body;
 
     @Override
     public MutableHttpResponse<B> cookie(Cookie cookie) {
@@ -105,7 +105,7 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
     }
 
     @Override
-    public MutableHttpResponse<B> status(int status, CharSequence message) {
+    public MutableHttpResponse<B> status(int status, @Nullable CharSequence message) {
         this.status = status;
         if (message == null) {
             this.reason = HttpStatus.getDefaultReason(status);

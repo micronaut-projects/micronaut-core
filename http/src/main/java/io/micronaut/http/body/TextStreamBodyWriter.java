@@ -16,7 +16,6 @@
 package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
@@ -77,7 +76,6 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
     }
 
     @SuppressWarnings("unchecked")
-    @NonNull
     private static Argument<Object> getBodyType(Argument<?> type) {
         if (type.getType().equals(Event.class)) {
             return (Argument<Object>) type.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
@@ -162,7 +160,7 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
      * @param attribute The attribute
      * @param value     The value
      */
-    private static void writeAttribute(Output eventData, byte[] attribute, String value) {
+    private static void writeAttribute(Output eventData, byte[] attribute, @Nullable String value) {
         if (value != null) {
             eventData.write(attribute)
                 .write(value, StandardCharsets.UTF_8)
@@ -186,6 +184,7 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
 
         ByteBufferOutput(ByteBufferFactory<?, ?> bufferFactory) {
             this.bufferFactory = bufferFactory;
+            buffer = bufferFactory.buffer(0);
         }
 
         @Override

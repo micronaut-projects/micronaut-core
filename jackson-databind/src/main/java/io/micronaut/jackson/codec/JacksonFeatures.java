@@ -15,12 +15,11 @@
  */
 package io.micronaut.jackson.codec;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.Module;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JacksonModule;
+import tools.jackson.databind.SerializationFeature;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.json.JsonFeatures;
@@ -32,7 +31,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Stores features to later configure an {@link com.fasterxml.jackson.databind.ObjectMapper}.
+ * Stores features to later configure an {@link tools.jackson.databind.ObjectMapper}.
  * Features are supplied through the {@link io.micronaut.jackson.annotation.JacksonFeatures} annotation.
  *
  * @author svishnyakov
@@ -43,7 +42,7 @@ public final class JacksonFeatures implements JsonFeatures {
 
     private final Map<SerializationFeature, Boolean> serializationFeatures;
     private final Map<DeserializationFeature, Boolean> deserializationFeatures;
-    private final List<Class<? extends Module>> additionalModules;
+    private final List<Class<? extends JacksonModule>> additionalModules;
 
     /**
      * Empty jackson features.
@@ -91,7 +90,7 @@ public final class JacksonFeatures implements JsonFeatures {
         if (ArrayUtils.isNotEmpty(additionalModules)) {
             for (Class<?> additionalModule : additionalModules) {
                 //noinspection unchecked
-                jacksonFeatures.addModule((Class<? extends Module>) additionalModule);
+                jacksonFeatures.addModule((Class<? extends JacksonModule>) additionalModule);
             }
         }
 
@@ -129,8 +128,7 @@ public final class JacksonFeatures implements JsonFeatures {
      * @return This object.
      * @since 3.2
      */
-    @NonNull
-    public JacksonFeatures addModule(@NonNull Class<? extends Module> moduleClass) {
+    public JacksonFeatures addModule(Class<? extends JacksonModule> moduleClass) {
         Objects.requireNonNull(moduleClass, "moduleClass");
         additionalModules.add(moduleClass);
         return this;
@@ -160,8 +158,7 @@ public final class JacksonFeatures implements JsonFeatures {
      * @return List of additional modules to load.
      * @since 3.2
      */
-    @NonNull
-    public List<Class<? extends Module>> getAdditionalModules() {
+    public List<Class<? extends JacksonModule>> getAdditionalModules() {
         return additionalModules;
     }
 

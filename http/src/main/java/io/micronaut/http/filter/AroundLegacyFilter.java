@@ -70,11 +70,21 @@ record AroundLegacyFilter(HttpFilter bean, FilterOrder order) implements Interna
                                                              Function<FilterContext, ExecutionFlow<FilterContext>> downstream) {
         // Legacy `Publisher<HttpResponse> proceed(..)` filters are always suspended
         FilterChainImpl chainSuspensionPoint = new FilterChainImpl(downstream, context);
-        try (PropagatedContext.Scope ignore = context.propagatedContext().propagate()) {
-            return chainSuspensionPoint.processResult(
-                bean().doFilter(context.request(), chainSuspensionPoint),
-                context.propagatedContext()
-            );
+        try {
+            PropagatedContext propagatedContext = context.propagatedContext();
+            if (propagatedContext.isBound()) {
+                return chainSuspensionPoint.processResult(
+                    bean().doFilter(context.request(), chainSuspensionPoint),
+                    propagatedContext
+                );
+            } else {
+                return propagatedContext.propagate(() ->
+                    chainSuspensionPoint.processResult(
+                        bean().doFilter(context.request(), chainSuspensionPoint),
+                        propagatedContext
+                    )
+                );
+            }
         } catch (Exception e) {
             return ExecutionFlow.error(e);
         }

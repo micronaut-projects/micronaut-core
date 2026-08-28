@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -498,7 +498,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         }
     }
 
-    private static class EmbeddedChannelId implements ChannelId {
+    private static final class EmbeddedChannelId implements ChannelId {
         @Override
         String asShortText() {
             return toString()
@@ -515,7 +515,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         }
     }
 
-    private static class EmbeddedServerChannel extends EmbeddedChannel implements ServerChannel {
+    private static final class EmbeddedServerChannel extends EmbeddedChannel implements ServerChannel {
 
     }
 }

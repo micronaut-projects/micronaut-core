@@ -75,8 +75,11 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
     private fun normalizePath(path: String) = path.replace("\\\\", "/").split("/").toMutableList()
 
     private fun getNativeElements(fileName: String, originatingElements: Array<out Element>): Dependencies {
+        // Aggregating outputs are often written in finish(), when KSP2 may have already
+        // invalidated PSI. Avoid ALL_FILES / originating KSFiles here — empty sources +
+        // aggregating is enough (anyChangesWildcard). See #12677.
         if (context.aggregating) {
-            return Dependencies.ALL_FILES
+            return Dependencies(aggregating = true, sources = emptyArray())
         }
         val sources: Array<KSFile> = if (originatingElements.isNotEmpty()) {
             val originatingFiles: MutableList<KSFile> = ArrayList(originatingElements.size)
@@ -96,6 +99,6 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
             )
             emptyArray()
         }
-        return Dependencies(false, sources = sources)
+        return Dependencies(aggregating = false, sources = sources)
     }
 }

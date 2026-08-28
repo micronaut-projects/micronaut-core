@@ -16,8 +16,6 @@
 package io.micronaut.core.propagation;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
@@ -54,7 +52,6 @@ public interface PropagatedContext {
      *
      * @return the empty context
      */
-    @NonNull
     static PropagatedContext empty() {
         return PropagatedContextImpl.EMPTY;
     }
@@ -64,7 +61,6 @@ public interface PropagatedContext {
      *
      * @return the current context or an empty one
      */
-    @NonNull
     static PropagatedContext getOrEmpty() {
         return PropagatedContextImpl.getOrEmpty();
     }
@@ -74,7 +70,6 @@ public interface PropagatedContext {
      *
      * @return the current context
      */
-    @NonNull
     static PropagatedContext get() {
         return PropagatedContextImpl.get();
     }
@@ -84,7 +79,6 @@ public interface PropagatedContext {
      *
      * @return the current optional context
      */
-    @NonNull
     static Optional<PropagatedContext> find() {
         return PropagatedContextImpl.find();
     }
@@ -97,8 +91,7 @@ public interface PropagatedContext {
      * @param runnable The runnable
      * @return new runnable or existing if the context is missing
      */
-    @NonNull
-    static Runnable wrapCurrent(@NonNull Runnable runnable) {
+    static Runnable wrapCurrent(Runnable runnable) {
         return PropagatedContext.find().map(ctx -> ctx.wrap(runnable)).orElse(runnable);
     }
 
@@ -111,8 +104,7 @@ public interface PropagatedContext {
      * @param <V> The callable type
      * @return new callable or existing if the context is missing
      */
-    @NonNull
-    static <V> Callable<V> wrapCurrent(@NonNull Callable<V> callable) {
+    static <V> Callable<V> wrapCurrent(Callable<V> callable) {
         return PropagatedContext.find().map(ctx -> ctx.wrap(callable)).orElse(callable);
     }
 
@@ -125,8 +117,7 @@ public interface PropagatedContext {
      * @param <V> The supplier type
      * @return new supplier or existing if the context is missing
      */
-    @NonNull
-    static <V> Supplier<V> wrapCurrent(@NonNull Supplier<V> supplier) {
+    static <V> Supplier<V> wrapCurrent(Supplier<V> supplier) {
         return PropagatedContext.find().map(ctx -> ctx.wrap(supplier)).orElse(supplier);
     }
 
@@ -140,6 +131,21 @@ public interface PropagatedContext {
     }
 
     /**
+     * Is this propagated context bound? If yes the propagation is not needed.
+     * @return true if bound
+     * @since 5.0
+     */
+    boolean isBound();
+
+    /**
+     * Checks whether the context is empty.
+     *
+     * @return true if the context contains no elements, otherwise false
+     * @since 5.0
+     */
+    boolean isEmpty();
+
+    /**
      * Returns a new context extended with the given element. This doesn't add anything
      * to the existing in-scope context (if any), so you will need to propagate it
      * yourself. You can add multiple elements of the same type.
@@ -147,8 +153,7 @@ public interface PropagatedContext {
      * @param element the element to be added
      * @return the new context
      */
-    @NonNull
-    PropagatedContext plus(@NonNull PropagatedContextElement element);
+    PropagatedContext plus(PropagatedContextElement element);
 
     /**
      * Returns a new context without the provided element. This doesn't remove anything
@@ -158,8 +163,7 @@ public interface PropagatedContext {
      * @param element The context element to be removed
      * @return the new context
      */
-    @NonNull
-    PropagatedContext minus(@NonNull PropagatedContextElement element);
+    PropagatedContext minus(PropagatedContextElement element);
 
     /**
      * Creates a new context with the given element replaced. This doesn't change anything
@@ -170,9 +174,7 @@ public interface PropagatedContext {
      * @param newElement the element that will replace it
      * @return the new context
      */
-    @NonNull
-    PropagatedContext replace(@NonNull PropagatedContextElement oldElement,
-                              @NonNull PropagatedContextElement newElement);
+    PropagatedContext replace(PropagatedContextElement oldElement, PropagatedContextElement newElement);
 
     /**
      * Finds the first element of the given type, if any exist.
@@ -181,7 +183,7 @@ public interface PropagatedContext {
      * @param <T> The element's type
      * @return element if found
      */
-    <T extends PropagatedContextElement> Optional<T> find(@NonNull Class<T> elementType);
+    <T extends PropagatedContextElement> Optional<T> find(Class<T> elementType);
 
     /**
      * Find all elements of the given type. The first element in the stream will be the last element added.
@@ -190,7 +192,7 @@ public interface PropagatedContext {
      * @param <T> The element's type
      * @return stream of elements of type
      */
-    <T extends PropagatedContextElement> Stream<T> findAll(@NonNull Class<T> elementType);
+    <T extends PropagatedContextElement> Stream<T> findAll(Class<T> elementType);
 
     /**
      * Gets the first element of the given type.
@@ -200,7 +202,7 @@ public interface PropagatedContext {
      * @return an element
      * @throws java.util.NoSuchElementException if no elements of that type are in the context.
      */
-    <T extends PropagatedContextElement> T get(@NonNull Class<T> elementType);
+    <T extends PropagatedContextElement> T get(Class<T> elementType);
 
     /**
      * Gets all elements.
@@ -214,8 +216,9 @@ public interface PropagatedContext {
      * object must be closed to undo the propagation.
      *
      * @return auto-closeable block to be used in try-resource block.
+     * @deprecated The method is only allowed for thread-local propagation.
      */
-    @NonNull
+    @Deprecated(since = "5.0")
     Scope propagate();
 
     /**
@@ -224,15 +227,7 @@ public interface PropagatedContext {
      * @param runnable The runnable that will execute with this context in scope.
      * @return new runnable
      */
-    @NonNull
-    default Runnable wrap(@NonNull Runnable runnable) {
-        PropagatedContext propagatedContext = this;
-        return () -> {
-            try (Scope ignore = propagatedContext.propagate()) {
-                runnable.run();
-            }
-        };
-    }
+    Runnable wrap(Runnable runnable);
 
     /**
      * Returns a new callable that runs the given callable with this context in scope.
@@ -241,15 +236,7 @@ public interface PropagatedContext {
      * @param <V>      The callable return type
      * @return new callable
      */
-    @NonNull
-    default <V> Callable<V> wrap(@NonNull Callable<V> callable) {
-        PropagatedContext propagatedContext = this;
-        return () -> {
-            try (Scope ignore = propagatedContext.propagate()) {
-                return callable.call();
-            }
-        };
-    }
+    <V> Callable<V> wrap(Callable<V> callable);
 
     /**
      * Returns a new supplier that runs the given supplier with this context in scope.
@@ -258,15 +245,7 @@ public interface PropagatedContext {
      * @param <V>      The supplier return type
      * @return new supplier
      */
-    @NonNull
-    default <V> Supplier<V> wrap(@NonNull Supplier<V> supplier) {
-        PropagatedContext propagatedContext = this;
-        return () -> {
-            try (Scope ignore = propagatedContext.propagate()) {
-                return supplier.get();
-            }
-        };
-    }
+    <V> Supplier<V> wrap(Supplier<V> supplier);
 
     /**
      * Executes the given supplier with this context in scope, restoring the previous context when execution completes.
@@ -275,12 +254,26 @@ public interface PropagatedContext {
      * @param <V>      The supplier return type
      * @return the result of calling {@link Supplier#get()}.
      */
-    @NonNull
-    default <V> V propagate(@NonNull Supplier<V> supplier) {
-        try (Scope ignore = propagate()) {
-            return supplier.get();
-        }
-    }
+    <V> V propagate(Supplier<V> supplier);
+
+    /**
+     * Executes the given supplier with this context in scope, restoring the previous context when execution completes.
+     *
+     * @param callable The supplier
+     * @param <V>      The supplier return type
+     * @return the result of calling {@link Callable#call()}.
+     * @throws Exception if an exception occurs
+     * @since 5.0
+     */
+    <V> V propagateCall(Callable<V> callable) throws Exception;
+
+    /**
+     * Executes the given runnable with this context in scope, restoring the previous context when execution completes.
+     *
+     * @param runnable The runnable
+     * @since 5.0
+     */
+    void propagate(Runnable runnable);
 
     /**
      * Closing this object undoes the effect of calling {@link #propagate()} on a context. Intended to be used in a

@@ -3,6 +3,7 @@ package io.micronaut.http.client
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.type.Argument
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.ServiceInstanceList
 import io.micronaut.http.BasicAuth
@@ -22,6 +23,11 @@ import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
+import java.util.concurrent.CompletionStage
+import java.util.function.Function
+
 import static io.micronaut.http.client.annotation.Client.DefinitionType.SERVER
 
 class ClientIntroductionAdviceSpec extends Specification {
@@ -31,12 +37,25 @@ class ClientIntroductionAdviceSpec extends Specification {
             'spec.name': 'ClientIntroductionAdviceSpec',
     ])
 
+    void "test injection method on an abstract HTTP client"() {
+        expect:
+        server.applicationContext.getBean(SetterInjectionClient).configurationInjected
+    }
+
     void "test implement HTTP client"() {
         given:
         MyClient myService = server.applicationContext.getBean(MyClient)
 
         expect:
         myService.index() == 'success'
+    }
+
+    void "test implement private nested HTTP client"() {
+        given:
+        PrivateNestedClient client = server.applicationContext.getBean(PrivateNestedClient)
+
+        expect:
+        client.index() == 'success'
     }
 
     void "test accept type defaults to json"() {
@@ -65,7 +84,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "service id appears in exceptions"() {
         given:
-        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        server.applicationContext.registerSingleton(ServiceInstanceList.class, new TestServiceInstanceList(server.getURI()))
         PolicyClient myService = server.applicationContext.getBean(PolicyClient)
 
         when:
@@ -79,7 +98,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "test multiple clients with the same id and different paths"() {
         given:
-        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        server.applicationContext.registerSingleton(ServiceInstanceList.class, new TestServiceInstanceList(server.getURI()))
 
         expect:
         server.applicationContext.getBean(PolicyClient).index() == 'policy'
@@ -88,7 +107,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "test a client with a body and header"() {
         given:
-        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        server.applicationContext.registerSingleton(ServiceInstanceList.class, new TestServiceInstanceList(server.getURI()))
 
         when:
         OfferClient client = server.applicationContext.getBean(OfferClient)
@@ -99,7 +118,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "test a client that auto encodes basic auth header"() {
         given:
-        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        server.applicationContext.registerSingleton(ServiceInstanceList.class, new TestServiceInstanceList(server.getURI()))
 
         when:
         BasicAuthHeaderAutoEncodingClient client = server.applicationContext.getBean(BasicAuthHeaderAutoEncodingClient)
@@ -158,7 +177,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
     void "test client interface definition type"() {
         given:
-        server.applicationContext.registerSingleton(new TestServiceInstanceList(server.getURI()))
+        server.applicationContext.registerSingleton(ServiceInstanceList.class, new TestServiceInstanceList(server.getURI()))
 
         when:
         var inverseClient = server.applicationContext.getBean(SingleInterfaceClient)
@@ -167,6 +186,129 @@ class ClientIntroductionAdviceSpec extends Specification {
 
         then:
         inverseClient.post(myObject) == "success"
+    }
+
+    void "async client stacktrace does not include reactive types"() {
+        given:
+        AsyncClient client = server.applicationContext.getBean(AsyncClient)
+
+        when:
+        client.fail()
+            .thenApply(Function.identity())
+            .toCompletableFuture()
+            .join()
+
+        then:
+        def e = thrown(CompletionException)
+        assert stackTraceHasNoReactiveClasses(e)
+    }
+
+    void "async client thenApply exception preserves clean stacktrace"() {
+        given:
+        AsyncClient client = server.applicationContext.getBean(AsyncClient)
+
+        when:
+        client.ok()
+            .thenApply({ throw new IllegalStateException("boom") } as Function<String, String>)
+            .toCompletableFuture()
+            .join()
+
+        then:
+        def e = thrown(CompletionException)
+        assert e.cause instanceof IllegalStateException
+        assert stackTraceHasNoReactiveClasses(e)
+    }
+
+    void "async client success response is available via thenApply"() {
+        given:
+        AsyncClient client = server.applicationContext.getBean(AsyncClient)
+
+        expect:
+        client.ok()
+            .thenApply({ it + "!" } as Function<String, String>)
+            .toCompletableFuture()
+            .join() == "async-ok!"
+    }
+
+    void "async client handles controller async success"() {
+        given:
+        AsyncClient client = server.applicationContext.getBean(AsyncClient)
+
+        expect:
+        client.okAsync()
+            .thenApply({ it + "?" } as Function<String, String>)
+            .toCompletableFuture()
+            .join() == "async-ok?"
+    }
+
+    void "async client handles void response cleanly"() {
+        given:
+        AsyncClient client = server.applicationContext.getBean(AsyncClient)
+
+        expect:
+        client.okVoid()
+            .toCompletableFuture()
+            .join() == null
+    }
+
+    void "async client handles controller async failure stacktrace clean"() {
+        given:
+        AsyncClient client = server.applicationContext.getBean(AsyncClient)
+
+        when:
+        client.failAsync().toCompletableFuture().join()
+
+        then:
+        def e = thrown(CompletionException)
+        assert e.cause instanceof HttpClientResponseException
+        assert stackTraceHasNoReactiveClasses(e)
+    }
+
+    void "async toAsync client retrieves successful response"() {
+        given:
+        HttpClient httpClient = server.applicationContext.createBean(HttpClient, server.getURL())
+        AsyncHttpClient async = httpClient.toAsync()
+
+        expect:
+        async.retrieve(HttpRequest.GET("/async/ok-async"), String.class)
+            .toCompletableFuture()
+            .join() == "async-ok"
+
+        cleanup:
+        httpClient.close()
+    }
+
+    void "async toAsync client void response does not throw"() {
+        given:
+        HttpClient httpClient = server.applicationContext.createBean(HttpClient, server.getURL())
+        AsyncHttpClient async = httpClient.toAsync()
+
+        expect:
+        async.retrieve(HttpRequest.GET("/async/ok-void"), Argument.VOID)
+            .toCompletableFuture()
+            .join() == null
+
+        cleanup:
+        httpClient.close()
+    }
+
+    void "async toAsync client failure preserves clean stacktrace"() {
+        given:
+        HttpClient httpClient = server.applicationContext.createBean(HttpClient, server.getURL())
+        AsyncHttpClient async = httpClient.toAsync()
+
+        when:
+        async.retrieve(HttpRequest.GET("/async/fail-async"), String.class)
+            .toCompletableFuture()
+            .join()
+
+        then:
+        def e = thrown(CompletionException)
+        assert e.cause instanceof HttpClientResponseException
+        assert stackTraceHasNoReactiveClasses(e)
+
+        cleanup:
+        httpClient.close()
     }
 
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
@@ -197,6 +339,66 @@ class ClientIntroductionAdviceSpec extends Specification {
             }
             return "<answer>success</answer>"
         }
+    }
+
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
+    @Controller('/async')
+    static class AsyncController {
+
+        @Get("/fail")
+        HttpResponse<String> fail() {
+            return HttpResponse.badRequest("bad")
+        }
+
+        @Get("/ok-async")
+        CompletionStage<String> okAsync() {
+            return CompletableFuture.completedFuture("async-ok")
+        }
+
+        @Get("/ok-void")
+        CompletionStage<Void> okVoid() {
+            return CompletableFuture.completedFuture(null)
+        }
+
+        @Get("/fail-async")
+        CompletionStage<HttpResponse<String>> failAsync() {
+            return CompletableFuture.completedFuture(HttpResponse.badRequest("bad"))
+        }
+
+        @Get("/ok")
+        String ok() {
+            return "async-ok"
+        }
+    }
+
+    @Client('/async')
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
+    static interface AsyncClient {
+
+        @Get("/fail")
+        CompletionStage<String> fail()
+
+        @Get("/ok")
+        CompletionStage<String> ok()
+
+        @Get("/ok-async")
+        CompletionStage<String> okAsync()
+
+        @Get("/ok-void")
+        CompletionStage<Void> okVoid()
+
+        @Get("/fail-async")
+        CompletionStage<String> failAsync()
+    }
+
+    private static boolean stackTraceHasNoReactiveClasses(Throwable throwable) {
+        List<String> classNames = new ArrayList<>()
+        Throwable current = throwable
+        while (current != null) {
+            classNames.addAll(current.stackTrace*.className)
+            current = current.cause
+        }
+        classNames.every { !it.startsWith('reactor.') && !it.contains('Mono') && !it.contains('Flux') }
     }
 
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
@@ -259,6 +461,11 @@ class ClientIntroductionAdviceSpec extends Specification {
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
     @Client('/aop')
     static interface MyClient extends MyApi {
+    }
+
+    @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
+    @Client('/aop')
+    private static interface PrivateNestedClient extends MyApi {
     }
 
     @Client('/accept')

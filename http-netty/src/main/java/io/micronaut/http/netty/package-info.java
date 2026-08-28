@@ -19,5 +19,10 @@
  * @author Sergio del Amo
  * @since 1.0
  */
+@Configuration
+@RequiresNetty
+@NullMarked
 package io.micronaut.http.netty;
 
+import io.micronaut.context.annotation.Configuration;
+import org.jspecify.annotations.NullMarked;

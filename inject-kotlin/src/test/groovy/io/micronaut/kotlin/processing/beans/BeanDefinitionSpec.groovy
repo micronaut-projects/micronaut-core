@@ -12,6 +12,7 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.HttpMethodMapping
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.AnnotationMetadataSupport
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -25,6 +26,9 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.buildContex
 import static io.micronaut.annotation.processing.test.KotlinCompiler.buildInterceptedBeanDefinition
 import static io.micronaut.annotation.processing.test.KotlinCompiler.getBean
 import static io.micronaut.annotation.processing.test.KotlinCompiler.getBeanDefinition
+
+import java.net.URL
+import java.net.URLClassLoader
 
 class BeanDefinitionSpec extends Specification {
 
@@ -485,19 +489,19 @@ class Test
         defaults["value"] == null
         defaults["intArray1"] == new int[] {}
         defaults["intArray2"] == new int[] {1, 2, 3}
-        defaults["intArray3"] == null
+        defaults["intArray3"] == new int[] {}
         defaults["stringArray1"] == new String[] {}
         defaults["stringArray2"] == new String[] {""}
         defaults["stringArray3"] == new String[] {"A"}
-        defaults["stringArray4"] == null
+        defaults["stringArray4"] == new String[] {}
         defaults["boolArray1"] == new boolean[] {}
         defaults["boolArray2"] == new boolean[] {true}
         defaults["boolArray3"] == new boolean[] {false}
-        defaults["boolArray4"] == null
+        defaults["boolArray4"] == new boolean[] {}
         defaults["myEnumArray1"] == new String[] {}
         defaults["myEnumArray2"] == new String[] {"ABC"}
         defaults["myEnumArray3"] == new String[] {"FOO", "BAR"}
-        defaults["myEnumArray4"] == null
+        defaults["myEnumArray4"] == new String[] {}
         defaults["classesArray1"] == new AnnotationClassValue[0]
         defaults["classesArray2"] == new AnnotationClassValue[] {new AnnotationClassValue(String)}
         defaults["ann"] == AnnotationValue.builder(MyAnnotation3).value("foo").build()
@@ -544,19 +548,19 @@ class Test
         defaults["bool"] == false
         defaults["intArray1"] == new int[] {}
         defaults["intArray2"] == new int[] {1, 2, 3}
-        defaults["intArray3"] == null
+        defaults["intArray3"] == new int[] {}
         defaults["stringArray1"] == new String[] {}
         defaults["stringArray2"] == new String[] {""}
         defaults["stringArray3"] == new String[] {"A"}
-        defaults["stringArray4"] == null
+        defaults["stringArray4"] == new String[] {}
         defaults["boolArray1"] == new boolean[] {}
         defaults["boolArray2"] == new boolean[] {true}
         defaults["boolArray3"] == new boolean[] {false}
-        defaults["boolArray4"] == null
+        defaults["boolArray4"] == new boolean[] {}
         defaults["myEnumArray1"] == new String[] {}
         defaults["myEnumArray2"] == new String[] {"ABC"}
         defaults["myEnumArray3"] == new String[] {"FOO", "BAR"}
-        defaults["myEnumArray4"] == null
+        defaults["myEnumArray4"] == new String[] {}
         defaults["classesArray1"] == new AnnotationClassValue[0]
         defaults["classesArray2"] == new AnnotationClassValue[] {new AnnotationClassValue(String)}
         defaults["ann"] == AnnotationValue.builder(MyAnnotation3).value("foo").build()
@@ -857,6 +861,49 @@ class Test: Runnable {
 ''')
         expect:
         reference.exposedTypes == [Runnable] as Set
+    }
+
+    void "test exposed types include kotlin internal interface from another package"() {
+        // Regression for https://github.com/micronaut-projects/micronaut-core/issues/12854
+        // Kotlin `internal` is public on the JVM; exposed types must still include such interfaces
+        // when the bean lives in a different package from the interface.
+        given:
+        def pair = KotlinCompiler.compile([
+            KotlinCompiler.kotlinSource('Intf.kt', '''
+package demo.package1.subpackage2.subpackage3.subpackage4
+
+internal interface Intf {
+    fun a()
+}
+'''),
+            KotlinCompiler.kotlinSource('Failing.kt', '''
+package demo.package1.subpackage2.subpackage3.subpackage4.subpackage5.subpackage6
+
+import demo.package1.subpackage2.subpackage3.subpackage4.Intf
+import jakarta.inject.Singleton
+
+@Singleton
+internal class Failing : Intf {
+    override fun a() {}
+}
+''')
+        ], { }, [])
+
+        def classpath = []
+        classpath << pair.component1().component2().outputDirectory.toURI().toURL()
+        classpath << pair.component2().component2().outputDirectory.toURI().toURL()
+        classpath.addAll(pair.component2().component1().classpaths.collect { it.toURI().toURL() })
+        classpath.addAll(pair.component1().component1().classpaths.collect { it.toURI().toURL() })
+        def classLoader = new URLClassLoader(classpath as URL[], KotlinCompiler.classLoader)
+        def reference = classLoader
+                .loadClass('demo.package1.subpackage2.subpackage3.subpackage4.subpackage5.subpackage6.$Failing$Definition')
+                .getDeclaredConstructor()
+                .newInstance() as BeanDefinitionReference
+
+        expect:
+        def exposedTypeNames = reference.exposedTypes*.name as Set
+        exposedTypeNames.contains('demo.package1.subpackage2.subpackage3.subpackage4.subpackage5.subpackage6.Failing')
+        exposedTypeNames.contains('demo.package1.subpackage2.subpackage3.subpackage4.Intf')
     }
 
     void "test fail compilation on invalid exposed bean type"() {
@@ -1276,10 +1323,10 @@ annotation class NotNull
 
         when:
             def doWorkMethod = Arrays.stream(definition.getBeanType().getDeclaredMethods())
-                    .filter {f -> !f.isSynthetic()}
+                    .filter { f -> !f.isSynthetic() && f.name.contains("doWork") }
                     .findFirst().orElseThrow()
             def supertypeMethods = definition.getBeanType().getSuperclass().getDeclaredMethods()
-                    .findAll { !it.name.contains('$jacoco')}
+                    .findAll { !it.name.contains('$jacoco') && it.name != "interceptedMethods" }
         then:
             supertypeMethods.every {doWorkMethod.name.contains(it.name)}
     }

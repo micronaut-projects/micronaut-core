@@ -16,11 +16,11 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.order.OrderUtil;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -39,10 +39,14 @@ import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.InternalByteBody;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 
 import java.lang.annotation.Annotation;
 import java.nio.charset.StandardCharsets;
@@ -62,15 +66,21 @@ import java.util.function.Supplier;
  * @since 4.0.0
  */
 @Internal
-public abstract class BaseFilterProcessor<A extends Annotation> implements ExecutableMethodProcessor<A> {
+public abstract class BaseFilterProcessor<A extends Annotation> implements BeanDefinitionProcessor<A> {
     @Nullable
     private final BeanContext beanContext;
     private final Class<A> filterAnnotation;
     private final RequestBinderRegistry argumentBinderRegistry;
+    @Nullable
+    private final ThreadSelectionConfiguration threadSelectionConfiguration;
+    @Nullable
+    private final ExecutorSelector executorSelector;
 
     public BaseFilterProcessor(@Nullable BeanContext beanContext, Class<A> filterAnnotation) {
         this.beanContext = beanContext;
         this.filterAnnotation = filterAnnotation;
+        this.threadSelectionConfiguration = beanContext != null && filterAnnotation == ServerFilter.class ? beanContext.findBean(ThreadSelectionConfiguration.class).orElse(null) : null;
+        this.executorSelector = beanContext != null && filterAnnotation == ServerFilter.class ? beanContext.findBean(ExecutorSelector.class).orElse(null) : null;
         Optional<RequestBinderRegistry> requestBinderRegistry = beanContext != null ? beanContext.findBean(RequestBinderRegistry.class) : Optional.empty();
         this.argumentBinderRegistry = new RequestBinderRegistry() {
             @Override
@@ -103,13 +113,14 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
     }
 
     @Override
-    public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        //noinspection unchecked,rawtypes
-        process0(beanDefinition, (ExecutableMethod) method);
+    public final void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
+        for (ExecutableMethod<?, ?> executableMethod : beanDefinition.getExecutableMethods()) {
+            process0(beanDefinition, (ExecutableMethod) executableMethod);
+        }
     }
 
     /**
-     * Add a filter. Called during {@link #process(BeanDefinition, ExecutableMethod)}.
+     * Add a filter.
      *
      * @param factory           Factory that will create the filter instance
      * @param methodAnnotations Annotations on the filter method
@@ -123,22 +134,30 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
             if (method.isAnnotationPresent(RequestFilter.class)) {
                 FilterMetadata methodLevel = metadata(method, RequestFilter.class);
                 FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-                addFilter(() -> MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, false, combined.order, argumentBinderRegistry, getExecutor(combined)), method, combined);
+                @Nullable Executor executor = getExecutor(method, combined);
+                addFilter(() -> MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, false, combined.order, argumentBinderRegistry, executor), method, combined);
             }
             if (method.isAnnotationPresent(ResponseFilter.class)) {
                 FilterMetadata methodLevel = metadata(method, ResponseFilter.class);
                 FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-                addFilter(() -> MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, true, combined.order, argumentBinderRegistry, getExecutor(combined)), method, combined);
+                @Nullable Executor executor = getExecutor(method, combined);
+                addFilter(() -> MethodFilter.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, true, combined.order, argumentBinderRegistry, executor), method, combined);
             }
         }
     }
 
-    private Executor getExecutor(FilterMetadata metadata) {
-        if (metadata.executeOn != null) {
-            return beanContext.getBean(Executor.class, Qualifiers.byName(metadata.executeOn));
-        } else {
+    @Nullable
+    private Executor getExecutor(MethodReference<?, ?> methodReference, FilterMetadata metadata) {
+        if (beanContext == null) {
             return null;
         }
+        if (metadata.executeOn != null) {
+            return beanContext.getBean(Executor.class, Qualifiers.byName(metadata.executeOn));
+        }
+        if (threadSelectionConfiguration == null || executorSelector == null) {
+            return null;
+        }
+        return executorSelector.selectExecutor(methodReference, threadSelectionConfiguration);
     }
 
     private FilterMetadata combineMetadata(FilterMetadata beanLevel, FilterMetadata methodLevel) {
@@ -191,8 +210,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
      * @param patterns Input patterns
      * @return Output patterns with server context path prepended
      */
-    @NonNull
-    protected List<String> prependContextPath(@NonNull List<String> patterns) {
+    protected List<String> prependContextPath(List<String> patterns) {
         return patterns;
     }
 
@@ -221,7 +239,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
             annotationMetadata.enumValue(annotationType, "patternStyle", FilterPatternStyle.class).orElse(FilterPatternStyle.ANT),
             ArrayUtils.isNotEmpty(patterns) ? Arrays.asList(patterns) : null,
             ArrayUtils.isNotEmpty(methods) ? Arrays.asList(methods) : null,
-            order.isPresent() ? new FilterOrder.Fixed(order.getAsInt()) : null,
+            order.isPresent() ? new FilterOrder.Fixed(order.getAsInt()) : new FilterOrder.Dynamic(OrderUtil.getOrder(annotationMetadata)),
             annotationMetadata.stringValue(ExecuteOn.class).orElse(null),
             ArrayUtils.isNotEmpty(serviceId) ? Arrays.asList(serviceId) : null,
             ArrayUtils.isNotEmpty(excludeServiceId) ? Arrays.asList(excludeServiceId) : null,
@@ -234,7 +252,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         FilterPatternStyle patternStyle,
         @Nullable List<String> patterns,
         @Nullable List<HttpMethod> methods,
-        @Nullable FilterOrder order,
+        FilterOrder order,
         @Nullable String executeOn,
         @Nullable List<String> serviceId,
         @Nullable List<String> excludeServiceId,

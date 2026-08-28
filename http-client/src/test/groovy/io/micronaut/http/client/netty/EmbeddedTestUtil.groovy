@@ -28,7 +28,7 @@ class EmbeddedTestUtil {
         new ConnectionDirection(client, server).register()
     }
 
-    private static class ConnectionDirection {
+    private static final class ConnectionDirection {
         final EmbeddedChannel source
         final EmbeddedChannel dest
         CompositeByteBuf sourceQueue

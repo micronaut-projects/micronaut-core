@@ -16,8 +16,7 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InvocationException;
@@ -31,6 +30,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -87,6 +87,34 @@ public class ReflectionUtils {
     }
 
     /**
+     * Retrieves all classes, interfaces, and superclasses in the hierarchy of the given class.
+     *
+     * @param aClass The class whose hierarchy is to be retrieved. Must not be null.
+     * @return A set of classes and interfaces representing the entire hierarchy of the given class,
+     *         including the provided class itself.
+     * @since 5.0
+     */
+    public static Set<Class<?>> getAllClassesInHierarchy(Class<?> aClass) {
+        ClassUtils.REFLECTION_LOGGER.debug("Reflectively retrieving hierarchy for class: {}", aClass);
+        Set<Class<?>> set = new LinkedHashSet<>();
+        collectAllClassesInHierarchy(set, aClass);
+        return set;
+    }
+
+    private static void collectAllClassesInHierarchy(Set<Class<?>> classes, Class<?> aClass) {
+        if (!classes.add(aClass)) {
+            return;
+        }
+        Class<?> superclass = aClass.getSuperclass();
+        if (superclass != null && superclass != Object.class && superclass != Record.class && superclass != Enum.class) {
+            collectAllClassesInHierarchy(classes, superclass);
+        }
+        for (Class<?> interfaceClass : aClass.getInterfaces()) {
+            collectAllClassesInHierarchy(classes, interfaceClass);
+        }
+    }
+
+    /**
      * Is the method a setter.
      *
      * @param name The method name
@@ -112,7 +140,7 @@ public class ReflectionUtils {
      */
     public static Class<?> getWrapperType(Class<?> primitiveType) {
         if (primitiveType.isPrimitive()) {
-            return PRIMITIVES_TO_WRAPPERS.get(primitiveType);
+            return PRIMITIVES_TO_WRAPPERS.getOrDefault(primitiveType, primitiveType);
         }
         return primitiveType;
     }
@@ -189,7 +217,8 @@ public class ReflectionUtils {
      * @param <T>       The instance type
      * @return The result
      */
-    public static <R, T> R invokeMethod(T instance, Method method, Object... arguments) {
+    @Nullable
+    public static <R, T> R invokeMethod(T instance, Method method, @Nullable Object... arguments) {
         try {
             return (R) method.invoke(instance, arguments);
         } catch (IllegalAccessException e) {
@@ -210,8 +239,9 @@ public class ReflectionUtils {
      * @return The result
      * @since 4.8
      */
+    @Nullable
     @UsedByGeneratedCode
-    public static <R, T> R invokeInaccessibleMethod(T instance, Method method, Object... arguments) {
+    public static <R, T> R invokeInaccessibleMethod(T instance, Method method, @Nullable Object... arguments) {
         try {
             method.setAccessible(true);
             return (R) method.invoke(instance, arguments);
@@ -328,7 +358,7 @@ public class ReflectionUtils {
      * @since 4.0.0
      */
     @Internal
-    public static Optional<Object> getFieldValue(@NonNull Class<?> fieldOwnerClass, @NonNull String fieldName, @NonNull Object instance) {
+    public static Optional<Object> getFieldValue(Class<?> fieldOwnerClass, String fieldName, Object instance) {
         try {
             final Field f = getRequiredField(fieldOwnerClass, fieldName);
             f.setAccessible(true);
@@ -459,10 +489,7 @@ public class ReflectionUtils {
      * @param instance The instance
      * @param value The value
      */
-    public static void setField(
-            @NonNull Field field,
-            @NonNull Object instance,
-            @Nullable Object value) {
+    public static void setField(Field field, Object instance, @Nullable Object value) {
         try {
             ClassUtils.REFLECTION_LOGGER.debug("Reflectively setting field {} to value {} on object {}", field, value, value);
             field.setAccessible(true);
@@ -484,7 +511,8 @@ public class ReflectionUtils {
      * @since 3.7.0
      */
     @UsedByGeneratedCode
-    public static Object getField(@NonNull Class<?> clazz, @NonNull String fieldName, @NonNull Object instance) {
+    @Nullable
+    public static Object getField(Class<?> clazz, String fieldName, Object instance) {
         try {
             ClassUtils.REFLECTION_LOGGER.debug("Reflectively getting field {} of class {} and instance {}", fieldName, clazz, instance);
             Field field = getRequiredField(clazz, fieldName);
@@ -503,9 +531,9 @@ public class ReflectionUtils {
      * @param value The value
      * @since 4.0.0
      */
-    public static void setField(@NonNull Class<?> clazz,
-                                @NonNull String fieldName,
-                                @NonNull Object instance,
+    public static void setField(Class<?> clazz,
+                                String fieldName,
+                                Object instance,
                                 @Nullable Object value) {
         try {
             Field field = findField(clazz, fieldName)

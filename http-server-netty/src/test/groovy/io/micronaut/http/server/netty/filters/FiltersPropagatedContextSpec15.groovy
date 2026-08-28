@@ -108,9 +108,9 @@ class FiltersPropagatedContextSpec15 extends Specification {
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new MyContext()).propagate()) {
-                return Mono.from(chain.proceed(request))
-            }
+            return PropagatedContext.getOrEmpty()
+                .plus(new MyContext())
+                .propagateCall(() -> Mono.from(chain.proceed(request)))
         }
 
         @Override
@@ -153,7 +153,7 @@ class FiltersPropagatedContextSpec15 extends Specification {
         }
     }
 
-    private static class MyContext implements PropagatedContextElement {
+    private static final class MyContext implements PropagatedContextElement {
     }
 
 }

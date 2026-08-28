@@ -15,9 +15,10 @@
  */
 package io.micronaut.http.multipart;
 
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.MediaType;
 
-import java.io.IOException;
+import java.io.Closeable;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Optional;
@@ -28,37 +29,83 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.0
  */
-public interface PartData {
+public final class PartData implements Closeable {
+    private final FormFieldMetadata fieldMetadata;
+    private final ReadBuffer readBuffer;
+
+    /**
+     * @param fieldMetadata The field metadata (name, file name, etc.)
+     * @param readBuffer    The buffered part data
+     */
+    public PartData(FormFieldMetadata fieldMetadata, ReadBuffer readBuffer) {
+        this.fieldMetadata = fieldMetadata;
+        this.readBuffer = readBuffer;
+    }
 
     /**
      * Gets the content of this chunk as an {@code InputStream}.
      *
      * @return The content of this chunk as an {@code InputStream}
-     * @throws IOException If an error occurs in retrieving the content
      */
-    InputStream getInputStream() throws IOException;
+    public InputStream getInputStream() {
+        return readBuffer.toInputStream();
+    }
 
     /**
      * Gets the content of this chunk as a {@code byte[]}.
      *
      * @return The content of this chunk as a {@code byte[]}
-     * @throws IOException If an error occurs in retrieving the content
      */
-    byte[] getBytes() throws IOException;
+    public byte[] getBytes() {
+        return readBuffer.toArray();
+    }
 
     /**
      * Gets the content of this chunk as a {@code ByteBuffer}.
      *
      * @return The content of this chunk as a {@code ByteBuffer}
-     * @throws IOException If an error occurs in retrieving the content
      */
-    ByteBuffer getByteBuffer() throws IOException;
+    public ByteBuffer getByteBuffer() {
+        return ByteBuffer.wrap(getBytes());
+    }
 
     /**
      * Gets the content type of this chunk.
      *
      * @return The content type of this chunk.
      */
-    Optional<MediaType> getContentType();
+    public Optional<MediaType> getContentType() {
+        return Optional.ofNullable(fieldMetadata.mediaType());
+    }
+
+    @Override
+    public void close() {
+        readBuffer.close();
+    }
+
+    /**
+     * The field metadata (name, file name, etc.).
+     *
+     * @return The field metadata
+     */
+    public FormFieldMetadata fieldMetadata() {
+        return fieldMetadata;
+    }
+
+    /**
+     * The field bytes.
+     *
+     * @return The field bytes
+     */
+    public ReadBuffer readBuffer() {
+        return readBuffer;
+    }
+
+    @Override
+    public String toString() {
+        return "PartData[" +
+            "fieldMetadata=" + fieldMetadata + ", " +
+            "readBuffer=" + readBuffer + ']';
+    }
 
 }

@@ -16,7 +16,6 @@
 package io.micronaut.validation.routes;
 
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.propagation.MutablePropagatedContext;
@@ -44,6 +43,7 @@ import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import org.reactivestreams.Publisher;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
@@ -73,7 +73,7 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
     );
 
     @Override
-    public @NonNull VisitorKind getVisitorKind() {
+    public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
     }
 
@@ -178,7 +178,7 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                 }
             }
         } catch (IllegalArgumentException e) {
-            context.fail(e.getMessage(), element);
+            context.fail(Objects.requireNonNullElse(e.getMessage(), "Illegal argument"), element);
         }
     }
 
@@ -189,12 +189,12 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
         return parameterType.isAssignable(byte[].class) || parameterType.isAssignable(ByteBuffer.class) || parameterType.isAssignable(String.class);
     }
 
-    private static ClassElement resolveReturnType(MethodElement element) {
+   private static ClassElement resolveReturnType(MethodElement element) {
         ClassElement returnType = element.getGenericReturnType();
         return resolveType(returnType);
     }
 
-    private static ClassElement resolveType(ClassElement returnType) {
+   private static ClassElement resolveType(ClassElement returnType) {
         if (returnType.isAssignable(Publisher.class) || returnType.isAssignable(CompletionStage.class) || returnType.isOptional()) {
             returnType = returnType.getFirstTypeArgument().orElse(returnType);
         }

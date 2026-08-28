@@ -16,7 +16,6 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
@@ -29,7 +28,9 @@ import java.util.Objects;
  * @param <T> The bean type
  * @author graemerocher
  * @since 3.0.0
+ * @deprecated No longer needed, user should have a custom implementation of {@link BeanConstructor} if needed
  */
+@Deprecated(since = "5.0", forRemoval = true)
 @UsedByGeneratedCode
 public abstract class AbstractBeanConstructor<T> implements BeanConstructor<T> {
     private final Class<T> beanType;
@@ -52,19 +53,16 @@ public abstract class AbstractBeanConstructor<T> implements BeanConstructor<T> {
     }
 
     @Override
-    @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
 
     @Override
-    @NonNull
     public Class<T> getDeclaringBeanType() {
         return beanType;
     }
 
     @Override
-    @NonNull
     public Argument<?>[] getArguments() {
         return arguments;
     }

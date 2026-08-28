@@ -17,6 +17,7 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.QualifiedBeanType;
 
 import java.lang.annotation.Annotation;
 
@@ -44,10 +45,18 @@ class AnnotationQualifier<T> extends FilteringQualifier<T> {
 
     @Override
     public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
-        if (!QualifierUtils.matchType(beanType, candidate)) {
-            return false;
+        if (QualifierUtils.match(candidate, this)) {
+            return true;
         }
-        if (QualifierUtils.matchAny(beanType, candidate)) {
+        if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(qualifiedName)) {
+            return true;
+        }
+        return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
+    }
+
+    @Override
+    public boolean doesQualify(Class<T> beanType, QualifiedBeanType<T> candidate) {
+        if (QualifierUtils.matchQualified(candidate, this)) {
             return true;
         }
         if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(qualifiedName)) {

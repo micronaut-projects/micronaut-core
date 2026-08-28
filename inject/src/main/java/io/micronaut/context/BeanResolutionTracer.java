@@ -17,8 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
@@ -37,9 +36,9 @@ sealed interface BeanResolutionTracer permits ConsoleBeanResolutionTracer {
      * @param disabledBeans The disabled beans
      */
     default void traceInitialConfiguration(
-        @NonNull Environment environment,
-        @NonNull Collection<BeanDefinitionReference<?>> beanReferences,
-        @NonNull Collection<DisabledBean<?>> disabledBeans) {
+        Environment environment,
+        Collection<BeanDefinitionReference<Object>> beanReferences,
+        Collection<DisabledBean<?>> disabledBeans) {
         // no-op
     }
 
@@ -51,9 +50,9 @@ sealed interface BeanResolutionTracer permits ConsoleBeanResolutionTracer {
      * @param beanType The bean type
      */
     void traceBeanCreation(
-        @NonNull BeanResolutionContext resolutionContext,
-        @NonNull BeanDefinition<?> beanDefinition,
-        @NonNull Argument<?> beanType);
+        BeanResolutionContext resolutionContext,
+        BeanDefinition<?> beanDefinition,
+        Argument<?> beanType);
 
     /**
      * Trace when a bean was resolved for a type.
@@ -64,8 +63,8 @@ sealed interface BeanResolutionTracer permits ConsoleBeanResolutionTracer {
      * @param <T> The bean generic type
      */
     default <T> void traceBeanResolved(
-        @NonNull BeanResolutionContext resolutionContext,
-        @NonNull Argument<T> beanType,
+        BeanResolutionContext resolutionContext,
+        Argument<T> beanType,
         @Nullable Qualifier<T> qualifier,
         @Nullable T bean
     ) {
@@ -82,10 +81,11 @@ sealed interface BeanResolutionTracer permits ConsoleBeanResolutionTracer {
      * @param <T> The bean generic type
      */
     default <T> void traceBeanDisabled(
-        @NonNull BeanResolutionContext resolutionContext,
-        @NonNull Argument<T> beanType,
-        @NonNull Qualifier<T> qualifier,
-        @NonNull String disabledBeanMessage) {
+        BeanResolutionContext resolutionContext,
+        Argument<T> beanType,
+        @Nullable
+        Qualifier<T> qualifier,
+        String disabledBeanMessage) {
         // no-op
     }
 
@@ -101,10 +101,11 @@ sealed interface BeanResolutionTracer permits ConsoleBeanResolutionTracer {
      * @param <T> The value generic type
      */
     default <T> void traceValueResolved(
-        @NonNull BeanResolutionContext resolutionContext,
-        @NonNull Argument<T> argument,
-        @NonNull String property,
-        @NonNull T value
+        BeanResolutionContext resolutionContext,
+        Argument<T> argument,
+        String property,
+        @Nullable
+        T value
     ) {
         // no-op
     }
@@ -116,8 +117,8 @@ sealed interface BeanResolutionTracer permits ConsoleBeanResolutionTracer {
      * @param <T> The bean type
      */
     <T> void traceBeanCreated(
-        @NonNull BeanResolutionContext resolutionContext,
-        @NonNull BeanDefinition<T> beanDefinition);
+        BeanResolutionContext resolutionContext,
+        BeanDefinition<T> beanDefinition);
 
     /**
      * Trace when a bean is about to be injected.
@@ -130,8 +131,8 @@ sealed interface BeanResolutionTracer permits ConsoleBeanResolutionTracer {
      * @param <T> The injection point type
      */
     <B, T> void traceInjectBean(
-        @NonNull BeanResolutionContext resolutionContext,
-        @NonNull BeanResolutionContext.Segment<B, T> segment);
+        BeanResolutionContext resolutionContext,
+        BeanResolutionContext.Segment<B, T> segment);
 
     /**
      * Called on the completion of resolution of an injection point.

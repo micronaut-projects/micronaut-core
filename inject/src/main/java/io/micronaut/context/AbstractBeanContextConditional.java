@@ -21,8 +21,7 @@ import io.micronaut.context.condition.Failure;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanContextConditional;
 import org.slf4j.Logger;
@@ -38,22 +37,25 @@ import org.slf4j.LoggerFactory;
 abstract class AbstractBeanContextConditional implements BeanContextConditional, AnnotationMetadataProvider {
 
     @Override
-    public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
+    public boolean isEnabled(BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         Condition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
-        DefaultBeanContext defaultBeanContext = (DefaultBeanContext) context;
-        DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(
-                defaultBeanContext,
-                this, resolutionContext);
-        boolean enabled = condition == null || condition.matches(conditionContext);
-        if (!enabled) {
-            onFail(conditionContext, defaultBeanContext);
+        if (condition == null) {
+            return true;
         }
-
+        DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(
+            context,
+            this,
+            resolutionContext
+        );
+        boolean enabled = condition.matches(conditionContext);
+        if (!enabled) {
+            onFail(conditionContext, context);
+        }
         return enabled;
     }
 
-    protected final void onFail(DefaultConditionContext<AbstractBeanContextConditional> conditionContext, DefaultBeanContext defaultBeanContext) {
+    protected final void onFail(DefaultConditionContext<AbstractBeanContextConditional> conditionContext, BeanContext context) {
         if (ConditionLog.LOG.isDebugEnabled()) {
             if (this instanceof BeanConfiguration) {
                 ConditionLog.LOG.debug("{} will not be loaded due to failing conditions:", this);
@@ -64,6 +66,7 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
                 ConditionLog.LOG.debug("* {}", failure.getMessage());
             }
         }
+        DefaultBeanContext defaultBeanContext = (DefaultBeanContext) context;
         defaultBeanContext.trackDisabledComponent(conditionContext);
     }
 

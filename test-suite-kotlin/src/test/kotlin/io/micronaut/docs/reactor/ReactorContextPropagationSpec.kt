@@ -1,5 +1,6 @@
 package io.micronaut.docs.reactor
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
@@ -80,7 +81,7 @@ class TestController(private val someService: SomeService) {
 }
 
 @Introspected
-class SomeBody(val name: String)
+data class SomeBody(@JsonProperty("name") val name: String)
 
 @Requires(property = "mdc.reactortestpropagation.enabled")
 @Singleton
@@ -103,7 +104,7 @@ class SomeService {
 }
 
 @Introspected
-class NameRequestBody(val name: String)
+data class NameRequestBody(@JsonProperty("name") val name: String)
 
 @Requires(property = "mdc.reactortestpropagation.enabled")
 // tag::simplefilter[]

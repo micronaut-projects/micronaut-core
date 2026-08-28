@@ -24,6 +24,7 @@ import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
+import org.jspecify.annotations.Nullable;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -47,11 +48,15 @@ abstract sealed class AbstractMessageBodyHandlerRegistry implements MessageBodyH
     private final Map<HandlerKey<?>, MessageBodyReader<?>> readers = new ConcurrentHashMap<>(10);
     private final Map<HandlerKey<?>, MessageBodyWriter<?>> writers = new ConcurrentHashMap<>(10);
 
+    @Nullable
     protected abstract <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes);
 
     @SuppressWarnings({"unchecked"})
     @Override
-    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, List<MediaType> mediaTypes) {
+    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, @Nullable List<MediaType> mediaTypes) {
+        if (mediaTypes == null) {
+            mediaTypes = List.of();
+        }
         HandlerKey<T> key = new HandlerKey<>(type, mediaTypes);
         MessageBodyReader<?> messageBodyReader = readers.get(key);
         if (messageBodyReader == null) {
@@ -71,13 +76,17 @@ abstract sealed class AbstractMessageBodyHandlerRegistry implements MessageBodyH
         }
     }
 
+    @Nullable
     protected abstract <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes);
 
     @SuppressWarnings({"unchecked"})
     @Override
-    public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaTypes) {
+    public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, @Nullable List<MediaType> mediaTypes) {
         if (type.getType() == Object.class) {
             return Optional.empty();
+        }
+        if (mediaTypes == null) {
+            mediaTypes = List.of();
         }
         HandlerKey<T> key = new HandlerKey<>(type, mediaTypes);
         MessageBodyWriter<?> messageBodyWriter = writers.get(key);
@@ -119,24 +128,26 @@ abstract sealed class AbstractMessageBodyHandlerRegistry implements MessageBodyH
 
     private static final class NoReader implements MessageBodyReader<Object> {
         @Override
-        public boolean isReadable(Argument<Object> type, MediaType mediaType) {
+        public boolean isReadable(Argument<Object> type, @Nullable MediaType mediaType) {
             return false;
         }
 
         @Override
-        public Object read(Argument<Object> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+        @Nullable
+        public Object read(Argument<Object> type, @Nullable MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
             return null;
         }
 
         @Override
-        public Object read(Argument<Object> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+        @Nullable
+        public Object read(Argument<Object> type, @Nullable MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
             return null;
         }
     }
 
     private static final class NoWriter implements MessageBodyWriter<Object> {
         @Override
-        public boolean isWriteable(Argument<Object> type, MediaType mediaType) {
+        public boolean isWriteable(Argument<Object> type, @Nullable MediaType mediaType) {
             return false;
         }
 

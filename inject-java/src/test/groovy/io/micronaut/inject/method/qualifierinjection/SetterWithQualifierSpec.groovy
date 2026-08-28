@@ -16,13 +16,9 @@
 package io.micronaut.inject.method.qualifierinjection
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
-
-import jakarta.inject.Qualifier
 
 class SetterWithQualifierSpec extends AbstractTypeElementSpec {
 

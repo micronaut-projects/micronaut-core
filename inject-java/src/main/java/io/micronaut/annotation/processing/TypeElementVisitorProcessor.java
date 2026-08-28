@@ -21,13 +21,13 @@ import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
+import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory;
+import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -42,6 +42,10 @@ import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
+import io.micronaut.inject.writer.OriginatingElements;
+import io.micronaut.sourcegen.model.ObjectDef;
+import org.jspecify.annotations.Nullable;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
@@ -49,7 +53,7 @@ import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
-import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
@@ -57,9 +61,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -82,6 +89,7 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING;
     VisitorContext.MICRONAUT_PROCESSING_MODULE
 })
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
+
     private static final Set<String> VISITOR_WARNINGS;
     private static final Set<String> SUPPORTED_ANNOTATION_NAMES;
 
@@ -110,7 +118,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         }
     }
 
+    @Nullable
     private List<LoadedVisitor> loadedVisitors;
+    @Nullable
     private Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors;
 
     /**
@@ -196,7 +206,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
     @Override
     public Set<String> getSupportedAnnotationTypes() {
-        if (loadedVisitors.isEmpty()) {
+        if (loadedVisitors == null || loadedVisitors.isEmpty()) {
             return Collections.emptySet();
         } else {
             return super.getSupportedAnnotationTypes();
@@ -213,7 +223,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             .flatMap(Collection::stream);
         Stream<String> visitorsAnnotationsOptions = typeElementVisitors
             .stream()
-            .filter(tev -> tev.getClass().isAnnotationPresent(SupportedOptions.class))
+            .filter(this::hasSupportedOptionsAnnotation)
             .map(TypeElementVisitor::getClass)
             .map(cls -> (SupportedOptions) cls.getAnnotation(SupportedOptions.class))
             .flatMap((SupportedOptions supportedOptions) -> Arrays.stream(supportedOptions.value()));
@@ -222,11 +232,19 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             .collect(Collectors.toSet());
     }
 
+    private boolean hasSupportedOptionsAnnotation(TypeElementVisitor<?, ?> visitor) {
+        try {
+            return visitor.getClass().isAnnotationPresent(SupportedOptions.class);
+        } catch (UnsupportedOperationException e) {
+            return false;
+        }
+    }
+
     @NextMajorVersion("`roundEnv.getRootElements()` should be removed in Micronaut 4. " +
         "It should not be possible to process elements without at least one annotation present and this call breaks that assumption")
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        if (!loadedVisitors.isEmpty() && !processingGeneratedAnnotation(annotations)) {
+        if (loadedVisitors != null && !loadedVisitors.isEmpty() && !processingGeneratedAnnotation(annotations)) {
 
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
@@ -324,9 +342,12 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = javaVisitorContext.getBeanElementBuilders();
         if (CollectionUtils.isNotEmpty(beanDefinitionBuilders)) {
+            DefaultElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory = new DefaultElementBeanDefinitionBuilderFactory(javaVisitorContext);
             try {
-                AbstractBeanDefinitionBuilder.writeBeanDefinitionBuilders(classWriterOutputVisitor, beanDefinitionBuilders);
-            } catch (IOException e) {
+                for (OutputObjectDef outputObjectDef : AbstractBeanDefinitionBuilder.build(beanDefinitionBuilders, beanDefinitionBuilderFactory)) {
+                    write(outputObjectDef, javaVisitorContext);
+                }
+            } catch (Exception e) {
                 // raise a compile error
                 String message = e.getMessage();
                 error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
@@ -337,6 +358,29 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             javaVisitorContext.finish();
         }
         return false;
+    }
+
+    private void write(OutputObjectDef outputObjectDef, VisitorContext visitorContext) {
+        try {
+            ObjectDef objectDef = outputObjectDef.objectDef();
+            Class<?> serviceClass = outputObjectDef.serviceClass();
+            OriginatingElements originatingElements = outputObjectDef.originatingElements();
+            if (serviceClass != null) {
+                classWriterOutputVisitor.visitServiceDescriptor(serviceClass, objectDef.getName(), originatingElements.getOriginatingElements()[0]);
+            }
+            try (OutputStream outputStream = classWriterOutputVisitor.visitClass(objectDef.getName(), originatingElements.getOriginatingElements())) {
+                outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, visitorContext));
+            }
+        } catch (Exception e) {
+            // raise a compile error
+            String message = e.getMessage();
+            Element javaElement = null;
+            io.micronaut.inject.ast.Element astElement = outputObjectDef.originatingElements().getOriginatingElements()[0];
+            if (astElement.getNativeType() instanceof JavaNativeElement javaNativeElement) {
+                javaElement = javaNativeElement.element();
+            }
+            error(javaElement, "Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
+        }
     }
 
     private <T extends Throwable> void postponeElement(JavaClassElement javaClassElement, Element originalElement, T e) throws T {
@@ -423,27 +467,42 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
      *
      * @return A collection of type element visitors.
      */
-    @NonNull
     protected synchronized Collection<? extends TypeElementVisitor<?, ?>> findTypeElementVisitors() {
         if (typeElementVisitors == null) {
-            for (String visitorWarning : VISITOR_WARNINGS) {
-                warning(visitorWarning);
-            }
+            reportWarnings();
             typeElementVisitors = findCoreTypeElementVisitors(null);
         }
         return typeElementVisitors;
     }
 
-    @NonNull
+    private void reportWarnings() {
+        for (String visitorWarning : VISITOR_WARNINGS) {
+            warning(visitorWarning);
+        }
+    }
+
     private static Collection<? extends TypeElementVisitor<?, ?>> findCoreTypeElementVisitors(@Nullable Set<String> warnings) {
-        return SoftServiceLoader.load(TypeElementVisitor.class, TypeElementVisitorProcessor.class.getClassLoader())
-            .disableFork()
-            .collectAll(visitor -> {
+        ClassLoader classLoader = TypeElementVisitorProcessor.class.getClassLoader();
+        if (Boolean.getBoolean(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER)) {
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            if (contextClassLoader != null) {
+                classLoader = contextClassLoader;
+            }
+        }
+        return loadTypeElementVisitors(classLoader, warnings)
+            .stream()
+            .filter(visitor -> {
                 if (!visitor.isEnabled()) {
                     return false;
                 }
 
-                final Requires requires = visitor.getClass().getAnnotation(Requires.class);
+                final Requires requires;
+                try {
+                    requires = visitor.getClass().getAnnotation(Requires.class);
+                } catch (UnsupportedOperationException e) {
+                    // Crema can throw UnsupportedOperationException for runtime annotation lookup; ignore @Requires checks in that case.
+                    return true;
+                }
                 if (requires != null) {
                     final Requires.Sdk sdk = requires.sdk();
                     if (sdk == Requires.Sdk.MICRONAUT) {
@@ -461,10 +520,37 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     }
                 }
                 return true;
-            }).stream()
-            .filter(Objects::nonNull)
-            .<TypeElementVisitor<?, ?>>map(e -> e)
-            // remove duplicate classes
-            .collect(Collectors.toMap(Object::getClass, v -> v, (a, b) -> a)).values();
+            })
+            // remove duplicate classes, preserving encounter order via LinkedHashMap
+            .collect(Collectors.toMap(Object::getClass, v -> v, (a, b) -> a, LinkedHashMap::new)).values();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<TypeElementVisitor<?, ?>> loadTypeElementVisitors(ClassLoader classLoader, @Nullable Set<String> warnings) {
+        List<TypeElementVisitor<?, ?>> visitors = (List) SoftServiceLoader.load(TypeElementVisitor.class, classLoader)
+            .disableFork()
+            .collectAll();
+        if (!visitors.isEmpty()) {
+            return visitors;
+        }
+        visitors = new ArrayList<>();
+        Iterator<ServiceLoader.Provider<TypeElementVisitor>> it = ServiceLoader.load(TypeElementVisitor.class, classLoader).stream().iterator();
+        while (it.hasNext()) {
+            Class<? extends TypeElementVisitor> type = null;
+            try {
+                ServiceLoader.Provider<TypeElementVisitor> provider = it.next();
+                type = provider.type();
+                visitors.add(provider.get());
+            } catch (Throwable e) {
+                if (e instanceof VirtualMachineError virtualMachineError) {
+                    throw virtualMachineError;
+                } else {
+                    if (warnings != null) {
+                        warnings.add("Error loading TypeElementVisitor " + (type != null ? type.getSimpleName() : "") + ": " + e.getMessage());
+                    }
+                }
+            }
+        }
+        return visitors;
     }
 }

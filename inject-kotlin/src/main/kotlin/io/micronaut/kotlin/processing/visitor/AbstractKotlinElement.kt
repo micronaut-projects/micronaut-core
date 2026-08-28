@@ -16,7 +16,6 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.KspExperimental
-import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getVisibility
 import com.google.devtools.ksp.isJavaPackagePrivate
 import com.google.devtools.ksp.isOpen
@@ -27,6 +26,7 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSModifierListOwner
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.KSTypeAlias
 import com.google.devtools.ksp.symbol.KSTypeArgument
 import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.Modifier
@@ -46,10 +46,7 @@ import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
-import io.micronaut.kotlin.processing.getBinaryName
-import io.micronaut.kotlin.processing.getClassDeclaration
 import java.util.*
-import kotlin.collections.HashSet
 
 internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     private val nativeType: T,
@@ -91,14 +88,21 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         element.presetAnnotationMetadata = presetAnnotationMetadata
     }
 
-    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): Element? {
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): Element {
         val kotlinElement: AbstractKotlinElement<T> = makeCopy()
         kotlinElement.presetAnnotationMetadata = annotationMetadata
         return kotlinElement
     }
 
     override fun isPublic() = if (annotatedInfo is KSDeclaration) {
-        annotatedInfo.getVisibility() == Visibility.PUBLIC
+        // Kotlin `internal` is public on the JVM (module-wide), so Class constants and
+        // bean exposed-type references are valid from any package in the compilation.
+        // Treating only Visibility.PUBLIC as public caused incomplete $EXPOSED_TYPES for
+        // internal interfaces implemented by beans in other packages (issue #12854).
+        when (annotatedInfo.getVisibility()) {
+            Visibility.PUBLIC, Visibility.INTERNAL -> true
+            else -> false
+        }
     } else {
         false
     }
@@ -180,12 +184,20 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         return super.getModifiers()
     }
 
-    override fun getDocumentation(parse: Boolean): Optional<String> {
-        return if (annotatedInfo is KSDeclaration) {
-            Optional.ofNullable(annotatedInfo.docString)
-        } else {
-            Optional.empty()
+    override fun getDocumentation(parse: Boolean): Optional<String> =
+        documentationText((annotatedInfo as? KSDeclaration)?.docString, parse)
+
+    /**
+     * Turns a raw KDoc string into element documentation: the verbatim string when [parse] is
+     * false, otherwise the prose description with block tags parsed out (empty description → absent).
+     */
+    protected fun documentationText(docString: String?, parse: Boolean): Optional<String> {
+        val raw = docString ?: return Optional.empty()
+        if (!parse) {
+            return Optional.of(raw)
         }
+        val description = parseKDoc(raw).description
+        return if (description.isEmpty()) Optional.empty() else Optional.of(description)
     }
 
     protected fun resolveDeclaringType(
@@ -200,8 +212,8 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             parent = parent.parent
         }
         return if (parent is KSClassDeclaration) {
-            val className = parent.getBinaryName(visitorContext.resolver, visitorContext)
-            if (owningType.name.equals(className)) {
+            val className = visitorContext.getBinaryName(parent)
+            if (owningType.name == className) {
                 owningType
             } else {
                 val parentTypeArguments = owningType.getTypeArguments(className)
@@ -284,15 +296,23 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         parentTypeArguments: Map<String, ClassElement>,
         visitedTypes: MutableSet<Any> = HashSet()
     ): Map<String, ClassElement> {
+        // A non-generic typealias (e.g. typealias BarList = List<Bar>) has no typeParameters
+        // on the alias itself, so KSType.arguments is empty and the concrete type arguments
+        // (Bar) would be lost. Expand to the underlying type to recover them.
+        val effectiveType = if (type.declaration is KSTypeAlias && type.declaration.typeParameters.isEmpty()) {
+            (type.declaration as KSTypeAlias).type.resolve()
+        } else {
+            type
+        }
         val typeArguments = mutableMapOf<String, ClassElement>()
-        val typeParameters = type.declaration.typeParameters
-        if (type.arguments.isEmpty() || type.arguments.size != typeParameters.size) {
+        val typeParameters = effectiveType.declaration.typeParameters
+        if (effectiveType.arguments.isEmpty() || effectiveType.arguments.size != typeParameters.size) {
             typeParameters.forEach {
                 typeArguments[it.name.asString()] =
                     resolveTypeParameter(owner, it, parentTypeArguments, visitedTypes)
             }
         } else {
-            type.arguments.forEachIndexed { i, typeArgument ->
+            effectiveType.arguments.forEachIndexed { i, typeArgument ->
                 val variableName = typeParameters[i].name.asString()
                 if (typeArgument.variance == Variance.STAR) {
                     val typeParameter =
@@ -465,8 +485,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             }
 
             else -> {
-                val objectType =
-                    visitorContext.resolver.getClassDeclarationByName(Object::class.java.name)!!
+                val objectType = visitorContext.classDeclarationByName(Object::class.java.name)!!
                 newKotlinClassElement(objectType, parentTypeArguments, visitedTypes)
             }
         }
@@ -511,7 +530,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     ) = newClassElement(
         owner,
         type,
-        type.declaration.getClassDeclaration(visitorContext),
+        visitorContext.getClassDeclaration(type.declaration),
         parentTypeArguments,
         visitedTypes,
         false,
@@ -553,13 +572,15 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     protected fun newClassElement(
         owner: KotlinNativeElement?,
         type: KSType,
-        parentTypeArguments: Map<String, ClassElement> = emptyMap()
+        parentTypeArguments: Map<String, ClassElement> = emptyMap(),
+        allowPrimitive: Boolean = true
     ) = newClassElement(
         owner,
         type,
-        type.declaration.getClassDeclaration(visitorContext),
+        visitorContext.getClassDeclaration(type.declaration),
         parentTypeArguments,
-        HashSet()
+        HashSet(),
+        allowPrimitive
     )
 
     private fun newTypeArgument(
@@ -571,7 +592,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     ) = newClassElement(
         owner,
         type,
-        type.declaration.getClassDeclaration(visitorContext),
+        visitorContext.getClassDeclaration(type.declaration),
         parentTypeArguments,
         visitedTypes,
         false,

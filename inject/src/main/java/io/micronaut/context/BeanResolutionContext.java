@@ -17,10 +17,11 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
@@ -34,7 +35,6 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 /**
  * Represents the resolution context for a current resolve of a given bean.
@@ -43,7 +43,8 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public interface BeanResolutionContext extends ValueResolver<CharSequence>, AutoCloseable {
+@UsedByGeneratedCode
+public interface BeanResolutionContext extends ValueResolver<CharSequence>, AutoCloseable, BeanLocator, ConversionServiceProvider {
 
     @Override
     default void close() {
@@ -51,66 +52,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
-     * Get a bean of the given type and qualifier.
-     *
-     * @param beanType          The bean type
-     * @param qualifier         The qualifier
-     * @param <T>               The bean type parameter
-     * @return The found bean
-     * @since 3.5.0
+     * @return The property resolver
      */
-    @NonNull
-    <T> T getBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
-
-    /**
-     * Get all beans of the given type and qualifier.
-     *
-     * @param beanType          The bean type
-     * @param qualifier         The qualifier
-     * @param <T>               The bean type parameter
-     * @return The found beans
-     * @since 3.5.0
-     */
-    @NonNull
-    <T> Collection<T> getBeansOfType(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
-
-    /**
-     * Obtains a stream of beans of the given type and qualifier.
-     *
-     * @param beanType          The bean type
-     * @param qualifier         The qualifier
-     * @param <T>               The bean concrete type
-     * @return A stream
-     * @since 3.5.0
-     */
-    @NonNull
-    <T> Stream<T> streamOfType(@NonNull  Argument<T> beanType, @Nullable  Qualifier<T> qualifier);
-
-    /**
-     * Obtains a map of beans of the given type and qualifier.
-     *
-     * @param beanType          The bean type
-     * @param qualifier         The qualifier
-     * @param <V>               The bean type
-     * @return A map of beans, never {@code null}.
-     * @since 4.0.0
-     */
-    @NonNull
-    default <V> Map<String, V> mapOfType(@NonNull Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
-        return Collections.emptyMap();
-    }
-
-    /**
-     * Find an optional bean of the given type and qualifier.
-     *
-     * @param beanType          The bean type
-     * @param qualifier         The qualifier
-     * @param <T>               The bean type parameter
-     * @return The found bean wrapped as an {@link Optional}
-     * @since 3.5.0
-     */
-    @NonNull
-    <T> Optional<T> findBean(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+    @Nullable
+    PropertyResolver getPropertyResolver();
 
     /**
      * Obtains the bean registrations for the given type and qualifier.
@@ -121,8 +66,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @return A collection of {@link BeanRegistration}
      * @since 3.5.0
      */
-    @NonNull
-    <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+    <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Call back to destroy any {@link io.micronaut.context.annotation.InjectScope} beans.
@@ -142,6 +86,36 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     BeanResolutionContext copy();
 
     /**
+     * Copy current context to be used later when resolving a lazy proxy target.
+     *
+     * @param proxyBeanDefinition The proxy bean definition
+     * @return The bean resolution context
+     * @since 5.1.0
+     */
+    @UsedByGeneratedCode
+    default BeanResolutionContext copyForLazyProxyTarget(BeanDefinition<?> proxyBeanDefinition) {
+        return copy();
+    }
+
+    /**
+     * Returns whether a newly constructed bean instance should receive field/method injection and initialization
+     * callbacks.
+     *
+     * @param beanDefinition The bean definition
+     * @param bean The newly constructed bean instance
+     * @return True if the bean instance should be injected and initialized
+     * @since 5.1.0
+     */
+    @UsedByGeneratedCode
+    default boolean shouldInitializeBean(BeanDefinition<?> beanDefinition, Object bean) {
+        BeanContext context = getContext();
+        if (context instanceof DefaultBeanContext defaultBeanContext) {
+            return defaultBeanContext.getBeanResolutionCustomizer().shouldInitializeBean(this, beanDefinition, bean);
+        }
+        return true;
+    }
+
+    /**
      * @return The context
      */
     BeanContext getContext();
@@ -149,6 +123,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * @return The class requested at the root of this resolution context
      */
+    @Nullable
     BeanDefinition getRootDefinition();
 
     /**
@@ -160,7 +135,6 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @return The configuration path.
      * @since 4.0.0
      */
-    @NonNull
     ConfigurationPath getConfigurationPath();
 
     /**
@@ -170,12 +144,14 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @param value The value
      * @return The previous value or null
      */
-    Object setAttribute(CharSequence key, Object value);
+    @Nullable
+    Object setAttribute(CharSequence key, @Nullable Object value);
 
     /**
      * @param key The key
      * @return The attribute value
      */
+    @Nullable
     Object getAttribute(CharSequence key);
 
     /**
@@ -184,6 +160,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @param key the key
      * @return The previous value
      */
+    @Nullable
     Object removeAttribute(CharSequence key);
 
     /**
@@ -252,7 +229,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * @return The dependent beans that must be destroyed by an upstream bean
      */
-    default @NonNull List<BeanRegistration<?>> getAndResetDependentBeans() {
+    default List<BeanRegistration<?>> getAndResetDependentBeans() {
         return Collections.emptyList();
     }
 
@@ -263,6 +240,15 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      */
     default @Nullable List<BeanRegistration<?>> popDependentBeans() {
         return null;
+    }
+
+    /**
+     * @return The current dependent beans that must be destroyed by an upstream bean.
+     *
+     * @since 5.1.0
+     */
+    default List<BeanRegistration<?>> getDependentBeans() {
+        return Collections.emptyList();
     }
 
     /**
@@ -308,7 +294,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @param isPlaceholder Whether it is a place holder
      * @return The resolved value
      */
-    @Nullable Object resolvePropertyValue(Argument<?> argument, String stringValue, String cliProperty, boolean isPlaceholder);
+    @Nullable Object resolvePropertyValue(Argument<?> argument, String stringValue, @Nullable String cliProperty, boolean isPlaceholder);
 
     /**
      * Callback when a value is resolved in some other context.
@@ -317,7 +303,22 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @param property The property
      * @param value The value
      */
-    void valueResolved(Argument<?> argument, Qualifier<?> qualifier, String property, @Nullable Object value);
+    void valueResolved(Argument<?> argument, @Nullable Qualifier<?> qualifier, String property, @Nullable Object value);
+
+    /**
+     * Resolves the proxy target for a given proxy bean definition. If the bean has no proxy then the original bean is returned.
+     *
+     * @param definition        The proxy bean definition
+     * @param beanType          The bean type
+     * @param qualifier         The bean qualifier
+     * @param <T>               The generic type
+     * @return The proxied instance
+     * @since 5.0
+     */
+    @UsedByGeneratedCode
+    <T> T getProxyTargetBean(BeanDefinition<T> definition,
+                             Argument<T> beanType,
+                             @Nullable Qualifier<T> qualifier);
 
     /**
      * Represents a path taken to resolve a bean definitions dependencies.
@@ -473,6 +474,7 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
          * @return The declaring type qualifier
          * @since 4.5.0
          */
+        @Nullable
         Qualifier<B> getDeclaringTypeQualifier();
 
         /**

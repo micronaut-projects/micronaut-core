@@ -16,10 +16,12 @@
 package io.micronaut.http.tck;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import org.junit.jupiter.api.Assertions;
@@ -31,7 +33,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Utility class used to perform assertions.
@@ -48,15 +51,15 @@ public final class AssertionUtils {
 
     }
 
-    public static BiConsumer<ServerUnderTest, HttpRequest<?>> assertThrowsStatus(@NonNull HttpStatus status) {
+    public static BiConsumer<ServerUnderTest, HttpRequest<?>> assertThrowsStatus(HttpStatus status) {
         return (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
             .status(status)
             .build());
     }
 
-    public static void assertThrows(@NonNull ServerUnderTest server,
-                                    @NonNull HttpRequest<?> request,
-                                    @NonNull HttpResponseAssertion assertion) {
+    public static void assertThrows(ServerUnderTest server,
+                                    HttpRequest<?> request,
+                                    HttpResponseAssertion assertion) {
         Executable e = assertion.getBody() != null ?
             () -> server.exchange(request, Argument.of(assertion.getBody().stream().map(BodyAssertion::getBodyType).findFirst().orElseThrow()), errorType(assertion)) :
             () -> server.exchange(request);
@@ -84,9 +87,9 @@ public final class AssertionUtils {
                 });
     }
 
-    public static void assertThrows(@NonNull ServerUnderTest server,
-                                    @NonNull HttpRequest<?> request,
-                                    @NonNull HttpStatus expectedStatus,
+    public static void assertThrows(ServerUnderTest server,
+                                    HttpRequest<?> request,
+                                    HttpStatus expectedStatus,
                                     @Nullable String expectedBody,
                                     @Nullable Map<String, String> expectedHeaders) {
         assertThrows(server, request, HttpResponseAssertion.builder()
@@ -96,11 +99,11 @@ public final class AssertionUtils {
             .build());
     }
 
-    public static <T> void assertDoesNotThrow(@NonNull ServerUnderTest server,
-                                          @NonNull HttpRequest<T> request,
-                                          @NonNull HttpStatus expectedStatus,
-                                          @Nullable String expectedBody,
-                                          @Nullable Map<String, String> expectedHeaders) {
+    public static <T> void assertDoesNotThrow(ServerUnderTest server,
+                                              HttpRequest<T> request,
+                                              HttpStatus expectedStatus,
+                                              @Nullable String expectedBody,
+                                              @Nullable Map<String, String> expectedHeaders) {
         assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
             .status(expectedStatus)
             .body(expectedBody)
@@ -108,9 +111,9 @@ public final class AssertionUtils {
             .build());
     }
 
-    public static <T> void assertDoesNotThrow(@NonNull ServerUnderTest server,
-                                              @NonNull HttpRequest<T> request,
-                                              @NonNull HttpResponseAssertion assertion) {
+    public static <T> void assertDoesNotThrow(ServerUnderTest server,
+                                              HttpRequest<T> request,
+                                              HttpResponseAssertion assertion) {
         ThrowingSupplier<HttpResponse<?>> executable = assertion.getBody() != null ?
             () -> server.exchange(request, Argument.of(assertion.getBody().stream().map(BodyAssertion::getBodyType).findFirst().orElseThrow()), errorType(assertion)) :
             () -> server.exchange(request);
@@ -121,7 +124,7 @@ public final class AssertionUtils {
         assertion.getResponseConsumer().ifPresent(httpResponseConsumer -> httpResponseConsumer.accept(response));
     }
 
-    private static void assertBody(@NonNull HttpResponse<?> response,  @Nullable List<BodyAssertion<?, ?>> bodyAssertions) {
+    private static void assertBody(HttpResponse<?> response,  @Nullable List<BodyAssertion<?, ?>> bodyAssertions) {
         if (bodyAssertions != null) {
             for (BodyAssertion<?, ?> bodyAssertion : bodyAssertions) {
                 Optional<?> bodyOptional = response.getBody(bodyAssertion.getBodyType());
@@ -130,7 +133,7 @@ public final class AssertionUtils {
         }
     }
 
-    private static void assertHeaders(@NonNull HttpResponse<?> response,  @Nullable Map<String, String> expectedHeaders) {
+    private static void assertHeaders(HttpResponse<?> response,  @Nullable Map<String, String> expectedHeaders) {
 
         if (expectedHeaders != null) {
             for (Map.Entry<String, String> expectedHeadersEntrySet : expectedHeaders.entrySet()) {

@@ -15,6 +15,9 @@
  */
 package io.micronaut.inject.injectionpoint;
 
+import io.micronaut.context.annotation.Requires;
+
+@Requires(property = "spec.name", value = "InjectionPointSpec")
 @SomeAdvice
 public interface SomeClient {
 

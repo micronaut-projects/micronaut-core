@@ -17,7 +17,7 @@ package io.micronaut.management.endpoint;
 
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -36,7 +36,9 @@ public class EndpointConfiguration {
     public static final String PREFIX = "endpoints";
     private static final String SLASH = "/";
 
+    @Nullable
     private Boolean enabled;
+    @Nullable
     private Boolean sensitive;
     @Nullable
     private String path;

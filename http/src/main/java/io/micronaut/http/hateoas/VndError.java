@@ -16,7 +16,8 @@
 package io.micronaut.http.hateoas;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
@@ -29,6 +30,7 @@ import java.util.List;
  * @since 1.1
  */
 @Produces(MediaType.APPLICATION_VND_ERROR)
+@ReflectiveAccess // for jackson
 public class VndError extends JsonError {
 
     /**

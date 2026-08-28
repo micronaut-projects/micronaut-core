@@ -29,6 +29,7 @@ import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
 import io.netty.handler.ssl.SslContext;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.security.KeyStore;
 import java.util.Optional;
@@ -45,7 +46,9 @@ import java.util.Set;
 public class CertificateProvidedSslBuilder extends AbstractServerSslBuilder implements ServerSslBuilder, RefreshEventListener, Ordered {
 
     private final ServerSslConfiguration ssl;
+    @Nullable
     private KeyStore keyStoreCache = null;
+    @Nullable
     private KeyStore trustStoreCache = null;
 
     /**

@@ -92,6 +92,60 @@ class AccessLogFormatParserSpec extends Specification {
 
     }
 
+    def "test access log format parser supports query string marker"() {
+        when:
+        AccessLogFormatParser parser = new AccessLogFormatParser("%q")
+
+        then:
+        parser.toString() == "%q"
+
+        when:
+        def queryStringElement = new RequestUriElementBuilder().build("q", null)
+        def queryString = queryStringElement.onRequestHeaders(ConnectionMetadata.empty(), "GET", new DefaultHttpHeaders(), "/test?foo=bar&baz=qux", "HTTP/1.1")
+
+        then:
+        queryString == "foo=bar&baz=qux"
+
+        when:
+        queryString = queryStringElement.onRequestHeaders(ConnectionMetadata.empty(), "GET", new DefaultHttpHeaders(), "/test", "HTTP/1.1")
+
+        then:
+        queryString == ""
+    }
+
+    def "test access log format parser supports requested URL path marker"() {
+        when:
+        AccessLogFormatParser parser = new AccessLogFormatParser("%U")
+
+        then:
+        parser.toString() == "%U"
+
+        when:
+        def requestPathElement = new RequestUriElementBuilder().build("U", null)
+        def requestPath = requestPathElement.onRequestHeaders(ConnectionMetadata.empty(), "GET", new DefaultHttpHeaders(), "/test/path?foo=bar&baz=qux", "HTTP/1.1")
+
+        then:
+        requestPath == "/test/path"
+
+        when:
+        requestPath = requestPathElement.onRequestHeaders(ConnectionMetadata.empty(), "GET", new DefaultHttpHeaders(), "http://localhost:8080/test/path?foo=bar&baz=qux", "HTTP/1.1")
+
+        then:
+        requestPath == "/test/path"
+
+        when:
+        requestPath = requestPathElement.onRequestHeaders(ConnectionMetadata.empty(), "GET", new DefaultHttpHeaders(), "http://localhost:8080?foo=bar", "HTTP/1.1")
+
+        then:
+        requestPath == "/"
+
+        when:
+        requestPath = requestPathElement.onRequestHeaders(ConnectionMetadata.empty(), "GET", new DefaultHttpHeaders(), "/test/path", "HTTP/1.1")
+
+        then:
+        requestPath == "/test/path"
+    }
+
     def 'Test string escaping from header value'() {
         def headers = new DefaultHttpHeaders()
         headers.add("User-Agent", "test string  \" \\")

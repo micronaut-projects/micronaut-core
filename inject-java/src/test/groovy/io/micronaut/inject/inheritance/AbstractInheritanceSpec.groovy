@@ -17,8 +17,6 @@ package io.micronaut.inject.inheritance
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
 import spock.lang.PendingFeature
 
@@ -42,6 +40,34 @@ class AbstractInheritanceSpec extends AbstractTypeElementSpec {
         context.close()
     }
 
+    void "test inherited injected method reports method declaring type"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition("test.SubClass", """
+package test;
+
+abstract class Parent {
+
+    @jakarta.inject.Inject
+    public void injectPublic(Bean bean) {
+
+    }
+}
+
+@jakarta.inject.Singleton
+class SubClass extends Parent {
+}
+
+@jakarta.inject.Singleton
+class Bean {
+}
+""")
+
+        then:
+        beanDefinition.injectedMethods.size() == 1
+        beanDefinition.injectedMethods[0].name == "injectPublic"
+        beanDefinition.injectedMethods[0].declaringType.name == "test.Parent"
+    }
+
     @PendingFeature
     void "test subclass method is injectable"() {
         when:
@@ -52,17 +78,17 @@ abstract class Parent {
 
     @jakarta.inject.Inject
     void inject(Bean bean) {
-    
+
     }
-    
+
     @jakarta.inject.Inject
     public void injectPublic(Bean bean) {
-    
+
     }
-    
+
     @jakarta.inject.Inject
     public void injectNoOverride(Bean bean) {
-    
+
     }
 }
 
@@ -70,7 +96,7 @@ class Middle extends Parent {
 
     @jakarta.inject.Inject
     public void injectNoOverride(Bean bean) {
-    
+
     }
 }
 
@@ -79,16 +105,16 @@ class SubClass extends Middle {
 
     @Override
     void inject(Bean bean) {
-    
+
     }
-    
+
     @Override
     public void injectPublic(Bean bean) {
-    
+
     }
-    
+
     public void injectNoOverride(Bean bean) {
-    
+
     }
 }
 

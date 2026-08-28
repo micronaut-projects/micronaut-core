@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.core.annotation;
+import org.jspecify.annotations.Nullable;
 
 /**
  * An interface for types capable of resolving {@link AnnotationMetadata}.
@@ -35,7 +36,7 @@ public interface AnnotationMetadataResolver {
      * @param type The type
      * @return The {@link AnnotationMetadata}
      */
-    default @NonNull AnnotationMetadata resolveMetadata(@Nullable Class<?> type) {
+    default AnnotationMetadata resolveMetadata(@Nullable Class<?> type) {
         return AnnotationMetadata.EMPTY_METADATA;
     }
 
@@ -45,7 +46,7 @@ public interface AnnotationMetadataResolver {
      * @param object The object
      * @return The {@link AnnotationMetadata}
      */
-    default @NonNull AnnotationMetadata resolveMetadata(Object object) {
+    default AnnotationMetadata resolveMetadata(Object object) {
         return resolveMetadata(object != null ? object.getClass() : null);
     }
 }

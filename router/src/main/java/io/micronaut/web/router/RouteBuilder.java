@@ -17,8 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.core.annotation.Indexed;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.MethodConvention;
 import io.micronaut.core.naming.conventions.PropertyConvention;
@@ -704,6 +703,124 @@ public interface RouteBuilder {
     UriRoute PATCH(String uri, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
+     * Route the specified URI to the specified target for an HTTP QUERY. Since the method to execute is not
+     * specified "query" is used by default.
+     *
+     * @param uri    The URI
+     * @param target The target object
+     * @return The route
+     * @since 5.2.0
+     */
+    default UriRoute QUERY(String uri, Object target) {
+        return QUERY(uri, target, MethodConvention.QUERY.methodName());
+    }
+
+    /**
+     * <p>Route to the specified object. The URI route is built by the configured {@link UriNamingStrategy}.</p>
+     *
+     * @param target The object
+     * @return The route
+     * @since 5.2.0
+     */
+    default UriRoute QUERY(Object target) {
+        Class<?> type = target.getClass();
+        return QUERY(getUriNamingStrategy().resolveUri(type), target);
+    }
+
+    /**
+     * <p>Route to the specified object and ID. The URI route is built by the configured {@link UriNamingStrategy}.</p>
+     *
+     * @param target The object
+     * @param id     The route id
+     * @return The route
+     * @since 5.2.0
+     */
+    default UriRoute QUERY(Object target, PropertyConvention id) {
+        Class<?> type = target.getClass();
+        return QUERY(getUriNamingStrategy().resolveUri(type, id), target, MethodConvention.QUERY.methodName());
+    }
+
+    /**
+     * <p>Route to the specified class. The URI route is built by the configured {@link UriNamingStrategy}.</p>
+     *
+     * @param type The class
+     * @return The route
+     * @since 5.2.0
+     */
+    default UriRoute QUERY(Class<?> type) {
+        return QUERY(getUriNamingStrategy().resolveUri(type), type, MethodConvention.QUERY.methodName());
+    }
+
+    /**
+     * <p>Route to the specified class and ID. The URI route is built by the configured {@link UriNamingStrategy}.</p>
+     *
+     * @param type The class
+     * @param id   The route id
+     * @return The route
+     * @since 5.2.0
+     */
+    default UriRoute QUERY(Class<?> type, PropertyConvention id) {
+        return QUERY(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.QUERY.methodName());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri    The URI
+     * @param method The method
+     * @return The route
+     * @since 5.2.0
+     */
+    default UriRoute QUERY(String uri, ExecutableMethod<?, ?> method) {
+        return QUERY(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param beanDefinition The bean definition
+     * @param uri            The URI
+     * @param method         The method
+     * @return The route
+     * @since 5.2.0
+     */
+    default UriRoute QUERY(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        return QUERY(uri, beanDefinition.getBeanType(), method.getMethodName(), method.getArgumentTypes());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri            The URI
+     * @param target         The target
+     * @param method         The method
+     * @param parameterTypes The parameter types for the target method
+     * @return The route
+     * @since 5.2.0
+     */
+    UriRoute QUERY(String uri, Object target, String method, Class<?>... parameterTypes);
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     *
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param uri            The URI
+     * @param type           The type
+     * @param method         The method
+     * @param parameterTypes The parameter types for the target method
+     * @return The route
+     * @since 5.2.0
+     */
+    UriRoute QUERY(String uri, Class<?> type, String method, Class<?>... parameterTypes);
+
+    /**
      * Route the specified URI to the specified target for an HTTP DELETE. Since the method to execute is not
      * specified "index" is used by default.
      *
@@ -1173,8 +1290,7 @@ public interface RouteBuilder {
          * @param beanDefinition The type
          * @return The URI to use
          */
-        default @NonNull
-        String resolveUri(BeanDefinition<?> beanDefinition) {
+        default String resolveUri(BeanDefinition<?> beanDefinition) {
             String uri = beanDefinition.stringValue(UriMapping.class).orElseGet(() ->
                     beanDefinition.stringValue(Controller.class).orElse(UriMapping.DEFAULT_URI)
             );
@@ -1197,8 +1313,7 @@ public interface RouteBuilder {
          * @param property The property
          * @return The URI to use
          */
-        default @NonNull
-        String resolveUri(String property) {
+        default String resolveUri(String property) {
             if (StringUtils.isEmpty(property)) {
                 return "/";
             }
@@ -1215,7 +1330,7 @@ public interface RouteBuilder {
          * @param id   the route id
          * @return The URI to use
          */
-        default @NonNull String resolveUri(Class<?> type, PropertyConvention id) {
+        default String resolveUri(Class<?> type, PropertyConvention id) {
             return resolveUri(type) + "/{" + id.lowerCaseName() + "}";
         }
 
@@ -1223,21 +1338,19 @@ public interface RouteBuilder {
          * Normalizes a URI.
          * <p>
          * Ensures the string:
-         * 1) Does not end with a /
+         * 1) Does not end with a / (except for the root path "/", which is preserved as-is)
          * 2) Starts with a /
          *
          * @param uri The URI
          * @return The normalized URI or null
          */
-        default String normalizeUri(@Nullable String uri) {
+         default @Nullable String normalizeUri(@Nullable String uri) {
             if (uri != null) {
                 int len = uri.length();
                 if (len > 0 && uri.charAt(0) != '/') {
                     uri = '/' + uri;
                 }
-                if (len > 1 && uri.charAt(uri.length() - 1) == '/') {
-                    uri = uri.substring(0, uri.length() - 1);
-                }
+                uri = StringUtils.trimTrailingSlashExceptRoot(uri);
                 if (len > 0) {
                     return uri;
                 }

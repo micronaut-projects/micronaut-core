@@ -16,7 +16,6 @@
 package io.micronaut.inject.foreach
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
@@ -26,7 +25,7 @@ class EachPropertyNullableSpec extends Specification {
 
     void 'test nullable dependencies with EachProperties'() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext(Environment.TEST)
+        ApplicationContext applicationContext = ApplicationContext.builder(Environment.TEST).build()
         applicationContext.environment.addPropertySource(MapPropertySource.of(
             Environment.TEST,
             [

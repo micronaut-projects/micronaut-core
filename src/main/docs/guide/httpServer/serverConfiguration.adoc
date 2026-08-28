@@ -1,5 +1,7 @@
 The HTTP server features a number of configuration options. They are defined in the api:http.server.netty.configuration.NettyHttpServerConfiguration[] configuration class, which extends api:http.server.HttpServerConfiguration[].
 
+Netty beans are enabled by default. Set `netty.enabled=false` to disable all Netty integration, or `micronaut.server.netty.enabled=false` to disable only the Netty server. These properties back api:http.netty.RequiresNetty[] and api:http.server.netty.RequiresNettyServer[].
+
 The following example shows how to tweak configuration options for the server via your configuration file (e.g `application.yml`):
 
 .Configuring HTTP server settings
@@ -17,7 +19,7 @@ micronaut:
         autoRead: true
 ----
 - By default, Micronaut framework binds to all network interfaces. Use `localhost` to bind only to loopback network interface
-- `maxHeaderSize` sets the maximum size for headers
+- `maxHeaderSize` sets the maximum header size
 - `worker.threads` specifies the number of Netty worker threads
 - `autoRead` enables request body auto read
 

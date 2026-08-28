@@ -1,7 +1,7 @@
 package io.micronaut.test.lombok;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.annotation.JsonDeserialize;
 import io.micronaut.core.annotation.Introspected;
 
 @Introspected

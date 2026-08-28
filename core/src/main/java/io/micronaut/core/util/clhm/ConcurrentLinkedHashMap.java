@@ -16,6 +16,8 @@
 
 package io.micronaut.core.util.clhm;
 
+import org.jspecify.annotations.NullUnmarked;
+
 import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
@@ -98,6 +100,7 @@ import static io.micronaut.core.util.clhm.ConcurrentLinkedHashMap.DrainStatus.RE
  * @see <a href="https://code.google.com/p/concurrentlinkedhashmap/">
  *      https://code.google.com/p/concurrentlinkedhashmap/</a>
  */
+@NullUnmarked
 // @ThreadSafe
 public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         implements ConcurrentMap<K, V>, Serializable {

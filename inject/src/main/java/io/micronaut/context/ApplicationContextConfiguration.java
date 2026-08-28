@@ -15,11 +15,16 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.context.env.ConfigImportPropertySourcesLocator;
+import io.micronaut.context.env.EnvironmentNamesDeducer;
+import io.micronaut.context.env.EnvironmentPackagesDeducer;
+import io.micronaut.context.env.PropertySourcesLocator;
 import io.micronaut.core.convert.MutableConversionService;
+import io.micronaut.core.io.ResourceLoadStrategy;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import org.jspecify.annotations.Nullable;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -45,7 +50,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     /**
      * @return The environment names
      */
-    @NonNull List<String> getEnvironments();
+    List<String> getEnvironments();
 
     /**
      * If set to {@code true} (the default is {@code true}) Micronaut will attempt to automatically deduce the environment
@@ -60,6 +65,16 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      */
     default Optional<Boolean> getDeduceEnvironments() {
         return Optional.empty();
+    }
+
+    /**
+     * If set to {@code true} (the default is {@code true}) Micronaut will attempt to automatically deduce the user package.
+     * Alternative is to use {@link io.micronaut.context.env.Environment#addPackage(String)}
+     * @return True if the package should be deduced
+     * @since 5.0
+     */
+    default boolean isDeducePackage() {
+        return true;
     }
 
     /**
@@ -129,7 +144,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      *
      * @return The classpath resource loader
      */
-    default @NonNull ClassPathResourceLoader getResourceLoader() {
+    default ClassPathResourceLoader getResourceLoader() {
         return ClassPathResourceLoader.defaultLoader(getClassLoader());
     }
 
@@ -157,4 +172,62 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     default Boolean isBootstrapEnvironmentEnabled() {
         return null;
     }
+
+    /**
+     * @return The environment names deducer
+     * @since 5.0
+     */
+    @Nullable
+    default EnvironmentNamesDeducer getEnvironmentNamesDeducer() {
+        return null;
+    }
+
+    /**
+     * @return The package deducer
+     * @since 5.0
+     */
+    @Nullable
+    default EnvironmentPackagesDeducer getPackageDeducer() {
+        return null;
+    }
+
+    /**
+     * @return The application name
+     * @since 5.0
+     */
+    default String getApplicationName() {
+        return "application";
+    }
+
+    /**
+     * @return The extra property sources locators
+     * @since 5.0
+     */
+    default Collection<PropertySourcesLocator> getPropertySourcesLocators() {
+        if (isConfigImportEnabled()) {
+            return List.of(new ConfigImportPropertySourcesLocator());
+        }
+        return List.of();
+    }
+
+    /**
+     * Defines how configuration resources are loaded when duplicates exist on the classpath.
+     *
+     * @return The configuration loading strategy
+     * @since 5.0.0
+     */
+    default ResourceLoadStrategy getConfigurationLoadingStrategy() {
+        return ResourceLoadStrategy.defaultStrategy();
+    }
+
+    /**
+     * Whether is the config import 'micronaut.config.import' processing enabled. Enabled by default.
+     *
+     * @return Returns {@code true} if the config import is enabled.
+     * @since 5.0
+     */
+    default boolean isConfigImportEnabled() {
+        return true;
+    }
+
 }

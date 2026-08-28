@@ -16,8 +16,6 @@
 package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
@@ -35,6 +33,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
+import org.jspecify.annotations.Nullable;
 
 import java.util.function.Supplier;
 
@@ -71,8 +70,12 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
         this.forceDelaySubscribe = forceDelaySubscribe;
     }
 
+    boolean isCompatible(EventLoop eventLoop) {
+        return sharedBuffer.eventLoop == eventLoop;
+    }
+
     @Override
-    public BufferConsumer.Upstream primary(BufferConsumer primary) {
+    public BufferConsumer.Upstream primary(@Nullable BufferConsumer primary) {
         touch();
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
@@ -91,7 +94,7 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
     }
 
     @Override
-    public @NonNull CloseableByteBody split(@NonNull SplitBackpressureMode backpressureMode) {
+    public CloseableByteBody split(SplitBackpressureMode backpressureMode) {
         touch();
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
@@ -104,7 +107,7 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
     }
 
     @Override
-    public @NonNull ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
+    public ExecutionFlow<? extends CloseableAvailableByteBody> bufferFlow() {
         BufferConsumer.Upstream upstream = this.upstream;
         if (upstream == null) {
             failClaim();
@@ -241,7 +244,9 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
 
         @Override
         public void add(ReadBuffer rb) {
-            assert eventLoop.inEventLoop();
+            if (!eventLoop.inEventLoop()) {
+                throw new IllegalStateException("Must only be called on event loop");
+            }
             adding = true;
             try {
                 super.add(rb);

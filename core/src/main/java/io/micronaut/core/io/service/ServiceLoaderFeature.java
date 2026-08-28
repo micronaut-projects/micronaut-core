@@ -18,11 +18,10 @@ package io.micronaut.core.io.service;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.BuildTimeInit;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.beans.BeanInfo;
 import io.micronaut.core.graal.GraalReflectionConfigurer;
-import io.micronaut.core.io.service.ServiceScanner.StaticServiceDefinitions;
+import io.micronaut.core.io.service.ServiceScanner.ExclusiveStaticServiceDefinitions;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.util.ArrayUtils;
 import org.graalvm.nativeimage.ImageSingletons;
@@ -40,7 +39,9 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
@@ -54,12 +55,21 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 @SuppressWarnings("unused")
 class ServiceLoaderFeature implements Feature {
 
+    private final List<String> INTERNAL_SERVICE = List.of(
+        "io.micronaut.core.convert.TypeConverterRegistrar",
+        "io.micronaut.context.env.PropertySourceLoader",
+        "io.micronaut.core.beans.BeanIntrospectionReference",
+        "io.micronaut.inject.BeanDefinitionReference",
+        "io.micronaut.context.env.PropertyExpressionResolver",
+        "io.micronaut.context.ApplicationContextConfigurer"
+    );
+
     @Override
     @SuppressWarnings("java:S1119")
     public void beforeAnalysis(BeforeAnalysisAccess access) {
         configureForReflection(access);
 
-        StaticServiceDefinitions staticServiceDefinitions = buildStaticServiceDefinitions(access);
+        ExclusiveStaticServiceDefinitions staticServiceDefinitions = buildStaticServiceDefinitions(access);
         final Collection<Set<String>> allTypeNames = staticServiceDefinitions.serviceTypeMap().values();
         for (Set<String> typeNameSet : allTypeNames) {
             Iterator<String> i = typeNameSet.iterator();
@@ -150,8 +160,8 @@ class ServiceLoaderFeature implements Feature {
      * Add an image singleton.
      * @param staticServiceDefinitions The static definitions.
      */
-    protected void addImageSingleton(StaticServiceDefinitions staticServiceDefinitions) {
-        ImageSingletons.add(StaticServiceDefinitions.class, staticServiceDefinitions);
+    protected void addImageSingleton(ExclusiveStaticServiceDefinitions staticServiceDefinitions) {
+        ImageSingletons.add(ExclusiveStaticServiceDefinitions.class, staticServiceDefinitions);
     }
 
     /**
@@ -193,15 +203,28 @@ class ServiceLoaderFeature implements Feature {
      * @param access The access
      * @return The definitions
      */
-    @NonNull
-    protected StaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
+    protected ExclusiveStaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
         try {
-            return new StaticServiceDefinitions(
-                MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(getClass().getClassLoader())
+            Map<String, Set<String>> services = MicronautMetaServiceLoaderUtils.findAllMicronautMetaServices(getClass().getClassLoader());
+            for (String internalService : INTERNAL_SERVICE) {
+                Set<String> entries = services.computeIfAbsent(internalService, x -> new LinkedHashSet<>());
+                collectDynamicServices(entries, internalService);
+            }
+            return new ExclusiveStaticServiceDefinitions(
+                services
             );
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private void collectDynamicServices(Collection<String> values, String name) {
+        SoftServiceLoader.newCollector(
+            name,
+            line -> true,
+            getClass().getClassLoader(),
+            className -> className
+        ).collect(values, false);
     }
 
     private void configureForReflection(BeforeAnalysisAccess access) {
@@ -209,7 +232,7 @@ class ServiceLoaderFeature implements Feature {
 
         final GraalReflectionConfigurer.ReflectionConfigurationContext context = new GraalReflectionConfigurer.ReflectionConfigurationContext() {
             @Override
-            public Class<?> findClassByName(@NonNull String name) {
+            public Class<?> findClassByName(String name) {
                 return access.findClassByName(name);
             }
 
@@ -246,7 +269,6 @@ class ServiceLoaderFeature implements Feature {
         }
     }
 
-    @NonNull
     protected Collection<GraalReflectionConfigurer> loadReflectionConfigurers(BeforeAnalysisAccess access) {
         Collection<GraalReflectionConfigurer> configurers = new ArrayList<>();
         SoftServiceLoader.load(GraalReflectionConfigurer.class, access.getApplicationClassLoader())
@@ -254,5 +276,4 @@ class ServiceLoaderFeature implements Feature {
         return configurers;
     }
 }
-
 

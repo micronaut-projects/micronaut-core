@@ -27,6 +27,7 @@ import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
+import org.jspecify.annotations.NullUnmarked;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ import java.util.function.Function;
  * @author Denis Stepanov
  * @since 1.0
  */
+@NullUnmarked
 @Internal
 public class AnnotationMetadataWriter {
 

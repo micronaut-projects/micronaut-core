@@ -15,7 +15,8 @@
  */
 package io.micronaut.core.util;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -70,8 +71,9 @@ public final class StringUtils {
      * @param str The string
      * @return True if str is empty or null
      */
+    @Contract("null -> true")
     public static boolean isEmpty(@Nullable CharSequence str) {
-        return str == null || str.length() == 0;
+        return str == null || str.isEmpty();
     }
 
     /**
@@ -80,6 +82,7 @@ public final class StringUtils {
      * @param str The string
      * @return True if str is not null and not empty
      */
+    @Contract("null -> false")
     public static boolean isNotEmpty(@Nullable CharSequence str) {
         return !isEmpty(str);
     }
@@ -90,6 +93,7 @@ public final class StringUtils {
      * @param str The string
      * @return True if str contains any non whitespace characters
      */
+    @Contract("null -> false")
     public static boolean hasText(@Nullable CharSequence str) {
         if (isEmpty(str)) {
             return false;
@@ -245,6 +249,41 @@ public final class StringUtils {
     }
 
     /**
+     * Returns a new string without a single trailing character that matches the supplied character.
+     *
+     * @param str The string
+     * @param c   The character to remove
+     * @return The string without a trailing character matching the supplied character, or {@code null} when the input is {@code null}.
+     * @since 5.1.6
+     */
+    @Nullable
+    public static String trimTrailingCharacter(@Nullable String str, char c) {
+        if (isEmpty(str)) {
+            return str;
+        }
+        int length = str.length();
+        if (str.charAt(length - 1) == c) {
+            return str.substring(0, length - 1);
+        }
+        return str;
+    }
+
+    /**
+     * Returns a new string without a single trailing slash character, unless the string is a single slash.
+     *
+     * @param str The string
+     * @return The string without a trailing slash character, or {@code null} when the input is {@code null}.
+     * @since 5.1.6
+     */
+    @Nullable
+    public static String trimTrailingSlashExceptRoot(@Nullable String str) {
+        if (isEmpty(str)) {
+            return str;
+        }
+        return str.length() > 1 ? trimTrailingCharacter(str, '/') : str;
+    }
+
+    /**
      * Returns a new string without any leading characters that match the supplied predicate.
      *
      * @param str       The string
@@ -310,7 +349,7 @@ public final class StringUtils {
             String str, String delimiters, boolean trimTokens, boolean ignoreEmptyTokens) {
 
         if (str == null) {
-            return null;
+            return EMPTY_STRING_ARRAY;
         }
         StringTokenizer st = new StringTokenizer(str, delimiters);
         List<String> tokens = new ArrayList<>();

@@ -1,6 +1,5 @@
 package io.micronaut.http.hateoas
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.context.ApplicationContext
 import io.micronaut.json.JsonMapper
 import spock.lang.AutoCleanup
@@ -34,7 +33,7 @@ class LinkSpec extends Specification {
         String json = objectMapper.writeValueAsString(test)
 
         then:
-        json == '{"name":"Fred","_links":{"self":{"href":"/test/{name}","templated":true}}}'
+        json == '{"_links":{"self":{"href":"/test/{name}","templated":true}},"name":"Fred"}'
 
         when:
         def read = objectMapper.readValue(json, Test)

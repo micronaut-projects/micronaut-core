@@ -1,0 +1,1579 @@
+/*
+ * Copyright 2017-2025 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.python.processing.annotation;
+
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.aop.Around;
+import io.micronaut.aop.InterceptorBinding;
+import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.Introduction;
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Type;
+import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.AnnotationMapper;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.python.processing.util.GraalPyUtil;
+import io.micronaut.python.processing.visitor.AnnotationMemberDef;
+import io.micronaut.python.processing.visitor.ArgumentDef;
+import io.micronaut.python.processing.visitor.AttributeDef;
+import io.micronaut.python.processing.visitor.ClassDef;
+import io.micronaut.python.processing.visitor.DecoratorDef;
+import io.micronaut.python.processing.visitor.ElementDef;
+import io.micronaut.python.processing.visitor.FunctionDef;
+import io.micronaut.python.processing.visitor.PropertyDef;
+import io.micronaut.python.processing.visitor.PythonClassElement;
+import io.micronaut.python.processing.visitor.PythonVisitorContext;
+import io.micronaut.python.processing.visitor.ReturnDef;
+import io.micronaut.python.processing.visitor.ScriptDef;
+import io.micronaut.python.processing.visitor.TypeRef;
+import org.graalvm.polyglot.Value;
+import org.jetbrains.annotations.Nullable;
+
+import java.lang.annotation.Annotation;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Builder for creating annotation metadata from Python decorators and elements.
+ * This class extends Micronaut's annotation metadata builder to handle Python-specific
+ * annotation processing, converting Python decorators to Java annotation metadata.
+ *
+ * @author Micronaut Team
+ * @since 5.2.0
+ */
+@Experimental
+public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<ElementDef, DecoratorDef> {
+    private final Map<String, DecoratorDef> decorators;
+    private final PythonVisitorContext visitorContext;
+    private final Map<String, String> binaryClassNameCache = new HashMap<>();
+    private final Map<String, Optional<ElementDef>> annotationMirrorCache = new HashMap<>();
+    private final Map<String, AnnotationMemberDef> javaAnnotationMemberCache = new HashMap<>();
+
+    public PythonAnnotationMetadataBuilder(Map<String, DecoratorDef> decorators, PythonVisitorContext visitorContext) {
+        this.decorators = decorators;
+        this.visitorContext = visitorContext;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public List<AnnotationValue<?>> mapAnnotation(DecoratorDef decorator) {
+        String annotationName = toBinaryClassName(decorator.annotationName());
+        List<AnnotationMapper<Annotation>> mappers = (List) getAnnotationMappers(annotationName);
+        if (mappers == null || mappers.isEmpty()) {
+            return List.of();
+        }
+        AnnotationValue<Annotation> annotationValue = (AnnotationValue) toAnnotationValue(decorator);
+        List<AnnotationValue<?>> mappedAnnotations = new ArrayList<>();
+        for (AnnotationMapper<Annotation> mapper : mappers) {
+            List<AnnotationValue<?>> mapped = mapper.map(annotationValue, visitorContext);
+            if (mapped != null) {
+                mappedAnnotations.addAll(mapped);
+            }
+        }
+        return mappedAnnotations;
+    }
+
+    private AnnotationValue<?> toAnnotationValue(DecoratorDef decorator) {
+        String annotationName = resolveAnnotationName(decorator);
+        Map<? extends ElementDef, ?> elementValues = readAnnotationRawValues(decorator);
+        Map<CharSequence, Object> annotationValues = new LinkedHashMap<>();
+        for (Map.Entry<? extends ElementDef, ?> entry : elementValues.entrySet()) {
+            ElementDef member = entry.getKey();
+            if (member != null) {
+                readAnnotationRawValues(
+                    getTypeForAnnotation(decorator),
+                    annotationName,
+                    member,
+                    getAnnotationMemberName(member),
+                    entry.getValue(),
+                    annotationValues
+                );
+            }
+        }
+        return new AnnotationValue<>(annotationName, annotationValues);
+    }
+
+    private List<AnnotationValue<AliasFor>> getCrossAnnotationAliases(AnnotationMemberDef memberDef) {
+        List<AnnotationValue<AliasFor>> aliases = memberDef.getAnnotationMetadata().getAnnotationValuesByType(AliasFor.class);
+        if (!aliases.isEmpty()) {
+            return aliases.stream()
+                .map(alias -> normalizeAliasForAnnotationValue(alias, AliasFor.class))
+                .toList();
+        }
+        Optional<AnnotationValue<AliasFor>> alias = memberDef.getAnnotationMetadata().findAnnotation(AliasFor.class)
+            .map(value -> normalizeAliasForAnnotationValue(value, AliasFor.class));
+        return alias.map(List::of).orElseGet(List::of);
+    }
+
+    @Override
+    public AnnotationMetadata buildDeclared(ElementDef element) {
+        if (element instanceof AnnotationMetadataProvider provider) {
+            return provider.getAnnotationMetadata();
+        } else {
+            return super.buildDeclared(element);
+        }
+    }
+
+    @Override
+    protected ElementDef getTypeForAnnotation(DecoratorDef annotationMirror) {
+        String annotationName = resolveAnnotationName(annotationMirror);
+        DecoratorDef resolvedDecorator = findDecoratorDef(annotationName);
+        if (resolvedDecorator != null) {
+            return getAnnotationMirror(annotationName).orElseGet(() -> new ClassDef(
+                annotationName,
+                resolvedDecorator.stereotypes()
+            ));
+        }
+        return getAnnotationMirror(annotationName).orElseGet(() -> new ClassDef(
+            annotationName,
+            annotationMirror.stereotypes()
+        ));
+    }
+
+    @Override
+    protected String getAnnotationTypeName(DecoratorDef annotationMirror) {
+        return resolveAnnotationName(annotationMirror);
+    }
+
+    @Override
+    protected List<ElementDef> buildHierarchy(ElementDef element, boolean inheritTypeAnnotations, boolean declaredOnly) {
+        if (element instanceof ClassDef classDef) {
+            if (declaredOnly) {
+                return List.of(classDef);
+            }
+            List<ElementDef> hierarchy = new ArrayList<>();
+            populateClassHierarchy(classDef, hierarchy, new LinkedHashSet<>());
+            return hierarchy;
+        } else if (element instanceof FunctionDef functionDef) {
+            List<ElementDef> hierarchy;
+            if (inheritTypeAnnotations && functionDef.declaringClass() != null) {
+                hierarchy = buildHierarchy(
+                    functionDef.declaringClass(),
+                    false,
+                    declaredOnly
+                );
+            } else {
+                hierarchy = new ArrayList<>();
+            }
+            hierarchy.add(functionDef);
+            return hierarchy;
+        } else if (element instanceof PropertyDef propertyDef) {
+            // For properties, include the property itself and its read/write methods
+            List<ElementDef> hierarchy = new java.util.ArrayList<>();
+            hierarchy.add(propertyDef);
+            if (propertyDef.getter() != null) {
+                hierarchy.add(propertyDef.getter());
+            }
+            if (propertyDef.setter() != null) {
+                hierarchy.add(propertyDef.setter());
+            }
+            return hierarchy;
+        } else if (element instanceof AttributeDef attributeDef) {
+            return List.of(attributeDef);
+        } else if (element instanceof io.micronaut.python.processing.visitor.ArgumentDef argumentDef) {
+            return List.of(argumentDef);
+        } else if (element instanceof ReturnDef returnDef) {
+            return List.of(returnDef);
+        } else if (element instanceof ScriptDef scriptDef) {
+            return List.of(scriptDef);
+        }
+        return List.of();
+    }
+
+    private void populateClassHierarchy(ClassDef classDef, List<ElementDef> hierarchy, Set<String> visited) {
+        String className = toQualifiedPythonName(classDef);
+        if (!visited.add(className)) {
+            return;
+        }
+        hierarchy.add(classDef);
+        for (TypeRef base : classDef.bases()) {
+            resolvePythonBaseClass(classDef, base).ifPresent(baseClass -> populateClassHierarchy(baseClass, hierarchy, visited));
+        }
+    }
+
+    private Optional<ClassDef> resolvePythonBaseClass(ClassDef declaringClass, TypeRef base) {
+        // Use raw parsed Python classes here. Resolving ClassElement instances while class
+        // metadata is being built can recursively initialize the same metadata cache.
+        Map<String, ClassDef> classes = visitorContext.getProcessingEnvironment().environment().classes();
+        ClassDef baseClass = classes.get(base.name());
+        if (baseClass == null && base.name().indexOf('.') < 0) {
+            String packageName = declaringClass.packageName();
+            if (!packageName.isEmpty()) {
+                baseClass = classes.get(packageName + '.' + base.name());
+            }
+            if (baseClass == null) {
+                baseClass = classes.get(PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.' + base.name());
+            }
+        }
+        return Optional.ofNullable(baseClass);
+    }
+
+    private static String toQualifiedPythonName(ClassDef classDef) {
+        String packageName = classDef.packageName();
+        if (packageName == null || packageName.isEmpty()) {
+            packageName = PythonClassElement.PYTHON_DEFAULT_PACKAGE;
+        }
+        return packageName + '.' + classDef.name();
+    }
+
+    @Override
+    protected List<? extends DecoratorDef> getAnnotationsForType(ElementDef element) {
+        if (element instanceof AnnotationMemberDef memberDef) {
+            List<DecoratorDef> memberAnnotations = toDecoratorDefs(memberDef.getAnnotationMetadata());
+            if (!memberAnnotations.isEmpty()) {
+                return memberAnnotations;
+            }
+        }
+        List<DecoratorDef> decoratorList = element.decorators();
+        if (decoratorList.isEmpty()) {
+            DecoratorDef decoratorDef = this.decorators.get(element.name());
+            if (decoratorDef != null) {
+                return expandAliasedDecorators(decoratorDef.stereotypes());
+            }
+        }
+        return expandAliasedDecorators(decoratorList);
+    }
+
+    private List<DecoratorDef> expandAliasedDecorators(List<DecoratorDef> decoratorList) {
+        if (decoratorList.isEmpty()) {
+            return decoratorList;
+        }
+        List<DecoratorDef> expanded = null;
+        for (DecoratorDef decorator : decoratorList) {
+            List<DecoratorDef> aliasedDecorators = buildAliasedDecorators(decorator);
+            if (!aliasedDecorators.isEmpty() && expanded == null) {
+                expanded = new ArrayList<>(decoratorList);
+            }
+            if (expanded != null) {
+                expanded.addAll(aliasedDecorators);
+            }
+        }
+        return expanded == null ? decoratorList : expanded;
+    }
+
+    private List<DecoratorDef> buildAliasedDecorators(DecoratorDef decorator) {
+        Map<?, ?> members = decorator.members();
+        if (members.isEmpty()) {
+            return List.of();
+        }
+        String annotationName = toBinaryClassName(decorator.annotationName());
+        ClassElement javaAnnotationType = getJavaAnnotationType(decorator);
+        Map<String, Map<String, Object>> aliasValues = new LinkedHashMap<>();
+        Set<String> expandedTargets = new LinkedHashSet<>();
+        for (Map.Entry<?, ?> entry : members.entrySet()) {
+            String memberName = normalizeAnnotationMemberName(entry.getKey());
+            AnnotationMemberDef memberDef = resolveMemberDef(annotationName, javaAnnotationType, memberName);
+            List<AnnotationValue<AliasFor>> crossAnnotationAliases = getCrossAnnotationAliases(memberDef).stream()
+                .filter(alias -> alias.stringValue("annotation")
+                    .or(() -> alias.stringValue("annotationName"))
+                    .filter(targetAnnotation -> !targetAnnotation.equals(annotationName))
+                    .isPresent())
+                .toList();
+            boolean multiTargetMember = crossAnnotationAliases.size() > 1;
+            for (AnnotationValue<AliasFor> alias : crossAnnotationAliases) {
+                Optional<String> targetAnnotation = alias.stringValue("annotation")
+                    .or(() -> alias.stringValue("annotationName"));
+                Optional<String> targetMember = alias.stringValue("member");
+                if (targetAnnotation.isEmpty() || targetMember.isEmpty()) {
+                    continue;
+                }
+                String targetAnnotationName = targetAnnotation.get();
+                String targetMemberName = targetMember.get();
+                if (targetAnnotationName.equals(annotationName) || targetMemberName.isBlank()) {
+                    continue;
+                }
+                if (multiTargetMember) {
+                    expandedTargets.add(targetAnnotationName);
+                }
+                aliasValues
+                    .computeIfAbsent(targetAnnotationName, ignored -> new LinkedHashMap<>())
+                    .putIfAbsent(targetMemberName, entry.getValue());
+            }
+        }
+        if (expandedTargets.isEmpty()) {
+            return List.of();
+        }
+        List<DecoratorDef> aliasedDecorators = new ArrayList<>(expandedTargets.size());
+        for (String targetAnnotation : expandedTargets) {
+            Map<String, Object> targetValues = aliasValues.get(targetAnnotation);
+            if (targetValues == null || targetValues.isEmpty()) {
+                continue;
+            }
+            // Keep cross-annotation aliases in metadata, not on generated stubs. This mirrors
+            // Java's APT view for Python decorators. Only members with multiple annotation
+            // targets activate synthesis, then other explicit aliases for that same target
+            // are folded in so partial stereotypes do not drop values such as prefix.
+            aliasedDecorators.add(new DecoratorDef(
+                targetAnnotation,
+                targetAnnotation,
+                null,
+                (Map) targetValues,
+                List.of()
+            ));
+        }
+        return aliasedDecorators;
+    }
+
+    @Override
+    protected boolean hasAnnotation(ElementDef element, String annotation) {
+        if (element instanceof AnnotationMemberDef memberDef && memberDef.getAnnotationMetadata().hasAnnotation(annotation)) {
+            return true;
+        }
+        String annotationName = toBinaryClassName(annotation);
+        List<DecoratorDef> decorators = element.decorators();
+        for (DecoratorDef decorator : decorators) {
+            if (toBinaryClassName(decorator.annotationName()).equals(annotationName)) {
+                return true;
+            }
+        }
+        if (AnnotationUtil.NULLABLE.equals(annotation) && hasSyntheticNullable(element)) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    protected boolean hasAnnotation(ElementDef element, Class<? extends Annotation> annotation) {
+        if (element instanceof AnnotationMemberDef memberDef && memberDef.getAnnotationMetadata().hasAnnotation(annotation)) {
+            return true;
+        }
+        String annotationName = annotation.getName();
+        List<DecoratorDef> decorators = element.decorators();
+        for (DecoratorDef decorator : decorators) {
+            if (toBinaryClassName(decorator.annotationName()).equals(annotationName)) {
+                return true;
+            }
+        }
+        if (AnnotationUtil.NULLABLE.equals(annotation.getName()) && hasSyntheticNullable(element)) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    protected boolean hasAnnotations(ElementDef element) {
+        if (element instanceof AnnotationMemberDef memberDef && !memberDef.getAnnotationMetadata().isEmpty()) {
+            return true;
+        }
+        return !element.decorators().isEmpty() || hasSyntheticNullable(element);
+    }
+
+    @Override
+    protected void postProcess(MutableAnnotationMetadata annotationMetadata, ElementDef element) {
+        if (hasSyntheticNullable(element) && !annotationMetadata.hasDeclaredStereotype(AnnotationUtil.NON_NULL)) {
+            annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, Map.of());
+        }
+        if ((element instanceof AttributeDef || element instanceof PropertyDef)
+            && !annotationMetadata.hasDeclaredStereotype(AnnotationUtil.INJECT)
+            && (annotationMetadata.hasDeclaredAnnotation(Property.class)
+                || annotationMetadata.hasDeclaredStereotype(Property.class)
+                || annotationMetadata.hasDeclaredAnnotation(io.micronaut.context.annotation.Value.class)
+                || annotationMetadata.hasDeclaredStereotype(io.micronaut.context.annotation.Value.class))) {
+            annotationMetadata.addDeclaredAnnotation(AnnotationUtil.INJECT, Map.of());
+        }
+        addInterceptorBindings(annotationMetadata, element);
+    }
+
+    private void addInterceptorBindings(MutableAnnotationMetadata annotationMetadata, ElementDef element) {
+        Map<String, BindingDefinition> bindingAnnotationNames = new LinkedHashMap<>();
+        for (DecoratorDef decorator : element.decorators()) {
+            collectBindingAnnotationNames(decorator, bindingAnnotationNames);
+        }
+        if (bindingAnnotationNames.isEmpty()) {
+            return;
+        }
+        List<AnnotationValue<InterceptorBinding>> existingBindings = annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class);
+        List<AnnotationValue<InterceptorBinding>> updatedBindings = new ArrayList<>(existingBindings.size() + bindingAnnotationNames.size());
+        Set<BindingKey> existingBindingsKeys = new LinkedHashSet<>();
+        boolean changed = false;
+        for (AnnotationValue<InterceptorBinding> binding : annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class)) {
+            String bindingAnnotationName = binding.stringValue().orElse(null);
+            InterceptorKind kind = binding.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND);
+            if (bindingAnnotationName != null) {
+                existingBindingsKeys.add(new BindingKey(bindingAnnotationName, kind));
+                BindingDefinition bindingDefinition = bindingAnnotationNames.get(bindingAnnotationName);
+                if (bindingDefinition != null && bindingDefinition.kind() == kind && bindingDefinition.interceptorType() != null && !hasInterceptorType(binding, bindingDefinition.interceptorType())) {
+                    updatedBindings.add(buildInterceptorBinding(bindingAnnotationName, bindingDefinition));
+                    changed = true;
+                    continue;
+                }
+            }
+            updatedBindings.add(binding);
+        }
+        for (Map.Entry<String, BindingDefinition> entry : bindingAnnotationNames.entrySet()) {
+            String bindingAnnotationName = entry.getKey();
+            BindingDefinition bindingDefinition = entry.getValue();
+            if (existingBindingsKeys.add(new BindingKey(bindingAnnotationName, bindingDefinition.kind()))) {
+                updatedBindings.add(buildInterceptorBinding(bindingAnnotationName, bindingDefinition));
+                changed = true;
+            }
+        }
+        if (changed) {
+            annotationMetadata.removeAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
+            annotationMetadata.removeAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+            for (AnnotationValue<InterceptorBinding> binding : updatedBindings) {
+                annotationMetadata.addDeclaredRepeatable(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS, binding);
+            }
+        }
+    }
+
+    private boolean hasInterceptorType(AnnotationValue<InterceptorBinding> binding, AnnotationClassValue<?> interceptorType) {
+        return binding.annotationClassValue("interceptorType")
+            .map(existingType -> existingType.getName().equals(interceptorType.getName()))
+            .orElse(false);
+    }
+
+    private AnnotationValue<InterceptorBinding> buildInterceptorBinding(
+        String bindingAnnotationName,
+        BindingDefinition bindingDefinition
+    ) {
+        AnnotationValueBuilder<InterceptorBinding> binding = AnnotationValue.builder(InterceptorBinding.class)
+            .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(bindingAnnotationName))
+            .member("kind", bindingDefinition.kind());
+        AnnotationClassValue<?> interceptorType = bindingDefinition.interceptorType();
+        if (interceptorType != null) {
+            binding.member("interceptorType", interceptorType);
+        }
+        return binding.build();
+    }
+
+    private void collectBindingAnnotationNames(DecoratorDef decorator, Map<String, BindingDefinition> bindingAnnotationNames) {
+        DecoratorDef resolvedDecorator = resolveDecoratorDefinition(decorator);
+        if (hasDirectAroundStereotype(resolvedDecorator)) {
+            bindingAnnotationNames.putIfAbsent(
+                toBinaryClassName(decorator.annotationName()),
+                new BindingDefinition(InterceptorKind.AROUND, interceptorType(resolvedDecorator))
+            );
+        }
+        if (hasDirectIntroductionStereotype(resolvedDecorator)) {
+            bindingAnnotationNames.putIfAbsent(
+                toBinaryClassName(decorator.annotationName()),
+                new BindingDefinition(InterceptorKind.INTRODUCTION, null)
+            );
+        }
+        for (DecoratorDef stereotype : resolvedDecorator.stereotypes()) {
+            collectBindingAnnotationNames(stereotype, bindingAnnotationNames);
+        }
+    }
+
+    private @Nullable AnnotationClassValue<?> interceptorType(DecoratorDef decorator) {
+        for (DecoratorDef stereotype : decorator.stereotypes()) {
+            if (Type.class.getName().equals(toBinaryClassName(stereotype.annotationName()))) {
+                AnnotationClassValue<?>[] values = annotationClassValues(stereotype.members().get(AnnotationMetadata.VALUE_MEMBER));
+                if (values.length > 0) {
+                    return values[0];
+                }
+            }
+        }
+        ClassElement javaAnnotationType = getJavaAnnotationType(decorator);
+        if (javaAnnotationType != null) {
+            AnnotationValue<Type> type = javaAnnotationType.getAnnotation(Type.class);
+            if (type != null) {
+                AnnotationClassValue<?>[] values = type.annotationClassValues(AnnotationMetadata.VALUE_MEMBER);
+                if (values.length > 0) {
+                    return values[0];
+                }
+            }
+        }
+        return null;
+    }
+
+    private DecoratorDef resolveDecoratorDefinition(DecoratorDef decorator) {
+        String annotationName = toBinaryClassName(decorator.annotationName());
+        DecoratorDef resolved = findDecoratorDef(annotationName);
+        if (resolved != null) {
+            return resolved;
+        }
+        Optional<ElementDef> annotationMirror = getAnnotationMirror(annotationName);
+        if (annotationMirror.isPresent()) {
+            return new DecoratorDef(
+                annotationName,
+                annotationName,
+                null,
+                Map.of(),
+                annotationMirror.get().decorators()
+            );
+        }
+        return decorator;
+    }
+
+    private boolean hasDirectAroundStereotype(DecoratorDef decorator) {
+        for (DecoratorDef stereotype : decorator.stereotypes()) {
+            if (Around.class.getName().equals(toBinaryClassName(stereotype.annotationName()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasDirectIntroductionStereotype(DecoratorDef decorator) {
+        for (DecoratorDef stereotype : decorator.stereotypes()) {
+            if (Introduction.class.getName().equals(toBinaryClassName(stereotype.annotationName()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasSyntheticNullable(ElementDef element) {
+        TypeRef typeRef = switch (element) {
+            case ArgumentDef argumentDef -> argumentDef.typeAnnotation();
+            case AttributeDef attributeDef -> attributeDef.typeName();
+            case ReturnDef returnDef -> returnDef.typeAnnotation();
+            default -> null;
+        };
+        return isNullableUnion(typeRef);
+    }
+
+    private static boolean isNullableUnion(@Nullable TypeRef typeRef) {
+        return typeRef != null && isNullableUnion(typeRef.name());
+    }
+
+    private static boolean isNullableUnion(@Nullable String typeName) {
+        if (typeName == null || typeName.indexOf('|') == -1) {
+            return false;
+        }
+        List<String> unionTypes = parseUnionTypes(typeName);
+        return unionTypes.size() > 1 && unionTypes.stream().anyMatch("None"::equals);
+    }
+
+    private static List<String> parseUnionTypes(String typeName) {
+        List<String> types = new ArrayList<>();
+        int start = 0;
+        int bracketCount = 0;
+        for (int i = 0; i < typeName.length(); i++) {
+            char c = typeName.charAt(i);
+            if (c == '[') {
+                bracketCount++;
+            } else if (c == ']') {
+                bracketCount--;
+            } else if (c == '|' && bracketCount == 0) {
+                String type = typeName.substring(start, i).trim();
+                if (!type.isEmpty()) {
+                    types.add(type);
+                }
+                start = i + 1;
+            }
+        }
+        String lastType = typeName.substring(start).trim();
+        if (!lastType.isEmpty()) {
+            types.add(lastType);
+        }
+        return types;
+    }
+
+    @Override
+    protected Object readAnnotationValue(
+        ElementDef originatingElement,
+        ElementDef member,
+        String annotationName,
+        String memberName,
+        Object annotationValue) {
+        Object resolvedValue;
+        if (annotationValue instanceof Value value) {
+            if (member instanceof AnnotationMemberDef memberDef && memberDef.memberType() != null) {
+                if (isEnumArrayMember(memberDef.memberType()) || isClassArrayMember(memberDef.memberType())) {
+                    return normalizeAnnotationValue(
+                        originatingElement,
+                        annotationName,
+                        memberName,
+                        memberDef,
+                        value
+                    );
+                }
+                return normalizeAnnotationValue(
+                    originatingElement,
+                    annotationName,
+                    memberName,
+                    memberDef,
+                    GraalPyUtil.convertValueToJava(value, memberDef.memberType(), visitorContext)
+                );
+            } else {
+                return resolveEvaluatedExpressionReferences(
+                    originatingElement,
+                    annotationName,
+                    memberName,
+                    GraalPyUtil.convertValueToJava(value, visitorContext)
+                );
+            }
+        }
+        if (member instanceof AnnotationMemberDef memberDef) {
+            resolvedValue = normalizeAnnotationValue(originatingElement, annotationName, memberName, memberDef, annotationValue);
+        } else {
+            resolvedValue = annotationValue;
+        }
+        return resolveEvaluatedExpressionReferences(originatingElement, annotationName, memberName, resolvedValue);
+    }
+
+    private Object normalizeAnnotationValue(
+        ElementDef originatingElement,
+        String annotationName,
+        String memberName,
+        AnnotationMemberDef memberDef,
+        Object annotationValue
+    ) {
+        ClassElement memberType = memberDef.memberType();
+        if (annotationValue instanceof String stringValue && isEnumMember(memberType)) {
+            int lastDot = stringValue.lastIndexOf('.');
+            if (lastDot > -1) {
+                annotationValue = stringValue.substring(lastDot + 1);
+            }
+        } else if (isEnumArrayMember(memberType)) {
+            annotationValue = enumValues(annotationValue);
+        } else if (isClassArrayMember(memberType)) {
+            annotationValue = annotationClassValues(annotationValue);
+        } else if (isAnnotationArrayMember(memberType)) {
+            annotationValue = annotationValues(memberType.fromArray(), annotationValue);
+        } else if (isArrayMember(memberType)) {
+            annotationValue = arrayValues(memberType.fromArray(), annotationValue);
+        } else if (isClassMember(memberType)) {
+            annotationValue = annotationClassValue(annotationValue);
+        }
+        return resolveEvaluatedExpressionReferences(originatingElement, annotationName, memberName, annotationValue);
+    }
+
+    private boolean isArrayMember(@Nullable ClassElement memberType) {
+        return memberType != null && memberType.isArray();
+    }
+
+    private boolean isClassMember(@Nullable ClassElement memberType) {
+        return memberType != null && !memberType.isArray() && Class.class.getName().equals(memberType.getName());
+    }
+
+    private boolean isClassArrayMember(@Nullable ClassElement memberType) {
+        return memberType != null && memberType.isArray() && isClassMember(memberType.fromArray());
+    }
+
+    private boolean isAnnotationArrayMember(@Nullable ClassElement memberType) {
+        return memberType != null && memberType.isArray() && isAnnotationMember(memberType.fromArray());
+    }
+
+    private boolean isAnnotationMember(@Nullable ClassElement memberType) {
+        return memberType != null && memberType.isAssignable(Annotation.class);
+    }
+
+    private @Nullable AnnotationClassValue<?> annotationClassValue(@Nullable Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof AnnotationClassValue<?> annotationClassValue) {
+            return annotationClassValue;
+        }
+        if (value instanceof Class<?> classValue) {
+            return new AnnotationClassValue<>(ReflectionUtils.getWrapperType(classValue));
+        }
+        if (value instanceof ClassElement classElement) {
+            return new AnnotationClassValue<>(classElement.getRawClassElement().getName());
+        }
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return null;
+            }
+            if (polyglotValue.isHostObject()) {
+                return annotationClassValue(polyglotValue.asHostObject());
+            }
+            if (polyglotValue.isString()) {
+                return annotationClassValue(polyglotValue.asString());
+            }
+            return annotationClassValue(GraalPyUtil.convertValueToJava(polyglotValue, visitorContext));
+        }
+        String typeName = rawTypeName(value.toString());
+        String pythonClassName = pythonClassName(typeName);
+        if (pythonClassName != null) {
+            return new AnnotationClassValue<>(pythonClassName);
+        }
+        String decoratorAnnotationName = decoratorAnnotationName(typeName);
+        if (decoratorAnnotationName != null) {
+            return new AnnotationClassValue<>(decoratorAnnotationName);
+        }
+        return new AnnotationClassValue<>(annotationClassName(typeName));
+    }
+
+    private @Nullable String pythonClassName(String typeName) {
+        Map<String, ClassDef> classes = visitorContext.getProcessingEnvironment().environment().classes();
+        ClassDef classDef = classes.get(typeName);
+        String defaultPackage = PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
+        if (classDef == null && typeName.startsWith(defaultPackage)) {
+            classDef = classes.get(typeName.substring(defaultPackage.length()));
+        }
+        if (classDef == null) {
+            classDef = classes.get(defaultPackage + typeName);
+        }
+        return classDef == null ? null : toQualifiedPythonName(classDef);
+    }
+
+    private String annotationClassName(String typeName) {
+        String builtinTypeName = builtinAnnotationClassName(typeName);
+        if (builtinTypeName != null) {
+            return builtinTypeName;
+        }
+        if (typeName.indexOf('.') > -1) {
+            JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
+            if (javaVisitorContext != null) {
+                ClassElement classElement = javaVisitorContext.getClassElement(typeName).orElse(null);
+                if (classElement != null) {
+                    return classElement.getName();
+                }
+            }
+        }
+        return typeName;
+    }
+
+    private static @Nullable String builtinAnnotationClassName(String typeName) {
+        return switch (typeName) {
+            case "object", "typing.Any", "Any" -> Object.class.getName();
+            case "int" -> Integer.class.getName();
+            case "float" -> Double.class.getName();
+            case "bool" -> Boolean.class.getName();
+            case "str" -> String.class.getName();
+            default -> null;
+        };
+    }
+
+    private @Nullable String decoratorAnnotationName(String typeName) {
+        Map<String, DecoratorDef> decorators = visitorContext.getProcessingEnvironment().environment().decorators();
+        DecoratorDef decoratorDef = decorators.get(typeName);
+        String defaultPackage = PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
+        if (decoratorDef == null && typeName.startsWith(defaultPackage)) {
+            decoratorDef = decorators.get(typeName.substring(defaultPackage.length()));
+        }
+        if (decoratorDef == null) {
+            for (DecoratorDef candidate : decorators.values()) {
+                if (candidate.annotationName().equals(typeName)
+                    || candidate.name().equals(typeName)
+                    || (typeName.startsWith(defaultPackage) && candidate.name().equals(typeName.substring(defaultPackage.length())))) {
+                    decoratorDef = candidate;
+                    break;
+                }
+            }
+        }
+        return decoratorDef == null ? null : decoratorDef.annotationName();
+    }
+
+    private static String rawTypeName(String typeName) {
+        int genericStart = typeName.indexOf('<');
+        return genericStart > -1 ? typeName.substring(0, genericStart) : typeName;
+    }
+
+    private AnnotationClassValue<?>[] annotationClassValues(@Nullable Object value) {
+        List<AnnotationClassValue<?>> values = new ArrayList<>();
+        collectAnnotationClassValues(value, values);
+        return values.toArray(AnnotationClassValue[]::new);
+    }
+
+    private void collectAnnotationClassValues(@Nullable Object value, List<AnnotationClassValue<?>> values) {
+        if (value == null) {
+            return;
+        }
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return;
+            }
+            if (polyglotValue.hasArrayElements()) {
+                int size = Math.toIntExact(polyglotValue.getArraySize());
+                for (int i = 0; i < size; i++) {
+                    collectAnnotationClassValues(polyglotValue.getArrayElement(i), values);
+                }
+                return;
+            }
+            addAnnotationClassValue(polyglotValue, values);
+            return;
+        }
+        if (value.getClass().isArray()) {
+            int size = Array.getLength(value);
+            for (int i = 0; i < size; i++) {
+                collectAnnotationClassValues(Array.get(value, i), values);
+            }
+            return;
+        }
+        if (value instanceof Iterable<?> iterable) {
+            for (Object element : iterable) {
+                collectAnnotationClassValues(element, values);
+            }
+            return;
+        }
+        addAnnotationClassValue(value, values);
+    }
+
+    private void addAnnotationClassValue(@Nullable Object value, List<AnnotationClassValue<?>> values) {
+        AnnotationClassValue<?> classValue = annotationClassValue(value);
+        if (classValue != null) {
+            values.add(classValue);
+        }
+    }
+
+    private Object arrayValues(ClassElement componentType, @Nullable Object value) {
+        List<Object> values = new ArrayList<>();
+        collectArrayValues(componentType, value, values);
+        return toArray(componentType, values);
+    }
+
+    private AnnotationValue<?>[] annotationValues(ClassElement componentType, @Nullable Object value) {
+        List<AnnotationValue<?>> values = new ArrayList<>();
+        collectAnnotationValues(componentType, value, values);
+        return values.toArray(AnnotationValue[]::new);
+    }
+
+    private void collectAnnotationValues(ClassElement componentType, @Nullable Object value, List<AnnotationValue<?>> values) {
+        if (value == null) {
+            return;
+        }
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return;
+            }
+            if (polyglotValue.hasArrayElements()) {
+                int size = Math.toIntExact(polyglotValue.getArraySize());
+                for (int i = 0; i < size; i++) {
+                    collectAnnotationValues(componentType, polyglotValue.getArrayElement(i), values);
+                }
+                return;
+            }
+            addAnnotationValue(componentType, polyglotValue, values);
+            return;
+        }
+        if (value.getClass().isArray()) {
+            int size = Array.getLength(value);
+            for (int i = 0; i < size; i++) {
+                collectAnnotationValues(componentType, Array.get(value, i), values);
+            }
+            return;
+        }
+        if (value instanceof Iterable<?> iterable) {
+            for (Object element : iterable) {
+                collectAnnotationValues(componentType, element, values);
+            }
+            return;
+        }
+        addAnnotationValue(componentType, value, values);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void addAnnotationValue(ClassElement componentType, Object value, List<AnnotationValue<?>> values) {
+        if (value instanceof AnnotationValue<?> annotationValue) {
+            values.add(annotationValue);
+            return;
+        }
+        if (value instanceof DecoratorDef decoratorDef) {
+            values.add(toAnnotationValue(decoratorDef));
+            return;
+        }
+        if (value instanceof Value polyglotValue) {
+            Object converted = GraalPyUtil.convertValueToJava(polyglotValue, componentType, visitorContext);
+            if (converted instanceof AnnotationValue<?> annotationValue) {
+                values.add(annotationValue);
+            } else if (converted instanceof DecoratorDef decoratorDef) {
+                values.add(toAnnotationValue(decoratorDef));
+            }
+        }
+    }
+
+    private void collectArrayValues(ClassElement componentType, @Nullable Object value, List<Object> values) {
+        if (value == null) {
+            return;
+        }
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return;
+            }
+            if (polyglotValue.hasArrayElements()) {
+                int size = Math.toIntExact(polyglotValue.getArraySize());
+                for (int i = 0; i < size; i++) {
+                    collectArrayValues(componentType, polyglotValue.getArrayElement(i), values);
+                }
+                return;
+            }
+            values.add(GraalPyUtil.convertValueToJava(polyglotValue, componentType, visitorContext));
+            return;
+        }
+        if (value.getClass().isArray()) {
+            int size = Array.getLength(value);
+            for (int i = 0; i < size; i++) {
+                collectArrayValues(componentType, Array.get(value, i), values);
+            }
+            return;
+        }
+        if (value instanceof Iterable<?> iterable) {
+            for (Object element : iterable) {
+                collectArrayValues(componentType, element, values);
+            }
+            return;
+        }
+        values.add(value);
+    }
+
+    private Object toArray(ClassElement componentType, List<Object> values) {
+        return switch (componentType.getName()) {
+            case "boolean" -> {
+                boolean[] array = new boolean[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toBoolean(values.get(i));
+                }
+                yield array;
+            }
+            case "byte" -> {
+                byte[] array = new byte[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toNumber(values.get(i)).byteValue();
+                }
+                yield array;
+            }
+            case "char" -> {
+                char[] array = new char[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    String stringValue = values.get(i).toString();
+                    array[i] = stringValue.isEmpty() ? '\0' : stringValue.charAt(0);
+                }
+                yield array;
+            }
+            case "double" -> {
+                double[] array = new double[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toNumber(values.get(i)).doubleValue();
+                }
+                yield array;
+            }
+            case "float" -> {
+                float[] array = new float[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toNumber(values.get(i)).floatValue();
+                }
+                yield array;
+            }
+            case "int" -> {
+                int[] array = new int[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toNumber(values.get(i)).intValue();
+                }
+                yield array;
+            }
+            case "long" -> {
+                long[] array = new long[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toNumber(values.get(i)).longValue();
+                }
+                yield array;
+            }
+            case "short" -> {
+                short[] array = new short[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = toNumber(values.get(i)).shortValue();
+                }
+                yield array;
+            }
+            case "java.lang.String" -> {
+                String[] array = new String[values.size()];
+                for (int i = 0; i < values.size(); i++) {
+                    array[i] = values.get(i).toString();
+                }
+                yield array;
+            }
+            default -> values.toArray(Object[]::new);
+        };
+    }
+
+    private Number toNumber(Object value) {
+        return value instanceof Number number ? number : Double.valueOf(value.toString());
+    }
+
+    private boolean toBoolean(Object value) {
+        return value instanceof Boolean booleanValue ? booleanValue : Boolean.parseBoolean(value.toString());
+    }
+
+    private Object resolveEvaluatedExpressionReferences(
+        ElementDef originatingElement,
+        String annotationName,
+        String memberName,
+        Object annotationValue
+    ) {
+        if (memberName != null && isEvaluatedExpression(annotationValue)) {
+            return buildEvaluatedExpressionReference(originatingElement, annotationName, memberName, annotationValue);
+        }
+        if (annotationValue instanceof AnnotationValue<?> nestedAnnotation) {
+            return resolveNestedEvaluatedExpressionReferences(originatingElement, nestedAnnotation);
+        }
+        if (annotationValue instanceof AnnotationValue<?>[] nestedAnnotations) {
+            AnnotationValue<?>[] resolvedAnnotations = new AnnotationValue<?>[nestedAnnotations.length];
+            for (int i = 0; i < nestedAnnotations.length; i++) {
+                resolvedAnnotations[i] = resolveNestedEvaluatedExpressionReferences(originatingElement, nestedAnnotations[i]);
+            }
+            return resolvedAnnotations;
+        }
+        if (annotationValue instanceof Object[] values) {
+            Object[] resolvedValues = new Object[values.length];
+            boolean changed = false;
+            for (int i = 0; i < values.length; i++) {
+                Object value = values[i];
+                Object resolvedValue = value instanceof AnnotationValue<?> nestedAnnotation
+                    ? resolveNestedEvaluatedExpressionReferences(originatingElement, nestedAnnotation)
+                    : value;
+                resolvedValues[i] = resolvedValue;
+                changed |= resolvedValue != value;
+            }
+            if (changed) {
+                return resolvedValues;
+            }
+        }
+        return annotationValue;
+    }
+
+    private AnnotationValue<?> resolveNestedEvaluatedExpressionReferences(
+        ElementDef originatingElement,
+        AnnotationValue<?> annotationValue
+    ) {
+        Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>();
+        boolean changed = false;
+        for (Map.Entry<CharSequence, Object> entry : annotationValue.getValues().entrySet()) {
+            String memberName = entry.getKey().toString();
+            Object value = entry.getValue();
+            Object resolvedValue = resolveEvaluatedExpressionReferences(
+                originatingElement,
+                annotationValue.getAnnotationName(),
+                memberName,
+                value
+            );
+            resolvedValues.put(memberName, resolvedValue);
+            changed |= resolvedValue != value;
+        }
+        if (!changed) {
+            return annotationValue;
+        }
+        return new AnnotationValue<>(annotationValue.getAnnotationName(), resolvedValues);
+    }
+
+    private static boolean isEnumMember(@Nullable ClassElement memberType) {
+        return memberType != null && (memberType.isEnum() || memberType.isAssignable(Enum.class));
+    }
+
+    private static boolean isEnumArrayMember(@Nullable ClassElement memberType) {
+        return memberType != null && memberType.isArray() && isEnumMember(memberType.fromArray());
+    }
+
+    private String[] enumValues(@Nullable Object value) {
+        List<String> values = new ArrayList<>();
+        collectEnumValues(value, values);
+        return values.toArray(String[]::new);
+    }
+
+    private void collectEnumValues(@Nullable Object value, List<String> values) {
+        if (value == null) {
+            return;
+        }
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return;
+            }
+            if (polyglotValue.hasArrayElements()) {
+                int size = Math.toIntExact(polyglotValue.getArraySize());
+                for (int i = 0; i < size; i++) {
+                    collectEnumValues(polyglotValue.getArrayElement(i), values);
+                }
+                return;
+            }
+            addEnumValue(polyglotValue, values);
+            return;
+        }
+        if (value.getClass().isArray()) {
+            int size = Array.getLength(value);
+            for (int i = 0; i < size; i++) {
+                collectEnumValues(Array.get(value, i), values);
+            }
+            return;
+        }
+        if (value instanceof Iterable<?> iterable) {
+            for (Object element : iterable) {
+                collectEnumValues(element, values);
+            }
+            return;
+        }
+        addEnumValue(value, values);
+    }
+
+    private void addEnumValue(Object value, List<String> values) {
+        String enumValue = enumValue(value);
+        if (enumValue != null) {
+            values.add(enumValue);
+        }
+    }
+
+    private @Nullable String enumValue(Object value) {
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return null;
+            }
+            if (polyglotValue.isHostObject()) {
+                return enumValue(polyglotValue.asHostObject());
+            }
+            if (polyglotValue.isString()) {
+                return enumValue(polyglotValue.asString());
+            }
+            return enumValue(GraalPyUtil.convertValueToJava(polyglotValue, visitorContext));
+        }
+        String stringValue = value instanceof Enum<?> enumValue ? enumValue.name() : value.toString();
+        int lastDot = stringValue.lastIndexOf('.');
+        return lastDot > -1 ? stringValue.substring(lastDot + 1) : stringValue;
+    }
+
+    @Override
+    protected void readAnnotationRawValues(
+        ElementDef originatingElement,
+        String annotationName,
+        ElementDef member,
+        String memberName,
+        Object annotationValue,
+        Map<CharSequence, Object> annotationValues) {
+        if (!annotationValues.containsKey(memberName)) {
+            var value = readAnnotationValue(originatingElement, member, annotationName, memberName, annotationValue);
+            if (value != null) {
+                validateAnnotationValue(originatingElement, annotationName, member, memberName, value);
+                annotationValues.put(memberName, value);
+            }
+        }
+    }
+
+    @Override
+    protected boolean isValidationRequired(ElementDef member) {
+        return false;
+    }
+
+    @Override
+    protected void addError(ElementDef originatingElement, String error) {
+        visitorContext.fail(error, null);
+    }
+
+    @Override
+    protected void addWarning(ElementDef originatingElement, String warning) {
+        visitorContext.warn(warning, null);
+    }
+
+    @Override
+    protected Map<? extends ElementDef, ?> readAnnotationDefaultValues(String annotationName, ElementDef annotationType) {
+        DecoratorDef decoratorDef = findDecoratorDef(annotationName);
+        if (decoratorDef == null) {
+            return Map.of();
+        }
+        ClassElement javaAnnotationType = getJavaAnnotationType(annotationName);
+        Map<ElementDef, Object> defaultValues = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : decoratorDef.members().entrySet()) {
+            String memberName = normalizeAnnotationMemberName(entry.getKey());
+            defaultValues.put(resolveMemberDef(annotationName, javaAnnotationType, memberName), entry.getValue());
+        }
+        return defaultValues;
+    }
+
+    @Override
+    protected Map<? extends ElementDef, ?> readAnnotationRawValues(DecoratorDef annotationMirror) {
+        Map<?, ?> members = annotationMirror.members();
+        ClassElement javaAnnotationType = getJavaAnnotationType(annotationMirror);
+        String annotationName = resolveAnnotationName(annotationMirror);
+
+        Map<ElementDef, Object> rawValues = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : members.entrySet()) {
+            String memberName = normalizeAnnotationMemberName(entry.getKey());
+            putRawValue(annotationName, javaAnnotationType, rawValues, memberName, entry.getValue());
+            for (String aliasMemberName : resolveSameAnnotationAliasMembers(annotationName, memberName)) {
+                putRawValue(annotationName, javaAnnotationType, rawValues, aliasMemberName, entry.getValue());
+            }
+        }
+        return rawValues;
+    }
+
+    private void putRawValue(
+        String annotationName,
+        @Nullable ClassElement javaAnnotationType,
+        Map<ElementDef, Object> rawValues,
+        String memberName,
+        Object value
+    ) {
+        if (rawValues.keySet().stream().noneMatch(member -> memberName.equals(getAnnotationMemberName(member)))) {
+            rawValues.put(resolveMemberDef(annotationName, javaAnnotationType, memberName), value);
+        }
+    }
+
+    private List<String> resolveSameAnnotationAliasMembers(String annotationName, String memberName) {
+        DecoratorDef decoratorDef = findDecoratorDef(annotationName);
+        if (decoratorDef == null) {
+            return List.of();
+        }
+        List<DecoratorDef> memberDecorators = decoratorDef.memberDecorators().getOrDefault(memberName, List.of());
+        if (memberDecorators.isEmpty()) {
+            return List.of();
+        }
+        List<String> aliases = new ArrayList<>();
+        for (DecoratorDef memberDecorator : memberDecorators) {
+            if (!"io.micronaut.context.annotation.AliasFor".equals(memberDecorator.annotationName())) {
+                continue;
+            }
+            if (hasAnnotationAliasTarget(memberDecorator)) {
+                continue;
+            }
+            Object aliasMember = memberDecorator.members().get("member");
+            if (aliasMember == null) {
+                aliasMember = memberDecorator.members().get(AnnotationMetadata.VALUE_MEMBER);
+            }
+            String aliasMemberName = annotationMemberStringValue(aliasMember);
+            if (aliasMemberName != null && !aliasMemberName.isBlank() && !aliasMemberName.equals(memberName)) {
+                aliases.add(aliasMemberName);
+            }
+        }
+        return aliases;
+    }
+
+    private static boolean hasAnnotationAliasTarget(DecoratorDef aliasFor) {
+        Object annotation = aliasFor.members().get("annotation");
+        return annotation != null && annotationMemberStringValue(annotation) != null;
+    }
+
+    private static @Nullable String annotationMemberStringValue(@Nullable Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Value polyglotValue) {
+            if (polyglotValue.isNull()) {
+                return null;
+            }
+            return polyglotValue.isString() ? polyglotValue.asString() : polyglotValue.toString();
+        }
+        return value.toString();
+    }
+
+    private static String normalizeAnnotationMemberName(Object memberName) {
+        if (memberName instanceof Number number) {
+            int index = number.intValue();
+            return index == 0 ? AnnotationMetadata.VALUE_MEMBER : "arg" + index;
+        }
+        return memberName.toString();
+    }
+
+    private @Nullable ClassElement getJavaAnnotationType(DecoratorDef annotationMirror) {
+        String annotationName = resolveAnnotationName(annotationMirror);
+        return getJavaAnnotationType(annotationName);
+    }
+
+    private @Nullable ClassElement getJavaAnnotationType(String annotationName) {
+        VisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
+        return Optional.ofNullable(javaVisitorContext)
+            .flatMap(vc -> vc.getClassElement(annotationName))
+            .orElse(null);
+    }
+
+    @Override
+    protected <K extends Annotation> Optional<AnnotationValue<K>> getAnnotationValues(ElementDef originatingElement, ElementDef member, Class<K> annotationType) {
+        if (member instanceof AnnotationMemberDef memberDef) {
+            Optional<AnnotationValue<K>> annotation = memberDef.getAnnotationMetadata().findAnnotation(annotationType);
+            if (annotation.isEmpty()) {
+                annotation = findMemberDecorator(memberDef, annotationType);
+            }
+            return annotation.map(value -> normalizeAliasForAnnotationValue(value, annotationType));
+        }
+        return Optional.empty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private <K extends Annotation> Optional<AnnotationValue<K>> findMemberDecorator(AnnotationMemberDef memberDef, Class<K> annotationType) {
+        String annotationName = annotationType.getName();
+        for (DecoratorDef decorator : memberDef.decorators()) {
+            if (toBinaryClassName(decorator.annotationName()).equals(annotationName)) {
+                return Optional.of((AnnotationValue<K>) toAnnotationValue(decorator));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private <K extends Annotation> AnnotationValue<K> normalizeAliasForAnnotationValue(AnnotationValue<K> annotationValue, Class<K> annotationType) {
+        if (annotationType == AliasFor.class && annotationValue.stringValue("annotationName").isEmpty()) {
+            Optional<AnnotationClassValue<?>> annotationClassValue = annotationValue.annotationClassValue("annotation");
+            if (annotationClassValue.isPresent()) {
+                return (AnnotationValue<K>) annotationValue
+                    .mutate()
+                    .member("annotationName", annotationClassValue.get().getName())
+                    .build();
+            }
+        }
+        return annotationValue;
+    }
+
+    @Override
+    protected String getElementName(ElementDef element) {
+        return element.name();
+    }
+
+    @Override
+    protected String getAnnotationMemberName(ElementDef member) {
+        if (member == null) {
+            return null;
+        }
+        return member.name();
+    }
+
+    @Override
+    protected String getRepeatableName(DecoratorDef annotationMirror) {
+        if (annotationMirror != null) {
+            String repeatedName = annotationMirror.repeatedName();
+            if (repeatedName != null) {
+                return toBinaryClassName(repeatedName);
+            }
+            return getJavaRepeatableContainerName(getJavaAnnotationType(annotationMirror));
+        } else {
+            return null;
+        }
+    }
+
+    @Override
+    protected String getRepeatableContainerNameForType(ElementDef annotationType) {
+        if (visitorContext != null) {
+            PythonProcessingEnvironment env = visitorContext.getProcessingEnvironment();
+            DecoratorDef decoratorDef = findDecoratorDef(env.environment().decorators(), annotationType.name());
+            if (decoratorDef != null && decoratorDef.repeatedName() != null) {
+                return toBinaryClassName(decoratorDef.repeatedName());
+            }
+        }
+        return getJavaRepeatableContainerName(getJavaAnnotationType(annotationType.name()));
+    }
+
+    private @Nullable String getJavaRepeatableContainerName(@Nullable ClassElement annotationType) {
+        if (annotationType == null) {
+            return null;
+        }
+        AnnotationValue<Repeatable> repeatable = annotationType.getAnnotation(Repeatable.class);
+        if (repeatable == null) {
+            return null;
+        }
+        return repeatable.annotationClassValue(AnnotationMetadata.VALUE_MEMBER)
+            .map(AnnotationClassValue::getName)
+            .orElse(null);
+    }
+
+    @Override
+    protected Optional<ElementDef> getAnnotationMirror(String annotationName) {
+        return annotationMirrorCache.computeIfAbsent(annotationName, this::resolveAnnotationMirror);
+    }
+
+    private Optional<ElementDef> resolveAnnotationMirror(String annotationName) {
+        JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
+        if (javaVisitorContext == null) {
+            return Optional.empty();
+        }
+        Optional<AnnotationValue<?>> annotationValue = javaVisitorContext.getAnnotationMetadataBuilder().buildAnnotation(annotationName);
+        if (annotationValue.isPresent()) {
+            AnnotationValue<?> av = annotationValue.get();
+            return Optional.of(new ClassDef(
+                av.getAnnotationName(),
+                av.getStereotypes().stream().map(this::toDecoratorDef).toList()
+            ));
+        }
+        return javaVisitorContext.getClassElement(annotationName)
+            .map(annotationType -> new ClassDef(
+                annotationType.getName(),
+                toDecoratorDefs(annotationType.getAnnotationMetadata())
+            ));
+    }
+
+    private DecoratorDef toDecoratorDef(AnnotationValue<?> av) {
+        String annotationName = toBinaryClassName(av.getAnnotationName());
+        return new DecoratorDef(annotationName, annotationName, null, (Map) av.getValues(), av.getStereotypes() == null ? List.of() : av.getStereotypes().stream().map(this::toDecoratorDef).toList());
+    }
+
+    private List<DecoratorDef> toDecoratorDefs(AnnotationMetadata annotationMetadata) {
+        if (annotationMetadata.isEmpty()) {
+            return List.of();
+        }
+        List<DecoratorDef> decoratorDefs = new ArrayList<>();
+        for (String annotationName : annotationMetadata.getDeclaredAnnotationNames()) {
+            AnnotationValue<?> annotationValue = annotationMetadata.getDeclaredAnnotation(annotationName);
+            if (annotationValue != null) {
+                decoratorDefs.add(toDecoratorDef(annotationValue));
+            }
+        }
+        return decoratorDefs;
+    }
+
+    @Override
+    protected String getOriginatingClassName(ElementDef originating) {
+        if (originating instanceof ClassDef classDef) {
+            return classDef.qualifiedName();
+        }
+        if (originating instanceof FunctionDef functionDef && functionDef.declaringClass() != null) {
+            return functionDef.declaringClass().qualifiedName();
+        }
+        if (originating instanceof ArgumentDef argumentDef
+            && argumentDef.declaringFunction() != null
+            && argumentDef.declaringFunction().declaringClass() != null) {
+            return argumentDef.declaringFunction().declaringClass().qualifiedName();
+        }
+        if (originating instanceof AttributeDef attributeDef && attributeDef.declaringClass() != null) {
+            return attributeDef.declaringClass().qualifiedName();
+        }
+        if (originating instanceof PropertyDef propertyDef && propertyDef.declaringClass() != null) {
+            return propertyDef.declaringClass().qualifiedName();
+        }
+        if (originating instanceof ScriptDef scriptDef) {
+            return scriptDef.qualifiedName();
+        }
+        return originating.name();
+    }
+
+    @Override
+    protected ElementDef getAnnotationMember(ElementDef annotationElement, CharSequence member) {
+        String memberName = member.toString();
+        ClassElement javaAnnotationType = getJavaAnnotationType(annotationElement.name());
+        if (javaAnnotationType == null) {
+            return resolvePythonAnnotationMember(annotationElement.name(), memberName);
+        } else {
+            return resolveJavaAnnotationMember(javaAnnotationType, memberName);
+        }
+    }
+
+    private AnnotationMemberDef resolveMemberDef(String annotationName, @Nullable ClassElement javaAnnotationType, String memberName) {
+        if (javaAnnotationType == null) {
+            return resolvePythonAnnotationMember(annotationName, memberName);
+        }
+        return resolveJavaAnnotationMember(javaAnnotationType, memberName);
+    }
+
+    private AnnotationMemberDef resolveJavaAnnotationMember(ClassElement javaAnnotationType, String memberName) {
+        String cacheKey = javaAnnotationType.getName() + '#' + memberName;
+        return javaAnnotationMemberCache.computeIfAbsent(
+            cacheKey,
+            ignored -> resolveJavaMemberDef(javaAnnotationType, memberName)
+        );
+    }
+
+    private AnnotationMemberDef resolvePythonAnnotationMember(String annotationName, String memberName) {
+        DecoratorDef decoratorDef = findDecoratorDef(annotationName);
+        List<DecoratorDef> memberDecorators = decoratorDef == null
+            ? List.of()
+            : decoratorDef.memberDecorators().getOrDefault(memberName, List.of());
+        return new AnnotationMemberDef(memberName, null, null, memberDecorators);
+    }
+
+    private @Nullable DecoratorDef findDecoratorDef(String annotationName) {
+        return findDecoratorDef(decorators, annotationName);
+    }
+
+    private @Nullable DecoratorDef findDecoratorDef(Map<String, DecoratorDef> decorators, String annotationName) {
+        DecoratorDef decoratorDef = decorators.get(annotationName);
+        if (decoratorDef != null) {
+            return decoratorDef;
+        }
+        String binaryName = toBinaryClassName(annotationName);
+        decoratorDef = decorators.get(binaryName);
+        if (decoratorDef != null) {
+            return decoratorDef;
+        }
+        for (DecoratorDef candidate : decorators.values()) {
+            String candidateName = candidate.name();
+            String candidateAnnotationName = toBinaryClassName(candidate.annotationName());
+            String defaultPackage = PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
+            if (candidateAnnotationName.equals(binaryName)
+                || (binaryName.startsWith(defaultPackage) && candidateName.equals(binaryName.substring(defaultPackage.length())))) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private String resolveAnnotationName(DecoratorDef annotationMirror) {
+        DecoratorDef decoratorDef = findDecoratorDef(annotationMirror.annotationName());
+        if (decoratorDef != null) {
+            return toBinaryClassName(decoratorDef.annotationName());
+        }
+        return toBinaryClassName(annotationMirror.annotationName());
+    }
+
+    private @Nullable String toBinaryClassName(@Nullable String className) {
+        if (className == null) {
+            return null;
+        }
+        return binaryClassNameCache.computeIfAbsent(className, this::resolveBinaryClassName);
+    }
+
+    private String resolveBinaryClassName(String className) {
+        JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
+        if (javaVisitorContext == null) {
+            return className;
+        }
+        return javaVisitorContext.getClassElement(className)
+            .map(ClassElement::getName)
+            .orElse(className);
+    }
+
+    private static @Nullable AnnotationMemberDef resolveJavaMemberDef(ClassElement javaAnnotationType, String memberName) {
+        MethodElement annotationMember = resolveAnnotationMember(javaAnnotationType, memberName);
+        if (annotationMember == null) {
+            return new AnnotationMemberDef(memberName, null, null);
+        } else {
+            return new AnnotationMemberDef(
+                memberName,
+                annotationMember.getReturnType(),
+                annotationMember.getAnnotationMetadata()
+            );
+        }
+    }
+
+    private static @Nullable MethodElement resolveAnnotationMember(ClassElement javaAnnotationType, String memberName) {
+        if (javaAnnotationType == null) {
+            return null;
+        }
+        return javaAnnotationType
+                .getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance()
+                .named(memberName))
+                .orElse(null);
+    }
+
+    @Override
+    protected VisitorContext getVisitorContext() {
+        return this.visitorContext;
+    }
+
+    @Override
+    protected RetentionPolicy getRetentionPolicy(ElementDef annotation) {
+        JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
+        if (javaVisitorContext != null) {
+            return javaVisitorContext.getAnnotationMetadataBuilder().getRetentionPolicy(annotation.name());
+        }
+        return RetentionPolicy.RUNTIME;
+    }
+
+    private record BindingDefinition(InterceptorKind kind, @Nullable AnnotationClassValue<?> interceptorType) {
+    }
+
+    private record BindingKey(String annotationName, InterceptorKind kind) {
+    }
+
+}

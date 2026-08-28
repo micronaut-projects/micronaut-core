@@ -15,11 +15,11 @@
  */
 package io.micronaut.upload;
 
+import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
-import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.validation.Validated;
 import org.reactivestreams.Publisher;
@@ -33,14 +33,14 @@ public class ValidatedController {
 
     @Post(value = "/receive-file-upload", consumes = MediaType.MULTIPART_FORM_DATA)
     public Publisher<HttpResponse> receiveFileUpload(StreamingFileUpload data) {
-        data.subscribe(new Subscriber<PartData>() {
+        data.streamingBody().toReadBufferPublisher().subscribe(new Subscriber<ReadBuffer>() {
             @Override
             public void onSubscribe(Subscription s) {
                 s.cancel();
             }
 
             @Override
-            public void onNext(PartData partData) {
+            public void onNext(ReadBuffer partData) {
 
             }
 

@@ -7,7 +7,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 class AnyQualifierSpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run()
+    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(['spec.name':'AnyQualifierSpec'])
 
     void 'test singleton any injection'() {
         when:

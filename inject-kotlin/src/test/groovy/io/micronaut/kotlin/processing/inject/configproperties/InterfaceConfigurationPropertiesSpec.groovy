@@ -150,6 +150,39 @@ interface ParentConfig {
 
     }
 
+    void "test inheritance from unannotated interface config props"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyConfig$Intercepted', '''
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+
+@ConfigurationProperties("foo")
+interface MyConfig : ParentConfig
+
+interface ParentConfig {
+    val host: String
+    val serverPort: Int
+}
+''')
+        then:
+        beanDefinition.getRequiredMethod("getHost")
+                .stringValue(Property, "name").get() == 'foo.host'
+        beanDefinition.getRequiredMethod("getServerPort")
+                .stringValue(Property, "name").get() == 'foo.server-port'
+
+        when:
+        def context = ApplicationContext.run('foo.host': 'test', 'foo.server-port': '9999')
+        def config = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
+
+        then:
+        config.host == 'test'
+        config.serverPort == 9999
+
+        cleanup:
+        context.close()
+    }
+
     void "test nested interface config props"() {
 
         when:

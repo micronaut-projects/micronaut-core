@@ -22,8 +22,7 @@ import io.micronaut.aop.InvocationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
@@ -56,25 +55,28 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
     protected static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
 
     protected final Interceptor<B, R>[] interceptors;
-    protected final Object[] originalParameters;
+    protected final @Nullable Object[] originalParameters;
     protected final int interceptorCount;
+    @Nullable
     protected volatile MutableConvertibleValues<Object> attributes;
     protected int index = 0;
+    @Nullable
     protected volatile Map<String, MutableArgumentValue<?>> parameters;
 
-    AbstractInterceptorChain(Interceptor<B, R>[] interceptors, Object... originalParameters) {
+    AbstractInterceptorChain(Interceptor<B, R>[] interceptors, @Nullable Object... originalParameters) {
         this.interceptors = interceptors;
         this.interceptorCount = interceptors.length;
         this.originalParameters = originalParameters;
     }
 
     @Override
-    public @NonNull Object[] getParameterValues() {
+    @Nullable
+    public Object[] getParameterValues() {
         return originalParameters;
     }
 
     @Override
-    public @NonNull MutableConvertibleValues<Object> getAttributes() {
+    public MutableConvertibleValues<Object> getAttributes() {
         MutableConvertibleValues<Object> localAttributes = this.attributes;
         if (localAttributes == null) {
             synchronized (this) { // double check
@@ -89,7 +91,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
     }
 
     @Override
-    public @NonNull Map<String, MutableArgumentValue<?>> getParameters() {
+    public Map<String, MutableArgumentValue<?>> getParameters() {
         Map<String, MutableArgumentValue<?>> localParameters = this.parameters;
         if (localParameters == null) {
             synchronized (this) { // double check
@@ -98,62 +100,8 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
                     Argument<?>[] arguments = getArguments();
                     localParameters = CollectionUtils.newLinkedHashMap(arguments.length);
                     for (int i = 0; i < arguments.length; i++) {
-                        Argument argument = arguments[i];
-                        int finalIndex = i;
-                        localParameters.put(argument.getName(), new MutableArgumentValue<>() {
-                            @NonNull
-                            @Override
-                            public AnnotationMetadata getAnnotationMetadata() {
-                                return argument.getAnnotationMetadata();
-                            }
-
-                            @Override
-                            public Optional<Argument<?>> getFirstTypeVariable() {
-                                return argument.getFirstTypeVariable();
-                            }
-
-                            @Override
-                            public Argument[] getTypeParameters() {
-                                return argument.getTypeParameters();
-                            }
-
-                            @Override
-                            public Map<String, Argument<?>> getTypeVariables() {
-                                return argument.getTypeVariables();
-                            }
-
-                            @NonNull
-                            @Override
-                            public String getName() {
-                                return argument.getName();
-                            }
-
-                            @NonNull
-                            @Override
-                            public Class<Object> getType() {
-                                return argument.getType();
-                            }
-
-                            @Override
-                            public boolean equalsType(@Nullable Argument<?> other) {
-                                return argument.equalsType(other);
-                            }
-
-                            @Override
-                            public int typeHashCode() {
-                                return argument.typeHashCode();
-                            }
-
-                            @Override
-                            public Object getValue() {
-                                return originalParameters[finalIndex];
-                            }
-
-                            @Override
-                            public void setValue(Object value) {
-                                originalParameters[finalIndex] = value;
-                            }
-                        });
+                        Argument<?> argument = arguments[i];
+                        localParameters.put(argument.getName(), create(argument, i));
                     }
                     localParameters = Collections.unmodifiableMap(localParameters);
                     this.parameters = localParameters;
@@ -163,8 +111,64 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
         return localParameters;
     }
 
+    private <T> MutableArgumentValue<T> create(Argument<T> argument, int finalIndex) {
+        return new MutableArgumentValue<>() {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return argument.getAnnotationMetadata();
+            }
+
+            @Override
+            public Optional<Argument<?>> getFirstTypeVariable() {
+                return argument.getFirstTypeVariable();
+            }
+
+            @Override
+            public Argument<?>[] getTypeParameters() {
+                return argument.getTypeParameters();
+            }
+
+            @Override
+            public Map<String, Argument<?>> getTypeVariables() {
+                return argument.getTypeVariables();
+            }
+
+            @Override
+            public String getName() {
+                return argument.getName();
+            }
+
+            @Override
+            public Class<T> getType() {
+                return argument.getType();
+            }
+
+            @Override
+            public boolean equalsType(@Nullable Argument<?> other) {
+                return argument.equalsType(other);
+            }
+
+            @Override
+            public int typeHashCode() {
+                return argument.typeHashCode();
+            }
+
+            @Override
+            @Nullable
+            public T getValue() {
+                return (T) originalParameters[finalIndex];
+            }
+
+            @Override
+            public void setValue(@Nullable Object value) {
+                originalParameters[finalIndex] = value;
+            }
+        };
+    }
+
     @Override
-    public R proceed(@NonNull Interceptor from) throws RuntimeException {
+    @Nullable
+    public R proceed(Interceptor from) throws RuntimeException {
         for (int i = 0; i < interceptors.length; i++) {
             Interceptor<B, R> interceptor = interceptors[i];
             if (interceptor == from) {
@@ -184,8 +188,7 @@ abstract class AbstractInterceptorChain<B, R> implements InvocationContext<B, R>
      * @return The binding
      * @since 3.3.0
      */
-    protected static @NonNull Collection<AnnotationValue<?>> resolveInterceptorValues(@NonNull AnnotationMetadata annotationMetadata,
-                                                                                      @NonNull InterceptorKind kind) {
+    protected static Collection<AnnotationValue<?>> resolveInterceptorValues(AnnotationMetadata annotationMetadata, InterceptorKind kind) {
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
             final List<AnnotationValue<InterceptorBinding>> declaredValues =

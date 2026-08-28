@@ -10,6 +10,8 @@ import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Issue
 import spock.lang.Specification
 
+import java.time.Instant
+
 class CurrentDateEndpointSpec extends Specification {
 
     void "test read custom date endpoint"() {
@@ -22,7 +24,7 @@ class CurrentDateEndpointSpec extends Specification {
 
         then:
         response.code() == HttpStatus.OK.code
-        new Date(response.body().toLong()) != null
+        new Date(Instant.parse(((String)response.body()).replace('"','')).toEpochMilli()) != null
 
         cleanup:
         server.close()
@@ -68,7 +70,7 @@ class CurrentDateEndpointSpec extends Specification {
 
         when:
         def response = rxClient.exchange("/date", String).blockFirst()
-        originalDate = new Date(response.body().toLong())
+        originalDate = new Date(Instant.parse(((String)response.body()).replace('"','')).toEpochMilli())
 
         and:
         response = rxClient.exchange(HttpRequest.POST("/date", [:]), String).blockFirst()
@@ -79,7 +81,7 @@ class CurrentDateEndpointSpec extends Specification {
 
         when:
         response = rxClient.exchange("/date", String).blockFirst()
-        resetDate = new Date(response.body().toLong())
+        resetDate = new Date(Instant.parse(((String)response.body()).replace('"','')).toEpochMilli())
 
         then:
         resetDate > originalDate

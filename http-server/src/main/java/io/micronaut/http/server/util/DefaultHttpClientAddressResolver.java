@@ -16,8 +16,7 @@
 package io.micronaut.http.server.util;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import jakarta.inject.Singleton;
@@ -46,7 +45,7 @@ public class DefaultHttpClientAddressResolver implements HttpClientAddressResolv
 
     @Override
     @Nullable
-    public String resolve(@NonNull HttpRequest request) {
+    public String resolve(HttpRequest request) {
         String configuredHeader = serverConfiguration.getClientAddressHeader();
         if (configuredHeader != null) {
             return request.getHeaders().get(configuredHeader);

@@ -17,20 +17,23 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -46,9 +49,10 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
 
     private static final Logger LOG = ClassUtils.getLogger(MatchArgumentQualifier.class);
     private final Argument<?> argument;
+    @Nullable
     private final Argument<?> covariantArgument;
 
-    private MatchArgumentQualifier(Argument<?> argument, Argument<?> covariantArgument) {
+    private MatchArgumentQualifier(Argument<?> argument, @Nullable Argument<?> covariantArgument) {
         this.argument = argument;
         this.covariantArgument = covariantArgument;
     }
@@ -76,8 +80,7 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
      * @param <T>             The bean type
      * @return The qualifier
      */
-    @NonNull
-    public static <T> MatchArgumentQualifier<T> covariant(@NonNull Class<T> beanType, @NonNull Argument<?> genericArgument) {
+    public static <T> MatchArgumentQualifier<T> covariant(Class<T> beanType, Argument<?> genericArgument) {
         Argument<?> covariantArgument = Argument.ofTypeVariable(genericArgument.getType(), null, genericArgument.getAnnotationMetadata(), genericArgument.getTypeParameters());
         return new MatchArgumentQualifier<>(
             Argument.of(beanType, covariantArgument),
@@ -101,8 +104,7 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
      * @param <T>             The bean type
      * @return The qualifier
      */
-    @NonNull
-    public static <T> MatchArgumentQualifier<T> contravariant(@NonNull Class<T> beanType, @NonNull Argument<?> genericArgument) {
+    public static <T> MatchArgumentQualifier<T> contravariant(Class<T> beanType, Argument<?> genericArgument) {
         return new MatchArgumentQualifier<>(
             Argument.of(beanType, Argument.ofTypeVariable(genericArgument.getType(), null, genericArgument.getAnnotationMetadata(), genericArgument.getTypeParameters())),
             null
@@ -155,7 +157,7 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
 
     private <BT extends BeanType<T>> Collection<BT> filterArgumentTypeParameters(Argument<?> argument,
                                                                                  Collection<BT> result,
-                                                                                 Function<BT, Argument<?>> typeArgumentExtractor) {
+                                                                                 @Nullable Function<BT, Argument<?>> typeArgumentExtractor) {
         Argument<?>[] typeParameters = argument.getTypeParameters();
         for (int i = 0; i < typeParameters.length; i++) {
             int finalI = i;
@@ -185,7 +187,8 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
 
     private <BT extends BeanType<T>> List<BT> filterMatching(Argument<?> argument,
                                                              Collection<BT> candidates,
-                                                             Function<BT, Argument<?>> typeArgumentExtractor) {
+                                                             Function<BT, @Nullable Argument<?>> typeArgumentExtractor) {
+        candidates = filterRawTypeVariableParameterCandidates(argument, candidates, typeArgumentExtractor);
         List<BT> selectedDirect = null;
         boolean directMatch = false;
         List<Map.Entry<Class<?>, List<BT>>> closestMatches = null;
@@ -212,7 +215,7 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
                     closestMatches = null;
                     directMatch = true;
                 }
-                selectedDirect.add(candidate);
+                Objects.requireNonNull(selectedDirect).add(candidate);
                 continue;
             }
             if (directMatch) {
@@ -261,11 +264,11 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
             closestMatches.add(new AbstractMap.SimpleEntry<>(candidateType, newSelected));
         }
         if (directMatch) {
-            return selectedDirect;
+            return Objects.requireNonNull(selectedDirect);
         }
         if (closestMatches != null) {
             if (closestMatches.size() == 1) {
-                return closestMatches.iterator().next().getValue();
+                return closestMatches.getFirst().getValue();
             }
             List<BT> result = new ArrayList<>();
             for (Map.Entry<Class<?>, List<BT>> match : closestMatches) {
@@ -274,6 +277,116 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
             return result;
         }
         return List.of();
+    }
+
+    private <B extends BeanType<T>> Collection<B> filterRawTypeVariableParameterCandidates(Argument<?> argument,
+                                                                                           Collection<B> candidates,
+                                                                                           Function<B, @Nullable Argument<?>> typeArgumentExtractor) {
+        if (!isRawGenericType(argument)) {
+            return candidates;
+        }
+        Class<?> argumentTypeClass = argument.getType();
+        List<B> directGenericCandidates = null;
+        List<B> directCandidates = null;
+        List<B> genericCandidates = null;
+        List<B> rawCompatibleCandidates = null;
+        for (B candidate : candidates) {
+            Argument<?> candidateArgument = typeArgumentExtractor.apply(candidate);
+            if (candidateArgument == null) {
+                continue;
+            }
+            boolean directMatch = argumentTypeClass.equals(candidateArgument.getType());
+            if (directMatch && matchesArgumentTypeParameters(argument, candidateArgument)) {
+                if (isUnboundedTypeVariableCandidate(candidateArgument)) {
+                    if (directGenericCandidates == null) {
+                        directGenericCandidates = new ArrayList<>(candidates.size());
+                    }
+                    directGenericCandidates.add(candidate);
+                } else {
+                    if (directCandidates == null) {
+                        directCandidates = new ArrayList<>(candidates.size());
+                    }
+                    directCandidates.add(candidate);
+                }
+                continue;
+            }
+            if (isUnboundedTypeVariableCandidate(candidateArgument)
+                && matchesRawArgument(argument, argumentTypeClass, candidateArgument)) {
+                if (genericCandidates == null) {
+                    genericCandidates = new ArrayList<>(candidates.size());
+                }
+                genericCandidates.add(candidate);
+            } else if (isRawCompatibleCandidate(argument, argumentTypeClass, candidateArgument)) {
+                if (rawCompatibleCandidates == null) {
+                    rawCompatibleCandidates = new ArrayList<>(candidates.size());
+                }
+                rawCompatibleCandidates.add(candidate);
+            }
+        }
+        if (directGenericCandidates != null) {
+            return directGenericCandidates;
+        }
+        if (directCandidates != null) {
+            return directCandidates;
+        }
+        if (genericCandidates != null && rawCompatibleCandidates != null) {
+            List<B> combinedCandidates = new ArrayList<>(genericCandidates.size() + rawCompatibleCandidates.size());
+            combinedCandidates.addAll(genericCandidates);
+            Set<Class<?>> genericCandidateTypes = new HashSet<>(genericCandidates.size());
+            for (B genericCandidate : genericCandidates) {
+                Argument<?> genericArgument = typeArgumentExtractor.apply(genericCandidate);
+                if (genericArgument != null) {
+                    genericCandidateTypes.add(genericArgument.getType());
+                }
+            }
+            for (B rawCompatibleCandidate : rawCompatibleCandidates) {
+                Argument<?> rawCompatibleArgument = typeArgumentExtractor.apply(rawCompatibleCandidate);
+                if (rawCompatibleArgument != null
+                    && !genericCandidateTypes.contains(rawCompatibleArgument.getType())) {
+                    combinedCandidates.add(rawCompatibleCandidate);
+                }
+            }
+            return combinedCandidates;
+        }
+        if (rawCompatibleCandidates != null) {
+            return rawCompatibleCandidates;
+        }
+        return genericCandidates == null ? candidates : genericCandidates;
+    }
+
+    private boolean matchesRawArgument(Argument<?> argument,
+                                       Class<?> argumentTypeClass,
+                                       Argument<?> candidateArgument) {
+        Class<?> candidateType = candidateArgument.getType();
+        if (argumentTypeClass.equals(candidateType)) {
+            return matchesArgumentTypeParameters(argument, candidateArgument);
+        }
+        return doesMatch(candidateArgument, candidateType, argument, argumentTypeClass);
+    }
+
+    private boolean isRawCompatibleCandidate(Argument<?> argument,
+                                             Class<?> argumentTypeClass,
+                                             Argument<?> candidateArgument) {
+        return candidateArgument.getType().getTypeParameters().length > 0
+            && matchesArgumentTypeParameters(argument, candidateArgument)
+            && matchesRawArgument(argument, argumentTypeClass, candidateArgument);
+    }
+
+    private static boolean isRawGenericType(Argument<?> argument) {
+        return argument.getTypeParameters().length == 0 && argument.getType().getTypeParameters().length > 0;
+    }
+
+    private static boolean isUnboundedTypeVariableCandidate(Argument<?> argument) {
+        Argument<?>[] typeParameters = argument.getTypeParameters();
+        if (typeParameters.length == 0) {
+            return argument.isTypeVariable() && argument.getType().equals(Object.class);
+        }
+        for (Argument<?> typeParameter : typeParameters) {
+            if (!typeParameter.isTypeVariable() || !typeParameter.getType().equals(Object.class)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean doesMatch(Argument<?> candidateArgument,

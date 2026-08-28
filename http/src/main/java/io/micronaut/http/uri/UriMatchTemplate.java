@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 package io.micronaut.http.uri;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
@@ -41,6 +40,7 @@ import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
  * @author Graeme Rocher
  * @since 1.0
  */
+@NullUnmarked
 public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
     protected static final String VARIABLE_MATCH_PATTERN = "([^/?#(?!{)&;+]";
@@ -168,14 +168,12 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      * @return a match or null
      */
     @Nullable
-    public UriMatchInfo tryMatch(@NonNull String uri) {
+    public UriMatchInfo tryMatch(String uri) {
         if (uri == null) {
             throw new IllegalArgumentException("Argument 'uri' cannot be null");
         }
         int length = uri.length();
-        if (length > 1 && uri.charAt(length - 1) == '/') {
-            uri = uri.substring(0, length - 1);
-        }
+        uri = StringUtils.trimTrailingSlashExceptRoot(uri);
 
         if (isRoot && (length == 0 || (length == 1 && uri.charAt(0) == '/'))) {
             if (rootMatchInfo == null) {
@@ -188,9 +186,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         if (parameterIndex > -1) {
             uri = uri.substring(0, parameterIndex);
         }
-        if (uri.endsWith("/")) {
-            uri = uri.substring(0, uri.length() - 1);
-        }
+        uri = StringUtils.trimTrailingCharacter(uri, '/');
         if (exactMatch) {
             if (uri.equals(templateString)) {
                 if (exactMatchInfo == null) {

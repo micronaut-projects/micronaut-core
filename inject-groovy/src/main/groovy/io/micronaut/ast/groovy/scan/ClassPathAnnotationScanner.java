@@ -16,7 +16,7 @@
 package io.micronaut.ast.groovy.scan;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.micronaut.core.io.scan.AnnotationScanner;
 import io.micronaut.core.reflect.ClassUtils;
 import org.slf4j.Logger;
@@ -148,7 +148,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
                         if (LOG.isDebugEnabled()) {
                             LOG.debug("Ignoring JAR URI entry [{}]. No JarURLConnection found.", url);
                         }
-                        // TODO: future support for servlet containers
+                        // Future support for servlet containers can add a fallback here.
                     }
 
                 }

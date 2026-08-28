@@ -23,13 +23,12 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanType;
 import jakarta.inject.Named;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.Collection;
@@ -81,18 +80,28 @@ public class Qualifiers {
      * @param <T>      The type
      * @return The resolved qualifier
      */
+    public static @Nullable <T> Qualifier<T> forArgument(Argument<?> argument) {
+        return of(Objects.requireNonNull(argument, "Argument cannot be null").getAnnotationMetadata());
+    }
+
+    /**
+     * Build a qualifier for the given annotation metadata.
+     *
+     * @param annotationMetadata The annotation metadata
+     * @param <T>                The type
+     * @return The resolved qualifier
+     */
     @SuppressWarnings("unchecked")
-    public static @Nullable
-    <T> Qualifier<T> forArgument(@NonNull Argument<?> argument) {
-        AnnotationMetadata annotationMetadata = Objects.requireNonNull(argument, "Argument cannot be null").getAnnotationMetadata();
-        boolean hasMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
+    public static @Nullable <T> Qualifier<T> of(AnnotationMetadata annotationMetadata) {
+        Objects.requireNonNull(annotationMetadata, "Annotation metadata cannot be null");
+        boolean hasMetadata = !annotationMetadata.isEmpty();
 
         List<String> qualifierTypes = hasMetadata ? AnnotationUtil.findQualifierAnnotationsNames(annotationMetadata) : null;
         if (CollectionUtils.isNotEmpty(qualifierTypes)) {
             if (qualifierTypes.size() == 1) {
                 return Qualifiers.byAnnotation(
-                        annotationMetadata,
-                        qualifierTypes.iterator().next()
+                    annotationMetadata,
+                    qualifierTypes.getFirst()
                 );
             } else {
                 Qualifier[] qualifiers = new Qualifier[qualifierTypes.size()];
@@ -103,7 +112,6 @@ public class Qualifiers {
                 return Qualifiers.byQualifiers(qualifiers);
             }
         }
-
         return null;
     }
 
@@ -136,7 +144,7 @@ public class Qualifiers {
      */
     @UsedByGeneratedCode
     public static <T> Qualifier<T> byName(String name) {
-        return new NameQualifier<>(null, name);
+        return new NameQualifier<>(name);
     }
 
     /**
@@ -146,7 +154,7 @@ public class Qualifiers {
      * @since 4.0.0
      */
     @Nullable
-    public static String findName(@NonNull Qualifier<?> qualifier) {
+    public static String findName(Qualifier<?> qualifier) {
         if (qualifier instanceof NameQualifier<?> nameQualifier) {
             return nameQualifier.getName();
         }
@@ -297,7 +305,7 @@ public class Qualifiers {
         if (instance != null) {
             return instance;
         }
-        return new AnnotationStereotypeQualifier<>(stereotype);
+        return new AnnotationStereotypeQualifier<>(stereotype.getName());
     }
 
     /**
@@ -313,7 +321,7 @@ public class Qualifiers {
         if (qualifier != null) {
             return qualifier;
         }
-        return new NamedAnnotationStereotypeQualifier<>(stereotype);
+        return new AnnotationStereotypeQualifier<>(stereotype);
     }
 
     /**
@@ -335,7 +343,7 @@ public class Qualifiers {
      * @return The qualifier
      * @since 3.0.0
      */
-    public static @NonNull <T> Qualifier<T> byExactTypeArgumentName(@NonNull String typeName) {
+    public static <T> Qualifier<T> byExactTypeArgumentName(String typeName) {
         return new ExactTypeArgumentNameQualifier<>(typeName);
     }
 
@@ -369,8 +377,7 @@ public class Qualifiers {
      * @param <T>                The bean type
      * @return The qualifier
      */
-    public static @NonNull
-    <T> Qualifier<T> byInterceptorBinding(@NonNull AnnotationMetadata annotationMetadata) {
+    public static <T> Qualifier<T> byInterceptorBinding(AnnotationMetadata annotationMetadata) {
         return new InterceptorBindingQualifier<>(annotationMetadata);
     }
 
@@ -382,13 +389,12 @@ public class Qualifiers {
      * @return The qualifier
      * @since 3.3.0
      */
-    public static @NonNull
-    <T> Qualifier<T> byInterceptorBindingValues(@NonNull Collection<AnnotationValue<?>> binding) {
-        return new InterceptorBindingQualifier<>(binding);
+    public static <T> Qualifier<T> byInterceptorBindingValues(Collection<AnnotationValue<?>> binding) {
+        return new InterceptorBindingQualifier(binding);
     }
 
     @Nullable
-    private static <T> Qualifier<T> findCustomByType(@NonNull AnnotationMetadata metadata, @NonNull Class<? extends Annotation> type) {
+    private static <T> Qualifier<T> findCustomByType(AnnotationMetadata metadata, Class<? extends Annotation> type) {
         if (Any.class == type) {
             //noinspection unchecked
             return AnyQualifier.INSTANCE;
@@ -410,7 +416,7 @@ public class Qualifiers {
     }
 
     @Nullable
-    private static <T> Qualifier<T> findCustomByName(@NonNull AnnotationMetadata metadata, @NonNull String type) {
+    private static <T> Qualifier<T> findCustomByName(AnnotationMetadata metadata, String type) {
         if (Type.NAME.equals(type)) {
             Optional<Class> aClass = metadata.classValue(type);
             if (aClass.isPresent()) {
@@ -435,10 +441,7 @@ public class Qualifiers {
         @Override
         public <B extends BeanType<T>> Stream<B> reduce(Class<T> beanType, Stream<B> candidates) {
             return candidates.filter(candidate -> {
-                if (!QualifierUtils.matchType(beanType, candidate)) {
-                    return false;
-                }
-                if (QualifierUtils.matchAny(beanType, candidate)) {
+                if (QualifierUtils.match(candidate, this)) {
                     return true;
                 }
 

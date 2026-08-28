@@ -16,8 +16,6 @@
 package io.micronaut.aop.simple
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 import spock.lang.Unroll
 

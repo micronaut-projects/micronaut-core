@@ -16,15 +16,12 @@
 package io.micronaut.http.body.stream;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.body.ByteBody;
-import io.micronaut.http.exceptions.BufferLengthExceededException;
-import io.micronaut.http.exceptions.ContentLengthExceededException;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -34,7 +31,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.OptionalLong;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Base type for a shared buffer that distributes a single {@link BufferConsumer} input to multiple
@@ -47,7 +43,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     private static final Logger SPLIT_LOG = LoggerFactory.getLogger(SPLIT_LOG_CLASS);
 
     private final ReadBufferFactory readBufferFactory;
-    private final BodySizeLimits limits;
+    private SizeLimitTracker.TrackerPair sizeLimitTrackers;
     /**
      * Upstream of all subscribers. This is only used to cancel incoming data if the max
      * request size is exceeded.
@@ -60,6 +56,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     /**
      * Any stream error.
      */
+    @Nullable
     private Throwable error;
     /**
      * Number of reserved subscriber spots. A new subscription MUST be preceded by a
@@ -69,11 +66,13 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     /**
      * Active subscribers.
      */
-    private List<@NonNull BufferConsumer> subscribers;
+    @Nullable
+    private List<BufferConsumer> subscribers;
     /**
      * Active subscribers that need the fully buffered body.
      */
-    private List<@NonNull DelayedExecutionFlow<ReadBuffer>> fullSubscribers;
+    @Nullable
+    private List<DelayedExecutionFlow<ReadBuffer>> fullSubscribers;
     /**
      * This flag is only used in tests, to verify that the BufferConsumer methods arent called
      * in a reentrant fashion.
@@ -93,20 +92,31 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * If not all {@link #subscribers} are ready or there are {@link #fullSubscribers}, this list
      * buffers input data.
      */
+    @Nullable
     private List<ReadBuffer> buffer;
-
-    private BufferLengthExceededException bufferLimitsExceeded = null;
+    @Nullable
+    private Exception bufferSizeExceeded = null;
 
     public BaseSharedBuffer(ReadBufferFactory readBufferFactory, BodySizeLimits limits, BufferConsumer.Upstream rootUpstream) {
         this.readBufferFactory = readBufferFactory;
-        this.limits = limits;
         this.rootUpstream = rootUpstream;
+        this.sizeLimitTrackers = SizeLimitTracker.notThreadSafe(limits);
     }
 
     public static void logClaim() {
         if (SPLIT_LOG.isTraceEnabled()) {
             SPLIT_LOG.trace("Body split at this location. This is not an error, but may aid in debugging other errors", new Exception());
         }
+    }
+
+    /**
+     * Add a second size limit tracker to this buffer. This tracker can be shared with other
+     * buffers.
+     *
+     * @param sizeLimitTrackers The additional tracker
+     */
+    public void addSizeLimitTrackers(SizeLimitTracker.TrackerPair sizeLimitTrackers) {
+        this.sizeLimitTrackers = SizeLimitTracker.combine(this.sizeLimitTrackers, sizeLimitTrackers);
     }
 
     /**
@@ -120,15 +130,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         return l < 0 ? OptionalLong.empty() : OptionalLong.of(l);
     }
 
-    public final BodySizeLimits getLimits() {
-        return limits;
-    }
-
     public final BufferConsumer.Upstream getRootUpstream() {
         return rootUpstream;
     }
 
-    public final void setExpectedLengthFrom(String contentLength) {
+    public final void setExpectedLengthFrom(@Nullable String contentLength) {
         if (contentLength == null) {
             return;
         }
@@ -141,8 +147,9 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         if (parsed < 0) {
             return;
         }
-        if (parsed > limits.maxBodySize()) {
-            error(new ContentLengthExceededException(limits.maxBodySize(), parsed));
+        Exception totalSizeException = sizeLimitTrackers.totalSize().add(parsed);
+        if (totalSizeException != null) {
+            error(totalSizeException);
         }
         setExpectedLength(parsed);
     }
@@ -239,8 +246,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             forwardInitialBuffer(subscriber, last);
             if (error != null) {
                 subscriber.error(error);
-            } else if (bufferLimitsExceeded != null) {
-                subscriber.error(bufferLimitsExceeded);
+            } else if (bufferSizeExceeded != null) {
+                subscriber.error(bufferSizeExceeded);
                 specificUpstream.allowDiscard();
             }
             if (complete) {
@@ -279,8 +286,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         working = true;
         boolean last = --reserved == 0;
         Throwable error = this.error;
-        if (error == null && lengthSoFar > limits.maxBufferSize()) {
-            error = new BufferLengthExceededException(limits.maxBufferSize(), lengthSoFar);
+        if (error == null && bufferSizeExceeded != null) {
+            error = bufferSizeExceeded;
             specificUpstream.allowDiscard();
         }
         if (error != null) {
@@ -288,12 +295,6 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 ret = ExecutionFlow.error(error);
             } else {
                 targetFlow.completeExceptionally(error);
-            }
-        } else if (bufferLimitsExceeded != null) {
-            if (canReturnImmediate) {
-                ret = ExecutionFlow.error(bufferLimitsExceeded);
-            } else {
-                targetFlow.completeExceptionally(bufferLimitsExceeded);
             }
         } else if (complete) {
             ReadBuffer buf = getBufferedData(last);
@@ -319,10 +320,13 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     private void discardBuffer() {
         if (buffer != null) {
+            long n = 0;
             for (ReadBuffer rb : buffer) {
+                n += rb.readable();
                 rb.close();
             }
             buffer = null;
+            sizeLimitTrackers.bufferedSize().subtract(n);
         }
     }
 
@@ -347,12 +351,15 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             if (complete || error != null) {
                 return;
             }
-            if (newLength > limits.maxBodySize()) {
-                // for maxBodySize, all subscribers get the error
-                error(new ContentLengthExceededException(limits.maxBodySize(), newLength));
-                rootUpstream.allowDiscard();
-                return;
-            }
+            if (expectedLength == -1) {
+                Exception totalSizeException = sizeLimitTrackers.totalSize().add(rb.readable());
+                if (totalSizeException != null) {
+                    // for maxBodySize, all subscribers get the error
+                    error(totalSizeException);
+                    rootUpstream.allowDiscard();
+                    return;
+                }
+            } // else, already checked the Content-Length
 
             working = true;
             if (subscribers != null) {
@@ -361,20 +368,21 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 }
             }
             if (reserved > 0 || fullSubscribers != null) {
-                if (newLength > limits.maxBufferSize() || bufferLimitsExceeded != null) {
-                    // new subscribers will recognize that the limit has been exceeded. Streaming
-                    // subscribers can proceed normally. Need to notify buffering subscribers
-                    discardBuffer();
-                    if (bufferLimitsExceeded == null) {
-                        bufferLimitsExceeded = new BufferLengthExceededException(limits.maxBufferSize(), lengthSoFar);
-                    if (fullSubscribers != null) {
-                        for (DelayedExecutionFlow<?> fullSubscriber : fullSubscribers) {
-                            fullSubscriber.completeExceptionally(bufferLimitsExceeded);
-                        }
-                        fullSubscribers = null;
+                if (bufferSizeExceeded == null) {
+                    bufferSizeExceeded = sizeLimitTrackers.bufferedSize().add(rb.readable());
+                    if (bufferSizeExceeded != null) {
+                        discardBuffer();
+                        // new subscribers will recognize that the limit has been exceeded. Streaming
+                        // subscribers can proceed normally. Need to notify buffering subscribers
+                        if (fullSubscribers != null) {
+                            for (DelayedExecutionFlow<?> fullSubscriber : fullSubscribers) {
+                                fullSubscriber.completeExceptionally(bufferSizeExceeded);
+                            }
+                            fullSubscribers = null;
                         }
                     }
-                } else {
+                }
+                if (bufferSizeExceeded == null) {
                     if (buffer == null) {
                         buffer = new ArrayList<>();
                     }
@@ -389,6 +397,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      * Implementation of {@link BufferConsumer#complete()}.<br>
      * Not thread safe, caller must handle concurrency.
      */
+    @Override
     public void complete() {
         if (expectedLength > lengthSoFar) {
             throw new IncorrectContentLengthException("Received fewer bytes than specified by Content-Length");
@@ -400,7 +409,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 subscriber.complete();
             }
         }
-        if (fullSubscribers != null && bufferLimitsExceeded == null) {
+        if (fullSubscribers != null && bufferSizeExceeded == null) {
             boolean last = reserved <= 0;
             for (Iterator<DelayedExecutionFlow<ReadBuffer>> iterator = fullSubscribers.iterator(); iterator.hasNext(); ) {
                 DelayedExecutionFlow<ReadBuffer> fullSubscriber = iterator.next();
@@ -416,9 +425,12 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      *
      * @param e The error
      */
+    @Override
     public void error(Throwable e) {
         if (error != null) {
-            error.addSuppressed(e);
+            if (error != e) {
+                error.addSuppressed(e);
+            }
             return;
         }
 
@@ -429,7 +441,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 subscriber.error(e);
             }
         }
-        if (fullSubscribers != null && bufferLimitsExceeded == null) {
+        if (fullSubscribers != null && bufferSizeExceeded == null) {
             for (DelayedExecutionFlow<?> fullSubscriber : fullSubscribers) {
                 fullSubscriber.completeExceptionally(e);
             }
@@ -444,8 +456,8 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     public static final class AsFlux implements BufferConsumer {
         private final BaseSharedBuffer sharedBuffer;
-        private final AtomicLong unconsumed = new AtomicLong(0);
         private final Sinks.Many<ReadBuffer> sink = Sinks.many().unicast().onBackpressureBuffer();
+        private boolean first = true;
 
         public AsFlux(BaseSharedBuffer sharedBuffer) {
             this.sharedBuffer = sharedBuffer;
@@ -453,9 +465,16 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
         @Override
         public void add(ReadBuffer buf) {
-            long newLength = unconsumed.addAndGet(buf.readable());
-            if (newLength > sharedBuffer.getLimits().maxBufferSize()) {
-                sink.tryEmitError(new BufferLengthExceededException(sharedBuffer.getLimits().maxBufferSize(), newLength));
+            if (first) {
+                // we need to upgrade to an atomic tracker so that we can properly subtract in doOnNext
+                sharedBuffer.sizeLimitTrackers = new SizeLimitTracker.TrackerPair(
+                    sharedBuffer.sizeLimitTrackers.totalSize(), sharedBuffer.sizeLimitTrackers.bufferedSize().makeAtomic()
+                );
+                first = false;
+            }
+            Exception bufferExceededExc = sharedBuffer.sizeLimitTrackers.bufferedSize().add(buf.readable());
+            if (bufferExceededExc != null) {
+                sink.tryEmitError(bufferExceededExc);
                 buf.close();
             } else if (sink.tryEmitNext(buf) != Sinks.EmitResult.OK) {
                 buf.close();
@@ -477,7 +496,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                 .doOnSubscribe(s -> upstream.start())
                 .doOnNext(bb -> {
                     int size = bb.readable();
-                    unconsumed.addAndGet(-size);
+                    sharedBuffer.sizeLimitTrackers.bufferedSize().subtract(size);
                     upstream.onBytesConsumed(size);
                 })
                 .doOnCancel(() -> {

@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -42,7 +42,7 @@ public class RoutesVersioningConfiguration implements Toggleable {
     public static final String PREFIX = "micronaut.router.versioning";
     private static final boolean DEFAULT_ENABLED = false;
     private boolean enabled = DEFAULT_ENABLED;
-    private String defaultVersion;
+    private @Nullable String defaultVersion;
 
     /**
      * @param enabled Enables the version based route matches filtering.

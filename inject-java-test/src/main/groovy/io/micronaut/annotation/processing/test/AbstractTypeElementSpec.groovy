@@ -27,16 +27,14 @@ import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextBuilder
-import io.micronaut.context.ApplicationContextConfiguration
-import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.DefaultBeanDefinitionsProvider
 import io.micronaut.context.Qualifier
-import io.micronaut.context.env.Environment
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationMetadataProvider
 import io.micronaut.core.annotation.Experimental
-import io.micronaut.core.annotation.NonNull
-import io.micronaut.core.annotation.Nullable
+import org.jspecify.annotations.NonNull
+import org.jspecify.annotations.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.graal.GraalReflectionConfigurer
@@ -309,30 +307,21 @@ class Test {
             builder.environments("test")
             builder.properties(properties)
             configureContext(builder)
-            def env = builder.build().environment
-            def context = new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
-                @Override
-                protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-                    def references = StreamSupport.stream(javaFiles.spliterator(), false)
-                            .filter({ JavaFileObject jfo ->
-                                jfo.kind == JavaFileObject.Kind.CLASS && (jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + '$Reference' + ".class") ||  jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + ".class"))
-                            })
-                            .map({ JavaFileObject jfo ->
-                                def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
-                                name = name.replace('/', '.') - '.class'
-                                return (BeanDefinitionReference) classLoader.loadClass(name).newInstance()
-                            })
-                            .collect(Collectors.toList())
+            builder.beanDefinitionsProvider {
+                def references = StreamSupport.stream(javaFiles.spliterator(), false)
+                        .filter({ JavaFileObject jfo ->
+                            jfo.kind == JavaFileObject.Kind.CLASS && (jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + '$Reference' + ".class") ||  jfo.name.endsWith(BeanDefinitionWriter.CLASS_SUFFIX + ".class"))
+                        })
+                        .map({ JavaFileObject jfo ->
+                            def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
+                            name = name.replace('/', '.') - '.class'
+                            return (BeanDefinitionReference) classLoader.loadClass(name).newInstance()
+                        })
+                        .collect(Collectors.toList())
 
-                    return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : getBuiltInBeanReferences())
-                }
-
-                @Override
-                protected Environment createEnvironment(@NonNull ApplicationContextConfiguration configuration) {
-                    return env
-                }
+                return references + (includeAllBeans ? new DefaultBeanDefinitionsProvider().provide(it) : getBuiltInBeanReferences())
             }
-            return context.start()
+            return builder.build().start()
         }
     }
 
@@ -583,17 +572,7 @@ class Test {
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
         byte[] bytecode = AnnotationMetadataWriter.write(className, toWrite)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
-        ClassLoader classLoader = new ClassLoader() {
-            @Override
-            protected Class<?> findClass(String name) throws ClassNotFoundException {
-                if (name == className) {
-                    byte[] bytes = bytecode
-                    return defineClass(name, bytes, 0, bytes.length)
-                }
-                return super.findClass(name)
-            }
-        }
-
+        ClassLoader classLoader = new DefiningClassLoader(className, bytecode)
         return ((AnnotationMetadataProvider) classLoader.loadClass(className).newInstance()).getAnnotationMetadata()
     }
 
@@ -702,7 +681,7 @@ class Test {
             def typeArguments = classElement.getTypeArguments().values()
             if (typeArguments.isEmpty()) {
                 return classElement.getSimpleName()
-            } else if (typeArguments.stream().allMatch { it.isRawType() }) {
+            } else if (typeArguments.stream().allMatch { it.isRawType() && it.isGenericPlaceholder() }) {
                 return classElement.getSimpleName()
             } else {
                 return classElement.getSimpleName() + typeArguments.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
@@ -729,5 +708,32 @@ class Test {
             return files
         }
 
+    }
+
+
+    // Workaround for Groovy 5 compiler bug
+    // java.lang.IllegalAccessException: class org.codehaus.groovy.reflection.CachedMethod cannot access a member of class java.lang.ClassLoader (in module java.base) with modifiers "protected final"
+    //	at io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec$2.findClass(AbstractBeanDefinitionSpec.groovy:229)
+    //	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:593)
+    //	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+    //	at io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec.writeAndLoadMetadata(AbstractBeanDefinitionSpec.groovy:235)
+    //	at io.micronaut.ast.groovy.annotation.router.GroovyAnnotationMetadataBuilderSpec.test enum value action annotation metadata(GroovyAnnotationMetadataBuilderSpec.groovy:51)
+    @CompileStatic
+    private static class DefiningClassLoader extends ClassLoader {
+        private final String className
+        private final byte[] bytecode
+
+        DefiningClassLoader(String className, byte[] bytecode) {
+            this.className = className
+            this.bytecode = bytecode
+        }
+
+        @Override
+        protected Class<?> findClass(String name) throws ClassNotFoundException {
+            if (name == className) {
+                return super.defineClass(name, bytecode, 0, bytecode.length)
+            }
+            return super.findClass(name)
+        }
     }
 }

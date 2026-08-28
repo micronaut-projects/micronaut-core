@@ -11,7 +11,7 @@ import spock.lang.Specification
 import java.util.stream.Collectors
 
 class AnyProviderSpec extends Specification {
-    @Shared @AutoCleanup ApplicationContext beanContext = ApplicationContext.run()
+    @Shared @AutoCleanup ApplicationContext beanContext = ApplicationContext.run(['spec.name':'AnyProviderSpec'])
 
     void 'test any injection'() {
         when:

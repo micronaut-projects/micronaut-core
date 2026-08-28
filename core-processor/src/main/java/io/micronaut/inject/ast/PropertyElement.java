@@ -16,8 +16,6 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.NonNull;
-
 import java.util.Optional;
 
 /**
@@ -31,7 +29,6 @@ public interface PropertyElement extends TypedElement, MemberElement {
     /**
      * @return The type of the property
      */
-    @NonNull
     @Override
     ClassElement getType();
 
@@ -142,7 +139,10 @@ public interface PropertyElement extends TypedElement, MemberElement {
     /**
      * @return The read type annotation metadata.
      * @since 4.4.0
+     * @deprecated Not used
+     * @since 4.10
      */
+    @Deprecated(forRemoval = true, since = "4.10")
     default Optional<AnnotationMetadata> getReadTypeAnnotationMetadata() {
         return Optional.empty();
     }
@@ -150,7 +150,10 @@ public interface PropertyElement extends TypedElement, MemberElement {
     /**
      * @return The write type annotation metadata.
      * @since 4.4.0
+     * @deprecated Not used
+     * @since 4.10
      */
+    @Deprecated(forRemoval = true, since = "4.10")
     default Optional<AnnotationMetadata> getWriteTypeAnnotationMetadata() {
         return Optional.empty();
     }

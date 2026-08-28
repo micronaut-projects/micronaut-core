@@ -15,8 +15,10 @@
  */
 package io.micronaut.aop;
 
+import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.Internal;
 import jakarta.inject.Singleton;
 
@@ -65,6 +67,7 @@ public @interface Adapter {
      *
      * @return An interface to adapt
      */
+    @AliasFor(member = "value", annotation = Indexed.class)
     Class<?> value();
 
     /**

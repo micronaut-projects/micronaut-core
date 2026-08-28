@@ -16,6 +16,8 @@
 package io.micronaut.inject.qualifiers.replaces;
 
 import jakarta.inject.Singleton;
+import io.micronaut.context.annotation.Requires;
 
+@Requires(property = "spec.name", value = "ReplacesSpec")
 @Singleton
 public class A1 implements A {}

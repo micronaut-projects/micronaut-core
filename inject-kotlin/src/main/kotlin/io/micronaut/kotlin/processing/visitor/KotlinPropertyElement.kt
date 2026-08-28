@@ -45,11 +45,21 @@ internal class KotlinPropertyElement(
     override val abstract = property.isAbstract()
 
     override val resolvedType: ClassElement by lazy {
-        newClassElement(nativeType, property.type.resolve(), emptyMap())
+        val getterReturnType = property.getter?.returnType?.resolve()
+        if (getterReturnType != null && getterReturnType != property.type.resolve()) {
+            newClassElement(nativeType, getterReturnType, emptyMap())
+        } else {
+            newClassElement(nativeType, property.type.resolve(), emptyMap())
+        }
     }
 
     override val resolvedGenericType: ClassElement by lazy {
-        newClassElement(nativeType, property.type.resolve(), declaringType.typeArguments)
+        val getterReturnType = property.getter?.returnType?.resolve()
+        if (getterReturnType != null && getterReturnType != property.type.resolve()) {
+            newClassElement(nativeType, getterReturnType, declaringType.typeArguments)
+        } else {
+            newClassElement(nativeType, property.type.resolve(), declaringType.typeArguments)
+        }
     }
 
     override val setter: Optional<MethodElement> by lazy {

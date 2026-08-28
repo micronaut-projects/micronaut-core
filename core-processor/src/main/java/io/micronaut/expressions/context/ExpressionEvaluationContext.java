@@ -16,8 +16,7 @@
 package io.micronaut.expressions.context;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -47,8 +46,7 @@ public interface ExpressionEvaluationContext {
      * @param name searched method name
      * @return list of methods with provided name
      */
-    @NonNull
-    List<MethodElement> findMethods(@NonNull String name);
+    List<MethodElement> findMethods(String name);
 
     /**
      * Search bean properties in compilation context by name.
@@ -56,8 +54,7 @@ public interface ExpressionEvaluationContext {
      * @param name searched property name
      * @return list of properties with provided name
      */
-    @NonNull
-    List<PropertyElement> findProperties(@NonNull String name);
+    List<PropertyElement> findProperties(String name);
 
     /**
      * Search method parameters in compilation context by name.
@@ -65,6 +62,5 @@ public interface ExpressionEvaluationContext {
      * @param name searched parameter name
      * @return list of parameters with provided name
      */
-    @NonNull
-    List<ParameterElement> findParameters(@NonNull String name);
+    List<ParameterElement> findParameters(String name);
 }

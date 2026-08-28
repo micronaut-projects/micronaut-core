@@ -17,8 +17,6 @@ package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NextMajorVersion;
-import io.micronaut.core.annotation.NonNull;
-
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.AbstractMap;
@@ -58,7 +56,7 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
     private final int maxSizeWithEvictionMargin;
 
     @SuppressWarnings("unused")
-    private Map<? extends K, ? extends V> actualField;
+    private Map<? extends K, ? extends V> actualField = EMPTY;
 
     static {
         try {
@@ -104,14 +102,13 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
         ACTUAL_HANDLE.setRelease(this, map);
     }
 
-    @NonNull
     @Override
     public Set<Entry<K, V>> entrySet() {
         return new EntrySet();
     }
 
     @Override
-    public V get(Object key) {
+    public @org.jspecify.annotations.Nullable V get(Object key) {
         return actual().get(key);
     }
 
@@ -248,12 +245,12 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
     }
 
     @Override
-    public boolean remove(@NonNull Object key, Object value) {
+    public boolean remove(Object key, Object value) {
         return update(m -> m.remove(key, value));
     }
 
     @Override
-    public boolean replace(@NonNull K key, @NonNull V oldValue, @NonNull V newValue) {
+    public boolean replace(K key, V oldValue, V newValue) {
         return update(m -> m.replace(key, oldValue, newValue));
     }
 
@@ -266,7 +263,7 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
     }
 
     @Override
-    public V computeIfAbsent(K key, @NonNull Function<? super K, ? extends V> mappingFunction) {
+    public V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction) {
         V present = get(key);
         if (present != null) {
             // fast path without sync
@@ -277,33 +274,33 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
     }
 
     @Override
-    public V computeIfPresent(K key, @NonNull BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+    public V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
         return update(m -> m.computeIfPresent(key, remappingFunction));
     }
 
     @Override
-    public V compute(K key, @NonNull BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
+    public V compute(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
         return update(m -> m.compute(key, remappingFunction));
     }
 
     @Override
-    public V merge(K key, @NonNull V value, @NonNull BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
+    public V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
         return update(m -> m.merge(key, value, remappingFunction));
     }
 
     @Override
-    public V putIfAbsent(@NonNull K key, V value) {
+    public V putIfAbsent(K key, V value) {
         return update(m -> m.putIfAbsent(key, value));
     }
 
     @Override
-    public V replace(@NonNull K key, @NonNull V value) {
+    public V replace(K key, V value) {
         return update(m -> m.replace(key, value));
     }
 
     private final class EntrySetIterator implements Iterator<Entry<K, V>> {
         final Iterator<? extends Entry<? extends K, ? extends V>> itr = actual().entrySet().iterator();
-        K lastKey;
+        @org.jspecify.annotations.Nullable K lastKey;
 
         @Override
         public boolean hasNext() {
@@ -319,7 +316,9 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
 
         @Override
         public void remove() {
-            CopyOnWriteMap.this.remove(lastKey);
+            if (lastKey != null) {
+                CopyOnWriteMap.this.remove(lastKey);
+            }
         }
     }
 

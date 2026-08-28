@@ -17,9 +17,16 @@ package io.micronaut.web.router.exceptions;
 
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.CookieValue;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.Part;
+import io.micronaut.http.annotation.PathVariable;
+import io.micronaut.http.annotation.QueryValue;
+import io.micronaut.http.annotation.RequestAttribute;
 
 import java.lang.annotation.Annotation;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -81,5 +88,10 @@ public class UnsatisfiedRouteException extends RoutingException {
      */
     public Argument<?> getArgument() {
         return argument;
+    }
+
+    @Override
+    public String getMessage() {
+        return Objects.requireNonNull(super.getMessage(), "Unsatisfied route");
     }
 }

@@ -15,13 +15,15 @@
  */
 package io.micronaut.http;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * An enum containing the valid HTTP methods. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public enum HttpMethod implements CharSequence {
+ public enum HttpMethod implements CharSequence {
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.2.
@@ -67,6 +69,12 @@ public enum HttpMethod implements CharSequence {
      * See https://tools.ietf.org/html/rfc5789.
      */
     PATCH(true, true),
+
+    /**
+     * See https://www.rfc-editor.org/rfc/rfc10008.txt.
+     * @since 5.2.0
+     */
+    QUERY(true, true),
 
     /**
      * A custom non-standard HTTP method.
@@ -133,7 +141,7 @@ public enum HttpMethod implements CharSequence {
      * @return True if it does
      */
     public static boolean requiresRequestBody(HttpMethod method) {
-        return method != null && (method.equals(POST) || method.equals(PUT) || method.equals(PATCH));
+        return method != null && (method.equals(POST) || method.equals(PUT) || method.equals(PATCH) || method.equals(QUERY));
     }
 
     /**
@@ -168,7 +176,7 @@ public enum HttpMethod implements CharSequence {
         return CUSTOM;
     }
 
-    private static HttpMethod parseString(String httpMethodName) {
+    private static @Nullable HttpMethod parseString(String httpMethodName) {
         switch (httpMethodName) {
             case "OPTIONS":
             case "options":
@@ -197,6 +205,9 @@ public enum HttpMethod implements CharSequence {
             case "PATCH":
             case "patch":
                 return PATCH;
+            case "QUERY":
+            case "query":
+                return QUERY;
             default:
                 return null;
         }

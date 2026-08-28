@@ -16,8 +16,7 @@
 package io.micronaut.web.router.naming;
 
 import io.micronaut.context.annotation.Value;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.TypeConvention;
 import io.micronaut.core.util.StringUtils;
@@ -27,6 +26,8 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.web.router.RouteBuilder;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+
+import java.util.Objects;
 
 /**
  * The default {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} if none is provided by the application.
@@ -64,7 +65,7 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
     }
 
     @Override
-    public @NonNull String resolveUri(BeanDefinition<?> beanDefinition) {
+    public String resolveUri(BeanDefinition<?> beanDefinition) {
         String uri = beanDefinition.stringValue(UriMapping.class).orElseGet(() ->
                 beanDefinition.stringValue(Controller.class).orElse(UriMapping.DEFAULT_URI)
         );
@@ -72,7 +73,7 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
     }
 
     @Override
-    public @NonNull String resolveUri(String property) {
+    public String resolveUri(String property) {
         if (StringUtils.isEmpty(property)) {
             return contextPath + "/";
         }
@@ -87,9 +88,7 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
             if (contextPath.charAt(0) != '/') {
                 contextPath = '/' + contextPath;
             }
-            if (contextPath.charAt(contextPath.length() - 1) == '/') {
-                contextPath = contextPath.substring(0, contextPath.length() - 1);
-            }
+            contextPath = Objects.requireNonNull(StringUtils.trimTrailingCharacter(contextPath, '/'));
         }
         return contextPath;
     }

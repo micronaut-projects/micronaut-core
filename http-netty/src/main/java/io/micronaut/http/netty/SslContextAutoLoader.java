@@ -17,8 +17,7 @@ package io.micronaut.http.netty;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.http.ssl.CertificateProvider;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -29,6 +28,7 @@ import reactor.util.function.Tuples;
 
 import java.security.KeyStore;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -48,6 +48,7 @@ public abstract class SslContextAutoLoader {
 
     @Nullable
     private SslContextHolder current;
+    @Nullable
     private Disposable refreshSslDisposable;
     private long generation;
 
@@ -126,14 +127,14 @@ public abstract class SslContextAutoLoader {
      *
      * @return a provider of {@link CertificateProvider} beans
      */
-    protected abstract @NonNull BeanProvider<CertificateProvider> certificateProviders();
+    protected abstract BeanProvider<CertificateProvider> certificateProviders();
 
     /**
      * The SSL configuration used to derive defaults like protocols, ciphers and client auth.
      *
      * @return the SSL configuration
      */
-    protected abstract @NonNull SslConfiguration sslConfiguration();
+    protected abstract SslConfiguration sslConfiguration();
 
     /**
      * Whether the target transport is QUIC/HTTP3 (true) or TCP (false).
@@ -148,7 +149,7 @@ public abstract class SslContextAutoLoader {
      *
      * @return a holder for legacy contexts
      */
-    protected abstract @NonNull SslContextHolder createLegacy();
+    protected abstract SslContextHolder createLegacy();
 
     /**
      * Start auto-loading using names from {@link SslConfiguration}
@@ -193,7 +194,7 @@ public abstract class SslContextAutoLoader {
             nextDisposable = Flux.from(keyProvider.getKeyStore())
                 .subscribe(ks -> refreshSsl(ks, null, gen));
         } else {
-            CertificateProvider trustProvider = certificateProviders().get(Qualifiers.byName(trustName));
+            CertificateProvider trustProvider = certificateProviders().get(Qualifiers.byName(Objects.requireNonNull(trustName)));
             nextDisposable = Flux.from(trustProvider.getTrustStore())
                 .subscribe(ts -> refreshSsl(null, ts, gen));
         }
@@ -216,7 +217,7 @@ public abstract class SslContextAutoLoader {
      *
      * @return the builder to construct Netty SSL contexts
      */
-    protected abstract @NonNull NettySslContextBuilder builder();
+    protected abstract NettySslContextBuilder builder();
 
     /**
      * Build fresh SSL contexts from the supplied key/trust stores and swap the active holder.

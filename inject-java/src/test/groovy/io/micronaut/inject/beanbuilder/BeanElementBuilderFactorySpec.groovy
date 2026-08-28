@@ -1,6 +1,7 @@
 package io.micronaut.inject.beanbuilder
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.aop.InterceptedProxy
 import io.micronaut.inject.visitor.TypeElementVisitor
 
 class BeanElementBuilderFactorySpec extends AbstractTypeElementSpec {
@@ -27,8 +28,39 @@ class Foo {
         context.close()
     }
 
+    void "test add associated factory bean with lazy proxy advice"() {
+        given:
+        InterceptedTestBeanProducer.reset()
+        def context = buildContext('''
+package factorybuilder;
+
+import io.micronaut.context.annotation.Prototype;
+
+@Prototype
+class Foo {
+}
+''')
+
+        when:
+        def bean = context.getBean(InterceptedTestBeanProducer.LazyProducedBean)
+
+        then:
+        bean instanceof InterceptedProxy
+        InterceptedTestBeanProducer.created == 0
+
+        when:
+        def result = bean.ping()
+
+        then:
+        result == "pong"
+        InterceptedTestBeanProducer.created == 1
+
+        cleanup:
+        context.close()
+    }
+
     @Override
     protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
-        [new TestBeanFactoryDefiningVisitor()]
+        [new TestBeanFactoryDefiningVisitor(), new TestInterceptedBeanFactoryDefiningVisitor()]
     }
 }

@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.http.ssl;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 
@@ -73,6 +71,7 @@ public abstract class SslBuilder<T> {
      *
      * @return The {@link TrustManagerFactory}
      */
+    @Nullable
     protected TrustManagerFactory getTrustManagerFactory(SslConfiguration ssl) {
         Optional<KeyStore> store;
         try {
@@ -90,7 +89,7 @@ public abstract class SslBuilder<T> {
      *
      * @return The {@link TrustManagerFactory}
      */
-    protected TrustManagerFactory getTrustManagerFactory(KeyStore store) {
+    protected TrustManagerFactory getTrustManagerFactory(@Nullable KeyStore store) {
         try {
             TrustManagerFactory trustManagerFactory = TrustManagerFactory
                 .getInstance(TrustManagerFactory.getDefaultAlgorithm());
@@ -129,6 +128,7 @@ public abstract class SslBuilder<T> {
      *
      * @return The {@link KeyManagerFactory}
      */
+    @Nullable
     protected KeyManagerFactory getKeyManagerFactory(SslConfiguration ssl) {
         try {
             Optional<KeyStore> keyStore = getKeyStore(ssl);
@@ -281,11 +281,11 @@ public abstract class SslBuilder<T> {
         }
     }
 
-    private static @NonNull KeyStore createEmptyKeyStore(@Nullable String provider, String type) throws KeyStoreException, NoSuchProviderException {
+    private static KeyStore createEmptyKeyStore(@Nullable String provider, String type) throws KeyStoreException, NoSuchProviderException {
         return provider == null ? KeyStore.getInstance(type) : KeyStore.getInstance(type, provider);
     }
 
-    private void loadPem(@NonNull String resource, @Nullable String password, @Nullable String provider, KeyStore store) throws IOException, GeneralSecurityException, PemParser.NotPemException {
+    private void loadPem(String resource, @Nullable String password, @Nullable String provider, KeyStore store) throws IOException, GeneralSecurityException, PemParser.NotPemException {
         List<Object> items;
         try (InputStream s = resourceResolver.getResourceAsStream(resource).orElseThrow(resourceNotFound(resource))) {
             items = new PemParser(provider, password)
@@ -322,11 +322,14 @@ public abstract class SslBuilder<T> {
      * @since 4.10.0
      */
     protected abstract static sealed class CertificateSpec {
+        @Nullable
         final String type;
+        @Nullable
         final String password;
+        @Nullable
         final String provider;
 
-        private CertificateSpec(String type, String password, String provider) {
+        private CertificateSpec(@Nullable String type, @Nullable String password, @Nullable String provider) {
             this.type = type;
             this.password = password;
             this.provider = provider;
@@ -373,7 +376,7 @@ public abstract class SslBuilder<T> {
     protected static final class KeyStoreBasedCertificateSpec extends CertificateSpec {
         final String path;
 
-        private KeyStoreBasedCertificateSpec(String type, String password, String provider, String path) {
+        private KeyStoreBasedCertificateSpec(@Nullable String type, @Nullable String password, @Nullable String provider, String path) {
             super(type, password, provider);
             this.path = path;
         }
@@ -383,7 +386,6 @@ public abstract class SslBuilder<T> {
          *
          * @return The path
          */
-        @NonNull
         public String getPath() {
             return path;
         }
@@ -400,7 +402,7 @@ public abstract class SslBuilder<T> {
         final String keyPath;
         final String certificatePath;
 
-        private PemBasedCertificateSpec(String type, String password, String provider, String keyPath, String certificatePath) {
+        private PemBasedCertificateSpec(@Nullable String type, @Nullable String password, @Nullable String provider, String keyPath, String certificatePath) {
             super(type, password, provider);
             this.keyPath = keyPath;
             this.certificatePath = certificatePath;
@@ -411,7 +413,6 @@ public abstract class SslBuilder<T> {
          *
          * @return The path
          */
-        @NonNull
         public String getKeyPath() {
             return keyPath;
         }
@@ -421,7 +422,6 @@ public abstract class SslBuilder<T> {
          *
          * @return The path
          */
-        @NonNull
         public String getCertificatePath() {
             return certificatePath;
         }

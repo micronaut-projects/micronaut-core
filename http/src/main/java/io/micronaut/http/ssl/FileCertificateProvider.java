@@ -20,10 +20,9 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.annotation.PreDestroy;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +45,7 @@ import java.security.UnrecoverableKeyException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -65,20 +65,21 @@ public final class FileCertificateProvider implements CertificateProvider {
 
     private final String name;
     private final Flux<KeyStore> flux;
+    @Nullable
     private final WatchService watchService;
 
     /**
      * Create a provider that loads and optionally refreshes certificate material from disk.
      *
-     * @param config file configuration
-     * @param scheduler scheduled executor for periodic refresh
+     * @param config           file configuration
+     * @param scheduler        scheduled executor for periodic refresh
      * @param blockingExecutor executor used for blocking file watching
      * @throws Exception if the initial load fails or watcher setup fails
      */
     FileCertificateProvider(
-        @NonNull Config config,
-        @NonNull @jakarta.inject.Named(TaskExecutors.SCHEDULED) ExecutorService scheduler,
-        @NonNull @jakarta.inject.Named(TaskExecutors.BLOCKING) Executor blockingExecutor
+        Config config,
+        @jakarta.inject.Named(TaskExecutors.SCHEDULED) ExecutorService scheduler,
+        @jakarta.inject.Named(TaskExecutors.BLOCKING) Executor blockingExecutor
     ) throws Exception {
         if (config.refreshMode == RefreshMode.NONE) {
             flux = Flux.just(load(config));
@@ -89,7 +90,10 @@ public final class FileCertificateProvider implements CertificateProvider {
 
             WatchService ws = null;
             if (config.refreshMode == RefreshMode.FILE_WATCHER || config.refreshMode == RefreshMode.FILE_WATCHER_OR_SCHEDULER) {
-                Path directory = config.path.getParent();
+                Path directory = config.getPath().getParent();
+                if (directory == null) {
+                    throw new UnsupportedOperationException("No parent directory for certificate path: " + config.getPath());
+                }
                 try {
                     ws = directory.getFileSystem().newWatchService();
                     directory.register(ws, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_MODIFY);
@@ -121,7 +125,7 @@ public final class FileCertificateProvider implements CertificateProvider {
                             WatchKey key = finalWs.take();
                             boolean changed = false;
                             for (WatchEvent<?> event : key.pollEvents()) {
-                                if (event.context() instanceof Path ctx && (ctx.getFileName().equals(config.path.getFileName()) || (config.certificatePath != null && ctx.getFileName().equals(config.certificatePath.getFileName())))) {
+                                if (event.context() instanceof Path ctx && (ctx.getFileName().equals(config.getPath().getFileName()) || (config.certificatePath != null && ctx.getFileName().equals(config.certificatePath.getFileName())))) {
                                     changed = true;
                                     break;
                                 }
@@ -157,7 +161,9 @@ public final class FileCertificateProvider implements CertificateProvider {
      */
     @PreDestroy
     void close() throws IOException {
-        watchService.close();
+        if (watchService != null) {
+            watchService.close();
+        }
     }
 
     private static void loadSafe(Sinks.Many<KeyStore> sink, Config config) {
@@ -168,8 +174,8 @@ public final class FileCertificateProvider implements CertificateProvider {
         }
     }
 
-    private static @NonNull KeyStore load(Config config) throws GeneralSecurityException, PemParser.NotPemException, IOException {
-        byte[] mainBytes = Files.readAllBytes(config.path);
+    private static KeyStore load(Config config) throws GeneralSecurityException, PemParser.NotPemException, IOException {
+        byte[] mainBytes = Files.readAllBytes(config.getPath());
         byte[] certBytes;
         if (config.certificatePath != null) {
             if (config.format != Format.PEM) {
@@ -183,7 +189,7 @@ public final class FileCertificateProvider implements CertificateProvider {
         return load(config, mainBytes, certBytes);
     }
 
-    static @NonNull KeyStore load(AbstractCertificateFileConfig config, byte[] mainBytes, byte[] certBytes) throws GeneralSecurityException, PemParser.NotPemException, IOException {
+    static KeyStore load(AbstractCertificateFileConfig config, byte[] mainBytes, byte @Nullable [] certBytes) throws GeneralSecurityException, PemParser.NotPemException, IOException {
         KeyStore ks;
         if (config.format == null) {
             try {
@@ -210,7 +216,7 @@ public final class FileCertificateProvider implements CertificateProvider {
         return ks;
     }
 
-    private static KeyStore load(AbstractCertificateFileConfig config, byte @NonNull [] mainBytes, byte @Nullable [] certBytes, @NonNull Format format) throws GeneralSecurityException, IOException, PemParser.NotPemException {
+    private static KeyStore load(AbstractCertificateFileConfig config, byte[] mainBytes, byte @Nullable [] certBytes, Format format) throws GeneralSecurityException, IOException, PemParser.NotPemException {
         KeyStore ks = KeyStore.getInstance(format == Format.JKS ? "JKS" : "PKCS12");
         if (format == Format.PEM) {
             ks.load(null, null);
@@ -244,14 +250,13 @@ public final class FileCertificateProvider implements CertificateProvider {
         return ks;
     }
 
-    @NonNull
     @Override
-    public Publisher<@NonNull KeyStore> getKeyStore() {
+    public Publisher<KeyStore> getKeyStore() {
         return flux;
     }
 
     @Override
-    public @NonNull String getName() {
+    public String getName() {
         return name;
     }
 
@@ -262,16 +267,13 @@ public final class FileCertificateProvider implements CertificateProvider {
     @EachProperty(CONFIG_PREFIX + ".file")
     @BootstrapContextCompatible
     public static final class Config extends AbstractCertificateFileConfig {
-        @NonNull
-        private Path path;
+        private @Nullable Path path;
         @Nullable
         private Path certificatePath;
-        @NonNull
         private RefreshMode refreshMode = RefreshMode.FILE_WATCHER_OR_SCHEDULER;
-        @NonNull
         private Duration refreshInterval = Duration.ofHours(1);
 
-        public Config(@Parameter @NonNull String name) {
+        public Config(@Parameter String name) {
             super(name);
         }
 
@@ -279,25 +281,28 @@ public final class FileCertificateProvider implements CertificateProvider {
          * Path to the main certificate file to load. For JKS/PKCS12 this is a key store (optionally protected by {@code password}).
          * For PEM this file may contain a private key and optionally certificates; when it only contains a private key, the certificate
          * chain can be supplied via {@code certificatePath}. Reload behavior is controlled by {@code refreshMode}/{@code refreshInterval}.
+         *
          * @return the path to the certificate file
          */
-        public @NonNull Path getPath() {
-            return path;
+        public Path getPath() {
+            return Objects.requireNonNull(path, "Path must be set");
         }
 
         /**
          * Path to the main certificate file to load. For JKS/PKCS12 this is a key store (optionally protected by {@code password}).
          * For PEM this file may contain a private key and optionally certificates; when it only contains a private key, the certificate
          * chain can be supplied via {@code certificatePath}. Reload behavior is controlled by {@code refreshMode}/{@code refreshInterval}.
+         *
          * @param path the path to the certificate file
          */
-        public void setPath(@NonNull Path path) {
+        public void setPath(Path path) {
             this.path = path;
         }
 
         /**
          * Optional path to a separate PEM-encoded certificate chain. Only supported when the {@code format} is {@code PEM}.
          * When set, the main file at {@code path} must contain only the private key.
+         *
          * @return the path to the PEM certificate chain or {@code null}
          */
         public @Nullable Path getCertificatePath() {
@@ -307,6 +312,7 @@ public final class FileCertificateProvider implements CertificateProvider {
         /**
          * Optional path to a separate PEM-encoded certificate chain. Only supported when the {@code format} is {@code PEM}.
          * When set, the main file at {@code path} must contain only the private key.
+         *
          * @param certificatePath the path to the PEM certificate chain or {@code null}
          */
         public void setCertificatePath(@Nullable Path certificatePath) {
@@ -316,36 +322,40 @@ public final class FileCertificateProvider implements CertificateProvider {
         /**
          * Strategy for reloading the certificate file. {@code NONE}: load once. {@code FILE_WATCHER}: watch the directory and reload on changes.
          * {@code SCHEDULER}: periodically reload. {@code FILE_WATCHER_OR_SCHEDULER}: use a watcher when supported, otherwise fall back to scheduled reloads.
+         *
          * @return the refresh strategy
          */
-        public @NonNull RefreshMode getRefreshMode() {
+        public RefreshMode getRefreshMode() {
             return refreshMode;
         }
 
         /**
          * Strategy for reloading the certificate file. {@code NONE}: load once. {@code FILE_WATCHER}: watch the directory and reload on changes.
          * {@code SCHEDULER}: periodically reload. {@code FILE_WATCHER_OR_SCHEDULER}: use a watcher when supported, otherwise fall back to scheduled reloads.
+         *
          * @param refreshMode the refresh strategy
          */
-        public void setRefreshMode(@NonNull RefreshMode refreshMode) {
+        public void setRefreshMode(RefreshMode refreshMode) {
             this.refreshMode = refreshMode;
         }
 
         /**
          * Interval used for scheduled reloads when the refresh mode uses a scheduler or when file watching is not available and a scheduled
          * fallback is used.
+         *
          * @return the refresh interval
          */
-        public @NonNull Duration getRefreshInterval() {
+        public Duration getRefreshInterval() {
             return refreshInterval;
         }
 
         /**
          * Interval used for scheduled reloads when the refresh mode uses a scheduler or when file watching is not available and a scheduled
          * fallback is used.
+         *
          * @param refreshInterval the refresh interval
          */
-        public void setRefreshInterval(@NonNull Duration refreshInterval) {
+        public void setRefreshInterval(Duration refreshInterval) {
             this.refreshInterval = refreshInterval;
         }
     }

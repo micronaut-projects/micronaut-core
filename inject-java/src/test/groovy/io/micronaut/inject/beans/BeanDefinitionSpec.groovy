@@ -10,6 +10,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.core.type.TypeInformation
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.annotation.AnnotationMetadataSupport
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 import test.another.BeanWithPackagePrivate
@@ -99,6 +100,29 @@ class Test implements Runnable {
 ''')
         expect:
         reference.exposedTypes == [Runnable] as Set
+    }
+
+    void "test exposed types omit package-private supertypes from another package"() {
+        given:
+        def reference = buildBeanDefinitionReference('limittypes.Test', '''
+package limittypes;
+
+import jakarta.inject.Singleton;
+import test.exposedtypes.internal.PublicExposedType;
+
+@Singleton
+class Test extends PublicExposedType {
+}
+
+''')
+
+        when:
+        def exposedTypeNames = reference.exposedTypes*.name as Set
+
+        then:
+        exposedTypeNames.contains('limittypes.Test')
+        exposedTypeNames.contains('test.exposedtypes.internal.PublicExposedType')
+        !exposedTypeNames.contains('test.exposedtypes.internal.HiddenExposedType')
     }
 
     void "test fail compilation on invalid exposed bean type"() {
@@ -879,7 +903,50 @@ record ProductDTO(String name, String price, String distributor) {
 ''')
 
         expect:
+        AnnotationMetadataSupport.getRepeatableAnnotation(Mapper.Mapping.class.name) == Mapper.name
+        AnnotationMetadataSupport.getRepeatableAnnotation(Mapper.Mapping.class.name.replace('$', '.')) == Mapper.name
         definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper)
         definition.getExecutableMethods()[0].hasDeclaredAnnotation(Mapper.Mapping)
+    }
+
+    void "test executable method on startup"() {
+        given:
+        def definition = buildBeanDefinition('test.MyService', '''
+package test;
+
+import io.micronaut.context.annotation.Executable;
+import jakarta.inject.Singleton;
+
+@Singleton
+class MyService {
+
+    public void simple() {
+    }
+
+    @Executable
+    public void abc() {
+    }
+
+    @Executable(processOnStartup = true)
+    public void foo() {
+    }
+
+    @Executable(processOnStartup = true)
+    public void bar() {
+    }
+
+    @Executable
+    public void some() {
+    }
+
+}
+
+''')
+
+        expect:
+        definition.getExecutableMethods().size() == 4
+        definition.getExecutableMethods().collect { it.name } == ["abc", "foo", "bar", "some"]
+        definition.requiresMethodProcessing()
+        definition.getExecutableMethodsForProcessing().collect { it.name } == ["foo", "bar"]
     }
 }

@@ -17,8 +17,7 @@ package io.micronaut.http.netty.channel;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.netty.configuration.NettyGlobalConfiguration;
 import io.netty.channel.Channel;
@@ -87,7 +86,7 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
      */
     @Inject
     public DefaultEventLoopGroupFactory(
-        @NonNull Map<String, EventLoopGroupFactory> eventLoopGroupFactories,
+        Map<String, EventLoopGroupFactory> eventLoopGroupFactories,
         @Nullable NettyGlobalConfiguration nettyGlobalConfiguration) {
 
         this.factories = eventLoopGroupFactories;
@@ -120,7 +119,7 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
-    public IoHandlerFactory createIoHandlerFactory(@NonNull EventLoopGroupConfiguration configuration) {
+    public IoHandlerFactory createIoHandlerFactory(EventLoopGroupConfiguration configuration) {
         return getFactory(configuration).createIoHandlerFactory(configuration);
     }
 
@@ -161,7 +160,7 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
     }
 
     @Override
-    public Channel channelInstance(NettyChannelType type, EventLoopGroupConfiguration configuration, Channel parent, int fd) {
+    public Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration, @Nullable Channel parent, int fd) {
         return getFactory(configuration).channelInstance(type, configuration, parent, fd);
     }
 
@@ -173,7 +172,7 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
                 .findFirst()
                 .orElseThrow(() -> new NoSuchElementException("No matching transport was found. Configured transports are " + configuration.getTransport() + ", available transports are " + factories.keySet()));
         } else {
-            return factories.get(NioEventLoopGroupFactory.NAME);
+            return Objects.requireNonNull(factories.get(NioEventLoopGroupFactory.NAME));
         }
     }
 

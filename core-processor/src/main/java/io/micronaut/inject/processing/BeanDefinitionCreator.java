@@ -17,19 +17,17 @@ package io.micronaut.inject.processing;
 
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 
-import java.util.Collection;
+import java.util.List;
 
 /**
  * Builder that produces multiple Bean definitions represented by {@link BeanDefinitionVisitor}.
  *
+ * @param <R> The type produced by the builder
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public interface BeanDefinitionCreator {
+public interface BeanDefinitionCreator<R> {
 
-    /**
-     * @return produces Bean definitions
-     */
-    Collection<BeanDefinitionVisitor> build();
+    List<R> build();
 
 }

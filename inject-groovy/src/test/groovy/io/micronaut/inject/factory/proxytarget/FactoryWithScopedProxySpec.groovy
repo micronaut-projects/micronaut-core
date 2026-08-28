@@ -117,4 +117,59 @@ class Test {
         def e = thrown(RuntimeException)
         e.message.contains("The produced type from a factory which has AOP proxy advice specified must define an accessible no arguments constructor")
     }
+
+    void "test that a factory that returns a class with reordered constructors and an accessible no args constructor compiles"() {
+        expect:
+        buildBeanDefinition('factproxyreordered.TestFactory', '''
+package factproxyreordered;
+
+import io.micronaut.context.annotation.*;
+
+@Factory
+class TestFactory {
+
+    @Bean
+    @io.micronaut.runtime.context.scope.ThreadLocal
+    Test test() {
+        return new Test();
+    }
+}
+
+class Test {
+    Test(String name) {}
+    Test() {
+        this("foo")
+    }
+}
+''')
+    }
+
+    void "test that a factory that returns an external class without accessible constructors compiles"() {
+        expect:
+        buildBeanDefinition('factproxyexternal.TestFactory', '''
+package factproxyexternal;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.factory.proxytarget.FactoryWithScopedProxySpec.ExternalClassWithoutAccessibleConstructor;
+
+@Factory
+class TestFactory {
+
+    @Bean
+    @io.micronaut.runtime.context.scope.ThreadLocal
+    ExternalClassWithoutAccessibleConstructor external() {
+        ExternalClassWithoutAccessibleConstructor.create()
+    }
+}
+''')
+    }
+
+    static class ExternalClassWithoutAccessibleConstructor {
+        private ExternalClassWithoutAccessibleConstructor(String name) {
+        }
+
+        static ExternalClassWithoutAccessibleConstructor create() {
+            new ExternalClassWithoutAccessibleConstructor("test")
+        }
+    }
 }

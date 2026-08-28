@@ -16,7 +16,6 @@
 package io.micronaut.inject.scope
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 
 class ContextScopeSpec extends Specification {

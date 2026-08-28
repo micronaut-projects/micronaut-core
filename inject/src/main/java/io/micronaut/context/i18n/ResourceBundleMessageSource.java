@@ -21,9 +21,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -37,6 +35,7 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
 
     private static final Logger LOG = LoggerFactory.getLogger(ResourceBundleMessageSource.class);
     private static final int DEFAULT_ORDER = 0;
+    private static final int MAX_CACHE_SIZE = 100;
     private final String baseName;
     private final Map<MessageKey, Optional<String>> messageCache =
                 buildMessageCache();
@@ -49,7 +48,7 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      * Default constructor.
      * @param baseName The base name of the message bundle
      */
-    public ResourceBundleMessageSource(@NonNull String baseName) {
+    public ResourceBundleMessageSource(String baseName) {
         this(baseName, null);
     }
 
@@ -58,7 +57,7 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      * @param baseName The base name of the message bundle
      * @param order used for the implementation of the {@link Ordered#getOrder()} method
      */
-    public ResourceBundleMessageSource(@NonNull String baseName, int order) {
+    public ResourceBundleMessageSource(String baseName, int order) {
         this(baseName, null, order);
     }
 
@@ -67,7 +66,7 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      * @param baseName The base name of the message bundle
      * @param defaultLocale The default locale to use if no message is found for the given locale
      */
-    public ResourceBundleMessageSource(@NonNull String baseName, @Nullable Locale defaultLocale) {
+    public ResourceBundleMessageSource(String baseName, @Nullable Locale defaultLocale) {
         this(baseName, defaultLocale, DEFAULT_ORDER);
     }
 
@@ -77,7 +76,7 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      * @param defaultLocale The default locale to use if no message is found for the given locale
      * @param order used for the implementation of the {@link Ordered#getOrder()} method
      */
-    public ResourceBundleMessageSource(@NonNull String baseName, @Nullable Locale defaultLocale, int order) {
+    public ResourceBundleMessageSource(String baseName, @Nullable Locale defaultLocale, int order) {
         this.order = order;
         ArgumentUtils.requireNonNull("baseName", baseName);
         this.baseName = baseName;
@@ -102,10 +101,9 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
         return order;
     }
 
-    @NonNull
     @Override
     @SuppressWarnings("java:S2789") // performance optimization
-    public Optional<String> getRawMessage(@NonNull String code, @NonNull MessageContext context) {
+    public Optional<String> getRawMessage(String code, MessageContext context) {
         final Locale locale = defaultBundle != null ? context.getLocale(defaultBundle.getLocale()) : context.getLocale();
         MessageKey messageKey = new MessageKey(locale, code);
         Optional<String> opt = messageCache.get(messageKey);
@@ -114,9 +112,9 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
             try {
                 final Optional<ResourceBundle> bundle = resolveBundle(locale);
                 if (bundle.isPresent()) {
-                    return bundle.map(b -> b.getString(code));
+                    opt = bundle.map(b -> b.getString(code));
                 } else {
-                    return resolveDefault(code);
+                    opt = resolveDefault(code);
                 }
             } catch (MissingResourceException e) {
                 opt = resolveDefault(code);
@@ -132,17 +130,17 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      * @return The classloader
      */
     protected ClassLoader getClassLoader() {
-        return getClass().getClassLoader();
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        return contextClassLoader != null ? contextClassLoader : getClass().getClassLoader();
     }
 
     /**
      * Build the cache used to store resolved messages.
      * @return The cache.
      */
-    @NonNull
     protected Map<MessageKey, Optional<String>> buildMessageCache() {
         return new ConcurrentLinkedHashMap.Builder<MessageKey, Optional<String>>()
-                .maximumWeightedCapacity(100)
+                .maximumWeightedCapacity(MAX_CACHE_SIZE)
                 .build();
     }
 
@@ -151,13 +149,13 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
      *
      * @return The cache.
      */
-    @NonNull
     protected Map<MessageKey, Optional<ResourceBundle>> buildBundleCache() {
-        return new ConcurrentHashMap<>(18);
+        return new ConcurrentLinkedHashMap.Builder<MessageKey, Optional<ResourceBundle>>()
+            .maximumWeightedCapacity(MAX_CACHE_SIZE)
+            .build();
     }
 
-    @NonNull
-    private Optional<String> resolveDefault(@NonNull String code) {
+    private Optional<String> resolveDefault(String code) {
         Optional<String> opt;
         if (defaultBundle != null) {
             try {

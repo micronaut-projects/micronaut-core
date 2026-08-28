@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.http.bind;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -53,6 +51,7 @@ import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
@@ -205,6 +204,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
      * @param <T>            The type
      * @return The request argument binder
      */
+    @Nullable
     protected <T> RequestArgumentBinder findBinder(Argument<T> argument, Class<? extends Annotation> annotationType) {
         TypeAndAnnotation key = new TypeAndAnnotation(argument, annotationType);
         return argumentBinderCache.computeIfAbsent(key, key1 -> {
@@ -377,7 +377,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         }
 
         @Override
-        public PushCapableHttpRequest<B> serverPush(@NonNull HttpRequest<?> request) {
+        public PushCapableHttpRequest<B> serverPush(HttpRequest<?> request) {
             push.serverPush(request);
             return this;
         }
@@ -392,12 +392,12 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         }
 
         @Override
-        public @NonNull ByteBody byteBody() {
+        public ByteBody byteBody() {
             return server.byteBody();
         }
 
         @Override
-        public @NonNull ByteBodyFactory byteBodyFactory() {
+        public ByteBodyFactory byteBodyFactory() {
             return server.byteBodyFactory();
         }
     }

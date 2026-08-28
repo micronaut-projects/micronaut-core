@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
-
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Locale;
 import java.util.Set;
@@ -56,7 +55,7 @@ final class RemoteIpElement implements LogElement {
     }
 
     @Override
-    public String onRequestHeaders(@NonNull ConnectionMetadata metadata, @NonNull String method, io.netty.handler.codec.http.@NonNull HttpHeaders headers, @NonNull String uri, @NonNull String protocol) {
+    public String onRequestHeaders(ConnectionMetadata metadata, String method, io.netty.handler.codec.http. HttpHeaders headers, String uri, String protocol) {
         // maybe this request was proxied or load balanced.
         // try and get the real originating IP
         final String xforwardedFor = headers.get(X_FORWARDED_FOR, null);
@@ -85,6 +84,7 @@ final class RemoteIpElement implements LogElement {
         }
     }
 
+    @Nullable
     private static String processForwarded(String forwarded) {
         final int firstComma = forwarded.indexOf(',');
         final String firstForward = (firstComma >= 0 ? forwarded.substring(0, firstComma) : forwarded)

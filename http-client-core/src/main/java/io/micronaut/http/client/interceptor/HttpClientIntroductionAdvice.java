@@ -19,15 +19,14 @@ import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.aop.kotlin.KotlinInterceptedMethod;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -36,6 +35,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
@@ -55,6 +55,7 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.CustomHttpMethod;
 import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.client.AsyncHttpClient;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClient;
@@ -72,7 +73,6 @@ import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -92,6 +92,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 
 /**
@@ -106,6 +108,7 @@ import java.util.function.Supplier;
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpClientIntroductionAdvice.class);
+    private static final String HTTP_ERROR_RESPONSE_LOG_MESSAGE = "Client [{}] received HTTP error response: {}";
 
     /**
      * The default Accept-Types.
@@ -164,11 +167,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
         HttpClient httpClient = clientFactory.getClient(annotationMetadata);
         if (httpMethodMapping.isPresent() && context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
-            AnnotationValue<HttpMethodMapping> mapping = context.getAnnotation(HttpMethodMapping.class);
-            String uri = mapping.getRequiredValue(String.class);
-            if (StringUtils.isEmpty(uri)) {
-                uri = "/" + context.getMethodName();
-            }
+            AnnotationValue<HttpMethodMapping> mapping = Objects.requireNonNull(context.getAnnotation(HttpMethodMapping.class));
+            String mappedUri = mapping.getRequiredValue(String.class);
+            final String uri = StringUtils.isEmpty(mappedUri) ? "/" + context.getMethodName() : mappedUri;
 
             Class<? extends Annotation> annotationType = httpMethodMapping.get();
             HttpMethod httpMethod = HttpMethod.parse(annotationType.getSimpleName().toUpperCase(Locale.ENGLISH));
@@ -184,23 +185,56 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             try {
                 Argument<?> valueType = interceptedMethod.returnTypeValue();
                 Class<?> reactiveValueType = valueType.getType();
-                return switch (interceptedMethod.resultType()) {
-                    case PUBLISHER ->
-                            handlePublisher(context, returnType, reactiveValueType, httpMethod, httpMethodName,
-                                uri, interceptedMethod, annotationMetadata, httpClient, errorType, valueType, declaringType);
-                    case COMPLETION_STAGE ->
-                            handleCompletionStage(context, httpMethod, httpMethodName, uri, interceptedMethod,
-                                annotationMetadata, httpClient, returnType, errorType, valueType, reactiveValueType, declaringType);
-                    case SYNCHRONOUS ->
-                            handleSynchronous(context, returnType, httpClient, httpMethod, httpMethodName, uri,
-                                interceptedMethod, annotationMetadata, errorType, declaringType);
-                };
+                // When io.micrometer:context-propagation enables Reactor automatic context
+                // propagation, ThreadLocals may be cleared around coroutine resumes even though
+                // the PropagatedContext is still present in the Kotlin coroutine context.
+                // Re-apply it for the synchronous client setup so filters capture the right context.
+                // Scope open is only attempted for Kotlin suspend clients (no Supplier alloc).
+                PropagatedContext.Scope kotlinScope = null;
+                try {
+                    if (interceptedMethod instanceof KotlinInterceptedMethod kotlinInterceptedMethod) {
+                        kotlinScope = KotlinClientPropagatedContext.maybePropagate(kotlinInterceptedMethod);
+                    }
+                    return dispatchClientCall(
+                        context, returnType, reactiveValueType, httpMethod, httpMethodName, uri,
+                        interceptedMethod, annotationMetadata, httpClient, errorType, valueType, declaringType);
+                } finally {
+                    if (kotlinScope != null) {
+                        kotlinScope.close();
+                    }
+                }
             } catch (Exception e) {
                 return interceptedMethod.handleException(e);
             }
         }
         // try other introduction advice
         return context.proceed();
+    }
+
+    @Nullable
+    private Object dispatchClientCall(MethodInvocationContext<Object, Object> context,
+                                      ReturnType<?> returnType,
+                                      Class<?> reactiveValueType,
+                                      HttpMethod httpMethod,
+                                      String httpMethodName,
+                                      String uri,
+                                      InterceptedMethod interceptedMethod,
+                                      AnnotationMetadata annotationMetadata,
+                                      HttpClient httpClient,
+                                      Argument<?> errorType,
+                                      Argument<?> valueType,
+                                      Class<?> declaringType) {
+        return switch (interceptedMethod.resultType()) {
+            case PUBLISHER ->
+                handlePublisher(context, returnType, reactiveValueType, httpMethod, httpMethodName,
+                    uri, interceptedMethod, annotationMetadata, httpClient, errorType, valueType, declaringType);
+            case COMPLETION_STAGE ->
+                handleCompletionStage(context, httpMethod, httpMethodName, uri, interceptedMethod,
+                    annotationMetadata, httpClient, returnType, errorType, valueType, reactiveValueType, declaringType);
+            case SYNCHRONOUS ->
+                handleSynchronous(context, returnType, httpClient, httpMethod, httpMethodName, uri,
+                    interceptedMethod, annotationMetadata, errorType, declaringType);
+        };
     }
 
     @Nullable
@@ -224,7 +258,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             return binderResult.errorResult;
         }
 
-        MutableHttpRequest<?> request = binderResult.request;
+        MutableHttpRequest<?> request = Objects.requireNonNull(binderResult.request);
 
         if (void.class == javaReturnType || httpMethod == HttpMethod.HEAD) {
             request.getHeaders().remove(HttpHeaders.ACCEPT);
@@ -238,13 +272,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     errorType
                 ));
         } else if (void.class == javaReturnType) {
-            return handleBlockingCall(clientName, javaReturnType, () -> blockingHttpClient.exchange(request, null, errorType));
+            return handleBlockingCall(clientName, javaReturnType, () -> blockingHttpClient.exchange(request, Argument.OBJECT_ARGUMENT, errorType));
         } else {
             return handleBlockingCall(clientName, javaReturnType,
                 () -> blockingHttpClient.retrieve(request, returnType.asArgument(), errorType));
         }
     }
 
+    @Nullable
     private Object handleCompletionStage(MethodInvocationContext<Object, Object> context,
                                          HttpMethod httpMethod,
                                          String httpMethodName,
@@ -257,62 +292,48 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                          Argument<?> valueType,
                                          Class<?> reactiveValueType,
                                          Class<?> declaringType) {
-
-        Publisher<RequestBinderResult> csRequestPublisher = Mono.fromCallable(() ->
-            bindRequest(context, httpMethod, httpMethodName, uriToBind, interceptedMethod, annotationMetadata));
-        Publisher<?> csPublisher = httpClientResponsePublisher(httpClient, csRequestPublisher, returnType, errorType, valueType);
-        CompletableFuture<Object> future = new CompletableFuture<>();
-        csPublisher.subscribe(new CompletionAwareSubscriber<Object>() {
-            Object message;
-            Subscription subscription;
-
-            @Override
-            protected void doOnSubscribe(Subscription subscription) {
-                this.subscription = subscription;
-                subscription.request(Long.MAX_VALUE);
-            }
-
-            @Override
-            protected void doOnNext(Object message) {
-                if (Void.class != reactiveValueType) {
-                    this.message = message;
-                }
-                // we only want the first item
-                subscription.cancel();
-                doOnComplete();
-            }
-
-            @Override
-            protected void doOnError(Throwable t) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Client [{}] received HTTP error response: {}", declaringType.getName(), t.getMessage(), t);
-                }
-
-                if (t instanceof HttpClientResponseException e) {
-                    if (e.code() == HttpStatus.NOT_FOUND.getCode()) {
-                        if (reactiveValueType == Optional.class) {
-                            future.complete(Optional.empty());
-                        } else if (HttpResponse.class.isAssignableFrom(reactiveValueType)) {
-                            future.complete(e.getResponse());
-                        } else {
-                            future.complete(null);
+        try {
+            RequestBinderResult binderResult = bindRequest(context, httpMethod, httpMethodName, uriToBind, interceptedMethod, annotationMetadata);
+            CompletableFuture<@Nullable Object> future = new CompletableFuture<>();
+            if (binderResult.isError()) {
+                future.complete(binderResult.errorResult());
+            } else {
+                MutableHttpRequest<?> request = Objects.requireNonNull(binderResult.request());
+                AsyncHttpClient asyncHttpClient = httpClient.toAsync();
+                CompletionStage<?> responseStage = httpClientResponseStage(asyncHttpClient, request, returnType, errorType, valueType);
+                responseStage.whenComplete((result, throwable) -> {
+                    if (throwable != null) {
+                        Throwable cause = (throwable instanceof CompletionException completionException && completionException.getCause() != null)
+                            ? completionException.getCause()
+                            : throwable;
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug(HTTP_ERROR_RESPONSE_LOG_MESSAGE, declaringType.getName(), cause.getMessage(), cause);
                         }
-                        return;
+                        if (cause instanceof HttpClientResponseException e && e.code() == HttpStatus.NOT_FOUND.getCode()) {
+                            if (reactiveValueType == Optional.class) {
+                                future.complete(Optional.empty());
+                                return;
+                            } else if (HttpResponse.class.isAssignableFrom(reactiveValueType)) {
+                                future.complete(e.getResponse());
+                                return;
+                            } else {
+                                future.complete(null);
+                                return;
+                            }
+                        }
+                        future.completeExceptionally(cause);
+                    } else {
+                        future.complete(result);
                     }
-                }
-
-                future.completeExceptionally(t);
+                });
             }
-
-            @Override
-            protected void doOnComplete() {
-                // can be called twice
-                future.complete(message);
-            }
-        });
-        return interceptedMethod.handleResult(future);
+            return interceptedMethod.handleResult(future);
+        } catch (Exception e) {
+            return interceptedMethod.handleException(e);
+        }
     }
 
+    @Nullable
     private Object handlePublisher(MethodInvocationContext<Object, Object> context,
                                    ReturnType<?> returnType,
                                    Class<?> reactiveValueType,
@@ -341,18 +362,19 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         if (LOG.isDebugEnabled()) {
             publisher = Flux.from(publisher).doOnError(t ->
-                LOG.debug("Client [{}] received HTTP error response: {}", declaringType.getName(), t.getMessage(), t)
+                LOG.debug(HTTP_ERROR_RESPONSE_LOG_MESSAGE, declaringType.getName(), t.getMessage(), t)
             );
         }
 
         Object finalPublisher = interceptedMethod.handleResult(publisher);
-        for (ReactiveClientResultTransformer transformer : transformers) {
-            finalPublisher = transformer.transform(finalPublisher);
+        if (finalPublisher != null) {
+            for (ReactiveClientResultTransformer transformer : transformers) {
+                finalPublisher = transformer.transform(finalPublisher);
+            }
         }
         return finalPublisher;
     }
 
-    @NonNull
     private RequestBinderResult bindRequest(MethodInvocationContext<Object, Object> context,
                                             HttpMethod httpMethod,
                                             String httpMethodName,
@@ -443,7 +465,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return RequestBinderResult.withRequest(request);
     }
 
-    private void bindPathParams(List<String> uriVariables, Map<String, Object> pathParams, Object body) {
+    private void bindPathParams(List<String> uriVariables, Map<String, Object> pathParams, @Nullable Object body) {
         boolean variableSatisfied = uriVariables.isEmpty() || pathParams.keySet().containsAll(uriVariables);
         if (body != null && !variableSatisfied) {
             if (body instanceof Map<?, ?> map) {
@@ -471,16 +493,17 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private Object bindRequestBody(MutableHttpRequest<?> request, List<Argument<?>> bodyArguments, Map<String, MutableArgumentValue<?>> parameters) {
         Object body = request.getBody().orElse(null);
         if (body == null && !bodyArguments.isEmpty()) {
-            Map<String, Object> bodyMap = new LinkedHashMap<>();
+            Map<String, @Nullable Object> bodyMap = new LinkedHashMap<>();
 
             for (Argument<?> bodyArgument : bodyArguments) {
                 String argumentName = bodyArgument.getName();
-                MutableArgumentValue<?> value = parameters.get(argumentName);
+                MutableArgumentValue<?> value = Objects.requireNonNull(parameters.get(argumentName));
+                Object argumentValue = value.getValue();
                 if (bodyArgument.getAnnotationMetadata().hasStereotype(Format.class)) {
-                    conversionService.convert(value.getValue(), ConversionContext.STRING.with(bodyArgument.getAnnotationMetadata()))
+                    conversionService.convert(argumentValue, ConversionContext.STRING.with(bodyArgument.getAnnotationMetadata()))
                         .ifPresent(v -> bodyMap.put(argumentName, v));
                 } else {
-                    bodyMap.put(argumentName, value.getValue());
+                    bodyMap.put(argumentName, argumentValue);
                 }
             }
             body = bodyMap;
@@ -489,7 +512,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         return body;
     }
 
-    @NonNull
     private ClientArgumentRequestBinder<Object> buildDefaultBinder(Map<String, Object> pathParams, List<Argument<?>> bodyArguments) {
         return (ctx, uriCtx, value, req) -> {
             Argument<?> argument = ctx.getArgument();
@@ -510,7 +532,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         };
     }
 
-    @NonNull
     private Optional<Object> bindArguments(MethodInvocationContext<Object, Object> context,
                                            Map<String, MutableArgumentValue<?>> parameters,
                                            ClientArgumentRequestBinder<Object> defaultBinder,
@@ -542,7 +563,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                                      Argument<?> errorType,
                                                      Argument<?> reactiveValueArgument) {
         Flux<RequestBinderResult> requestFlux = Flux.from(requestPublisher);
-        return requestFlux.filter(result -> !result.isError).map(RequestBinderResult::request).flatMap(request -> {
+        return requestFlux.filter(result -> !result.isError()).map(RequestBinderResult::request).flatMap(request -> {
             Class<?> argumentType = reactiveValueArgument.getType();
             if (Void.class == argumentType || returnType.isVoid()) {
                 request.getHeaders().remove(HttpHeaders.ACCEPT);
@@ -599,11 +620,28 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }).switchIfEmpty(requestFlux.mapNotNull(RequestBinderResult::errorResult));
     }
 
-    private Object getValue(Argument argument,
+    private CompletionStage<?> httpClientResponseStage(AsyncHttpClient asyncHttpClient,
+                                                       MutableHttpRequest<?> request,
+                                                       ReturnType<?> returnType,
+                                                       Argument<?> errorType,
+                                                       Argument<?> reactiveValueArgument) {
+        Class<?> argumentType = reactiveValueArgument.getType();
+        if (Void.class == argumentType || returnType.isVoid()) {
+            request.getHeaders().remove(HttpHeaders.ACCEPT);
+            return asyncHttpClient.retrieve(request, Argument.VOID, errorType);
+        } else if (HttpResponse.class.isAssignableFrom(argumentType)) {
+            return asyncHttpClient.exchange(request, reactiveValueArgument, errorType);
+        } else {
+            return asyncHttpClient.retrieve(request, reactiveValueArgument, errorType);
+        }
+    }
+
+    @Nullable
+    private Object getValue(Argument<?> argument,
                             MethodInvocationContext<?, ?> context,
                             Map<String, MutableArgumentValue<?>> parameters) {
         String argumentName = argument.getName();
-        MutableArgumentValue<?> value = parameters.get(argumentName);
+        MutableArgumentValue<?> value = Objects.requireNonNull(parameters.get(argumentName));
 
         Object definedValue = value.getValue();
 
@@ -618,14 +656,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             );
         }
 
-        if (definedValue instanceof Optional optional) {
+        if (definedValue instanceof Optional<?> optional) {
             return optional.orElse(null);
         } else {
             return definedValue;
         }
     }
 
-    private Object handleBlockingCall(String clientName, Class returnType, Supplier<Object> supplier) {
+    @Nullable
+    @SuppressWarnings("ReturnValueIgnored")
+    private Object handleBlockingCall(String clientName, Class<?> returnType, Supplier<Object> supplier) {
         try {
             if (void.class == returnType) {
                 supplier.get();
@@ -635,7 +675,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
         } catch (RuntimeException t) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Client [{}] received HTTP error response: {}", clientName, t.getMessage(), t);
+                LOG.debug(HTTP_ERROR_RESPONSE_LOG_MESSAGE, clientName, t.getMessage(), t);
             }
 
             if (t instanceof HttpClientResponseException exception && exception.code() == HttpStatus.NOT_FOUND.getCode()) {
@@ -679,6 +719,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
     }
 
+    @Nullable
     private String getClientId(AnnotationMetadata clientAnn) {
         return clientAnn.stringValue(Client.class).orElse(null);
     }
@@ -710,13 +751,40 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         boolean isError
     ) {
 
-        static RequestBinderResult withRequest(@NonNull MutableHttpRequest<?> request) {
+        static RequestBinderResult withRequest(MutableHttpRequest<?> request) {
             Objects.requireNonNull(request, "Bound HTTP request must not be null");
             return new RequestBinderResult(request, null, false);
         }
 
         static RequestBinderResult withErrorResult(@Nullable Object errorResult) {
             return new RequestBinderResult(null, errorResult, true);
+        }
+    }
+
+    /**
+     * Recovers {@link PropagatedContext} from the Kotlin coroutine context for suspend
+     * client calls. Only called by the caller once it has already established, via
+     * {@code instanceof} {@link KotlinInterceptedMethod}, that the current call is a
+     * Kotlin suspend function (the same guard {@link io.micronaut.aop.internal.intercepted
+     * .KotlinInterceptedMethodImpl} relies on before touching Kotlin coroutine types).
+     */
+    private static final class KotlinClientPropagatedContext {
+        private KotlinClientPropagatedContext() {
+        }
+
+        /**
+         * If {@code kotlinInterceptedMethod} carries a non-empty unbound
+         * {@link PropagatedContext} in its coroutine context, open a thread-bound scope.
+         * Otherwise return {@code null} (caller skips close).
+         */
+        static PropagatedContext.@Nullable Scope maybePropagate(KotlinInterceptedMethod kotlinInterceptedMethod) {
+            PropagatedContext fromCoroutine =
+                io.micronaut.core.async.propagation.KotlinCoroutinePropagation.Companion
+                    .findPropagatedContext(kotlinInterceptedMethod.getCoroutineContext());
+            if (fromCoroutine == null || fromCoroutine.isEmpty() || fromCoroutine.isBound()) {
+                return null;
+            }
+            return fromCoroutine.propagate();
         }
     }
 }

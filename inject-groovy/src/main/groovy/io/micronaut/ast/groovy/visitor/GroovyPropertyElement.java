@@ -17,8 +17,8 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
@@ -42,7 +42,9 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
 
     private final ClassElement type;
     private final String name;
+    @Nullable
     private final AccessKind readAccessKind;
+    @Nullable
     private final AccessKind writeAccessKind;
     private final ClassElement owningElement;
     @Nullable
@@ -51,7 +53,10 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     private final MethodElement setter;
     @Nullable
     private final FieldElement field;
+    @Nullable
+    private final MemberElement sourceMember;
     private final boolean excluded;
+    private final boolean constructorWriteAccess;
     private final PropertyElementAnnotationMetadata annotationMetadata;
 
     GroovyPropertyElement(GroovyVisitorContext visitorContext,
@@ -60,38 +65,56 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
                           @Nullable MethodElement getter,
                           @Nullable MethodElement setter,
                           @Nullable FieldElement field,
+                          @Nullable MemberElement sourceMember,
                           ElementAnnotationMetadataFactory annotationMetadataFactory,
                           String name,
-                          AccessKind readAccessKind,
-                          AccessKind writeAccessKind,
-                          boolean excluded) {
-        super(visitorContext, selectNativeType(getter, setter, field), annotationMetadataFactory);
+                          @Nullable AccessKind readAccessKind,
+                          @Nullable AccessKind writeAccessKind,
+                          boolean excluded,
+                          boolean constructorWriteAccess) {
+        super(visitorContext, selectNativeType(getter, setter, field, sourceMember), annotationMetadataFactory);
         this.type = type;
         this.getter = getter;
         this.setter = setter;
         this.field = field;
+        this.sourceMember = sourceMember;
         this.name = name;
         this.readAccessKind = readAccessKind;
         this.writeAccessKind = writeAccessKind;
         this.owningElement = owningElement;
         this.excluded = excluded;
-        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, false);
+        this.constructorWriteAccess = constructorWriteAccess;
+        this.annotationMetadata = new PropertyElementAnnotationMetadata(
+            this,
+            annotationMethod(getter, sourceMember),
+            setter,
+            annotationField(field, sourceMember),
+            null,
+            null,
+            false
+        );
     }
 
     @Override
     public Optional<AnnotationMetadata> getWriteTypeAnnotationMetadata() {
+        if (writeAccessKind == null && !constructorWriteAccess) {
+            return Optional.empty();
+        }
         return Optional.of(annotationMetadata.getWriteAnnotationMetadata());
     }
 
     @Override
     public Optional<AnnotationMetadata> getReadTypeAnnotationMetadata() {
+        if (readAccessKind == null) {
+            return Optional.empty();
+        }
         return Optional.of(annotationMetadata.getReadAnnotationMetadata());
     }
 
     @Override
     protected @NonNull AbstractGroovyElement copyConstructor() {
-        return new GroovyPropertyElement(visitorContext, owningElement, type, getter, setter, field,
-            elementAnnotationMetadataFactory, name, readAccessKind, writeAccessKind, excluded);
+        return new GroovyPropertyElement(visitorContext, owningElement, type, getter, setter, field, sourceMember,
+            elementAnnotationMetadataFactory, name, readAccessKind, writeAccessKind, excluded, constructorWriteAccess);
     }
 
     @Override
@@ -99,9 +122,10 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
         return (MemberElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
-    private static GroovyNativeElement selectNativeType(MethodElement getter,
-                                                        MethodElement setter,
-                                                        FieldElement field) {
+    private static GroovyNativeElement selectNativeType(@Nullable MethodElement getter,
+                                                        @Nullable MethodElement setter,
+                                                        @Nullable FieldElement field,
+                                                        @Nullable MemberElement sourceMember) {
         if (getter instanceof AbstractGroovyElement) {
             return (GroovyNativeElement) getter.getNativeType();
         }
@@ -111,7 +135,32 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
         if (field instanceof AbstractGroovyElement) {
             return (GroovyNativeElement) field.getNativeType();
         }
+        if (sourceMember instanceof AbstractGroovyElement) {
+            return (GroovyNativeElement) sourceMember.getNativeType();
+        }
         throw new IllegalStateException();
+    }
+
+    @Nullable
+    private static MethodElement annotationMethod(@Nullable MethodElement getter, @Nullable MemberElement sourceMember) {
+        if (getter != null) {
+            return getter;
+        }
+        if (sourceMember instanceof MethodElement methodElement) {
+            return methodElement;
+        }
+        return null;
+    }
+
+    @Nullable
+    private static FieldElement annotationField(@Nullable FieldElement field, @Nullable MemberElement sourceMember) {
+        if (field != null) {
+            return field;
+        }
+        if (sourceMember instanceof FieldElement fieldElement) {
+            return fieldElement;
+        }
+        return null;
     }
 
     @Override
@@ -141,12 +190,53 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
 
     @Override
     public Optional<MethodElement> getWriteMethod() {
+        if (writeAccessKind != AccessKind.METHOD) {
+            return Optional.empty();
+        }
         return Optional.ofNullable(setter);
     }
 
     @Override
     public Optional<MethodElement> getReadMethod() {
+        if (readAccessKind != AccessKind.METHOD) {
+            return Optional.empty();
+        }
         return Optional.ofNullable(getter);
+    }
+
+    @Override
+    public Optional<? extends MemberElement> getReadMember() {
+        if (readAccessKind == null) {
+            return Optional.empty();
+        }
+        return PropertyElement.super.getReadMember();
+    }
+
+    @Override
+    public Optional<ClassElement> getReadType() {
+        if (readAccessKind == null) {
+            return Optional.empty();
+        }
+        return PropertyElement.super.getReadType();
+    }
+
+    @Override
+    public Optional<? extends MemberElement> getWriteMember() {
+        if (writeAccessKind == null) {
+            return Optional.empty();
+        }
+        return PropertyElement.super.getWriteMember();
+    }
+
+    @Override
+    public Optional<ClassElement> getWriteType() {
+        if (constructorWriteAccess) {
+            return Optional.of(type);
+        }
+        if (writeAccessKind == null) {
+            return Optional.empty();
+        }
+        return PropertyElement.super.getWriteType();
     }
 
     @Override
@@ -186,16 +276,22 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
 
     @Override
     public AccessKind getReadAccessKind() {
-        return readAccessKind;
+        return readAccessKind == null ? AccessKind.METHOD : readAccessKind;
     }
 
     @Override
     public AccessKind getWriteAccessKind() {
-        return writeAccessKind;
+        return writeAccessKind == null ? AccessKind.METHOD : writeAccessKind;
     }
 
     @Override
     public boolean isReadOnly() {
+        if (constructorWriteAccess) {
+            return false;
+        }
+        if (writeAccessKind == null) {
+            return true;
+        }
         return switch (writeAccessKind) {
             case METHOD -> setter == null;
             case FIELD -> field == null || field.isFinal();
@@ -204,6 +300,9 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
 
     @Override
     public boolean isWriteOnly() {
+        if (readAccessKind == null) {
+            return true;
+        }
         return switch (readAccessKind) {
             case METHOD -> getter == null;
             case FIELD -> field == null;
@@ -220,6 +319,9 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
         }
         if (setter != null) {
             return setter.getDeclaringType();
+        }
+        if (sourceMember != null) {
+            return sourceMember.getDeclaringType();
         }
         throw new IllegalStateException();
     }

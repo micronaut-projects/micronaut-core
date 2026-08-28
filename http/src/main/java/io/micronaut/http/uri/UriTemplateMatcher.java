@@ -16,10 +16,10 @@
 package io.micronaut.http.uri;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,6 +36,7 @@ import java.util.regex.Pattern;
  * @author Denis Stepanov
  * @since 4.6.0
  */
+@NullUnmarked
 @Internal
 public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTemplateMatcher> {
 
@@ -254,7 +255,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
      * @return a match or null
      */
     @Nullable
-    public UriMatchInfo tryMatch(@NonNull String uri) {
+    public UriMatchInfo tryMatch(String uri) {
         int length = uri.length();
         if (length > 1 && uri.charAt(length - 1) == '/') {
             uri = uri.substring(0, length - 1);
@@ -364,6 +365,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
                         return true;
                     }
                 }
+                return false;
             default:
                 return false;
         }
@@ -497,7 +499,7 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     }
 
     private record Segment(SegmentType type, String value,
-                           Pattern pattern, String[] regexpVariables) {
+                           @Nullable Pattern pattern, @Nullable String[] regexpVariables) {
     }
 
     private enum SegmentType {

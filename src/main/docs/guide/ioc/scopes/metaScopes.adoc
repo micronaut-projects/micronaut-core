@@ -50,5 +50,12 @@ public @interface Driver {
 @Retention(RUNTIME)
 annotation class Driver
 ----
+[source.multi-language-sample,python]
+----
+@Requires(classes = Car)
+@DefaultScope(Singleton) # <1>
+def Driver(func):
+    return func
+----
 
 <1> api:context.annotation.DefaultScope[] declares the scope to use if none is specified

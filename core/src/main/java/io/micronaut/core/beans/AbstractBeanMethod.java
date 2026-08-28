@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.core.beans;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -51,12 +49,11 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
      * @param arguments The argument types
      */
     @UsedByGeneratedCode
-    protected AbstractBeanMethod(
-            @NonNull BeanIntrospection<B> introspection,
-            @NonNull Argument<T> returnType,
-            @NonNull String name,
-            @Nullable AnnotationMetadata annotationMetadata,
-            @Nullable Argument<?>... arguments) {
+    protected AbstractBeanMethod(BeanIntrospection<B> introspection,
+                                 Argument<T> returnType,
+                                 String name,
+                                 @Nullable AnnotationMetadata annotationMetadata,
+                                 Argument<?> @Nullable ... arguments) {
         this.introspection = introspection;
         this.name = name;
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
@@ -64,14 +61,13 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
         this.returnType = returnType;
     }
 
-    @NonNull
     @Override
     public BeanIntrospection<B> getDeclaringBean() {
         return introspection;
     }
 
     @Override
-    public final @NonNull ReturnType<T> getReturnType() {
+    public final ReturnType<T> getReturnType() {
         return new ReturnType<>() {
             @Override
             public Class<T> getType() {
@@ -79,7 +75,6 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
             }
 
             @Override
-            @NonNull
             public Argument<T> asArgument() {
                 return returnType;
             }
@@ -89,7 +84,6 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
                 return returnType.getTypeVariables();
             }
 
-            @NonNull
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
                 return returnType.getAnnotationMetadata();
@@ -97,13 +91,11 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
         };
     }
 
-    @NonNull
     @Override
     public final AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
 
-    @NonNull
     @Override
     public final String getName() {
         return name;
@@ -116,7 +108,8 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
 
     @SuppressWarnings("java:S2638")
     @Override
-    public T invoke(@NonNull B instance, Object... arguments) {
+    @Nullable
+    public T invoke(B instance, @Nullable Object... arguments) {
         return invokeInternal(instance, arguments);
     }
 
@@ -128,5 +121,6 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
      */
     @UsedByGeneratedCode
     @Internal
-    protected abstract T invokeInternal(B instance, Object... arguments);
+    @Nullable
+    protected abstract T invokeInternal(B instance, @Nullable Object... arguments);
 }

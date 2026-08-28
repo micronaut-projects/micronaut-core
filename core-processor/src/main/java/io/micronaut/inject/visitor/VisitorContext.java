@@ -17,8 +17,7 @@ package io.micronaut.inject.visitor;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
@@ -30,6 +29,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 
+import java.lang.annotation.RetentionPolicy;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
@@ -52,6 +52,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     String MICRONAUT_PROCESSING_PROJECT_DIR = "micronaut.processing.project.dir";
     String MICRONAUT_PROCESSING_GROUP = "micronaut.processing.group";
     String MICRONAUT_PROCESSING_MODULE = "micronaut.processing.module";
+    String MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER = "micronaut.processing.use.context.classloader";
 
     /**
      * @return The visitor context's language.
@@ -65,7 +66,6 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @return The element factory
      * @since 2.3.0
      */
-    @NonNull
     ElementFactory<?, ?, ?, ?> getElementFactory();
 
     /**
@@ -74,7 +74,6 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @return The element annotation metadata factory
      * @since 4.0.0
      */
-    @NonNull
     ElementAnnotationMetadataFactory getElementAnnotationMetadataFactory();
 
     /**
@@ -82,7 +81,6 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @since 4.0.0
      */
     @Experimental
-    @NonNull
     ExpressionCompilationContextFactory getExpressionCompilationContextFactory();
 
     /**
@@ -93,8 +91,31 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @since 4.0.0
      */
     @Internal
-    @NonNull
     AbstractAnnotationMetadataBuilder<?, ?> getAnnotationMetadataBuilder();
+
+    /**
+     * Resolves the default values declared by the given annotation type.
+     *
+     * @param annotationName The annotation type name
+     * @return The default values, or an empty map if the annotation type cannot be resolved
+     * @since 5.1.0
+     */
+    @Experimental
+    default Map<CharSequence, Object> getAnnotationDefaultValues(String annotationName) {
+        return getAnnotationMetadataBuilder().getAnnotationDefaultValues(annotationName);
+    }
+
+    /**
+     * Resolves the retention policy declared by the given annotation type.
+     *
+     * @param annotationName The annotation type name
+     * @return The retention policy, or {@link RetentionPolicy#RUNTIME} if the annotation type cannot be resolved
+     * @since 5.1.0
+     */
+    @Experimental
+    default RetentionPolicy getAnnotationRetentionPolicy(String annotationName) {
+        return getAnnotationMetadataBuilder().getRetentionPolicy(annotationName);
+    }
 
     /**
      * Allows printing informational messages.
@@ -130,7 +151,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     /**
      * @return The visitor configuration
      */
-    default @NonNull VisitorConfiguration getConfiguration() {
+    default VisitorConfiguration getConfiguration() {
         return VisitorConfiguration.DEFAULT;
     }
 
@@ -162,7 +183,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @return An iterable of resources
      */
     @Experimental
-    default @NonNull Iterable<URL> getClasspathResources(@NonNull String path) {
+    default Iterable<URL> getClasspathResources(String path) {
         return Collections.emptyList();
     }
 
@@ -217,8 +238,12 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
         Optional<GeneratedFile> dummy = visitMetaInfFile("dummy", Element.EMPTY_ELEMENT_ARRAY);
         if (dummy.isPresent()) {
             // we want the parent directory of META-INF/dummy
-            Path classesOutputDir = Path.of(dummy.get().toURI()).getParent().getParent();
-            return Optional.of(classesOutputDir);
+            Path parent = Path.of(dummy.get().toURI()).getParent();
+            if (parent == null) {
+                return Optional.empty();
+            }
+            Path classesOutputDir = parent.getParent();
+            return Optional.ofNullable(classesOutputDir);
         }
         return Optional.empty();
     }
@@ -277,7 +302,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @param stereotypes The stereotypes
      * @return The class elements
      */
-    default @NonNull ClassElement[] getClassElements(@NonNull String aPackage, @NonNull String... stereotypes) {
+    default ClassElement[] getClassElements(String aPackage, String... stereotypes) {
         return ClassElement.ZERO_CLASS_ELEMENTS;
     }
 
@@ -288,7 +313,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * @return The class elements
      * @see 4.10
      */
-    default @NonNull List<ClassElement> getClassElements(@NonNull PackageElement packageElement) {
+    default List<ClassElement> getClassElements(PackageElement packageElement) {
         return List.of(getClassElements(packageElement.getName(), "*"));
     }
 
@@ -340,7 +365,8 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     enum Language {
         JAVA("Java"),
         GROOVY("Groovy"),
-        KOTLIN("Kotlin");
+        KOTLIN("Kotlin"),
+        PYTHON("Python"),;
 
         private final String displayName;
 

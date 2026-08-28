@@ -25,6 +25,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.util.Objects;
@@ -88,7 +89,7 @@ sealed class PublisherInterceptedMethod implements InterceptedMethod permits Rea
     }
 
     @Override
-    public Object handleResult(Object result) {
+    public Object handleResult(@Nullable Object result) {
         if (result == null) {
             result = Publishers.empty();
         }
@@ -118,7 +119,7 @@ sealed class PublisherInterceptedMethod implements InterceptedMethod permits Rea
             .orElseThrow(() -> new IllegalStateException("Cannot convert publisher result: " + result + " to '" + returnType.getType().getName() + "'"));
     }
 
-    protected Publisher<?> convertToPublisher(Object result) {
+    protected Publisher<?> convertToPublisher(@Nullable Object result) {
         if (result == null) {
             return Publishers.empty();
         }

@@ -1,9 +1,8 @@
 package io.micronaut.inject.autowired
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.DependencyInjectionException
-import io.micronaut.context.exceptions.NoSuchBeanException
+import spock.lang.PendingFeature
 
 class AutowiredSpec extends AbstractTypeElementSpec {
 
@@ -79,6 +78,7 @@ record Foo(String name) {
         bean.foo.name == 'test'
     }
 
+    @PendingFeature(reason = "Nullable and @Value is not supported, the check was ignored before")
     void "test autowired required=false on field value (optional injection)"() {
         given:
         def context = buildContext('''

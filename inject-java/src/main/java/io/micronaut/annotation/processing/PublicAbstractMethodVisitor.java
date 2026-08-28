@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import org.jspecify.annotations.NullUnmarked;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -39,6 +40,7 @@ import java.util.Set;
  * @since 1.0
  * @deprecated No longer used
  */
+@NullUnmarked
 @Deprecated(forRemoval = true)
 public abstract class PublicAbstractMethodVisitor<R, P> extends PublicMethodVisitor<R, P> {
 

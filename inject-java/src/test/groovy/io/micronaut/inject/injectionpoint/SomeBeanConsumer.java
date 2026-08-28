@@ -17,7 +17,9 @@ package io.micronaut.inject.injectionpoint;
 
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import io.micronaut.context.annotation.Requires;
 
+@Requires(property = "spec.name", value = "InjectionPointSpec")
 @Singleton
 public class SomeBeanConsumer {
 

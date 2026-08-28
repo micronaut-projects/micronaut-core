@@ -15,12 +15,13 @@
  */
 package io.micronaut.jackson.core.tree;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.json.JsonStreamConfig;
 import io.micronaut.json.tree.JsonNode;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.JsonToken;
+import tools.jackson.core.ObjectReadContext;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -126,7 +127,7 @@ public final class JsonNodeTreeCodec {
         if (tree.isObject()) {
             generator.writeStartObject();
             for (Map.Entry<String, JsonNode> entry : tree.entries()) {
-                generator.writeFieldName(entry.getKey());
+                generator.writeName(entry.getKey());
                 writeTree(generator, entry.getValue());
             }
             generator.writeEndObject();
@@ -171,10 +172,11 @@ public final class JsonNodeTreeCodec {
      * Create a new parser that traverses over the given json node.
      *
      * @param node The json node to traverse over.
+     * @param context The context for databinding.
      * @return The parser that will visit the json node.
      */
-    public JsonParser treeAsTokens(JsonNode node) {
-        return new JsonNodeTraversingParser(node);
+    public JsonParser treeAsTokens(JsonNode node, ObjectReadContext context) {
+        return new JsonNodeTraversingParser(node, context);
     }
 
     /**

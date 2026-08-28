@@ -15,22 +15,10 @@
  */
 package io.micronaut.jackson.databind.convert;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ContainerNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.MutableConversionService;
@@ -42,8 +30,18 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
 import jakarta.inject.Inject;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.PropertyNamingStrategy;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ContainerNode;
+import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.type.TypeFactory;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
@@ -68,7 +66,7 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
      * @param conversionService The conversion service
      */
     @Inject
-    protected JacksonConverterRegistrar(
+    public JacksonConverterRegistrar(
         BeanProvider<ObjectMapper> objectMapper,
         ConversionService conversionService) {
         this.objectMapper = objectMapper;
@@ -165,7 +163,7 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
                     }
                     return Optional.ofNullable(result);
                 }
-            } catch (IOException e) {
+            } catch (JacksonException e) {
                 context.reject(e);
                 return Optional.empty();
             }
@@ -180,7 +178,7 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
             Map<String, Argument<?>> typeVariables = context.getTypeVariables();
             Class<?> elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
             var results = new ArrayList<>();
-            node.elements().forEachRemaining(jsonNode -> {
+            node.elements().forEach(jsonNode -> {
                 Optional<?> converted = conversionService.convert(jsonNode, elementType, context);
                 if (converted.isPresent()) {
                     results.add(converted.get());
@@ -198,14 +196,13 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
             try {
                 Object[] result = objectMapper.get().treeToValue(node, targetType);
                 return Optional.of(result);
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 context.reject(e);
                 return Optional.empty();
             }
         };
     }
 
-    @NonNull
     private Optional<PropertyNamingStrategy> resolvePropertyNamingStrategy(@Nullable CharSequence charSequence) {
         if (charSequence != null) {
             String stringValue = NameUtils.environmentName(charSequence.toString());

@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyEntry;
 import io.micronaut.context.env.PropertySource;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
@@ -29,6 +28,10 @@ import io.micronaut.core.util.AnsiColour;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.StringWriter;
@@ -36,8 +39,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 abstract sealed class ConsoleBeanResolutionTracer
     implements BeanResolutionTracer {
@@ -52,9 +53,12 @@ abstract sealed class ConsoleBeanResolutionTracer
         "java.util"
     );
 
-
     @Override
-    public void traceInitialConfiguration(Environment environment, Collection<BeanDefinitionReference<?>> beanReferences, Collection<DisabledBean<?>> disabledBeans) {
+    public void traceInitialConfiguration(Environment environment, Collection<BeanDefinitionReference<Object>> beanReferences, Collection<DisabledBean<?>> disabledBeans) {
+        if (environment == null) {
+            return;
+        }
+
         Collection<PropertySource> propertySources = environment.getPropertySources();
         Set<String> activeNames = environment.getActiveNames();
         StringWriter sw = new StringWriter();
@@ -84,7 +88,7 @@ abstract sealed class ConsoleBeanResolutionTracer
             writer.newLine();
             writer.write(AnsiColour.brightBlue("Configurable Beans: "));
             writer.newLine();
-            List<BeanDefinitionReference<?>> configRefs = beanReferences.stream()
+            List<BeanDefinitionReference<Object>> configRefs = beanReferences.stream()
                 .filter(ref -> ref.hasStereotype(ConfigurationReader.class) &&
                     ref.stringValue(ConfigurationReader.class, "prefix").isPresent())
                 .sorted((b1, b2) ->
@@ -162,7 +166,7 @@ abstract sealed class ConsoleBeanResolutionTracer
      * Write the output for the tracer.
      * @param output The output
      */
-    protected abstract void writeOutput(@NonNull String output);
+    protected abstract void writeOutput(String output);
 
     @Override
     public void traceBeanCreation(
@@ -206,7 +210,7 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
     @Override
-    public <T> void traceBeanResolved(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, T bean) {
+    public <T> void traceBeanResolved(BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable T bean) {
         String prefix = padLeft(resolutionContext, 1) + RIGHT_ARROW;
         StringWriter sw = new StringWriter();
         try (BufferedWriter writer = new BufferedWriter(sw)) {
@@ -240,7 +244,7 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
     @Override
-    public <T> void traceBeanDisabled(BeanResolutionContext resolutionContext, Argument<T> beanType, Qualifier<T> qualifier, String disabledBeanMessage) {
+    public <T> void traceBeanDisabled(BeanResolutionContext resolutionContext, Argument<T> beanType, @Nullable Qualifier<T> qualifier, String disabledBeanMessage) {
         String[] lines = disabledBeanMessage.split("\\r?\\n");
         String prefix = padLeft(resolutionContext, 3);
         StringWriter sw = new StringWriter();
@@ -266,7 +270,7 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
     @Override
-    public <T> void traceValueResolved(BeanResolutionContext resolutionContext, Argument<T> argument, String property, T value) {
+    public <T> void traceValueResolved(BeanResolutionContext resolutionContext, Argument<T> argument, String property, @Nullable T value) {
         BeanContext context = resolutionContext.getContext();
         if (context instanceof ApplicationContext applicationContext) {
             Environment environment = applicationContext.getEnvironment();
@@ -343,7 +347,6 @@ abstract sealed class ConsoleBeanResolutionTracer
     }
 
 
-    @NonNull
     private static String padLeft(BeanResolutionContext resolutionContext, int amount) {
         int size = resolutionContext.getPath().size() + amount;
         String prefix = "";

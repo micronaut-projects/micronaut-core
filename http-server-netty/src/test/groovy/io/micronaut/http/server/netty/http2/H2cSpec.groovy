@@ -2,7 +2,7 @@ package io.micronaut.http.server.netty.http2
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.NonNull
+import org.jspecify.annotations.NonNull
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Body
@@ -67,9 +67,10 @@ class H2cSpec extends Specification {
 
     private CompletableFuture requestUpgrade(DefaultFullHttpRequest initialRequest) {
         def responseFuture = new CompletableFuture()
+        def group = new NioEventLoopGroup(1)
         def bootstrap = new Bootstrap()
                 .remoteAddress(embeddedServer.host, embeddedServer.port)
-                .group(new NioEventLoopGroup())
+                .group(group)
                 .channel(NioSocketChannel.class)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
@@ -120,7 +121,7 @@ class H2cSpec extends Specification {
         channel.writeAndFlush(initialRequest)
         channel.read()
 
-        return responseFuture
+        return responseFuture.whenComplete((r, e) -> group.shutdownGracefully())
     }
 
     void 'test using direct netty http2 client'() {
@@ -129,6 +130,9 @@ class H2cSpec extends Specification {
 
         expect:
         responseFuture.get(10, TimeUnit.SECONDS) != null
+
+        cleanup:
+        ReferenceCountUtil.release(responseFuture.getNow(null))
     }
 
     void 'test using micronaut http client: retrieve'() {

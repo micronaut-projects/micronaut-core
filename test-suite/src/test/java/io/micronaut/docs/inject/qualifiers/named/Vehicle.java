@@ -15,10 +15,12 @@
  */
 package io.micronaut.docs.inject.qualifiers.named;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
+@Requires(property = "spec.name", value = "VehicleQualifiersNamedSpec")
 // tag::class[]
 @Singleton
 public class Vehicle {

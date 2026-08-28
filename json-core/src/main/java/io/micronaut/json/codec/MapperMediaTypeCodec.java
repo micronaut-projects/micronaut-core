@@ -17,8 +17,8 @@ package io.micronaut.json.codec;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -51,6 +51,7 @@ import java.util.List;
  */
 @Deprecated(since = "4.7")
 @Experimental
+@NullUnmarked
 public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     public static final String REGULAR_JSON_MEDIA_TYPE_CODEC_NAME = "json";
 
@@ -241,7 +242,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> void encode(@NonNull Argument<T> type, @NonNull T object, @NonNull OutputStream outputStream) throws CodecException {
+    public <T> void encode(Argument<T> type, T object, OutputStream outputStream) throws CodecException {
         try {
             getJsonMapper().writeValue(outputStream, type, object);
         } catch (IOException e) {
@@ -263,7 +264,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> byte[] encode(@NonNull Argument<T> type, T object) throws CodecException {
+    public <T> byte[] encode(Argument<T> type, T object) throws CodecException {
         try {
             if (object instanceof byte[] bytes) {
                 return bytes;
@@ -294,7 +295,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T, B> @NonNull ByteBuffer<B> encode(@NonNull Argument<T> type, T object, @NonNull ByteBufferFactory<?, B> allocator) throws CodecException {
+    public <T, B> ByteBuffer<B> encode(Argument<T> type, T object, ByteBufferFactory<?, B> allocator) throws CodecException {
         if (object instanceof byte[] bytes) {
             return allocator.copiedBuffer(bytes);
         }

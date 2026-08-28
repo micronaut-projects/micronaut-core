@@ -15,8 +15,10 @@
  */
 package io.micronaut.docs.server.binding
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.core.annotation.Introspected
 
 @Introspected
-data class Point (val x: Int, val y: Int)
+data class Point (@JsonProperty("x") val x: Int,
+                  @JsonProperty("y") val y: Int)
 

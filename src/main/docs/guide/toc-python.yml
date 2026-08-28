@@ -1,0 +1,361 @@
+introduction:
+  title: Introduction
+  upgrading: Upgrading your Micronaut Application
+quickStart:
+  title: Quick Start
+  buildCLI: Install the CLI
+  creatingServer: Creating a Server Application
+#  ideSetup:
+#    title: Setting up an IDE
+#    ideaSetup: IntelliJ IDEA
+#    vsCodeSetup: Visual Studio Code
+#    eclipseSetup: Eclipse
+#  creatingClient: Creating a Client
+#  deployingApp: Deploying the Application
+ioc:
+  title: Dependency Injection
+  beans: Defining Beans
+  how: How Does it Work?
+  iocDebugging: Debugging Dependency Injection
+  beanContext: The BeanContext
+  injection:
+    title: Dependency Injection Types
+    constructorInjection: Constructor Injection
+    fieldInjection: Field Injection
+    methodInjection: Method Injection
+    nullableInjection: Nullable Injection
+  types: Injectable Container Types
+  qualifiers: Bean Qualifiers
+  typed: Limiting Injectable Types
+  scopes:
+    title: Scopes
+    builtInScopes:
+      title: Built-In Scopes
+      eagerInit: Eager Initialization of Singletons
+    refreshable: Refreshable Scope
+    metaScopes: Scopes on Meta Annotations
+  factories: Bean Factories
+  conditionalBeans: Conditional Beans
+  replaces: Bean Replacement
+  beanConfigurations: Bean Configurations
+  lifecycle: Life-Cycle Methods
+  gracefulShutdown: Graceful Shutdown
+  contextEvents: Context Events
+  events: Bean Events
+  introspection:
+    title: Bean Introspection
+    atIntrospected: Use the @Introspected Annotation
+    staticAtCreator: Static Creator Methods
+    beanWrapperApi: The BeanWrapper API
+  beanMappers:
+    title: Bean Mappers
+    beanMappersMerging:
+      title: Bean Mappers Merging
+      beanMappersMergingStrategy: Merging Strategy
+  beanValidation: Bean Validation
+config:
+  title: Application Configuration
+  environments:
+    title: The Environment
+    environmentPriority: Environment Priority
+    disablingEnvironmentDetection: Disabling Environment Detection
+    defaultEnvironment: Default Environment
+  banner: Micronaut Banner
+  propertySource: Externalized Configuration with PropertySources
+  valueAnnotation: Configuration Injection
+  evaluatedExpressions: Expression Language
+  configurationProperties: Configuration Properties
+  customTypeConverter: Custom Type Converters
+  eachProperty: Using @EachProperty to Drive Configuration
+  eachBean: Using @EachBean to Drive Configuration
+  immutableConfig: Immutable Configuration
+  # validation: Validating Configuration
+  bootstrap: Bootstrap Configuration
+  jmx:
+    title: JMX Support
+aop:
+  title: Aspect Oriented Programming
+  aroundAdvice: Around Advice
+  introductionAdvice: Introduction Advice
+  adapterAdvice: Method Adapter Advice
+  lifecycleAdvice: Bean Life Cycle Advice
+  validation:
+    title: Validation Advice
+  caching:
+    title: Cache Advice
+  retry:
+    title: Retry Advice
+  scheduling:
+    title: Scheduled Tasks
+httpServer:
+  title: The HTTP Server
+  runningServer: Running the Embedded Server
+  runningSpecificPort: Running Server on a Specific Port
+  routing: HTTP Routing
+  binding: Simple Request Binding
+  customArgumentBinding: Custom Argument Binding
+  hostResolution: Host Resolution
+  localeResolution: Locale Resolution
+  clientIpAddress: Client IP Address
+  requestResponse: The HttpRequest and HttpResponse
+  statusAnnotation: Response Status
+  producesAnnotation: Response Content-Type
+  consumesAnnotation: Accepted Request Content-Type
+  reactiveServer:
+    title: Reactive HTTP Request Processing
+    bodyAnnotation: Using the @Body Annotation
+    reactiveResponses: Reactive Responses
+  jsonBinding:
+    title: JSON Binding
+    serializeUsingMicronautSerialization: Serialize using Micronaut Serialization
+    jsonMapper: JsonMapper
+    bindingUsingReactiveFrameworks: Binding using Reactive Frameworks
+    bindingUsingCompletableFuture: Binding Using CompletableFuture
+    bindingUsingPOJOs: Binding using POJOs
+  plainTextResponses: Plain Text Responses
+  datavalidation:
+    title: Data Validation
+    validationGroups: Validation Groups
+  staticResources: Serving Static Resources
+  errorHandling:
+    title: Error Handling
+    statusHandlers: Status Handlers
+    localErrorHandling: Local Error Handling
+    globalErrorHandling: Global Error Handling
+    exceptionHandler:
+      title: ExceptionHandler
+      builtInExceptionHandlers: Built-In Exception Handlers
+      customExceptionHandler: Custom Exception Handler
+    errorFormatting: Error Formatting
+  apiVersioning: API Versioning
+  formData: Handling Form Data
+  serverIO: Writing Response Data
+  uploads: File Uploads
+  transfers: File Transfers
+  filters:
+    title: HTTP Filters
+    filterPatterns: Filter Patterns
+    filtermethods:
+      title: Filter Methods
+      filtermethodsexample: Server Filter with Filter Methods
+      filtermethodproceed: Proceeding with Filter Methods
+      errorStates: Error States
+      continuations: Continuations
+      order: Filter Order
+    httpServerFilter:
+      title: HttpServerFilter
+      httpServerFilterExample: HttpServerFilter Example
+      httpServerFilterErrorStates: HttpServerFilter Error States
+  byteBody:
+    title: Advanced body access
+    byteBodyPrimary: Primary operations
+    byteBodySplitting: Splitting
+    byteBodyExample: Example
+  sessions: HTTP Sessions
+  sse: Server Sent Events
+  websocket:
+    title: WebSocket Support
+    websocketServer: Using @ServerWebSocket
+    websocketClient: Using @ClientWebSocket
+  http2Server: HTTP/2 Support
+  http3Server: HTTP/3 Support
+  serverEvents: Server Events
+  serverConfiguration:
+    title: Configuring the HTTP Server
+    threadPools:
+      title: Configuring Server Thread Pools
+      blockingOperations: Blocking Operations
+      virtualThreads: Virtual Threads
+      atBlocking: '@Blocking'
+    nettyClientPipeline: Configuring the Netty Client Pipeline
+    nettyServerPipeline: Configuring the Netty Server Pipeline
+    listener: Advanced Listener Configuration
+    cors:
+      title: Configuring CORS
+      annotationBasedCors: Annotation-based CORS Configuration
+      corsConfiguration: CORS via Configuration
+      corsAllowedOrigins: Allowed Origins
+      corsAllowedMethods: Allowed Methods
+      corsAllowedHeaders: Allowed Headers
+      corsExposedHeaders: Exposed Headers
+      corsAllowCredentials: Allow Credentials
+      corsAllowPrivateNetwork: Allow Private Network
+      corsMaxAge: Max Age
+      corsMultipleHeaderValues: Multiple Header Values
+    https: Securing the Server with HTTPS
+    dualProtocol: Enabling HTTP and HTTPS
+    accessLogger: Enabling Access Logger
+    secondaryServers: Starting Secondary Servers
+  views:
+    title: Server Side View Rendering
+  openapi: OpenAPI / Swagger Support
+  graphql: GraphQL Support
+httpClient:
+  title: The HTTP Client
+  httpClientImplementations:
+    title: HTTP Client Implementations
+    nettyHttpClient: HTTP Client based on Netty
+    jdkHttpClient:
+      title: HTTP Client based on the Java HTTP Client
+  lowLevelOrHighLevel: Low-Level and High-Level APIs
+  lowLevelHttpClient:
+    title: Using the Low-Level HTTP Client
+    clientBasics: Sending your first HTTP request
+    clientPostRequests: Posting a Request Body
+    clientUploads: Multipart Client Uploads
+    clientStreaming: Streaming JSON over HTTP
+    clientConfiguration: Configuring HTTP clients
+    lowLevelClientError: Error Responses
+    bindErrors: Bind Errors
+  proxyClient: Proxying Requests with ProxyHttpClient
+  clientAnnotation:
+    title: Declarative HTTP Clients with @Client
+    clientParameters: Customizing Parameter Binding
+    clientAnnotationStreaming: Streaming with @Client
+    clientError: Error Responses
+    clientHeaders: Customizing Request Headers
+    clientJackson: Customizing Jackson Settings
+    clientRetry: Retry and Circuit Breaker
+    clientFallback: Client Fallbacks
+    netflixHystrix: Netflix Hystrix Support
+  clientFilter: HTTP Client Filters
+  clientHttp2: HTTP/2 Support
+  clientHttp3: HTTP/3 Support
+  clientSample: HTTP Client Sample
+  nettyPooling: Connection pooling in the netty client
+certificates: Certificate providers
+contextPropagation:
+  title: Context propagation
+  reactorContextPropagation: Reactor context propagation
+  httpFilterContextPropagation: HTTP filters context propagation
+cloud:
+  title: Cloud Native Features
+  cloudConfiguration:
+    title: Cloud Configuration
+    distributedConfiguration: Distributed Configuration
+    distributedConfigurationConsul: HashiCorp Consul Support
+    distributedConfigurationVault: HashiCorp Vault Support
+    distributedConfigurationSpringCloud: Spring Cloud Config Support
+    distributedConfigurationAwsParameterStore: AWS Parameter Store Support
+    distributedConfigurationOracleCloudVault: Oracle Cloud Vault Support
+    distributedConfigurationGoogleCloudSecretManager: Google Cloud Secret Manager Support
+    distributedConfigurationKubernetes: Kubernetes Support
+  serviceDiscovery:
+    title: Service Discovery
+    serviceDiscoveryConsul: Consul Support
+    serviceDiscoveryEureka: Eureka Support
+    serviceDiscoveryKubernetes: Kubernetes Support
+    serviceDiscoveryRoute53: AWS Route 53 Support
+    serviceDiscoveryManual: Manual Service Discovery Configuration
+  clientSideLoadBalancing:
+    title: Client Side Load Balancing
+    netflixRibbon: Netflix Ribbon Support
+  distributedTracing: Distributed Tracing
+serverlessFunctions:
+  title: Serverless Functions
+  awsLambda: AWS Lambda
+  gcpFunction: Google Cloud Function
+  gcpCloudRun: Google Cloud Run
+  azureFunction: Azure Function
+messaging:
+  title: Message-Driven Microservices
+  kafka: Kafka Support
+  rabbitmq: RabbitMQ Support
+  nats: Nats.io Support
+commandLineApps:
+  title: Standalone Command Line Applications
+  picocli:
+    title: Picocli Support
+configurations:
+  title: Configurations
+  dataAccess:
+    title: Configurations for Data Access
+    sqlSupport: Configuring a SQL Data Source
+    mongoSupport: Configuring MongoDB
+    neo4jSupport: Configuring Neo4j
+    postgresSupport: Configuring Postgres
+    redisSupport: Configuring Redis
+    cassandraSupport: Configuring Cassandra
+    liquibaseSupport: Configuring Liquibase
+    flywaySupport: Configuring Flyway
+logging:
+  title: Logging
+  loggingMessages: Logging Messages
+  loggingConfiguration: Configuration
+  logback: Logback
+  loggingSystem: Logging System
+languageSupport:
+  title: Language Support
+  python:
+    title: Micronaut for Python
+    typeOrdering: Type Ordering and Forward References
+    keywords: Python Keywords in Java APIs
+    asyncAwait:
+      title: Async/Await
+      asyncioRuntime: Netty-Backed Asyncio Runtime
+      asyncioNetworking: Asyncio Networking and TLS
+      asyncioUnsupported: Unsupported Asyncio APIs
+management:
+  title: Management & Monitoring
+  buildingEndpoints:
+    title: Creating Endpoints
+    endpointAnnotation: The Endpoint Annotation
+    endpointMethod: Endpoint Methods
+    endpointSensitivity: Endpoint Sensitivity
+    endpointConfiguration: Endpoint Configuration
+  providedEndpoints:
+    title: Built-In Endpoints
+    beansEndpoint: The Beans Endpoint
+    infoEndpoint: The Info Endpoint
+    healthEndpoint:
+      title: The Health Endpoint
+      healthEndpointConfiguration: Health Endpoint Configuration
+      healthEndpointStatusCode: Health Status Codes
+      healthLogging: Health Logging
+      healthEndpointCustomization: Custom Health Indicator
+      healthMonitoringTask: Health Monitor Task
+      healthProvidedIndicators:
+        title: Provided Indicators
+        diskSpaceHealthIndicator: Disk Space Health Indicator
+        jdbcHealthIndicator: JDBC Health Indicator
+        deadlockedThreads: Deadlocked Threads
+    metricsEndpoint: The Metrics Endpoint
+    refreshEndpoint: The Refresh Endpoint
+    routesEndpoint: The Routes Endpoint
+    loggersEndpoint: The Loggers Endpoint
+    cachesEndpoint: The Caches Endpoint
+    stopEndpoint: The Server Stop Endpoint
+    environmentEndpoint: The Environment Endpoint
+    threadDumpEndpoint: The ThreadDump Endpoint
+security:
+  title: Security
+multitenancy:
+  title: Multi-Tenancy
+cli:
+  title: Micronaut CLI
+  createProject:
+    title: Creating a Project
+    comparingVersions: Comparing Versions
+  features: Features
+  commands: Commands
+i18n:
+  title: Internationalization
+  bundle: Resource Bundles
+  localizedMessageSource: Localized Message Source
+resources:
+  title: Resources
+appendix:
+  title: Appendices
+  architecture:
+    title: Micronaut Architecture
+    compilerArch: Compiler
+    annotationArch: Annotation Metadata
+    introspectionArch: Bean Introspections
+    iocArch: Bean Definitions
+    aopArch: AOP Proxies
+    containerArch: Application Context
+    httpServerArch: HTTP Server
+  faq: Frequently Asked Questions (FAQ)
+  usingsnapshots: Using Snapshots
+  problems: Common Problems
+  breaks: Breaking Changes

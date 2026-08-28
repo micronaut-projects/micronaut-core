@@ -16,7 +16,9 @@
 package io.micronaut.inject.qualifiers.replaces;
 
 import io.micronaut.aop.simple.Mutating;
+import io.micronaut.context.annotation.Requires;
 
+@Requires(property = "spec.name", value = "ReplacesSpec")
 @Mutating("name")
 public class HImpl implements H {
 

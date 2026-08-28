@@ -18,7 +18,6 @@ package io.micronaut.http.client.annotation;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -77,7 +76,6 @@ public @interface Client {
      * @see Produces
      */
     @Experimental
-    @NonNull
     DefinitionType definitionType() default DefinitionType.CLIENT;
 
     /**
@@ -117,7 +115,6 @@ public @interface Client {
      * @return The plaintext connection mode.
      * @since 4.0.0
      */
-    @NonNull
     HttpVersionSelection.PlaintextMode plaintextMode() default HttpVersionSelection.PlaintextMode.HTTP_1;
 
     /**
@@ -129,7 +126,6 @@ public @interface Client {
      * @return The supported ALPN protocols.
      * @since 4.0.0
      */
-    @NonNull
     String[] alpnModes() default {
         HttpVersionSelection.ALPN_HTTP_2,
         HttpVersionSelection.ALPN_HTTP_1

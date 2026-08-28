@@ -21,6 +21,8 @@
  * @since 1.0
  */
 @Internal
+@NullUnmarked
 package io.micronaut.annotation.processing;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.NullUnmarked;

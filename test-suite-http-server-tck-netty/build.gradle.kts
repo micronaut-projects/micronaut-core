@@ -6,6 +6,7 @@ plugins {
 dependencies {
     implementation(projects.micronautHttpServerTck)
     implementation(projects.micronautJacksonDatabind)
+    implementation(projects.micronautManagement)
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(projects.micronautHttpClient)
     testImplementation(libs.junit.platform.engine)
@@ -42,7 +43,7 @@ graalvmNative {
             if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
                 buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsSuiteClass")
                 buildArgs.add("--initialize-at-build-time=org.junit.platform.suite.engine.IsPotentialTestContainer")
-                buildArgs.add("--strict-image-heap")
+                buildArgs.add("-H:+SharedArenaSupport")
             }
             resources.autodetect()
         }

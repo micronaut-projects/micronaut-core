@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -29,8 +30,9 @@ import java.util.List;
  * @since 3.5.0
  */
 @Internal
-final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> {
+final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implements DependentBeanProvider {
     private final BeanContext beanContext;
+    @Nullable
     private final List<BeanRegistration<?>> dependents;
 
     BeanDisposingRegistration(BeanContext beanContext,
@@ -57,7 +59,13 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> {
         beanContext.destroyBean(this);
     }
 
+    @Nullable
     public List<BeanRegistration<?>> getDependents() {
         return dependents;
+    }
+
+    @Override
+    public List<BeanRegistration<?>> dependentBeans() {
+        return dependents == null ? List.of() : List.copyOf(dependents);
     }
 }

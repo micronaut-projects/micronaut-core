@@ -19,10 +19,10 @@ import io.micronaut.context.annotation.BeanProperties;
 import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -43,6 +43,10 @@ public final class PropertyElementQuery {
     private static final String[] DEFAULT_READ_PREFIXES = { AccessorsStyle.DEFAULT_READ_PREFIX };
     private static final String[] DEFAULT_WRITE_PREFIXES = { AccessorsStyle.DEFAULT_WRITE_PREFIX };
     private static final EnumSet<BeanProperties.AccessKind> DEFAULT_ACCESS_KINDS = EnumSet.of(BeanProperties.AccessKind.METHOD);
+    private static final JsonAutoDetectConfiguration.Visibility DEFAULT_JSON_FIELD_VISIBILITY = JsonAutoDetectConfiguration.Visibility.PUBLIC_ONLY;
+    private static final JsonAutoDetectConfiguration.Visibility DEFAULT_JSON_GETTER_VISIBILITY = JsonAutoDetectConfiguration.Visibility.PUBLIC_ONLY;
+    private static final JsonAutoDetectConfiguration.Visibility DEFAULT_JSON_IS_GETTER_VISIBILITY = JsonAutoDetectConfiguration.Visibility.PUBLIC_ONLY;
+    private static final JsonAutoDetectConfiguration.Visibility DEFAULT_JSON_SETTER_VISIBILITY = JsonAutoDetectConfiguration.Visibility.ANY;
     private BeanProperties.Visibility visibility = BeanProperties.Visibility.DEFAULT;
     private Set<BeanProperties.AccessKind> accessKinds = DEFAULT_ACCESS_KINDS;
     private Set<String> includes = Collections.emptySet();
@@ -55,13 +59,18 @@ public final class PropertyElementQuery {
 
     private boolean ignoreSettersWithDifferingType;
     private Set<String> excludedAnnotations = Collections.emptySet();
+    private boolean jsonAutoDetectConfigured;
+    private JsonAutoDetectConfiguration.Visibility jsonFieldVisibility = DEFAULT_JSON_FIELD_VISIBILITY;
+    private JsonAutoDetectConfiguration.Visibility jsonGetterVisibility = DEFAULT_JSON_GETTER_VISIBILITY;
+    private JsonAutoDetectConfiguration.Visibility jsonIsGetterVisibility = DEFAULT_JSON_IS_GETTER_VISIBILITY;
+    private JsonAutoDetectConfiguration.Visibility jsonSetterVisibility = DEFAULT_JSON_SETTER_VISIBILITY;
 
     /**
      * Creates a query for the given metadata.
      * @param annotationMetadata The metadata
      * @return The query
      */
-    public static @NonNull PropertyElementQuery of(@NonNull AnnotationMetadata annotationMetadata) {
+    public static PropertyElementQuery of(AnnotationMetadata annotationMetadata) {
         PropertyElementQuery conf = new PropertyElementQuery();
 
         AnnotationValue<BeanProperties> annotation = annotationMetadata.getAnnotation(BeanProperties.class);
@@ -92,7 +101,41 @@ public final class PropertyElementQuery {
         if (ArrayUtils.isNotEmpty(writerPrefixes)) {
             conf.writePrefixes(writerPrefixes);
         }
+
+        AnnotationValue<JsonAutoDetectConfiguration> jsonAutoDetect = annotationMetadata.getAnnotation(JsonAutoDetectConfiguration.class);
+        if (jsonAutoDetect != null) {
+            conf.jsonAutoDetect(
+                resolveJsonVisibility(
+                    jsonAutoDetect,
+                    JsonAutoDetectConfiguration.MEMBER_FIELD_VISIBILITY,
+                    DEFAULT_JSON_FIELD_VISIBILITY
+                ),
+                resolveJsonVisibility(
+                    jsonAutoDetect,
+                    JsonAutoDetectConfiguration.MEMBER_GETTER_VISIBILITY,
+                    DEFAULT_JSON_GETTER_VISIBILITY
+                ),
+                resolveJsonVisibility(
+                    jsonAutoDetect,
+                    JsonAutoDetectConfiguration.MEMBER_IS_GETTER_VISIBILITY,
+                    DEFAULT_JSON_IS_GETTER_VISIBILITY
+                ),
+                resolveJsonVisibility(
+                    jsonAutoDetect,
+                    JsonAutoDetectConfiguration.MEMBER_SETTER_VISIBILITY,
+                    DEFAULT_JSON_SETTER_VISIBILITY
+                )
+            );
+        }
         return conf;
+    }
+
+    private static JsonAutoDetectConfiguration.Visibility resolveJsonVisibility(AnnotationValue<JsonAutoDetectConfiguration> annotation,
+                                                                               String member,
+                                                                               JsonAutoDetectConfiguration.Visibility defaultVisibility) {
+        JsonAutoDetectConfiguration.Visibility visibility = annotation.enumValue(member, JsonAutoDetectConfiguration.Visibility.class)
+            .orElse(JsonAutoDetectConfiguration.Visibility.DEFAULT);
+        return visibility == JsonAutoDetectConfiguration.Visibility.DEFAULT ? defaultVisibility : visibility;
     }
 
     /**
@@ -107,7 +150,7 @@ public final class PropertyElementQuery {
      * @param shouldIgnore True if they should be ignored.
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery ignoreSettersWithDifferingType(boolean shouldIgnore) {
+    public PropertyElementQuery ignoreSettersWithDifferingType(boolean shouldIgnore) {
         this.ignoreSettersWithDifferingType = shouldIgnore;
         return this;
     }
@@ -116,7 +159,6 @@ public final class PropertyElementQuery {
      * @return The visibility strategy.
      * @see io.micronaut.context.annotation.BeanProperties.Visibility
      */
-    @NonNull
     public BeanProperties.Visibility getVisibility() {
         return visibility;
     }
@@ -127,7 +169,7 @@ public final class PropertyElementQuery {
      * @return This PropertyElementQuery
      * @see io.micronaut.context.annotation.BeanProperties.Visibility
      */
-    public @NonNull PropertyElementQuery visibility(BeanProperties.Visibility visibility) {
+    public PropertyElementQuery visibility(BeanProperties.Visibility visibility) {
         this.visibility = Objects.requireNonNullElse(visibility, BeanProperties.Visibility.DEFAULT);
         return this;
     }
@@ -137,9 +179,111 @@ public final class PropertyElementQuery {
      * @return A set of access kinds
      * @see BeanProperties.AccessKind
      */
-    @NonNull
     public Set<BeanProperties.AccessKind> getAccessKinds() {
         return accessKinds;
+    }
+
+    /**
+     * Returns whether Jackson auto-detect visibility metadata is configured.
+     *
+     * @return Whether Jackson auto-detect visibility metadata is configured.
+     */
+    public boolean isJsonAutoDetectConfigured() {
+        return jsonAutoDetectConfigured;
+    }
+
+    /**
+     * Tests field visibility using mapped Jackson auto-detect metadata.
+     *
+     * @param fieldElement The field
+     * @return True if the field is visible.
+     */
+    public boolean isJsonAutoDetectFieldVisible(FieldElement fieldElement) {
+        return isJsonVisible(fieldElement, jsonFieldVisibility);
+    }
+
+    /**
+     * Tests getter visibility using mapped Jackson auto-detect metadata.
+     *
+     * @param methodElement The method
+     * @param methodName The method name
+     * @return True if the getter is visible.
+     */
+    public boolean isJsonAutoDetectGetterVisible(MethodElement methodElement, String methodName) {
+        if (isJsonIsGetterName(methodName)) {
+            return isJsonIsGetter(methodElement, methodName) && isJsonVisible(methodElement, jsonIsGetterVisibility);
+        }
+        return isJsonVisible(methodElement, jsonGetterVisibility);
+    }
+
+    /**
+     * Tests setter visibility using mapped Jackson auto-detect metadata.
+     *
+     * @param methodElement The method
+     * @return True if the setter is visible.
+     */
+    public boolean isJsonAutoDetectSetterVisible(MethodElement methodElement) {
+        return isJsonVisible(methodElement, jsonSetterVisibility);
+    }
+
+    /**
+     * Tests whether the method name is a Jackson auto-detect reader name.
+     *
+     * @param methodElement The method
+     * @param methodName The method name
+     * @return True if the method can be a Jackson auto-detect reader.
+     */
+    public boolean isJsonAutoDetectReaderName(MethodElement methodElement, String methodName) {
+        return (jsonGetterVisibility != JsonAutoDetectConfiguration.Visibility.NONE
+            && NameUtils.isReaderName(methodName, AccessorsStyle.DEFAULT_READ_PREFIX)
+            && !isJsonIsGetterName(methodName))
+            || (jsonIsGetterVisibility != JsonAutoDetectConfiguration.Visibility.NONE
+                && isJsonIsGetter(methodElement, methodName));
+    }
+
+    /**
+     * Tests whether the method name is a Jackson auto-detect writer name.
+     *
+     * @param methodName The method name
+     * @return True if the method can be a Jackson auto-detect writer.
+     */
+    public boolean isJsonAutoDetectWriterName(String methodName) {
+        return jsonSetterVisibility != JsonAutoDetectConfiguration.Visibility.NONE &&
+            NameUtils.isWriterName(methodName, AccessorsStyle.DEFAULT_WRITE_PREFIX);
+    }
+
+    private PropertyElementQuery jsonAutoDetect(JsonAutoDetectConfiguration.Visibility fieldVisibility,
+                                                JsonAutoDetectConfiguration.Visibility getterVisibility,
+                                                JsonAutoDetectConfiguration.Visibility isGetterVisibility,
+                                                JsonAutoDetectConfiguration.Visibility setterVisibility) {
+        jsonAutoDetectConfigured = true;
+        jsonFieldVisibility = fieldVisibility;
+        jsonGetterVisibility = getterVisibility;
+        jsonIsGetterVisibility = isGetterVisibility;
+        jsonSetterVisibility = setterVisibility;
+        return this;
+    }
+
+    private static boolean isJsonVisible(MemberElement memberElement, JsonAutoDetectConfiguration.Visibility visibility) {
+        return switch (visibility) {
+            case ANY -> true;
+            case NON_PRIVATE -> !memberElement.isPrivate();
+            case PROTECTED_AND_PUBLIC -> memberElement.isProtected() || memberElement.isPublic();
+            case PUBLIC_ONLY -> memberElement.isPublic();
+            case NONE, DEFAULT -> false;
+        };
+    }
+
+    private static boolean isJsonIsGetterName(String methodName) {
+        return NameUtils.isReaderName(methodName, "is") && methodName.startsWith("is");
+    }
+
+    private static boolean isJsonIsGetter(MethodElement methodElement, String methodName) {
+        return isJsonIsGetterName(methodName) && isBoolean(methodElement.getReturnType());
+    }
+
+    private static boolean isBoolean(ClassElement type) {
+        return type.getName().equals(PrimitiveElement.BOOLEAN.getName()) || type.getName().equals(Boolean.class.getName());
     }
 
     /**
@@ -147,7 +291,7 @@ public final class PropertyElementQuery {
      * @param accessKinds The access kinds
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery accessKinds(@Nullable Set<BeanProperties.AccessKind> accessKinds) {
+    public PropertyElementQuery accessKinds(@Nullable Set<BeanProperties.AccessKind> accessKinds) {
         if (CollectionUtils.isNotEmpty(accessKinds)) {
             this.accessKinds = Collections.unmodifiableSet(accessKinds);
         } else {
@@ -160,7 +304,6 @@ public final class PropertyElementQuery {
      * The property names to include.
      * @return The includes.
      */
-    @NonNull
     public Set<String> getIncludes() {
         return includes;
     }
@@ -170,7 +313,6 @@ public final class PropertyElementQuery {
      * @param includes The includes
      * @return This PropertyElementQuery
      */
-    @NonNull
     public PropertyElementQuery includes(@Nullable Set<String> includes) {
         if (CollectionUtils.isNotEmpty(includes)) {
             this.includes = Collections.unmodifiableSet(includes);
@@ -184,7 +326,6 @@ public final class PropertyElementQuery {
      * The property names to exclude.
      * @return The excludes
      */
-    @NonNull
     public Set<String> getExcludes() {
         return excludes;
     }
@@ -194,7 +335,7 @@ public final class PropertyElementQuery {
      * @param excludes The property names to exclude
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery excludes(@Nullable Set<String> excludes) {
+    public PropertyElementQuery excludes(@Nullable Set<String> excludes) {
         if (CollectionUtils.isNotEmpty(excludes)) {
             this.excludes = Collections.unmodifiableSet(excludes);
         } else {
@@ -206,7 +347,6 @@ public final class PropertyElementQuery {
     /**
      * @return The read method prefixes.
      */
-    @NonNull
     public String[] getReadPrefixes() {
         return readPrefixes;
     }
@@ -216,7 +356,7 @@ public final class PropertyElementQuery {
      * @param readPrefixes The read methos prefixes
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery readPrefixes(String... readPrefixes) {
+    public PropertyElementQuery readPrefixes(String... readPrefixes) {
         if (ArrayUtils.isNotEmpty(readPrefixes)) {
             this.readPrefixes = readPrefixes;
         } else {
@@ -228,7 +368,7 @@ public final class PropertyElementQuery {
     /**
      * @return The write method prefixes.
      */
-    public @NonNull String[] getWritePrefixes() {
+    public String [] getWritePrefixes() {
         return writePrefixes;
     }
 
@@ -237,7 +377,7 @@ public final class PropertyElementQuery {
      * @param writePrefixes The write prefixes
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery writePrefixes(String[] writePrefixes) {
+    public PropertyElementQuery writePrefixes(String [] writePrefixes) {
         if (ArrayUtils.isNotEmpty(writePrefixes)) {
             this.writePrefixes = writePrefixes;
         } else {
@@ -258,7 +398,7 @@ public final class PropertyElementQuery {
      * @param allowSetterWithZeroArgs True to allow zero argument setters
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery allowSetterWithZeroArgs(boolean allowSetterWithZeroArgs) {
+    public PropertyElementQuery allowSetterWithZeroArgs(boolean allowSetterWithZeroArgs) {
         this.allowSetterWithZeroArgs = allowSetterWithZeroArgs;
         return this;
     }
@@ -276,7 +416,7 @@ public final class PropertyElementQuery {
      * @param allowSetterWithMultipleArgs True if setters with multiple arguments are allowed.
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery allowSetterWithMultipleArgs(boolean allowSetterWithMultipleArgs) {
+    public PropertyElementQuery allowSetterWithMultipleArgs(boolean allowSetterWithMultipleArgs) {
         this.allowSetterWithMultipleArgs = allowSetterWithMultipleArgs;
         return this;
     }
@@ -293,7 +433,7 @@ public final class PropertyElementQuery {
      * @param allowStaticProperties True if static properties are allowed.
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery allowStaticProperties(boolean allowStaticProperties) {
+    public PropertyElementQuery allowStaticProperties(boolean allowStaticProperties) {
         this.allowStaticProperties = allowStaticProperties;
         return this;
     }
@@ -301,7 +441,6 @@ public final class PropertyElementQuery {
     /**
      * @return The excludes annotation names.
      */
-    @NonNull
     public Set<String> getExcludedAnnotations() {
         return excludedAnnotations;
     }
@@ -311,7 +450,7 @@ public final class PropertyElementQuery {
      * @param excludedAnnotations The excluded annotation names
      * @return This PropertyElementQuery
      */
-    public @NonNull PropertyElementQuery excludedAnnotations(@Nullable Set<String> excludedAnnotations) {
+    public PropertyElementQuery excludedAnnotations(@Nullable Set<String> excludedAnnotations) {
         if (CollectionUtils.isNotEmpty(excludedAnnotations)) {
             this.excludedAnnotations = Collections.unmodifiableSet(excludedAnnotations);
         } else {

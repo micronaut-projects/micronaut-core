@@ -16,13 +16,11 @@
 package io.micronaut.inject.configproperties
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
-import jakarta.validation.Validation
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 
@@ -33,7 +31,7 @@ class ValidatedGetterConfigurationSpec extends Specification {
 
     void "test validated config with invalid config"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.start()
 
         when:
@@ -50,7 +48,7 @@ class ValidatedGetterConfigurationSpec extends Specification {
 
     void "test validated config with valid config"() {
         given:
-        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
         applicationContext.environment.addPropertySource(PropertySource.of(
                 'test',
                 ['foo.bar.url':'http://localhost',

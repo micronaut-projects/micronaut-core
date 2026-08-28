@@ -18,8 +18,10 @@ package io.micronaut.inject.injectionpoint;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.inject.InjectionPoint;
+import io.micronaut.context.annotation.Requires;
 
 @Factory
+@Requires(property = "spec.name", value = "InjectionPointSpec")
 public class SomeFactory {
 
     @Prototype

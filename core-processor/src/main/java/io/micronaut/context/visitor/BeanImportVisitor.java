@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -36,6 +35,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 
@@ -51,6 +51,7 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
 
     private static final List<BeanImportHandler> BEAN_IMPORT_HANDLERS;
+    private static final ClassElement[] EMPTY_CLASS_ELEMENTS = new ClassElement[0];
 
     static {
         final ServiceLoader<BeanImportHandler> handlers = ServiceLoader.load(BeanImportHandler.class);
@@ -72,16 +73,22 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
         List<ClassElement> beanElements = collectInjectableElements(element, context);
 
         for (ClassElement beanElement : beanElements) {
-            final BeanElementBuilder beanElementBuilder =
-                    element.addAssociatedBean(beanElement)
-                    .inject();
+            final BeanElementBuilder beanElementBuilder = element.addAssociatedBean(beanElement);
+            for (Map.Entry<String, Map<String, ClassElement>> typeArgumentsEntry : beanElement.getAllTypeArguments().entrySet()) {
+                context.getClassElement(typeArgumentsEntry.getKey()).ifPresent(typeElement -> {
+                    ClassElement[] typeArguments = typeArgumentsEntry.getValue().values().toArray(EMPTY_CLASS_ELEMENTS);
+                    if (typeArguments.length > 0) {
+                        beanElementBuilder.typeArgumentsForType(typeElement, typeArguments);
+                    }
+                });
+            }
+            beanElementBuilder.inject();
             for (BeanImportHandler beanImportHandler : BEAN_IMPORT_HANDLERS) {
                 beanImportHandler.beanAdded(beanElementBuilder, context);
             }
         }
     }
 
-    @NonNull
     public static List<ClassElement> collectInjectableElements(AnnotationMetadata element, VisitorContext context) {
         List<ClassElement> beanElements = new ArrayList<>();
         AnnotationValue<Import> annotation = element.getAnnotation(Import.class);
@@ -128,7 +135,6 @@ public class BeanImportVisitor implements TypeElementVisitor<Import, Object> {
         return Collections.singleton(Import.class.getName());
     }
 
-    @NonNull
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
