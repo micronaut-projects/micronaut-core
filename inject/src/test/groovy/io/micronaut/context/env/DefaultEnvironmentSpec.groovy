@@ -28,8 +28,10 @@ import spock.util.environment.RestoreSystemProperties
 
 import java.nio.file.Files
 import java.nio.file.Path
-import java.net.URLClassLoader
-import java.util.Comparator
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Function
 
 /**
@@ -83,6 +85,48 @@ class DefaultEnvironmentSpec extends Specification {
 
         expect:
         env.getProperty("test.foo", Map.class).get() == [bar: "10", baz: "20"]
+    }
+
+    void "test cache related issue when refresh method is executed"() {
+        given:
+        def propertyMap = ['testPropKey': 'testPropValueOld']
+        def propertySource = new MapPropertySource('CustomPS', propertyMap)
+        def env = new DefaultEnvironment({['test']})
+        env.addPropertySource(propertySource)
+        env.start()
+
+        expect:
+        env.getRequiredProperty("testPropKey", String.class) == 'testPropValueOld'
+
+        and:
+        def testFinished = new AtomicBoolean(false)
+        def started = new CountDownLatch(1)
+        def executor = Executors.newSingleThreadExecutor()
+        def task = executor.submit(new Runnable() {
+            @Override
+            void run() {
+                started.countDown()
+                while (!testFinished.get() && !Thread.currentThread().isInterrupted()) {
+                    env.getProperty("testPropKey", String.class)
+                }
+            }
+        })
+        assert started.await(5, TimeUnit.SECONDS)
+
+        when:
+        propertyMap.put('testPropKey', 'testPropValueNew')
+        def diff = env.refreshAndDiff()
+        testFinished.set(true)
+
+        then:
+        env.getRequiredProperty("testPropKey", String.class) == 'testPropValueNew'
+        diff.get('test-prop-key') == 'testPropValueOld'
+
+        cleanup:
+        testFinished.set(true)
+        executor.shutdownNow()
+        assert executor.awaitTermination(5, TimeUnit.SECONDS)
+        task.get(0, TimeUnit.MILLISECONDS)
     }
 
     void "test environment refresh and diff"() {
