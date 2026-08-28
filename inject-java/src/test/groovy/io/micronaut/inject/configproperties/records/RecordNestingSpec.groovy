@@ -2,6 +2,7 @@ package io.micronaut.inject.configproperties.records
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContextBuilder
+import io.micronaut.inject.qualifiers.Qualifiers
 
 class RecordNestingSpec extends AbstractTypeElementSpec {
 
@@ -50,6 +51,29 @@ record RecordOuterConfig(
         config.inners().size() == 1
         config.inners()[0].count() == 30
         config.inners()[0].thirdLevel().num() == 40
+    }
+
+    void "test EachProperty record where @Parameter field is not alphabetically first"() {
+        given:
+        def context = buildContext('test.UnorderedConfig', '''
+package test;
+
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
+
+@EachProperty("demos")
+record UnorderedConfig(
+    @Parameter String name,
+    boolean enabled) {
+}
+''', false, ['demos.test.enabled': 'true'])
+
+        when:
+        def config = getBean(context, 'test.UnorderedConfig', Qualifiers.byName('test'))
+
+        then:
+        config.name() == 'test'
+        config.enabled()
     }
 
     @Override
