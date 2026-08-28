@@ -1430,17 +1430,17 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (other == null || !annotationName.equals(other.getAnnotationName())) {
             return false;
         }
-        Map<CharSequence, Object> values = completedValues(this);
-        Map<CharSequence, Object> otherValues = completedValues(other);
-        if (values.size() != otherValues.size()) {
+        Map<CharSequence, Object> members = completedValues(this);
+        Map<CharSequence, Object> otherMembers = completedValues(other);
+        if (members.size() != otherMembers.size()) {
             return false;
         }
-        for (Map.Entry<CharSequence, Object> member : values.entrySet()) {
-            if (!otherValues.containsKey(member.getKey())) {
+        for (Map.Entry<CharSequence, Object> member : members.entrySet()) {
+            if (!otherMembers.containsKey(member.getKey())) {
                 return false;
             }
             Object value = member.getValue();
-            Object otherValue = otherValues.get(member.getKey());
+            Object otherValue = otherMembers.get(member.getKey());
             if (value == null || otherValue == null) {
                 if (value != null || otherValue != null) {
                     return false;
