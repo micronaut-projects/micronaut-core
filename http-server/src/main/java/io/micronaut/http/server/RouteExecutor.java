@@ -571,8 +571,11 @@ public final class RouteExecutor {
         boolean isKotlinFunctionReturnTypeUnit =
             routeInfo instanceof MethodBasedRouteInfo<?, ?> mbri &&
                 isKotlinFunctionReturnTypeUnit(mbri.getTargetMethod().getExecutableMethod());
-        final Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(request);
         if (isKotlinCoroutineSuspended(body)) {
+            Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(request);
+            if (supplier == null) {
+                return ExecutionFlow.empty();
+            }
             Mono<MutableHttpResponse<?>> responsePublisher = Mono.fromCompletionStage(supplier)
                 .flatMap(obj -> {
                     MutableHttpResponse<?> response;
