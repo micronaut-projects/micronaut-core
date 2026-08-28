@@ -41,6 +41,7 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.NullType;
+import javax.lang.model.type.PrimitiveType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.AbstractAnnotationValueVisitor8;
 import javax.lang.model.util.Elements;
@@ -56,6 +57,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -652,6 +654,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                     String className = JavaModelUtils.getClassName(element);
                     resolvedValue = new AnnotationClassValue<>(className);
                 }
+            } else if (t instanceof PrimitiveType primitiveType) {
+                resolvedValue = new AnnotationClassValue<>(primitiveType.getKind().name().toLowerCase(Locale.ENGLISH));
             }
             return null;
         }
@@ -797,6 +801,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                         final String className = JavaModelUtils.getClassName(element);
                         values.add(new AnnotationClassValue<>(className));
                     }
+                } else if (t instanceof PrimitiveType primitiveType) {
+                    values.add(new AnnotationClassValue<>(primitiveType.getKind().name().toLowerCase(Locale.ENGLISH)));
                 } else if (t instanceof ArrayType arrayType) {
                     TypeMirror componentType = arrayType.getComponentType();
                     if (componentType instanceof DeclaredType declaredType) {
