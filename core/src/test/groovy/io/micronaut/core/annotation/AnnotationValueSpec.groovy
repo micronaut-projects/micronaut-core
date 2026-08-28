@@ -216,6 +216,76 @@ class AnnotationValueSpec extends Specification {
         av.getAnnotation("bar", Bar.class).get() == innerAv
         av.getAnnotation("bars", Bar.class).get() == innerAv
     }
+    void "test matches() fills the members neither value declared in from the defaults"() {
+        given:
+        def defaults = [level: "INFO"] as Map<CharSequence, Object>
+        def declared = new AnnotationValue("test.Audited", [level: "INFO"] as Map<CharSequence, Object>, defaults)
+        def omitted = new AnnotationValue("test.Audited", [:] as Map<CharSequence, Object>, defaults)
+        def other = new AnnotationValue("test.Audited", [level: "DEBUG"] as Map<CharSequence, Object>, defaults)
+
+        expect: "the declared default and the omitted one are the same annotation"
+        declared.matches(omitted)
+        omitted.matches(declared)
+
+        and: "a member declared as something else is not"
+        !declared.matches(other)
+        !omitted.matches(other)
+
+        and: "equals() still compares the members that were declared"
+        declared != omitted
+    }
+
+    void "test matches() compares the annotation name"() {
+        given:
+        def av = new AnnotationValue("test.Foo", [value: 1] as Map<CharSequence, Object>)
+
+        expect: "a value matches itself"
+        av.matches(av)
+
+        and:
+        !av.matches(null)
+        !av.matches(new AnnotationValue("test.Bar", [value: 1] as Map<CharSequence, Object>))
+    }
+
+    void "test matches() compares every member"() {
+        given:
+        def av = new AnnotationValue("test.Foo", [one: 1] as Map<CharSequence, Object>)
+
+        expect: "a value with a member the other does not have is not the same annotation"
+        !av.matches(new AnnotationValue("test.Foo", [one: 1, two: 2] as Map<CharSequence, Object>))
+        !new AnnotationValue("test.Foo", [one: 1, two: 2] as Map<CharSequence, Object>).matches(av)
+
+        and: "nor is one binding the same number of members under other names"
+        !av.matches(new AnnotationValue("test.Foo", [two: 1] as Map<CharSequence, Object>))
+
+        and: "nor one binding the same member to something else"
+        !av.matches(new AnnotationValue("test.Foo", [one: 2] as Map<CharSequence, Object>))
+
+        and:
+        av.matches(new AnnotationValue("test.Foo", [one: 1] as Map<CharSequence, Object>))
+    }
+
+    void "test matches() compares a member bound to null"() {
+        given:
+        def nullValue = new AnnotationValue("test.Foo", [one: null] as Map<CharSequence, Object>)
+        def value = new AnnotationValue("test.Foo", [one: 1] as Map<CharSequence, Object>)
+
+        expect:
+        nullValue.matches(new AnnotationValue("test.Foo", [one: null] as Map<CharSequence, Object>))
+        !nullValue.matches(value)
+        !value.matches(nullValue)
+    }
+
+    void "test matches() with no defaults to fill in"() {
+        given: "one value carrying no defaults and one carrying an empty map of them"
+        def noDefaults = new AnnotationValue("test.Foo", [one: 1] as Map<CharSequence, Object>, (Map<CharSequence, Object>) null)
+        def emptyDefaults = new AnnotationValue("test.Foo", [one: 1] as Map<CharSequence, Object>, [:] as Map<CharSequence, Object>)
+
+        expect: "the declared members are compared as they are"
+        noDefaults.matches(emptyDefaults)
+        emptyDefaults.matches(noDefaults)
+        !noDefaults.matches(new AnnotationValue("test.Foo", [:] as Map<CharSequence, Object>, (Map<CharSequence, Object>) null))
+    }
 }
 
 @interface Bar {}

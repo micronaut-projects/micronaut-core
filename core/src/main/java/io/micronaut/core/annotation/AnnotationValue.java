@@ -1407,6 +1407,62 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return object.toString();
     }
 
+    /**
+     * Whether this and another annotation value are the same annotation.
+     *
+     * <p>Two values are the same annotation when they name the same annotation and bind the same members to the
+     * same values, with the members neither of them declared filled in from the defaults of the annotation. An
+     * element which leaves a member at its default therefore matches one which writes that default down, which
+     * {@link #equals(Object)} does not do: it compares the members that were declared.</p>
+     *
+     * <p>This is a comparison of every member, where {@link #equals(Object)} passes over a member the other value
+     * does not have. A member can only be left out when it has a default, so filling the defaults in is what makes
+     * every member comparable.</p>
+     *
+     * @param other The other annotation value
+     * @return Whether the two are the same annotation
+     * @since 5.2.0
+     */
+    public boolean matches(@Nullable AnnotationValue<?> other) {
+        if (this == other) {
+            return true;
+        }
+        if (other == null || !annotationName.equals(other.getAnnotationName())) {
+            return false;
+        }
+        Map<CharSequence, Object> members = completedValues(this);
+        Map<CharSequence, Object> otherMembers = completedValues(other);
+        if (members.size() != otherMembers.size()) {
+            return false;
+        }
+        for (Map.Entry<CharSequence, Object> member : members.entrySet()) {
+            if (!otherMembers.containsKey(member.getKey())) {
+                return false;
+            }
+            Object value = member.getValue();
+            Object otherValue = otherMembers.get(member.getKey());
+            if (value == null || otherValue == null) {
+                if (value != null || otherValue != null) {
+                    return false;
+                }
+            } else if (!AnnotationUtil.areEqual(value, otherValue)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static Map<CharSequence, Object> completedValues(AnnotationValue<?> value) {
+        Map<CharSequence, Object> defaults = value.getDefaultValues();
+        Map<CharSequence, Object> declared = value.getValues();
+        if (defaults == null || defaults.isEmpty()) {
+            return declared;
+        }
+        Map<CharSequence, Object> completed = new LinkedHashMap<>(defaults);
+        completed.putAll(declared);
+        return completed;
+    }
+
     @Override
     public int hashCode() {
         return 31 * annotationName.hashCode() + AnnotationUtil.calculateHashCode(getValues());

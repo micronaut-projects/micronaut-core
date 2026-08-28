@@ -126,7 +126,8 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
                     interceptorBinding.getAnnotation(META_BINDING_VALUES).orElse(null);
                 boolean matched = true;
                 for (AnnotationValue<?> binding : bindingList) {
-                    matched = matched && (!binding.isPresent(META_BINDING_VALUES) || otherBinding != null && binding.equals(otherBinding));
+                    matched = matched && (!binding.isPresent(META_BINDING_VALUES)
+                        || otherBinding != null && bindingValuesMatch(otherBinding, binding));
                 }
                 return matched;
             }
@@ -144,7 +145,8 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
                     final AnnotationValue<Annotation> otherBinding =
                         annotation.getAnnotation(META_BINDING_VALUES).orElse(null);
                     for (AnnotationValue<?> binding : bindingList) {
-                        matched = (!binding.isPresent(META_BINDING_VALUES) || otherBinding != null && binding.equals(otherBinding));
+                        matched = (!binding.isPresent(META_BINDING_VALUES)
+                            || otherBinding != null && bindingValuesMatch(otherBinding, binding));
                         if (matched) {
                             break;
                         }
@@ -159,6 +161,26 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
             }
             return matched;
         }
+    }
+
+    /**
+     * Whether the members an interceptor binds by are the members the intercept point binds by.
+     *
+     * <p>The values recorded for an element are the members it declared, so an element leaving a defaulted member
+     * out records something other than one writing the default down. The two are the same annotation, and
+     * {@link AnnotationValue#matches(AnnotationValue)} compares them as such.</p>
+     *
+     * @param interceptorValues    The members the interceptor binds by, or {@code null} when it binds by none
+     * @param interceptPointValues The members the intercept point binds by, or {@code null} when it has none
+     * @return Whether the two are the same binding
+     */
+    @Internal
+    public static boolean bindingValuesMatch(@Nullable AnnotationValue<?> interceptorValues,
+                                             @Nullable AnnotationValue<?> interceptPointValues) {
+        if (interceptorValues == null) {
+            return true;
+        }
+        return interceptorValues.matches(interceptPointValues);
     }
 
     @Override
