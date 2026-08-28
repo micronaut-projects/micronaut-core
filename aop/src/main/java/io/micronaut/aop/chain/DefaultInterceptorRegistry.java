@@ -205,7 +205,7 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
             }
             AnnotationValue<Annotation> otherMembers =
                 applicableValue.getAnnotation(InterceptorBindingQualifier.META_BINDING_VALUES).orElse(null);
-            if (otherMembers != null && !memberBinding.equals(otherMembers)) {
+            if (otherMembers != null && !InterceptorBindingQualifier.bindingValuesMatch(memberBinding, otherMembers)) {
                 continue;
             }
             return true;
