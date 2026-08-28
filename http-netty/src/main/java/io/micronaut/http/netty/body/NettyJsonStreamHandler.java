@@ -40,6 +40,7 @@ import reactor.core.publisher.Flux;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Netty json stream implementation for MessageBodyHandler.
@@ -79,7 +80,10 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
             throw new IllegalArgumentException("Can only read json-stream to a Publisher or list type");
         }
         //noinspection unchecked
-        return (T) readChunked((Argument<T>) type.getFirstTypeVariable().orElse(type), mediaType, httpHeaders, Flux.just(byteBuffer)).collectList().block();
+        return (T) Objects.requireNonNull(
+            readChunked((Argument<T>) type.getFirstTypeVariable().orElse(type), mediaType, httpHeaders, Flux.just(byteBuffer)).collectList().block(),
+            "The JSON stream reader returned no result"
+        );
     }
 
     @Override

@@ -571,8 +571,11 @@ public final class RouteExecutor {
         boolean isKotlinFunctionReturnTypeUnit =
             routeInfo instanceof MethodBasedRouteInfo<?, ?> mbri &&
                 isKotlinFunctionReturnTypeUnit(mbri.getTargetMethod().getExecutableMethod());
-        final Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(request);
         if (isKotlinCoroutineSuspended(body)) {
+            final Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(request);
+            if (supplier == null) {
+                return ExecutionFlow.error(new IllegalStateException("Missing coroutine continuation for suspended route"));
+            }
             Mono<MutableHttpResponse<?>> responsePublisher = Mono.fromCompletionStage(supplier)
                 .flatMap(obj -> {
                     MutableHttpResponse<?> response;

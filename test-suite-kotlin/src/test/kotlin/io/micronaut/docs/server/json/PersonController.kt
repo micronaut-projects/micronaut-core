@@ -51,7 +51,7 @@ class PersonController {
     @SingleResult
     operator fun get(name: String): Publisher<Person> {
         return if (inMemoryDatastore.containsKey(name)) {
-            Mono.just(inMemoryDatastore[name])
+            Mono.justOrEmpty(inMemoryDatastore[name])
         } else Mono.empty()
     }
 
