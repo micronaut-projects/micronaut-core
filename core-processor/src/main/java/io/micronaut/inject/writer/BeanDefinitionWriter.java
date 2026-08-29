@@ -107,6 +107,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.DefaultArgument;
@@ -143,6 +144,7 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.beans.BeanElement;
@@ -1094,14 +1096,39 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             .stringValues(Bean.class, "typed");
         if (ArrayUtils.isNotEmpty(types) && !beanTypeElement.isProxy()) {
             for (String name : types) {
-                final ClassElement exposedType = visitorContext.getClassElement(name).orElse(null);
+                final ClassElement exposedType = resolveExposedType(name, visitorContext).orElse(null);
                 if (exposedType == null) {
                     visitorContext.fail("Bean defines an exposed type [" + name + "] that is not on the classpath", beanProducingElement);
-                } else if (!beanTypeElement.isAssignable(exposedType)) {
+                } else if (!isExposedTypeOfBean(exposedType)) {
                     visitorContext.fail("Bean defines an exposed type [" + name + "] that is not implemented by the bean type", beanProducingElement);
                 }
             }
         }
+    }
+
+    /**
+     * Resolves an exposed type by name. Primitive types are not resolvable from the classpath, but a
+     * primitive is a perfectly valid class literal and can be the type of a bean produced by a factory.
+     *
+     * @param name           The type name
+     * @param visitorContext The visitor context
+     * @return The resolved type, if any
+     */
+    private Optional<ClassElement> resolveExposedType(String name, VisitorContext visitorContext) {
+        if (ClassUtils.getPrimitiveType(name).isPresent()) {
+            return Optional.of(PrimitiveElement.valueOf(name));
+        }
+        return visitorContext.getClassElement(name);
+    }
+
+    private boolean isExposedTypeOfBean(ClassElement exposedType) {
+        if (exposedType.isPrimitive() && !exposedType.isArray()) {
+            // A primitive and the type that boxes it denote the same bean type, and how a bean type
+            // relates to a primitive is not expressed consistently across the supported languages.
+            // Whether the bean is resolvable by the exposed type is left to the runtime.
+            return true;
+        }
+        return beanTypeElement.isAssignable(exposedType);
     }
 
     private static String getBeanDefinitionName(String packageName, String className) {
@@ -4520,7 +4547,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         if (ArrayUtils.isNotEmpty(types)) {
             HashSet<ClassElement> classElements = new HashSet<>();
             for (String type : types) {
-                visitorContext.getClassElement(type).ifPresent(classElements::add);
+                resolveExposedType(type, visitorContext).ifPresent(classElements::add);
             }
             return Collections.unmodifiableSet(classElements);
         } else {
