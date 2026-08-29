@@ -1122,16 +1122,13 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     private boolean isExposedTypeOfBean(ClassElement exposedType) {
-        if (beanTypeElement.isAssignable(exposedType)) {
+        if (exposedType.isPrimitive() && !exposedType.isArray()) {
+            // A primitive and the type that boxes it denote the same bean type, and how a bean type
+            // relates to a primitive is not expressed consistently across the supported languages.
+            // Whether the bean is resolvable by the exposed type is left to the runtime.
             return true;
         }
-        // a primitive and the type that boxes it denote the same bean type, so a bean of the
-        // wrapper type may expose the primitive just as a primitive bean may expose the wrapper
-        return !exposedType.isArray()
-            && ClassUtils.getPrimitiveType(exposedType.getName())
-            .map(ReflectionUtils::getWrapperType)
-            .filter(wrapper -> wrapper.getName().equals(beanTypeElement.getName()))
-            .isPresent();
+        return beanTypeElement.isAssignable(exposedType);
     }
 
     private static String getBeanDefinitionName(String packageName, String className) {

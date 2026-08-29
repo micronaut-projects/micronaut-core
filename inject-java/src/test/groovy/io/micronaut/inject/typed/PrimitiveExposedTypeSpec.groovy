@@ -1,6 +1,7 @@
 package io.micronaut.inject.typed
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.exceptions.NoSuchBeanException
 
 class PrimitiveExposedTypeSpec extends AbstractTypeElementSpec {
 
@@ -118,9 +119,67 @@ class Longs {
         context.close()
     }
 
-    void 'test fail compilation on a primitive exposed type not implemented by the bean type'() {
-        when:
-        buildBeanDefinition('primitivetypes.Numbers$Max0', '''
+    void 'test a factory method producing a primitive can expose only the wrapper'() {
+        given:
+        def context = buildContext('''
+package primitivetypes;
+
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Prototype;
+
+@Factory
+class Numbers {
+    @Bean(typed = Double.class)
+    @Prototype
+    double max() {
+        return 10.5d;
+    }
+}
+''')
+        def definition = context.getBeanDefinition(Double.class)
+
+        expect:
+        definition.exposedTypes == [Double.class] as Set
+        context.getBean(Double.class) == 10.5d
+        !context.containsBean(double.class)
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test a factory method producing a wrapper can expose only the primitive'() {
+        given:
+        def context = buildContext('''
+package primitivetypes;
+
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Prototype;
+
+@Factory
+class Numbers {
+    @Bean(typed = double.class)
+    @Prototype
+    Double max() {
+        return 10.5d;
+    }
+}
+''')
+        def definition = context.getBeanDefinition(double.class)
+
+        expect:
+        definition.exposedTypes == [double.class] as Set
+        context.getBean(double.class) == 10.5d
+        !context.containsBean(Double.class)
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test a primitive exposed type unrelated to the bean type fails at runtime, not compilation'() {
+        given:"a bean that exposes a primitive it does not produce"
+        def context = buildContext('''
 package primitivetypes;
 
 import io.micronaut.context.annotation.Bean;
@@ -137,8 +196,19 @@ class Numbers {
 }
 ''')
 
+        expect:"compilation to succeed, the exposed type to be taken at its word"
+        context.getBeanDefinition(int.class).exposedTypes == [int.class] as Set
+
+        and:"the bean to no longer be resolvable by the type it actually produces"
+        !context.containsBean(double.class)
+
+        when:
+        context.getBean(double.class)
+
         then:
-        def e = thrown(RuntimeException)
-        e.message.contains("Bean defines an exposed type [int] that is not implemented by the bean type")
+        thrown(NoSuchBeanException)
+
+        cleanup:
+        context.close()
     }
 }
