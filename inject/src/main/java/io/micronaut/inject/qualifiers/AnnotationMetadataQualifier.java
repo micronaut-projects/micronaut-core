@@ -138,8 +138,9 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
     }
 
     /**
-     * A member read off an annotation instance, or {@code null} when the annotation type is not open to this
-     * module and so cannot be read. A member of an annotation is never null itself, so the two do not overlap.
+     * A member read off an annotation instance, or {@code null} when it cannot be read: the annotation type is
+     * not open to this module, or the instance would not answer for the member. A member of an annotation is
+     * never null itself, so the two do not overlap.
      *
      * <p>A qualifier that cannot read one of its members cannot compare it either, and it goes on qualifying by
      * its type alone rather than by the members it did manage to read.</p>

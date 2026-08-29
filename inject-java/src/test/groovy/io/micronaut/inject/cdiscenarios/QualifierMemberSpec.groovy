@@ -167,33 +167,68 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 interface Fish {
 }
 
-@Chunky(kind = Kind.COD, caught = String.class, seas = {"north", "baltic"}, weights = {1, 2})
+@Chunky(kind = Kind.COD, kinds = {Kind.COD, Kind.HADDOCK}, caught = String.class, caughts = {String.class},
+        seas = {"north", "baltic"}, weights = {1, 2}, net = @Net(mesh = 3), nets = {@Net(mesh = 4)})
 @Prototype
 class Cod implements Fish {
 }
 
-@Chunky(kind = Kind.COD, caught = String.class, seas = {"north", "baltic"}, weights = {1, 2})
-class SameChunk {
+@Prototype
+class Haddock implements Fish {
 }
 
-@Chunky(kind = Kind.HADDOCK, caught = String.class, seas = {"north", "baltic"}, weights = {1, 2})
+@Chunky(kind = Kind.COD, kinds = {Kind.COD, Kind.HADDOCK}, caught = String.class, caughts = {String.class},
+        seas = {"north", "baltic"}, weights = {1, 2}, net = @Net(mesh = 3), nets = {@Net(mesh = 4)})
+class Same {
+}
+
+@Chunky(kind = Kind.HADDOCK, kinds = {Kind.COD, Kind.HADDOCK}, caught = String.class, caughts = {String.class},
+        seas = {"north", "baltic"}, weights = {1, 2}, net = @Net(mesh = 3), nets = {@Net(mesh = 4)})
 class OtherKind {
 }
 
-@Chunky(kind = Kind.COD, caught = Integer.class, seas = {"north", "baltic"}, weights = {1, 2})
-class OtherClass {
+@Chunky(kind = Kind.COD, kinds = {Kind.HADDOCK, Kind.COD}, caught = String.class, caughts = {String.class},
+        seas = {"north", "baltic"}, weights = {1, 2}, net = @Net(mesh = 3), nets = {@Net(mesh = 4)})
+class OtherKinds {
 }
 
-@Chunky(kind = Kind.COD, caught = String.class, seas = {"north"}, weights = {1, 2})
+@Chunky(kind = Kind.COD, kinds = {Kind.COD, Kind.HADDOCK}, caught = Integer.class, caughts = {String.class},
+        seas = {"north", "baltic"}, weights = {1, 2}, net = @Net(mesh = 3), nets = {@Net(mesh = 4)})
+class OtherCaught {
+}
+
+@Chunky(kind = Kind.COD, kinds = {Kind.COD, Kind.HADDOCK}, caught = String.class, caughts = {Integer.class},
+        seas = {"north", "baltic"}, weights = {1, 2}, net = @Net(mesh = 3), nets = {@Net(mesh = 4)})
+class OtherCaughts {
+}
+
+@Chunky(kind = Kind.COD, kinds = {Kind.COD, Kind.HADDOCK}, caught = String.class, caughts = {String.class},
+        seas = {"north"}, weights = {1, 2}, net = @Net(mesh = 3), nets = {@Net(mesh = 4)})
 class OtherSeas {
 }
 
-@Chunky(kind = Kind.COD, caught = String.class, seas = {"north", "baltic"}, weights = {1, 3})
+@Chunky(kind = Kind.COD, kinds = {Kind.COD, Kind.HADDOCK}, caught = String.class, caughts = {String.class},
+        seas = {"north", "baltic"}, weights = {1, 3}, net = @Net(mesh = 3), nets = {@Net(mesh = 4)})
 class OtherWeights {
+}
+
+@Chunky(kind = Kind.COD, kinds = {Kind.COD, Kind.HADDOCK}, caught = String.class, caughts = {String.class},
+        seas = {"north", "baltic"}, weights = {1, 2}, net = @Net(mesh = 5), nets = {@Net(mesh = 4)})
+class OtherNet {
+}
+
+@Chunky(kind = Kind.COD, kinds = {Kind.COD, Kind.HADDOCK}, caught = String.class, caughts = {String.class},
+        seas = {"north", "baltic"}, weights = {1, 2}, net = @Net(mesh = 3), nets = {@Net(mesh = 6)})
+class OtherNets {
 }
 
 enum Kind {
     COD, HADDOCK
+}
+
+@Retention(RUNTIME)
+@interface Net {
+    int mesh();
 }
 
 @Qualifier
@@ -201,23 +236,30 @@ enum Kind {
 @interface Chunky {
     Kind kind();
 
+    Kind[] kinds();
+
     Class<?> caught();
+
+    Class<?>[] caughts();
 
     String[] seas();
 
     int[] weights();
+
+    Net net();
+
+    Net[] nets();
 }
 ''')
         Class<?> fish = context.classLoader.loadClass('qualifiermembershapes.Fish')
 
-        expect: 'the same members of every shape resolve the bean'
-        context.getBeanDefinitions(fish, Qualifiers.byAnnotation(annotationOn(context, 'qualifiermembershapes.SameChunk'))).size() == 1
+        expect: 'the same members of every shape resolve the bean, and leave the unqualified one out'
+        context.getBeanDefinitions(fish, Qualifiers.byAnnotation(annotationOn(context, 'qualifiermembershapes.Same'))).size() == 1
 
-        and: 'and a difference in any one of them does not'
-        context.getBeanDefinitions(fish, Qualifiers.byAnnotation(annotationOn(context, 'qualifiermembershapes.OtherKind'))).isEmpty()
-        context.getBeanDefinitions(fish, Qualifiers.byAnnotation(annotationOn(context, 'qualifiermembershapes.OtherClass'))).isEmpty()
-        context.getBeanDefinitions(fish, Qualifiers.byAnnotation(annotationOn(context, 'qualifiermembershapes.OtherSeas'))).isEmpty()
-        context.getBeanDefinitions(fish, Qualifiers.byAnnotation(annotationOn(context, 'qualifiermembershapes.OtherWeights'))).isEmpty()
+        and: 'and a difference in any one of them resolves nothing'
+        ['OtherKind', 'OtherKinds', 'OtherCaught', 'OtherCaughts', 'OtherSeas', 'OtherWeights', 'OtherNet', 'OtherNets'].every {
+            context.getBeanDefinitions(fish, Qualifiers.byAnnotation(annotationOn(context, "qualifiermembershapes.$it"))).isEmpty()
+        }
 
         cleanup:
         context.close()
