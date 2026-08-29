@@ -193,6 +193,12 @@ public class Qualifiers {
     /**
      * Build a qualifier for the given annotation.
      *
+     * <p>The members of the annotation take part in the comparison, the way they do for
+     * {@link #byAnnotation(AnnotationMetadata, AnnotationValue)}: a candidate qualified {@code @Chunky(true)} does
+     * not qualify for {@code @Chunky(false)}, and a member annotated {@link io.micronaut.context.annotation.NonBinding}
+     * is left out of the comparison from either side. An annotation with no member to compare qualifies by its type
+     * alone.</p>
+     *
      * @param annotation The annotation
      * @param <T>        The component type
      * @return The qualifier
@@ -201,6 +207,10 @@ public class Qualifiers {
         Qualifier<T> qualifier = findCustomByType(AnnotationMetadata.EMPTY_METADATA, annotation.annotationType());
         if (qualifier != null) {
             return qualifier;
+        }
+        Qualifier<T> byMembers = AnnotationMetadataQualifier.fromAnnotation(annotation);
+        if (byMembers != null) {
+            return byMembers;
         }
         return new AnnotationQualifier<>(annotation);
     }
