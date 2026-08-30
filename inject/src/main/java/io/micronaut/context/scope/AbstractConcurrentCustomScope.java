@@ -179,7 +179,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             }
             if (CollectionUtils.isNotEmpty(scopeMap)) {
 
-                final CreatedBean<?> createdBean = scopeMap.get(identifier);
+                final CreatedBean<?> createdBean = scopeMap.remove(identifier);
                 if (createdBean != null) {
                     try {
                         createdBean.close();
