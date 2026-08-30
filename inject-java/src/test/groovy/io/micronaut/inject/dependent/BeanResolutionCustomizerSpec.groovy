@@ -4,6 +4,7 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.BeanResolutionContext
 import io.micronaut.context.BeanResolutionCustomizer
+import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.BeanDefinition
 
@@ -164,6 +165,68 @@ class ArrayConsumer {
         context.close()
     }
 
+    void "customizer allowing a null bean gets its resolveNullBean answer for a factory returning null"() {
+        given:
+        def context = buildContext('test.NullableProductFactory', '''
+package test;
+
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+
+class NullableProduct {
+}
+
+@Factory
+class NullableProductFactory {
+    @Bean
+    NullableProduct nullableProduct() {
+        return null;
+    }
+}
+''')
+
+        when:
+        def bean = context.getBean(context.classLoader.loadClass('test.NullableProduct'))
+
+        then:
+        bean != null
+        bean.class.name == 'test.NullableProduct'
+
+        cleanup:
+        context.close()
+    }
+
+    void "factory returning null without the customizer allowing it still fails to instantiate"() {
+        given:
+        def context = buildContext('test.StrictProductFactory', '''
+package test;
+
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+
+class StrictProduct {
+}
+
+@Factory
+class StrictProductFactory {
+    @Bean
+    StrictProduct strictProduct() {
+        return null;
+    }
+}
+''')
+
+        when:
+        context.getBean(context.classLoader.loadClass('test.StrictProduct'))
+
+        then:
+        def e = thrown(BeanInstantiationException)
+        e.message.contains('returned null')
+
+        cleanup:
+        context.close()
+    }
+
     @Override
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
         contextBuilder.beanResolutionCustomizer(new BeanResolutionCustomizer() {
@@ -178,6 +241,21 @@ class ArrayConsumer {
             @Override
             boolean shouldResolveArrayAsBean(Argument<?> injectionPoint) {
                 return injectionPoint.array && injectionPoint.type.componentType.name == 'test.ArrayThing'
+            }
+
+            @Override
+            boolean shouldAllowNullBean(BeanResolutionContext resolutionContext, BeanDefinition<?> beanDefinition) {
+                return beanDefinition.beanType.name == 'test.NullableProduct'
+            }
+
+            @Override
+            Optional<?> resolveNullBean(Argument<?> requestedBeanType, Argument<?> resolvedBeanType, BeanDefinition<?> beanDefinition) {
+                if (resolvedBeanType.type.name == 'test.NullableProduct') {
+                    def constructor = resolvedBeanType.type.getDeclaredConstructor()
+                    constructor.accessible = true
+                    return Optional.of(constructor.newInstance())
+                }
+                return Optional.empty()
             }
 
             @Override

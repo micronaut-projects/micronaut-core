@@ -90,6 +90,19 @@ public interface BeanResolutionCustomizer {
     }
 
     /**
+     * Returns whether a bean definition may legitimately instantiate to {@code null} even though it is not
+     * declared {@code @Nullable}, letting {@link #resolveNullBean} decide what the {@code null} becomes.
+     *
+     * @param resolutionContext The current resolution context
+     * @param beanDefinition The bean definition that produced {@code null}
+     * @return True if a {@code null} instance is allowed
+     * @since 5.2.0
+     */
+    default boolean shouldAllowNullBean(BeanResolutionContext resolutionContext, BeanDefinition<?> beanDefinition) {
+        return false;
+    }
+
+    /**
      * Resolve a replacement value for a bean that was found but produced {@code null}.
      *
      * @param requestedBeanType The originally requested bean type

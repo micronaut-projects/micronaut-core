@@ -2119,7 +2119,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             } else {
                 throw new BeanInstantiationException(resolutionContext, "Expected InstantiatableBeanDefinition [" + beanDefinition + "]");
             }
-            if (bean == null && !isNullableBeanDefinition(beanDefinition)) {
+            if (bean == null && !isNullableBeanDefinition(beanDefinition)
+                && !beanResolutionCustomizer.shouldAllowNullBean(resolutionContext, beanDefinition)) {
                 throw new BeanInstantiationException(resolutionContext, "InstantiatableBeanDefinition [" + beanDefinition + "] returned null");
             }
             if (bean instanceof Qualified qualified && declaredQualifier != null) {
