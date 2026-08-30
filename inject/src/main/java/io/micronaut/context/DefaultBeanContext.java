@@ -2431,6 +2431,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             return beanRegistration;
         }
 
+        assertContextState();
+
         Optional<BeanDefinition<T>> concreteCandidate = findBeanDefinition(resolutionContext, beanType, qualifier);
 
         BeanRegistration<T> registration;
@@ -2486,7 +2488,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private void assertContextState() {
         if (!this.running.get() && !this.initializing.get()) {
-            throw new BeanContextException("Cannot resolve beans until the context is running");
+            // resolving against a context in the wrong lifecycle state, including a stale
+            // reference held across shutdown, is what IllegalStateException means in the JDK
+            throw new IllegalStateException("Cannot resolve beans until the context is running");
         }
     }
 

@@ -2,6 +2,7 @@ package io.micronaut.context
 
 
 import io.micronaut.core.type.Argument
+import io.micronaut.runtime.ApplicationConfiguration
 import spock.lang.Specification
 
 class DefaultBeanContextSpec extends Specification {
@@ -85,6 +86,22 @@ class DefaultBeanContextSpec extends Specification {
 
         cleanup:
         beanContext.close()
+    }
+
+    def "resolving a bean from a closed context throws IllegalStateException"() {
+        given:
+            ApplicationContext context = ApplicationContext.run()
+
+        expect:
+            context.getBean(ApplicationConfiguration) != null
+
+        when:
+            context.close()
+            context.getBean(ApplicationConfiguration)
+
+        then:
+            IllegalStateException e = thrown()
+            e.message == "Cannot resolve beans until the context is running"
     }
 
     static class MyBean {
