@@ -2,43 +2,41 @@ Since 1.3, Micronaut framework supports the definition of immutable configuratio
 
 dependency::micronaut-context[]
 
-`micronaut-context` is a transitive dependency of `micronaut-http`. If you use a Micronaut HTTP runtime, your project already includes the `Micronaut-context` dependency. 
+`micronaut-context` is a transitive dependency of `micronaut-http`. If you use a Micronaut HTTP runtime, your project already includes the `micronaut-context` dependency.
 
-There are two ways to define immutable configuration. The preferred way is to define an interface annotated with ann:context.annotation.ConfigurationProperties[]. For example:
+Micronaut framework offers several styles of immutable configuration. They bind values the same way but differ in how a bean behaves when the configuration is <<refreshable, refreshed>> at runtime.
 
-snippet::io.micronaut.docs.config.itfce.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
+== Interface-based configuration
+
+One approach is to declare an interface annotated with ann:context.annotation.ConfigurationProperties[]. It reflects refreshed configuration automatically, without any additional annotation:
+
+snippet::io.micronaut.docs.config.itfce.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Interface"]
 
 <1> The ann:context.annotation.ConfigurationProperties[] annotation takes the configuration prefix and is declared on an interface
 <2> You can use ann:core.bind.annotation.Bindable[] to set a default value
 <3> Validation annotations can also be used
-<4> You can also specify references to other ann:context.annotation.ConfigurationProperties[] beans.
+<4> You can reference other ann:context.annotation.ConfigurationProperties[] beans
 <5> You can nest immutable configuration
-<6> Optional configuration can be indicated by returning an `Optional` or specifying `@Nullable`
+<6> Optional configuration is indicated by returning an `Optional` or specifying `@Nullable`
 
-In this case the Micronaut framework provides a compile-time implementation that delegates all getters to call the `getProperty(..)` method of the api:context.env.Environment[] interface.
+Micronaut framework provides a compile-time implementation whose getters delegate to the `getProperty(..)` method of the api:context.env.Environment[] interface. Because each getter reads the `Environment` on every call, an interface bean always reflects the current configuration, including after a <<refreshable, refresh>>.
 
-This has the advantage that if the application configuration is <<refreshable, refreshed>> (for example by invoking the `/refresh` endpoint), the injected interface automatically sees the new values.
+NOTE: Only getter methods are allowed (default methods are supported). Declaring any other abstract method causes a compilation error.
 
-NOTE: If you try to specify any other abstract method other than a getter, a compilation error occurs (default methods are supported).
+== Constructor-based configuration
 
-Another way to implement immutable configuration is to define a class and use the ann:context.annotation.ConfigurationInject[] annotation on a constructor of a ann:context.annotation.ConfigurationProperties[] or ann:context.annotation.EachProperty[] bean.
+Alternatively, define a class and annotate one of its constructors with ann:context.annotation.ConfigurationInject[]:
 
-For example:
-
-snippet::io.micronaut.docs.config.immutable.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
+snippet::io.micronaut.docs.config.immutable.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationInject Constructor"]
 
 <1> The ann:context.annotation.ConfigurationProperties[] annotation takes the configuration prefix
-<2> The ann:context.annotation.ConfigurationInject[] annotation is defined on the constructor
+<2> The ann:context.annotation.ConfigurationInject[] annotation is declared on the constructor
 <3> You can use ann:core.bind.annotation.Bindable[] to set a default value
 <4> Validation annotations can be used too
 <5> You can nest immutable configuration
-<6> Optional configuration can be indicated with `@Nullable`
+<6> Optional configuration is indicated with `@Nullable`
 
-The ann:context.annotation.ConfigurationInject[] annotation provides a hint to the Micronaut framework to prioritize binding values from configuration instead of injecting beans.
-
-NOTE: Using this approach, to make the configuration refreshable, add the ann:runtime.context.scope.Refreshable[] annotation to the class as well. This allows the bean to be re-created in the case of a <<refreshable,runtime configuration refresh event>>.
-
-There are a few exceptions to this rule. Micronaut framework will not perform configuration binding for a parameter if any of these conditions is met:
+The ann:context.annotation.ConfigurationInject[] annotation tells the framework to prioritize binding values from configuration over injecting beans. Binding is skipped for a constructor parameter that meets any of these conditions:
 
 * The parameter is annotated with `@Value` (explicit binding)
 * The parameter is annotated with `@Property` (explicit binding)
@@ -46,7 +44,32 @@ There are a few exceptions to this rule. Micronaut framework will not perform co
 * The parameter is annotated with `@Inject` (generic bean injection)
 * The type of the parameter is annotated with a bean scope (such as `@Singleton`)
 
-Once you have prepared a type-safe configuration it can be injected into your beans like any other bean:
+Unlike the interface approach, a constructor-based bean reads configuration only once, when it is constructed, and stores the values. A running instance therefore does not observe a <<refreshable, refresh>>. To have the bean rebuilt when configuration changes, add the ann:runtime.context.scope.Refreshable[] annotation to the class.
+
+== Record-like types
+
+Java records and Kotlin data classes can be used directly. Micronaut framework treats their canonical (record) or primary (data class) constructor as though it were annotated with ann:context.annotation.ConfigurationInject[], so no annotation is needed on the constructor:
+
+snippet::io.micronaut.docs.config.immutable.ValueAddedTaxConfiguration[tags="imports,class",title="Record-like Configuration"]
+
+<1> The `percentage` component defines the `vat.percentage` configuration property
+
+Like all constructor-based configuration, record-like types capture their values at construction, so annotate them with ann:runtime.context.scope.Refreshable[] if they must update on a <<refreshable, refresh>>.
+
+NOTE: An interface getter resolves its value through a proxy on every call, whereas constructor-based configuration — including record-like types — returns an already-bound field, so it carries slightly less overhead. This difference is minor; let your refresh requirements drive the choice: use an interface when a bean must observe configuration refreshes automatically, and constructor-based or record-like configuration otherwise.
+
+== Default values
+
+You can supply a default for a property in two ways:
+
+* the `defaultValue` member of ann:core.bind.annotation.Bindable[], for example `@Bindable(defaultValue = "Ford")`
+* a constructor default parameter, in languages that support them (such as Kotlin)
+
+Prefer ann:core.bind.annotation.Bindable[]. Its default value is written to the generated configuration metadata, so IDE completion, JSON schema validation, and generated documentation all display it. A language-level default parameter works at runtime but is invisible to that tooling.
+
+== Using immutable configuration
+
+Once you have prepared a type-safe configuration, it can be injected into your beans like any other bean:
 
 snippet::io.micronaut.docs.config.immutable.Engine[tags="class",indent=0,title="@ConfigurationProperties Dependency Injection"]
 
@@ -57,17 +80,7 @@ Configuration values can then be supplied when running the application. For exam
 
 snippet::io.micronaut.docs.config.immutable.VehicleSpec[tags="start",indent=0,title="Supply Configuration"]
 
-The above example prints: `"Ford Engine Starting V8 [rodLength=7B.0]"`
-
-==== Using Java Record Classes to define immutable configuration
-
-For Java language applications, it's also possible to use https://docs.oracle.com/en/java/javase/17/language/records.html[Java Record Classes] for immutable configuration with ann:context.annotation.ConfigurationProperties[]. For example:
-
-snippet::io.micronaut.docs.config.immutable.ValueAddedTaxConfiguration[tags="imports,class",title="Java Record Example"]
-
-<1> The `percentage` field defines a configuration property for "vat"
-
-NOTE: From a performance perspective Java records are better than interfaces.
+The above example prints: `"Ford Engine Starting V8 [rodLength=7.0]"`
 
 == Customizing accessors
 
