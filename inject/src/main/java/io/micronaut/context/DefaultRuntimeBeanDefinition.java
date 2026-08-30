@@ -292,7 +292,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
 
         @Override
         public Builder<B> singleton(boolean isSingleton) {
-            this.singleton = true;
+            this.singleton = isSingleton;
             return this;
         }
 
