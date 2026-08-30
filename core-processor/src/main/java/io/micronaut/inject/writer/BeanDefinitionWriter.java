@@ -3126,9 +3126,20 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private ExpressionDef getQualifier(AnnotationMetadata element, Supplier<ExpressionDef> argumentExpressionSupplier) {
         final List<String> qualifierNames = element.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
         if (!qualifierNames.isEmpty()) {
-            if (qualifierNames.size() == 1) {
+            // @Primary narrows nothing: it breaks the tie between candidates that already qualify, which is why
+            // it is written as no qualifier at all. Where it is written beside another qualifier it takes no part
+            // in the composite either, and leaving it in would put a null in the array the composite is built
+            // from, which the composite then dereferences
+            final List<String> narrowing = qualifierNames.stream()
+                .filter(name -> !name.equals(Primary.NAME))
+                .toList();
+            if (narrowing.isEmpty()) {
+                // nothing but @Primary was declared, which is the same as no qualifier
+                return ExpressionDef.nullValue();
+            }
+            if (narrowing.size() == 1) {
                 // simple qualifier
-                final String annotationName = qualifierNames.iterator().next();
+                final String annotationName = narrowing.iterator().next();
                 return getQualifierForAnnotation(element, annotationName, argumentExpressionSupplier.get());
             }
             // composite qualifier
@@ -3136,7 +3147,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 METHOD_QUALIFIER_BY_QUALIFIERS,
 
                 TYPE_QUALIFIER.array().instantiate(
-                    qualifierNames.stream().map(name -> getQualifierForAnnotation(element, name, argumentExpressionSupplier.get())).toList()
+                    narrowing.stream().map(name -> getQualifierForAnnotation(element, name, argumentExpressionSupplier.get())).toList()
                 )
             );
         }
