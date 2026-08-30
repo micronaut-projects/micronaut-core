@@ -75,4 +75,69 @@ class Test {
         cleanup:
         context.close()
     }
+
+    void "test inject scope on a constructor parameter of a prototype bean destroys the bean and notifies listeners"() {
+        given:
+        def context = buildContext('''
+package injectscopeprototype;
+
+import io.micronaut.context.annotation.InjectScope;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.event.BeanPreDestroyEvent;
+import io.micronaut.context.event.BeanPreDestroyEventListener;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
+import java.util.concurrent.atomic.AtomicInteger;
+
+@Prototype
+class Connection {
+    public boolean open = true;
+
+    @PreDestroy
+    void close() {
+        open = false;
+    }
+}
+
+@Prototype
+class Resource {
+    // no @PreDestroy of its own; destruction is only observable through the listener
+}
+
+@Singleton
+class Holder {
+    public final Connection connection;
+    public final Resource resource;
+
+    Holder(@InjectScope Connection connection, @InjectScope Resource resource) {
+        this.connection = connection;
+        this.resource = resource;
+    }
+}
+
+@Singleton
+class ResourceDestroyListener implements BeanPreDestroyEventListener<Resource> {
+    public final AtomicInteger destroyed = new AtomicInteger();
+
+    @Override
+    public Resource onPreDestroy(BeanPreDestroyEvent<Resource> event) {
+        destroyed.incrementAndGet();
+        return event.getBean();
+    }
+}
+''')
+
+        when:
+        def holder = getBean(context, 'injectscopeprototype.Holder')
+        def listener = getBean(context, 'injectscopeprototype.ResourceDestroyListener')
+
+        then: 'the prototype bean injected with @InjectScope is destroyed once the holder has been resolved'
+        !holder.connection.open
+
+        and: 'pre-destroy listeners run even for a bean with nothing else to dispose'
+        listener.destroyed.get() == 1
+
+        cleanup:
+        context.close()
+    }
 }
