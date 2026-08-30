@@ -2431,7 +2431,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             return beanRegistration;
         }
 
-        assertContextState();
+        if (!configured.get()) {
+            // the bean definitions are unavailable before configuration and are reset on stop;
+            // fail with the lifecycle error rather than an NPE from the definition lookup
+            assertContextState();
+        }
 
         Optional<BeanDefinition<T>> concreteCandidate = findBeanDefinition(resolutionContext, beanType, qualifier);
 
