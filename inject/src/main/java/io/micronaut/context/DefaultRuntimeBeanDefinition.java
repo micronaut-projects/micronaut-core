@@ -44,6 +44,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -57,7 +58,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     private static final AtomicInteger REF_COUNT = new AtomicInteger(0);
     private static final String MSG_BEAN_TYPE_CANNOT_BE_NULL = "Bean type cannot be null";
     private final Argument<T> beanType;
-    private final Supplier<T> supplier;
+    private final Function<BeanResolutionContext, T> beanFactory;
     private final AnnotationMetadata annotationMetadata;
     private final String beanName;
     @Nullable
@@ -71,7 +72,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     private final int order;
 
     DefaultRuntimeBeanDefinition(Argument<T> beanType,
-                                 Supplier<T> supplier,
+                                 Function<BeanResolutionContext, T> beanFactory,
                                  @Nullable Qualifier<T> qualifier,
                                  @Nullable AnnotationMetadata annotationMetadata,
                                  boolean isSingleton,
@@ -80,10 +81,10 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
                                  @Nullable
                                  Map<Class<?>, List<Argument<?>>> typeArguments) {
         Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
-        Objects.requireNonNull(supplier, "Bean supplier cannot be null");
+        Objects.requireNonNull(beanFactory, "Bean factory cannot be null");
 
         this.beanType = beanType;
-        this.supplier = supplier;
+        this.beanFactory = beanFactory;
         this.beanName = generateBeanName(beanType.getType());
         this.qualifier = qualifier;
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
@@ -228,7 +229,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
 
     @Override
     public T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
-        return supplier.get();
+        return beanFactory.apply(resolutionContext);
     }
 
     /**
@@ -237,7 +238,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
      */
     static final class RuntimeBeanBuilder<B> implements RuntimeBeanDefinition.Builder<B> {
         private Argument<B> beanType;
-        private final Supplier<B> supplier;
+        private final Function<BeanResolutionContext, B> beanFactory;
         @Nullable
         private Qualifier<B> qualifier;
         private boolean singleton;
@@ -253,7 +254,14 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
 
         RuntimeBeanBuilder(Argument<B> beanType, Supplier<B> supplier) {
             this.beanType = Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
-            this.supplier = Objects.requireNonNull(supplier, "Bean supplier cannot be null");
+            Objects.requireNonNull(supplier, "Bean supplier cannot be null");
+            this.beanFactory = resolutionContext -> supplier.get();
+            this.annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
+        }
+
+        RuntimeBeanBuilder(Argument<B> beanType, Function<BeanResolutionContext, B> beanFactory) {
+            this.beanType = Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
+            this.beanFactory = Objects.requireNonNull(beanFactory, "Bean factory cannot be null");
             this.annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
         }
 
@@ -350,7 +358,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
             }
             return new DefaultRuntimeBeanDefinition<>(
                 beanType,
-                supplier,
+                beanFactory,
                 qualifier,
                 annotationMetadata,
                 singleton,
