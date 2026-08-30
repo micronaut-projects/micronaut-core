@@ -184,7 +184,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
     private static final Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", InterceptorRegistry.class, ExecutableMethod.class, List.class);
 
-    private static final Method GET_INTERCEPTOR_REGISTRATIONS_METHOD = ReflectionUtils.getRequiredInternalMethod(Intercepted.class, "$interceptorRegistrations");
 
     private static final Constructor<?> CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class, Object[].class).orElseThrow(() ->
         new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
@@ -209,6 +208,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
     private static final String FIELD_INTERCEPTORS = "$interceptors";
     private static final String FIELD_INTERCEPTOR_REGISTRATIONS = "$interceptorRegistrations";
+
+    // The proxy accessor is named after the field it returns.
+    private static final Method GET_INTERCEPTOR_REGISTRATIONS_METHOD =
+        ReflectionUtils.getRequiredInternalMethod(Intercepted.class, FIELD_INTERCEPTOR_REGISTRATIONS);
     private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
     private static final String FIELD_BEAN_QUALIFIER = "$beanQualifier";
     private static final String FIELD_PROXY_METHODS = "$proxyMethods";

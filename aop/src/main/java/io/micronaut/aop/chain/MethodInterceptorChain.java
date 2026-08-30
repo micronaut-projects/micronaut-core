@@ -33,7 +33,6 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -440,6 +439,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
                 interceptors.add((BeanRegistration<Interceptor<?, ?>>) dependent);
             }
         }
-        return CollectionUtils.isEmpty(interceptors) ? Collections.emptyList() : interceptors;
+        // Only ever assigned immediately before an add, so a non-null list is never empty.
+        return interceptors == null ? Collections.emptyList() : interceptors;
     }
 }

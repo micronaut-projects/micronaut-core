@@ -60,7 +60,8 @@ public interface Intercepted extends InterceptedBean {
      */
     @Internal
     @UsedByGeneratedCode
-    @SuppressWarnings("checkstyle:MethodName")
+    // The $ prefix marks this as generated-code infrastructure and keeps it clear of any method on the proxied type.
+    @SuppressWarnings({"checkstyle:MethodName", "java:S100"})
     default List<BeanRegistration<Interceptor<?, ?>>> $interceptorRegistrations() {
         return List.of();
     }
