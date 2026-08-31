@@ -27,11 +27,13 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.ContentDisposition;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.sse.Event;
+import io.micronaut.http.util.ContentDispositionUtils;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
@@ -62,6 +64,8 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     protected final boolean producesMediaTypesContainsAll;
     @Nullable
     protected final HttpStatus definedStatus;
+    @Nullable
+    protected final String definedContentDisposition;
     protected final boolean isWebSocketRoute;
     private final boolean isVoid;
     private final boolean imperative;
@@ -116,6 +120,11 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         this.isVoid = returnType.isVoid();
         isWebSocketRoute = annotationMetadata.hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
         definedStatus = annotationMetadata.enumValue(Status.class, HttpStatus.class).orElse(null);
+        definedContentDisposition = annotationMetadata.findAnnotation(ContentDisposition.class)
+            .map(av -> ContentDispositionUtils.toHeaderValue(
+                av.stringValue("type").orElse("attachment"),
+                av.stringValue("filename").filter(s -> !s.isEmpty()).orElse(null)))
+            .orElse(null);
 
         if (producesMediaTypes.isEmpty()) {
             MediaType[] producesTypes = MediaType.of(annotationMetadata.stringValues(Produces.class));
@@ -323,6 +332,12 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
             return defaultStatus;
         }
         return HttpStatus.OK;
+    }
+
+    @Override
+    @Nullable
+    public String findContentDispositionHeader() {
+        return definedContentDisposition;
     }
 
     @Override
