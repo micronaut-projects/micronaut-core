@@ -35,6 +35,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -354,6 +355,51 @@ final class PythonAsyncioRuntimeTest {
                 pool.release(second);
                 pool.release(third);
             }
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+    @Test
+    void waitingBorrowFailsWhenPoolCloses() throws Exception {
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            Context borrowed = pool.borrow();
+            Future<Context> waitingBorrow = executorService.submit(pool::borrow);
+            assertThrows(TimeoutException.class, () -> waitingBorrow.get(100, TimeUnit.MILLISECONDS));
+
+            pool.shutdownGracefully().toCompletableFuture().get(1, TimeUnit.SECONDS);
+
+            ExecutionException failure = assertThrows(
+                ExecutionException.class,
+                () -> waitingBorrow.get(1, TimeUnit.SECONDS)
+            );
+            assertEquals("Pool closed", assertInstanceOf(IllegalStateException.class, failure.getCause()).getMessage());
+            pool.release(borrowed);
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+    @Test
+    void waitingBorrowRespondsToInterruption() throws Exception {
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            Context borrowed = pool.borrow();
+            Future<Context> waitingBorrow = executorService.submit(pool::borrow);
+            assertThrows(TimeoutException.class, () -> waitingBorrow.get(100, TimeUnit.MILLISECONDS));
+
+            assertTrue(waitingBorrow.cancel(true));
+            assertTrue(executorService.submit(() -> true).get(1, TimeUnit.SECONDS));
+            pool.release(borrowed);
         } finally {
             executorService.shutdownNow();
         }

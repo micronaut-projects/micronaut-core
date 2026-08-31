@@ -1330,7 +1330,7 @@ class ProductMappers:
                 );
                 assertEquals(List.of("__PYTHON_CLASS_REFERENCE"), enumDef.getFields().stream().map(FieldDef::getName).toList());
                 assertEquals(1, enumDef.getSuperinterfaces().size());
-                assertEquals(List.of("asPolyglotValue", "asPolyglotValue", "fromPolyglotValue", "jsonValue", "toString"), enumDef.getMethods().stream().map(MethodDef::getName).toList());
+                assertEquals(List.of("asPolyglotValue", "asPolyglotValue", "reconstructPolyglotValue", "fromPolyglotValue", "jsonValue", "toString"), enumDef.getMethods().stream().map(MethodDef::getName).toList());
             }
         }
     }

@@ -2,6 +2,8 @@ package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.PythonContextRuntime
+import io.micronaut.context.python.PooledValueCoercible
+import io.micronaut.context.python.PythonPool
 import io.micronaut.context.python.GraalPyContextFactory
 import io.micronaut.context.python.GraalPyRuntimeUtil
 import io.micronaut.context.python.ValueCoercible
@@ -563,6 +565,55 @@ class Move:
         then:
         white.name() == "WHITE"
         pythonMove.getMember('player').getMember('value').asString() == 'w'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "introspected Python classes preserve nested identity and cycles in a pooled context"() {
+        given:
+        String py = '''
+from micronaut.core.annotation import Introspected
+
+
+@Introspected
+class Node:
+    name: str | None = None
+    next: "Node | None" = None
+
+
+@Introspected
+class Pair:
+    left: Node | None = None
+    right: Node | None = None
+
+
+'''
+        ApplicationContext ctx = buildContext(py, true, [
+            "micronaut.python.pool.enabled": true,
+            "micronaut.python.pool.size": 1
+        ])
+        Class<?> nodeClass = ctx.classLoader.loadClass('python.Node')
+        Class<?> pairClass = ctx.classLoader.loadClass('python.Pair')
+        def node = nodeClass.getDeclaredConstructor().newInstance()
+        nodeClass.getField('name').set(node, 'root')
+        nodeClass.getField('next').set(node, node)
+        def pair = pairClass.getDeclaredConstructor().newInstance()
+        pairClass.getField('left').set(pair, node)
+        pairClass.getField('right').set(pair, node)
+
+        when:
+        boolean identityPreserved = ctx.getBean(PythonPool).withContext { Context targetContext ->
+            Value targetPair = ((PooledValueCoercible) pair).asPolyglotValue(targetContext)
+            targetContext.getBindings('python').putMember('target_pair', targetPair)
+            targetContext.eval(
+                'python',
+                'target_pair.left is target_pair.right and target_pair.left.next is target_pair.left'
+            ).asBoolean()
+        }
+
+        then:
+        identityPreserved
 
         cleanup:
         ctx?.close()

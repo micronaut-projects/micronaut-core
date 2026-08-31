@@ -37,7 +37,6 @@ import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.ParameterDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
-import io.micronaut.sourcegen.model.VariableDef;
 
 import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
@@ -51,7 +50,6 @@ import static io.micronaut.python.processing.PythonStubGenerator.FROM_POLYGLOT_V
 import static io.micronaut.python.processing.PythonStubGenerator.POLYGLOT_VALUE;
 import static io.micronaut.python.processing.PythonStubGenerator.PYTHON_ASYNCIO_RUNTIME;
 import static io.micronaut.python.processing.PythonStubGenerator.addReferencedPythonClassReferenceFields;
-import static io.micronaut.python.processing.PythonStubGenerator.coerceParameterToPolyglotValue;
 import static io.micronaut.python.processing.PythonStubGenerator.erasedType;
 import static io.micronaut.python.processing.PythonStubGenerator.handleReturnType;
 import static io.micronaut.python.processing.PythonStubGenerator.isAsyncPythonMethod;
@@ -223,9 +221,7 @@ final class PythonPooledStubGenerator {
         builder.addMethod(methodBuilder.build(((aThis, methodParameters) -> {
             List<ExpressionDef> parameterExpressions = new ArrayList<>();
             for (int i = 0; i < methodElement.getParameters().length; i++) {
-                ParameterElement parameter = methodElement.getParameters()[i];
-                VariableDef.MethodParameter mp = methodParameters.get(i);
-                coerceParameterToPolyglotValue(parameter, parameterExpressions, mp);
+                parameterExpressions.add(methodParameters.get(i));
             }
             List<ExpressionDef> args = new ArrayList<>();
             args.add(pythonClassReference(element, element));
@@ -255,9 +251,7 @@ final class PythonPooledStubGenerator {
         builder.addMethod(methodBuilder.build(((aThis, methodParameters) -> {
             List<ExpressionDef> parameterExpressions = new ArrayList<>();
             for (int i = 0; i < methodElement.getParameters().length; i++) {
-                ParameterElement parameter = methodElement.getParameters()[i];
-                VariableDef.MethodParameter mp = methodParameters.get(i);
-                coerceParameterToPolyglotValue(parameter, parameterExpressions, mp);
+                parameterExpressions.add(methodParameters.get(i));
             }
             List<ExpressionDef> args = new ArrayList<>();
             args.add(ExpressionDef.constant(pkg));
@@ -326,7 +320,7 @@ final class PythonPooledStubGenerator {
             parameters.add(ExpressionDef.constant(pkg));
             parameters.add(ExpressionDef.constant(script));
             parameters.add(ExpressionDef.constant(beanProperty.getName()));
-            coerceParameterToPolyglotValue(beanProperty, parameters, methodParameters.getFirst());
+            parameters.add(methodParameters.getFirst());
             var result = PYTHON_CONTEXT_RUNTIME.invokeStatic(adaptAsyncMembers ? "injectPooledScriptAsync" : "injectPooledScript", TypeDef.VOID, parameters);
             if (returnType.equals(TypeDef.VOID)) {
                 return result;

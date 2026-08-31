@@ -57,10 +57,24 @@ class Person:
 
   @Override
   public Value asPolyglotValue(Context arg1) {
+    return GraalPyRuntimeUtil.coercePooledValue(this, arg1);
+  }
+
+  @Override
+  public Value reconstructPolyglotValue(Context arg1) {
     if (GraalPyRuntimeUtil.isValueInContext(this.graalpyInternalValue, arg1)) {
-      return this.asPolyglotValue();
+      GraalPyRuntimeUtil.rememberPooledValue(this, arg1, this.graalpyInternalValue);
+      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "name", GraalPyRuntimeUtil.coerceToContext(this.name, arg1, java.lang.String.class));
+      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "age", GraalPyRuntimeUtil.coerceToContext(this.age, arg1, int.class));
+      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", GraalPyRuntimeUtil.coerceToContext(this.address, arg1, python.Address.class));
+      return this.graalpyInternalValue;
     } else {
-      return PythonContextRuntime.newUninitializedInstance(arg1, Person.__PYTHON_CLASS_REFERENCE, AnnotationUtil.mapOf("name", GraalPyRuntimeUtil.coerceToContext(this.name, arg1, java.lang.String.class), "age", GraalPyRuntimeUtil.coerceToContext(this.age, arg1, int.class), "address", GraalPyRuntimeUtil.coerceToContext(this.address, arg1, python.Address.class)));
+      Value targetValue = PythonContextRuntime.newUninitializedInstance(arg1, Person.__PYTHON_CLASS_REFERENCE);
+      GraalPyRuntimeUtil.rememberPooledValue(this, arg1, targetValue);
+      GraalPyRuntimeUtil.putMember(targetValue, "name", GraalPyRuntimeUtil.coerceToContext(this.name, arg1, java.lang.String.class));
+      GraalPyRuntimeUtil.putMember(targetValue, "age", GraalPyRuntimeUtil.coerceToContext(this.age, arg1, int.class));
+      GraalPyRuntimeUtil.putMember(targetValue, "address", GraalPyRuntimeUtil.coerceToContext(this.address, arg1, python.Address.class));
+      return targetValue;
     }
   }
 

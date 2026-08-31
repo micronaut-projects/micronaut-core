@@ -1088,7 +1088,7 @@ public final class PythonContextRuntime {
     @UsedByGeneratedCode
     public static Value newUninitializedInstance(Context context,
                                                  PythonClassReference classReference,
-                                                 Map<String, Object> props) {
+                                                 @Nullable Map<String, Object> props) {
         Value instance = newUninitializedInstance(context, classReference);
         populateProperties(instance, props);
         return instance;
@@ -1103,7 +1103,7 @@ public final class PythonContextRuntime {
      * @since 5.2.0
      */
     @UsedByGeneratedCode
-    public static Value newInstance(PythonClassReference classReference, Map<String, Object> props) {
+    public static Value newInstance(PythonClassReference classReference, @Nullable Map<String, Object> props) {
         return newInstance(getContext(), classReference, props);
     }
 
@@ -1117,7 +1117,7 @@ public final class PythonContextRuntime {
      * @since 5.2.0
      */
     @UsedByGeneratedCode
-    public static Value newInstance(Context context, PythonClassReference classReference, Map<String, Object> props) {
+    public static Value newInstance(Context context, PythonClassReference classReference, @Nullable Map<String, Object> props) {
         Value pythonClass = findClass(classReference, context);
         return withContextClassLoader(() -> {
             Value instance = instantiate(classReference, new Object[0], pythonClass);
@@ -1135,7 +1135,7 @@ public final class PythonContextRuntime {
      * @since 5.2.0
      */
     @UsedByGeneratedCode
-    public static Value newFrozenDataclassInstance(PythonClassReference classReference, Map<String, Object> props) {
+    public static Value newFrozenDataclassInstance(PythonClassReference classReference, @Nullable Map<String, Object> props) {
         return newFrozenDataclassInstance(getContext(), classReference, props);
     }
 
@@ -1149,7 +1149,9 @@ public final class PythonContextRuntime {
      * @since 5.2.0
      */
     @UsedByGeneratedCode
-    public static Value newFrozenDataclassInstance(Context context, PythonClassReference classReference, Map<String, Object> props) {
+    public static Value newFrozenDataclassInstance(Context context,
+                                                   PythonClassReference classReference,
+                                                   @Nullable Map<String, Object> props) {
         Value pythonClass = findClass(classReference, context);
         return withContextClassLoader(() -> {
             Value instance = uninitializedInstanceFactory(pythonClass.getContext()).execute(pythonClass);
@@ -1158,8 +1160,8 @@ public final class PythonContextRuntime {
         });
     }
 
-    private static void populateProperties(Value instance, Map<String, Object> props) {
-        if (!props.isEmpty()) {
+    private static void populateProperties(Value instance, @Nullable Map<String, Object> props) {
+        if (props != null && !props.isEmpty()) {
             Value propertySetter = propertySetter(instance.getContext());
             for (java.util.Map.Entry<String, Object> e : props.entrySet()) {
                 propertySetter.execute(
@@ -1169,6 +1171,23 @@ public final class PythonContextRuntime {
                 );
             }
         }
+    }
+
+    /**
+     * Set a property on an instance without invoking an overridden {@code __setattr__} implementation.
+     *
+     * @param instance The target instance
+     * @param name The property name
+     * @param value The property value
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static void setInstanceProperty(Value instance, String name, @Nullable Object value) {
+        propertySetter(instance.getContext()).execute(
+            instance,
+            name,
+            GraalPyRuntimeUtil.coerceToContext(value, instance.getContext())
+        );
     }
 
     private static Value uninitializedInstanceFactory(Context context) {

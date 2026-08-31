@@ -135,12 +135,14 @@ final class PyronautCompilerTest {
         assertTrue(generated.contains("PythonContextRuntime.newInstance"));
         assertTrue(generated.contains("PooledValueCoercible"));
         assertTrue(generated.contains("asPolyglotValue(Context "));
+        assertTrue(generated.contains("reconstructPolyglotValue(Context "));
         assertTrue(generated.contains("newUninitializedInstance(arg1,"));
         assertTrue(generated.contains("GraalPyRuntimeUtil.coerceToContext"));
 
         String frozen = Files.readString(findGeneratedSource(outputDirectory, "TeamId.java"));
         assertTrue(frozen.contains("PooledValueCoercible"));
-        assertTrue(frozen.contains("newFrozenDataclassInstance(arg1,"));
+        assertTrue(frozen.contains("reconstructPolyglotValue(Context "));
+        assertTrue(frozen.contains("PythonContextRuntime.setInstanceProperty"));
 
         String regularClass = Files.readString(findGeneratedSource(outputDirectory, "TeamBuilder.java"));
         assertTrue(regularClass.contains("PooledValueCoercible"));

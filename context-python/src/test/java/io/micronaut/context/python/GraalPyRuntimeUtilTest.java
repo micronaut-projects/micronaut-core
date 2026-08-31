@@ -371,6 +371,81 @@ class GraalPyRuntimeUtilTest {
     }
 
     @Test
+    void coerceArgumentsPreservesPooledWrapperIdentity() {
+        Value targetValue = context.eval("python", "type('Body', (), {})()");
+        AtomicInteger reconstructions = new AtomicInteger();
+        PooledValueCoercible body = new PooledValueCoercible() {
+            @Override
+            public Value asPolyglotValue() {
+                throw new AssertionError("The primary-context conversion must not be used");
+            }
+
+            @Override
+            public Value asPolyglotValue(Context targetContext) {
+                return GraalPyRuntimeUtil.coercePooledValue(this, targetContext);
+            }
+
+            @Override
+            public Value reconstructPolyglotValue(Context targetContext) {
+                assertSame(context, targetContext);
+                reconstructions.incrementAndGet();
+                return targetValue;
+            }
+        };
+
+        Object[] converted = GraalPyRuntimeUtil.coerceArgumentsToContext(context, new Object[] {body, body});
+
+        assertSame(converted[0], converted[1]);
+        assertEquals(1, reconstructions.get());
+    }
+
+    @Test
+    void pooledConversionSupportsCyclesAfterTargetAllocation() {
+        PooledValueCoercible node = new PooledValueCoercible() {
+            @Override
+            public Value asPolyglotValue() {
+                throw new AssertionError("The primary-context conversion must not be used");
+            }
+
+            @Override
+            public Value asPolyglotValue(Context targetContext) {
+                return GraalPyRuntimeUtil.coercePooledValue(this, targetContext);
+            }
+
+            @Override
+            public Value reconstructPolyglotValue(Context targetContext) {
+                Value target = targetContext.eval("python", "type('Node', (), {})()");
+                GraalPyRuntimeUtil.rememberPooledValue(this, targetContext, target);
+                GraalPyRuntimeUtil.putMember(target, "next", this);
+                return target;
+            }
+        };
+
+        Value converted = (Value) GraalPyRuntimeUtil.coerceToContext(node, context);
+        context.getBindings("python").putMember("converted_node", converted);
+
+        assertTrue(context.eval("python", "converted_node.next is converted_node").asBoolean());
+    }
+
+    @Test
+    void nonReconstructibleWrapperFromAnotherContextFailsLoudly() {
+        try (Context other = Context.newBuilder("python").allowAllAccess(true).build()) {
+            ValueCoercible wrapper = () -> other.eval("python", "object()");
+
+            IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> GraalPyRuntimeUtil.coerceToContext(wrapper, context)
+            );
+
+            assertTrue(exception.getMessage().contains("cannot be reconstructed in the target context"));
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> GraalPyRuntimeUtil.coerceToContext(other.eval("python", "object()"), context)
+            );
+        }
+    }
+
+    @Test
     void testConvertHostOptional() {
         context.getBindings("python").putMember("optional", Optional.of("value"));
 

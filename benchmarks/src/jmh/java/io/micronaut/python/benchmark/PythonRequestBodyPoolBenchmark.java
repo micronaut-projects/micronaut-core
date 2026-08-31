@@ -55,7 +55,8 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>Run a smoke benchmark with
  * {@code ./gradlew :benchmarks:jmh -Pjmh.includes=io.micronaut.python.benchmark.PythonRequestBodyPoolBenchmark
- * -Pjmh.warmupIterations=1 -Pjmh.iterations=1}.</p>
+ * -Pjmh.warmupIterations=1 -Pjmh.iterations=1}. Run the full pool-size sweep by adding
+ * {@code -Pjmh.poolSizes=1,2,4,8}.</p>
  *
  * @since 5.2.0
  */
@@ -70,7 +71,7 @@ public class PythonRequestBodyPoolBenchmark {
         """;
 
     /** Configured Python context pool size. */
-    @Param({"1", "2", "4", "8"})
+    @Param({"4"})
     public int poolSize;
 
     private ApplicationContext applicationContext;
