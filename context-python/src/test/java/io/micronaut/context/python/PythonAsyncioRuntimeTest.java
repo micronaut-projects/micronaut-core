@@ -343,8 +343,7 @@ final class PythonAsyncioRuntimeTest {
             assertEquals(2, pool.pooledContextCount());
 
             Future<Context> waitingBorrow = executorService.submit(pool::borrow);
-            Thread.sleep(200);
-            assertFalse(waitingBorrow.isDone());
+            assertThrows(TimeoutException.class, () -> waitingBorrow.get(200, TimeUnit.MILLISECONDS));
 
             pool.release(first);
             Context third = waitingBorrow.get(5, TimeUnit.SECONDS);
@@ -378,8 +377,7 @@ final class PythonAsyncioRuntimeTest {
                 assertTrue(gate.entered.await(5, TimeUnit.SECONDS));
 
                 Future<Context> waitingBorrow = executorService.submit(pool::borrow);
-                Thread.sleep(100);
-                assertFalse(waitingBorrow.isDone());
+                assertThrows(TimeoutException.class, () -> waitingBorrow.get(100, TimeUnit.MILLISECONDS));
 
                 pool.release(first);
                 first = null;

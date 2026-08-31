@@ -175,7 +175,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
                 return;
             }
             pooledQueue.add(c);
-            notify();
+            notifyAll();
         }
     }
 
@@ -473,7 +473,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
             } finally {
                 synchronized (this) {
                     creatingContext = null;
-                    notify();
+                    notifyAll();
                 }
             }
         } finally {

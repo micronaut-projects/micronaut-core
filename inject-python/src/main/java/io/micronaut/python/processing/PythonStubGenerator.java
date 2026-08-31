@@ -122,6 +122,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
     private static final String PUBLISHER = "org.reactivestreams.Publisher";
     private static final String GET_MEMBER = "getMember";
+    private static final String MAP_OF = "mapOf";
+    private static final String ENUM_VALUE = "enumValue";
     private static final String ANN_CONFIGURATION_BUILDER = "io.micronaut.context.annotation.ConfigurationBuilder";
     private static final String NEW_UNINITIALIZED_INSTANCE = "newUninitializedInstance";
     private static final String ANN_CONFIGURATION_INJECT = "io.micronaut.context.annotation.ConfigurationInject";
@@ -298,6 +300,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     List<PropertyElement> beanProperties = element.getBeanProperties();
                     boolean hasDynamicBeanProperties = beanProperties.stream().anyMatch(PythonStubGenerator::isDynamicBeanProperty);
+                    // Declared attributes are fully represented by generated Java fields. Custom
+                    // Python properties may depend on hidden state that cannot be reconstructed in
+                    // another context from the BeanIntrospection alone.
                     boolean isReconstructibleBean = isIntrospectedBean && !hasDynamicBeanProperties;
                     if (isReconstructibleBean) {
                         builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
@@ -542,7 +547,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             mapEntries.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef));
                                         }
                                         ExpressionDef propsMap = ClassTypeDef.of(AnnotationUtil.class)
-                                            .invokeStatic("mapOf", TypeDef.of(Map.class), mapEntries);
+                                            .invokeStatic(MAP_OF, TypeDef.of(Map.class), mapEntries);
                                         reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                                             "newFrozenDataclassInstance",
                                             POLYGLOT_VALUE,
@@ -633,7 +638,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         }
                                     }
                                     ExpressionDef propsMap = ClassTypeDef.of(AnnotationUtil.class)
-                                        .invokeStatic("mapOf", TypeDef.of(Map.class), mapEntries);
+                                        .invokeStatic(MAP_OF, TypeDef.of(Map.class), mapEntries);
                                     reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic("newFrozenDataclassInstance", POLYGLOT_VALUE,
                                         List.of(targetContext, pythonClassReference(element, pythonClassReference), propsMap));
                                 } else if (beanProperties.isEmpty()) {
@@ -649,7 +654,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         }
                                     }
                                     ExpressionDef propsMap = ClassTypeDef.of(AnnotationUtil.class)
-                                        .invokeStatic("mapOf", TypeDef.of(Map.class), mapEntries);
+                                        .invokeStatic(MAP_OF, TypeDef.of(Map.class), mapEntries);
                                     reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_UNINITIALIZED_INSTANCE, POLYGLOT_VALUE,
                                         List.of(targetContext, pythonClassReference(element, pythonClassReference), propsMap));
                                 }
@@ -2848,7 +2853,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addModifiers(Modifier.PUBLIC)
             .returns(POLYGLOT_VALUE)
             .build((aThis, parameters) -> PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                "enumValue",
+                ENUM_VALUE,
                 POLYGLOT_VALUE,
                 pythonClassReference(classElement, pythonClassReference),
                 aThis.invoke("name", TypeDef.STRING)
@@ -2859,7 +2864,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addParameter(POLYGLOT_CONTEXT)
             .returns(POLYGLOT_VALUE)
             .build((aThis, parameters) -> PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                "enumValue",
+                ENUM_VALUE,
                 POLYGLOT_VALUE,
                 parameters.getFirst(),
                 pythonClassReference(classElement, pythonClassReference),
@@ -2937,7 +2942,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 "enumStringValue",
                 TypeDef.STRING,
                 PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                    "enumValue",
+                    ENUM_VALUE,
                     POLYGLOT_VALUE,
                     pythonClassReference(classElement, classElement),
                     enumName

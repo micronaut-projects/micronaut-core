@@ -142,6 +142,11 @@ final class PyronautCompilerTest {
         assertTrue(frozen.contains("PooledValueCoercible"));
         assertTrue(frozen.contains("newFrozenDataclassInstance(arg1,"));
 
+        String regularClass = Files.readString(findGeneratedSource(outputDirectory, "TeamBuilder.java"));
+        assertTrue(regularClass.contains("PooledValueCoercible"));
+        assertTrue(regularClass.contains("asPolyglotValue(Context "));
+        assertTrue(regularClass.contains("newUninitializedInstance(arg1,"));
+
     }
 
     @Test

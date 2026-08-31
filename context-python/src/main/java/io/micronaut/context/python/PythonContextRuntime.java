@@ -1159,7 +1159,7 @@ public final class PythonContextRuntime {
     }
 
     private static void populateProperties(Value instance, Map<String, Object> props) {
-        if (props != null && !props.isEmpty()) {
+        if (!props.isEmpty()) {
             Value propertySetter = propertySetter(instance.getContext());
             for (java.util.Map.Entry<String, Object> e : props.entrySet()) {
                 propertySetter.execute(

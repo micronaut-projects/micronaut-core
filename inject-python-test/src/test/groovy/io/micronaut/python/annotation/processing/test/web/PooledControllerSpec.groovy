@@ -63,6 +63,16 @@ class Order:
     def ctx_id(self) -> str:
         return context_id()
 
+@Introspected
+class InventoryItem:
+    sku: str
+    quantity: int
+    tags: list[str]
+    metadata: dict[str, str]
+
+    def ctx_id(self) -> str:
+        return context_id()
+
 @Get("/pool/ctx")
 def ctx() -> str:
     import time
@@ -81,6 +91,10 @@ def pair() -> str:
 @Post("/pool/body")
 def body(order: Annotated[Order, Body]) -> str:
     return f"{order.customer}:{order.address.city}:{','.join(order.items)}:{order.metadata['source']}:{order.priority.value}:{order.ctx_id()}:{context_id()}"
+
+@Post("/pool/plain-body")
+def plain_body(item: Annotated[InventoryItem, Body]) -> str:
+    return f"{item.sku}:{item.quantity}:{','.join(item.tags)}:{item.metadata['source']}:{item.ctx_id()}:{context_id()}"
 '''
         def previousContextIdProperty = System.getProperty("micronaut.python.context-id.enabled")
         System.setProperty("micronaut.python.context-id.enabled", "true")
@@ -146,6 +160,33 @@ def body(order: Annotated[Order, Body]) -> str:
                 parts[5] == parts[6]
         }
         bodyResponses.collect { it.split(":")[6] }.toSet().size() >= 2
+
+        when:
+        def plainBodyResponses = (1..8).collect {
+            executor.submit {
+                def request = HttpRequest.POST("/pool/plain-body", [
+                    sku: "MN-PY",
+                    quantity: 4,
+                    tags: ["plain", "introspected"],
+                    metadata: [source: "json"]
+                ]).contentType(MediaType.APPLICATION_JSON_TYPE)
+                client.toBlocking().retrieve(request)
+            }
+        }.collect {
+            it.get(10, TimeUnit.SECONDS)
+        }
+
+        then:
+        plainBodyResponses.every {
+            def parts = it.split(":")
+            parts.length == 6 &&
+                parts[0] == "MN-PY" &&
+                parts[1] == "4" &&
+                parts[2] == "plain,introspected" &&
+                parts[3] == "json" &&
+                parts[4] == parts[5]
+        }
+        plainBodyResponses.collect { it.split(":")[5] }.toSet().size() >= 2
 
         cleanup:
         executor?.shutdownNow()
