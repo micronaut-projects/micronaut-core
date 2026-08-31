@@ -870,7 +870,21 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value newIntroduction(PythonClassReference classReference, Object... args) {
-        Value pythonClass = findClass(classReference);
+        return newIntroduction(getContext(), classReference, args);
+    }
+
+    /**
+     * Create an abstract introduction instance in a supplied context.
+     *
+     * @param context The target context
+     * @param classReference The Python class reference
+     * @param args The args
+     * @return The new instance
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Value newIntroduction(Context context, PythonClassReference classReference, Object... args) {
+        Value pythonClass = findClass(classReference, context);
         if (!pythonClass.hasMember("__micronaut_introduction__")) {
 
             Value abstractMethods = pythonClass.getMember("__abstractmethods__");
@@ -882,7 +896,6 @@ public final class PythonContextRuntime {
                     pythonClass.putMember(methodName, stub);
                 }
             }
-            Context context = pythonClass.getContext();
             if (!context.getBindings(PYTHON).hasMember("update_abstractmethods")) {
                 context.eval(PYTHON, "from abc import update_abstractmethods");
             }
@@ -915,6 +928,24 @@ public final class PythonContextRuntime {
     }
 
     /**
+     * Create an abstract introduction instance in a supplied context, omitting trailing defaults.
+     *
+     * @param context The target context
+     * @param classReference The Python class reference
+     * @param requiredArgCount The number of non-defaulted positional constructor arguments
+     * @param args The arguments
+     * @return The new instance
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Value newIntroductionWithDefaultedTrailingNulls(Context context,
+                                                                  PythonClassReference classReference,
+                                                                  int requiredArgCount,
+                                                                  Object... args) {
+        return newIntroduction(context, classReference, trimDefaultedTrailingNulls(requiredArgCount, args));
+    }
+
+    /**
      * Create a new instance for the given class reference and args.
      *
      * @param classReference The Python class reference
@@ -924,7 +955,21 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value newInstance(PythonClassReference classReference, Object... args) {
-        Value pythonClass = findClass(classReference);
+        return newInstance(getContext(), classReference, args);
+    }
+
+    /**
+     * Create a new instance in a supplied context.
+     *
+     * @param context The target context
+     * @param classReference The Python class reference
+     * @param args The args
+     * @return The new instance
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Value newInstance(Context context, PythonClassReference classReference, Object... args) {
+        Value pythonClass = findClass(classReference, context);
         return instantiate(classReference, args, pythonClass);
     }
 
@@ -938,7 +983,21 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value enumValue(PythonClassReference classReference, String name) {
-        Value pythonClass = findClass(classReference);
+        return enumValue(getContext(), classReference, name);
+    }
+
+    /**
+     * Resolve a Python enum constant by its Java enum name in a supplied context.
+     *
+     * @param context The target context
+     * @param classReference The Python class reference
+     * @param name The enum constant name
+     * @return The Python enum constant
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Value enumValue(Context context, PythonClassReference classReference, String name) {
+        Value pythonClass = findClass(classReference, context);
         return withContextClassLoader(() -> {
             Value enumValue = pythonClass.getMember(name);
             if (enumValue != null && !GraalPyRuntimeUtil.isNone(enumValue)) {
@@ -974,6 +1033,24 @@ public final class PythonContextRuntime {
     }
 
     /**
+     * Create a new instance in a supplied context, omitting trailing defaults.
+     *
+     * @param context The target context
+     * @param classReference The Python class reference
+     * @param requiredArgCount The number of non-defaulted positional constructor arguments
+     * @param args The arguments
+     * @return The new instance
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Value newInstanceWithDefaultedTrailingNulls(Context context,
+                                                              PythonClassReference classReference,
+                                                              int requiredArgCount,
+                                                              Object... args) {
+        return newInstance(context, classReference, trimDefaultedTrailingNulls(requiredArgCount, args));
+    }
+
+    /**
      * Create a Python instance without invoking {@code __init__}.
      *
      * @param classReference The Python class reference
@@ -982,9 +1059,39 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value newUninitializedInstance(PythonClassReference classReference) {
-        Context context = getContext();
+        return newUninitializedInstance(getContext(), classReference);
+    }
+
+    /**
+     * Create an instance without invoking {@code __init__} in a supplied context.
+     *
+     * @param context The target context
+     * @param classReference The Python class reference
+     * @return The new uninitialized instance
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Value newUninitializedInstance(Context context, PythonClassReference classReference) {
         Value pythonClass = findClass(classReference, context);
         return context.eval(PYTHON, "lambda cls: object.__new__(cls)").execute(pythonClass);
+    }
+
+    /**
+     * Create an instance without invoking {@code __init__} and populate its properties in a supplied context.
+     *
+     * @param context The target context
+     * @param classReference The Python class reference
+     * @param props Map of property names to values
+     * @return The populated uninitialized instance
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Value newUninitializedInstance(Context context,
+                                                 PythonClassReference classReference,
+                                                 Map<String, Object> props) {
+        Value instance = newUninitializedInstance(context, classReference);
+        populateProperties(instance, props);
+        return instance;
     }
 
     /**
@@ -997,19 +1104,24 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value newInstance(PythonClassReference classReference, Map<String, Object> props) {
-        Value pythonClass = findClass(classReference);
+        return newInstance(getContext(), classReference, props);
+    }
+
+    /**
+     * Create a new instance and populate its properties in a supplied context.
+     *
+     * @param context The target context
+     * @param classReference The Python class reference
+     * @param props Map of property names to values
+     * @return The new instance with members populated
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Value newInstance(Context context, PythonClassReference classReference, Map<String, Object> props) {
+        Value pythonClass = findClass(classReference, context);
         return withContextClassLoader(() -> {
             Value instance = instantiate(classReference, new Object[0], pythonClass);
-            if (props != null && !props.isEmpty()) {
-                Value propertySetter = propertySetter(instance.getContext());
-                for (java.util.Map.Entry<String, Object> e : props.entrySet()) {
-                    propertySetter.execute(
-                        instance,
-                        e.getKey(),
-                        GraalPyRuntimeUtil.coerceToContext(e.getValue(), instance.getContext())
-                    );
-                }
-            }
+            populateProperties(instance, props);
             return instance;
         });
     }
@@ -1024,21 +1136,39 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value newFrozenDataclassInstance(PythonClassReference classReference, Map<String, Object> props) {
-        Value pythonClass = findClass(classReference);
+        return newFrozenDataclassInstance(getContext(), classReference, props);
+    }
+
+    /**
+     * Create a frozen dataclass instance and populate its properties in a supplied context.
+     *
+     * @param context The target context
+     * @param classReference The Python class reference
+     * @param props Map of property names to values
+     * @return The new instance with members populated
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Value newFrozenDataclassInstance(Context context, PythonClassReference classReference, Map<String, Object> props) {
+        Value pythonClass = findClass(classReference, context);
         return withContextClassLoader(() -> {
             Value instance = uninitializedInstanceFactory(pythonClass.getContext()).execute(pythonClass);
-            if (props != null && !props.isEmpty()) {
-                Value propertySetter = propertySetter(instance.getContext());
-                for (java.util.Map.Entry<String, Object> e : props.entrySet()) {
-                    propertySetter.execute(
-                        instance,
-                        e.getKey(),
-                        GraalPyRuntimeUtil.coerceToContext(e.getValue(), instance.getContext())
-                    );
-                }
-            }
+            populateProperties(instance, props);
             return instance;
         });
+    }
+
+    private static void populateProperties(Value instance, Map<String, Object> props) {
+        if (props != null && !props.isEmpty()) {
+            Value propertySetter = propertySetter(instance.getContext());
+            for (java.util.Map.Entry<String, Object> e : props.entrySet()) {
+                propertySetter.execute(
+                    instance,
+                    e.getKey(),
+                    GraalPyRuntimeUtil.coerceToContext(e.getValue(), instance.getContext())
+                );
+            }
+        }
     }
 
     private static Value uninitializedInstanceFactory(Context context) {

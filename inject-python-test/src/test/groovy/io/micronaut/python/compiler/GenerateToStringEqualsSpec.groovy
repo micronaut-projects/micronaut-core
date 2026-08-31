@@ -26,12 +26,12 @@ class Person:
         assertGeneratedSourceContains(pythonCode, """
   @JsonCreator
   public Person(@JsonProperty("name") String name, @JsonProperty("age") int age, @JsonProperty("address") Address address) {
-    this.graalpyInternalValue = PythonContextRuntime.newUninitializedInstance(Person.__PYTHON_CLASS_REFERENCE);
     this.name = name;
     this.age = age;
     this.address = address;
   }
 
+  @Override
   public Value asPolyglotValue() {
     if (this.graalpyInternalValue != null) {
       if (this.graalpyInternalValueSyncing) {
@@ -52,6 +52,15 @@ class Person:
       GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", GraalPyRuntimeUtil.coerceValue(this.address));
       this.graalpyInternalValueSyncing = false;
       return this.graalpyInternalValue;
+    }
+  }
+
+  @Override
+  public Value asPolyglotValue(Context arg1) {
+    if (GraalPyRuntimeUtil.isValueInContext(this.graalpyInternalValue, arg1)) {
+      return this.asPolyglotValue();
+    } else {
+      return PythonContextRuntime.newUninitializedInstance(arg1, Person.__PYTHON_CLASS_REFERENCE, AnnotationUtil.mapOf("name", GraalPyRuntimeUtil.coerceToContext(this.name, arg1, java.lang.String.class), "age", GraalPyRuntimeUtil.coerceToContext(this.age, arg1, int.class), "address", GraalPyRuntimeUtil.coerceToContext(this.address, arg1, python.Address.class)));
     }
   }
 

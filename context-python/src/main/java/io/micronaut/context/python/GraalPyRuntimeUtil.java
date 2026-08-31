@@ -17,6 +17,7 @@ package io.micronaut.context.python;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -249,6 +250,8 @@ public final class GraalPyRuntimeUtil {
     @UsedByGeneratedCode
     public static @Nullable Object coerceValue(@Nullable Object value) {
         return switch (value) {
+            case PooledValueCoercible pooledValueCoercible when value instanceof Enum<?> ->
+                pooledValueCoercible.asPolyglotValue();
             case ValueCoercible valueCoercible when !(value instanceof PooledValueCoercible) ->
                 valueCoercible.asPolyglotValue();
             case null, default -> value;
@@ -266,6 +269,14 @@ public final class GraalPyRuntimeUtil {
         Object standardType = coerceStandardTypeToContext(value, context);
         if (standardType != value) {
             return standardType;
+        }
+        if (value != null && value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            Object[] result = new Object[length];
+            for (int i = 0; i < length; i++) {
+                result[i] = coerceToContext(Array.get(value, i), context);
+            }
+            return result;
         }
         switch (value) {
             case null -> {
@@ -298,13 +309,6 @@ public final class GraalPyRuntimeUtil {
                 }
                 return result;
             }
-            case Object[] array -> {
-                Object[] result = new Object[array.length];
-                for (int i = 0; i < array.length; i++) {
-                    result[i] = coerceToContext(array[i], context);
-                }
-                return result;
-            }
             default -> {
             }
         }
@@ -333,6 +337,9 @@ public final class GraalPyRuntimeUtil {
         if (standardType != value) {
             return standardType;
         }
+        if (declaredType.isArray() && value.getClass().isArray()) {
+            return coerceToContext(value, context);
+        }
         return switch (value) {
             case PooledValueCoercible pooledValueCoercible ->
                 pooledValueCoercible.asPolyglotValue(context);
@@ -342,9 +349,20 @@ public final class GraalPyRuntimeUtil {
                 coerceToContext(value, context);
             case Set<?> _ when Set.class.equals(declaredType) ->
                 coerceToContext(value, context);
-            case Object[] _ when declaredType.isArray() -> coerceToContext(value, context);
             default -> value;
         };
+    }
+
+    /**
+     * Determines whether a polyglot value belongs to the supplied context.
+     *
+     * @param value The value to inspect
+     * @param context The expected context
+     * @return Whether the value belongs to the context
+     */
+    @UsedByGeneratedCode
+    public static boolean isValueInContext(@Nullable Value value, Context context) {
+        return value != null && context.equals(value.getContext());
     }
 
     private static @Nullable Object coerceStandardTypeToContext(@Nullable Object value, Context context) {

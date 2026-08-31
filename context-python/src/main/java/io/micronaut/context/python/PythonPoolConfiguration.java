@@ -15,22 +15,25 @@
  */
 package io.micronaut.context.python;
 
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.bind.annotation.Bindable;
+import org.jspecify.annotations.Nullable;
+
+import java.time.Duration;
 
 /**
  * Configuration for the PythonPool.
  *
  * @param enabled    Whether pooling is enabled.
  * @param size       The size of the pool. Defaults to the number of processors * 2.
- * @param warnWaitMs The amount of time to wait for a pooled context before a warning is printed.
+ * @param warnWait   The amount of time to wait for a pooled context before a warning is printed.
  */
 @ConfigurationProperties("micronaut.python.pool")
 @Experimental
 public record PythonPoolConfiguration(
     @Bindable(defaultValue = "true") boolean enabled,
     @Bindable(defaultValue = "0") int size,
-    @Bindable(defaultValue = "2000") long warnWaitMs
+    @Bindable(defaultValue = "2s") @Nullable Duration warnWait
 ) {
 }

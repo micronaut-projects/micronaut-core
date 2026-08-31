@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import io.micronaut.http.HttpResponse;
 import org.graalvm.polyglot.Context;
@@ -32,6 +33,7 @@ import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyObject;
 import org.junit.jupiter.api.AfterEach;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -328,6 +330,44 @@ class GraalPyRuntimeUtilTest {
 
         assertTrue(result instanceof Map);
         assertEquals(Map.of("existing", "value"), result);
+    }
+
+    @Test
+    void coerceToContextUsesPooledConversionForTargetContext() {
+        Value targetValue = context.eval("python", "{'context': 'target'}");
+        AtomicInteger noArgumentConversions = new AtomicInteger();
+        AtomicInteger targetConversions = new AtomicInteger();
+        PooledValueCoercible body = new PooledValueCoercible() {
+            @Override
+            public Value asPolyglotValue() {
+                noArgumentConversions.incrementAndGet();
+                throw new AssertionError("The primary-context conversion must not be used");
+            }
+
+            @Override
+            public Value asPolyglotValue(Context targetContext) {
+                assertSame(context, targetContext);
+                targetConversions.incrementAndGet();
+                return targetValue;
+            }
+        };
+
+        assertSame(targetValue, GraalPyRuntimeUtil.coerceToContext(body, context));
+
+        Object nested = GraalPyRuntimeUtil.coerceToContext(
+            List.of(Map.of("bodies", new Object[] {body})),
+            context
+        );
+        List<?> nestedList = (List<?>) nested;
+        Map<?, ?> nestedMap = (Map<?, ?>) nestedList.getFirst();
+        assertArrayEquals(new Object[] {targetValue}, (Object[]) nestedMap.get("bodies"));
+        assertArrayEquals(
+            new Object[] {1, 2, 3},
+            (Object[]) GraalPyRuntimeUtil.coerceToContext(new int[] {1, 2, 3}, context, int[].class)
+        );
+
+        assertEquals(2, targetConversions.get());
+        assertEquals(0, noArgumentConversions.get());
     }
 
     @Test

@@ -1,11 +1,13 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.python.PythonContextExecutor
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 
 import java.util.concurrent.Executors
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class PooledClassSpec extends AbstractPythonTypeElementSpec {
@@ -59,6 +61,7 @@ class PoolController:
         server.start()
         def client = context.createBean(HttpClient, server.URL)
         def executor = Executors.newFixedThreadPool(4)
+        warmPool(context, executor, 4)
 
         when:
         def getCtxId = readerClass.getMethod("get_ctx_id")
@@ -94,6 +97,27 @@ class PoolController:
         } else {
             System.setProperty("micronaut.python.context-id.enabled", previousContextIdProperty)
         }
+    }
+
+    private static void warmPool(ApplicationContext context, def executor, int size) {
+        def contextExecutor = context.getBean(PythonContextExecutor)
+        def acquired = new CountDownLatch(size)
+        def release = new CountDownLatch(1)
+        def futures = (1..size).collect {
+            executor.submit {
+                contextExecutor.withContext {
+                    acquired.countDown()
+                    release.await()
+                    null
+                }
+            }
+        }
+        try {
+            assert acquired.await(30, TimeUnit.SECONDS)
+        } finally {
+            release.countDown()
+        }
+        futures.each { it.get(30, TimeUnit.SECONDS) }
     }
 
     void "pooled class with ctor args fails compilation"() {
