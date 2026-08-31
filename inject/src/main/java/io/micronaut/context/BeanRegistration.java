@@ -84,9 +84,9 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     }
 
     /**
-     * Creates new bean registration. When a bean context is provided the returned registration's
-     * {@link #close()} destroys the bean through {@link BeanContext#destroyBean(BeanRegistration)},
-     * triggering {@link io.micronaut.context.event.BeanPreDestroyEventListener} and
+     * Creates new bean registration. The returned registration's {@link #close()} destroys the
+     * bean through {@link BeanContext#destroyBean(BeanRegistration)}, triggering
+     * {@link io.micronaut.context.event.BeanPreDestroyEventListener} and
      * {@link io.micronaut.context.event.BeanDestroyedEventListener} instances even if the bean has
      * no destruction logic of its own.
      *
@@ -105,11 +105,8 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
                                              K bean,
                                              @Nullable
                                              List<BeanRegistration<?>> dependents) {
-        if (beanContext == null) {
-            return new BeanRegistration<>(identifier, beanDefinition, bean);
-        }
         return CollectionUtils.isNotEmpty(dependents) ?
-            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, dependents) :
+            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, Objects.requireNonNull(dependents)) :
             new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean);
     }
 
