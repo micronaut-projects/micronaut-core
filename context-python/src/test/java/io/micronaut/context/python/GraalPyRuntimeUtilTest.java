@@ -371,6 +371,35 @@ class GraalPyRuntimeUtilTest {
     }
 
     @Test
+    void putMemberDefersPooledWrapperConversionToTargetContext() {
+        try (Context targetContext = Context.newBuilder("python").allowAllAccess(true).build()) {
+            Value target = targetContext.eval("python", "type('Parent', (), {})()");
+            AtomicInteger noArgumentConversions = new AtomicInteger();
+            AtomicInteger targetConversions = new AtomicInteger();
+            PooledValueCoercible child = new PooledValueCoercible() {
+                @Override
+                public Value asPolyglotValue() {
+                    noArgumentConversions.incrementAndGet();
+                    return context.eval("python", "type('WrongContext', (), {})()");
+                }
+
+                @Override
+                public Value asPolyglotValue(Context context) {
+                    assertEquals(targetContext, context);
+                    targetConversions.incrementAndGet();
+                    return context.eval("python", "type('Child', (), {'name': 'target'})()");
+                }
+            };
+
+            GraalPyRuntimeUtil.putMember(target, "child", GraalPyRuntimeUtil.coerceValue(child));
+
+            assertEquals("target", target.getMember("child").getMember("name").asString());
+            assertEquals(1, targetConversions.get());
+            assertEquals(0, noArgumentConversions.get());
+        }
+    }
+
+    @Test
     void coerceArgumentsPreservesPooledWrapperIdentity() {
         Value targetValue = context.eval("python", "type('Body', (), {})()");
         AtomicInteger reconstructions = new AtomicInteger();

@@ -2829,25 +2829,34 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         List<ExpressionDef> parameters,
         VariableDef.MethodParameter methodParam,
         @Nullable ExpressionDef targetContext) {
+        ClassElement genericType = param.getGenericType();
+        boolean mapOfPython = genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement;
+        boolean listOfPython = genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement;
         if (targetContext != null) {
-            // Generated Python-class arguments stay as host bridges for ordinary methods because
-            // Python code can call their generated Java methods. Pooled bridges instead pass raw
-            // arguments to invokePooled, which converts them after borrowing the target context.
-            parameters.add(param.getGenericType() instanceof PythonClassElement
-                ? methodParam
-                : RUNTIME_UTIL.invokeStatic(
+            // Generated Python-class arguments stay as host bridges for ordinary methods, including
+            // inside lists and maps, so Python consistently uses their generated Java accessors.
+            // Pooled bridges instead pass raw arguments to invokePooled, which converts them after
+            // borrowing the target context.
+            ExpressionDef parameter;
+            if (mapOfPython) {
+                parameter = RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), methodParam);
+            } else if (listOfPython) {
+                parameter = RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), methodParam);
+            } else if (genericType instanceof PythonClassElement) {
+                parameter = methodParam;
+            } else {
+                parameter = RUNTIME_UTIL.invokeStatic(
                     "coerceToContext",
                     TypeDef.OBJECT,
                     methodParam,
                     targetContext,
                     classLiteral(param.getGenericType())
-                ));
+                );
+            }
+            parameters.add(parameter);
             return;
         }
         ExpressionDef parameter;
-        ClassElement genericType = param.getGenericType();
-        boolean mapOfPython = genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement;
-        boolean listOfPython = genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement;
         if (mapOfPython) {
             parameter = RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), methodParam);
         } else if (listOfPython) {

@@ -619,6 +619,43 @@ class Pair:
         ctx?.close()
     }
 
+    void "ordinary Python methods keep bare list and map elements as host bridges"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+
+@dataclass
+@Introspected
+class Item:
+    name: str
+
+
+@Introspected
+class Consumer:
+    def describe(self, item: Item, items: list[Item], items_by_name: dict[str, Item]) -> str:
+        return ":".join((
+            item.getName(),
+            items[0].getName(),
+            items_by_name.get("primary").getName(),
+        ))
+
+
+'''
+        ApplicationContext ctx = buildContext(py, true)
+        Class<?> itemClass = ctx.classLoader.loadClass('python.Item')
+        Class<?> consumerClass = ctx.classLoader.loadClass('python.Consumer')
+        def item = itemClass.getDeclaredConstructor(String).newInstance('one')
+        def consumer = consumerClass.getDeclaredConstructor().newInstance()
+
+        expect:
+        consumer.describe(item, [item], [primary: item]) == 'one:one:one'
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "generated dataclass wrapper setters called from Python update Java fields"() {
         given:
         String py = '''

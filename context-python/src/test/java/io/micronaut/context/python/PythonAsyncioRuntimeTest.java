@@ -1098,6 +1098,31 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
+    void asyncMemberValueReconstructsPythonWrapperInTargetContext() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, "type('Target', (), {})()");
+            PooledValueCoercible client = new PooledValueCoercible() {
+                @Override
+                public Value asPolyglotValue() {
+                    throw new AssertionError("Primary conversion should not be used");
+                }
+
+                @Override
+                public Value asPolyglotValue(Context targetContext) {
+                    assertEquals(context, targetContext);
+                    return targetContext.eval(PYTHON, "type('Client', (), {'name': 'python-client'})()");
+                }
+            };
+
+            Object adapted = GraalPyRuntimeUtil.asyncMemberValue(target, client);
+            GraalPyRuntimeUtil.putMember(target, "client", adapted);
+
+            assertEquals("python-client", target.getMember("client").getMember("name").asString());
+            assertEquals(context, assertInstanceOf(Value.class, adapted).getContext());
+        }
+    }
+
+    @Test
     void asyncMemberValueAdaptsPublisherMethodResultsAsScalarAwaitables() throws Exception {
         try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
             Value target = context.eval(PYTHON, """

@@ -253,7 +253,8 @@ public final class GraalPyRuntimeUtil {
     @UsedByGeneratedCode
     public static @Nullable Object coerceValue(@Nullable Object value) {
         return switch (value) {
-            case ValueCoercible valueCoercible -> valueCoercible.asPolyglotValue();
+            case ValueCoercible valueCoercible when !(value instanceof PooledValueCoercible) ->
+                valueCoercible.asPolyglotValue();
             case null, default -> value;
         };
     }
@@ -569,6 +570,9 @@ public final class GraalPyRuntimeUtil {
         Context context = target.getContext();
         if (value instanceof CompletionStage<?> completionStage) {
             return PythonAsyncioRuntime.toAwaitable(context, completionStage);
+        }
+        if (value instanceof PooledValueCoercible || value instanceof Value) {
+            return coerceToContext(value, context);
         }
         return asyncMemberFactory(context).execute(value, ASYNC_MEMBER_ADAPTER, context);
     }

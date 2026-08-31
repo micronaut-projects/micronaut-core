@@ -512,19 +512,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         }
         Context c = createContext();
         if (closed) {
-            try {
-                GraalPyContextFactory.closeContext(c);
-            } catch (PolyglotException e) {
-                if (e.isCancelled()) {
-                    LOG.debug("Python pool context close cancelled during shutdown", e);
-                } else {
-                    LOG.warn("Unexpected error while closing Python pool context", e);
-                    throw e;
-                }
-            } catch (RuntimeException | Error e) {
-                LOG.warn("Unexpected error while closing Python pool context", e);
-                throw e;
-            }
+            closeContext(c);
             return null;
         }
         cache.put(c, new ConcurrentHashMap<>());
@@ -551,7 +539,19 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     }
 
     private static void closeContext(Context context) {
-        GraalPyContextFactory.closeContext(context);
+        try {
+            GraalPyContextFactory.closeContext(context);
+        } catch (PolyglotException e) {
+            if (e.isCancelled()) {
+                LOG.debug("Python pool context was already cancelled while closing", e);
+            } else {
+                LOG.warn("Unexpected error while closing Python pool context", e);
+                throw e;
+            }
+        } catch (RuntimeException | Error e) {
+            LOG.warn("Unexpected error while closing Python pool context", e);
+            throw e;
+        }
     }
 
     private List<Context> snapshotIncludingPrimary() {
