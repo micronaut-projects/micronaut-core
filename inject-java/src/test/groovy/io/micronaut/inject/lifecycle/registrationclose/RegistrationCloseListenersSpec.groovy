@@ -66,6 +66,56 @@ class RegistrationCloseListenersSpec extends Specification {
         context.close()
     }
 
+    void "closing a synthetic container element registration does not destroy through the container definition"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        ElementFactory.CONTAINER_CREATIONS.set(0)
+        ContainedElementPreDestroyListener preListener = context.getBean(ContainedElementPreDestroyListener)
+        ContainedElementDestroyedListener postListener = context.getBean(ContainedElementDestroyedListener)
+
+        when:
+        List<BeanRegistration<ContainedElement>> registrations = context.getBeanRegistrations(ContainedElement).toList()
+
+        then:
+        registrations.size() == 2
+        ElementFactory.CONTAINER_CREATIONS.get() == 1
+
+        when: "the synthetic per element registrations are closed"
+        registrations*.close()
+        List<ContainedElement> elementsAfterClose = context.getBeanRegistrations(ContainedElement)*.bean()
+
+        then: "no destruction runs with the mismatched container definition"
+        preListener.destroyed.empty
+        postListener.destroyed.empty
+
+        and: "the container singleton is not purged"
+        ElementFactory.CONTAINER_CREATIONS.get() == 1
+        elementsAfterClose == registrations*.bean()
+
+        cleanup:
+        context.close()
+    }
+
+    void "closing a synthetic container element registration still stops a LifeCycle element"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+
+        when:
+        BeanRegistration<StoppableElement> registration = context.getBeanRegistrations(StoppableElement).first()
+
+        then:
+        registration.bean().running
+
+        when:
+        registration.close()
+
+        then:
+        !registration.bean().running
+
+        cleanup:
+        context.close()
+    }
+
     void "a pre destroy listener can replace the bean instance"() {
         given:
         ApplicationContext context = ApplicationContext.run()
