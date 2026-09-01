@@ -1,0 +1,24 @@
+A api:core.beans.BeanIntrospection[] describes the constructor it instantiates beans with, which is the one returned by `getConstructor` and used by `instantiate`. By default that is the only constructor described, so `getConstructors` returns a single-element list.
+
+To describe every declared constructor instead, set the `constructors` member of the ann:core.annotation.Introspected[] annotation to `true`:
+
+snippet::io.micronaut.docs.ioc.beans.Shipment[tags="class"]
+
+<1> Every declared constructor of the class is described
+<2> The ann:core.annotation.Creator[] annotation still selects the constructor used to instantiate beans
+
+Each described constructor is a api:core.beans.BeanConstructor[] carrying its own annotation metadata and the annotation metadata of its parameters, and each one can instantiate the type:
+
+snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="constructors", indent=0]
+
+<1> `getConstructors` returns every described constructor, the one returned by `getConstructor` first
+<2> Constructors are told apart by their arguments
+<3> Any described constructor can instantiate the type
+
+To describe one particular constructor rather than all of them, annotate that constructor with ann:context.annotation.Executable[]:
+
+snippet::io.micronaut.docs.ioc.beans.Delivery[tags="class"]
+
+<1> This constructor is described in addition to the one beans are instantiated with
+
+NOTE: Describing constructors does not change how beans of the type are built. The constructor returned by `getConstructor` is the same either way, and a constructor annotated with ann:context.annotation.Executable[] does not become an executable method of the bean.

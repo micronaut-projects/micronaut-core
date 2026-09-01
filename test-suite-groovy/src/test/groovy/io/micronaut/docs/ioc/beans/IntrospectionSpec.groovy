@@ -1,5 +1,6 @@
 package io.micronaut.docs.ioc.beans
 
+import io.micronaut.core.beans.BeanConstructor
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.beans.BeanWrapper
@@ -71,5 +72,35 @@ class IntrospectionSpec extends Specification {
 
         then:
         user.age == 23
+    }
+
+    void testShipmentConstructors() {
+        when:
+        // tag::constructors[]
+        BeanIntrospection<Shipment> introspection = BeanIntrospection.getIntrospection(Shipment)
+
+        List<BeanConstructor<Shipment>> constructors = introspection.getConstructors() // <1>
+
+        BeanConstructor<Shipment> byItem = constructors.find { it.arguments.length == 1 } // <2>
+
+        Shipment shipment = byItem.instantiate("book") // <3>
+        // end::constructors[]
+
+        then:
+        constructors.size() == 2
+        constructors[0].arguments.length == introspection.constructor.arguments.length
+        shipment.item == "book"
+        shipment.quantity == 1
+    }
+
+    void testDeliveryExecutableConstructor() {
+        when:
+        BeanIntrospection<Delivery> introspection = BeanIntrospection.getIntrospection(Delivery)
+        List<BeanConstructor<Delivery>> constructors = introspection.getConstructors()
+        Delivery delivery = constructors.find { it.arguments.length == 1 }.instantiate("Main Street")
+
+        then:
+        constructors.size() == 2
+        delivery.address == "Main Street"
     }
 }
