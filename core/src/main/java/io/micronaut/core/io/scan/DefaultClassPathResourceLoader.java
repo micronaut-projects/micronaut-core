@@ -140,60 +140,65 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         }
 
         URL url = classLoader.getResource(prefixPath(path));
-        if (url != null) {
-            if (startsWithBase(url)) {
-                try {
-                    URI uri = url.toURI();
-                    if (uri.getScheme().equals("jar")) {
-                        synchronized (DefaultClassPathResourceLoader.class) {
-                            FileSystem fileSystem = null;
+        if (url == null) {
+            // Nothing below can turn this into a hit: the fallback re-runs the identical
+            // classLoader.getResource(prefixPath(path)), and so does the isDirectory() check inside
+            // it, so a miss used to scan the whole classpath three times. Startup probes for
+            // configuration files that are usually absent, so the miss is the common case.
+            return Optional.empty();
+        }
+        if (startsWithBase(url)) {
+            try {
+                URI uri = url.toURI();
+                if (uri.getScheme().equals("jar")) {
+                    synchronized (DefaultClassPathResourceLoader.class) {
+                        FileSystem fileSystem = null;
+                        try {
                             try {
+                                fileSystem = FileSystems.getFileSystem(uri);
+                            } catch (FileSystemNotFoundException e) {
+                                //no-op
+                            }
+                            if (fileSystem == null || !fileSystem.isOpen()) {
                                 try {
+                                    fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
+                                } catch (FileSystemAlreadyExistsException e) {
                                     fileSystem = FileSystems.getFileSystem(uri);
-                                } catch (FileSystemNotFoundException e) {
-                                    //no-op
                                 }
-                                if (fileSystem == null || !fileSystem.isOpen()) {
-                                    try {
-                                        fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
-                                    } catch (FileSystemAlreadyExistsException e) {
-                                        fileSystem = FileSystems.getFileSystem(uri);
-                                    }
+                            }
+                            Path pathObject = fileSystem.getPath(path);
+                            if (!Files.exists(pathObject) && uri.toString().contains("!/")) {
+                                // Gracefully transform a URL: "jar:file:/{JAR_PATH}!/{PREFIX}!/{RESOURCE}" to path: "{PREFIX}/{RESOURCE}"
+                                final String altPath = Arrays.stream(uri.toString().split("\\!\\/")).skip(1).collect(Collectors.joining("/"));
+                                final Path altPathObject = fileSystem.getPath(altPath);
+                                if (Files.exists(altPathObject) && !Files.isDirectory(pathObject)) {
+                                    // Use this path only if the resource exists at that location
+                                    pathObject = altPathObject;
                                 }
-                                Path pathObject = fileSystem.getPath(path);
-                                if (!Files.exists(pathObject) && uri.toString().contains("!/")) {
-                                    // Gracefully transform a URL: "jar:file:/{JAR_PATH}!/{PREFIX}!/{RESOURCE}" to path: "{PREFIX}/{RESOURCE}"
-                                    final String altPath = Arrays.stream(uri.toString().split("\\!\\/")).skip(1).collect(Collectors.joining("/"));
-                                    final Path altPathObject = fileSystem.getPath(altPath);
-                                    if (Files.exists(altPathObject) && !Files.isDirectory(pathObject)) {
-                                        // Use this path only if the resource exists at that location
-                                        pathObject = altPathObject;
-                                    }
-                                }
-                                if (Files.isDirectory(pathObject)) {
-                                    return Optional.empty();
-                                }
-                                return Optional.of(new ByteArrayInputStream(Files.readAllBytes(pathObject)));
-                            } finally {
-                                if (fileSystem != null && fileSystem.isOpen()) {
-                                    try {
-                                        fileSystem.close();
-                                    } catch (IOException e) {
-                                        log.debug("Error shutting down JAR file system [{}]: {}", fileSystem, e.getMessage(), e);
-                                    }
+                            }
+                            if (Files.isDirectory(pathObject)) {
+                                return Optional.empty();
+                            }
+                            return Optional.of(new ByteArrayInputStream(Files.readAllBytes(pathObject)));
+                        } finally {
+                            if (fileSystem != null && fileSystem.isOpen()) {
+                                try {
+                                    fileSystem.close();
+                                } catch (IOException e) {
+                                    log.debug("Error shutting down JAR file system [{}]: {}", fileSystem, e.getMessage(), e);
                                 }
                             }
                         }
-                    } else if (uri.getScheme().equals("file")) {
-                        Path pathObject = Paths.get(uri);
-                        if (Files.isDirectory(pathObject)) {
-                            return Optional.empty();
-                        }
-                        return Optional.of(Files.newInputStream(pathObject));
                     }
-                } catch (URISyntaxException | IOException | ProviderNotFoundException e) {
-                    log.debug("Error establishing whether path is a directory: {}", e.getMessage(), e);
+                } else if (uri.getScheme().equals("file")) {
+                    Path pathObject = Paths.get(uri);
+                    if (Files.isDirectory(pathObject)) {
+                        return Optional.empty();
+                    }
+                    return Optional.of(Files.newInputStream(pathObject));
                 }
+            } catch (URISyntaxException | IOException | ProviderNotFoundException e) {
+                log.debug("Error establishing whether path is a directory: {}", e.getMessage(), e);
             }
         }
         // fallback to less sophisticated approach
