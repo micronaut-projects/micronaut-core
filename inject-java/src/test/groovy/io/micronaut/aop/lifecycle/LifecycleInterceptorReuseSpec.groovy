@@ -532,6 +532,7 @@ package reuse.noproxysingleton;
 import io.micronaut.aop.*;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import io.micronaut.context.annotation.Prototype;
 import jakarta.inject.Singleton;
 import java.lang.annotation.*;
 import java.util.*;
@@ -563,6 +564,25 @@ class SharedInterceptor implements Interceptor<Object, Object> {
     }
 }
 
+@Prototype
+@InterceptorBinding(value = Managed.class, kind = InterceptorKind.AROUND_CONSTRUCT)
+@InterceptorBinding(value = Managed.class, kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(value = Managed.class, kind = InterceptorKind.PRE_DESTROY)
+class PerBeanInterceptor implements Interceptor<Object, Object> {
+    static int instances;
+    static final List<String> kinds = new ArrayList<>();
+
+    PerBeanInterceptor() { instances++; }
+
+    @Override
+    public Object intercept(InvocationContext<Object, Object> context) {
+        kinds.add(context instanceof ConstructorInvocationContext
+            ? "AROUND_CONSTRUCT"
+            : ((MethodInvocationContext<?, ?>) context).getKind().name());
+        return context.proceed();
+    }
+}
+
 @Singleton
 @Managed
 class MyBean {
@@ -578,6 +598,146 @@ class MyBean {
 
         then: 'a singleton interceptor is not a dependent of the bean, so pre destroy must still find it alongside the prototype one'
         interceptorType.kinds == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT', 'PRE_DESTROY']
+        context.classLoader.loadClass('reuse.noproxysingleton.PerBeanInterceptor').instances == 1
+        context.classLoader.loadClass('reuse.noproxysingleton.PerBeanInterceptor').kinds == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT', 'PRE_DESTROY']
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test an injected interceptor is not reused as a lifecycle interceptor'() {
+        given:
+        ApplicationContext context = buildContext('''
+package reuse.noproxyinjected;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@AroundConstruct
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
+@interface Managed {
+}
+
+@Prototype
+@InterceptorBinding(value = Managed.class, kind = InterceptorKind.AROUND_CONSTRUCT)
+@InterceptorBinding(value = Managed.class, kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(value = Managed.class, kind = InterceptorKind.PRE_DESTROY)
+class LifecycleInterceptor implements Interceptor<Object, Object> {
+    static int instances;
+    static int postConstructCalls;
+    static int preDestroyCalls;
+
+    LifecycleInterceptor() { instances++; }
+
+    @Override
+    public Object intercept(InvocationContext<Object, Object> context) {
+        String kind = context instanceof ConstructorInvocationContext
+            ? "AROUND_CONSTRUCT"
+            : ((MethodInvocationContext<?, ?>) context).getKind().name();
+        if (kind.equals("POST_CONSTRUCT")) {
+            postConstructCalls++;
+        } else if (kind.equals("PRE_DESTROY")) {
+            preDestroyCalls++;
+        }
+        return context.proceed();
+    }
+}
+
+@Singleton
+@Managed
+class MyBean {
+    MyBean(LifecycleInterceptor injected) {}
+    @PostConstruct void init() {}
+    @PreDestroy void close() {}
+}
+''')
+        Class<?> interceptorType = context.classLoader.loadClass('reuse.noproxyinjected.LifecycleInterceptor')
+
+        when:
+        context.getBean(context.classLoader.loadClass('reuse.noproxyinjected.MyBean'))
+        context.stop()
+
+        then: 'the ordinary dependency and lifecycle candidate are distinct, but only the latter receives lifecycle advice'
+        interceptorType.instances == 2
+        interceptorType.postConstructCalls == 1
+        interceptorType.preDestroyCalls == 1
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test a runtime proxy reuses lifecycle interceptor registrations'() {
+        given:
+        ApplicationContext context = buildContext('''
+package reuse.runtime;
+
+import io.micronaut.aop.*;
+import io.micronaut.aop.runtime.RuntimeProxy;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Around
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
+@interface Managed {
+}
+
+@Prototype
+@InterceptorBinding(value = Managed.class, kind = InterceptorKind.AROUND)
+@InterceptorBinding(value = Managed.class, kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(value = Managed.class, kind = InterceptorKind.PRE_DESTROY)
+class LifecycleInterceptor implements Interceptor<Object, Object> {
+    static int instances;
+    static final List<String> events = new ArrayList<>();
+    private final int id = ++instances;
+
+    @Override
+    public Object intercept(InvocationContext<Object, Object> context) {
+        String kind = context instanceof ConstructorInvocationContext
+            ? "AROUND_CONSTRUCT"
+            : ((MethodInvocationContext<?, ?>) context).getKind().name();
+        events.add(id + ":" + kind);
+        return context.proceed();
+    }
+}
+
+@Singleton
+@RuntimeProxy(io.micronaut.aop.ByteBuddyRuntimeProxy.class)
+@Managed
+class MyBean {
+    @PostConstruct void init() {}
+    String work() { return "done"; }
+    @PreDestroy void close() {}
+}
+''')
+        context.registerSingleton(new io.micronaut.aop.ByteBuddyRuntimeProxy())
+        Class<?> interceptorType = context.classLoader.loadClass('reuse.runtime.LifecycleInterceptor')
+
+        when:
+        context.getBean(context.classLoader.loadClass('reuse.runtime.MyBean')).work()
+        context.stop()
+
+        then:
+        interceptorType.instances == 1
+        interceptorType.events == [
+            '1:POST_CONSTRUCT',
+            '1:AROUND',
+            '1:PRE_DESTROY'
+        ]
 
         cleanup:
         context.close()

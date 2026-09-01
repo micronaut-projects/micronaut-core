@@ -105,9 +105,23 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
                                              K bean,
                                              @Nullable
                                              List<BeanRegistration<?>> dependents) {
+        return of(beanContext, identifier, beanDefinition, bean, dependents, null);
+    }
+
+    /**
+     * Creates a bean registration with optional dependent and lifecycle interceptor registrations.
+     *
+     * <p>This overload is package-private because the interceptor registrations are an internal bean-creation detail.</p>
+     */
+    static <K> BeanRegistration<K> of(BeanContext beanContext,
+                                      BeanIdentifier identifier,
+                                      BeanDefinition<K> beanDefinition,
+                                      K bean,
+                                      @Nullable List<BeanRegistration<?>> dependents,
+                                      @Nullable List<?> interceptorRegistrations) {
         return CollectionUtils.isNotEmpty(dependents) ?
-            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, Objects.requireNonNull(dependents)) :
-            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean);
+            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, Objects.requireNonNull(dependents), interceptorRegistrations) :
+            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, interceptorRegistrations);
     }
 
     @Override

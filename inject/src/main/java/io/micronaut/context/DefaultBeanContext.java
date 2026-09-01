@@ -1215,9 +1215,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * fresh resolution context, so without this the pre-destroy advice would resolve a new interceptor and a
      * {@code @Prototype} interceptor could not release the state it set up in {@code @PostConstruct}.</p>
      *
-     * <p>The registrations are already in hand here: they are the dependents this method's caller destroys once the
-     * bean has been disposed of. Beans that own no dependents, which includes every prototype created through
-     * {@code createBean} and destroyed through {@code destroyBean(Object)}, take the plain path.</p>
+     * <p>The registrations are retained by the bean registration created alongside the bean. Beans created through
+     * {@code createBean} and destroyed through {@code destroyBean(Object)} have no bean registration and therefore
+     * retain the existing fresh-resolution behaviour.</p>
      *
      * @param definition    The disposable definition
      * @param registration  The registration of the bean being destroyed
@@ -1231,12 +1231,23 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         List<BeanRegistration<?>> dependents = registration instanceof DependentBeanProvider provider
             ? provider.dependentBeans()
             : Collections.emptyList();
-        if (dependents.isEmpty()) {
+        List<?> interceptorRegistrations = registration instanceof BeanDisposingRegistration<?> disposingRegistration
+            ? disposingRegistration.getInterceptorRegistrations()
+            : null;
+        if (dependents.isEmpty() && (interceptorRegistrations == null || interceptorRegistrations.isEmpty())) {
             definition.dispose(this, beanToDestroy);
             return;
         }
         try (DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, definition)) {
-            resolutionContext.setAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS, dependents);
+            if (!dependents.isEmpty()) {
+                resolutionContext.setAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS, dependents);
+            }
+            if (interceptorRegistrations != null && !interceptorRegistrations.isEmpty()) {
+                resolutionContext.setAttribute(
+                    BeanResolutionContext.EXISTING_INTERCEPTOR_REGISTRATIONS,
+                    interceptorRegistrations
+                );
+            }
             definition.dispose(resolutionContext, this, beanToDestroy);
         }
     }
@@ -2916,6 +2927,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 } else {
                     throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                 }
+                List<?> interceptorRegistrations = null;
+                if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
+                    Object value = registrations.remove(definition);
+                    if (value instanceof List<?> list) {
+                        interceptorRegistrations = list;
+                    }
+                }
                 bean = postBeanCreated(context, definition, beanType, qualifier, bean);
 
                 BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
@@ -2928,7 +2946,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
                 BeanKey<T> beanKey = new BeanKey<>(beanType, registrationQualifier);
                 List<BeanRegistration<?>> dependentBeans = context.getAndResetDependentBeans();
-                BeanRegistration<T> beanRegistration = BeanRegistration.of(this, beanKey, definition, bean, dependentBeans);
+                BeanRegistration<T> beanRegistration = BeanRegistration.of(
+                    this,
+                    beanKey,
+                    definition,
+                    bean,
+                    dependentBeans,
+                    interceptorRegistrations
+                );
                 context.pushDependentBeans(parentDependentBeans);
                 if (dependent) {
                     context.addDependentBean(beanRegistration);

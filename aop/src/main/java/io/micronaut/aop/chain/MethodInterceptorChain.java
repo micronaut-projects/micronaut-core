@@ -387,39 +387,31 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      * @return The interceptor registrations to select from
      * @since 5.2.0
      */
+    @SuppressWarnings("unchecked")
     private static Collection<BeanRegistration<Interceptor<?, ?>>> resolveLifecycleInterceptors(
         BeanResolutionContext resolutionContext,
         Collection<AnnotationValue<?>> binding) {
 
-        final List<BeanRegistration<Interceptor<?, ?>>> existing = findExistingInterceptors(resolutionContext);
-        if (existing.isEmpty()) {
-            return resolutionContext.getBeanRegistrations(
+        Object attribute = resolutionContext.getAttribute(BeanResolutionContext.EXISTING_INTERCEPTOR_REGISTRATIONS);
+        if (attribute instanceof List<?> existing) {
+            return (List<BeanRegistration<Interceptor<?, ?>>>) existing;
+        }
+        List<BeanRegistration<Interceptor<?, ?>>> existing = findExistingInterceptors(resolutionContext);
+        return existing.isEmpty()
+            ? resolutionContext.getBeanRegistrations(
                 Interceptor.ARGUMENT,
                 Qualifiers.byInterceptorBindingValues(binding)
-            );
-        }
-        return existing;
+            )
+            : existing;
     }
 
     /**
-     * Finds the interceptor instances that the bean being destroyed already owns.
-     *
-     * <p>The scenario is pre-destroy interception of a bean with lifecycle advice but no around proxy. Every
-     * interceptor bound to such a bean's lifecycle was created while the bean was, and became one of its dependent
-     * registrations, so those registrations are the candidate set and nothing further needs resolving.</p>
-     *
-     * <p>Because the resolution context at destruction is a fresh one with no dependents of its own, the
-     * registrations owned by the bean arrive through {@link BeanResolutionContext#EXISTING_DEPENDENT_BEANS}.</p>
-     *
-     * <p>Returns empty for a bean that owns no interceptors, which includes a prototype created through
-     * {@code createBean} and destroyed through {@code destroyBean(Object)}: no registration is tracked for it, so
-     * nothing can be handed over and its interceptors are resolved by binding instead.</p>
-     *
-     * <p>Singleton interceptors are ignored because resolving them again yields the same instance.</p>
+     * Finds interceptor registrations already associated with a legacy disposal path. New bean registrations carry
+     * the exact selected set through {@link BeanResolutionContext#EXISTING_INTERCEPTOR_REGISTRATIONS}; this fallback
+     * remains for generated factory definitions that cannot transfer that set during construction.
      *
      * @param resolutionContext The resolution context
-     * @return The reusable interceptor registrations, never {@code null}
-     * @since 5.2.0
+     * @return Existing interceptor registrations
      */
     @SuppressWarnings("unchecked")
     private static List<BeanRegistration<Interceptor<?, ?>>> findExistingInterceptors(BeanResolutionContext resolutionContext) {
@@ -439,7 +431,6 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
                 interceptors.add((BeanRegistration<Interceptor<?, ?>>) dependent);
             }
         }
-        // Only ever assigned immediately before an add, so a non-null list is never empty.
         return interceptors == null ? Collections.emptyList() : interceptors;
     }
 }

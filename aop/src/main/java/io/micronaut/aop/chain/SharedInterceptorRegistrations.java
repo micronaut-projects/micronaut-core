@@ -25,6 +25,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.List;
 
 /**
@@ -110,6 +111,7 @@ public final class SharedInterceptorRegistrations {
      * @param registrations     The registrations that were pushed
      * @since 5.2.0
      */
+    @SuppressWarnings("unchecked")
     public static void pop(BeanResolutionContext resolutionContext,
                            BeanDefinition<?> definition,
                            @Nullable List<?> registrations) {
@@ -118,8 +120,33 @@ public final class SharedInterceptorRegistrations {
         }
         Deque<Entry> stack = stack(resolutionContext);
         if (stack != null && !stack.isEmpty() && stack.peek().definition == definition) {
-            stack.pop();
+            Entry entry = stack.pop();
+            store(resolutionContext, entry.definition, entry.registrations);
         }
+    }
+
+    /**
+     * Stores registrations resolved outside the constructor-sharing stack, such as runtime proxy definitions.
+     *
+     * @param resolutionContext The resolution context
+     * @param definition        The definition being instantiated
+     * @param registrations     The registrations
+     * @since 5.2.0
+     */
+    @SuppressWarnings("unchecked")
+    public static void store(BeanResolutionContext resolutionContext,
+                             BeanDefinition<?> definition,
+                             @Nullable List<?> registrations) {
+        if (registrations == null || registrations.isEmpty()) {
+            return;
+        }
+        IdentityHashMap<BeanDefinition<?>, List<?>> completed = (IdentityHashMap<BeanDefinition<?>, List<?>>)
+            resolutionContext.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS);
+        if (completed == null) {
+            completed = new IdentityHashMap<>(3);
+            resolutionContext.setAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS, completed);
+        }
+        completed.put(definition, registrations);
     }
 
     /**
@@ -134,13 +161,19 @@ public final class SharedInterceptorRegistrations {
     public static @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> peek(BeanResolutionContext resolutionContext,
                                                                                 BeanDefinition<?> definition) {
         Deque<Entry> stack = stack(resolutionContext);
-        if (stack == null || stack.isEmpty()) {
+        if (stack != null && !stack.isEmpty()) {
+            Entry entry = stack.peek();
+            if (entry.definition == definition) {
+                return (Collection<BeanRegistration<Interceptor<?, ?>>>) entry.registrations;
+            }
             return null;
         }
-        Entry entry = stack.peek();
-        return entry.definition == definition
-            ? (Collection<BeanRegistration<Interceptor<?, ?>>>) entry.registrations
-            : null;
+        IdentityHashMap<BeanDefinition<?>, List<?>> completed = (IdentityHashMap<BeanDefinition<?>, List<?>>)
+            resolutionContext.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS);
+        if (completed == null) {
+            return null;
+        }
+        return (Collection<BeanRegistration<Interceptor<?, ?>>>) completed.get(definition);
     }
 
     @SuppressWarnings("unchecked")
