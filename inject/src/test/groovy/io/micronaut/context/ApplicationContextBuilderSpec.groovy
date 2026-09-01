@@ -1,7 +1,6 @@
 package io.micronaut.context
 
 import io.micronaut.context.env.PropertySource
-import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.context.scope.CustomScopeRegistry
 import io.micronaut.runtime.ApplicationConfiguration
@@ -43,7 +42,7 @@ class ApplicationContextBuilderSpec extends Specification {
         context.getBean(ApplicationConfiguration)
 
         then:
-        thrown(BeanContextException)
+        thrown(IllegalStateException)
 
         when:"The context is started"
         context.start()
