@@ -133,7 +133,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     String packageName = NameUtils.getPackageName(name);
                     return !name.equals(AnnotationUtil.KOTLIN_METADATA) && !AnnotationUtil.STEREOTYPE_EXCLUDES.contains(packageName);
                 })
-                .filter(ann -> annotationMetadataBuilder.lookupOrBuildForType(ann).hasStereotype(ANNOTATION_STEREOTYPES)
+                .filter(ann -> ClassImport.class.getName().equals(ann.getQualifiedName().toString())
+                    // the import annotation is processed for what it names rather than for a stereotype it
+                    // carries; the stereotype check below can never see it on itself
+                    || annotationMetadataBuilder.lookupOrBuildForType(ann).hasStereotype(ANNOTATION_STEREOTYPES)
                     || isProcessedAnnotation(ann.getQualifiedName().toString()))
                 .collect(Collectors.toSet());
 
