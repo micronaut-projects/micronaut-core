@@ -73,12 +73,51 @@ public final class MicronautMetaServiceLoaderUtils {
     public static <S> List<S> findMetaMicronautServiceEntries(ClassLoader classLoader,
                                                               Class<S> serviceClass,
                                                               @Nullable Predicate<S> predicate) {
-        SoftServiceLoader.StaticServiceLoader<S> staticServiceLoader = (SoftServiceLoader.StaticServiceLoader<S>) SoftServiceLoader.STATIC_SERVICES.get(serviceClass.getName());
+        String serviceName = serviceClass.getName();
+        SoftServiceLoader.StaticServiceLoader<S> staticServiceLoader = (SoftServiceLoader.StaticServiceLoader<S>) SoftServiceLoader.STATIC_SERVICES.get(serviceName);
         if (staticServiceLoader != null) {
             return staticServiceLoader.load(predicate);
         }
-        return new MicronautServiceCollector<>(classLoader, serviceClass.getName(), predicate)
+        List<S> aggregated = collectAggregated(classLoader, serviceName, predicate);
+        if (!aggregated.isEmpty() && !hasMarkerFiles(classLoader)) {
+            // every module on the classpath is aggregated, so there is nothing left to scan for.
+            // Worth checking explicitly: the scan's empty case is its most expensive one, because
+            // IOUtils#getResources falls back to opening the jrt file system and listing the JDK's
+            // own modules when the classpath yields no match
+            return aggregated;
+        }
+        List<S> scanned = new MicronautServiceCollector<>(classLoader, serviceName, predicate)
             .collect(true);
+        if (aggregated.isEmpty()) {
+            return scanned;
+        }
+        if (scanned.isEmpty()) {
+            return aggregated;
+        }
+        aggregated.addAll(scanned);
+        return aggregated;
+    }
+
+    private static boolean hasMarkerFiles(ClassLoader classLoader) {
+        try {
+            return classLoader.getResources(MICRONAUT_SERVICES_PATH).hasMoreElements();
+        } catch (IOException e) {
+            return true;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <S> List<S> collectAggregated(ClassLoader classLoader,
+                                                 String serviceName,
+                                                 @Nullable Predicate<S> predicate) {
+        List<S> collected = new ArrayList<>();
+        ServiceAggregators.collect(
+            classLoader,
+            serviceName,
+            predicate == null ? null : service -> predicate.test((S) service),
+            service -> collected.add((S) service)
+        );
+        return collected;
     }
 
     /**

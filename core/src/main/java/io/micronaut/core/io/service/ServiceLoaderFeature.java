@@ -68,6 +68,7 @@ class ServiceLoaderFeature implements Feature {
     @SuppressWarnings("java:S1119")
     public void beforeAnalysis(BeforeAnalysisAccess access) {
         configureForReflection(access);
+        configureServiceAggregators(access);
 
         ExclusiveStaticServiceDefinitions staticServiceDefinitions = buildStaticServiceDefinitions(access);
         final Collection<Set<String>> allTypeNames = staticServiceDefinitions.serviceTypeMap().values();
@@ -196,6 +197,59 @@ class ServiceLoaderFeature implements Feature {
         if (buildInitClass != null) {
             RuntimeClassInitialization.initializeAtBuildTime(buildInitClass);
         }
+    }
+
+    /**
+     * Resolves the module service aggregators during the build and bakes them into the image.
+     *
+     * <p>An aggregated module has no {@code META-INF/micronaut} marker files, so
+     * {@link #buildStaticServiceDefinitions} finds nothing for it and none of its services would be
+     * registered. It does not need to be: the aggregator constructs its services with {@code new},
+     * so unlike the marker file path none of them needs reflective instantiation, which is the point
+     * of doing this. What they do still need is build time initialization, the same as the scanned
+     * ones get.</p>
+     *
+     * <p>The aggregators themselves are constructed here and stored in the image heap, so at runtime
+     * there is no resource to read and no class to resolve by name.</p>
+     *
+     * @param access The access
+     */
+    protected void configureServiceAggregators(BeforeAnalysisAccess access) {
+        // the application class loader is not always set on the access, so fall back to the one that
+        // loaded this feature, which is what buildStaticServiceDefinitions uses too
+        ClassLoader classLoader = access.getApplicationClassLoader();
+        List<ServiceAggregator> aggregators = ServiceAggregators.load(
+            classLoader == null ? getClass().getClassLoader() : classLoader
+        );
+        if (aggregators.isEmpty()) {
+            return;
+        }
+        for (ServiceAggregator aggregator : aggregators) {
+            initializeAtBuildTime(aggregator.getClass());
+            for (String serviceName : aggregator.getServiceNames()) {
+                int chunks = aggregator.getChunkCount(serviceName);
+                for (int chunk = 0; chunk < chunks; chunk++) {
+                    aggregator.collect(serviceName, chunk, service -> {
+                        Class<?> type = service.getClass();
+                        initializeAtBuildTime(type);
+                        Class<?> exec = access.findClassByName(type.getName() + "$Exec");
+                        if (exec != null) {
+                            initializeAtBuildTime(exec);
+                        }
+                    });
+                }
+            }
+        }
+        addImageSingleton(new ServiceAggregators.ExclusiveStaticAggregators(aggregators));
+    }
+
+    /**
+     * Adds the resolved aggregators to the image.
+     *
+     * @param aggregators The aggregators
+     */
+    protected void addImageSingleton(ServiceAggregators.ExclusiveStaticAggregators aggregators) {
+        ImageSingletons.add(ServiceAggregators.ExclusiveStaticAggregators.class, aggregators);
     }
 
     /**

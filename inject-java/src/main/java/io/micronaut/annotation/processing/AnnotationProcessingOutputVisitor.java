@@ -116,6 +116,12 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     @Override
     @SuppressWarnings("java:S1075")
     public void visitServiceDescriptor(String type, String classname, io.micronaut.inject.ast.Element originatingElement) {
+        // when aggregation is on the descriptor is buffered and emitted as one generated aggregator
+        // for the whole module; add() declines once the aggregator has been written, in which case
+        // the entry falls back to an ordinary marker file
+        if (ServiceAggregation.add(filer, type, classname, originatingElement)) {
+            return;
+        }
         final String path = "META-INF/micronaut/" + type + "/" + classname;
         try {
             Element element = originatingElement instanceof ElementProvider jne ? jne.element() : null;

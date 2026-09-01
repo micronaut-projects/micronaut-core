@@ -179,6 +179,18 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             Collection<S> values,
             @Nullable Predicate<S> predicate,
             String name) {
+        ServiceAggregators.collect(
+            classLoader,
+            name,
+            service -> {
+                @SuppressWarnings("unchecked") S value = (S) service;
+                return condition.test(value.getClass().getName()) && (predicate == null || predicate.test(value));
+            },
+            service -> {
+                @SuppressWarnings("unchecked") S value = (S) service;
+                values.add(value);
+            }
+        );
         ServiceCollector<S> collector = newCollector(name, condition, classLoader, className -> {
             try {
                 @SuppressWarnings("unchecked") final Class<S> loadedClass =

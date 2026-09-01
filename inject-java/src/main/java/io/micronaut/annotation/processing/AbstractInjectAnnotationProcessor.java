@@ -107,6 +107,8 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
             options = new HashSet<>(5);
         }
         options.addAll(super.getSupportedOptions());
+        options.add(ServiceAggregation.OPTION_ENABLED);
+        options.add(ServiceAggregation.OPTION_CLASS_NAME);
         return options;
     }
 
@@ -116,6 +118,11 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
      * @see #GRADLE_PROCESSING_ISOLATING
      */
     protected String getIncrementalProcessorType() {
+        // NOTE: this value doubles as the selector for which TypeElementVisitor kinds a processor
+        // runs, so it must not be switched to aggregating just because service aggregation is on:
+        // doing so makes TypeElementVisitorProcessor skip every isolating visitor, silently dropping
+        // bean introspections. Service aggregation instead relies on the build declaring the
+        // processors aggregating, or on aggregating after compilation from the compiled output.
         return GRADLE_PROCESSING_ISOLATING;
     }
 
@@ -199,6 +206,8 @@ public abstract class AbstractInjectAnnotationProcessor extends AbstractProcesso
         this.modelUtils = new ModelUtils(elementUtils, typeUtils);
 
         this.javaVisitorContext = newVisitorContext(processingEnv);
+
+        ServiceAggregation.configure(filer, javaVisitorContext.getOptions());
 
         this.incremental = isIncremental(processingEnv);
         if (incremental) {

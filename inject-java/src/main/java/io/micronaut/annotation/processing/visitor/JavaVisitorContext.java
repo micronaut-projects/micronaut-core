@@ -22,6 +22,7 @@ import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder;
 import io.micronaut.annotation.processing.JavaElementAnnotationMetadataFactory;
 import io.micronaut.annotation.processing.JavaNativeElementsHelper;
 import io.micronaut.annotation.processing.ModelUtils;
+import io.micronaut.annotation.processing.ServiceAggregation;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -423,6 +424,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
 
     @Override
     public void finish() {
+        ServiceAggregation.write(filer, this, outputVisitor);
         outputVisitor.finish();
     }
 
