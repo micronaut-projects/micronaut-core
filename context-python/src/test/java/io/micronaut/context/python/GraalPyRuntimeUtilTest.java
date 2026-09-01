@@ -476,9 +476,10 @@ class GraalPyRuntimeUtilTest {
             );
 
             assertTrue(exception.getMessage().contains("cannot be reconstructed in the target context"));
+            Value foreignValue = other.eval("python", "object()");
             assertThrows(
                 IllegalArgumentException.class,
-                () -> GraalPyRuntimeUtil.coerceToContext(other.eval("python", "object()"), context)
+                () -> GraalPyRuntimeUtil.coerceToContext(foreignValue, context)
             );
         }
     }

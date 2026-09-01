@@ -125,6 +125,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String GET_MEMBER = "getMember";
     private static final String MAP_OF = "mapOf";
     private static final String ENUM_VALUE = "enumValue";
+    private static final String TARGET_VALUE = "targetValue";
+    private static final String REMEMBER_POOLED_VALUE = "rememberPooledValue";
+    private static final String COERCE_MAP = "coerceMap";
+    private static final String COERCE_LIST = "coerceList";
     private static final String ANN_CONFIGURATION_BUILDER = "io.micronaut.context.annotation.ConfigurationBuilder";
     private static final String NEW_UNINITIALIZED_INSTANCE = "newUninitializedInstance";
     private static final String ANN_CONFIGURATION_INJECT = "io.micronaut.context.annotation.ConfigurationInject";
@@ -582,7 +586,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 continue;
                                             }
                                             ExpressionDef fieldRef = aThis.field(field);
-                                            syncStatements.add((StatementDef) RUNTIME_UTIL.invokeStatic(
+                                            syncStatements.add(RUNTIME_UTIL.invokeStatic(
                                                 "putMember",
                                                 TypeDef.VOID,
                                                 storedValue,
@@ -640,28 +644,28 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         }
                                     }
                                     ExpressionDef introduction = PYTHON_CONTEXT_RUNTIME.invokeStatic("newIntroduction", POLYGLOT_VALUE, arguments);
-                                    reconstructedBody = introduction.newLocal("targetValue", targetValue -> StatementDef.multi(
-                                        (StatementDef) RUNTIME_UTIL.invokeStatic(
-                                            "rememberPooledValue", TypeDef.VOID, aThis, targetContext, targetValue
+                                    reconstructedBody = introduction.newLocal(TARGET_VALUE, targetValue -> StatementDef.multi(
+                                        RUNTIME_UTIL.invokeStatic(
+                                            REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
                                         ),
                                         targetValue.returning()
                                     ));
                                 } else if (beanProperties.isEmpty()) {
                                     ExpressionDef instance = PYTHON_CONTEXT_RUNTIME.invokeStatic("newInstance", POLYGLOT_VALUE,
                                         List.of(targetContext, pythonClassReference(element, pythonClassReference)));
-                                    reconstructedBody = instance.newLocal("targetValue", targetValue -> StatementDef.multi(
-                                        (StatementDef) RUNTIME_UTIL.invokeStatic(
-                                            "rememberPooledValue", TypeDef.VOID, aThis, targetContext, targetValue
+                                    reconstructedBody = instance.newLocal(TARGET_VALUE, targetValue -> StatementDef.multi(
+                                        RUNTIME_UTIL.invokeStatic(
+                                            REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
                                         ),
                                         targetValue.returning()
                                     ));
                                 } else {
                                     ExpressionDef instance = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_UNINITIALIZED_INSTANCE, POLYGLOT_VALUE,
                                         List.of(targetContext, pythonClassReference(element, pythonClassReference)));
-                                    reconstructedBody = instance.newLocal("targetValue", targetValue -> {
+                                    reconstructedBody = instance.newLocal(TARGET_VALUE, targetValue -> {
                                         List<StatementDef> statements = new ArrayList<>();
-                                        statements.add((StatementDef) RUNTIME_UTIL.invokeStatic(
-                                            "rememberPooledValue", TypeDef.VOID, aThis, targetContext, targetValue
+                                        statements.add(RUNTIME_UTIL.invokeStatic(
+                                            REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
                                         ));
                                         for (PropertyElement beanProperty : beanProperties) {
                                             FieldDef field = propertyFields.get(beanProperty.getName());
@@ -672,7 +676,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 beanProperty, aThis.field(field), targetContext
                                             ).cast(TypeDef.OBJECT);
                                             if (isFrozenDataclass) {
-                                                statements.add((StatementDef) PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                                                statements.add(PYTHON_CONTEXT_RUNTIME.invokeStatic(
                                                     "setInstanceProperty",
                                                     TypeDef.VOID,
                                                     targetValue,
@@ -680,7 +684,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                     propertyValue
                                                 ));
                                             } else {
-                                                statements.add((StatementDef) RUNTIME_UTIL.invokeStatic(
+                                                statements.add(RUNTIME_UTIL.invokeStatic(
                                                     "putMember",
                                                     TypeDef.VOID,
                                                     targetValue,
@@ -696,14 +700,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 if (pythonValueFinal != null) {
                                     ExpressionDef storedValue = aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field"));
                                     List<StatementDef> reuseStatements = new ArrayList<>();
-                                    reuseStatements.add((StatementDef) RUNTIME_UTIL.invokeStatic(
-                                        "rememberPooledValue", TypeDef.VOID, aThis, targetContext, storedValue
+                                    reuseStatements.add(RUNTIME_UTIL.invokeStatic(
+                                        REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, storedValue
                                     ));
                                     if (!isFrozenDataclass) {
                                         for (PropertyElement beanProperty : beanProperties) {
                                             FieldDef field = propertyFields.get(beanProperty.getName());
                                             if (field != null) {
-                                                reuseStatements.add((StatementDef) RUNTIME_UTIL.invokeStatic(
+                                                reuseStatements.add(RUNTIME_UTIL.invokeStatic(
                                                     "putMember",
                                                     TypeDef.VOID,
                                                     storedValue,
@@ -2839,9 +2843,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             // borrowing the target context.
             ExpressionDef parameter;
             if (mapOfPython) {
-                parameter = RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), methodParam);
+                parameter = RUNTIME_UTIL.invokeStatic(COERCE_MAP, TypeDef.of(Map.class), methodParam);
             } else if (listOfPython) {
-                parameter = RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), methodParam);
+                parameter = RUNTIME_UTIL.invokeStatic(COERCE_LIST, TypeDef.of(List.class), methodParam);
             } else if (genericType instanceof PythonClassElement) {
                 parameter = methodParam;
             } else {
@@ -2858,9 +2862,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         ExpressionDef parameter;
         if (mapOfPython) {
-            parameter = RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), methodParam);
+            parameter = RUNTIME_UTIL.invokeStatic(COERCE_MAP, TypeDef.of(Map.class), methodParam);
         } else if (listOfPython) {
-            parameter = RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), methodParam);
+            parameter = RUNTIME_UTIL.invokeStatic(COERCE_LIST, TypeDef.of(List.class), methodParam);
         } else {
             parameter = methodParam;
         }
@@ -2870,9 +2874,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static ExpressionDef coerceTypedElementToPolyglotValue(TypedElement element, ExpressionDef expr) {
         ClassElement genericType = element.getGenericType();
         if (genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement) {
-            return RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), expr);
+            return RUNTIME_UTIL.invokeStatic(COERCE_MAP, TypeDef.of(Map.class), expr);
         } else if (genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement) {
-            return RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), expr);
+            return RUNTIME_UTIL.invokeStatic(COERCE_LIST, TypeDef.of(List.class), expr);
         } else if (genericType instanceof PythonClassElement) {
             return RUNTIME_UTIL.invokeStatic("coerceValue", TypeDef.OBJECT, expr);
         } else {
@@ -3857,7 +3861,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 );
             }
             return StatementDef.multi(
-                (StatementDef) RUNTIME_UTIL.invokeStatic(
+                RUNTIME_UTIL.invokeStatic(
                     "putMember",
                     TypeDef.VOID,
                     targetValue,
@@ -3869,7 +3873,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         methodParameters.getFirst().cast(TypeDef.OBJECT)
                     )
                 ),
-                (StatementDef) PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                PYTHON_CONTEXT_RUNTIME.invokeStatic(
                     "rememberAsyncMember",
                     TypeDef.VOID,
                     targetValue,
@@ -3903,7 +3907,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 );
             }
             return StatementDef.multi(
-                (StatementDef) RUNTIME_UTIL.invokeStatic(
+                RUNTIME_UTIL.invokeStatic(
                     "putMember",
                     TypeDef.VOID,
                     targetValue,
@@ -3915,7 +3919,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         methodParameters.getFirst().cast(TypeDef.OBJECT)
                     )
                 ),
-                (StatementDef) PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                PYTHON_CONTEXT_RUNTIME.invokeStatic(
                     "rememberAsyncMember",
                     TypeDef.VOID,
                     targetValue,
