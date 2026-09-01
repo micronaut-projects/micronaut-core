@@ -22,7 +22,7 @@ class ClientProxySpec extends Specification {
 
     static final int PROXY_PORT = 3128
     static final String URL = "https://micronaut.io/"
-    static final String HTML_FRAGMENT = 'Home - Micronaut Framework'
+    static final String HTML_FRAGMENT = '<title>Micronaut Framework</title>'
 
     @AutoCleanup
     GenericContainer proxyContainer =
