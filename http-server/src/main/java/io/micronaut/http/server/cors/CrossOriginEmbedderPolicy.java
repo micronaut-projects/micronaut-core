@@ -17,6 +17,8 @@ package io.micronaut.http.server.cors;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Map;
+
 /**
  * The possible values of the {@code Cross-Origin-Embedder-Policy} header.
  *
@@ -27,6 +29,12 @@ public enum CrossOriginEmbedderPolicy {
     UNSAFE_NONE("unsafe-none"),
     REQUIRE_CORP("require-corp"),
     CREDENTIALLESS("credentialless");
+
+    private static final Map<String, CrossOriginEmbedderPolicy> BY_VALUE = Map.of(
+        "unsafe-none", UNSAFE_NONE,
+        "require-corp", REQUIRE_CORP,
+        "credentialless", CREDENTIALLESS
+    );
 
     private final String value;
 
@@ -45,12 +53,7 @@ public enum CrossOriginEmbedderPolicy {
         if (value == null) {
             return null;
         }
-        for (CrossOriginEmbedderPolicy policy : values()) {
-            if (policy.value.equals(value)) {
-                return policy;
-            }
-        }
-        return null;
+        return BY_VALUE.get(value);
     }
 
     /**
