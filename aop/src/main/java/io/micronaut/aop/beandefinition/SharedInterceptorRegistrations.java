@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.aop.chain;
+package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
 import io.micronaut.core.annotation.Internal;
@@ -58,6 +58,9 @@ import java.util.List;
  * <p>Destruction happens later with a fresh resolution context, so nothing is shared with it here; see
  * {@code MethodInterceptorChain} for how pre-destroy reaches the interceptors a bean owns.</p>
  *
+ * <p>Everything here is package-private except {@link #store}, which the runtime proxy path in
+ * {@code io.micronaut.aop.runtime} calls from another package.</p>
+ *
  * @author Denis Stepanov
  * @since 5.2.0
  */
@@ -85,7 +88,7 @@ public final class SharedInterceptorRegistrations {
      * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
-    public static void push(BeanResolutionContext resolutionContext,
+    static void push(BeanResolutionContext resolutionContext,
                             BeanDefinition<?> definition,
                             @Nullable List<?> registrations) {
         if (registrations == null || registrations.isEmpty()) {
@@ -112,7 +115,7 @@ public final class SharedInterceptorRegistrations {
      * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
-    public static void pop(BeanResolutionContext resolutionContext,
+    static void pop(BeanResolutionContext resolutionContext,
                            BeanDefinition<?> definition,
                            @Nullable List<?> registrations) {
         if (registrations == null || registrations.isEmpty()) {
@@ -158,7 +161,7 @@ public final class SharedInterceptorRegistrations {
      * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
-    public static @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> peek(BeanResolutionContext resolutionContext,
+    static @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> peek(BeanResolutionContext resolutionContext,
                                                                                 BeanDefinition<?> definition) {
         Deque<Entry> stack = stack(resolutionContext);
         if (stack != null && !stack.isEmpty()) {

@@ -17,7 +17,6 @@ package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.chain.MethodInterceptorChain;
-import io.micronaut.aop.chain.SharedInterceptorRegistrations;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.BeanRegistration;
