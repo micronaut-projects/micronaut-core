@@ -2401,7 +2401,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             @SuppressWarnings("unchecked")
             BeanDefinition<T> def = (BeanDefinition<T>) new DefaultRuntimeBeanDefinition<>(
                 Argument.of(beanClass),
-                () -> (T) this,
+                ctx -> (T) this,
                 null,
                 null,
                 true,

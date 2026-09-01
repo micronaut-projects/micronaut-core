@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -188,6 +189,48 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
         return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
             beanType,
             beanSupplier
+        );
+    }
+
+    /**
+     * A new builder for constructing and configuring runtime created beans where the bean factory
+     * receives the current {@link BeanResolutionContext}.
+     *
+     * <p>The resolution context allows the factory to introspect where in a resolution the bean is being
+     * created, for example via {@link BeanResolutionContext#getPath()} to discover the injection point
+     * the bean is being created for.</p>
+     *
+     * @param beanType The bean type
+     * @param beanFactory The bean factory that receives the current {@link BeanResolutionContext}
+     * @return The builder
+     * @param <B> The bean type
+     * @since 5.2.0
+     */
+    static <B> Builder<B> builder(Class<B> beanType, Function<BeanResolutionContext, B> beanFactory) {
+        return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
+            Argument.of(beanType),
+            beanFactory
+        );
+    }
+
+    /**
+     * A new builder for constructing and configuring runtime created beans where the bean factory
+     * receives the current {@link BeanResolutionContext}.
+     *
+     * <p>The resolution context allows the factory to introspect where in a resolution the bean is being
+     * created, for example via {@link BeanResolutionContext#getPath()} to discover the injection point
+     * the bean is being created for.</p>
+     *
+     * @param beanType The bean type
+     * @param beanFactory The bean factory that receives the current {@link BeanResolutionContext}
+     * @return The builder
+     * @param <B> The bean type
+     * @since 5.2.0
+     */
+    static <B> Builder<B> builder(Argument<B> beanType, Function<BeanResolutionContext, B> beanFactory) {
+        return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
+            beanType,
+            beanFactory
         );
     }
 
