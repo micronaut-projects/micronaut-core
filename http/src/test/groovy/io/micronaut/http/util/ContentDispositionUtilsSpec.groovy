@@ -16,4 +16,10 @@ class ContentDispositionUtilsSpec extends Specification {
         ContentDispositionUtils.toHeaderValue('attachment', '') == 'attachment'
         ContentDispositionUtils.toHeaderValue('inline', null) == 'inline'
     }
+
+    def 'toHeaderValue strips backslashes and quotes from the legacy filename fallback'() {
+        expect:
+        ContentDispositionUtils.toHeaderValue('attachment', 'foo\\bar') == 'attachment; filename="foobar"; filename*=utf-8\'\'foo%5Cbar'
+        ContentDispositionUtils.toHeaderValue('attachment', 'foo"bar') == 'attachment; filename="foobar"; filename*=utf-8\'\'foo%22bar'
+    }
 }
