@@ -595,9 +595,16 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     }
 
     private static @Nullable Object coerceInjectedValue(Value script, Object value, boolean async) {
-        return async
-            ? GraalPyRuntimeUtil.asyncMemberValue(script, value)
-            : GraalPyRuntimeUtil.coerceToContext(value, script.getContext());
+        if (async) {
+            return GraalPyRuntimeUtil.asyncMemberValue(script, value);
+        }
+        // Introduction and other stateful Python wrappers cannot be reconstructed from Java-side
+        // state. Keep them as host proxies when injecting them into pooled modules, as they were
+        // before context-local request argument conversion was introduced.
+        if (value instanceof ValueCoercible && !(value instanceof PooledValueCoercible)) {
+            return value;
+        }
+        return GraalPyRuntimeUtil.coerceToContext(value, script.getContext());
     }
 
     private static String scriptKey(String pkg, String script) {

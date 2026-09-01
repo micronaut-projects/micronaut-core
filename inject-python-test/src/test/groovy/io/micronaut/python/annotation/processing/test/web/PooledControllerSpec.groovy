@@ -197,4 +197,52 @@ def plain_body(item: Annotated[InventoryItem, Body]) -> str:
         }
     }
 
+    void "pooled controller preserves injected mapper introduction as a host proxy"() {
+        given:
+        def python = '''
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Annotated
+
+from jakarta.inject import Inject, Singleton
+from micronaut.context.annotation import Mapper
+from micronaut.core.annotation import Introspected
+from micronaut.http.annotation import Get
+
+@Introspected
+@dataclass
+class ContactForm:
+    name: str
+
+@Introspected
+@dataclass
+class ContactEntity:
+    name: str
+
+@Singleton
+class FormMapper(ABC):
+    @Mapper
+    @abstractmethod
+    def to_entity(self, form: ContactForm) -> ContactEntity:
+        ...
+
+form_mapper: Annotated[FormMapper, Inject]
+
+@Get("/pool/mapper")
+def mapper() -> str:
+    return "FormMapper" if form_mapper is not None else "missing"
+'''
+        ApplicationContext context = buildContext(python, true, ["micronaut.python.pool.size": 2])
+        def server = context.getBean(EmbeddedServer)
+        server.start()
+        def client = context.createBean(HttpClient, server.URL)
+
+        expect:
+        client.toBlocking().retrieve("/pool/mapper") == "FormMapper"
+
+        cleanup:
+        client?.close()
+        context?.close()
+    }
+
 }
