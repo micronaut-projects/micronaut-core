@@ -379,8 +379,9 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     }
 
     private boolean visitAopAndExecutableMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
-        if (methodElement.isStatic() && !isExplicitlyAnnotatedAsExecutable(methodElement)) {
-            // Only allow static executable methods when it's explicitly annotated with Executable.class
+        if (methodElement.isStatic() && !isStaticExecutableMethod(methodElement)) {
+            // Only allow static executable methods when the method itself is annotated with @Executable
+            // (directly or via an annotation meta-annotated with @Executable)
             return false;
         }
         if (methodElement.hasStereotype(Adapter.class)) {
@@ -459,6 +460,26 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
 
     private static boolean isExplicitlyAnnotatedAsExecutable(MethodElement methodElement) {
         return methodElement.getMethodAnnotationMetadata().hasDeclaredAnnotation(Executable.class);
+    }
+
+    /**
+     * Should a static method be turned into an executable method? That is the case when the method itself
+     * is annotated with {@link Executable}, either directly or via an annotation meta-annotated with
+     * {@link Executable}. Executable advice inherited from the declaring class doesn't count, since that
+     * would silently turn every static utility method of the class into an executable method.
+     *
+     * @param methodElement The method element
+     * @return true if it should
+     */
+    private static boolean isStaticExecutableMethod(MethodElement methodElement) {
+        AnnotationMetadata methodAnnotationMetadata = methodElement.getMethodAnnotationMetadata();
+        if (methodAnnotationMetadata.hasDeclaredAnnotation(Executable.class)) {
+            return true;
+        }
+        // Adapter advice, for example @EventListener, adapts a method of a bean instance and cannot be
+        // applied to a static method, so those methods keep being ignored
+        return methodAnnotationMetadata.hasDeclaredStereotype(Executable.class)
+            && !methodAnnotationMetadata.hasDeclaredStereotype(Adapter.class);
     }
 
     /**
