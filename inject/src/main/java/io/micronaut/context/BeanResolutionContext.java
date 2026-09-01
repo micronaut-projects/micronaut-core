@@ -46,6 +46,39 @@ import java.util.Optional;
 @UsedByGeneratedCode
 public interface BeanResolutionContext extends ValueResolver<CharSequence>, AutoCloseable, BeanLocator, ConversionServiceProvider {
 
+    /**
+     * Attribute that exposes the dependent bean registrations already created for the bean this context is operating
+     * on.
+     *
+     * <p>During bean creation those registrations are available from {@link #getDependentBeans()}, but a bean is
+     * destroyed with a fresh resolution context that has no dependents of its own. This attribute is retained for
+     * compatibility with generated factory definitions that still use that fallback.</p>
+     *
+     * @since 5.2.0
+     */
+    String EXISTING_DEPENDENT_BEANS = "io.micronaut.context.existingDependentBeans";
+
+    /**
+     * Attribute used while a bean is being created to transfer the interceptor registrations selected for that bean
+     * to its {@link BeanRegistration}.
+     *
+     * <p>The value is an identity map keyed by {@link BeanDefinition}. It is consumed by the bean context after
+     * creation and must be treated as an implementation detail.</p>
+     *
+     * @since 5.2.0
+     */
+    String INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.interceptorRegistrations";
+
+    /**
+     * Attribute that exposes the interceptor registrations selected while creating the bean being disposed.
+     *
+     * <p>The value is a read-only {@code List<BeanRegistration<?>>}. It is set only while a bean is being disposed and
+     * is intended for lifecycle interception.</p>
+     *
+     * @since 5.2.0
+     */
+    String EXISTING_INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.existingInterceptorRegistrations";
+
     @Override
     default void close() {
         // no-op

@@ -34,24 +34,30 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     private final BeanContext beanContext;
     @Nullable
     private final List<BeanRegistration<?>> dependents;
+    @Nullable
+    private final List<?> interceptorRegistrations;
 
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
                               BeanDefinition<BT> beanDefinition,
                               BT createdBean,
-                              List<BeanRegistration<?>> dependents) {
+                              List<BeanRegistration<?>> dependents,
+                              @Nullable List<?> interceptorRegistrations) {
         super(identifier, beanDefinition, createdBean);
         this.beanContext = beanContext;
         this.dependents = dependents;
+        this.interceptorRegistrations = interceptorRegistrations;
     }
 
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
                               BeanDefinition<BT> beanDefinition,
-                              BT createdBean) {
+                              BT createdBean,
+                              @Nullable List<?> interceptorRegistrations) {
         super(identifier, beanDefinition, createdBean);
         this.beanContext = beanContext;
         this.dependents = null;
+        this.interceptorRegistrations = interceptorRegistrations;
     }
 
     @Override
@@ -67,5 +73,13 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     @Override
     public List<BeanRegistration<?>> dependentBeans() {
         return dependents == null ? List.of() : List.copyOf(dependents);
+    }
+
+    /**
+     * @return The interceptor registrations selected while this bean was created, or {@code null}
+     */
+    @Nullable
+    List<?> getInterceptorRegistrations() {
+        return interceptorRegistrations;
     }
 }
