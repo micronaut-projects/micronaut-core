@@ -2560,4 +2560,656 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             this.argument = ExpressionsAwareArgument.wrapIfNecessary(argument);
         }
     }
+
+    // ------------------------------------------------------------------------------------------
+    // Concrete overrides of the AnnotationMetadataDelegate defaults.
+    //
+    // WHY: BeanDefinition's interface closure carries 344 default methods, 301 of which nothing in
+    // the class hierarchy implements. 243 of those come from one diamond - AnnotationMetadataDelegate
+    // extends AnnotationMetadata and redeclares most of it as delegating defaults - and the JVM runs
+    // DefaultMethods::generate_default_methods over that overlap every time it defines a class in the
+    // hierarchy. An application defines one per bean, so it pays for the same resolution hundreds of
+    // times. Implementing the methods here puts them in this class's vtable and the generated
+    // definitions inherit them, taking the still-inherited count from 301 to 39.
+    //
+    // Measured on 500 identically shaped classes: 174ms of CPU to define them carrying the closure,
+    // 95ms with the closure implemented by their base class. End to end that is -4% wall and -12%
+    // CPU on a 528 bean application.
+    //
+    // SAFE BECAUSE: each body is exactly what the interface default did - delegate to
+    // getAnnotationMetadata(). Of the 33 signatures where another interface in the closure also
+    // declares a default, 32 come from AnnotationMetadataProvider and AnnotationSource, both
+    // supertypes of AnnotationMetadataDelegate, so its body was already the one being inherited. The
+    // one independent case, EnvironmentConfigurable#hasPropertyExpressions, was already implemented
+    // concretely above and is not overridden here.
+    //
+    // Each body is the delegate's own: a virtual getAnnotationMetadata() call on this. That matters
+    // because the field can hold an EvaluatedAnnotationMetadata wrapper, and going through the
+    // wrapper is what the inherited default did - unwrapping here would silently drop expression
+    // evaluation.
+    //
+    // Machine generated, carrying the nullability the interfaces declare so no suppression is
+    // needed. Generating them into the class at build time, or removing the overlap at the source by
+    // reconsidering whether BeanDefinition needs to be an AnnotationMetadataDelegate at all, would
+    // both be better than keeping them checked in by hand.
+    // ------------------------------------------------------------------------------------------
+    @Override
+    public java.util.Optional<java.lang.Boolean> booleanValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().booleanValue(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Boolean> booleanValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1) {
+        return getAnnotationMetadata().booleanValue(p0, p1);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Boolean> booleanValue(java.lang.String p0) {
+        return getAnnotationMetadata().booleanValue(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Boolean> booleanValue(java.lang.String p0, java.lang.String p1) {
+        return getAnnotationMetadata().booleanValue(p0, p1);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Class> classValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().classValue(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Class> classValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1) {
+        return getAnnotationMetadata().classValue(p0, p1);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Class> classValue(java.lang.String p0) {
+        return getAnnotationMetadata().classValue(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Class> classValue(java.lang.String p0, java.lang.String p1) {
+        return getAnnotationMetadata().classValue(p0, p1);
+    }
+
+    @Override
+    public <V> java.lang.Class<V>[] classValues(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().classValues(p0);
+    }
+
+    @Override
+    public <V> java.lang.Class<V>[] classValues(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1) {
+        return getAnnotationMetadata().classValues(p0, p1);
+    }
+
+    @Override
+    public <V> java.lang.Class<V>[] classValues(java.lang.String p0) {
+        return getAnnotationMetadata().classValues(p0);
+    }
+
+    @Override
+    public <V> java.lang.Class<V>[] classValues(java.lang.String p0, java.lang.String p1) {
+        return getAnnotationMetadata().classValues(p0, p1);
+    }
+
+    @Override
+    public io.micronaut.core.annotation.AnnotationMetadata copyAnnotationMetadata() {
+        return getAnnotationMetadata().copyAnnotationMetadata();
+    }
+
+    @Override
+    public java.util.OptionalDouble doubleValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().doubleValue(p0);
+    }
+
+    @Override
+    public java.util.OptionalDouble doubleValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1) {
+        return getAnnotationMetadata().doubleValue(p0, p1);
+    }
+
+    @Override
+    public java.util.OptionalDouble doubleValue(java.lang.String p0, java.lang.String p1) {
+        return getAnnotationMetadata().doubleValue(p0, p1);
+    }
+
+    @Override
+    public <E extends java.lang.Enum<E>> java.util.Optional<E> enumValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.Class<E> p1) {
+        return getAnnotationMetadata().enumValue(p0, p1);
+    }
+
+    @Override
+    public <E extends java.lang.Enum<E>> java.util.Optional<E> enumValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1, java.lang.Class<E> p2) {
+        return getAnnotationMetadata().enumValue(p0, p1, p2);
+    }
+
+    @Override
+    public <E extends java.lang.Enum<E>> java.util.Optional<E> enumValue(java.lang.String p0, java.lang.Class<E> p1) {
+        return getAnnotationMetadata().enumValue(p0, p1);
+    }
+
+    @Override
+    public <E extends java.lang.Enum<E>> java.util.Optional<E> enumValue(java.lang.String p0, java.lang.String p1, java.lang.Class<E> p2) {
+        return getAnnotationMetadata().enumValue(p0, p1, p2);
+    }
+
+    @Override
+    public <E extends java.lang.Enum<E>> E[] enumValues(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.Class<E> p1) {
+        return getAnnotationMetadata().enumValues(p0, p1);
+    }
+
+    @Override
+    public <E extends java.lang.Enum<E>> E[] enumValues(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1, java.lang.Class<E> p2) {
+        return getAnnotationMetadata().enumValues(p0, p1, p2);
+    }
+
+    @Override
+    public <E extends java.lang.Enum<E>> E[] enumValues(java.lang.String p0, java.lang.Class<E> p1) {
+        return getAnnotationMetadata().enumValues(p0, p1);
+    }
+
+    @Override
+    public <E extends java.lang.Enum<E>> E[] enumValues(java.lang.String p0, java.lang.String p1, java.lang.Class<E> p2) {
+        return getAnnotationMetadata().enumValues(p0, p1, p2);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> java.util.Optional<io.micronaut.core.annotation.AnnotationValue<A>> findAnnotation(java.lang.Class<A> p0) {
+        return getAnnotationMetadata().findAnnotation(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> java.util.Optional<io.micronaut.core.annotation.AnnotationValue<A>> findAnnotation(java.lang.String p0) {
+        return getAnnotationMetadata().findAnnotation(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> java.util.Optional<io.micronaut.core.annotation.AnnotationValue<A>> findDeclaredAnnotation(java.lang.Class<A> p0) {
+        return getAnnotationMetadata().findDeclaredAnnotation(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> java.util.Optional<io.micronaut.core.annotation.AnnotationValue<A>> findDeclaredAnnotation(java.lang.String p0) {
+        return getAnnotationMetadata().findDeclaredAnnotation(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.String> findRepeatableAnnotation(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().findRepeatableAnnotation(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.String> findRepeatableAnnotation(java.lang.String p0) {
+        return getAnnotationMetadata().findRepeatableAnnotation(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> io.micronaut.core.annotation.@Nullable AnnotationValue<A> getAnnotation(java.lang.Class<A> p0) {
+        return getAnnotationMetadata().getAnnotation(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> io.micronaut.core.annotation.@Nullable AnnotationValue<A> getAnnotation(java.lang.String p0) {
+        return getAnnotationMetadata().getAnnotation(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.String> getAnnotationNameByStereotype(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().getAnnotationNameByStereotype(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.String> getAnnotationNameByStereotype(java.lang.@Nullable String p0) {
+        return getAnnotationMetadata().getAnnotationNameByStereotype(p0);
+    }
+
+    @Override
+    public java.util.Set<java.lang.String> getAnnotationNames() {
+        return getAnnotationMetadata().getAnnotationNames();
+    }
+
+    @Override
+    public java.util.List<java.lang.String> getAnnotationNamesByStereotype(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().getAnnotationNamesByStereotype(p0);
+    }
+
+    @Override
+    public java.util.List<java.lang.String> getAnnotationNamesByStereotype(java.lang.@Nullable String p0) {
+        return getAnnotationMetadata().getAnnotationNamesByStereotype(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Class<? extends java.lang.annotation.Annotation>> getAnnotationType(java.lang.String p0) {
+        return getAnnotationMetadata().getAnnotationType(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Class<? extends java.lang.annotation.Annotation>> getAnnotationType(java.lang.String p0, java.lang.ClassLoader p1) {
+        return getAnnotationMetadata().getAnnotationType(p0, p1);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Class<? extends java.lang.annotation.Annotation>> getAnnotationTypeByStereotype(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().getAnnotationTypeByStereotype(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Class<? extends java.lang.annotation.Annotation>> getAnnotationTypeByStereotype(java.lang.@Nullable String p0) {
+        return getAnnotationMetadata().getAnnotationTypeByStereotype(p0);
+    }
+
+    @Override
+    public java.util.List<java.lang.Class<? extends java.lang.annotation.Annotation>> getAnnotationTypesByStereotype(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().getAnnotationTypesByStereotype(p0);
+    }
+
+    @Override
+    public java.util.List<java.lang.Class<? extends java.lang.annotation.Annotation>> getAnnotationTypesByStereotype(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.ClassLoader p1) {
+        return getAnnotationMetadata().getAnnotationTypesByStereotype(p0, p1);
+    }
+
+    @Override
+    public java.util.List<java.lang.Class<? extends java.lang.annotation.Annotation>> getAnnotationTypesByStereotype(java.lang.String p0) {
+        return getAnnotationMetadata().getAnnotationTypesByStereotype(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> java.util.List<io.micronaut.core.annotation.AnnotationValue<A>> getAnnotationValuesByName(java.lang.String p0) {
+        return getAnnotationMetadata().getAnnotationValuesByName(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> java.util.List<io.micronaut.core.annotation.AnnotationValue<A>> getAnnotationValuesByStereotype(java.lang.@Nullable String p0) {
+        return getAnnotationMetadata().getAnnotationValuesByStereotype(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> java.util.List<io.micronaut.core.annotation.AnnotationValue<A>> getAnnotationValuesByType(java.lang.Class<A> p0) {
+        return getAnnotationMetadata().getAnnotationValuesByType(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> io.micronaut.core.annotation.@Nullable AnnotationValue<A> getDeclaredAnnotation(java.lang.Class<A> p0) {
+        return getAnnotationMetadata().getDeclaredAnnotation(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> io.micronaut.core.annotation.@Nullable AnnotationValue<A> getDeclaredAnnotation(java.lang.String p0) {
+        return getAnnotationMetadata().getDeclaredAnnotation(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.String> getDeclaredAnnotationNameByStereotype(java.lang.@Nullable String p0) {
+        return getAnnotationMetadata().getDeclaredAnnotationNameByStereotype(p0);
+    }
+
+    @Override
+    public java.util.Set<java.lang.String> getDeclaredAnnotationNames() {
+        return getAnnotationMetadata().getDeclaredAnnotationNames();
+    }
+
+    @Override
+    public java.util.List<java.lang.String> getDeclaredAnnotationNamesByStereotype(java.lang.@Nullable String p0) {
+        return getAnnotationMetadata().getDeclaredAnnotationNamesByStereotype(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Class<? extends java.lang.annotation.Annotation>> getDeclaredAnnotationTypeByStereotype(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().getDeclaredAnnotationTypeByStereotype(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Class<? extends java.lang.annotation.Annotation>> getDeclaredAnnotationTypeByStereotype(java.lang.@Nullable String p0) {
+        return getAnnotationMetadata().getDeclaredAnnotationTypeByStereotype(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> java.util.List<io.micronaut.core.annotation.AnnotationValue<A>> getDeclaredAnnotationValuesByName(java.lang.String p0) {
+        return getAnnotationMetadata().getDeclaredAnnotationValuesByName(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> java.util.List<io.micronaut.core.annotation.AnnotationValue<A>> getDeclaredAnnotationValuesByType(java.lang.Class<A> p0) {
+        return getAnnotationMetadata().getDeclaredAnnotationValuesByType(p0);
+    }
+
+    @Override
+    public io.micronaut.core.annotation.AnnotationMetadata getDeclaredMetadata() {
+        return getAnnotationMetadata().getDeclaredMetadata();
+    }
+
+    @Override
+    public java.util.Set<java.lang.String> getDeclaredStereotypeAnnotationNames() {
+        return getAnnotationMetadata().getDeclaredStereotypeAnnotationNames();
+    }
+
+    @Override
+    public <V> java.util.Optional<V> getDefaultValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1, io.micronaut.core.type.Argument<V> p2) {
+        return getAnnotationMetadata().getDefaultValue(p0, p1, p2);
+    }
+
+    @Override
+    public <V> java.util.Optional<V> getDefaultValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1, java.lang.Class<V> p2) {
+        return getAnnotationMetadata().getDefaultValue(p0, p1, p2);
+    }
+
+    @Override
+    public <V> java.util.Optional<V> getDefaultValue(java.lang.String p0, java.lang.String p1, io.micronaut.core.type.Argument<V> p2) {
+        return getAnnotationMetadata().getDefaultValue(p0, p1, p2);
+    }
+
+    @Override
+    public <V> java.util.Optional<V> getDefaultValue(java.lang.String p0, java.lang.String p1, java.lang.Class<V> p2) {
+        return getAnnotationMetadata().getDefaultValue(p0, p1, p2);
+    }
+
+    @Override
+    public java.util.Map<java.lang.CharSequence, java.lang.Object> getDefaultValues(java.lang.String p0) {
+        return getAnnotationMetadata().getDefaultValues(p0);
+    }
+
+    @Override
+    public java.util.Set<java.lang.String> getStereotypeAnnotationNames() {
+        return getAnnotationMetadata().getStereotypeAnnotationNames();
+    }
+
+    @Override
+    public io.micronaut.core.annotation.AnnotationMetadata getTargetAnnotationMetadata() {
+        return getAnnotationMetadata().getTargetAnnotationMetadata();
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Object> getValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().getValue(p0);
+    }
+
+    @Override
+    public <V> java.util.Optional<V> getValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, io.micronaut.core.type.Argument<V> p1) {
+        return getAnnotationMetadata().getValue(p0, p1);
+    }
+
+    @Override
+    public <V> java.util.Optional<V> getValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.Class<V> p1) {
+        return getAnnotationMetadata().getValue(p0, p1);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Object> getValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1) {
+        return getAnnotationMetadata().getValue(p0, p1);
+    }
+
+    @Override
+    public <V> java.util.Optional<V> getValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1, io.micronaut.core.type.Argument<V> p2) {
+        return getAnnotationMetadata().getValue(p0, p1, p2);
+    }
+
+    @Override
+    public <V> java.util.Optional<V> getValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1, java.lang.Class<V> p2) {
+        return getAnnotationMetadata().getValue(p0, p1, p2);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Object> getValue(java.lang.String p0) {
+        return getAnnotationMetadata().getValue(p0);
+    }
+
+    @Override
+    public <V> java.util.Optional<V> getValue(java.lang.String p0, io.micronaut.core.type.Argument<V> p1) {
+        return getAnnotationMetadata().getValue(p0, p1);
+    }
+
+    @Override
+    public <V> java.util.Optional<V> getValue(java.lang.String p0, java.lang.Class<V> p1) {
+        return getAnnotationMetadata().getValue(p0, p1);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.Object> getValue(java.lang.String p0, java.lang.String p1) {
+        return getAnnotationMetadata().getValue(p0, p1);
+    }
+
+    @Override
+    public <V> java.util.Optional<V> getValue(java.lang.String p0, java.lang.String p1, io.micronaut.core.type.Argument<V> p2) {
+        return getAnnotationMetadata().getValue(p0, p1, p2);
+    }
+
+    @Override
+    public <V> java.util.Optional<V> getValue(java.lang.String p0, java.lang.String p1, java.lang.Class<V> p2) {
+        return getAnnotationMetadata().getValue(p0, p1, p2);
+    }
+
+    @Override
+    public <V> io.micronaut.core.value.OptionalValues<V> getValues(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.Class<V> p1) {
+        return getAnnotationMetadata().getValues(p0, p1);
+    }
+
+    @Override
+    public <V> io.micronaut.core.value.OptionalValues<V> getValues(java.lang.String p0, java.lang.Class<V> p1) {
+        return getAnnotationMetadata().getValues(p0, p1);
+    }
+
+    @Override
+    public boolean hasAnnotation(java.lang.@Nullable Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().hasAnnotation(p0);
+    }
+
+    @Override
+    public boolean hasAnnotation(java.lang.@Nullable String p0) {
+        return getAnnotationMetadata().hasAnnotation(p0);
+    }
+
+    @Override
+    public boolean hasDeclaredAnnotation(java.lang.@Nullable Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().hasDeclaredAnnotation(p0);
+    }
+
+    @Override
+    public boolean hasDeclaredAnnotation(java.lang.@Nullable String p0) {
+        return getAnnotationMetadata().hasDeclaredAnnotation(p0);
+    }
+
+    @Override
+    public boolean hasDeclaredStereotype(java.lang.Class<? extends java.lang.annotation.Annotation> @Nullable ... p0) {
+        return getAnnotationMetadata().hasDeclaredStereotype(p0);
+    }
+
+    @Override
+    public boolean hasDeclaredStereotype(java.lang.@Nullable Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().hasDeclaredStereotype(p0);
+    }
+
+    @Override
+    public boolean hasDeclaredStereotype(java.lang.@Nullable String p0) {
+        return getAnnotationMetadata().hasDeclaredStereotype(p0);
+    }
+
+    @Override
+    public boolean hasSimpleAnnotation(java.lang.@Nullable String p0) {
+        return getAnnotationMetadata().hasSimpleAnnotation(p0);
+    }
+
+    @Override
+    public boolean hasSimpleDeclaredAnnotation(java.lang.@Nullable String p0) {
+        return getAnnotationMetadata().hasSimpleDeclaredAnnotation(p0);
+    }
+
+    @Override
+    public boolean hasStereotype(java.lang.Class<? extends java.lang.annotation.Annotation> @Nullable ... p0) {
+        return getAnnotationMetadata().hasStereotype(p0);
+    }
+
+    @Override
+    public boolean hasStereotype(java.lang.String @Nullable [] p0) {
+        return getAnnotationMetadata().hasStereotype(p0);
+    }
+
+    @Override
+    public boolean hasStereotype(java.lang.@Nullable Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().hasStereotype(p0);
+    }
+
+    @Override
+    public boolean hasStereotype(java.lang.@Nullable String p0) {
+        return getAnnotationMetadata().hasStereotype(p0);
+    }
+
+    @Override
+    public java.util.OptionalInt intValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().intValue(p0);
+    }
+
+    @Override
+    public java.util.OptionalInt intValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1) {
+        return getAnnotationMetadata().intValue(p0, p1);
+    }
+
+    @Override
+    public java.util.OptionalInt intValue(java.lang.String p0, java.lang.String p1) {
+        return getAnnotationMetadata().intValue(p0, p1);
+    }
+
+    @Override
+    public boolean isAnnotationPresent(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().isAnnotationPresent(p0);
+    }
+
+    @Override
+    public boolean isDeclaredAnnotationPresent(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().isDeclaredAnnotationPresent(p0);
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return getAnnotationMetadata().isEmpty();
+    }
+
+    @Override
+    public boolean isFalse(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1) {
+        return getAnnotationMetadata().isFalse(p0, p1);
+    }
+
+    @Override
+    public boolean isFalse(java.lang.String p0, java.lang.String p1) {
+        return getAnnotationMetadata().isFalse(p0, p1);
+    }
+
+    @Override
+    public boolean isPresent(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1) {
+        return getAnnotationMetadata().isPresent(p0, p1);
+    }
+
+    @Override
+    public boolean isPresent(java.lang.String p0, java.lang.String p1) {
+        return getAnnotationMetadata().isPresent(p0, p1);
+    }
+
+    @Override
+    public boolean isRepeatableAnnotation(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().isRepeatableAnnotation(p0);
+    }
+
+    @Override
+    public boolean isRepeatableAnnotation(java.lang.String p0) {
+        return getAnnotationMetadata().isRepeatableAnnotation(p0);
+    }
+
+    @Override
+    public boolean isTrue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1) {
+        return getAnnotationMetadata().isTrue(p0, p1);
+    }
+
+    @Override
+    public boolean isTrue(java.lang.String p0, java.lang.String p1) {
+        return getAnnotationMetadata().isTrue(p0, p1);
+    }
+
+    @Override
+    public java.util.OptionalLong longValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1) {
+        return getAnnotationMetadata().longValue(p0, p1);
+    }
+
+    @Override
+    public java.util.OptionalLong longValue(java.lang.String p0, java.lang.String p1) {
+        return getAnnotationMetadata().longValue(p0, p1);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.String> stringValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().stringValue(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.String> stringValue(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1) {
+        return getAnnotationMetadata().stringValue(p0, p1);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.String> stringValue(java.lang.String p0) {
+        return getAnnotationMetadata().stringValue(p0);
+    }
+
+    @Override
+    public java.util.Optional<java.lang.String> stringValue(java.lang.String p0, java.lang.String p1) {
+        return getAnnotationMetadata().stringValue(p0, p1);
+    }
+
+    @Override
+    public java.lang.String[] stringValues(java.lang.Class<? extends java.lang.annotation.Annotation> p0) {
+        return getAnnotationMetadata().stringValues(p0);
+    }
+
+    @Override
+    public java.lang.String[] stringValues(java.lang.Class<? extends java.lang.annotation.Annotation> p0, java.lang.String p1) {
+        return getAnnotationMetadata().stringValues(p0, p1);
+    }
+
+    @Override
+    public java.lang.String[] stringValues(java.lang.String p0) {
+        return getAnnotationMetadata().stringValues(p0);
+    }
+
+    @Override
+    public java.lang.String[] stringValues(java.lang.String p0, java.lang.String p1) {
+        return getAnnotationMetadata().stringValues(p0, p1);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> @Nullable A synthesize(java.lang.Class<A> p0) {
+        return getAnnotationMetadata().synthesize(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> @Nullable A synthesize(java.lang.Class<A> p0, java.lang.String p1) {
+        return getAnnotationMetadata().synthesize(p0, p1);
+    }
+
+    @Override
+    public java.lang.annotation.Annotation[] synthesizeAll() {
+        return getAnnotationMetadata().synthesizeAll();
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> A[] synthesizeAnnotationsByType(java.lang.Class<A> p0) {
+        return getAnnotationMetadata().synthesizeAnnotationsByType(p0);
+    }
+
+    @Override
+    public java.lang.annotation.Annotation[] synthesizeDeclared() {
+        return getAnnotationMetadata().synthesizeDeclared();
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> @Nullable A synthesizeDeclared(java.lang.Class<A> p0) {
+        return getAnnotationMetadata().synthesizeDeclared(p0);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> @Nullable A synthesizeDeclared(java.lang.Class<A> p0, java.lang.String p1) {
+        return getAnnotationMetadata().synthesizeDeclared(p0, p1);
+    }
+
+    @Override
+    public <A extends java.lang.annotation.Annotation> A[] synthesizeDeclaredAnnotationsByType(java.lang.Class<A> p0) {
+        return getAnnotationMetadata().synthesizeDeclaredAnnotationsByType(p0);
+    }
 }
