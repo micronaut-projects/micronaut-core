@@ -3303,13 +3303,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         if (o == null || !beanType.isInstance(o)) {
                             continue;
                         }
-                        beansOfTypeList.add(BeanRegistration.of(
-                            this,
-                             new BeanKey<>(beanType, (qualifier == null ? Qualifiers.byName(String.valueOf(i++)) : Qualifiers.byQualifiers(Qualifiers.byName(String.valueOf(i++)), qualifier))),
-
-                            candidate,
-                            (T) o
-                        ));
+                        BeanKey<T> elementKey = new BeanKey<>(beanType, (qualifier == null ? Qualifiers.byName(String.valueOf(i++)) : Qualifiers.byQualifiers(Qualifiers.byName(String.valueOf(i++)), qualifier)));
+                        // An element of a container bean shares the container's definition: destroying it
+                        // through the context would run destruction with a mismatched definition and purge
+                        // the container's singleton registration, so close() stays a no-op unless the
+                        // element carries its own lifecycle or disposal semantics
+                        beansOfTypeList.add(candidate instanceof DisposableBeanDefinition || o instanceof LifeCycle ?
+                            BeanRegistration.of(this, elementKey, candidate, (T) o) :
+                            new BeanRegistration<>(elementKey, candidate, (T) o));
                     }
                 }
             } else {
