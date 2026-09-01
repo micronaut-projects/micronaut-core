@@ -29,6 +29,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *
  * <p>When applied to a type all public methods will be considered executable and the necessary metadata produced</p>
  *
+ * <p>When applied to a constructor of an {@link io.micronaut.core.annotation.Introspected} type, the
+ * constructor is described by the generated introspection and exposed via
+ * {@link io.micronaut.core.beans.BeanIntrospection#getConstructors()}.</p>
+ *
  * <p>This annotation can be used as a meta annotation</p>
  *
  * @author Graeme Rocher
@@ -36,7 +40,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.METHOD, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
+@Target({ElementType.METHOD, ElementType.CONSTRUCTOR, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @Inherited
 public @interface Executable {
 

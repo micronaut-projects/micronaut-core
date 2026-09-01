@@ -53,6 +53,7 @@ ioc:
     introspectedProperty: Explicit Bean Properties
     atCreator: Constructor Methods
     staticAtCreator: Static Creator Methods
+    introspectionConstructors: Describing Constructors
     introspectionBuilders: Builders
     introspectionEnums: Introspect Enums
     introspectedAnnotationOnAConfigurationClass: Use the @Introspected Annotation on a Configuration Class

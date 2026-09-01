@@ -2562,4 +2562,151 @@ class MyMessage: Message()
         then:
         noExceptionThrown()
     }
+
+    void "constructors = true does not change the constructor beans are built with"() {
+        when: 'the same type is built with and without the member'
+        def source = '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(%s)
+class Order(val name: String, val quantity: Int) {
+    constructor() : this("default-ctor", 0)
+    constructor(name: String) : this(name, 7)
+}
+'''
+        def baseline = buildBeanIntrospection('test.Order', String.format(source, ''))
+        def described = buildBeanIntrospection('test.Order', String.format(source, 'constructors = true'))
+
+        then: 'the instantiating constructor is unchanged'
+        described.constructor.arguments.length == baseline.constructor.arguments.length
+        described.constructorArguments.length == baseline.constructorArguments.length
+        described.isBuildable() == baseline.isBuildable()
+
+        and: 'instantiate still runs the same constructor'
+        described.getRequiredProperty("name", String).get(described.instantiate("abc", 1)) ==
+            baseline.getRequiredProperty("name", String).get(baseline.instantiate("abc", 1))
+
+        and: 'only the described set grew'
+        baseline.getConstructors().size() == 1
+        described.getConstructors().size() == 3
+        described.getConstructors()[0].arguments.length == baseline.constructor.arguments.length
+    }
+
+    void "a secondary constructor annotated as executable does not change the primary constructor"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.context.annotation.Executable
+
+@Introspected
+class Order(val name: String, val quantity: Int) {
+    @Executable constructor(name: String) : this(name, 7)
+}
+''')
+
+        then: 'the Kotlin primary constructor still builds beans'
+        introspection.constructor.arguments.length == 2
+        introspection.getRequiredProperty("quantity", int).get(introspection.instantiate("abc", 1)) == 1
+
+        and: 'and is described first, ahead of the secondary one'
+        introspection.getConstructors().size() == 2
+        introspection.getConstructors()[0].arguments.length == 2
+        introspection.getConstructors()[1].arguments.length == 1
+    }
+
+    void "constructors = true does not change a constructor with default parameter values"() {
+        when:
+        def source = '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(%s)
+class Order(val name: String = "default-ctor", val quantity: Int = 7)
+'''
+        def baseline = buildBeanIntrospection('test.Order', String.format(source, ''))
+        def described = buildBeanIntrospection('test.Order', String.format(source, 'constructors = true'))
+
+        then: 'the instantiating constructor is unchanged and defaults still apply'
+        described.constructor.arguments.length == baseline.constructor.arguments.length
+        described.getRequiredProperty("name", String).get(described.instantiate()) ==
+            baseline.getRequiredProperty("name", String).get(baseline.instantiate())
+        described.getRequiredProperty("name", String).get(described.instantiate()) == "default-ctor"
+    }
+
+    void "every declared constructor is described including secondary constructors"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(constructors = true)
+class Order(val name: String, val quantity: Int) {
+    constructor() : this("none", 0)
+    constructor(name: String) : this(name, 0)
+}
+''')
+
+        then:
+        introspection.getConstructors().size() == 3
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+        introspection.getConstructors()*.arguments*.length.toSorted() == [0, 1, 2]
+    }
+
+    void "instantiating through a described constructor works"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(constructors = true)
+class Order(val name: String) {
+    constructor() : this("none")
+}
+''')
+        def order = introspection.getConstructors().find { it.arguments.length == 1 }.instantiate("abc")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(order) == "abc"
+    }
+
+    void "a data class describes its constructor"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(constructors = true)
+data class Order(val name: String, val quantity: Int)
+''')
+
+        then:
+        introspection.getConstructors().size() == 1
+        introspection.getConstructors()[0].arguments.length == 2
+    }
+
+    void "an introspection that did not ask for constructors keeps describing one"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Order(val name: String) {
+    constructor() : this("none")
+}
+''')
+
+        then:
+        introspection.getConstructors().size() == 1
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+    }
 }

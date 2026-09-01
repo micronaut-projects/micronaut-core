@@ -2645,4 +2645,70 @@ class Test extends MySuperclass {
         and: 'the package private superclass property is introspected, as we are in the same package'
         introspection.getProperty("packagePrivateProperty").orElse(null)
     }
+
+    void "every declared constructor is described"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(constructors = true)
+class Order {
+    String name
+    int quantity
+
+    Order() {}
+    Order(String name) { this.name = name }
+    Order(String name, int quantity) { this.name = name; this.quantity = quantity }
+}
+''')
+
+        then:
+        introspection.getConstructors().size() == 3
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+        introspection.getConstructors()*.arguments*.length.toSorted() == [0, 1, 2]
+    }
+
+    void "instantiating through a described constructor works"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected(constructors = true)
+class Order {
+    String name
+
+    Order() { this.name = "none" }
+    Order(String name) { this.name = name }
+}
+''')
+        def order = introspection.getConstructors().find { it.arguments.length == 1 }.instantiate("abc")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(order) == "abc"
+    }
+
+    void "an introspection that did not ask for constructors keeps describing one"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Order {
+    String name
+
+    Order() {}
+    Order(String name) { this.name = name }
+}
+''')
+
+        then:
+        introspection.getConstructors().size() == 1
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+    }
 }

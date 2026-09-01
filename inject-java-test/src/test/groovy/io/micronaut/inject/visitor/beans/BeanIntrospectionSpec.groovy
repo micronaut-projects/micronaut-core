@@ -37,6 +37,7 @@ import jakarta.validation.Constraint
 import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
 import spock.lang.Issue
 
@@ -6189,6 +6190,752 @@ class SharedBuilder {
 
         cleanup:
         context?.close()
+    }
+
+    void "every declared constructor is described"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotNull;
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+    Order(@NotNull String name) {}
+    Order(String name, int quantity) {}
+}
+''')
+
+        when:
+        def constructors = introspection.getConstructors()
+
+        then:
+        constructors.size() == 3
+        // getConstructor() first, per the contract
+        constructors[0].arguments.length == introspection.constructor.arguments.length
+        constructors*.arguments*.length.toSorted() == [0, 1, 2]
+    }
+
+    void "a constructor carries the annotations of its parameters"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import java.util.List;
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+    Order(@NotNull String name, List<@Valid Line> lines) {}
+}
+
+class Line {}
+''')
+
+        when:
+        def constructor = introspection.getConstructors().find { it.arguments.length == 2 }
+
+        then:
+        constructor.arguments[0].annotationMetadata.hasAnnotation(NotNull)
+        constructor.arguments[1].typeParameters[0].annotationMetadata.hasAnnotation('jakarta.validation.Valid')
+    }
+
+    void "a constructor carries its own annotations"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+    @Deprecated Order(String name) {}
+}
+''')
+
+        expect:
+        introspection.getConstructors().find { it.arguments.length == 1 }.annotationMetadata.hasAnnotation(Deprecated)
+    }
+
+    void "an introspection that did not ask for constructors keeps describing one"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Order {
+    Order() {}
+    Order(String name) {}
+}
+''')
+
+        expect:
+        introspection.getConstructors().size() == 1
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+    }
+
+    void "a constructor annotated as executable is described"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+class Order {
+    Order() {}
+    @Executable Order(String name) {}
+    Order(String name, int quantity) {}
+}
+''')
+
+        when:
+        def constructors = introspection.getConstructors()
+
+        then:
+        // the bean instantiating constructor, plus the one asked for by @Executable
+        constructors.size() == 2
+        constructors[0].arguments.length == introspection.constructor.arguments.length
+        constructors[1].arguments.length == 1
+    }
+
+    void "instantiating through a described constructor works"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(constructors = true)
+class Order {
+    final String name;
+    Order() { this.name = "none"; }
+    Order(String name) { this.name = name; }
+    public String getName() { return name; }
+}
+''')
+
+        when:
+        def order = introspection.getConstructors().find { it.arguments.length == 1 }.instantiate("abc")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(order) == "abc"
+    }
+
+    void "type level executable does not sweep in every constructor"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+@Executable
+class Order {
+    Order() {}
+    Order(String name) {}
+    Order(String name, int quantity) {}
+}
+''')
+
+        expect:
+        introspection.getConstructors().size() == 1
+    }
+
+    void "@Executable on a secondary constructor does not change the constructor beans are built with"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+class Order {
+    private final String name;
+
+    public Order() { this.name = "default-ctor"; }
+
+    @Executable
+    public Order(String name) { this.name = name; }
+
+    public String getName() { return name; }
+}
+''')
+
+        expect: 'the default constructor is still the one that builds beans'
+        introspection.constructor.arguments.length == 0
+        introspection.constructorArguments.length == 0
+        introspection.getRequiredProperty("name", String).get(introspection.instantiate()) == "default-ctor"
+
+        and: 'it is still described first, and the @Executable one is described too'
+        introspection.getConstructors().size() == 2
+        introspection.getConstructors()[0].arguments.length == 0
+        introspection.getConstructors()[1].arguments.length == 1
+    }
+
+    void "@Executable on a non-primary constructor does not change the primary constructor"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+class Order {
+    private final String name;
+    private final int quantity;
+
+    public Order(String name) { this.name = name; this.quantity = 0; }
+
+    @Executable
+    public Order(String name, int quantity) { this.name = name; this.quantity = quantity; }
+
+    public String getName() { return name; }
+    public int getQuantity() { return quantity; }
+}
+''')
+
+        expect: 'the first public constructor is still the primary one'
+        introspection.constructor.arguments.length == 1
+        introspection.constructorArguments.length == 1
+        introspection.getRequiredProperty("quantity", int).get(introspection.instantiate("abc")) == 0
+
+        and: 'the primary constructor is described first even though the other one asked to be described'
+        introspection.getConstructors()[0].arguments.length == 1
+    }
+
+    void "@Executable on a constructor does not override an explicit @Creator"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Creator;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+class Order {
+    private final String name;
+    private final int quantity;
+
+    @Executable
+    public Order(String name, int quantity) { this.name = name; this.quantity = quantity; }
+
+    @Creator
+    public Order(String name) { this.name = name; this.quantity = 42; }
+
+    public String getName() { return name; }
+    public int getQuantity() { return quantity; }
+}
+''')
+
+        expect: '@Creator still wins as the bean instantiating constructor'
+        introspection.constructor.arguments.length == 1
+        introspection.getRequiredProperty("quantity", int).get(introspection.instantiate("abc")) == 42
+
+        and: 'and is described first'
+        introspection.getConstructors()[0].arguments.length == 1
+    }
+
+    void "constructors = true does not change the constructor beans are built with"() {
+        given: 'the same type built with and without the member'
+        def source = '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(%s)
+class Order {
+    private final String name;
+    private final int quantity;
+
+    // declared first, but not public, so not the primary constructor
+    Order(String name, int quantity) { this.name = name; this.quantity = quantity; }
+
+    public Order() { this.name = "default-ctor"; this.quantity = 0; }
+    public Order(String name) { this.name = name; this.quantity = 0; }
+
+    public String getName() { return name; }
+    public int getQuantity() { return quantity; }
+}
+'''
+        def baseline = buildBeanIntrospection('test.Order', String.format(source, ''))
+        def described = buildBeanIntrospection('test.Order', String.format(source, 'constructors = true'))
+
+        expect: 'the instantiating constructor is unchanged'
+        described.constructor.arguments.length == baseline.constructor.arguments.length
+        described.constructorArguments.length == baseline.constructorArguments.length
+        described.isBuildable() == baseline.isBuildable()
+
+        and: 'instantiate() still runs the same constructor'
+        described.getRequiredProperty("name", String).get(described.instantiate()) ==
+            baseline.getRequiredProperty("name", String).get(baseline.instantiate())
+        described.getRequiredProperty("name", String).get(described.instantiate()) == "default-ctor"
+
+        and: 'only the described set grew'
+        baseline.getConstructors().size() == 1
+        described.getConstructors().size() == 3
+        described.getConstructors()[0].arguments.length == baseline.constructor.arguments.length
+    }
+
+    void "constructors = true does not change a primary constructor that takes arguments"() {
+        given:
+        def source = '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(%s)
+class Order {
+    private final String name;
+    private final int quantity;
+
+    // declared first, but not public, so not the primary constructor
+    Order(String name, int quantity) { this.name = name; this.quantity = quantity; }
+
+    public Order(String name) { this.name = name; this.quantity = 7; }
+
+    public String getName() { return name; }
+    public int getQuantity() { return quantity; }
+}
+'''
+        def baseline = buildBeanIntrospection('test.Order', String.format(source, ''))
+        def described = buildBeanIntrospection('test.Order', String.format(source, 'constructors = true'))
+
+        expect: 'the same single-argument constructor still builds beans'
+        baseline.constructor.arguments.length == 1
+        described.constructor.arguments.length == 1
+        described.getRequiredProperty("quantity", int).get(described.instantiate("abc")) ==
+            baseline.getRequiredProperty("quantity", int).get(baseline.instantiate("abc"))
+        described.getRequiredProperty("quantity", int).get(described.instantiate("abc")) == 7
+
+        and: 'and is described first, ahead of the constructor declared before it'
+        described.getConstructors().size() == 2
+        described.getConstructors()[0].arguments.length == 1
+        described.getConstructors()[1].arguments.length == 2
+    }
+
+    void "a described constructor preserves annotation values and stereotypes"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import static java.lang.annotation.ElementType.CONSTRUCTOR;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Retention(RUNTIME)
+@interface Marker {}
+
+@Marker
+@Retention(RUNTIME)
+@Target(CONSTRUCTOR)
+@interface OrderCreator {
+    String value();
+    int max() default 5;
+}
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+
+    @OrderCreator(value = "explicit", max = 10)
+    Order(String name) {}
+
+    @OrderCreator("only-value")
+    Order(String name, int quantity) {}
+}
+''')
+
+        when:
+        def oneArg = introspection.getConstructors().find { it.arguments.length == 1 }
+        def twoArg = introspection.getConstructors().find { it.arguments.length == 2 }
+
+        then: 'explicitly set members keep their values'
+        oneArg.annotationMetadata.hasAnnotation('test.OrderCreator')
+        oneArg.annotationMetadata.stringValue('test.OrderCreator').get() == 'explicit'
+        oneArg.annotationMetadata.intValue('test.OrderCreator', 'max').getAsInt() == 10
+
+        and: 'a member set on one constructor is not seen on the other'
+        twoArg.annotationMetadata.stringValue('test.OrderCreator').get() == 'only-value'
+        twoArg.annotationMetadata.intValue('test.OrderCreator', 'max').isEmpty()
+
+        and: 'meta annotations are resolved as stereotypes'
+        oneArg.annotationMetadata.hasStereotype('test.Marker')
+        twoArg.annotationMetadata.hasStereotype('test.Marker')
+    }
+
+    void "a described constructor carries the same metadata the constructor path already produced"() {
+        given: 'the same annotated constructor, once as the only described one and once as a described set'
+        def source = '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.Size;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import static java.lang.annotation.ElementType.CONSTRUCTOR;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Retention(RUNTIME)
+@interface Marker {}
+
+@Marker
+@Retention(RUNTIME)
+@Target(CONSTRUCTOR)
+@interface OrderCreator {
+    String value();
+    int max() default 5;
+}
+
+@Introspected(%s)
+class Order {
+    @OrderCreator(value = "explicit", max = 10)
+    public Order(@Size(min = 1, max = 10) String name) {}
+}
+'''
+        def baseline = buildBeanIntrospection('test.Order', String.format(source, ''))
+        def described = buildBeanIntrospection('test.Order', String.format(source, 'constructors = true'))
+
+        expect: 'the described constructor reports exactly what getConstructor() reports'
+        def expected = baseline.constructor.annotationMetadata
+        def actual = described.getConstructors()[0].annotationMetadata
+
+        actual.stringValue('test.OrderCreator') == expected.stringValue('test.OrderCreator')
+        actual.intValue('test.OrderCreator', 'max') == expected.intValue('test.OrderCreator', 'max')
+        actual.hasStereotype('test.Marker') == expected.hasStereotype('test.Marker')
+        actual.annotationNames.toSorted() == expected.annotationNames.toSorted()
+
+        and: 'and so do its parameters'
+        described.getConstructors()[0].arguments[0].annotationMetadata.intValue(Size, "min") ==
+            baseline.constructorArguments[0].annotationMetadata.intValue(Size, "min")
+        described.getConstructors()[0].arguments[0].annotationMetadata.intValue(Size, "max") ==
+            baseline.constructorArguments[0].annotationMetadata.intValue(Size, "max")
+
+        and: 'sanity: the values really are there rather than both being empty'
+        actual.stringValue('test.OrderCreator').get() == 'explicit'
+        described.getConstructors()[0].arguments[0].annotationMetadata.intValue(Size, "max").getAsInt() == 10
+    }
+
+    void "annotations on one described constructor do not leak onto another"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Retention(RUNTIME)
+@interface First {}
+
+@Retention(RUNTIME)
+@interface Second {}
+
+@Introspected(constructors = true)
+class Order {
+    @First
+    Order() {}
+
+    @Second
+    Order(String name) {}
+
+    Order(String name, int quantity) {}
+}
+''')
+
+        when:
+        def noArg = introspection.getConstructors().find { it.arguments.length == 0 }
+        def oneArg = introspection.getConstructors().find { it.arguments.length == 1 }
+        def twoArg = introspection.getConstructors().find { it.arguments.length == 2 }
+
+        then: 'each constructor carries only its own annotations'
+        noArg.annotationMetadata.hasAnnotation('test.First')
+        !noArg.annotationMetadata.hasAnnotation('test.Second')
+
+        oneArg.annotationMetadata.hasAnnotation('test.Second')
+        !oneArg.annotationMetadata.hasAnnotation('test.First')
+
+        and: 'an unannotated constructor carries neither'
+        !twoArg.annotationMetadata.hasAnnotation('test.First')
+        !twoArg.annotationMetadata.hasAnnotation('test.Second')
+    }
+
+    void "a described constructor does not inherit the annotations of its declaring type"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Retention(RUNTIME)
+@interface OnType {}
+
+@Retention(RUNTIME)
+@interface OnConstructor {}
+
+@OnType
+@Introspected(constructors = true)
+class Order {
+    @OnConstructor
+    Order() {}
+
+    Order(String name) {}
+}
+''')
+
+        expect: 'the type level annotation is not reported on the constructors'
+        introspection.getConstructors().every { !it.annotationMetadata.hasAnnotation('test.OnType') }
+        !introspection.getConstructors()[0].annotationMetadata.hasStereotype(Introspected)
+
+        and: 'the constructor level one still is'
+        introspection.getConstructors().find { it.arguments.length == 0 }
+            .annotationMetadata.hasAnnotation('test.OnConstructor')
+    }
+
+    void "a described constructor preserves the annotation values of its parameters"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+
+    Order(@Size(min = 1, max = 10) String name, @Min(5) int quantity) {}
+}
+''')
+
+        when:
+        def constructor = introspection.getConstructors().find { it.arguments.length == 2 }
+
+        then: 'each parameter keeps its own annotation and its member values'
+        constructor.arguments[0].annotationMetadata.intValue(Size, "min").getAsInt() == 1
+        constructor.arguments[0].annotationMetadata.intValue(Size, "max").getAsInt() == 10
+        constructor.arguments[1].annotationMetadata.intValue(Min).getAsInt() == 5
+
+        and: 'stereotypes of the parameter annotations are resolved'
+        constructor.arguments[0].annotationMetadata.hasStereotype(Constraint)
+        constructor.arguments[1].annotationMetadata.hasStereotype(Constraint)
+
+        and: 'annotations do not leak between parameters'
+        !constructor.arguments[0].annotationMetadata.hasAnnotation(Min)
+        !constructor.arguments[1].annotationMetadata.hasAnnotation(Size)
+    }
+
+    void "a described constructor preserves type use annotations on parameter type arguments"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.Min;
+import java.util.List;
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+
+    Order(List<@Min(10) Long> quantities) {}
+}
+''')
+
+        when:
+        def typeArgument = introspection.getConstructors()
+            .find { it.arguments.length == 1 }
+            .arguments[0].typeParameters[0]
+
+        then:
+        typeArgument.annotationMetadata.hasAnnotation(Min)
+        typeArgument.annotationMetadata.intValue(Min).getAsInt() == 10
+        typeArgument.annotationMetadata.hasStereotype(Constraint)
+    }
+
+    void "a constructor described via @Executable preserves its other annotations"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import jakarta.validation.constraints.Size;
+import java.lang.annotation.Retention;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Retention(RUNTIME)
+@interface OrderCreator {
+    String value() default "fallback";
+}
+
+@Introspected
+class Order {
+    Order() {}
+
+    @Executable
+    @OrderCreator("named")
+    Order(@Size(max = 3) String name) {}
+}
+''')
+
+        when:
+        def constructor = introspection.getConstructors().find { it.arguments.length == 1 }
+
+        then: 'the gating annotation is preserved alongside the others'
+        constructor.annotationMetadata.hasAnnotation(Executable)
+        constructor.annotationMetadata.stringValue('test.OrderCreator').get() == 'named'
+        constructor.arguments[0].annotationMetadata.intValue(Size, "max").getAsInt() == 3
+    }
+
+
+    void "a constructor described via @Executable does not become a bean method"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+class Order {
+    Order() {}
+
+    @Executable
+    Order(String name) {}
+}
+''')
+
+        expect: 'the constructor is described as a constructor'
+        introspection.getConstructors().size() == 2
+
+        and: 'and does not show up among the bean methods'
+        introspection.getBeanMethods().isEmpty()
+        introspection.getBeanMethods().every { it.name != '<init>' }
+    }
+
+    void "constructors = true does not add anything to the bean methods"() {
+        given: 'the same type built with and without the member'
+        def source = '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected(%s)
+class Order {
+    private String name;
+
+    Order() {}
+    Order(String name) { this.name = name; }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    @Executable
+    public String describe() { return "order:" + name; }
+}
+'''
+        def baseline = buildBeanIntrospection('test.Order', String.format(source, ''))
+        def described = buildBeanIntrospection('test.Order', String.format(source, 'constructors = true'))
+
+        expect: 'the bean methods are untouched'
+        described.getBeanMethods().size() == baseline.getBeanMethods().size()
+        described.getBeanMethods()*.name.toSorted() == baseline.getBeanMethods()*.name.toSorted()
+        described.getBeanMethods()*.name == ['describe']
+
+        and: 'only the described constructors grew'
+        baseline.getConstructors().size() == 1
+        described.getConstructors().size() == 2
+
+        and: 'a bean method still works on an instance built through a described constructor'
+        described.getBeanMethods()[0].invoke(
+            described.getConstructors().find { it.arguments.length == 1 }.instantiate("abc")
+        ) == 'order:abc'
+    }
+
+    void "an @Executable method does not become a described constructor"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected(constructors = true)
+class Order {
+    Order() {}
+    Order(String name) {}
+
+    @Executable
+    public String describe() { return "described"; }
+
+    @Executable
+    public String describe(String prefix) { return prefix; }
+}
+''')
+
+        expect: 'the constructors are exactly the declared ones, not the methods'
+        introspection.getConstructors().size() == 2
+        introspection.getConstructors()*.arguments*.length.toSorted() == [0, 1]
+
+        and: 'the methods are exactly the executable ones'
+        introspection.getBeanMethods()*.name.toSorted() == ['describe', 'describe']
+    }
+
+    void "an @Executable constructor and an @Executable method land in their own buckets"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Order', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+
+@Introspected
+class Order {
+    private String name;
+
+    Order() {}
+
+    @Executable
+    Order(String name) { this.name = name; }
+
+    public String getName() { return name; }
+
+    @Executable
+    public String describe() { return "order:" + name; }
+}
+''')
+
+        expect: 'the constructor bucket holds only constructors'
+        introspection.getConstructors().size() == 2
+        introspection.getConstructors().every { it.declaringBeanType.simpleName == 'Order' }
+
+        and: 'the method bucket holds only the method'
+        introspection.getBeanMethods().size() == 1
+        introspection.getBeanMethods()[0].name == 'describe'
+
+        and: 'both are usable through their own API'
+        introspection.getConstructors().find { it.arguments.length == 1 }.instantiate("abc") != null
+        introspection.getBeanMethods()[0].invoke(introspection.instantiate()) == 'order:null'
     }
 
     @Override

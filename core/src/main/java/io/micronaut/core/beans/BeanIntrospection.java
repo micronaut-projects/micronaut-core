@@ -386,6 +386,23 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
     }
 
     /**
+     * Returns the constructors this introspection describes.
+     *
+     * <p>By default an introspection only describes the constructor used to instantiate beans, in
+     * which case this method returns a singleton list containing {@link #getConstructor()}. When the
+     * introspected type opts in via {@link io.micronaut.core.annotation.Introspected#constructors()},
+     * or by annotating individual constructors with {@code io.micronaut.context.annotation.Executable},
+     * every described constructor is returned, including its own annotation metadata and the
+     * annotation metadata of its parameters.</p>
+     *
+     * @return Every described constructor of the type, {@link #getConstructor()} first
+     * @since 5.2.0
+     */
+    default List<BeanConstructor<T>> getConstructors() {
+        return List.of(getConstructor());
+    }
+
+    /**
      * Obtains an introspection from the default {@link BeanIntrospector}.
      *
      * @param type The type
