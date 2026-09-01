@@ -73,8 +73,16 @@ final class IntroductionInterfaceBeanElementCreator<R> extends AbstractBeanEleme
         return proxyBuilder.build();
     }
 
+    /**
+     * Checks if the method is an interface default method.
+     * Only invoked for a non-abstract method of an interface, where a static and a private method
+     * are the only alternatives to a default method; an interface method can never be final.
+     *
+     * @param method The non-abstract method of the interface
+     * @return true if the method is a default method
+     */
     private static boolean isDefaultMethod(MethodElement method) {
-        return !method.isAbstract() && !method.isStatic() && !method.isPrivate() && !method.isFinal();
+        return !method.isStatic() && !method.isPrivate();
     }
 
     private void handlePropertyMethod(ElementProxyBuilder<R> proxyBuilder, List<MethodElement> methods, @Nullable MethodElement method) {
