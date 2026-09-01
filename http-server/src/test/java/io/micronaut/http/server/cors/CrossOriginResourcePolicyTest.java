@@ -17,6 +17,7 @@ package io.micronaut.http.server.cors;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.stream.Stream;
@@ -35,6 +36,17 @@ class CrossOriginResourcePolicyTest {
     private static Stream<Arguments> findsPolicyFromHeaderValue() {
         return Stream.of(CrossOriginResourcePolicy.values())
             .map(policy -> Arguments.of(policy.toString(), policy));
+    }
+
+    @ParameterizedTest
+    @EnumSource(CrossOriginResourcePolicy.class)
+    void wrapsHeaderValueAsCharSequence(CrossOriginResourcePolicy policy) {
+        CharSequence value = policy;
+        String expected = policy.toString();
+
+        assertEquals(expected.length(), value.length());
+        assertEquals(expected.charAt(0), value.charAt(0));
+        assertEquals(expected.subSequence(1, expected.length()), value.subSequence(1, value.length()));
     }
 
     @ParameterizedTest

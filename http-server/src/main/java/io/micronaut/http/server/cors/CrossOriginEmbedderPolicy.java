@@ -25,7 +25,7 @@ import java.util.Map;
  * @see <a href="https://fetch.spec.whatwg.org/#cross-origin-embedder-policy-header">Cross-Origin-Embedder-Policy header</a>
  * @since 5.2.0
  */
-public enum CrossOriginEmbedderPolicy {
+public enum CrossOriginEmbedderPolicy implements CharSequence {
     UNSAFE_NONE("unsafe-none"),
     REQUIRE_CORP("require-corp"),
     CREDENTIALLESS("credentialless");
@@ -54,6 +54,21 @@ public enum CrossOriginEmbedderPolicy {
             return null;
         }
         return BY_VALUE.get(value);
+    }
+
+    @Override
+    public int length() {
+        return value.length();
+    }
+
+    @Override
+    public char charAt(int index) {
+        return value.charAt(index);
+    }
+
+    @Override
+    public CharSequence subSequence(int start, int end) {
+        return value.subSequence(start, end);
     }
 
     /**

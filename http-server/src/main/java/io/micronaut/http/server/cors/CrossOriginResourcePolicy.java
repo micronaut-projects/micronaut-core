@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
  * @see <a href="https://fetch.spec.whatwg.org/#cross-origin-resource-policy-header">Cross-Origin-Resource-Policy header</a>
  * @since 5.2.0
  */
-public enum CrossOriginResourcePolicy {
+public enum CrossOriginResourcePolicy implements CharSequence {
     SAME_ORIGIN("same-origin"),
     SAME_SITE("same-site"),
     CROSS_ORIGIN("cross-origin");
@@ -51,6 +51,21 @@ public enum CrossOriginResourcePolicy {
             }
         }
         return null;
+    }
+
+    @Override
+    public int length() {
+        return value.length();
+    }
+
+    @Override
+    public char charAt(int index) {
+        return value.charAt(index);
+    }
+
+    @Override
+    public CharSequence subSequence(int start, int end) {
+        return value.subSequence(start, end);
     }
 
     /**
