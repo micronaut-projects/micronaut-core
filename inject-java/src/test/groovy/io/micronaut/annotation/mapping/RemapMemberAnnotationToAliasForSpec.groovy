@@ -703,6 +703,115 @@ class OverridesTest {
             patterns[2].stringValue('regexp').get() == 'over'
     }
 
+    void 'test literal AliasFor applies defaults only when opted in'() {
+        given:
+            def definition = buildBeanDefinition('addann.LiteralDefaultsTest', '''
+package addann;
+
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Executable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface SizeLike {
+    int min() default 0;
+    int max() default 100;
+}
+
+@SizeLike(min = 20, max = 30)
+@Retention(RetentionPolicy.RUNTIME)
+@interface ComposedSize {
+
+    @AliasFor(annotation = SizeLike.class, member = "min", applyDefault = true)
+    int min() default 5;
+
+    @AliasFor(annotation = SizeLike.class, member = "max")
+    int max() default 6;
+}
+
+@Bean
+class LiteralDefaultsTest {
+
+    @ComposedSize
+    @Executable
+    public String getValue() {
+        return "";
+    }
+}
+''')
+            def metadata = definition.getRequiredMethod("getValue").getAnnotationMetadata()
+
+        expect: 'a literal applyDefault alias uses the overriding member default'
+            metadata.intValue('addann.SizeLike', 'min').getAsInt() == 5
+
+        and: 'a literal alias without applyDefault does not use the overriding member default'
+            metadata.intValue('addann.SizeLike', 'max').getAsInt() == 30
+    }
+
+    void 'test literal AliasFor index targets one repeatable stereotype and the default index targets all'() {
+        given:
+            def definition = buildBeanDefinition('addann.LiteralIndexTest', '''
+package addann;
+
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Executable;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Repeatable(PatternLikeList.class)
+@interface PatternLike {
+    String regexp();
+    String message() default "pattern";
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface PatternLikeList {
+    PatternLike[] value();
+}
+
+@PatternLike(regexp = "first")
+@PatternLike(regexp = "second")
+@Retention(RetentionPolicy.RUNTIME)
+@interface ComposedPattern {
+
+    @AliasFor(annotation = PatternLike.class, member = "regexp", index = 1)
+    String regex();
+
+    @AliasFor(annotation = PatternLike.class, member = "message")
+    String patternMessage();
+}
+
+@Bean
+class LiteralIndexTest {
+
+    @ComposedPattern(regex = "selected", patternMessage = "overridden")
+    @Executable
+    public String getValue() {
+        return "";
+    }
+}
+''')
+            def metadata = definition.getRequiredMethod("getValue").getAnnotationMetadata()
+
+        when:
+            def patternType = (Class) definition.getClass().getClassLoader().loadClass('addann.PatternLike')
+            def patterns = metadata.getAnnotationValuesByType(patternType)
+
+        then: 'the indexed literal alias changes only the selected occurrence'
+            patterns.size() == 2
+            patterns[0].stringValue('regexp').get() == 'first'
+            patterns[1].stringValue('regexp').get() == 'selected'
+
+        and: 'the default index applies the alias to every occurrence'
+            patterns[0].stringValue('message').get() == 'overridden'
+            patterns[1].stringValue('message').get() == 'overridden'
+    }
+
     static class MyOverridesTransformer implements TypedAnnotationTransformer<MyOverrides> {
 
         @Override
