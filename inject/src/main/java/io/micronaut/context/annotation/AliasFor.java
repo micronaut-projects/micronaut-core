@@ -49,4 +49,26 @@ public @interface AliasFor {
      * If not specified the alias is applied to the current annotation.
      */
     String annotationName() default "";
+
+    /**
+     * When the aliased {@link #annotation()} is a repeatable annotation declared multiple times as a
+     * stereotype of the annotation this member belongs to, selects which occurrence (in declaration
+     * order, starting at zero) the alias applies to. The default of {@code -1} applies the alias to
+     * every declared occurrence.
+     *
+     * @return The occurrence index of the aliased repeatable annotation
+     * @since 5.2
+     */
+    int index() default -1;
+
+    /**
+     * Whether the alias should also be applied using the member's default value when the member is
+     * not explicitly set. By default, aliases only apply to explicitly set members. This allows
+     * modelling semantics such as {@code jakarta.validation.OverridesAttribute}, where the
+     * overriding member's default value replaces the value declared on the aliased annotation.
+     *
+     * @return Whether to apply the alias for the member's default value
+     * @since 5.2
+     */
+    boolean applyDefault() default false;
 }

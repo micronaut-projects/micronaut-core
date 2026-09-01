@@ -87,6 +87,28 @@ include::http-client-core/src/main/java/io/micronaut/http/client/annotation/Clie
 
 With these aliases in place, whether you define `@Client("foo")` or `@Client(id="foo")`, both the `value` and `id` members will be set, making it easier to parse and work with the annotation.
 
+==== Aliasing Members of Other Annotations
+
+An alias can also target a member of a different annotation by setting the `annotation()` (or `annotationName()`) member of ann:io.micronaut.context.annotation.AliasFor[]. When the annotated member is set, the aliased annotation receives the value as a stereotype of the annotation being processed. If the targeted annotation is already declared as a stereotype, the aliased value *overrides* the declared member value instead of contributing a second annotation.
+
+Two additional members refine this behaviour:
+
+* `applyDefault()` - by default an alias only applies when the member is explicitly set at the use site. With `applyDefault = true` the alias also applies the member's *default* value. This allows modelling semantics such as `jakarta.validation.OverridesAttribute`, where the overriding member's default replaces the value declared on the composed constraint.
+* `index()` - when the aliased annotation is repeatable and declared multiple times as a stereotype, `index` selects which occurrence (in declaration order, starting at zero) the alias overrides. The default of `-1` applies the alias to every declared occurrence, and an index outside the declared occurrences is ignored.
+
+For example:
+
+snippet::io.micronaut.docs.inject.aliasfor.ComposedZip[tags="imports, class", indent=0, title="Overriding a Member of a Declared Stereotype"]
+
+<1> `@Size` is declared as a stereotype with `max` set to `5`
+<2> The `max()` member aliases `Size.max`, overriding the declared value
+
+Any use of `@ComposedZip` therefore produces `@Size(min = 5, max = 10)` in the metadata — `max` comes from the `max()` default because `applyDefault` is `true` — while `@ComposedZip(max = 20)` produces `@Size(min = 5, max = 20)`.
+
+NOTE: `index()` is only computed for annotations processed from Java and Groovy sources. The Kotlin (KSP) annotation metadata builder does not extract repeatable stereotype containers, so a repeatable annotation declared multiple times on a Kotlin annotation class cannot be targeted by index.
+
+Annotations that cannot depend on Micronaut can participate in alias resolution through an api:io.micronaut.inject.annotation.AnnotationTransformer[]: when an annotation member carries no literal `@AliasFor`, the registered transformers are applied to the member's annotations, and any produced `@AliasFor` values are processed as if declared directly (a produced alias without a `member` value defaults to the annotated member's own name). This is how, for example, `jakarta.validation.OverridesAttribute` can be remapped to `@AliasFor` by a validation annotation processor.
+
 If you do not have control over the annotation, another approach is to use an api:io.micronaut.inject.annotation.AnnotationMapper[]. To create an `AnnotationMapper`, do the following:
 
 * Implement the api:io.micronaut.inject.annotation.AnnotationMapper[] interface

@@ -5,3 +5,5 @@ io.micronaut.annotation.mapping.TransformsToRepeatableAnnotationSpec$TheAnnotati
 io.micronaut.annotation.mapping.TransformNotInheritedAnnotationSpec$TheAnnotationMapper
 io.micronaut.annotation.mapping.TransformToInheritedAnnotationSpec$TheAnnotationMapper
 io.micronaut.inject.autowired.AutowiredTransformer
+io.micronaut.annotation.mapping.RemapMemberAnnotationToAliasForSpec$MyOverridesTransformer
+io.micronaut.annotation.mapping.RemapMemberAnnotationToAliasForSpec$MyOverridesListTransformer
