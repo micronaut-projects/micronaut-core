@@ -107,7 +107,9 @@ internal class KotlinVisitorContext(
     private fun computeRepeatableContainerNameForType(annotationType: KSAnnotated): String? {
         val name = Repeatable::class.java.name
         val repeatable = annotationType.annotations.find {
-            it.annotationType.resolve().declaration.qualifiedName?.asString() == name
+            // Resolve through getAnnotationTypeName so that Kotlin's @JvmRepeatable,
+            // a typealias for java.lang.annotation.Repeatable, is detected as well
+            getAnnotationTypeName(it) == name
         }
         if (repeatable != null) {
             val value = repeatable.arguments.find { it.name?.asString() == "value" }?.value
