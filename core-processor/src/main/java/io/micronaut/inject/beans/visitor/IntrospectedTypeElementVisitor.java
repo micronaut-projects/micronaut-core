@@ -49,8 +49,10 @@ import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -76,6 +78,15 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     private static final String ANN_LOMBOK_BUILDER = "lombok.Builder";
 
     private final Set<String> processed = new HashSet<>();
+    /**
+     * The introspections written during this compilation, keyed by the generated introspection class
+     * name and holding the name of the type the introspection was generated for. An introspection
+     * generated on behalf of another element (via {@link Introspected#classNames()},
+     * {@link Introspected#classes()} or {@link io.micronaut.context.annotation.ClassImport}) is not
+     * named after the type it introspects, so this is the only reliable way to detect that the same
+     * introspection is about to be written twice.
+     */
+    private final Map<String, String> writtenIntrospections = new HashMap<>();
 
     @Override
     public int getOrder() {
@@ -100,6 +111,28 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
     private boolean isIntrospected(VisitorContext context, ClassElement c) {
         return processed.contains(c.getName()) || context.getClassElement(c.getPackageName() + ".$" + c.getSimpleName() + "$Introspection").isPresent();
+    }
+
+    /**
+     * Claims the introspection about to be written by the given writer.
+     *
+     * @param beanClassElement The introspected type
+     * @param writer           The writer
+     * @return {@code true} if the very same introspection was already written during this compilation
+     * and should not be written again
+     */
+    private boolean isAlreadyWritten(ClassElement beanClassElement, BeanIntrospectionWriter writer) {
+        String introspectionName = writer.getIntrospectionName();
+        String previous = writtenIntrospections.putIfAbsent(introspectionName, beanClassElement.getName());
+        if (previous == null) {
+            return false;
+        }
+        if (!previous.equals(beanClassElement.getName())) {
+            throw new ProcessingException(beanClassElement, "Introspection '" + introspectionName
+                + "' cannot be generated for '" + beanClassElement.getName()
+                + "' because it is already generated for '" + previous + "'");
+        }
+        return true;
     }
 
     private void processIntrospected(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected) {
@@ -442,6 +475,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     .forEach(builderWriter::visitBeanMethod);
 
                 processed.add(classToBuild.getName());
+                if (isAlreadyWritten(builderType, builderWriter)) {
+                    return;
+                }
                 for (OutputObjectDef outputObjectDef : builderWriter.build()) {
                     write(outputObjectDef, context);
                 }
@@ -472,6 +508,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 ClassElement ce,
                                 BeanIntrospectionWriter writer,
                                 VisitorContext context) {
+        if (isAlreadyWritten(ce, writer)) {
+            processed.add(ce.getName());
+            return;
+        }
         List<PropertyElement> beanProperties = ce.getBeanProperties(propertyElementQuery).stream()
             .filter(p -> !p.isExcluded())
             .toList();

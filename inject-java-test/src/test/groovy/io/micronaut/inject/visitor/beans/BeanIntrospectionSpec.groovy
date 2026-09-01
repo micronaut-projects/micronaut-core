@@ -6043,6 +6043,154 @@ class PrivateNoAccessors {
         e.message.contains("the field is not accessible for visibility [DEFAULT]")
     }
 
+    void "test a nested type named on classNames is introspected once"() {
+        given:
+        ApplicationContext context = buildContext('test.Holder', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotNull;
+
+@Introspected(classNames = {"test.Outer$Nested"})
+class Holder {}
+
+class Outer {
+    static class Nested {
+        @NotNull private String name;
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+    }
+}
+
+class Unrelated1 {}
+
+class Unrelated2 {}
+''')
+
+        when:
+        def reference = context.classLoader.loadClass('test.$test_Outer$Nested$Introspection').newInstance()
+
+        then:
+        reference instanceof BeanIntrospectionReference
+        reference.load().beanType.name == 'test.Outer$Nested'
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test a nested type imported with ClassImport is introspected once"() {
+        given:
+        ApplicationContext context = buildContext('test.Holder', '''
+package test;
+
+import io.micronaut.context.annotation.ClassImport;
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotNull;
+
+@ClassImport(classes = {test.Outer.Nested.class}, annotate = Introspected.class)
+class Holder {}
+
+class Outer {
+    public static class Nested {
+        @NotNull private String name;
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+    }
+}
+
+class Unrelated1 {}
+
+class Unrelated2 {}
+''')
+
+        when:
+        def reference = context.classLoader.loadClass('test.$test_Outer$Nested$Introspection').newInstance()
+
+        then:
+        reference instanceof BeanIntrospectionReference
+        reference.load().beanType.name == 'test.Outer$Nested'
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test a type imported by two importers is introspected once"() {
+        given:
+        ApplicationContext context = buildContext('test.Holder', '''
+package test;
+
+import io.micronaut.context.annotation.ClassImport;
+import io.micronaut.core.annotation.Introspected;
+
+@ClassImport(classes = {test.Outer.Nested.class}, annotate = Introspected.class)
+class Holder {}
+
+@ClassImport(classes = {test.Outer.Nested.class}, annotate = Introspected.class)
+class Holder2 {}
+
+class Outer {
+    public static class Nested {
+        private String name;
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+    }
+}
+''')
+
+        when:
+        def reference = context.classLoader.loadClass('test.$test_Outer$Nested$Introspection').newInstance()
+
+        then:
+        reference instanceof BeanIntrospectionReference
+        reference.load().beanType.name == 'test.Outer$Nested'
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test a builder shared by two introspected types is generated once"() {
+        given:
+        ApplicationContext context = buildContext('test.Holder', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(classNames = {"test.A", "test.B"})
+class Holder {}
+
+@Introspected(builder = @Introspected.IntrospectionBuilder(builderClass = SharedBuilder.class))
+class A {
+    private String name;
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+}
+
+@Introspected(builder = @Introspected.IntrospectionBuilder(builderClass = SharedBuilder.class))
+class B {
+    private String name;
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+}
+
+class SharedBuilder {
+    private String name;
+    public SharedBuilder name(String name) { this.name = name; return this; }
+    public A buildA() { A a = new A(); a.setName(name); return a; }
+    public B buildB() { B b = new B(); b.setName(name); return b; }
+}
+''')
+
+        when:
+        def reference = context.classLoader.loadClass('test.$test_SharedBuilder$Introspection').newInstance()
+
+        then:
+        reference instanceof BeanIntrospectionReference
+        reference.load().beanType.name == 'test.SharedBuilder'
+
+        cleanup:
+        context?.close()
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {

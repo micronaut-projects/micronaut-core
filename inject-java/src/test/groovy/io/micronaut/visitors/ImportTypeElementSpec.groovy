@@ -135,6 +135,63 @@ class Importer {
             DefaultTypeElementVisitor.cleanup()
     }
 
+    void 'test an imported class is visited once when other classes are compiled alongside the importer'() {
+        when:
+            DefaultTypeElementVisitor.ENABLED = true
+            def definition = buildBeanDefinition('test.Importer', '''
+package test;
+
+import io.micronaut.context.annotation.ClassImport;
+import io.micronaut.context.annotation.Prototype;
+
+@Prototype
+@ClassImport(classes = io.micronaut.visitors.MySimpleClass.class)
+class Importer {
+}
+
+class Other1 {
+}
+
+class Other2 {
+}
+
+''')
+        then:
+            definition
+            DefaultTypeElementVisitor.VISITED_CLASSES.count { it.name == 'io.micronaut.visitors.MySimpleClass' } == 1
+
+        cleanup:
+            DefaultTypeElementVisitor.cleanup()
+    }
+
+    void 'test a class imported by two importers is visited once'() {
+        when:
+            DefaultTypeElementVisitor.ENABLED = true
+            def definition = buildBeanDefinition('test.Importer', '''
+package test;
+
+import io.micronaut.context.annotation.ClassImport;
+import io.micronaut.context.annotation.Prototype;
+
+@Prototype
+@ClassImport(classes = io.micronaut.visitors.MySimpleClass.class)
+class Importer {
+}
+
+@Prototype
+@ClassImport(classes = io.micronaut.visitors.MySimpleClass.class)
+class Importer2 {
+}
+
+''')
+        then:
+            definition
+            DefaultTypeElementVisitor.VISITED_CLASSES.count { it.name == 'io.micronaut.visitors.MySimpleClass' } == 1
+
+        cleanup:
+            DefaultTypeElementVisitor.cleanup()
+    }
+
     static class DefaultTypeElementVisitor implements TypeElementVisitor<Object, Object> {
 
         static boolean ENABLED = false
