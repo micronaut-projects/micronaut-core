@@ -51,7 +51,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -311,10 +310,12 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      * @since 5.2.0
      */
     protected void setCrossOriginEmbedderPolicy(HttpServerConfiguration.CorsConfiguration corsConfiguration, MutableHttpResponse<?> response) {
-        populateResponseHttpHeaderIfNotSet(CROSS_ORIGIN_EMBEDDER_POLICY, () -> {
+        if (!response.getHeaders().contains(CROSS_ORIGIN_EMBEDDER_POLICY)) {
             CrossOriginEmbedderPolicy value = corsConfiguration.getCrossOriginEmbedderPolicy();
-            return value == null ? null : value.toString();
-        }, response);
+            if (value != null) {
+                response.header(CROSS_ORIGIN_EMBEDDER_POLICY, value);
+            }
+        }
     }
 
     /**
@@ -325,17 +326,12 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      * @since 5.2.0
      */
     protected void setCrossOriginResourcePolicy(HttpServerConfiguration.CorsConfiguration corsConfiguration, MutableHttpResponse<?> response) {
-        Supplier<@Nullable String> headerValueSupplier = new Supplier<>() {
-            @Override
-            public @Nullable String get() {
-                CrossOriginResourcePolicy value = corsConfiguration.getCrossOriginResourcePolicy();
-                if (value != null) {
-                    return value.toString();
-                }
-                return null;
+        if (!response.getHeaders().contains(CROSS_ORIGIN_RESOURCE_POLICY)) {
+            CrossOriginResourcePolicy value = corsConfiguration.getCrossOriginResourcePolicy();
+            if (value != null) {
+                response.header(CROSS_ORIGIN_RESOURCE_POLICY, value);
             }
-        };
-        populateResponseHttpHeaderIfNotSet(CROSS_ORIGIN_RESOURCE_POLICY, headerValueSupplier, response);
+        }
     }
 
     /**
@@ -570,15 +566,4 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         return methods;
     }
 
-    private static void populateResponseHttpHeaderIfNotSet(String headerName,
-                                                           Supplier<@Nullable String> headerValueSupplier,
-                                                           MutableHttpResponse<?> response) {
-        if (response.getHeaders().contains(headerName)) {
-            return;
-        }
-        var value = headerValueSupplier.get();
-        if (value != null) {
-            response.header(headerName, value);
-        }
-    }
 }
