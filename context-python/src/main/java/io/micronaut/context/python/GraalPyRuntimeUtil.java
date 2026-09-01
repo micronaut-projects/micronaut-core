@@ -267,6 +267,9 @@ public final class GraalPyRuntimeUtil {
      * @return The coerced value
      */
     public static @Nullable Object coerceToContext(@Nullable Object value, Context context) {
+        if (isInteropPrimitive(value)) {
+            return value;
+        }
         return withContextConversion(context, () -> coerceToContext0(value, context));
     }
 
@@ -347,6 +350,9 @@ public final class GraalPyRuntimeUtil {
      * @return The coerced value
      */
     public static @Nullable Object coerceToContext(@Nullable Object value, Context context, Class<?> declaredType) {
+        if (isInteropPrimitive(value)) {
+            return value;
+        }
         return withContextConversion(context, () -> coerceToContext0(value, context, declaredType));
     }
 
@@ -401,11 +407,11 @@ public final class GraalPyRuntimeUtil {
     public static Value coercePooledValue(PooledValueCoercible value, Context context) {
         return withContextConversion(context, () -> {
             ContextConversion conversion = CURRENT_CONTEXT_CONVERSION.get();
-            Value existing = conversion.values.get(value);
+            Value existing = conversion.get(value);
             if (existing != null) {
                 return existing;
             }
-            if (conversion.inProgress.put(value, Boolean.TRUE) != null) {
+            if (!conversion.begin(value)) {
                 throw new IllegalStateException(
                     "Cyclic Python wrapper cannot be reconstructed before its target instance is allocated: "
                         + value.getClass().getName()
@@ -413,10 +419,10 @@ public final class GraalPyRuntimeUtil {
             }
             try {
                 Value reconstructed = value.reconstructPolyglotValue(context);
-                conversion.values.put(value, reconstructed);
+                conversion.remember(value, reconstructed);
                 return reconstructed;
             } finally {
-                conversion.inProgress.remove(value);
+                conversion.end(value);
             }
         });
     }
@@ -435,7 +441,7 @@ public final class GraalPyRuntimeUtil {
             || !value.getContext().equals(context)) {
             throw new IllegalStateException("No matching Python context conversion is active");
         }
-        CURRENT_CONTEXT_CONVERSION.get().values.put(source, value);
+        CURRENT_CONTEXT_CONVERSION.get().remember(source, value);
     }
 
     private static <T> T withContextConversion(Context context, Supplier<T> operation) {
@@ -534,6 +540,16 @@ public final class GraalPyRuntimeUtil {
      * @return The coerced arguments
      */
     public static Object[] coerceArgumentsToContext(Context context, Object[] args) {
+        boolean conversionRequired = false;
+        for (Object arg : args) {
+            if (!isInteropPrimitive(arg)) {
+                conversionRequired = true;
+                break;
+            }
+        }
+        if (!conversionRequired) {
+            return args;
+        }
         return withContextConversion(context, () -> {
             Object[] result = new Object[args.length];
             for (int i = 0; i < args.length; i++) {
@@ -608,11 +624,35 @@ public final class GraalPyRuntimeUtil {
 
     private static final class ContextConversion {
         private final Context context;
-        private final IdentityHashMap<PooledValueCoercible, Value> values = new IdentityHashMap<>();
-        private final IdentityHashMap<PooledValueCoercible, Boolean> inProgress = new IdentityHashMap<>();
+        private @Nullable IdentityHashMap<PooledValueCoercible, Value> values;
+        private @Nullable IdentityHashMap<PooledValueCoercible, Boolean> inProgress;
 
         private ContextConversion(Context context) {
             this.context = context;
+        }
+
+        private @Nullable Value get(PooledValueCoercible value) {
+            return values == null ? null : values.get(value);
+        }
+
+        private void remember(PooledValueCoercible source, Value value) {
+            if (values == null) {
+                values = new IdentityHashMap<>();
+            }
+            values.put(source, value);
+        }
+
+        private boolean begin(PooledValueCoercible value) {
+            if (inProgress == null) {
+                inProgress = new IdentityHashMap<>();
+            }
+            return inProgress.put(value, Boolean.TRUE) == null;
+        }
+
+        private void end(PooledValueCoercible value) {
+            if (inProgress != null) {
+                inProgress.remove(value);
+            }
         }
     }
 

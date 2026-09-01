@@ -429,6 +429,15 @@ class GraalPyRuntimeUtilTest {
     }
 
     @Test
+    void interopPrimitiveArgumentsUseFastPath() {
+        Object[] arguments = {null, 1, true, "value"};
+
+        assertSame(arguments, GraalPyRuntimeUtil.coerceArgumentsToContext(context, arguments));
+        assertSame(arguments[3], GraalPyRuntimeUtil.coerceToContext(arguments[3], context));
+        assertSame(arguments[3], GraalPyRuntimeUtil.coerceToContext(arguments[3], context, String.class));
+    }
+
+    @Test
     void pooledConversionSupportsCyclesAfterTargetAllocation() {
         PooledValueCoercible node = new PooledValueCoercible() {
             @Override
