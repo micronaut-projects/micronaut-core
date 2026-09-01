@@ -32,6 +32,8 @@ import java.util.List;
 @Internal
 final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implements DependentBeanProvider {
     private final BeanContext beanContext;
+    private final java.util.concurrent.atomic.AtomicBoolean closed =
+        new java.util.concurrent.atomic.AtomicBoolean();
     @Nullable
     private final List<BeanRegistration<?>> dependents;
     @Nullable
@@ -62,7 +64,13 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
 
     @Override
     public void close() {
-        beanContext.destroyBean(this);
+        // idempotent, as AutoCloseable asks an implementation to be: destroying a bean runs its pre-destroy
+        // listeners, its @PreDestroy and its disposer, and a registration closed twice — by a
+        // try-with-resources and an explicit close, or by two owners that each believe they hold it — must
+        // not run them twice
+        if (closed.compareAndSet(false, true)) {
+            beanContext.destroyBean(this);
+        }
     }
 
     @Nullable
