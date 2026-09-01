@@ -537,4 +537,109 @@ class ExecutableConstructorBean {
         definition.findMethod('<init>').isEmpty()
         definition.findMethod('describe').isPresent()
     }
+
+    void "test executable method is created for a static method"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.StaticExecutableBean','''\
+package test;
+
+import io.micronaut.context.annotation.Executable;
+import jakarta.inject.Singleton;
+
+@Singleton
+class StaticExecutableBean {
+
+    @Executable
+    public static String staticMethod(String name) {
+        return "static " + name;
+    }
+
+    @Executable
+    public String instanceMethod(String name) {
+        return "instance " + name;
+    }
+}
+''')
+        expect:
+        definition != null
+        definition.findMethod('staticMethod', String).isPresent()
+        definition.findMethod('staticMethod', String).get().declaringType == definition.beanType
+        definition.findMethod('staticMethod', String).get().returnType.type == String
+
+        and: 'the static method can be invoked without an instance'
+        definition.findMethod('staticMethod', String).get().invoke(null, 'foo') == 'static foo'
+        definition.findMethod('instanceMethod', String).isPresent()
+    }
+
+    void "test executable method is created for a static method meta-annotated as executable"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.StaticMetaExecutableBean','''\
+package test;
+
+import io.micronaut.inject.executable.RepeatableExecutable;
+import jakarta.inject.Singleton;
+
+@Singleton
+class StaticMetaExecutableBean {
+
+    @RepeatableExecutable("a")
+    public static String staticMethod(String name) {
+        return "static " + name;
+    }
+}
+''')
+        expect:
+        definition != null
+        definition.findMethod('staticMethod', String).isPresent()
+        definition.findMethod('staticMethod', String).get().invoke(null, 'foo') == 'static foo'
+    }
+
+    void "test @Executable on the class does not make static methods executable"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.ClassExecutableBean','''\
+package test;
+
+import io.micronaut.context.annotation.Executable;
+import jakarta.inject.Singleton;
+
+@Singleton
+@Executable
+class ClassExecutableBean {
+
+    public static String staticMethod(String name) {
+        return "static " + name;
+    }
+
+    public String instanceMethod(String name) {
+        return "instance " + name;
+    }
+}
+''')
+        expect:
+        definition != null
+        definition.findMethod('instanceMethod', String).isPresent()
+        definition.findMethod('staticMethod', String).isEmpty()
+    }
+
+    void "test a static method with adapter advice is still ignored"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.StaticEventListenerBean','''\
+package test;
+
+import io.micronaut.context.event.StartupEvent;
+import io.micronaut.runtime.event.annotation.EventListener;
+import jakarta.inject.Singleton;
+
+@Singleton
+class StaticEventListenerBean {
+
+    @EventListener
+    public static void onStartup(StartupEvent event) {
+    }
+}
+''')
+        expect: 'adapter advice needs a bean instance to adapt, so the static method is not executable'
+        definition != null
+        definition.findMethod('onStartup', io.micronaut.context.event.StartupEvent).isEmpty()
+    }
 }
