@@ -1,5 +1,6 @@
 import io.micronaut.build.docs.PublishGuideTask
 import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.javadoc.Javadoc
 
 plugins {
     id "io.micronaut.build.internal.parent"
@@ -36,6 +37,12 @@ tasks.withType(PublishGuideTask).configureEach {
     inputs.files(languageSnippetSources)
             .withPropertyName("languageSnippetSources")
             .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+tasks.named("javadoc", Javadoc) {
+    // This task aggregates sources from modules that contain split packages.
+    modularity.inferModulePath.set(false)
+    exclude("**/module-info.java")
 }
 
 tasks.named("updateVersionCatalogs") {
