@@ -71,9 +71,12 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
                 return ExecutionFlow.error(t);
             }
         } else if (publisher instanceof FlowAsMono<T> flowAsMono) {
-            // unwrap directly
-            //noinspection unchecked
-            return (ExecutionFlow<T>) flowAsMono.flow;
+            ImperativeExecutionFlow<?> completed = flowAsMono.flow.tryComplete();
+            if (completed != null) {
+                //noinspection unchecked
+                return (ExecutionFlow<T>) completed;
+            }
+            // An incomplete flow may be shared. Subscribe below to create an independent flow.
         }
 
         // special subscriber that (a) contains the propagated context and (b) can return an

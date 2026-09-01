@@ -151,6 +151,48 @@ class ReactorExecutionFlowImplSpec extends Specification {
         flow.tryCompleteValue() == "foobar"
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12940")
+    def 'defuse incomplete FlowAsMono creates independent flows'() {
+        given:
+        Hooks.resetOnOperatorDebug()
+        DelayedExecutionFlow<String> source = DelayedExecutionFlow.create()
+        def mono = ReactorExecutionFlowImpl.toMono(source)
+
+        when:
+        def first = ReactorExecutionFlowImpl.defuse(mono, PropagatedContext.empty())
+        def second = ReactorExecutionFlowImpl.defuse(mono, PropagatedContext.empty())
+
+        then:
+        !first.is(source)
+        !second.is(source)
+        !first.is(second)
+        first.tryComplete() == null
+        second.tryComplete() == null
+
+        when:
+        source.complete("foo")
+
+        then:
+        first.tryCompleteValue() == "foo"
+        second.tryCompleteValue() == "foo"
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12940")
+    def 'defuse completed FlowAsMono preserves immediate flow'() {
+        given:
+        Hooks.resetOnOperatorDebug()
+        DelayedExecutionFlow<String> source = DelayedExecutionFlow.create()
+        def mono = ReactorExecutionFlowImpl.toMono(source)
+        source.complete("foo")
+
+        when:
+        def flow = ReactorExecutionFlowImpl.defuse(mono, PropagatedContext.empty())
+
+        then:
+        flow instanceof ImperativeExecutionFlow
+        flow.tryCompleteValue() == "foo"
+    }
+
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/11744")
     def 'double cancel'() {
         given:
