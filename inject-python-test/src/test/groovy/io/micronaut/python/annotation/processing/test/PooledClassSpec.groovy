@@ -59,6 +59,7 @@ class PoolController:
         server.start()
         def client = context.createBean(HttpClient, server.URL)
         def executor = Executors.newFixedThreadPool(4)
+        warmPool(context, executor, 4)
 
         when:
         def getCtxId = readerClass.getMethod("get_ctx_id")

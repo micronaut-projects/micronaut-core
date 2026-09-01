@@ -23,6 +23,7 @@ import io.micronaut.context.DefaultBeanDefinitionsProvider
 import io.micronaut.context.Qualifier
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.context.python.PythonContextRuntime
+import io.micronaut.context.python.PythonContextExecutor
 import io.micronaut.core.io.IOUtils
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.core.beans.BeanIntrospection
@@ -42,6 +43,8 @@ import spock.lang.Specification
 import javax.tools.JavaFileObject
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Base class to extend from to allow compilation of Python sources
@@ -259,6 +262,27 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
      * @param contextBuilder The context builder
      */
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
+    }
+
+    protected static void warmPool(ApplicationContext context, def executor, int size) {
+        def contextExecutor = context.getBean(PythonContextExecutor)
+        def acquired = new CountDownLatch(size)
+        def release = new CountDownLatch(1)
+        def futures = (1..size).collect {
+            executor.submit {
+                contextExecutor.withContext {
+                    acquired.countDown()
+                    release.await()
+                    null
+                }
+            }
+        }
+        try {
+            assert acquired.await(30, TimeUnit.SECONDS)
+        } finally {
+            release.countDown()
+        }
+        futures.each { it.get(30, TimeUnit.SECONDS) }
     }
 
     /**

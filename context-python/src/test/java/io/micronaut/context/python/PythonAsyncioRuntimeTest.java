@@ -35,6 +35,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -49,6 +50,7 @@ import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -285,6 +287,51 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
+    void disabledPoolUsesPrimaryContextWithoutCreatingPooledContexts() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", false
+        ))) {
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            Context first = pool.withContext(context -> context);
+            Context second = pool.withContext(context -> context);
+
+            assertSame(PythonContextRuntime.getContext(), first);
+            assertSame(first, second);
+            assertEquals(0, pool.pooledContextCount());
+            assertEquals(0, pool.availableContextCount());
+        }
+    }
+
+    @Test
+    void conversionFailureReleasesBorrowedContext() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            PooledValueCoercible failing = new PooledValueCoercible() {
+                @Override
+                public Value asPolyglotValue() {
+                    throw new AssertionError("Primary conversion should not be used");
+                }
+
+                @Override
+                public Value asPolyglotValue(Context context) {
+                    throw new IllegalArgumentException("conversion failed");
+                }
+            };
+
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                pool.withContext(context -> GraalPyRuntimeUtil.coerceToContext(failing, context))
+            );
+
+            assertEquals("conversion failed", exception.getMessage());
+            assertEquals(1, pool.pooledContextCount());
+            assertEquals(1, pool.availableContextCount());
+        }
+    }
+
+    @Test
     void concurrentBorrowsGrowToConfiguredSizeAndThenWait() throws Exception {
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
@@ -297,8 +344,7 @@ final class PythonAsyncioRuntimeTest {
             assertEquals(2, pool.pooledContextCount());
 
             Future<Context> waitingBorrow = executorService.submit(pool::borrow);
-            Thread.sleep(200);
-            assertFalse(waitingBorrow.isDone());
+            assertThrows(TimeoutException.class, () -> waitingBorrow.get(200, TimeUnit.MILLISECONDS));
 
             pool.release(first);
             Context third = waitingBorrow.get(5, TimeUnit.SECONDS);
@@ -308,6 +354,96 @@ final class PythonAsyncioRuntimeTest {
             } finally {
                 pool.release(second);
                 pool.release(third);
+            }
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+    @Test
+    void waitingBorrowFailsWhenPoolCloses() throws Exception {
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            Context borrowed = pool.borrow();
+            Future<Context> waitingBorrow = executorService.submit(pool::borrow);
+            assertThrows(TimeoutException.class, () -> waitingBorrow.get(100, TimeUnit.MILLISECONDS));
+
+            pool.shutdownGracefully().toCompletableFuture().get(1, TimeUnit.SECONDS);
+
+            ExecutionException failure = assertThrows(
+                ExecutionException.class,
+                () -> waitingBorrow.get(1, TimeUnit.SECONDS)
+            );
+            assertEquals("Pool closed", assertInstanceOf(IllegalStateException.class, failure.getCause()).getMessage());
+            pool.release(borrowed);
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+    @Test
+    void waitingBorrowRespondsToInterruption() throws Exception {
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1
+        ))) {
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            Context borrowed = pool.borrow();
+            Future<Context> waitingBorrow = executorService.submit(pool::borrow);
+            assertThrows(TimeoutException.class, () -> waitingBorrow.get(100, TimeUnit.MILLISECONDS));
+
+            assertTrue(waitingBorrow.cancel(true));
+            assertTrue(executorService.submit(() -> true).get(1, TimeUnit.SECONDS));
+            pool.release(borrowed);
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+    @Test
+    void releasedContextCanBeBorrowedWhileAnotherContextIsBeingCreated() throws Exception {
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 2
+        ))) {
+            PythonPool pool = applicationContext.getBean(PythonPool.class);
+            Context first = pool.borrow();
+            Context expectedReuse = first;
+            Context second = null;
+            Context reused = null;
+            BlockingGraalPyContextCustomizer.Gate gate = BlockingGraalPyContextCustomizer.blockNextContext();
+            try {
+                Future<Context> creatingBorrow = executorService.submit(pool::borrow);
+                assertTrue(gate.entered.await(5, TimeUnit.SECONDS));
+
+                Future<Context> waitingBorrow = executorService.submit(pool::borrow);
+                assertThrows(TimeoutException.class, () -> waitingBorrow.get(100, TimeUnit.MILLISECONDS));
+
+                pool.release(first);
+                first = null;
+                reused = waitingBorrow.get(1, TimeUnit.SECONDS);
+                assertSame(expectedReuse, reused);
+
+                gate.proceed.countDown();
+                second = creatingBorrow.get(5, TimeUnit.SECONDS);
+                assertEquals(2, pool.pooledContextCount());
+            } finally {
+                gate.proceed.countDown();
+                if (first != null) {
+                    pool.release(first);
+                }
+                if (second != null) {
+                    pool.release(second);
+                }
+                if (reused != null) {
+                    pool.release(reused);
+                }
             }
         } finally {
             executorService.shutdownNow();
@@ -958,6 +1094,31 @@ final class PythonAsyncioRuntimeTest {
             CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
 
             assertEquals("demo:backend", stage.toCompletableFuture().get(1, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void asyncMemberValueReconstructsPythonWrapperInTargetContext() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, "type('Target', (), {})()");
+            PooledValueCoercible client = new PooledValueCoercible() {
+                @Override
+                public Value asPolyglotValue() {
+                    throw new AssertionError("Primary conversion should not be used");
+                }
+
+                @Override
+                public Value asPolyglotValue(Context targetContext) {
+                    assertEquals(context, targetContext);
+                    return targetContext.eval(PYTHON, "type('Client', (), {'name': 'python-client'})()");
+                }
+            };
+
+            Object adapted = GraalPyRuntimeUtil.asyncMemberValue(target, client);
+            GraalPyRuntimeUtil.putMember(target, "client", adapted);
+
+            assertEquals("python-client", target.getMember("client").getMember("name").asString());
+            assertEquals(context, assertInstanceOf(Value.class, adapted).getContext());
         }
     }
 

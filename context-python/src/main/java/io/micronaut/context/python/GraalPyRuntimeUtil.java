@@ -17,9 +17,11 @@ package io.micronaut.context.python;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,6 +36,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import java.util.function.Supplier;
 
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.annotation.Internal;
@@ -71,6 +74,7 @@ public final class GraalPyRuntimeUtil {
     private static final String TO_PYTHON_STANDARD_TYPE = "__micronaut_to_python_standard_type";
     private static final String UTC_OFFSET = "__micronaut_utc_offset";
     private static final AsyncMemberAdapter ASYNC_MEMBER_ADAPTER = new AsyncMemberAdapter();
+    private static final ScopedValue<ContextConversion> CURRENT_CONTEXT_CONVERSION = ScopedValue.newInstance();
     private static final Source PUT_MEMBER_SOURCE = Source.newBuilder(PYTHON, """
         def __micronaut_put_member(target, name, value):
             setattr(target, name, value)
@@ -263,16 +267,46 @@ public final class GraalPyRuntimeUtil {
      * @return The coerced value
      */
     public static @Nullable Object coerceToContext(@Nullable Object value, Context context) {
+        if (isInteropPrimitive(value)) {
+            return value;
+        }
+        return withContextConversion(context, () -> coerceToContext0(value, context));
+    }
+
+    private static @Nullable Object coerceToContext0(@Nullable Object value, Context context) {
         Object standardType = coerceStandardTypeToContext(value, context);
         if (standardType != value) {
             return standardType;
+        }
+        if (value != null && value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            Object[] result = new Object[length];
+            for (int i = 0; i < length; i++) {
+                result[i] = coerceToContext(Array.get(value, i), context);
+            }
+            return result;
         }
         switch (value) {
             case null -> {
                 return null;
             }
             case PooledValueCoercible pooledValueCoercible -> {
-                return pooledValueCoercible.asPolyglotValue(context);
+                return coercePooledValue(pooledValueCoercible, context);
+            }
+            case ValueCoercible valueCoercible -> {
+                Value polyglotValue = valueCoercible.asPolyglotValue();
+                if (polyglotValue == null || isValueInContext(polyglotValue, context)) {
+                    return polyglotValue;
+                }
+                throw new IllegalArgumentException(
+                    "Python wrapper " + value.getClass().getName() + " cannot be reconstructed in the target context"
+                );
+            }
+            case Value polyglotValue -> {
+                if (isValueInContext(polyglotValue, context)) {
+                    return polyglotValue;
+                }
+                throw new IllegalArgumentException("Cannot pass a polyglot Value to a different context");
             }
             case List<?> list -> {
                 List<@Nullable Object> result = new ArrayList<>(list.size());
@@ -298,13 +332,6 @@ public final class GraalPyRuntimeUtil {
                 }
                 return result;
             }
-            case Object[] array -> {
-                Object[] result = new Object[array.length];
-                for (int i = 0; i < array.length; i++) {
-                    result[i] = coerceToContext(array[i], context);
-                }
-                return result;
-            }
             default -> {
             }
         }
@@ -323,6 +350,13 @@ public final class GraalPyRuntimeUtil {
      * @return The coerced value
      */
     public static @Nullable Object coerceToContext(@Nullable Object value, Context context, Class<?> declaredType) {
+        if (isInteropPrimitive(value)) {
+            return value;
+        }
+        return withContextConversion(context, () -> coerceToContext0(value, context, declaredType));
+    }
+
+    private static @Nullable Object coerceToContext0(@Nullable Object value, Context context, Class<?> declaredType) {
         if (value == null) {
             return null;
         }
@@ -333,18 +367,88 @@ public final class GraalPyRuntimeUtil {
         if (standardType != value) {
             return standardType;
         }
+        if (declaredType.isArray() && value.getClass().isArray()) {
+            return coerceToContext(value, context);
+        }
         return switch (value) {
             case PooledValueCoercible pooledValueCoercible ->
-                pooledValueCoercible.asPolyglotValue(context);
+                coercePooledValue(pooledValueCoercible, context);
+            case ValueCoercible _, Value _ -> coerceToContext0(value, context);
             case List<?> _ when List.class.equals(declaredType) ->
                 coerceToContext(value, context);
             case Map<?, ?> _ when Map.class.equals(declaredType) ->
                 coerceToContext(value, context);
             case Set<?> _ when Set.class.equals(declaredType) ->
                 coerceToContext(value, context);
-            case Object[] _ when declaredType.isArray() -> coerceToContext(value, context);
             default -> value;
         };
+    }
+
+    /**
+     * Determines whether a polyglot value belongs to the supplied context.
+     *
+     * @param value The value to inspect
+     * @param context The expected context
+     * @return Whether the value belongs to the context
+     */
+    @UsedByGeneratedCode
+    public static boolean isValueInContext(@Nullable Value value, Context context) {
+        return value != null && context.equals(value.getContext());
+    }
+
+    /**
+     * Converts a generated wrapper while preserving wrapper identity for the current conversion.
+     *
+     * @param value The generated wrapper
+     * @param context The target context
+     * @return The context-local Python value
+     */
+    @UsedByGeneratedCode
+    public static Value coercePooledValue(PooledValueCoercible value, Context context) {
+        return withContextConversion(context, () -> {
+            ContextConversion conversion = CURRENT_CONTEXT_CONVERSION.get();
+            Value existing = conversion.get(value);
+            if (existing != null) {
+                return existing;
+            }
+            if (!conversion.begin(value)) {
+                throw new IllegalStateException(
+                    "Cyclic Python wrapper cannot be reconstructed before its target instance is allocated: "
+                        + value.getClass().getName()
+                );
+            }
+            try {
+                Value reconstructed = value.reconstructPolyglotValue(context);
+                conversion.remember(value, reconstructed);
+                return reconstructed;
+            } finally {
+                conversion.end(value);
+            }
+        });
+    }
+
+    /**
+     * Registers a newly allocated Python object before generated code populates its properties.
+     *
+     * @param source The source wrapper
+     * @param context The target context
+     * @param value The newly allocated value
+     */
+    @UsedByGeneratedCode
+    public static void rememberPooledValue(PooledValueCoercible source, Context context, Value value) {
+        if (!CURRENT_CONTEXT_CONVERSION.isBound()
+            || !CURRENT_CONTEXT_CONVERSION.get().context.equals(context)
+            || !value.getContext().equals(context)) {
+            throw new IllegalStateException("No matching Python context conversion is active");
+        }
+        CURRENT_CONTEXT_CONVERSION.get().remember(source, value);
+    }
+
+    private static <T> T withContextConversion(Context context, Supplier<T> operation) {
+        if (CURRENT_CONTEXT_CONVERSION.isBound() && CURRENT_CONTEXT_CONVERSION.get().context.equals(context)) {
+            return operation.get();
+        }
+        return ScopedValue.where(CURRENT_CONTEXT_CONVERSION, new ContextConversion(context)).call(operation::get);
     }
 
     private static @Nullable Object coerceStandardTypeToContext(@Nullable Object value, Context context) {
@@ -436,11 +540,23 @@ public final class GraalPyRuntimeUtil {
      * @return The coerced arguments
      */
     public static Object[] coerceArgumentsToContext(Context context, Object[] args) {
-        Object[] result = new Object[args.length];
-        for (int i = 0; i < args.length; i++) {
-            result[i] = coerceToContext(args[i], context);
+        boolean conversionRequired = false;
+        for (Object arg : args) {
+            if (!isInteropPrimitive(arg)) {
+                conversionRequired = true;
+                break;
+            }
         }
-        return result;
+        if (!conversionRequired) {
+            return args;
+        }
+        return withContextConversion(context, () -> {
+            Object[] result = new Object[args.length];
+            for (int i = 0; i < args.length; i++) {
+                result[i] = coerceToContext0(args[i], context);
+            }
+            return result;
+        });
     }
 
     /**
@@ -470,6 +586,9 @@ public final class GraalPyRuntimeUtil {
         Context context = target.getContext();
         if (value instanceof CompletionStage<?> completionStage) {
             return PythonAsyncioRuntime.toAwaitable(context, completionStage);
+        }
+        if (value instanceof PooledValueCoercible || value instanceof Value) {
+            return coerceToContext(value, context);
         }
         return asyncMemberFactory(context).execute(value, ASYNC_MEMBER_ADAPTER, context);
     }
@@ -501,6 +620,40 @@ public final class GraalPyRuntimeUtil {
 
     private static Value memberSetter(Context context) {
         return PythonContextRuntime.helper(context, PUT_MEMBER, PUT_MEMBER_SOURCE);
+    }
+
+    private static final class ContextConversion {
+        private final Context context;
+        private @Nullable IdentityHashMap<PooledValueCoercible, Value> values;
+        private @Nullable IdentityHashMap<PooledValueCoercible, Boolean> inProgress;
+
+        private ContextConversion(Context context) {
+            this.context = context;
+        }
+
+        private @Nullable Value get(PooledValueCoercible value) {
+            return values == null ? null : values.get(value);
+        }
+
+        private void remember(PooledValueCoercible source, Value value) {
+            if (values == null) {
+                values = new IdentityHashMap<>();
+            }
+            values.put(source, value);
+        }
+
+        private boolean begin(PooledValueCoercible value) {
+            if (inProgress == null) {
+                inProgress = new IdentityHashMap<>();
+            }
+            return inProgress.put(value, Boolean.TRUE) == null;
+        }
+
+        private void end(PooledValueCoercible value) {
+            if (inProgress != null) {
+                inProgress.remove(value);
+            }
+        }
     }
 
     private static Value asyncMemberFactory(Context context) {

@@ -110,6 +110,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final TypeDef POLYGLOT_CONTEXT = TypeDef.of(Context.class);
     public static final VariableDef.StaticField CLASS_OBJECT = ClassTypeDef.of(Object.class).getStaticField("class", TypeDef.CLASS);
     public static final String AS_POLYGLOT_VALUE = "asPolyglotValue";
+    public static final String RECONSTRUCT_POLYGLOT_VALUE = "reconstructPolyglotValue";
     public static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
     public static final ClassTypeDef RUNTIME_UTIL = ClassTypeDef.of("io.micronaut.context.python.GraalPyRuntimeUtil");
     public static final ClassTypeDef PYTHON_ASYNCIO_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonAsyncioRuntime");
@@ -122,6 +123,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
     private static final String PUBLISHER = "org.reactivestreams.Publisher";
     private static final String GET_MEMBER = "getMember";
+    private static final String MAP_OF = "mapOf";
+    private static final String ENUM_VALUE = "enumValue";
+    private static final String TARGET_VALUE = "targetValue";
+    private static final String REMEMBER_POOLED_VALUE = "rememberPooledValue";
+    private static final String COERCE_MAP = "coerceMap";
+    private static final String COERCE_LIST = "coerceList";
     private static final String ANN_CONFIGURATION_BUILDER = "io.micronaut.context.annotation.ConfigurationBuilder";
     private static final String NEW_UNINITIALIZED_INSTANCE = "newUninitializedInstance";
     private static final String ANN_CONFIGURATION_INJECT = "io.micronaut.context.annotation.ConfigurationInject";
@@ -285,22 +292,28 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         && !extendsPythonClass
                         && !Object.class.getName().equals(superType.getName())
                         && !superType.isInterface();
-                    if (!extendsPythonClass) {
-                        builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
-                    }
+                    boolean isIntrospectedBean = element.hasStereotype(Introspected.class);
 
                     // Check if this class extends another PythonClassElement
                     if (extendsPythonClass || extendsHostClass) {
                         builder.superclass(parameterizedClassTypeDef(superType));
                     }
 
-                    boolean isIntrospectedBean = element.hasStereotype(Introspected.class);
                     final boolean isIntroductionBean = element.hasStereotype(Introduction.class);
                     boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(ann -> ann.hasDeclaredAnnotation(JUNIT_TEST))).isPresent();
                     boolean isConfigurationBuilderType = isConfigurationBuilderType(element);
 
                     List<PropertyElement> beanProperties = element.getBeanProperties();
                     boolean hasDynamicBeanProperties = beanProperties.stream().anyMatch(PythonStubGenerator::isDynamicBeanProperty);
+                    // Declared attributes are fully represented by generated Java fields. Custom
+                    // Python properties may depend on hidden state that cannot be reconstructed in
+                    // another context from the BeanIntrospection alone.
+                    boolean isReconstructibleBean = isIntrospectedBean && !hasDynamicBeanProperties;
+                    if (isReconstructibleBean) {
+                        builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
+                    } else if (!extendsPythonClass) {
+                        builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
+                    }
                     boolean hasConfigurationBuilderProperty = beanProperties.stream()
                         .anyMatch(PythonStubGenerator::isConfigurationBuilderProperty);
                     if (!isIntrospectedBean
@@ -483,6 +496,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         final boolean isAbstractIntro = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
                         final boolean isFrozenDataclass = isFrozenPythonDataclass(element);
                         builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
+                            .addAnnotation(Override.class)
                             .addModifiers(Modifier.PUBLIC)
                             .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> {
                                     if (hasDynamicBeanProperties && pythonValueFinal != null) {
@@ -538,7 +552,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                             mapEntries.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef));
                                         }
                                         ExpressionDef propsMap = ClassTypeDef.of(AnnotationUtil.class)
-                                            .invokeStatic("mapOf", TypeDef.of(Map.class), mapEntries);
+                                            .invokeStatic(MAP_OF, TypeDef.of(Map.class), mapEntries);
                                         reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                                             "newFrozenDataclassInstance",
                                             POLYGLOT_VALUE,
@@ -572,7 +586,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                                 continue;
                                             }
                                             ExpressionDef fieldRef = aThis.field(field);
-                                            syncStatements.add((StatementDef) RUNTIME_UTIL.invokeStatic(
+                                            syncStatements.add(RUNTIME_UTIL.invokeStatic(
                                                 "putMember",
                                                 TypeDef.VOID,
                                                 storedValue,
@@ -602,6 +616,117 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     return reconstructedValue.returning();
                                 })
                             ));
+                        if (isReconstructibleBean) {
+                            builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
+                                .addAnnotation(Override.class)
+                                .addModifiers(Modifier.PUBLIC)
+                                .addParameter(POLYGLOT_CONTEXT)
+                                .returns(POLYGLOT_VALUE)
+                                .build((aThis, methodParameters) -> RUNTIME_UTIL.invokeStatic(
+                                    "coercePooledValue",
+                                    POLYGLOT_VALUE,
+                                    aThis,
+                                    methodParameters.getFirst()
+                                ).returning()));
+                            builder.addMethod(MethodDef.builder(RECONSTRUCT_POLYGLOT_VALUE)
+                                .addAnnotation(Override.class)
+                                .addModifiers(Modifier.PUBLIC)
+                                .addParameter(POLYGLOT_CONTEXT)
+                                .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> {
+                                ExpressionDef targetContext = methodParameters.getFirst();
+                                StatementDef reconstructedBody;
+                                if (isAbstractIntro) {
+                                    List<ExpressionDef> arguments = new ArrayList<>(List.of(targetContext, pythonClassReference(element, pythonClassReference)));
+                                    for (PropertyElement beanProperty : beanProperties) {
+                                        FieldDef field = propertyFields.get(beanProperty.getName());
+                                        if (field != null) {
+                                            arguments.add(coerceTypedElementToPolyglotValue(beanProperty, aThis.field(field), targetContext).cast(TypeDef.OBJECT));
+                                        }
+                                    }
+                                    ExpressionDef introduction = PYTHON_CONTEXT_RUNTIME.invokeStatic("newIntroduction", POLYGLOT_VALUE, arguments);
+                                    reconstructedBody = introduction.newLocal(TARGET_VALUE, targetValue -> StatementDef.multi(
+                                        RUNTIME_UTIL.invokeStatic(
+                                            REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
+                                        ),
+                                        targetValue.returning()
+                                    ));
+                                } else if (beanProperties.isEmpty()) {
+                                    ExpressionDef instance = PYTHON_CONTEXT_RUNTIME.invokeStatic("newInstance", POLYGLOT_VALUE,
+                                        List.of(targetContext, pythonClassReference(element, pythonClassReference)));
+                                    reconstructedBody = instance.newLocal(TARGET_VALUE, targetValue -> StatementDef.multi(
+                                        RUNTIME_UTIL.invokeStatic(
+                                            REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
+                                        ),
+                                        targetValue.returning()
+                                    ));
+                                } else {
+                                    ExpressionDef instance = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_UNINITIALIZED_INSTANCE, POLYGLOT_VALUE,
+                                        List.of(targetContext, pythonClassReference(element, pythonClassReference)));
+                                    reconstructedBody = instance.newLocal(TARGET_VALUE, targetValue -> {
+                                        List<StatementDef> statements = new ArrayList<>();
+                                        statements.add(RUNTIME_UTIL.invokeStatic(
+                                            REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
+                                        ));
+                                        for (PropertyElement beanProperty : beanProperties) {
+                                            FieldDef field = propertyFields.get(beanProperty.getName());
+                                            if (field == null) {
+                                                continue;
+                                            }
+                                            ExpressionDef propertyValue = coerceTypedElementToPolyglotValue(
+                                                beanProperty, aThis.field(field), targetContext
+                                            ).cast(TypeDef.OBJECT);
+                                            if (isFrozenDataclass) {
+                                                statements.add(PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                                                    "setInstanceProperty",
+                                                    TypeDef.VOID,
+                                                    targetValue,
+                                                    ExpressionDef.constant(beanProperty.getName()),
+                                                    propertyValue
+                                                ));
+                                            } else {
+                                                statements.add(RUNTIME_UTIL.invokeStatic(
+                                                    "putMember",
+                                                    TypeDef.VOID,
+                                                    targetValue,
+                                                    ExpressionDef.constant(beanProperty.getName()),
+                                                    propertyValue
+                                                ));
+                                            }
+                                        }
+                                        statements.add(targetValue.returning());
+                                        return StatementDef.multi(statements);
+                                    });
+                                }
+                                if (pythonValueFinal != null) {
+                                    ExpressionDef storedValue = aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field"));
+                                    List<StatementDef> reuseStatements = new ArrayList<>();
+                                    reuseStatements.add(RUNTIME_UTIL.invokeStatic(
+                                        REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, storedValue
+                                    ));
+                                    if (!isFrozenDataclass) {
+                                        for (PropertyElement beanProperty : beanProperties) {
+                                            FieldDef field = propertyFields.get(beanProperty.getName());
+                                            if (field != null) {
+                                                reuseStatements.add(RUNTIME_UTIL.invokeStatic(
+                                                    "putMember",
+                                                    TypeDef.VOID,
+                                                    storedValue,
+                                                    ExpressionDef.constant(beanProperty.getName()),
+                                                    coerceTypedElementToPolyglotValue(
+                                                        beanProperty, aThis.field(field), targetContext
+                                                    ).cast(TypeDef.OBJECT)
+                                                ));
+                                            }
+                                        }
+                                    }
+                                    reuseStatements.add(storedValue.returning());
+                                    return RUNTIME_UTIL.invokeStatic("isValueInContext", TypeDef.Primitive.BOOLEAN, storedValue, targetContext).isTrue()
+                                        .doIfElse(StatementDef.multi(reuseStatements), reconstructedBody);
+                                }
+                                return reconstructedBody;
+                                })
+                            ));
+                        }
                     } else {
                         builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                             .addModifiers(Modifier.PUBLIC)
@@ -706,17 +831,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     List<StatementDef> assignments = new ArrayList<>();
                                     if (extendsHostClass) {
                                         assignments.add(aThis.superRef().invokeSuperConstructor(superConstructorArguments(superType, parameters, methodParameters)));
-                                    }
-                                    if (constructorParametersBackedByFields) {
-                                        // Ordinary field-backed introspected beans must not invoke a Python
-                                        // constructor whose parameters are supplied by Micronaut.
-                                        assignments.add(aThis.field(requireField(pythonValueFinal, "Expected graalpyInternalValue field")).assign(
-                                            PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                                                NEW_UNINITIALIZED_INSTANCE,
-                                                POLYGLOT_VALUE,
-                                                List.of(pythonClassReference(element, pythonClassReference))
-                                            )
-                                        ));
                                     }
                                     for (int i = 0; i < parameters.length; i++) {
                                         @NonNull ParameterElement parameter = parameters[i];
@@ -2719,17 +2833,40 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         List<ExpressionDef> parameters,
         VariableDef.MethodParameter methodParam,
         @Nullable ExpressionDef targetContext) {
-        ExpressionDef parameter;
         ClassElement genericType = param.getGenericType();
-        if (genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement) {
-            parameter = RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), methodParam);
-        } else if (genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement) {
-            parameter = RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), methodParam);
+        boolean mapOfPython = genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement;
+        boolean listOfPython = genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement;
+        if (targetContext != null) {
+            // Generated Python-class arguments stay as host bridges for ordinary methods, including
+            // inside lists and maps, so Python consistently uses their generated Java accessors.
+            // Pooled bridges instead pass raw arguments to invokePooled, which converts them after
+            // borrowing the target context.
+            ExpressionDef parameter;
+            if (mapOfPython) {
+                parameter = RUNTIME_UTIL.invokeStatic(COERCE_MAP, TypeDef.of(Map.class), methodParam);
+            } else if (listOfPython) {
+                parameter = RUNTIME_UTIL.invokeStatic(COERCE_LIST, TypeDef.of(List.class), methodParam);
+            } else if (genericType instanceof PythonClassElement) {
+                parameter = methodParam;
+            } else {
+                parameter = RUNTIME_UTIL.invokeStatic(
+                    "coerceToContext",
+                    TypeDef.OBJECT,
+                    methodParam,
+                    targetContext,
+                    classLiteral(param.getGenericType())
+                );
+            }
+            parameters.add(parameter);
+            return;
+        }
+        ExpressionDef parameter;
+        if (mapOfPython) {
+            parameter = RUNTIME_UTIL.invokeStatic(COERCE_MAP, TypeDef.of(Map.class), methodParam);
+        } else if (listOfPython) {
+            parameter = RUNTIME_UTIL.invokeStatic(COERCE_LIST, TypeDef.of(List.class), methodParam);
         } else {
             parameter = methodParam;
-        }
-        if (targetContext != null) {
-            parameter = RUNTIME_UTIL.invokeStatic("coerceToContext", TypeDef.OBJECT, parameter, targetContext, classLiteral(param.getGenericType()));
         }
         parameters.add(parameter);
     }
@@ -2737,14 +2874,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static ExpressionDef coerceTypedElementToPolyglotValue(TypedElement element, ExpressionDef expr) {
         ClassElement genericType = element.getGenericType();
         if (genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement) {
-            return RUNTIME_UTIL.invokeStatic("coerceMap", TypeDef.of(Map.class), expr);
+            return RUNTIME_UTIL.invokeStatic(COERCE_MAP, TypeDef.of(Map.class), expr);
         } else if (genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement) {
-            return RUNTIME_UTIL.invokeStatic("coerceList", TypeDef.of(List.class), expr);
+            return RUNTIME_UTIL.invokeStatic(COERCE_LIST, TypeDef.of(List.class), expr);
         } else if (genericType instanceof PythonClassElement) {
             return RUNTIME_UTIL.invokeStatic("coerceValue", TypeDef.OBJECT, expr);
         } else {
             return expr;
         }
+    }
+
+    private static ExpressionDef coerceTypedElementToPolyglotValue(TypedElement element,
+                                                                    ExpressionDef expr,
+                                                                    ExpressionDef targetContext) {
+        return RUNTIME_UTIL.invokeStatic("coerceToContext", TypeDef.OBJECT, expr, targetContext, classLiteral(element.getGenericType()));
     }
 
     private void copyAnnotations(Element element, AbstractElementBuilder<?> builder, Set<String> annotationPackagesToCopy, VisitorContext visitorContext) {
@@ -2775,7 +2918,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addModifiers(Modifier.PUBLIC)
             .addAnnotation(Vetoed.class)
             .addAnnotation(pythonClassAnnotation(classElement))
-            .addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
+            .addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
         enumBuilder.addField(pythonClassReference);
         copyAnnotations(classElement, enumBuilder, ANNOTATION_PACKAGES_TO_COPY, context);
         List<String> enumConstants = classElement instanceof EnumElement enumElement ? enumElement.values() : List.of();
@@ -2787,8 +2930,31 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addModifiers(Modifier.PUBLIC)
             .returns(POLYGLOT_VALUE)
             .build((aThis, parameters) -> PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                "enumValue",
+                ENUM_VALUE,
                 POLYGLOT_VALUE,
+                pythonClassReference(classElement, pythonClassReference),
+                aThis.invoke("name", TypeDef.STRING)
+            ).returning()));
+        enumBuilder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .addParameter(POLYGLOT_CONTEXT)
+            .returns(POLYGLOT_VALUE)
+            .build((aThis, parameters) -> RUNTIME_UTIL.invokeStatic(
+                "coercePooledValue",
+                POLYGLOT_VALUE,
+                aThis,
+                parameters.getFirst()
+            ).returning()));
+        enumBuilder.addMethod(MethodDef.builder(RECONSTRUCT_POLYGLOT_VALUE)
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .addParameter(POLYGLOT_CONTEXT)
+            .returns(POLYGLOT_VALUE)
+            .build((aThis, parameters) -> PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                ENUM_VALUE,
+                POLYGLOT_VALUE,
+                parameters.getFirst(),
                 pythonClassReference(classElement, pythonClassReference),
                 aThis.invoke("name", TypeDef.STRING)
             ).returning()));
@@ -2864,7 +3030,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 "enumStringValue",
                 TypeDef.STRING,
                 PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                    "enumValue",
+                    ENUM_VALUE,
                     POLYGLOT_VALUE,
                     pythonClassReference(classElement, classElement),
                     enumName
@@ -3695,7 +3861,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 );
             }
             return StatementDef.multi(
-                (StatementDef) RUNTIME_UTIL.invokeStatic(
+                RUNTIME_UTIL.invokeStatic(
                     "putMember",
                     TypeDef.VOID,
                     targetValue,
@@ -3707,7 +3873,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         methodParameters.getFirst().cast(TypeDef.OBJECT)
                     )
                 ),
-                (StatementDef) PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                PYTHON_CONTEXT_RUNTIME.invokeStatic(
                     "rememberAsyncMember",
                     TypeDef.VOID,
                     targetValue,
@@ -3741,7 +3907,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 );
             }
             return StatementDef.multi(
-                (StatementDef) RUNTIME_UTIL.invokeStatic(
+                RUNTIME_UTIL.invokeStatic(
                     "putMember",
                     TypeDef.VOID,
                     targetValue,
@@ -3753,7 +3919,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         methodParameters.getFirst().cast(TypeDef.OBJECT)
                     )
                 ),
-                (StatementDef) PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                PYTHON_CONTEXT_RUNTIME.invokeStatic(
                     "rememberAsyncMember",
                     TypeDef.VOID,
                     targetValue,

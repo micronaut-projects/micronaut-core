@@ -1,5 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-base")
+    id("io.micronaut.build.internal.python")
     id("me.champeau.jmh") version "0.7.3"
 }
 
@@ -48,6 +49,8 @@ val jmhWarmupIterations = providers.gradleProperty("jmh.warmupIterations").map(S
 val jmhProfilers = providers.gradleProperty("jmh.profilers")
     .map { it.split(",").map(String::trim).filter(String::isNotEmpty) }
     .getOrElse(emptyList())
+val jmhPoolSizes = providers.gradleProperty("jmh.poolSizes")
+    .map { it.split(",").map(String::trim).filter(String::isNotEmpty) }
 val jmhHumanOutput = providers.gradleProperty("jmh.humanOutput")
     .map(layout.projectDirectory::file)
 
@@ -57,6 +60,11 @@ jmh {
     iterations = jmhIterations
     warmupIterations = jmhWarmupIterations
     profilers = jmhProfilers
+    providers.gradleProperty("jmh.warmupTime").orNull?.let(warmup::set)
+    providers.gradleProperty("jmh.timeOnIteration").orNull?.let(timeOnIteration::set)
+    jmhPoolSizes.orNull?.let { sizes ->
+        benchmarkParameters.put("poolSize", objects.listProperty(String::class.java).value(sizes))
+    }
     humanOutputFile.set(jmhHumanOutput)
     duplicateClassesStrategy = DuplicatesStrategy.WARN
 }
@@ -69,7 +77,6 @@ tasks {
     named<Jar>("jmhJar") {
         isZip64 = true
         manifest.attributes["Multi-Release"] = "true"
-        exclude("GRAALPY-VFS/**")
     }
 }
 

@@ -1,2 +1,3 @@
 io.micronaut.context.python.SecondGraalPyContextCustomizer
 io.micronaut.context.python.FirstGraalPyContextCustomizer
+io.micronaut.context.python.BlockingGraalPyContextCustomizer

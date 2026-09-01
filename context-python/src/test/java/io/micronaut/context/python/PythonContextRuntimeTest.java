@@ -235,4 +235,24 @@ final class PythonContextRuntimeTest {
             PythonContextRuntime.resetContext();
         }
     }
+
+    @Test
+    void uninitializedInstanceAcceptsNullProperties() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            context.eval(PYTHON, "class Empty: pass");
+            Value value = PythonContextRuntime.newUninitializedInstance(
+                context,
+                new PythonContextRuntime.PythonClassReference(
+                    null,
+                    "Empty",
+                    new String[0],
+                    "Empty",
+                    "class-instance:python.Empty"
+                ),
+                null
+            );
+
+            assertEquals("Empty", value.getMetaObject().getMetaSimpleName());
+        }
+    }
 }

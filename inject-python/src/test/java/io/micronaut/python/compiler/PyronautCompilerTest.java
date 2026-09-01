@@ -96,6 +96,11 @@ final class PyronautCompilerTest {
                     self.value = value
                     return self
 
+            @Introspected
+            @dataclass(frozen=True)
+            class TeamId:
+                value: str
+
             @ConfigurationProperties("team")
             @Introspected
             @dataclass(init=False)
@@ -126,15 +131,24 @@ final class PyronautCompilerTest {
             .targetDir(outputDirectory.toFile())
             .build()
             .compile();
-        Path generatedSource;
-        try (var paths = Files.walk(outputDirectory)) {
-            generatedSource = paths
-                .filter(path -> path.getFileName().toString().equals("TeamConfiguration.java"))
-                .findFirst()
-                .orElseThrow();
-        }
-        String generated = Files.readString(generatedSource);
+        String generated = Files.readString(findGeneratedSource(outputDirectory, "TeamConfiguration.java"));
         assertTrue(generated.contains("PythonContextRuntime.newInstance"));
+        assertTrue(generated.contains("PooledValueCoercible"));
+        assertTrue(generated.contains("asPolyglotValue(Context "));
+        assertTrue(generated.contains("reconstructPolyglotValue(Context "));
+        assertTrue(generated.contains("newUninitializedInstance(arg1,"));
+        assertTrue(generated.contains("GraalPyRuntimeUtil.coerceToContext"));
+
+        String frozen = Files.readString(findGeneratedSource(outputDirectory, "TeamId.java"));
+        assertTrue(frozen.contains("PooledValueCoercible"));
+        assertTrue(frozen.contains("reconstructPolyglotValue(Context "));
+        assertTrue(frozen.contains("PythonContextRuntime.setInstanceProperty"));
+
+        String regularClass = Files.readString(findGeneratedSource(outputDirectory, "TeamBuilder.java"));
+        assertTrue(regularClass.contains("PooledValueCoercible"));
+        assertTrue(regularClass.contains("asPolyglotValue(Context "));
+        assertTrue(regularClass.contains("newUninitializedInstance(arg1,"));
+
     }
 
     @Test
@@ -169,5 +183,14 @@ final class PyronautCompilerTest {
         }
         assertTrue(filesList.contains("__main__.py"));
         assertFalse(filesList.contains(".pyc"));
+    }
+
+    private static Path findGeneratedSource(Path outputDirectory, String fileName) throws Exception {
+        try (var paths = Files.walk(outputDirectory)) {
+            return paths
+                .filter(path -> path.getFileName().toString().equals(fileName))
+                .findFirst()
+                .orElseThrow();
+        }
     }
 }

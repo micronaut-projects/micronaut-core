@@ -26,12 +26,12 @@ class Person:
         assertGeneratedSourceContains(pythonCode, """
   @JsonCreator
   public Person(@JsonProperty("name") String name, @JsonProperty("age") int age, @JsonProperty("address") Address address) {
-    this.graalpyInternalValue = PythonContextRuntime.newUninitializedInstance(Person.__PYTHON_CLASS_REFERENCE);
     this.name = name;
     this.age = age;
     this.address = address;
   }
 
+  @Override
   public Value asPolyglotValue() {
     if (this.graalpyInternalValue != null) {
       if (this.graalpyInternalValueSyncing) {
@@ -52,6 +52,29 @@ class Person:
       GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", GraalPyRuntimeUtil.coerceValue(this.address));
       this.graalpyInternalValueSyncing = false;
       return this.graalpyInternalValue;
+    }
+  }
+
+  @Override
+  public Value asPolyglotValue(Context arg1) {
+    return GraalPyRuntimeUtil.coercePooledValue(this, arg1);
+  }
+
+  @Override
+  public Value reconstructPolyglotValue(Context arg1) {
+    if (GraalPyRuntimeUtil.isValueInContext(this.graalpyInternalValue, arg1)) {
+      GraalPyRuntimeUtil.rememberPooledValue(this, arg1, this.graalpyInternalValue);
+      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "name", GraalPyRuntimeUtil.coerceToContext(this.name, arg1, java.lang.String.class));
+      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "age", GraalPyRuntimeUtil.coerceToContext(this.age, arg1, int.class));
+      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", GraalPyRuntimeUtil.coerceToContext(this.address, arg1, python.Address.class));
+      return this.graalpyInternalValue;
+    } else {
+      Value targetValue = PythonContextRuntime.newUninitializedInstance(arg1, Person.__PYTHON_CLASS_REFERENCE);
+      GraalPyRuntimeUtil.rememberPooledValue(this, arg1, targetValue);
+      GraalPyRuntimeUtil.putMember(targetValue, "name", GraalPyRuntimeUtil.coerceToContext(this.name, arg1, java.lang.String.class));
+      GraalPyRuntimeUtil.putMember(targetValue, "age", GraalPyRuntimeUtil.coerceToContext(this.age, arg1, int.class));
+      GraalPyRuntimeUtil.putMember(targetValue, "address", GraalPyRuntimeUtil.coerceToContext(this.address, arg1, python.Address.class));
+      return targetValue;
     }
   }
 
