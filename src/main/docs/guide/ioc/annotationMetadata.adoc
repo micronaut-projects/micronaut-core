@@ -98,19 +98,14 @@ Two additional members refine this behaviour:
 
 For example:
 
-.Overriding a repeatable stereotype member
-[source,java]
-----
-@Pattern(regexp = ".....")
-@Pattern(regexp = "bar")
-@interface ComposedZip {
+snippet::io.micronaut.docs.inject.aliasfor.ComposedZip[tags="imports, class", indent=0, title="Overriding a Member of a Declared Stereotype"]
 
-    @AliasFor(annotation = Pattern.class, member = "regexp", index = 1, applyDefault = true)
-    String regex() default "\\d*";
-}
-----
+<1> `@Size` is declared as a stereotype with `max` set to `5`
+<2> The `max()` member aliases `Size.max`, overriding the declared value
 
-Here any use of `@ComposedZip` produces metadata containing two `@Pattern` stereotypes with the `regexp` members `"....."` and `"\\d*"` — the second occurrence is overridden by the `regex()` default, and by an explicit value such as `@ComposedZip(regex = "[0-9]+")` when set.
+Any use of `@ComposedZip` therefore produces `@Size(min = 5, max = 10)` in the metadata — `max` comes from the `max()` default because `applyDefault` is `true` — while `@ComposedZip(max = 20)` produces `@Size(min = 5, max = 20)`.
+
+NOTE: `index()` is only computed for annotations processed from Java and Groovy sources. The Kotlin (KSP) annotation metadata builder does not extract repeatable stereotype containers, so a repeatable annotation declared multiple times on a Kotlin annotation class cannot be targeted by index.
 
 Annotations that cannot depend on Micronaut can participate in alias resolution through an api:io.micronaut.inject.annotation.AnnotationTransformer[]: when an annotation member carries no literal `@AliasFor`, the registered transformers are applied to the member's annotations, and any produced `@AliasFor` values are processed as if declared directly (a produced alias without a `member` value defaults to the annotated member's own name). This is how, for example, `jakarta.validation.OverridesAttribute` can be remapped to `@AliasFor` by a validation annotation processor.
 
