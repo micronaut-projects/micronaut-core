@@ -1523,7 +1523,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                     Argument<T> beanType,
                                     @Nullable Qualifier<T> qualifier) {
         BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, qualifier);
-        return Objects.requireNonNull(resolveBeanRegistration(resolutionContext, definition, beanType, qualifier)).bean;
+        return getProxyTargetBean(resolutionContext, definition, beanType, qualifier);
     }
 
     /**
@@ -1543,7 +1543,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                     BeanDefinition<T> definition,
                                     Argument<T> beanType,
                                     @Nullable Qualifier<T> qualifier) {
-        return Objects.requireNonNull(resolveBeanRegistration(resolutionContext, definition, beanType, qualifier)).bean;
+        BeanRegistration<T> registration = Objects.requireNonNull(resolveBeanRegistration(resolutionContext, definition, beanType, qualifier));
+        if (registration.bean == null) {
+            // let the customizer decide what a null target becomes, as bean lookup does
+            registration = resolveNullBeanRegistration(beanType, beanType, registration);
+        }
+        return registration.bean;
     }
 
     @Override
