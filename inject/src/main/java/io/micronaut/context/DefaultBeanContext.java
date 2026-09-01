@@ -2773,7 +2773,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (scope.isPresent()) {
             Class<? extends Annotation> scopeAnnotation = scope.get();
             if (scopeAnnotation == Prototype.class) {
-                return null;
+                // a prototype bean has no lifecycle of its own, so a scope declared on the
+                // injection point (such as @InjectScope) still applies to it
+                return findInjectionPointDeclaredScope(resolutionContext);
             }
             CustomScope<?> customScope = customScopeRegistry.findScope(scopeAnnotation).orElse(null);
             if (customScope != null) {
@@ -2784,7 +2786,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (scopeName.isPresent()) {
                 String scopeAnnotation = scopeName.get();
                 if (Prototype.class.getName().equals(scopeAnnotation)) {
-                    return null;
+                    // a prototype bean has no lifecycle of its own, so a scope declared on the
+                    // injection point (such as @InjectScope) still applies to it
+                    return findInjectionPointDeclaredScope(resolutionContext);
                 }
                 CustomScope<?> customScope = customScopeRegistry.findScope(scopeAnnotation).orElse(null);
                 if (customScope != null) {
@@ -2793,6 +2797,19 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
 
+        CustomScope<?> injectionPointScope = findInjectionPointDeclaredScope(resolutionContext);
+        if (injectionPointScope != null) {
+            return injectionPointScope;
+        }
+
+        if (!isScopedProxyDefinition || !isProxy) {
+            return customScopeRegistry.findDeclaredScope(definition).orElse(null);
+        }
+        return null;
+    }
+
+    @Nullable
+    private CustomScope<?> findInjectionPointDeclaredScope(@Nullable BeanResolutionContext resolutionContext) {
         if (resolutionContext != null) {
             BeanResolutionContext.Segment<?, ?> currentSegment = resolutionContext
                 .getPath()
@@ -2800,15 +2817,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 .orElse(null);
             if (currentSegment != null) {
                 Argument<?> argument = currentSegment.getArgument();
-                CustomScope<?> customScope = customScopeRegistry.findDeclaredScope(argument).orElse(null);
-                if (customScope != null) {
-                    return customScope;
-                }
+                return customScopeRegistry.findDeclaredScope(argument).orElse(null);
             }
-        }
-
-        if (!isScopedProxyDefinition || !isProxy) {
-            return customScopeRegistry.findDeclaredScope(definition).orElse(null);
         }
         return null;
     }

@@ -42,10 +42,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 public class DefaultCustomScopeRegistry implements CustomScopeRegistry {
-    /**
-     * Constant to refer to inject scope.
-     */
-    static final CustomScope<InjectScope> INJECT_SCOPE = new InjectScopeImpl();
+    // one per registry rather than shared: the scope tracks what it created, and destroys it through the
+    // context so that pre-destroy listeners run even for a bean with nothing else to dispose
     private final BeanLocator beanLocator;
     private final Map<String, Optional<CustomScope<?>>> scopes = new ConcurrentHashMap<>(2);
 
@@ -54,7 +52,7 @@ public class DefaultCustomScopeRegistry implements CustomScopeRegistry {
      */
     protected DefaultCustomScopeRegistry(BeanLocator beanLocator) {
         this.beanLocator = beanLocator;
-        this.scopes.put(InjectScope.class.getName(), Optional.of(INJECT_SCOPE));
+        this.scopes.put(InjectScope.class.getName(), Optional.of(new InjectScopeImpl(beanLocator)));
     }
 
     @Override
@@ -119,6 +117,11 @@ public class DefaultCustomScopeRegistry implements CustomScopeRegistry {
     private static final class InjectScopeImpl implements CustomScope<InjectScope>, LifeCycle<InjectScopeImpl> {
 
         private final List<CreatedBean<?>> currentCreatedBeans = new ArrayList<>(2);
+        private final BeanLocator beanLocator;
+
+        private InjectScopeImpl(BeanLocator beanLocator) {
+            this.beanLocator = beanLocator;
+        }
 
         @Override
         public Class<InjectScope> annotationType() {
@@ -145,10 +148,21 @@ public class DefaultCustomScopeRegistry implements CustomScopeRegistry {
         @Override
         public InjectScopeImpl stop() {
             for (CreatedBean<?> currentCreatedBean : currentCreatedBeans) {
-                currentCreatedBean.close();
+                if (currentCreatedBean instanceof BeanRegistration<?> registration
+                    && beanLocator instanceof BeanContext beanContext) {
+                    // close() is a no-op for a registration with nothing of its own to dispose; destroying
+                    // through the context reaches the pre-destroy listeners as well
+                    destroy(beanContext, registration);
+                } else {
+                    currentCreatedBean.close();
+                }
             }
             currentCreatedBeans.clear();
             return this;
+        }
+
+        private static <T> void destroy(BeanContext beanContext, BeanRegistration<T> registration) {
+            beanContext.destroyBean(registration);
         }
     }
 }

@@ -3800,10 +3800,14 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private boolean hasInjectScope() {
         if (factoryMethodDefinition != null) {
-            return hasInjectScope(factoryMethodDefinition.methodElement());
+            MethodElement methodElement = factoryMethodDefinition.methodElement();
+            return hasInjectScope((AnnotationMetadata) methodElement)
+                || hasInjectScope(methodElement.getSuspendParameters());
         }
         if (constructorDefinition != null) {
-            return hasInjectScope(constructorDefinition.constructorElement());
+            MethodElement constructorElement = constructorDefinition.constructorElement();
+            return hasInjectScope((AnnotationMetadata) constructorElement)
+                || hasInjectScope(constructorElement.getSuspendParameters());
         }
         return false;
     }
