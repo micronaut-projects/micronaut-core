@@ -20,6 +20,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.Locale;
 
 /**
  * <p>Declares that the response returned by the annotated route should include a
@@ -33,7 +34,7 @@ import java.lang.annotation.Target;
  * }
  * </pre>
  *
- * <p>Set {@link #type()} to {@code "inline"} to ask the browser to display the response instead of
+ * <p>Set {@link #type()} to {@link Type#INLINE} to ask the browser to display the response instead of
  * downloading it.</p>
  *
  * @author Shubham Jain
@@ -45,12 +46,35 @@ import java.lang.annotation.Target;
 public @interface ContentDisposition {
 
     /**
-     * @return The disposition type, either {@code attachment} or {@code inline}. Defaults to {@code attachment}.
+     * @return The disposition type. Defaults to {@link Type#ATTACHMENT}.
      */
-    String type() default "attachment";
+    Type type() default Type.ATTACHMENT;
 
     /**
      * @return The filename to include in the header. If left blank, no filename parameter is added.
      */
     String filename() default "";
+
+    /**
+     * The {@code Content-Disposition} type.
+     *
+     * @since 4.10.0
+     */
+    enum Type {
+        /**
+         * Indicates the response should be downloaded rather than displayed.
+         */
+        ATTACHMENT,
+        /**
+         * Indicates the response should be displayed by the browser rather than downloaded.
+         */
+        INLINE;
+
+        /**
+         * @return The lower-case header token for this type, e.g. {@code attachment}
+         */
+        public String toHeaderToken() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
 }

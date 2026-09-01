@@ -81,7 +81,7 @@ public class ContentDispositionTest {
         }
 
         @Get(uri = "/inline", processes = MediaType.TEXT_PLAIN)
-        @ContentDisposition(type = "inline")
+        @ContentDisposition(type = ContentDisposition.Type.INLINE)
         String inline() {
             return "hello";
         }

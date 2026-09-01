@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.util;
 
+import io.micronaut.core.util.StringUtils;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -39,20 +40,21 @@ public final class ContentDispositionUtils {
      * @since 4.10.0
      */
     public static String toHeaderValue(String type, @Nullable String filename) {
-        if (filename == null || filename.isEmpty()) {
+        if (StringUtils.isEmpty(filename)) {
             return type;
         }
         // https://httpwg.org/specs/rfc6266.html#advice.generating
         // 'filename' parameter is the fallback for legacy browsers, 'filename*' is the supported approach.
-        return type + "; filename=\"" + sanitizeAscii(filename) + "\"; filename*=utf-8''" + encodeRfc6987(filename);
+        return type + "; filename=\"" + sanitizeAscii(filename) + "\"; filename*=utf-8''" + encodeRfc5987(filename);
     }
 
     private static String sanitizeAscii(String s) {
         StringBuilder builder = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            // " ends the string
-            if (c >= 32 && c < 127 && c != '"') {
+            // '"' ends the quoted-string early and '\' is its escape character; stripping both
+            // keeps this legacy fallback value unambiguous instead of escaping them.
+            if (c >= 32 && c < 127 && c != '"' && c != '\\') {
                 builder.append(c);
             }
         }
@@ -62,7 +64,7 @@ public final class ContentDispositionUtils {
     // this is mostly copied from netty QueryStringEncoder
 
     @SuppressWarnings({"java:S3776", "java:S135", "java:S127"}) // stay close to netty impl
-    static String encodeRfc6987(String s) {
+    static String encodeRfc5987(String s) {
         StringBuilder uriBuilder = new StringBuilder();
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);

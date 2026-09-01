@@ -23,6 +23,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -122,8 +123,8 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         definedStatus = annotationMetadata.enumValue(Status.class, HttpStatus.class).orElse(null);
         definedContentDisposition = annotationMetadata.findAnnotation(ContentDisposition.class)
             .map(av -> ContentDispositionUtils.toHeaderValue(
-                av.stringValue("type").orElse("attachment"),
-                av.stringValue("filename").filter(s -> !s.isEmpty()).orElse(null)))
+                av.enumValue("type", ContentDisposition.Type.class).orElse(ContentDisposition.Type.ATTACHMENT).toHeaderToken(),
+                av.stringValue("filename").filter(StringUtils::isNotEmpty).orElse(null)))
             .orElse(null);
 
         if (producesMediaTypes.isEmpty()) {
