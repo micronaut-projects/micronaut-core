@@ -46,6 +46,8 @@ BeanIntrospector introspector = new ReflectionBeanIntrospector(BeanIntrospector.
 BeanIntrospection<Order> introspection = introspector.getIntrospection(Order.class);
 ----
 
+`ReflectionBeanIntrospection.of` also takes the annotations the caller means the type to carry, for a specification that was told to handle a class the class itself says nothing about.
+
 ==== Allowing Reflection in the Shared Introspector
 
 The shared api:core.beans.BeanIntrospector[] the framework uses - and with it `BeanIntrospection.getIntrospection(Class)`, serialization and the other features built on introspections - never reflects on a type by default. With the module on the classpath, it asks api:reflection.ReflectionBeanIntrospectionFallback[] for the types it has no generated introspection for, and the fallback describes only the types the application allowed. Allow them with the `micronaut.introspection.allow-reflection` property, as a system property or in the application configuration:
@@ -90,4 +92,19 @@ beanContext.registerBeanDefinition(
 );
 ----
 
-Each injected argument is resolved as a generated definition resolves it, including collections, arrays, streams, optionals and maps of beans, api:context.BeanRegistration[] and configuration values. The features that need the processors - `@ConfigurationProperties` binding, `@EachProperty` and `@EachBean`, `@Parameter` arguments and AOP advice - are not available to a reflective definition.
+Each injected argument is resolved as a generated definition resolves it, including collections, arrays, streams, optionals and maps of beans, api:context.BeanRegistration[] and configuration values. A record is instantiated by its canonical constructor. The features that need the processors - `@ConfigurationProperties` binding, `@EachProperty` and `@EachBean`, `@Parameter` arguments and AOP advice - are not available to a reflective definition.
+
+Code adapting another container has two more needs the builder covers. `additionalAnnotationMetadata` adds the annotations that container means the bean to carry without losing the ones its class declares, both counting as declared, which is how the framework reads a scope, a qualifier or a primary marker. And `postConstruct` and `preDestroy` take method names, for a container that names its life cycle methods instead of annotating them:
+
+[source,java]
+----
+beanContext.registerBeanDefinition(
+    ReflectionBeanDefinition.builder(OrderService.class)
+        .additionalAnnotationMetadata(ReflectionAnnotations.declaring(Primary.class))
+        .postConstruct("start")
+        .preDestroy("stop")
+        .build()
+);
+----
+
+`ReflectionAnnotations.declaring` builds the metadata of an annotation type with its defaults and its stereotypes, which declaring it by name alone would lose, and `ReflectionAnnotations.merge` puts two metadata together.

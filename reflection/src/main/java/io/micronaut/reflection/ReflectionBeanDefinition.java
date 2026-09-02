@@ -55,7 +55,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -581,9 +583,12 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
         private Class<?>[] exposedTypes = new Class<?>[0];
         @Nullable
         private AnnotationMetadata annotationMetadata;
+        private AnnotationMetadata additionalAnnotationMetadata = AnnotationMetadata.EMPTY_METADATA;
         @Nullable
         private Constructor<T> constructor;
         private Predicate<Method> executable = method -> false;
+        private Set<String> postConstruct = Set.of();
+        private Set<String> preDestroy = Set.of();
 
         private Builder(Class<T> type) {
             this.type = Objects.requireNonNull(type, "The type cannot be null");
@@ -661,6 +666,45 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
         }
 
         /**
+         * The annotations the bean carries beyond the ones its class declares, both of them declared: a
+         * container adapting another one - a Spring bean it marks primary, a Guice binding it qualifies - adds
+         * its own without losing what the class says.
+         *
+         * @param annotationMetadata The annotations to add
+         * @return This builder
+         */
+        public Builder<T> additionalAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
+            this.additionalAnnotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
+            return this;
+        }
+
+        /**
+         * The methods to invoke once the bean is created and injected, named rather than annotated: a
+         * container that names them - the {@code initMethod} of a Spring bean definition - has no annotation to
+         * read. The methods annotated {@code @PostConstruct} are invoked as well, and the arguments of a named
+         * method are injected as those of an annotated one are.
+         *
+         * @param methodNames The method names
+         * @return This builder
+         */
+        public Builder<T> postConstruct(String... methodNames) {
+            this.postConstruct = Set.of(methodNames);
+            return this;
+        }
+
+        /**
+         * The methods to invoke when the bean is destroyed, named rather than annotated.
+         *
+         * @param methodNames The method names
+         * @return This builder
+         * @see #postConstruct(String...)
+         */
+        public Builder<T> preDestroy(String... methodNames) {
+            this.preDestroy = Set.of(methodNames);
+            return this;
+        }
+
+        /**
          * The constructor the bean is instantiated with, overriding the selection from the constructors of the
          * class.
          *
@@ -701,7 +745,9 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
             if (type.isMemberClass() && !Modifier.isStatic(type.getModifiers())) {
                 throw new IllegalArgumentException("The type " + type.getName() + " cannot be a bean: it is a non-static inner class");
             }
-            AnnotationMetadata metadata = annotationMetadata != null ? annotationMetadata : ReflectionAnnotations.metadataOf(type);
+            AnnotationMetadata metadata = ReflectionAnnotations.merge(
+                annotationMetadata != null ? annotationMetadata : ReflectionAnnotations.metadataOf(type),
+                additionalAnnotationMetadata);
             Constructor<T> selected = constructor != null ? constructor : selectConstructor(type);
             if (selected == null) {
                 throw new IllegalArgumentException("The type " + type.getName() + " cannot be a bean: it has no accessible constructor");
@@ -767,6 +813,17 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
         @SuppressWarnings("unchecked")
         private static <T> Constructor<T> selectConstructor(Class<T> type) {
             Constructor<?>[] declared = type.getDeclaredConstructors();
+            if (type.isRecord()) {
+                // the canonical constructor is the one a record is built by; another one it declares delegates to it
+                Class<?>[] components = Arrays.stream(type.getRecordComponents())
+                    .map(RecordComponent::getType)
+                    .toArray(Class<?>[]::new);
+                for (Constructor<?> candidate : declared) {
+                    if (Arrays.equals(candidate.getParameterTypes(), components)) {
+                        return (Constructor<T>) candidate;
+                    }
+                }
+            }
             for (Constructor<?> candidate : declared) {
                 if (candidate.isAnnotationPresent(Creator.class)
                     || ReflectionAnnotations.metadataOf(candidate).hasStereotype(AnnotationUtil.INJECT)) {
@@ -853,9 +910,9 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
             for (Method method : candidates) {
                 AnnotationMetadata methodMetadata = ReflectionAnnotations.metadataOf(method);
                 boolean isStatic = Modifier.isStatic(method.getModifiers());
-                if (!isStatic && methodMetadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT)) {
+                if (!isStatic && (methodMetadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT) || postConstruct.contains(method.getName()))) {
                     addInjectedMethod(methods, methodReferences, method, methodMetadata, true, false);
-                } else if (!isStatic && methodMetadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
+                } else if (!isStatic && (methodMetadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY) || preDestroy.contains(method.getName()))) {
                     addInjectedMethod(methods, methodReferences, method, methodMetadata, false, true);
                 } else if (!isStatic && methodMetadata.hasDeclaredStereotype(AnnotationUtil.INJECT)) {
                     addInjectedMethod(methods, methodReferences, method, methodMetadata, false, false);

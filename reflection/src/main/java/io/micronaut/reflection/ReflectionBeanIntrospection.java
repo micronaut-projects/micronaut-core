@@ -82,9 +82,9 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     private final List<BeanProperty<T, Object>> properties;
     private final List<BeanMethod<T, Object>> methods;
 
-    private ReflectionBeanIntrospection(Class<T> beanType) {
+    private ReflectionBeanIntrospection(Class<T> beanType, AnnotationMetadata additionalAnnotationMetadata) {
         this.beanType = beanType;
-        this.annotationMetadata = ReflectionAnnotations.metadataOf(beanType);
+        this.annotationMetadata = ReflectionAnnotations.merge(ReflectionAnnotations.metadataOf(beanType), additionalAnnotationMetadata);
         this.constructor = selectConstructor(beanType);
         this.constructorArguments = constructor == null ? Argument.ZERO_ARGUMENTS : ReflectionArguments.argumentsOf(constructor);
         this.beanConstructor = new SelectedBeanConstructor();
@@ -101,10 +101,28 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
      * @throws IllegalArgumentException When the type cannot be introspected, see {@link #isIntrospectable(Class)}
      */
     public static <T> ReflectionBeanIntrospection<T> of(Class<T> beanType) {
+        return of(beanType, AnnotationMetadata.EMPTY_METADATA);
+    }
+
+    /**
+     * The reflective introspection of a type, carrying annotations the caller means it to have beyond the ones
+     * the class declares.
+     *
+     * <p>A specification that reads a type it was told to handle - serialization asked to read a class that
+     * was never annotated - decides that itself, and the code downstream asks the introspection for the
+     * annotation rather than being told separately.</p>
+     *
+     * @param beanType                     The bean type
+     * @param additionalAnnotationMetadata The annotations to carry beyond the ones of the class
+     * @param <T>                          The bean type
+     * @return The introspection
+     * @throws IllegalArgumentException When the type cannot be described reflectively
+     */
+    public static <T> ReflectionBeanIntrospection<T> of(Class<T> beanType, AnnotationMetadata additionalAnnotationMetadata) {
         if (!isIntrospectable(beanType)) {
             throw new IllegalArgumentException("The type " + beanType.getName() + " cannot be introspected reflectively");
         }
-        return new ReflectionBeanIntrospection<>(beanType);
+        return new ReflectionBeanIntrospection<>(beanType, additionalAnnotationMetadata);
     }
 
     /**
@@ -313,6 +331,18 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     @SuppressWarnings("unchecked")
     private static <T> @Nullable Constructor<T> selectConstructor(Class<T> beanType) {
         Constructor<?>[] declared = beanType.getDeclaredConstructors();
+        if (beanType.isRecord()) {
+            // the canonical constructor is the one a record is built by; another one it declares delegates to it
+            Class<?>[] components = Arrays.stream(beanType.getRecordComponents())
+                .map(RecordComponent::getType)
+                .toArray(Class<?>[]::new);
+            for (Constructor<?> candidate : declared) {
+                if (Arrays.equals(candidate.getParameterTypes(), components)) {
+                    candidate.trySetAccessible();
+                    return (Constructor<T>) candidate;
+                }
+            }
+        }
         Constructor<?> selected = null;
         for (Constructor<?> candidate : declared) {
             if (candidate.isAnnotationPresent(Creator.class)) {

@@ -3,6 +3,7 @@ package io.micronaut.reflection
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospector
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import spock.lang.Specification
@@ -160,6 +161,77 @@ class ReflectionApiSpec extends Specification {
         executable.targetMethod == Book.getMethod("getTitle")
         executable.invoke(new Book("dispatched", 1)) == "dispatched"
         definition.executableMethods*.name == ["getTitle"]
+    }
+
+    void "the life cycle methods of another container are named rather than annotated"() {
+        given:
+        def context = ApplicationContext.run()
+        context.registerBeanDefinition(
+                ReflectionBeanDefinition.builder(io.micronaut.reflection.Named)
+                        .singleton(true)
+                        .postConstruct("open")
+                        .preDestroy("close")
+                        .build())
+
+        when:
+        def bean = context.getBean(io.micronaut.reflection.Named)
+
+        then:
+        bean.events == ["open"]
+
+        when:
+        context.close()
+
+        then:
+        bean.events == ["open", "close"]
+    }
+
+    void "the annotations of another container are added to the ones of the class, both declared"() {
+        given: "a class that declares its own scope, and a container that means it to be primary"
+        def definition = ReflectionBeanDefinition.builder(Warehouse)
+                .additionalAnnotationMetadata(ReflectionAnnotations.declaring(io.micronaut.context.annotation.Primary))
+                .build()
+
+        expect: "the class is still read"
+        definition.singleton
+        definition.scope.get() == jakarta.inject.Singleton
+
+        and: "and the added annotation counts as declared, which is how the framework reads it"
+        definition.primary
+        definition.annotationMetadata.hasDeclaredAnnotation(io.micronaut.context.annotation.Primary)
+
+        and: "the metadata of two are merged the same way on their own"
+        ReflectionAnnotations.merge(ReflectionAnnotations.declaring(Portable), ReflectionAnnotations.declaring(Restricted))
+                .with { it.hasDeclaredAnnotation(Portable) && it.hasDeclaredAnnotation(Restricted) }
+        ReflectionAnnotations.merge(ReflectionAnnotations.declaring(Portable), AnnotationMetadata.EMPTY_METADATA)
+                .hasDeclaredAnnotation(Portable)
+        ReflectionAnnotations.merge(AnnotationMetadata.EMPTY_METADATA, ReflectionAnnotations.declaring(Portable))
+                .hasDeclaredAnnotation(Portable)
+    }
+
+    void "a record is instantiated by its canonical constructor, not by a wider one it declares"() {
+        given:
+        def definition = ReflectionBeanDefinition.of(Delegating)
+
+        expect:
+        definition.targetConstructor.parameterCount == 1
+        definition.constructor.arguments*.name == ["label"]
+
+        and: "the introspection selects it as well"
+        ReflectionBeanIntrospection.of(Delegating).constructorArguments*.name == ["label"]
+        ReflectionBeanIntrospection.of(Delegating).instantiate("only") == new Delegating("only")
+    }
+
+    void "an introspection carries the annotations the caller means it to have"() {
+        given:
+        def introspection = ReflectionBeanIntrospection.of(Book, ReflectionAnnotations.declaring(Portable))
+
+        expect: "the class is still read, and the added annotation is there"
+        introspection.annotationMetadata.hasDeclaredAnnotation(Portable)
+        introspection.beanProperties*.name.contains("title")
+
+        and: "an introspection with nothing added is the class alone"
+        !ReflectionBeanIntrospection.of(Book).annotationMetadata.hasDeclaredAnnotation(Portable)
     }
 
     void "a reflective bean definition reports the order of its class and is loaded by the context"() {

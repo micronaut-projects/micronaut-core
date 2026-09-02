@@ -28,6 +28,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.inject.annotation.AnnotationMetadataException;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataSupport;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -236,6 +237,32 @@ public final class ReflectionAnnotations {
                 new AnnotationValue<>(name, new LinkedHashMap<>(values), defaultValues(annotationType)));
         }
         addStereotypes(metadata, annotationType, List.of(name), true);
+    }
+
+    /**
+     * The annotations of two metadata in one, both declared: the metadata of a class together with the
+     * annotations another container means it to carry.
+     *
+     * <p>A container adapting another one - a Spring bean it marks primary, a Guice binding it qualifies -
+     * has annotations of its own to add to the ones a class declares. Replacing the metadata of the class
+     * loses what the class says; a {@link AnnotationMetadataHierarchy hierarchy} keeps both but only the last
+     * level counts as declared, and the framework reads a scope, a qualifier and a primary marker from the
+     * declared level. This merges them, so both are declared.</p>
+     *
+     * @param first  The metadata whose values win where both declare the same annotation
+     * @param second The metadata to add
+     * @return The merged metadata
+     */
+    public static AnnotationMetadata merge(AnnotationMetadata first, AnnotationMetadata second) {
+        if (second.isEmpty()) {
+            return first;
+        }
+        if (first.isEmpty()) {
+            return second;
+        }
+        MutableAnnotationMetadata merged = MutableAnnotationMetadata.of(second);
+        merged.addAnnotationMetadata(MutableAnnotationMetadata.of(first));
+        return merged;
     }
 
     /**
