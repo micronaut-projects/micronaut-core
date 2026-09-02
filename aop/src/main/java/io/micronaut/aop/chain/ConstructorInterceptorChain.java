@@ -209,43 +209,45 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     private static @Nullable Object[] resolveConcreteSubset(BeanDefinition<?> beanDefinition,
                                                             @Nullable Object[] originalParameters,
                                                             int additionalProxyConstructorParametersCount) {
-
+        Object[] parameters = normalizeParameters(originalParameters);
         if (beanDefinition instanceof AdvisedBeanType) {
-
-            // intercepted bean constructors include additional arguments in
-            // addition to the arguments declared in the bean
-            // Here we subtract these from the parameters made visible to the interceptor consumer
-            if (originalParameters.length < additionalProxyConstructorParametersCount) {
-                throw new IllegalStateException("Invalid intercepted bean constructor. This should never happen. Report an issue to the project maintainers.");
-            }
+            validateAdditionalProxyParameters(parameters, additionalProxyConstructorParametersCount);
             return Arrays.copyOfRange(
-                originalParameters,
+                parameters,
                 0,
-                originalParameters.length - additionalProxyConstructorParametersCount
+                parameters.length - additionalProxyConstructorParametersCount
             );
         }
-        return originalParameters;
+        return parameters;
     }
 
     private static @Nullable Object[] resolveInterceptorArguments(BeanDefinition<?> beanDefinition,
                                                                   @Nullable Object[] originalParameters,
                                                                   int additionalProxyConstructorParametersCount) {
-
+        Object[] parameters = normalizeParameters(originalParameters);
         if (beanDefinition instanceof AdvisedBeanType) {
-
-            // intercepted bean constructors include additional arguments in
-            // addition to the arguments declared in the bean
-            // Here we subtract these from the parameters made visible to the interceptor consumer
-            if (originalParameters.length < additionalProxyConstructorParametersCount) {
-                throw new IllegalStateException("Invalid intercepted bean constructor. This should never happen. Report an issue to the project maintainers.");
-            }
+            validateAdditionalProxyParameters(parameters, additionalProxyConstructorParametersCount);
             return Arrays.copyOfRange(
-                originalParameters,
-                originalParameters.length - additionalProxyConstructorParametersCount,
-                originalParameters.length
+                parameters,
+                parameters.length - additionalProxyConstructorParametersCount,
+                parameters.length
             );
         }
-        return originalParameters;
+        return parameters;
+    }
+
+    private static Object[] normalizeParameters(@Nullable Object[] originalParameters) {
+        return originalParameters == null ? ArrayUtils.EMPTY_OBJECT_ARRAY : originalParameters;
+    }
+
+    private static void validateAdditionalProxyParameters(Object[] parameters,
+                                                          int additionalProxyConstructorParametersCount) {
+        // intercepted bean constructors include additional arguments in
+        // addition to the arguments declared in the bean
+        // Here we subtract these from the parameters made visible to the interceptor consumer
+        if (parameters.length < additionalProxyConstructorParametersCount) {
+            throw new IllegalStateException("Invalid intercepted bean constructor. This should never happen. Report an issue to the project maintainers.");
+        }
     }
 
     /**
