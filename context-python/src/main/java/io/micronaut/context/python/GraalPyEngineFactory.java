@@ -31,7 +31,9 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Factory for producing a GraalVM Polyglot {@link Engine} for Python contexts.
@@ -41,6 +43,7 @@ import java.util.Map;
 @Factory
 final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
     private static final Logger LOG = LoggerFactory.getLogger(GraalPyEngineFactory.class);
+    private static final Map<String, Boolean> SUPPORTED_ENGINE_OPTIONS = new ConcurrentHashMap<>();
 
     /**
      * Create the application-scoped Python engine bean.
@@ -74,10 +77,52 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
      * @return A new Python polyglot engine.
      */
     static Engine buildPythonEngine(GraalPyEngineConfiguration engineConfiguration) {
-        return engineConfiguration.builder
+        Engine.Builder builder = engineConfiguration.builder
             .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
-            .logHandler(new GraalPySlf4jLogHandler())
-            .build();
+            .logHandler(new GraalPySlf4jLogHandler());
+        // Engine.Builder#options accumulates, so an unsupported option cannot be removed once set.
+        // The support check has to happen before it is applied, not as a retry.
+        Map<String, String> supported = new LinkedHashMap<>();
+        for (Map.Entry<String, String> option : engineConfiguration.optionalOptions.entrySet()) {
+            if (isEngineOptionSupported(option.getKey())) {
+                supported.put(option.getKey(), option.getValue());
+            } else {
+                LOG.debug("GraalPy runtime does not support engine option {}, leaving it unset", option.getKey());
+            }
+        }
+        if (!supported.isEmpty()) {
+            builder.options(supported);
+        }
+        return builder.build();
+    }
+
+    /**
+     * Whether the active Truffle runtime knows the given engine option.
+     *
+     * <p>The tuning options Micronaut sets exist only on the optimizing runtime. On the fallback
+     * runtime - any JVM without JVMCI, which includes stock OpenJDK and a GraalVM CE not started
+     * with {@code -XX:+EnableJVMCI} - setting one makes {@code build()} throw and Python then fails
+     * to start at all rather than merely running interpreted.</p>
+     *
+     * <p>The probe engine is not the cost it appears to be: it is polyglot initialization, which the
+     * real engine pays regardless, so a second creation is effectively free.</p>
+     *
+     * @param option The option name
+     * @return Whether it is supported
+     */
+    private static boolean isEngineOptionSupported(String option) {
+        Boolean known = SUPPORTED_ENGINE_OPTIONS.get(option);
+        if (known != null) {
+            return known;
+        }
+        boolean supported;
+        try (Engine probe = Engine.create()) {
+            supported = probe.getOptions().get(option) != null;
+        } catch (Exception e) {
+            supported = false;
+        }
+        SUPPORTED_ENGINE_OPTIONS.put(option, supported);
+        return supported;
     }
 
     /**
@@ -135,6 +180,11 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
     static final class GraalPyEngineConfiguration {
         public static final String PREFIX = "graalpy.engine";
 
+        /**
+         * Options to apply only if the runtime recognises them.
+         */
+        final Map<String, String> optionalOptions = new LinkedHashMap<>();
+
         @ConfigurationBuilder(prefixes = "", excludes = {"out", "in", "err", "exceptionHandler", "messageTransport"})
         Engine.Builder builder = Engine.newBuilder(
             GraalPyContextCustomizers.languages(GraalPyContextCustomizers.currentClassLoader())
@@ -142,7 +192,12 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
 
         GraalPyEngineConfiguration() {
             // currently GraalPy spawns too many compiler threads by default. limit to 1 for now.
-            builder.options(Map.of("engine.CompilerThreads", "1"));
+            // Only the optimizing Truffle runtime knows this option. On the fallback runtime - any
+            // JVM without JVMCI enabled, which includes stock OpenJDK and a GraalVM CE that was not
+            // started with -XX:+EnableJVMCI - setting it makes Engine.build() throw
+            // IllegalArgumentException, and Python then fails to start at all rather than merely
+            // running interpreted. Applied on a best effort basis instead, in buildPythonEngine.
+            optionalOptions.put("engine.CompilerThreads", "1");
         }
 
         /**

@@ -88,14 +88,7 @@ public final class PythonAstParser {
     }
 
     PythonAstParser(ClassLoader classLoader, boolean incremental) {
-        var contextBuilder = GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
-                .resourceDirectory(INJECT_RESOURCES)
-                .resourceLoadingClass(PythonAstParser.class)
-                .build())
-            // Future hardening should constrain host access to the required Micronaut API surface.
-            .allowHostAccess(HostAccess.ALL)
-            .hostClassLoader(classLoader)
-            .allowHostClassLookup(name -> name.startsWith("io.micronaut"));
+        var contextBuilder = newContextBuilder(classLoader);
         if (incremental) {
             // Incremental processing is a short-lived workload. Tune GraalPy for startup latency
             // and avoid paying for a core-count-based compiler thread pool.
@@ -103,10 +96,45 @@ public final class PythonAstParser {
                 .option("engine.Mode", "latency")
                 .option("engine.CompilerThreads", "1");
         }
-        this.context = contextBuilder.build();
+        // Both of those options exist only on the optimizing Truffle runtime. On the fallback
+        // runtime - any JVM without JVMCI, which includes stock OpenJDK and a GraalVM CE not started
+        // with -XX:+EnableJVMCI - build() throws IllegalArgumentException and Pyronaut cannot compile
+        // Python at all. Tuning is not worth failing the build over, so fall back without them.
+        this.context = buildTolerantly(contextBuilder, incremental, classLoader);
         context.initialize(PYTHON);
         context.eval(COMPILE_RUNTIME_AST_SOURCE);
         runtimeAstCompiler = context.getBindings(PYTHON).getMember("_mn_compile_runtime_ast");
+    }
+
+    private static Context.Builder newContextBuilder(ClassLoader classLoader) {
+        return GraalPyResources.contextBuilder(VirtualFileSystem.newBuilder()
+                .resourceDirectory(INJECT_RESOURCES)
+                .resourceLoadingClass(PythonAstParser.class)
+                .build())
+            // Future hardening should constrain host access to the required Micronaut API surface.
+            .allowHostAccess(HostAccess.ALL)
+            .hostClassLoader(classLoader)
+            .allowHostClassLookup(name -> name.startsWith("io.micronaut"));
+    }
+
+    /**
+     * Builds the context, retrying without the optimizing-runtime tuning options if the runtime does
+     * not recognise them.
+     *
+     * @param contextBuilder The builder, already carrying the tuning options when incremental
+     * @param incremental    Whether the tuning options were applied
+     * @param classLoader    The host class loader, needed to rebuild from scratch
+     * @return The context
+     */
+    private static Context buildTolerantly(Context.Builder contextBuilder, boolean incremental, ClassLoader classLoader) {
+        try {
+            return contextBuilder.build();
+        } catch (IllegalArgumentException e) {
+            if (!incremental) {
+                throw e;
+            }
+            return newContextBuilder(classLoader).build();
+        }
     }
 
     PythonBytecodeCompiler bytecodeCompiler() {
