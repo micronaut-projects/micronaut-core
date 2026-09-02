@@ -1047,17 +1047,17 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Override
     public boolean hasDeclaredAnnotation(@Nullable String annotation) {
-        return declaredAnnotations != null && StringUtils.isNotEmpty(annotation) && declaredAnnotations.containsKey(annotation);
+        return containsAnnotation(declaredAnnotations, annotation);
     }
 
     @Override
     public boolean hasAnnotation(@Nullable String annotation) {
-        return hasDeclaredAnnotation(annotation) || (allAnnotations != null && StringUtils.isNotEmpty(annotation) && allAnnotations.containsKey(annotation));
+        return hasDeclaredAnnotation(annotation) || containsAnnotation(allAnnotations, annotation);
     }
 
     @Override
     public boolean hasStereotype(@Nullable String annotation) {
-        return hasAnnotation(annotation) || (allStereotypes != null && StringUtils.isNotEmpty(annotation) && allStereotypes.containsKey(annotation));
+        return hasAnnotation(annotation) || containsAnnotation(allStereotypes, annotation);
     }
 
     @Override
@@ -1074,7 +1074,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Override
     public boolean hasDeclaredStereotype(@Nullable String annotation) {
-        return hasDeclaredAnnotation(annotation) || (declaredStereotypes != null && StringUtils.isNotEmpty(annotation) && declaredStereotypes.containsKey(annotation));
+        return hasDeclaredAnnotation(annotation) || containsAnnotation(declaredStereotypes, annotation);
     }
 
     @Override
@@ -1140,10 +1140,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 return Collections.unmodifiableList(annotations);
             }
         }
-        if (allAnnotations != null && allAnnotations.containsKey(stereotype)) {
-            return List.of(stereotype);
-        }
-        if (declaredAnnotations != null && declaredAnnotations.containsKey(stereotype)) {
+        if (containsAnnotation(allAnnotations, stereotype) || containsAnnotation(declaredAnnotations, stereotype)) {
             return List.of(stereotype);
         }
         return List.of();
@@ -1227,7 +1224,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             if (annotations != null) {
                 annotations = new ArrayList<>(annotations);
                 if (declaredAnnotations != null) {
-                    annotations.removeIf(s -> !declaredAnnotations.containsKey(s));
+                    annotations.removeIf(s -> !containsAnnotation(declaredAnnotations, s));
                     return Collections.unmodifiableList(annotations);
                 } else {
                     // no declared
@@ -1235,7 +1232,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 }
             }
         }
-        if (declaredAnnotations != null && declaredAnnotations.containsKey(stereotype)) {
+        if (containsAnnotation(declaredAnnotations, stereotype)) {
             return List.of(stereotype);
         }
         return List.of();
@@ -1559,6 +1556,25 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Nullable
     protected String findRepeatableAnnotationContainerInternal(String annotation) {
         return AnnotationMetadataSupport.getRepeatableAnnotation(annotation);
+    }
+
+    /**
+     * Whether the annotation is present in the given map, either under its own name or, for a repeatable
+     * annotation, under the name of its container (the form in which repeated values are stored).
+     *
+     * @param annotations The annotations or stereotypes, keyed by name
+     * @param annotation  The annotation name
+     * @return True if present
+     */
+    private boolean containsAnnotation(@Nullable Map<String, Map<CharSequence, Object>> annotations, @Nullable String annotation) {
+        if (annotations == null || StringUtils.isEmpty(annotation)) {
+            return false;
+        }
+        if (annotations.containsKey(annotation)) {
+            return true;
+        }
+        String repeatableContainer = findRepeatableAnnotationContainerInternal(annotation);
+        return repeatableContainer != null && annotations.containsKey(repeatableContainer);
     }
 
     @Nullable
