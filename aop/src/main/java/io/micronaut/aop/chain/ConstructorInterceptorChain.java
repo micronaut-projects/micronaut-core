@@ -209,38 +209,32 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     private static @Nullable Object[] resolveConcreteSubset(BeanDefinition<?> beanDefinition,
                                                             @Nullable Object[] originalParameters,
                                                             int additionalProxyConstructorParametersCount) {
-        Object[] parameters = normalizeParameters(originalParameters);
         if (beanDefinition instanceof AdvisedBeanType) {
-            validateAdditionalProxyParameters(parameters, additionalProxyConstructorParametersCount);
+            validateAdditionalProxyParameters(originalParameters, additionalProxyConstructorParametersCount);
             return Arrays.copyOfRange(
-                parameters,
+                originalParameters,
                 0,
-                parameters.length - additionalProxyConstructorParametersCount
+                originalParameters.length - additionalProxyConstructorParametersCount
             );
         }
-        return parameters;
+        return originalParameters;
     }
 
     private static @Nullable Object[] resolveInterceptorArguments(BeanDefinition<?> beanDefinition,
                                                                   @Nullable Object[] originalParameters,
                                                                   int additionalProxyConstructorParametersCount) {
-        Object[] parameters = normalizeParameters(originalParameters);
         if (beanDefinition instanceof AdvisedBeanType) {
-            validateAdditionalProxyParameters(parameters, additionalProxyConstructorParametersCount);
+            validateAdditionalProxyParameters(originalParameters, additionalProxyConstructorParametersCount);
             return Arrays.copyOfRange(
-                parameters,
-                parameters.length - additionalProxyConstructorParametersCount,
-                parameters.length
+                originalParameters,
+                originalParameters.length - additionalProxyConstructorParametersCount,
+                originalParameters.length
             );
         }
-        return parameters;
+        return originalParameters;
     }
 
-    private static Object[] normalizeParameters(@Nullable Object[] originalParameters) {
-        return originalParameters == null ? ArrayUtils.EMPTY_OBJECT_ARRAY : originalParameters;
-    }
-
-    private static void validateAdditionalProxyParameters(Object[] parameters,
+    private static void validateAdditionalProxyParameters(@Nullable Object[] parameters,
                                                           int additionalProxyConstructorParametersCount) {
         // intercepted bean constructors include additional arguments in
         // addition to the arguments declared in the bean
@@ -324,11 +318,10 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
 
         @Override
         public T instantiate(@Nullable Object... parameterValues) {
-            @Nullable Object[] values = parameterValues == null ? ArrayUtils.EMPTY_OBJECT_ARRAY : parameterValues;
             if (ArrayUtils.isNotEmpty(internalParameters)) {
-                values = ArrayUtils.concat(values, internalParameters);
+                return proxyConstructor.instantiate(ArrayUtils.concat(parameterValues, internalParameters));
             }
-            return proxyConstructor.instantiate(values);
+            return proxyConstructor.instantiate(parameterValues);
         }
 
         @Override
