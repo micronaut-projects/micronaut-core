@@ -1595,16 +1595,31 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     public static <T extends Annotation> AnnotationValue<T> of(T annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         Class<? extends Annotation> annotationType = annotation.annotationType();
-        Method[] members = annotationType.getDeclaredMethods();
-        Map<CharSequence, Object> values = CollectionUtils.newLinkedHashMap(members.length);
-        for (Method member : members) {
-            if (member.getParameterCount() != 0 || member.isSynthetic()) {
-                continue;
-            }
-            values.put(member.getName(), toMemberValue(readMember(annotation, member)));
+        Map<String, Method> members = ANNOTATION_MEMBERS.get(annotationType);
+        Map<CharSequence, Object> values = CollectionUtils.newLinkedHashMap(members.size());
+        for (Map.Entry<String, Method> member : members.entrySet()) {
+            values.put(member.getKey(), toMemberValue(readMember(annotation, member.getValue())));
         }
         return new AnnotationValue<>(annotationType.getName(), values, RetentionPolicy.RUNTIME);
     }
+
+    /**
+     * The members of each annotation type, by name, in declaration order: the zero-argument methods it declares,
+     * looked up once per type rather than on every read of an instance.
+     */
+    private static final ClassValue<Map<String, Method>> ANNOTATION_MEMBERS = new ClassValue<>() {
+        @Override
+        protected Map<String, Method> computeValue(Class<?> annotationType) {
+            Method[] declared = annotationType.getDeclaredMethods();
+            Map<String, Method> members = CollectionUtils.newLinkedHashMap(declared.length);
+            for (Method member : declared) {
+                if (member.getParameterCount() == 0 && !member.isSynthetic()) {
+                    members.put(member.getName(), member);
+                }
+            }
+            return Collections.unmodifiableMap(members);
+        }
+    };
 
     /**
      * A member read off an annotation instance.
@@ -1641,37 +1656,34 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The value as metadata records it
      */
     private static Object toMemberValue(Object value) {
-        if (value instanceof Class<?> type) {
-            return new AnnotationClassValue<>(type);
-        }
-        if (value instanceof Enum<?> constant) {
-            return constant.name();
-        }
-        if (value instanceof Annotation nested) {
-            return of(nested);
-        }
-        if (value instanceof Class<?>[] types) {
-            AnnotationClassValue<?>[] classValues = new AnnotationClassValue[types.length];
-            for (int i = 0; i < types.length; i++) {
-                classValues[i] = new AnnotationClassValue<>(types[i]);
+        return switch (value) {
+            case Class<?> type -> new AnnotationClassValue<>(type);
+            case Enum<?> constant -> constant.name();
+            case Annotation nested -> of(nested);
+            case Annotation[] nested -> {
+                AnnotationValue<?>[] annotationValues = new AnnotationValue[nested.length];
+                for (int i = 0; i < nested.length; i++) {
+                    annotationValues[i] = of(nested[i]);
+                }
+                yield annotationValues;
             }
-            return classValues;
-        }
-        if (value instanceof Enum<?>[] constants) {
-            String[] names = new String[constants.length];
-            for (int i = 0; i < constants.length; i++) {
-                names[i] = constants[i].name();
+            // a generic array type is not a pattern the parser accepts, so the two are matched by a guard
+            case Object[] array when array instanceof Class<?>[] types -> {
+                AnnotationClassValue<?>[] classValues = new AnnotationClassValue[types.length];
+                for (int i = 0; i < types.length; i++) {
+                    classValues[i] = new AnnotationClassValue<>(types[i]);
+                }
+                yield classValues;
             }
-            return names;
-        }
-        if (value instanceof Annotation[] nested) {
-            AnnotationValue<?>[] annotationValues = new AnnotationValue[nested.length];
-            for (int i = 0; i < nested.length; i++) {
-                annotationValues[i] = of(nested[i]);
+            case Object[] array when array instanceof Enum<?>[] constants -> {
+                String[] names = new String[constants.length];
+                for (int i = 0; i < constants.length; i++) {
+                    names[i] = constants[i].name();
+                }
+                yield names;
             }
-            return annotationValues;
-        }
-        return value;
+            default -> value;
+        };
     }
 
     /**
