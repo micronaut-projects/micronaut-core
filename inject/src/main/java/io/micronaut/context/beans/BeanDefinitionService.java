@@ -199,8 +199,10 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
     /**
      * Finds the bean definition that was compiled as the given definition class.
      *
-     * <p>The lookup is by the definition's own class name, as reported by
-     * {@link BeanDefinitionReference#getBeanDefinitionName()}, so unmatched definitions are never loaded.
+     * <p>Candidates are narrowed by the definition's own class name, as reported by
+     * {@link BeanDefinitionReference#getBeanDefinitionName()}, so unmatched definitions are never loaded; each
+     * candidate is then loaded until one of them is the requested class, so a name that two references share,
+     * as separate class loaders can make happen, does not hide the definition that was asked for.
      * The instance returned is the one this service hands out for every other lookup.</p>
      *
      * @param beanContext     the bean context to eliminate disabled beans

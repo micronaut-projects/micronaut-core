@@ -48,6 +48,7 @@ import jakarta.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -108,6 +109,18 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     private final ClassLoader classLoader;
     @Nullable
     private Beans beans;
+
+    /**
+     * The producers of {@link #beans}, keyed by the definition name their reference reports. Built on the first
+     * lookup by definition class and dropped as soon as the producers are rebuilt, which the {@link Beans} the
+     * index was built from detects. Only a {@link io.micronaut.context.RuntimeBeanDefinition} is added to a live
+     * {@code Beans}, and the name it generates is never a compiled definition class name, so an index built
+     * before such an addition cannot answer a lookup wrongly.
+     */
+    @Nullable
+    @SuppressWarnings("java:S3077")
+    private volatile ProducersByDefinitionName producersByDefinitionName;
+
     private final BeanResolutionCustomizer beanResolutionCustomizer;
 
     private final List<BeanDefinitionProducer> additionalBeanDefinitions = new ArrayList<>();
@@ -220,24 +233,11 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         if (current == null) {
             return null;
         }
-        BeanDefinition<T> definition = findDefinitionByDefinitionClass(current.all, beanContext, definitionClass);
-        if (definition == null) {
-            // A proxied bean is disabled in the main list and its target is kept apart, see createBeans
-            definition = findDefinitionByDefinitionClass(current.proxyTargetBeans, beanContext, definitionClass);
+        List<BeanDefinitionProducer> candidates = producersByDefinitionName(current).get(definitionClass.getName());
+        if (candidates == null) {
+            return null;
         }
-        return definition;
-    }
-
-    @Nullable
-    private <T> BeanDefinition<T> findDefinitionByDefinitionClass(List<BeanDefinitionProducer> producers,
-                                                                 BeanContext beanContext,
-                                                                 Class<? extends BeanDefinition<T>> definitionClass) {
-        String definitionName = definitionClass.getName();
-        for (BeanDefinitionProducer producer : producers) {
-            BeanDefinitionReference<?> reference = producer.reference;
-            if (reference == null || !definitionName.equals(reference.getBeanDefinitionName())) {
-                continue;
-            }
+        for (BeanDefinitionProducer producer : candidates) {
             // The name is only a cheap filter: two references can carry the same name across class loaders,
             // so keep looking until one of them loads as the requested class
             BeanDefinition<T> definition = producer.getDefinitionIfEnabled(beanContext, null, beanResolutionCustomizer, null, null, null);
@@ -246,6 +246,28 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             }
         }
         return null;
+    }
+
+    private Map<String, List<BeanDefinitionProducer>> producersByDefinitionName(Beans current) {
+        ProducersByDefinitionName cached = producersByDefinitionName;
+        if (cached != null && cached.beans == current) {
+            return cached.index;
+        }
+        Map<String, List<BeanDefinitionProducer>> index = new HashMap<>();
+        indexByDefinitionName(index, current.all);
+        // A proxied bean is disabled in the main list and its target is kept apart, see createBeans
+        indexByDefinitionName(index, current.proxyTargetBeans);
+        producersByDefinitionName = new ProducersByDefinitionName(current, index);
+        return index;
+    }
+
+    private static void indexByDefinitionName(Map<String, List<BeanDefinitionProducer>> index, List<BeanDefinitionProducer> producers) {
+        for (BeanDefinitionProducer producer : producers) {
+            BeanDefinitionReference<?> reference = producer.reference;
+            if (reference != null) {
+                index.computeIfAbsent(reference.getBeanDefinitionName(), name -> new ArrayList<>(1)).add(producer);
+            }
+        }
     }
 
     @Override
@@ -616,6 +638,9 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             refs = list;
         }
         return refs;
+    }
+
+    private record ProducersByDefinitionName(Beans beans, Map<String, List<BeanDefinitionProducer>> index) {
     }
 
     private record Beans(
