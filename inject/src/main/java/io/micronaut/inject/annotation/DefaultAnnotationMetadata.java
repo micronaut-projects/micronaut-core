@@ -172,7 +172,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 null,
                 null,
                 annotationsByStereotype,
-                hasPropertyExpressions
+                hasPropertyExpressions,
+                hasEvaluatedExpressions
         );
     }
 
@@ -1377,7 +1378,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 allStereotypes != null ? cloneMapOfMapValue(allStereotypes) : null,
                 allAnnotations != null ? cloneMapOfMapValue(allAnnotations) : null,
                 annotationsByStereotype != null ? cloneMapOfListValue(annotationsByStereotype) : null,
-                hasPropertyExpressions
+                hasPropertyExpressions,
+                hasEvaluatedExpressions
         );
         return cloned;
     }
