@@ -531,12 +531,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             } else if (Properties.class.isAssignableFrom(requiredType)) {
                 Properties properties = resolveSubProperties(name, entries, conversionContext);
                 return Optional.of((T) properties);
-            } else if (Map.class.isAssignableFrom(requiredType)) {
+            } else if (isMapConvertible(requiredType)) {
                 Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
                 if (!subMap.isEmpty()) {
                     return conversionService.convert(subMap, Map.class, requiredType, conversionContext);
-                } else {
+                } else if (Map.class.isAssignableFrom(requiredType)) {
                     return (Optional<T>) Optional.of(subMap);
+                } else {
+                    return Optional.empty();
                 }
             } else if (PropertyResolver.class.isAssignableFrom(requiredType)) {
                 Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
@@ -552,6 +554,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             return Optional.of((T) Collections.emptyMap());
         }
         return Optional.empty();
+    }
+
+    private boolean isMapConvertible(Class<?> requiredType) {
+        return Map.class.isAssignableFrom(requiredType) || conversionService.canConvert(Map.class, requiredType);
     }
 
     /**

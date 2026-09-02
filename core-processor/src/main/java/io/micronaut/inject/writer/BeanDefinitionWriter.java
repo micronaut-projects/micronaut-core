@@ -110,7 +110,6 @@ import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -254,15 +253,23 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method GET_BEAN_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getBeanRegistrationsForConstructorArgument", true);
 
+    private static final Method GET_BEAN_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT_OBJECT = getBeanLookupMethod("getBeanRegistrationsForConstructorArgumentObject", true);
+
     private static final Method GET_BEAN_REGISTRATION_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getBeanRegistrationForConstructorArgument", true);
 
     private static final Method GET_BEANS_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getBeansOfTypeForConstructorArgument", true);
+
+    private static final Method GET_BEANS_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT_OBJECT = getBeanLookupMethod("getBeansOfTypeForConstructorArgumentObject", true);
 
     private static final Method GET_STREAM_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getStreamOfTypeForConstructorArgument", true);
 
     private static final Method GET_MAP_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getMapOfTypeForConstructorArgument", true);
 
+    private static final Method GET_MAP_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT_OBJECT = getBeanLookupMethod("getMapOfTypeForConstructorArgumentObject", true);
+
     private static final Method FIND_BEAN_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("findBeanForConstructorArgument", true);
+
+    private static final Method FIND_BEAN_FOR_CONSTRUCTOR_ARGUMENT_OBJECT = getBeanLookupMethod("findBeanForConstructorArgumentObject", true);
 
     private static final Method GET_BEAN_FOR_FIELD = getBeanLookupMethod("getBeanForField", false);
 
@@ -270,9 +277,13 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method GET_BEAN_REGISTRATIONS_FOR_FIELD = getBeanLookupMethod("getBeanRegistrationsForField", true);
 
+    private static final Method GET_BEAN_REGISTRATIONS_FOR_FIELD_OBJECT = getBeanLookupMethod("getBeanRegistrationsForFieldObject", true);
+
     private static final Method GET_BEAN_REGISTRATION_FOR_FIELD = getBeanLookupMethod("getBeanRegistrationForField", true);
 
     private static final Method GET_BEANS_OF_TYPE_FOR_FIELD = getBeanLookupMethod("getBeansOfTypeForField", true);
+
+    private static final Method GET_BEANS_OF_TYPE_FOR_FIELD_OBJECT = getBeanLookupMethod("getBeansOfTypeForFieldObject", true);
 
     private static final Method GET_VALUE_FOR_FIELD = getBeanLookupMethod("getValueForField", false);
 
@@ -280,7 +291,11 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method GET_MAP_OF_TYPE_FOR_FIELD = getBeanLookupMethod("getMapOfTypeForField", true);
 
+    private static final Method GET_MAP_OF_TYPE_FOR_FIELD_OBJECT = getBeanLookupMethod("getMapOfTypeForFieldObject", true);
+
     private static final Method FIND_BEAN_FOR_FIELD = getBeanLookupMethod("findBeanForField", true);
+
+    private static final Method FIND_BEAN_FOR_FIELD_OBJECT = getBeanLookupMethod("findBeanForFieldObject", true);
 
     private static final Method GET_VALUE_FOR_PATH = ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanDefinition.class, "getValueForPath", BeanResolutionContext.class, BeanContext.class, Argument.class, String.class);
 
@@ -290,15 +305,23 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method GET_BEAN_REGISTRATIONS_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getBeanRegistrationsForMethodArgument", true);
 
+    private static final Method GET_BEAN_REGISTRATIONS_FOR_METHOD_ARGUMENT_OBJECT = getBeanLookupMethodForArgument("getBeanRegistrationsForMethodArgumentObject", true);
+
     private static final Method GET_BEAN_REGISTRATION_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getBeanRegistrationForMethodArgument", true);
 
     private static final Method GET_BEANS_OF_TYPE_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getBeansOfTypeForMethodArgument", true);
+
+    private static final Method GET_BEANS_OF_TYPE_FOR_METHOD_ARGUMENT_OBJECT = getBeanLookupMethodForArgument("getBeansOfTypeForMethodArgumentObject", true);
 
     private static final Method GET_STREAM_OF_TYPE_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getStreamOfTypeForMethodArgument", true);
 
     private static final Method GET_MAP_OF_TYPE_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getMapOfTypeForMethodArgument", true);
 
+    private static final Method GET_MAP_OF_TYPE_FOR_METHOD_ARGUMENT_OBJECT = getBeanLookupMethodForArgument("getMapOfTypeForMethodArgumentObject", true);
+
     private static final Method FIND_BEAN_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("findBeanForMethodArgument", true);
+
+    private static final Method FIND_BEAN_FOR_METHOD_ARGUMENT_OBJECT = getBeanLookupMethodForArgument("findBeanForMethodArgumentObject", true);
 
     private static final Method CHECK_INJECTED_BEAN_PROPERTY_VALUE = ReflectionUtils.getRequiredInternalMethod(
         AbstractInitializableBeanDefinition.class,
@@ -2883,17 +2906,17 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 case BeanRegistrationInjectionPoint<ClassElement> ignore ->
                     resolveFieldValue(injectMethodSignature, fieldElement, GET_BEAN_REGISTRATION_FOR_FIELD, isArray, true, fieldIndex);
 
-                case BeanRegistrationsInjectionPoint<ClassElement> ignore ->
-                    resolveFieldValue(injectMethodSignature, fieldElement, GET_BEAN_REGISTRATIONS_FOR_FIELD, isArray, true, fieldIndex);
+                case BeanRegistrationsInjectionPoint<ClassElement> v ->
+                    resolveFieldValue(injectMethodSignature, fieldElement, GET_BEAN_REGISTRATIONS_FOR_FIELD_OBJECT, v.beanType(), isArray, true, fieldIndex);
 
-                case BeansInjectionPoint<ClassElement> ignore ->
-                    resolveFieldValue(injectMethodSignature, fieldElement, GET_BEANS_OF_TYPE_FOR_FIELD, isArray, true, fieldIndex);
+                case BeansInjectionPoint<ClassElement> v ->
+                    resolveFieldValue(injectMethodSignature, fieldElement, GET_BEANS_OF_TYPE_FOR_FIELD_OBJECT, v.beanType(), isArray, true, fieldIndex);
 
-                case MapOfBeansInjectionPoint<ClassElement> ignore ->
-                    resolveFieldValue(injectMethodSignature, fieldElement, GET_MAP_OF_TYPE_FOR_FIELD, isArray, true, fieldIndex);
+                case MapOfBeansInjectionPoint<ClassElement> v ->
+                    resolveFieldValue(injectMethodSignature, fieldElement, GET_MAP_OF_TYPE_FOR_FIELD_OBJECT, v.beanType(), isArray, true, fieldIndex);
 
-                case OptionalBeanInjectionPoint<ClassElement> ignore ->
-                    resolveFieldValue(injectMethodSignature, fieldElement, FIND_BEAN_FOR_FIELD, isArray, true, fieldIndex);
+                case OptionalBeanInjectionPoint<ClassElement> v ->
+                    resolveFieldValue(injectMethodSignature, fieldElement, FIND_BEAN_FOR_FIELD_OBJECT, v.beanType(), isArray, true, fieldIndex);
 
                 case StreamOfBeansInjectionPoint<ClassElement> ignore ->
                     resolveFieldValue(injectMethodSignature, fieldElement, GET_STREAM_OF_TYPE_FOR_FIELD, isArray, true, fieldIndex);
@@ -3046,7 +3069,22 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         return null;
     }
 
-    private ExpressionDef resolveFieldValue(InjectMethodSignature injectMethodSignature, FieldElement fieldElement, Method methodToInvoke, boolean isArray, boolean requiresGenericType, int fieldIndex) {
+    private ExpressionDef resolveFieldValue(InjectMethodSignature injectMethodSignature,
+                                            FieldElement fieldElement,
+                                            Method methodToInvoke,
+                                            boolean isArray,
+                                            boolean requiresGenericType,
+                                            int fieldIndex) {
+        return resolveFieldValue(injectMethodSignature, fieldElement, methodToInvoke, null, isArray, requiresGenericType, fieldIndex);
+    }
+
+    private ExpressionDef resolveFieldValue(InjectMethodSignature injectMethodSignature,
+                                            FieldElement fieldElement,
+                                            Method methodToInvoke,
+                                            @Nullable ClassElement genericType,
+                                            boolean isArray,
+                                            boolean requiresGenericType,
+                                            int fieldIndex) {
         ExpressionDef valueExpression;
         List<ExpressionDef> valueExpressions = new ArrayList<>(
             List.of(
@@ -3056,9 +3094,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             )
         );
         if (requiresGenericType) {
-            valueExpressions.add(
-                resolveFieldArgumentGenericType(fieldElement.getGenericType(), fieldIndex)
-            );
+            valueExpressions.add(resolveFieldArgumentGenericType(fieldElement.getGenericType(), genericType, fieldIndex));
         }
         valueExpressions.add(
             getQualifier(fieldElement, resolveFieldArgument(fieldIndex))
@@ -3359,6 +3395,29 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                                      int methodIndex,
                                                      int parameterIndex,
                                                      AnnotationMetadata annotationMetadata) {
+        return injectMethodParameter(methodToInvoke, null, hasGenericType, resultType, aThis, methodParameters, methodIndex, parameterIndex, annotationMetadata);
+    }
+
+    private ExpressionDef.Cast injectMethodParameter(Method methodToInvoke,
+                                                     ClassElement genericType,
+                                                     ClassElement resultType,
+                                                     VariableDef.This aThis,
+                                                     List<VariableDef.MethodParameter> methodParameters,
+                                                     int methodIndex,
+                                                     int parameterIndex,
+                                                     AnnotationMetadata annotationMetadata) {
+        return injectMethodParameter(methodToInvoke, genericType, true, resultType, aThis, methodParameters, methodIndex, parameterIndex, annotationMetadata);
+    }
+
+    private ExpressionDef.Cast injectMethodParameter(Method methodToInvoke,
+                                                     @Nullable ClassElement genericType,
+                                                     boolean hasGenericType,
+                                                     ClassElement resultType,
+                                                     VariableDef.This aThis,
+                                                     List<VariableDef.MethodParameter> methodParameters,
+                                                     int methodIndex,
+                                                     int parameterIndex,
+                                                     AnnotationMetadata annotationMetadata) {
         boolean isArray = resultType.isArray();
         List<ExpressionDef> values = new ArrayList<>(
             List.of(
@@ -3376,7 +3435,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         // invoke getBeanForField
         if (hasGenericType) {
             values.add(
-                resolveMethodArgumentGenericType(resultType, methodIndex, parameterIndex)
+                resolveMethodArgumentGenericType(resultType, genericType, methodIndex, parameterIndex)
             );
         }
         ExpressionDef argumentExpression = resolveMethodArgument(methodIndex, parameterIndex);
@@ -3858,13 +3917,13 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             case BeanRegistrationInjectionPoint<ClassElement> v ->
                 injectConstructorParameter(GET_BEAN_REGISTRATION_FOR_CONSTRUCTOR_ARGUMENT, true, v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
             case BeanRegistrationsInjectionPoint<ClassElement> v ->
-                injectConstructorParameter(GET_BEAN_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT, true, v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
+                injectConstructorParameter(GET_BEAN_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT_OBJECT, v.beanType(), v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
             case BeansInjectionPoint<ClassElement> v ->
-                injectConstructorParameter(GET_BEANS_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT, true, v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
+                injectConstructorParameter(GET_BEANS_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT_OBJECT, v.beanType(), v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
             case MapOfBeansInjectionPoint<ClassElement> v ->
-                injectConstructorParameter(GET_MAP_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT, true, v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
+                injectConstructorParameter(GET_MAP_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT_OBJECT, v.beanType(), v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
             case OptionalBeanInjectionPoint<ClassElement> v ->
-                injectConstructorParameter(FIND_BEAN_FOR_CONSTRUCTOR_ARGUMENT, true, v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
+                injectConstructorParameter(FIND_BEAN_FOR_CONSTRUCTOR_ARGUMENT_OBJECT, v.beanType(), v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
             case StreamOfBeansInjectionPoint<ClassElement> v ->
                 injectConstructorParameter(GET_STREAM_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT, true, v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
             case ParameterInjectionPoint<ClassElement> v -> {
@@ -3908,13 +3967,13 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             case BeanRegistrationInjectionPoint<ClassElement> v ->
                 injectMethodParameter(GET_BEAN_REGISTRATION_FOR_METHOD_ARGUMENT, true, v.type(), aThis, methodParameters, methodIndex, parameterIndex, v.annotationMetadata());
             case BeanRegistrationsInjectionPoint<ClassElement> v ->
-                injectMethodParameter(GET_BEAN_REGISTRATIONS_FOR_METHOD_ARGUMENT, true, v.type(), aThis, methodParameters, methodIndex, parameterIndex, v.annotationMetadata());
+                injectMethodParameter(GET_BEAN_REGISTRATIONS_FOR_METHOD_ARGUMENT_OBJECT, v.beanType(), v.type(), aThis, methodParameters, methodIndex, parameterIndex, v.annotationMetadata());
             case BeansInjectionPoint<ClassElement> v ->
-                injectMethodParameter(GET_BEANS_OF_TYPE_FOR_METHOD_ARGUMENT, true, v.type(), aThis, methodParameters, methodIndex, parameterIndex, v.annotationMetadata());
+                injectMethodParameter(GET_BEANS_OF_TYPE_FOR_METHOD_ARGUMENT_OBJECT, v.beanType(), v.type(), aThis, methodParameters, methodIndex, parameterIndex, v.annotationMetadata());
             case MapOfBeansInjectionPoint<ClassElement> v ->
-                injectMethodParameter(GET_MAP_OF_TYPE_FOR_METHOD_ARGUMENT, true, v.type(), aThis, methodParameters, methodIndex, parameterIndex, v.annotationMetadata());
+                injectMethodParameter(GET_MAP_OF_TYPE_FOR_METHOD_ARGUMENT_OBJECT, v.beanType(), v.type(), aThis, methodParameters, methodIndex, parameterIndex, v.annotationMetadata());
             case OptionalBeanInjectionPoint<ClassElement> v ->
-                injectMethodParameter(FIND_BEAN_FOR_METHOD_ARGUMENT, true, v.type(), aThis, methodParameters, methodIndex, parameterIndex, v.annotationMetadata());
+                injectMethodParameter(FIND_BEAN_FOR_METHOD_ARGUMENT_OBJECT, v.beanType(), v.type(), aThis, methodParameters, methodIndex, parameterIndex, v.annotationMetadata());
             case StreamOfBeansInjectionPoint<ClassElement> v ->
                 injectMethodParameter(GET_STREAM_OF_TYPE_FOR_METHOD_ARGUMENT, true, v.type(), aThis, methodParameters, methodIndex, parameterIndex, v.annotationMetadata());
             case ParameterInjectionPoint<ClassElement> ignore ->
@@ -3995,6 +4054,29 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                                           int index,
                                                           Supplier<VariableDef> constructorMethodVarSupplier,
                                                           AnnotationMetadata am) {
+        return injectConstructorParameter(methodToInvoke, null, hasGenericType, resultType, aThis, methodParameters, index, constructorMethodVarSupplier, am);
+    }
+
+    private ExpressionDef.Cast injectConstructorParameter(Method methodToInvoke,
+                                                          ClassElement genericType,
+                                                          ClassElement resultType,
+                                                          VariableDef.This aThis,
+                                                          List<VariableDef.MethodParameter> methodParameters,
+                                                          int index,
+                                                          Supplier<VariableDef> constructorMethodVarSupplier,
+                                                          AnnotationMetadata am) {
+        return injectConstructorParameter(methodToInvoke, genericType, true, resultType, aThis, methodParameters, index, constructorMethodVarSupplier, am);
+    }
+
+    private ExpressionDef.Cast injectConstructorParameter(Method methodToInvoke,
+                                                          @Nullable ClassElement genericType,
+                                                          boolean hasGenericType,
+                                                          ClassElement resultType,
+                                                          VariableDef.This aThis,
+                                                          List<VariableDef.MethodParameter> methodParameters,
+                                                          int index,
+                                                          Supplier<VariableDef> constructorMethodVarSupplier,
+                                                          AnnotationMetadata am) {
         List<ExpressionDef> values = new ArrayList<>();
         // load the first two arguments of the method (the BeanResolutionContext and the BeanContext) to be passed to the method
         values.add(methodParameters.get(0));
@@ -4003,7 +4085,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         values.add(ExpressionDef.constant(index));
         if (hasGenericType) {
             values.add(
-                resolveConstructorArgumentGenericType(resultType, index, constructorMethodVarSupplier)
+                resolveConstructorArgumentGenericType(resultType, genericType, index, constructorMethodVarSupplier)
             );
         }
         // push qualifier
@@ -4070,6 +4152,23 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     private ExpressionDef resolveConstructorArgumentGenericType(ClassElement type, int argumentIndex, Supplier<VariableDef> constructorMethodVarSupplier) {
+        return resolveConstructorArgumentGenericType(type, null, argumentIndex, constructorMethodVarSupplier);
+    }
+
+    private ExpressionDef resolveConstructorArgumentGenericType(ClassElement type,
+                                                                @Nullable ClassElement genericType,
+                                                                int argumentIndex,
+                                                                Supplier<VariableDef> constructorMethodVarSupplier) {
+        if (genericType != null) {
+            return ArgumentExpUtils.pushCreateArgument(
+                annotationMetadataDefaults,
+                beanTypeElement,
+                beanDefinitionTypeDef,
+                genericType.getName(),
+                genericType,
+                loadClassValueExpressionFn
+            );
+        }
         ExpressionDef expressionDef = resolveArgumentGenericType(type);
         if (expressionDef != null) {
             return expressionDef;
@@ -4090,6 +4189,23 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     private ExpressionDef resolveMethodArgumentGenericType(ClassElement type, int methodIndex, int argumentIndex) {
+        return resolveMethodArgumentGenericType(type, null, methodIndex, argumentIndex);
+    }
+
+    private ExpressionDef resolveMethodArgumentGenericType(ClassElement type,
+                                                           @Nullable ClassElement genericType,
+                                                           int methodIndex,
+                                                           int argumentIndex) {
+        if (genericType != null) {
+            return ArgumentExpUtils.pushCreateArgument(
+                annotationMetadataDefaults,
+                beanTypeElement,
+                beanDefinitionTypeDef,
+                genericType.getName(),
+                genericType,
+                loadClassValueExpressionFn
+            );
+        }
         ExpressionDef expressionDef = resolveArgumentGenericType(type);
         if (expressionDef != null) {
             return expressionDef;
@@ -4112,6 +4228,22 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     private ExpressionDef resolveFieldArgumentGenericType(ClassElement type, int fieldIndex) {
+        return resolveFieldArgumentGenericType(type, null, fieldIndex);
+    }
+
+    private ExpressionDef resolveFieldArgumentGenericType(ClassElement type,
+                                                          @Nullable ClassElement genericType,
+                                                          int fieldIndex) {
+        if (genericType != null) {
+            return ArgumentExpUtils.pushCreateArgument(
+                annotationMetadataDefaults,
+                beanTypeElement,
+                beanDefinitionTypeDef,
+                genericType.getName(),
+                genericType,
+                loadClassValueExpressionFn
+            );
+        }
         ExpressionDef argumentExpression = resolveArgumentGenericType(type);
         if (argumentExpression != null) {
             return argumentExpression;
@@ -4313,7 +4445,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     private boolean isContainerType() {
-        return beanTypeElement.isArray() || DefaultArgument.CONTAINER_TYPES.stream().anyMatch(c -> c.equals(beanFullClassName));
+        return beanTypeElement.isArray() || beanTypeElement.isContainerType();
     }
 
     private static boolean isConfigurationProperties(AnnotationMetadata annotationMetadata) {

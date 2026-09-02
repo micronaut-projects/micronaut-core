@@ -189,7 +189,7 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
                 }
             } else {
                 final Argument<?>[] beanTypeParameters;
-                if (!Iterable.class.isAssignableFrom(beanClass)) {
+                if (!Iterable.class.isAssignableFrom(beanClass) && !beanClass.isAssignableFrom(getBeanType())) {
                     final Optional<Argument<?>> containerElement = getContainerElement();
                     //noinspection OptionalIsPresent
                     if (containerElement.isPresent()) {

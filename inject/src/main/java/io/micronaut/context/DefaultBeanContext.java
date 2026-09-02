@@ -3366,11 +3366,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
         if (beanRegistration != null) {
             if (candidate.isContainerType()) {
-                Object container = beanRegistration.bean;
-                if (container instanceof Object[] array) {
-                    container = Arrays.asList(array);
-                }
-                if (container instanceof Iterable<?> iterable) {
+                Iterable<?> iterable = asIterable(beanRegistration.bean);
+                if (iterable != null) {
                     int i = 0;
                     for (Object o : iterable) {
                         if (o == null || !beanType.isInstance(o)) {
@@ -3390,6 +3387,23 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 beansOfTypeList.add(beanRegistration);
             }
         }
+    }
+
+    @Nullable
+    private Iterable<?> asIterable(Object container) {
+        if (container == null) {
+            return null;
+        }
+        if (container instanceof Object[] array) {
+            return Arrays.asList(array);
+        }
+        if (container instanceof Iterable<?> iterable) {
+            return iterable;
+        }
+        if (getConversionService().canConvert(container.getClass(), Iterable.class)) {
+            return getConversionService().convert(container, Iterable.class).orElse(null);
+        }
+        return null;
     }
 
     private <T> boolean isCandidatePresent(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {

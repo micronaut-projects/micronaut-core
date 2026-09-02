@@ -186,6 +186,14 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
             beanDefinitionBuilder = beanDefinitionBuilderFactory.factoryField((FieldElement) producingElement);
         }
 
+        if (producedAnnotationMetadata.hasStereotype(ConfigurationReader.class)) {
+            for (PropertyElement propertyElement : producedType.getBeanProperties()) {
+                if (!propertyElement.isExcluded()) {
+                    ConfigurationReaderBeanElementCreator.visitPropertyValue(beanDefinitionBuilder, producedType, visitorContext, propertyElement);
+                }
+            }
+        }
+
         if (InterceptedMethodUtil.hasAroundStereotype(producedAnnotationMetadata) && !producedType.isAssignable("io.micronaut.aop.Interceptor")) {
             if (producedType.isArray()) {
                 throw new ProcessingException(producingElement, "Cannot apply AOP advice to arrays");

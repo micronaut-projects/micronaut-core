@@ -83,6 +83,29 @@ public abstract class AbstractEnumBeanIntrospectionAndReference<E extends Enum<E
         this.enumConstantRefs = List.of(enumValueRefs);
     }
 
+    /**
+     * The default constructor for enum-like languages whose enum constants are resolved by generated code.
+     *
+     * @param beanType                      The bean type
+     * @param annotationMetadata            The annotation metadata
+     * @param constructorAnnotationMetadata The constructor annotation metadata
+     * @param constructorArguments          The constructor arguments
+     * @param propertiesRefs                The property references
+     * @param methodsRefs                   The method references
+     * @param enumValueRefs                 The enum references
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    protected AbstractEnumBeanIntrospectionAndReference(Class<E> beanType,
+                                                        AnnotationMetadata annotationMetadata,
+                                                        AnnotationMetadata constructorAnnotationMetadata,
+                                                        Argument<?>[] constructorArguments,
+                                                        BeanPropertyRef<Object>[] propertiesRefs,
+                                                        BeanMethodRef<Object>[] methodsRefs,
+                                                        EnumConstantObjectRef<?>[] enumValueRefs) {
+        super(beanType, annotationMetadata, constructorAnnotationMetadata, constructorArguments, propertiesRefs, methodsRefs);
+        this.enumConstantRefs = (List) List.of(enumValueRefs);
+    }
+
     @Override
     public List<EnumConstant<E>> getConstants() {
         return enumConstantRefs;
@@ -125,6 +148,25 @@ public abstract class AbstractEnumBeanIntrospectionAndReference<E extends Enum<E
                 throw new IllegalStateException("Enum type: " + enumClass.getType() + " is not present on the classpath!");
             }
             return Enum.valueOf(type, name);
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return annotationMetadata;
+        }
+    }
+
+    /**
+     * Enum value compile-time data container for enum-like languages whose constants are resolved by generated code.
+     */
+    @Internal
+    @UsedByGeneratedCode
+    public record EnumConstantObjectRef<E>(E value,
+                                           AnnotationMetadata annotationMetadata) implements EnumConstant<E> {
+
+        @Override
+        public E getValue() {
+            return value;
         }
 
         @Override
