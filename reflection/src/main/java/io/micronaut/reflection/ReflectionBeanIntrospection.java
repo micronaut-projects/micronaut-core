@@ -44,6 +44,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Arrays;
@@ -174,8 +175,9 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     }
 
     /**
-     * Every constructor of the type, the selected one first. An introspection describes one constructor;
-     * a specification that names constructors by their parameter types needs the others too.
+     * Every constructor of the type, the selected one first, the others by arity and then by parameter types.
+     * An introspection describes one constructor; a specification that names constructors by their parameter
+     * types needs the others too.
      *
      * @return The constructors
      */
@@ -184,10 +186,17 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     public List<BeanConstructor<T>> getConstructors() {
         List<BeanConstructor<T>> constructors = new ArrayList<>();
         constructors.add(beanConstructor);
+        // reflection reports the constructors in no particular order: the others are listed by arity, then by
+        // parameter types, so that the list is the same on every JVM
+        List<Constructor<?>> others = new ArrayList<>();
         for (Constructor<?> declared : beanType.getDeclaredConstructors()) {
-            if (declared.isSynthetic() || declared.equals(constructor)) {
-                continue;
+            if (!declared.isSynthetic() && !declared.equals(constructor)) {
+                others.add(declared);
             }
+        }
+        others.sort(Comparator.<Constructor<?>>comparingInt(Constructor::getParameterCount)
+            .thenComparing(declared -> Arrays.toString(declared.getParameterTypes())));
+        for (Constructor<?> declared : others) {
             declared.trySetAccessible();
             constructors.add(new ReflectionBeanConstructor<>((Constructor<T>) declared));
         }

@@ -4,6 +4,12 @@ plugins {
 
 description = "Reflection based implementations of the metadata the Micronaut annotation processors generate"
 
+micronautBuild {
+    binaryCompatibility {
+        enabledAfter("5.2.0")
+    }
+}
+
 dependencies {
     annotationProcessor(projects.micronautInjectJava)
 
