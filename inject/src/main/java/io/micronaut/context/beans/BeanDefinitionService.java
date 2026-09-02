@@ -197,6 +197,22 @@ public sealed interface BeanDefinitionService permits DefaultBeanDefinitionServi
     List<BeanDefinitionReference<Object>> getBeanReferences();
 
     /**
+     * Finds the bean definition that was compiled as the given definition class.
+     *
+     * <p>The lookup is by the definition's own class name, as reported by
+     * {@link BeanDefinitionReference#getBeanDefinitionName()}, so unmatched definitions are never loaded.
+     * The instance returned is the one this service hands out for every other lookup.</p>
+     *
+     * @param beanContext     the bean context to eliminate disabled beans
+     * @param definitionClass the class of the compiled definition
+     * @param <T>             the bean type
+     * @return the enabled definition compiled as that class, or {@code null} if there is none
+     * @since 5.2.0
+     */
+    @Nullable
+    <T> BeanDefinition<T> findBeanDefinitionByDefinitionClass(BeanContext beanContext, Class<? extends BeanDefinition<T>> definitionClass);
+
+    /**
      * Registers a bean configuration.
      *
      * @param configuration the configuration to register

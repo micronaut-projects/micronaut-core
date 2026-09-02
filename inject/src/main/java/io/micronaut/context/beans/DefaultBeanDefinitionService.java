@@ -214,6 +214,36 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     }
 
     @Override
+    @Nullable
+    public <T> BeanDefinition<T> findBeanDefinitionByDefinitionClass(BeanContext beanContext, Class<? extends BeanDefinition<T>> definitionClass) {
+        Beans current = beans;
+        if (current == null) {
+            return null;
+        }
+        String definitionName = definitionClass.getName();
+        BeanDefinitionProducer producer = findProducerByDefinitionName(current.all, definitionName);
+        if (producer == null) {
+            // A proxied bean is disabled in the main list and its target is kept apart, see createBeans
+            producer = findProducerByDefinitionName(current.proxyTargetBeans, definitionName);
+        }
+        if (producer == null) {
+            return null;
+        }
+        return producer.getDefinitionIfEnabled(beanContext, null, beanResolutionCustomizer, null, null, null);
+    }
+
+    @Nullable
+    private static BeanDefinitionProducer findProducerByDefinitionName(List<BeanDefinitionProducer> producers, String definitionName) {
+        for (BeanDefinitionProducer producer : producers) {
+            BeanDefinitionReference<?> reference = producer.reference;
+            if (reference != null && definitionName.equals(reference.getBeanDefinitionName())) {
+                return producer;
+            }
+        }
+        return null;
+    }
+
+    @Override
     public <B> Iterable<BeanDefinition<B>> getBeanDefinitions(BeanResolutionContext beanResolutionContext,
                                                               Argument<B> beanType,
                                                               @Nullable Predicate<BeanDefinitionReference<B>> refPredicate,

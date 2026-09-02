@@ -445,6 +445,53 @@ public interface BeanDefinitionRegistry {
     }
 
     /**
+     * Obtain the {@link BeanDefinition} that was compiled as the given definition class.
+     *
+     * <p>Every other lookup on this registry resolves by bean type and qualifier. This one resolves by
+     * identity: the compiled definition class itself, such as the one a
+     * {@link ProxyBeanDefinition#getTargetDefinitionType() proxy names as its target}. The definition returned
+     * is the instance the registry uses for every other lookup, so it can be compared by identity with them.
+     * Unmatched definitions are never loaded; the match is on the name a
+     * {@link BeanDefinitionReference#getBeanDefinitionName() reference reports}.</p>
+     *
+     * <p>Only definitions generated at compile time have a class of their own. A
+     * {@link RuntimeBeanDefinition} shares its class with every other runtime definition and is not found here.</p>
+     *
+     * <p>The default walks {@link #getBeanDefinitionReferences()} and loads the one reference whose name matches.
+     * Whether a definition is enabled can only be decided against a {@link BeanContext}, so a registry that is not
+     * one answers with the loaded definition as it is; a registry that is one answers only with an enabled definition.
+     * Implementations that cache loaded definitions should override this so the instance returned is the one they
+     * resolve elsewhere.</p>
+     *
+     * @param definitionClass The class of the compiled definition
+     * @param <T>             The bean type
+     * @return An {@link Optional} of the definition, empty when no enabled definition was compiled as that class
+     * @since 5.2.0
+     */
+    @SuppressWarnings("unchecked")
+    default <T> Optional<BeanDefinition<T>> findBeanDefinitionByDefinitionClass(Class<? extends BeanDefinition<T>> definitionClass) {
+        Objects.requireNonNull(definitionClass, "Definition class cannot be null");
+        String definitionName = definitionClass.getName();
+        for (BeanDefinitionReference<Object> reference : getBeanDefinitionReferences()) {
+            if (!definitionName.equals(reference.getBeanDefinitionName())) {
+                continue;
+            }
+            if (this instanceof BeanContext context) {
+                if (!reference.isEnabled(context)) {
+                    return Optional.empty();
+                }
+                BeanDefinition<Object> definition = reference.load(context);
+                if (definition == null || !definition.isEnabled(context)) {
+                    return Optional.empty();
+                }
+                return Optional.of((BeanDefinition<T>) definition);
+            }
+            return Optional.ofNullable((BeanDefinition<T>) reference.load());
+        }
+        return Optional.empty();
+    }
+
+    /**
      * Obtain the proxy {@link BeanDefinition} for the bean of type and qualifier.
      *
      * @param beanType  The type
