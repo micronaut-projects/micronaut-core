@@ -899,6 +899,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         addInjectionMethod(methodDefinition);
         postConstructMethods.add(methodDefinition);
         postProcessMethod(methodDefinition);
+        if (isPostConstructIntercepted()) {
+            addLifecycleExecutableMethod(methodDefinition, true);
+        }
         return this;
     }
 
@@ -907,7 +910,28 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         addInjectionMethod(methodDefinition);
         preDestroyMethods.add(methodDefinition);
         postProcessMethod(methodDefinition);
+        if (isPreDestroyIntercepted()) {
+            addLifecycleExecutableMethod(methodDefinition, false);
+        }
         return this;
+    }
+
+    /**
+     * Makes a lifecycle callback of an intercepted phase available to the interceptors of that phase.
+     *
+     * <p>The callbacks of an intercepted phase are still invoked by the generated {@code doInitialize} or
+     * {@code doDispose}, one chain per phase; registering them with the executable methods definition only gives
+     * the interceptors a reflection-free {@link io.micronaut.inject.ExecutableMethod} for each of them, in
+     * invocation order. The executable methods definition keeps them out of the executable methods of the bean,
+     * which is why it can be shared with an AOP proxy of the bean without the proxy observing them either. A
+     * private callback is dispatched reflectively, which is what the generated lifecycle method does as well.</p>
+     *
+     * @param methodDefinition The callback
+     * @param postConstruct    {@code true} for a post-construct callback, {@code false} for a pre-destroy one
+     */
+    private void addLifecycleExecutableMethod(MethodDefinition<ClassElement, MethodElement> methodDefinition, boolean postConstruct) {
+        MethodElement methodElement = methodDefinition.methodElement();
+        getExecutableMethodsWriter().addLifecycleMethod(methodElement.getDeclaringType(), methodElement, postConstruct);
     }
 
     /**
@@ -1476,6 +1500,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             int methodsCount = executableMethodsDefinitionWriter.getMethodsCount();
             List<ExpressionDef> expressions = new ArrayList<>(methodsCount);
             for (int i = 0; i < methodsCount; i++) {
+                if (executableMethodsDefinitionWriter.isLifecycleMethod(i)) {
+                    // never processed at startup: a lifecycle callback is not an executable method of the bean
+                    continue;
+                }
                 MethodElement method = executableMethodsDefinitionWriter.getMethodByIndex(i);
                 if (method.booleanValue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP).orElse(false)) {
                     expressions.add(TypeDef.Primitive.INT.constant(i));

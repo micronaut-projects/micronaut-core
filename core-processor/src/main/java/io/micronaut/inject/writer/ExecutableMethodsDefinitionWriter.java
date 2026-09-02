@@ -54,6 +54,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -75,6 +76,8 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
     public static final Method GET_EXECUTABLE_AT_INDEX_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "getExecutableMethodByIndex", int.class);
 
     public static final Method REQUIRES_METHOD_PROCESSING_METHOD = ReflectionUtils.getRequiredInternalMethod(ExecutableMethodsDefinition.class, "requiresMethodProcessing");
+    private static final Method GET_POST_CONSTRUCT_METHOD_INDEXES = ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "getPostConstructMethodIndexes");
+    private static final Method GET_PRE_DESTROY_METHOD_INDEXES = ReflectionUtils.getRequiredInternalMethod(AbstractExecutableMethodsDefinition.class, "getPreDestroyMethodIndexes");
 
     private static final Constructor<?> METHOD_REFERENCE_CONSTRUCTOR = ReflectionUtils.getRequiredInternalConstructor(
         AbstractExecutableMethodsDefinition.MethodReference.class,
@@ -110,6 +113,8 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
 
     private final OriginatingElements originatingElements;
     private boolean requiresMethodProcessing;
+    private final Set<Integer> postConstructIndexes = new LinkedHashSet<>();
+    private final Set<Integer> preDestroyIndexes = new LinkedHashSet<>();
     @Nullable
     private ClassTypeDef proxyType;
 
@@ -179,7 +184,46 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
         if (preprocess) {
             requiresMethodProcessing = true;
         }
+        addMethod(declaringType, methodElement);
+    }
 
+    /**
+     * Adds a {@code @PostConstruct} or {@code @PreDestroy} callback of the bean so that it is dispatched, without
+     * reflection, through this definition.
+     *
+     * <p>A callback added here is deliberately not an executable method of the bean: it is excluded from
+     * {@link ExecutableMethodsDefinition#getExecutableMethods()} and never marked for startup processing, so
+     * executable method processors and adapters do not observe it. It is only reachable through
+     * {@link ExecutableMethodsDefinition#getPostConstructExecutableMethods()} and
+     * {@link ExecutableMethodsDefinition#getPreDestroyExecutableMethods()}, in the order it was added, which is
+     * the order the bean definition invokes the callbacks.</p>
+     *
+     * @param declaringType The declaring type
+     * @param methodElement The callback
+     * @param postConstruct {@code true} for a post-construct callback, {@code false} for a pre-destroy one
+     * @return The index of the callback
+     * @since 5.2.0
+     */
+    public int addLifecycleMethod(TypedElement declaringType, MethodElement methodElement, boolean postConstruct) {
+        addMethod(declaringType, methodElement);
+        int index = findIndexOfExecutableMethod(methodElement);
+        (postConstruct ? postConstructIndexes : preDestroyIndexes).add(index);
+        return index;
+    }
+
+    /**
+     * Whether the method at the given index is a lifecycle callback added through
+     * {@link #addLifecycleMethod(TypedElement, MethodElement, boolean)}.
+     *
+     * @param index The index
+     * @return {@code true} if the method is a lifecycle callback
+     * @since 5.2.0
+     */
+    public boolean isLifecycleMethod(int index) {
+        return postConstructIndexes.contains(index) || preDestroyIndexes.contains(index);
+    }
+
+    private void addMethod(TypedElement declaringType, MethodElement methodElement) {
         evaluatedExpressionProcessor.processEvaluatedExpressions(methodElement);
 
         methodDispatchWriter.addOrGetMethod(declaringType, methodElement);
@@ -216,6 +260,8 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
     @Override
     public final OutputObjectDef build() {
         Map<String, MethodDef> loadTypeMethods = new LinkedHashMap<>();
+        MethodDef postConstructIndexesMethod = buildIndexesMethod(GET_POST_CONSTRUCT_METHOD_INDEXES, postConstructIndexes);
+        MethodDef preDestroyIndexesMethod = buildIndexesMethod(GET_PRE_DESTROY_METHOD_INDEXES, preDestroyIndexes);
 
         ClassTypeDef thisType = ClassTypeDef.of(className);
 
@@ -299,6 +345,13 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
             if (dispatchMethod != null) {
                 classDefBuilder.addMethod(dispatchMethod);
             }
+        }
+
+        if (postConstructIndexesMethod != null) {
+            classDefBuilder.addMethod(postConstructIndexesMethod);
+        }
+        if (preDestroyIndexesMethod != null) {
+            classDefBuilder.addMethod(preDestroyIndexesMethod);
         }
 
         MethodDef getTargetMethodByIndex = methodDispatchWriter.buildGetTargetMethodByIndex();
@@ -437,6 +490,16 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
                 AnnotationMetadataGenUtils.instantiateNewMetadata(mutableAnnotationMetadata, loadClassValueExpressionFn);
             default -> throw new IllegalStateException("Unknown metadata: " + annotationMetadata);
         };
+    }
+
+    @Nullable
+    private static MethodDef buildIndexesMethod(Method method, Set<Integer> indexes) {
+        if (indexes.isEmpty()) {
+            return null;
+        }
+        List<ExpressionDef> values = indexes.stream().map(index -> (ExpressionDef) TypeDef.Primitive.INT.constant(index.intValue())).toList();
+        return MethodDef.override(method)
+            .build((aThis, methodParameters) -> TypeDef.Primitive.INT.array().instantiate(values).returning());
     }
 
     /**

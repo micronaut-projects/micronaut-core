@@ -694,7 +694,11 @@ public final class DispatchWriter implements ClassOutputWriter {
     }
 
     private static String methodKey(MethodElement methodElement) {
-        return methodElement.getName() +
+        // A private method cannot be overridden, so the same signature declared privately in two classes of the
+        // hierarchy names two different methods, for example a @PostConstruct init() in a bean and its superclass.
+        String owner = methodElement.isPrivate() ? methodElement.getDeclaringType().getName() + "#" : "";
+        return owner +
+            methodElement.getName() +
             "(" +
             Arrays.stream(methodElement.getSuspendParameters())
                 .map(p -> toTypeString(p.getType()))
