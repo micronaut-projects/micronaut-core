@@ -94,6 +94,11 @@ import java.util.stream.IntStream;
 @Internal
 final class BeanIntrospectionWriter implements OriginatingElements, Buildable<List<OutputObjectDef>> {
     private static final String INTROSPECTION_SUFFIX = "$Introspection";
+    /**
+     * The longest name a generated introspection may have. The name is used as a single file name
+     * component, and file systems commonly cap those at 255 bytes.
+     */
+    private static final int MAX_INTROSPECTION_NAME_LENGTH = 240;
 
     private static final String FIELD_CONSTRUCTOR_ANNOTATION_METADATA = "$FIELD_CONSTRUCTOR_ANNOTATION_METADATA";
     private static final String FIELD_CONSTRUCTOR_ARGUMENTS = "$CONSTRUCTOR_ARGUMENTS";
@@ -1163,12 +1168,44 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
     }
 
     private static String computeShortIntrospectionName(String packageName, String className) {
-        final String shortName = NameUtils.getSimpleName(className);
-        return packageName + ".$" + shortName + INTROSPECTION_SUFFIX;
+        return computeIntrospectionName(packageName, NameUtils.getSimpleName(className), className);
     }
 
     private static String computeIntrospectionName(String packageName, String className) {
-        return packageName + ".$" + className.replace('.', '_') + INTROSPECTION_SUFFIX;
+        return computeIntrospectionName(packageName, className.replace('.', '_'), className);
+    }
+
+    /**
+     * Computes the name of the generated introspection, shortening it if it would be too long to
+     * be used as a file name.
+     *
+     * <p>The name is written to the file system twice: as {@code <name>.class} and, more
+     * importantly, as the file name of the
+     * {@code META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/<name>} service
+     * descriptor, where the whole name including the package is a single path segment. Most file
+     * systems reject a path segment longer than 255 bytes, which an introspection generated on
+     * behalf of another element exceeds as soon as the package is deeply nested, because such a
+     * name repeats the fully qualified class name after the package.</p>
+     *
+     * @param packageName The package the introspection is generated into
+     * @param simpleName  The name of the introspection within that package, without the marker or suffix
+     * @param className   The introspected type, used to keep a shortened name unique
+     * @return The introspection name
+     */
+    private static String computeIntrospectionName(String packageName, String simpleName, String className) {
+        String introspectionName = packageName + ".$" + simpleName + INTROSPECTION_SUFFIX;
+        if (introspectionName.length() <= MAX_INTROSPECTION_NAME_LENGTH) {
+            return introspectionName;
+        }
+        // Keep the tail of the name, which carries the simple name of the introspected type, and
+        // make it unique again with a stable hash of the type the introspection is generated for
+        String hash = "_" + Integer.toHexString(className.hashCode());
+        int available = MAX_INTROSPECTION_NAME_LENGTH - packageName.length() - 2 - hash.length() - INTROSPECTION_SUFFIX.length();
+        if (available < 1) {
+            // the package alone is already too long, nothing but the hash can be kept
+            return packageName + ".$" + hash.substring(1) + INTROSPECTION_SUFFIX;
+        }
+        return packageName + ".$" + simpleName.substring(simpleName.length() - available) + hash + INTROSPECTION_SUFFIX;
     }
 
     /**

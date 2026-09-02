@@ -6079,6 +6079,47 @@ class Unrelated2 {}
         context?.close()
     }
 
+    void "test the name of an introspection generated for another element stays usable as a file name"() {
+        given:
+        // The name of an introspection generated on behalf of another element repeats the fully
+        // qualified name of the introspected type after the package, and it is written out as a
+        // single file name component of the BeanIntrospectionReference service descriptor. File
+        // systems reject a name longer than 255 bytes, which a deeply nested package exceeds.
+        def pkg = 'deep234567.deep234567.deep234567.deep234567.deep234567.deep234567.deep234567.deep234567.deep234567.deep234567'
+        ApplicationContext context = buildContext("${pkg}.Holder", """
+package ${pkg};
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(classNames = {"${pkg}.Outer\$Nested"})
+class Holder {}
+
+class Outer {
+    static class Nested {
+        private String name;
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+    }
+}
+""")
+
+        when:
+        def reference = context.classLoader
+                .getResources("META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/")
+                .collect { it.toString().substring(it.toString().lastIndexOf('/') + 1) }
+                .findAll { it.startsWith(pkg) }
+                .collect { context.classLoader.loadClass(it).newInstance() }
+                .find { it.beanType.name == "${pkg}.Outer\$Nested".toString() }
+
+        then:
+        reference instanceof BeanIntrospectionReference
+        reference.getClass().name.length() <= 240
+        reference.load().getProperty("name").isPresent()
+
+        cleanup:
+        context?.close()
+    }
+
     void "test a nested type imported with ClassImport is introspected once"() {
         given:
         ApplicationContext context = buildContext('test.Holder', '''
