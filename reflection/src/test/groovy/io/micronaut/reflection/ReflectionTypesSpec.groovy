@@ -45,6 +45,21 @@ class ReflectionTypesSpec extends Specification {
         type.bounds == [Object] as Object[]
     }
 
+    void "a placeholder renders as the type it is bounded by when the caller compares types"() {
+        given:
+        def method = Types.getDeclaredMethod("identity", Object)
+        def argument = ReflectionArguments.argumentsOf(method)[0]
+
+        expect: "the erasing rendering, which an assignability check wants"
+        ReflectionArguments.toType(argument, false) == Object
+        !(ReflectionArguments.toType(argument, false) instanceof TypeVariable)
+
+        and: "a parameterized type keeps its parameters either way, the variables inside it following the choice"
+        def names = ReflectionArguments.of(Types.getDeclaredField("names"))
+        ReflectionArguments.toType(names, false) == Types.getDeclaredField("names").genericType
+        ReflectionArguments.toType(names, true) == Types.getDeclaredField("names").genericType
+    }
+
     void "a type is converted tolerantly"() {
         expect: "a generic array is the array of its raw component"
         ReflectionArguments.of(Types.getDeclaredField("matrix").genericType).type == List[]

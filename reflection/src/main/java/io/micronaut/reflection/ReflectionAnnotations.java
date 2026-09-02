@@ -25,6 +25,9 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.inject.annotation.AnnotationMetadataException;
 import io.micronaut.inject.annotation.AnnotationMetadataSupport;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -34,6 +37,8 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Array;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Proxy;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -235,6 +240,9 @@ public final class ReflectionAnnotations {
     public static Map<CharSequence, Object> values(Annotation annotation) {
         Map<CharSequence, Object> values = new LinkedHashMap<>();
         Class<? extends Annotation> type = annotation.annotationType();
+        // a member equal to its default is left out of the values, as it is at compilation time; registering the
+        // defaults is what lets the accessors serve it afterwards
+        defaultValues(type);
         List<String> nonBinding = null;
         for (Method member : MEMBERS.get(type)) {
             if (member.isAnnotationPresent(NonBinding.class)) {
@@ -318,10 +326,21 @@ public final class ReflectionAnnotations {
      * @param <A>             The annotation type
      * @return The annotation
      */
+    @SuppressWarnings("unchecked")
     public static <A extends Annotation> A synthesize(Class<A> annotationType, AnnotationValue<A> annotationValue) {
         // register the defaults of the type, so that the members the value does not carry are served
         defaultValues(annotationType);
-        return AnnotationMetadataSupport.buildAnnotation(annotationType, annotationValue);
+        try {
+            return AnnotationMetadataSupport.buildAnnotation(annotationType, annotationValue);
+        } catch (AnnotationMetadataException | IllegalArgumentException e) {
+            // the shared path needs a proxy carrying AnnotationValueProvider, which cannot be built for every
+            // annotation type - one that is not public, or whose loader cannot see that interface - and a
+            // specification hands those over like any other
+            return (A) Proxy.newProxyInstance(
+                annotationType.getClassLoader(),
+                new Class<?>[]{annotationType},
+                new SynthesizedAnnotation<>(annotationType, annotationValue));
+        }
     }
 
     /**
@@ -538,5 +557,111 @@ public final class ReflectionAnnotations {
         return name.startsWith(JAVA_LANG_ANNOTATION)
             || name.startsWith(KOTLIN)
             || AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(name);
+    }
+
+    /**
+     * An annotation instance over an {@link AnnotationValue}, for a type the shared proxy cannot be built for.
+     * A member is the value the annotation value carries, converted to the type the member declares, or the
+     * default of the member; {@code equals}, {@code hashCode} and {@code toString} follow
+     * {@link Annotation}, so that an instance compares equal to the annotation the compiler makes.
+     *
+     * @param <A> The annotation type
+     */
+    private static final class SynthesizedAnnotation<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
+
+        private final Class<A> annotationType;
+        private final AnnotationValue<A> annotationValue;
+
+        SynthesizedAnnotation(Class<A> annotationType, AnnotationValue<A> annotationValue) {
+            this.annotationType = annotationType;
+            this.annotationValue = annotationValue;
+        }
+
+        @Override
+        public AnnotationValue<A> annotationValue() {
+            return annotationValue;
+        }
+
+        @Override
+        @Nullable
+        public Object invoke(Object proxy, Method method, Object @Nullable [] args) {
+            String name = method.getName();
+            if (args != null && args.length == 1 && "equals".equals(name)) {
+                return equalsAnnotation(args[0]);
+            }
+            if (args == null || args.length == 0) {
+                switch (name) {
+                    case "hashCode" -> {
+                        return annotationHashCode();
+                    }
+                    case "toString" -> {
+                        return annotationValue.toString();
+                    }
+                    case "annotationType" -> {
+                        return annotationType;
+                    }
+                    default -> {
+                        if (method.getReturnType() == AnnotationValue.class) {
+                            return annotationValue;
+                        }
+                        return member(method);
+                    }
+                }
+            }
+            return member(method);
+        }
+
+        @Nullable
+        private Object member(Method member) {
+            Object value = annotationValue.getValues().get(member.getName());
+            if (value == null) {
+                return member.getDefaultValue();
+            }
+            Object converted = ConversionService.SHARED
+                .convert(value, Argument.of(member.getReturnType()))
+                .orElse(null);
+            return converted == null ? member.getDefaultValue() : converted;
+        }
+
+        private boolean equalsAnnotation(@Nullable Object other) {
+            if (other == null || !annotationType.isInstance(other)) {
+                return false;
+            }
+            if (other instanceof AnnotationValueProvider<?> provider) {
+                return annotationValue.equals(provider.annotationValue());
+            }
+            for (Method declared : MEMBERS.get(annotationType)) {
+                Object mine = member(declared);
+                Object theirs = ReflectionUtils.invokeMethod(other, declared);
+                if (!Objects.deepEquals(mine, theirs)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /**
+         * The hash code {@link Annotation#hashCode()} defines: the sum over the members of the hash of the
+         * member name times 127, exclusive-ored with the hash of its value.
+         */
+        private int annotationHashCode() {
+            int hashCode = 0;
+            for (Method declared : MEMBERS.get(annotationType)) {
+                Object value = member(declared);
+                int valueHash = value == null ? 0 : (value.getClass().isArray() ? arrayHashCode(value) : value.hashCode());
+                hashCode += (127 * declared.getName().hashCode()) ^ valueHash;
+            }
+            return hashCode;
+        }
+
+        private static int arrayHashCode(Object array) {
+            int length = Array.getLength(array);
+            int hashCode = 1;
+            for (int i = 0; i < length; i++) {
+                Object element = Array.get(array, i);
+                hashCode = 31 * hashCode + (element == null ? 0 : element.hashCode());
+            }
+            return hashCode;
+        }
     }
 }

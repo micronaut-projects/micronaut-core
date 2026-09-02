@@ -55,7 +55,8 @@ import java.util.stream.Stream;
  * and of every level of its type as metadata built by {@link ReflectionAnnotations}.
  *
  * <p>The reverse direction, {@link #toType(Argument)}, renders an argument as a {@link Type} for the APIs
- * defined on {@code java.lang.reflect}.</p>
+ * defined on {@code java.lang.reflect}, either keeping an unresolved type variable or rendering it as the type
+ * it is bounded by.</p>
  *
  * @author Denis Stepanov
  * @since 5.2.0
@@ -194,16 +195,35 @@ public final class ReflectionArguments {
      *
      * @param argument The argument
      * @return The type
+     * @see #toType(Argument, boolean) to render a placeholder as the type it is bounded by instead
      */
     public static Type toType(Argument<?> argument) {
+        return toType(argument, true);
+    }
+
+    /**
+     * Renders an argument as a {@link Type}, choosing what an unresolved type variable becomes.
+     *
+     * <p>An API that describes a declaration - the type of an injection point, of an observed event - wants the
+     * variable itself, so that it can tell {@code List<T>} from {@code List<String>}; an API that compares types
+     * by assignability wants the type the variable is bounded by, which is what the erasure of the declaration
+     * yields. The generated metadata carries a {@link GenericPlaceholder} for both cases, so the caller says
+     * which of the two it means.</p>
+     *
+     * @param argument      The argument
+     * @param typeVariables Whether a {@link GenericPlaceholder} is rendered as a {@link TypeVariable} rather
+     *                      than as the type it is bounded by
+     * @return The type
+     */
+    public static Type toType(Argument<?> argument, boolean typeVariables) {
         Argument<?>[] typeParameters = argument.getTypeParameters();
         Type[] arguments = new Type[typeParameters.length];
         for (int i = 0; i < arguments.length; i++) {
-            arguments[i] = toType(typeParameters[i]);
+            arguments[i] = toType(typeParameters[i], typeVariables);
         }
         Class<?> rawType = argument.getType();
         Type type = arguments.length == 0 ? rawType : new ReflectionParameterizedType(rawType, arguments);
-        if (argument instanceof GenericPlaceholder<?> placeholder) {
+        if (typeVariables && argument instanceof GenericPlaceholder<?> placeholder) {
             return new ReflectionTypeVariable(placeholder.getVariableName(), type);
         }
         return type;

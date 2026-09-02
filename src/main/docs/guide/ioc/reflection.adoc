@@ -17,6 +17,10 @@ Argument<?>[] arguments = ReflectionArguments.argumentsOf(Order.class.getDeclare
 Argument<?> argument = ReflectionArguments.of(Order.class.getDeclaredField("lines"));
 ----
 
+`ReflectionAnnotations.synthesize` goes the other way, building an annotation instance from an api:core.annotation.AnnotationValue[]. It uses the proxy the framework generates where there is one, and a JDK proxy otherwise, so an annotation type that is not public - a specification often nests one in a class of its own - is synthesized too.
+
+`ReflectionArguments.toType` renders an argument back as a `java.lang.reflect.Type`. An unresolved type variable becomes a `TypeVariable`, which is what an API describing a declaration needs; pass `false` to render it as the type it is bounded by, which is what an API comparing types by assignability needs.
+
 The mappers, transformers and remappers of the processors are not available at runtime. A library that relies on one registers a api:reflection.ReflectionAnnotationCustomizer[] service instead, which receives the values of every annotation the module converts.
 
 === Executable Methods
