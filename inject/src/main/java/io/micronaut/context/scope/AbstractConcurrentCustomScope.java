@@ -218,9 +218,6 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      */
     @SuppressWarnings("unchecked")
     public <T> Optional<T> remove(BeanDefinition<T> beanDefinition) {
-        if (beanDefinition == null) {
-            return Optional.empty();
-        }
         final CreatedBean<?> createdBean;
         w.lock();
         try {
@@ -287,9 +284,6 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      */
     @Override
     public <T> Optional<BeanRegistration<T>> findBeanRegistration(BeanDefinition<T> beanDefinition) {
-        if (beanDefinition == null) {
-            return Optional.empty();
-        }
         r.lock();
         try {
             final Map<BeanIdentifier, CreatedBean<?>> scopeMap;
@@ -316,9 +310,6 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         final Class<?> targetDefinitionType = getTargetDefinitionType(beanDefinition);
         for (CreatedBean<?> createdBean : scopeMap.values()) {
             final BeanDefinition<?> held = createdBean.definition();
-            if (held == null) {
-                continue;
-            }
             if (held.equals(beanDefinition) || (targetDefinitionType != null && targetDefinitionType == unwrap(held).getClass())) {
                 return createdBean;
             }

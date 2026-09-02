@@ -7,9 +7,6 @@ import io.micronaut.context.annotation.Parameter;
 
 public class EachProxiedBean {
 
-    public EachProxiedBean() {
-    }
-
     public String hello() {
         return "hello";
     }
