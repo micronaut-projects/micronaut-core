@@ -1,0 +1,12 @@
+To configure the https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html#cross-origin-resource-policy-corp[Cross-Origin-Resource-Policy (CORP)] response header, set the `cross-origin-resource-policy` option. <<corsConfiguration, CORS>> does not need to be enabled.
+
+.Example CORP Configuration
+[configuration]
+----
+micronaut:
+  server:
+    cors:
+      cross-origin-resource-policy: same-origin
+----
+
+The supported values are `same-origin`, `same-site`, and `cross-origin`.

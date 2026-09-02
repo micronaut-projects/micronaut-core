@@ -222,6 +222,20 @@ public interface HttpHeaders extends Headers {
     String CONTENT_RANGE = "Content-Range";
 
     /**
+     * {@code "Content-Security-Policy"}.
+     *
+     * @since 5.2.0
+     */
+    String CONTENT_SECURITY_POLICY = "Content-Security-Policy";
+
+    /**
+     * {@code "Content-Security-Policy-Report-Only"}.
+     *
+     * @since 5.2.0
+     */
+    String CONTENT_SECURITY_POLICY_REPORT_ONLY = "Content-Security-Policy-Report-Only";
+
+    /**
      * {@code "Content-Type"}.
      */
     String CONTENT_TYPE = "Content-Type";
@@ -230,6 +244,13 @@ public interface HttpHeaders extends Headers {
      * {@code "Cookie"}.
      */
     String COOKIE = "Cookie";
+
+    /**
+     * {@code "Cross-Origin-Embedder-Policy"}.
+     *
+     * @since 5.2.0
+     */
+    String CROSS_ORIGIN_EMBEDDER_POLICY = "Cross-Origin-Embedder-Policy";
 
     /**
      * {@code "Cross-Origin-Resource-Policy"}.
@@ -593,8 +614,11 @@ public interface HttpHeaders extends Headers {
         CONTENT_TRANSFER_ENCODING,
         CONTENT_MD5,
         CONTENT_RANGE,
+        CONTENT_SECURITY_POLICY,
+        CONTENT_SECURITY_POLICY_REPORT_ONLY,
         CONTENT_TYPE,
         COOKIE,
+        CROSS_ORIGIN_EMBEDDER_POLICY,
         CROSS_ORIGIN_RESOURCE_POLICY,
         DATE,
         DEVICE_MEMORY,
