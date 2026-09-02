@@ -114,14 +114,15 @@ explains the one case that behaves differently:
 |The bean's registration in the context
 |construct, post-construct, pre-destroy
 
-|A ann:context.annotation.Prototype[] created with `createBean` and destroyed with `destroyBean(Object)`
+|A ann:context.annotation.Prototype[] with ann:aop.AroundConstruct[] advice and no proxy, created with `createBean` and destroyed with `destroyBean(Object)`
 |Nothing; the context tracks no registration for it
 |construct and post-construct only
 |===
 
 NOTE: In the last row the context has no registration for the instance, so nothing links its destruction back to what
-it was created with, and `PRE_DESTROY` resolves a new interceptor. Prototypes injected into other beans, and prototypes
-destroyed through their `BeanRegistration`, are unaffected.
+it was created with, and `PRE_DESTROY` resolves a new interceptor. A proxied bean created and destroyed the same way
+is unaffected: the proxy retained its registrations and `destroyBean(Object)` destroys the non-singleton ones with the
+target. Prototypes injected into other beans, and prototypes destroyed through their `BeanRegistration`, are unaffected.
 
 == Ordering
 

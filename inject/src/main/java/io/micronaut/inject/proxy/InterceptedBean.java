@@ -15,8 +15,11 @@
  */
 package io.micronaut.inject.proxy;
 
+import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ExecutableMethod;
+
+import java.util.List;
 
 /**
  * An internal interface implemented by generated proxy classes.
@@ -36,5 +39,22 @@ public interface InterceptedBean {
      */
     default ExecutableMethod<?, ?>[] interceptedMethods() {
         return new ExecutableMethod[0];
+    }
+
+    /**
+     * The interceptor registrations the proxy retained when it was constructed.
+     *
+     * <p>Declared here, in the inject module, so that the context can reach them without depending on the AOP
+     * module. A proxy is the only thing that survives from a bean's creation to its destruction, and when the
+     * context tracks no registration for the instance the registrations it retained are the only record of the
+     * interceptors created for it. {@code io.micronaut.aop.Intercepted} narrows the element type.</p>
+     *
+     * @return The retained interceptor registrations, never {@code null}
+     * @since 5.2.0
+     */
+    // The $ prefix marks this as generated-code infrastructure and keeps it clear of any method on the proxied type.
+    @SuppressWarnings({"checkstyle:MethodName", "java:S100"})
+    default List<? extends BeanRegistration<?>> $interceptorRegistrations() {
+        return List.of();
     }
 }

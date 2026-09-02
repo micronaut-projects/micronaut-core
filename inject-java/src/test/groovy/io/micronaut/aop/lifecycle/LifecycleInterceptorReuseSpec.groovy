@@ -1,6 +1,7 @@
 package io.micronaut.aop.lifecycle
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.aop.Intercepted
 import io.micronaut.context.ApplicationContext
 
 class LifecycleInterceptorReuseSpec extends AbstractTypeElementSpec {
@@ -393,6 +394,7 @@ class Holder {
 
     // destroyBean(Object) cannot find a registration for a bean created with createBean, so the registrations
     // owned by that bean are not available to the dispose call and pre destroy still resolves a new interceptor.
+    // This bean has constructor advice but no around proxy, so nothing retains the registrations for it.
     void 'test a prototype created through createBean reuses the interceptor up to post construct'() {
         given:
         ApplicationContext context = buildContext('''
@@ -452,6 +454,90 @@ class Product {
 
         cleanup:
         context.close()
+    }
+
+    // A proxied bean is different: the proxy retains the registrations it was constructed with, so destroyBean(Object)
+    // can hand them to the untracked registration it builds and the prototype interceptor dies with its target.
+    void 'test destroyBean(Object) destroys the prototype interceptor a proxied prototype retained'() {
+        given:
+        ApplicationContext context = buildContext('''
+package reuse.destroyproxied;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Around
+@InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
+@interface Tracked {
+}
+
+@Prototype
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.AROUND)
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.PRE_DESTROY)
+class PrototypeInterceptor implements MethodInterceptor<Object, Object> {
+    static int instances;
+    static int destroyed;
+
+    PrototypeInterceptor() { instances++; }
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        return context.proceed();
+    }
+
+    @PreDestroy
+    void destroy() { destroyed++; }
+}
+
+@Singleton
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.AROUND)
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.PRE_DESTROY)
+class SingletonInterceptor implements MethodInterceptor<Object, Object> {
+    static int destroyed;
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        return context.proceed();
+    }
+
+    @PreDestroy
+    void destroy() { destroyed++; }
+}
+
+@Prototype
+@Tracked
+class MyBean {
+    String work() { return "done"; }
+    @PreDestroy void close() {}
+}
+''')
+        Class<?> prototypeInterceptor = context.classLoader.loadClass('reuse.destroyproxied.PrototypeInterceptor')
+        Class<?> singletonInterceptor = context.classLoader.loadClass('reuse.destroyproxied.SingletonInterceptor')
+
+        when:
+        def bean = context.createBean(context.classLoader.loadClass('reuse.destroyproxied.MyBean'))
+        bean.work()
+        context.destroyBean(bean)
+
+        then: 'the prototype interceptor the proxy retained is destroyed with its target, exactly once'
+        bean instanceof Intercepted
+        prototypeInterceptor.instances == 1
+        prototypeInterceptor.destroyed == 1
+
+        and: 'the singleton interceptor bound to the same bean outlives the target'
+        singletonInterceptor.destroyed == 0
+
+        when:
+        context.close()
+
+        then: 'closing the context destroys the singleton once and does not destroy the prototype again'
+        prototypeInterceptor.destroyed == 1
+        singletonInterceptor.destroyed == 1
     }
 
     void 'test an intercepted bean resolved as a nested dependency is not confused with its consumer'() {

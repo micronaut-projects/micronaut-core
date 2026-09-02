@@ -100,6 +100,7 @@ import io.micronaut.inject.ReplacesDefinition;
 import io.micronaut.inject.UnsafeExecutionHandle;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.provider.AbstractProviderDefinition;
+import io.micronaut.inject.proxy.InterceptedBean;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.FilteringQualifier;
@@ -1123,10 +1124,47 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (beanDefinition.isPresent()) {
                 BeanDefinition<T> definition = beanDefinition.get();
                 BeanKey<T> key = new BeanKey<>(definition, definition.getDeclaredQualifier());
-                destroyBean(BeanRegistration.of(this, key, definition, bean));
+                destroyBean(BeanRegistration.of(this, key, definition, bean, retainedInterceptorDependents(bean)));
             }
         }
         return bean;
+    }
+
+    /**
+     * The interceptor registrations a proxy retained, narrowed to the ones that live and die with their target.
+     *
+     * <p>{@link #destroyBean(Object)} builds a registration of its own only when the context tracks none for the
+     * instance, which is the case for a bean created with {@code createBean}. The dependents the tracked path would
+     * have carried were never recorded, so on that path a {@code @Prototype} interceptor was never destroyed with
+     * its target. A generated proxy that retained its interceptor registrations for lifecycle interception is the
+     * one thing that survived from creation to destruction, and those registrations stand in for the missing
+     * dependents.</p>
+     *
+     * <p>Singleton interceptors are left out, because a singleton is never a dependent of one target: the tracked
+     * path resolves it from the singleton scope instead of creating it for the bean, and destroying it here would
+     * take it away from every other bean it advises. This is the same rule
+     * {@link #destroyBean(BeanRegistration, boolean)} applies when it skips a singleton proxy definition destroyed
+     * as a dependent; here it has to cover plain definitions too, since an interceptor is rarely proxied itself.</p>
+     *
+     * @param bean The bean being destroyed
+     * @return The non-singleton interceptor registrations to destroy with the bean, or {@code null} if there are none
+     */
+    @Nullable
+    private static List<BeanRegistration<?>> retainedInterceptorDependents(Object bean) {
+        if (!(bean instanceof InterceptedBean intercepted)) {
+            return null;
+        }
+        List<? extends BeanRegistration<?>> registrations = intercepted.$interceptorRegistrations();
+        if (registrations.isEmpty()) {
+            return null;
+        }
+        List<BeanRegistration<?>> dependents = new ArrayList<>(registrations.size());
+        for (BeanRegistration<?> registration : registrations) {
+            if (!registration.beanDefinition.isSingleton()) {
+                dependents.add(registration);
+            }
+        }
+        return dependents.isEmpty() ? null : dependents;
     }
 
     @Override
@@ -1219,7 +1257,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      *
      * <p>The registrations are retained by the bean registration created alongside the bean. Beans created through
      * {@code createBean} and destroyed through {@code destroyBean(Object)} have no bean registration and therefore
-     * retain the existing fresh-resolution behaviour.</p>
+     * retain the existing fresh-resolution behaviour, unless a generated proxy retained the registrations itself,
+     * in which case {@code destroyBean(Object)} destroys the non-singleton ones with the target.</p>
      *
      * @param definition    The disposable definition
      * @param registration  The registration of the bean being destroyed
