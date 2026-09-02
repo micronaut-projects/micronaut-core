@@ -107,6 +107,8 @@ class Rep {
 
         expect:
         probe(element.getAnnotationMetadata()) == EXPECTED
+        element.getAnnotationMetadata().getDeclaredAnnotationNamesByStereotype(QS) == [QS]
+        element.getAnnotationMetadata().getDeclaredAnnotationNamesByStereotype('') == []
         probe(field.getAnnotationMetadata()) == EXPECTED
         probe(ctorParam.getAnnotationMetadata()) == EXPECTED
         probe(methodParam.getAnnotationMetadata()) == EXPECTED

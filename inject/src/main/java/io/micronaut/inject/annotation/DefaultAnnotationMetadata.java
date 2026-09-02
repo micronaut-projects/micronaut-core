@@ -1570,7 +1570,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @return True if present
      */
     private boolean containsAnnotation(@Nullable Map<String, Map<CharSequence, Object>> annotations, @Nullable String annotation) {
-        if (annotations == null || StringUtils.isEmpty(annotation)) {
+        if (annotations == null || annotation == null || annotation.isEmpty()) {
             return false;
         }
         if (annotations.containsKey(annotation)) {
