@@ -18,31 +18,48 @@ class ProxyTargetDefinitionLookupSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
+    ApplicationContext context = ApplicationContext.run(['spec.name': 'ProxyTargetDefinitionLookupSpec'])
 
-    void "a proxy definition finds the very target definition the context resolves"() {
+    void "the context finds the very target definition for a proxy definition"() {
         when: "the definition of a bean whose methods are proxied is obtained"
         BeanDefinition<ProxyingClass> proxy = context.getBeanDefinition(ProxyingClass)
 
         then: "it is the proxy standing in front of the class that was written"
         proxy instanceof ProxyBeanDefinition
 
-        when: "the target is asked for by identity and by type"
+        when: "the target is asked for by its definition and by type"
         ProxyBeanDefinition<ProxyingClass> proxyDefinition = (ProxyBeanDefinition<ProxyingClass>) proxy
-        Optional<BeanDefinition<ProxyingClass>> byIdentity = proxyDefinition.findTargetDefinition(context)
+        Optional<BeanDefinition<ProxyingClass>> byDefinition = context.findProxyTargetBeanDefinition(proxy)
         BeanDefinition<ProxyingClass> byType = context.getProxyTargetBeanDefinition(ProxyingClass, null)
 
         then: "both answer with the same instance"
-        byIdentity.isPresent()
-        byIdentity.get().is(byType)
-        !byIdentity.get().isProxy()
-        byIdentity.get().getClass() == proxyDefinition.getTargetDefinitionType()
+        byDefinition.isPresent()
+        byDefinition.get().is(byType)
+        !byDefinition.get().isProxy()
+        byDefinition.get().getClass() == proxyDefinition.getTargetDefinitionType()
 
         and: "the registry lookup the default delegates to answers the same"
         context.findBeanDefinitionByDefinitionClass(proxyDefinition.getTargetDefinitionType()).get().is(byType)
 
         and: "the proxy definition is itself reachable through its own class"
         context.findBeanDefinitionByDefinitionClass(proxy.getClass()).get().is(proxy)
+    }
+
+    void "a proxy definition identifies its target when its target type is ambiguous"() {
+        given: "two proxied factory products with the same target type"
+        List<ProxyBeanDefinition<AmbiguousProxyTarget>> proxies = context.allBeanDefinitions
+            .findAll { it instanceof ProxyBeanDefinition && it.targetType == AmbiguousProxyTarget }
+            .collect { (ProxyBeanDefinition<AmbiguousProxyTarget>) it }
+
+        expect: "type resolution alone cannot select either target"
+        proxies.size() == 2
+        context.findProxyTargetBeanDefinition(AmbiguousProxyTarget, null).isEmpty()
+
+        and: "each proxy resolves its own compiled target definition"
+        proxies.every { proxy ->
+            Optional<BeanDefinition<AmbiguousProxyTarget>> target = context.findProxyTargetBeanDefinition(proxy)
+            target.isPresent() && target.get().getClass() == proxy.targetDefinitionType
+        }
     }
 
     void "a definition that is not a proxy is found by its own class"() {

@@ -451,8 +451,8 @@ public interface BeanDefinitionRegistry {
      * identity: the compiled definition class itself, such as the one a
      * {@link ProxyBeanDefinition#getTargetDefinitionType() proxy names as its target}. The definition returned
      * is the instance the registry uses for every other lookup, so it can be compared by identity with them.
-     * Unmatched definitions are never loaded; the match is on the name a
-     * {@link BeanDefinitionReference#getBeanDefinitionName() reference reports}.</p>
+     * Definitions whose names do not match are never loaded; the matching definition is then verified against
+     * the requested class.</p>
      *
      * <p>Only definitions generated at compile time have a class of their own. A
      * {@link RuntimeBeanDefinition} shares its class with every other runtime definition and is not found here.</p>
@@ -481,12 +481,16 @@ public interface BeanDefinitionRegistry {
                     return Optional.empty();
                 }
                 BeanDefinition<Object> definition = reference.load(context);
-                if (definition == null || !definition.isEnabled(context)) {
+                if (definition == null || definition.getClass() != definitionClass || !definition.isEnabled(context)) {
                     return Optional.empty();
                 }
                 return Optional.of((BeanDefinition<T>) definition);
             }
-            return Optional.ofNullable((BeanDefinition<T>) reference.load());
+            BeanDefinition<Object> definition = reference.load();
+            if (definition == null || definition.getClass() != definitionClass) {
+                return Optional.empty();
+            }
+            return Optional.of((BeanDefinition<T>) definition);
         }
         return Optional.empty();
     }

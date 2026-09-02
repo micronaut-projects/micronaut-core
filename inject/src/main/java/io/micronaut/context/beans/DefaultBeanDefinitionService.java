@@ -229,7 +229,8 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         if (producer == null) {
             return null;
         }
-        return producer.getDefinitionIfEnabled(beanContext, null, beanResolutionCustomizer, null, null, null);
+        BeanDefinition<T> definition = producer.getDefinitionIfEnabled(beanContext, null, beanResolutionCustomizer, null, null, null);
+        return definition != null && definition.getClass() == definitionClass ? definition : null;
     }
 
     @Nullable
