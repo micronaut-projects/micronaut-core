@@ -80,4 +80,14 @@ public interface CustomScopeRegistry {
     default <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
         return Optional.empty();
     }
+
+    /**
+     * Forgets that no scope was found for an annotation, so that the next lookup for it consults
+     * the bean context again. Called when a {@link CustomScope} is registered after the context started,
+     * since a lookup made before then may have recorded the scope's absence.
+     *
+     * @since 5.2.0
+     */
+    default void invalidate() {
+    }
 }

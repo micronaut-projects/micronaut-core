@@ -114,6 +114,13 @@ public class DefaultCustomScopeRegistry implements CustomScopeRegistry {
         });
     }
 
+    @Override
+    public void invalidate() {
+        // only the misses: a scope that was found keeps the beans it holds, and dropping it here would
+        // let a second lookup of the same scope bean create a second instance of a non-singleton one
+        scopes.values().removeIf(Optional::isEmpty);
+    }
+
     private static final class InjectScopeImpl implements CustomScope<InjectScope>, LifeCycle<InjectScopeImpl> {
 
         private final List<CreatedBean<?>> currentCreatedBeans = new ArrayList<>(2);

@@ -1653,7 +1653,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @Override
     public <B> BeanContext registerBeanDefinition(RuntimeBeanDefinition<B> definition) {
         beanDefinitionProvider.addBeanDefinition(definition);
-        purgeCacheForBeanType(definition.getBeanType());
+        Class<B> beanType = definition.getBeanType();
+        purgeCacheForBeanType(beanType);
+        if (CustomScope.class.isAssignableFrom(beanType)) {
+            // a bean of this scope resolved earlier left the scope's absence recorded in the registry
+            customScopeRegistry.invalidate();
+        }
         return this;
     }
 
