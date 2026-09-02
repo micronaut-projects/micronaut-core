@@ -802,6 +802,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
+     * Obtain the remappers for the given annotation package.
+     *
+     * @param packageName The annotation package
+     * @return The remappers
+     * @since 5.2.0
+     */
+    protected List<AnnotationRemapper> getAnnotationRemappers(String packageName) {
+        List<AnnotationRemapper> annotationRemappers = ANNOTATION_REMAPPERS.get(packageName);
+        if (annotationRemappers == null) {
+            return ALL_ANNOTATION_REMAPPERS;
+        }
+        return CollectionUtils.concat(annotationRemappers, ALL_ANNOTATION_REMAPPERS);
+    }
+
+    /**
      * Returns the visitor context for this implementation.
      *
      * @return The visitor context
@@ -1710,12 +1725,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                                                    ProcessedAnnotation processedAnnotation) {
         AnnotationValue<?> annotationValue = processedAnnotation.getAnnotationValue();
         String packageName = NameUtils.getPackageName(annotationValue.getAnnotationName());
-        List<AnnotationRemapper> annotationRemappers = ANNOTATION_REMAPPERS.get(packageName);
-        if (annotationRemappers == null) {
-            annotationRemappers = ALL_ANNOTATION_REMAPPERS;
-        } else {
-            annotationRemappers = CollectionUtils.concat(annotationRemappers, ALL_ANNOTATION_REMAPPERS);
-        }
+        List<AnnotationRemapper> annotationRemappers = getAnnotationRemappers(packageName);
         annotationRemappers = eliminateProcessed(context, annotationRemappers);
         return remapAnnotation(
                 context,
