@@ -1,6 +1,5 @@
 package io.micronaut.core.annotation
 
-import spock.lang.PendingFeature
 import spock.lang.Specification
 
 class AnnotationValueSpec extends Specification {
@@ -49,7 +48,6 @@ class AnnotationValueSpec extends Specification {
      * {@code getMemberNames()} and {@code toString()}, so this is the one hole left in "it is not an
      * attribute", and it widens the blast radius of the reserved member beyond the opted-in consumers.</p>
      */
-    @PendingFeature(reason = "convertibleValues is constructed from the raw values map, bypassing getValues()")
     void "the reserved stereotypes member is hidden from the convertible values"() {
         given:
         def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()

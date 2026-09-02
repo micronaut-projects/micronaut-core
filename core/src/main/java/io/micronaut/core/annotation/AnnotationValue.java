@@ -1749,9 +1749,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     private ConvertibleValues<Object> newConvertibleValues(Map<CharSequence, Object> values) {
         if (CollectionUtils.isEmpty(values)) {
             return ConvertibleValues.EMPTY;
-        } else {
-            return ConvertibleValues.of(values);
         }
+        if (values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            // The reserved member is not an attribute, so it is not part of the convertible view either
+            Map<CharSequence, Object> attributes = new LinkedHashMap<>(values);
+            attributes.remove(AnnotationUtil.STEREOTYPES_MEMBER);
+            return attributes.isEmpty() ? ConvertibleValues.EMPTY : ConvertibleValues.of(attributes);
+        }
+        return ConvertibleValues.of(values);
     }
 
     @Nullable

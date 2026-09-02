@@ -3,7 +3,6 @@ package io.micronaut.inject.annotation
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
-import spock.lang.PendingFeature
 import spock.lang.Unroll
 
 /**
@@ -152,7 +151,6 @@ class Test {
      *
      * <p>Both views are asserted so that a fix moves them together.</p>
      */
-    @PendingFeature(reason = "applyIntroducedAliases does not re-run down the subtree whose members it rewrote")
     void "a transitive override cascades to what the intermediate annotation composes"() {
         given:
         def annotationMetadata = writeAndLoadMetadata('nestedspec.Test', buildTypeAnnotationMetadata(NESTED))

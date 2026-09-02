@@ -1366,11 +1366,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 unmatched.add(alias.getAnnotation());
             } else if (alias.getIndex() < 0) {
                 for (int position : occurrences) {
-                    result.set(position, result.get(position).mutateAnnotationValue(builder -> builder.members(aliasValue.getValues())));
+                    result.set(position, overrideMembers(context, result.get(position), aliasValue.getValues()));
                 }
             } else if (alias.getIndex() < occurrences.size()) {
                 int position = occurrences.get(alias.getIndex());
-                result.set(position, result.get(position).mutateAnnotationValue(builder -> builder.members(aliasValue.getValues())));
+                result.set(position, overrideMembers(context, result.get(position), aliasValue.getValues()));
             }
             // An index outside the declared occurrences has no target and the alias is dropped
         }
@@ -1378,6 +1378,38 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             result.addAll(0, unmatched.stream().flatMap(a -> processAnnotation(context, a)).toList());
         }
         return result;
+    }
+
+    /**
+     * Overrides the members of a declared stereotype occurrence with the values an alias introduces, and cascades
+     * the override: an overridden member may itself alias a member of an annotation the occurrence composes, and
+     * the occurrence's subtree was computed from the values it had before the override. The occurrence's aliases
+     * are applied again with the overridden values, down to the leaves.
+     *
+     * @param context    The processing context
+     * @param occurrence The declared stereotype occurrence, with its subtree computed
+     * @param members    The member values the alias introduces
+     * @return The overridden occurrence
+     */
+    private ProcessedAnnotation overrideMembers(ProcessingContext context,
+                                                ProcessedAnnotation occurrence,
+                                                Map<CharSequence, Object> members) {
+        ProcessedAnnotation overridden = occurrence.mutateAnnotationValue(builder -> builder.members(members));
+        List<AnnotationValue<?>> stereotypes = overridden.getAnnotationValue().getStereotypes();
+        if (stereotypes == null || stereotypes.isEmpty()) {
+            return overridden;
+        }
+        List<IntroducedAlias> cascaded = new ArrayList<>(2);
+        overridden = processAliases(overridden, cascaded);
+        if (cascaded.isEmpty()) {
+            return overridden;
+        }
+        List<AnnotationValue<?>> overriddenStereotypes = applyIntroducedAliases(
+            context,
+            stereotypes.stream().map(this::toProcessedAnnotation).toList(),
+            cascaded
+        ).stream().<AnnotationValue<?>>map(ProcessedAnnotation::getAnnotationValue).toList();
+        return overridden.mutateAnnotationValue(builder -> builder.replaceStereotypes(overriddenStereotypes));
     }
 
     private ProcessedAnnotation addDefaults(ProcessedAnnotation processedAnnotation) {
