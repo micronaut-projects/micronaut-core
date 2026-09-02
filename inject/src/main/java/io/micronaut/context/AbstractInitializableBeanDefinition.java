@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.DefaultBeanContext.ListenersSupplier;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.DependsOn;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Property;
@@ -500,6 +501,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                     argumentConsumer.accept(annotationReference.argument);
                 }
             }
+        }
+        if (annotationMetadata != null) {
+            Collections.addAll(requiredComponents, annotationMetadata.classValues(DependsOn.class));
         }
         this.requiredComponents = Collections.unmodifiableSet(requiredComponents);
         return this.requiredComponents;

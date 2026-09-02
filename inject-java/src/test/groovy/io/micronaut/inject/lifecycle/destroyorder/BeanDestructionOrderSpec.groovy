@@ -3,10 +3,11 @@ package io.micronaut.inject.lifecycle.destroyorder
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
+import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.core.annotation.Order
 
 /**
- * The order in which singletons are destroyed when the context is closed.
+ * The order in which singletons are created and destroyed.
  */
 class BeanDestructionOrderSpec extends AbstractTypeElementSpec {
 
@@ -14,9 +15,11 @@ class BeanDestructionOrderSpec extends AbstractTypeElementSpec {
 package test;
 
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.DependsOn;
+import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.event.ShutdownEvent;
 import io.micronaut.core.annotation.Order;
-import io.micronaut.core.order.Ordered;
 import io.micronaut.runtime.event.annotation.EventListener;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Inject;
@@ -119,97 +122,134 @@ class DataSource {
         log.EVENTS.indexOf('repository') < log.EVENTS.indexOf('dataSource')
     }
 
-    void "@Order controls the destruction order of independent beans, lowest first"() {
+    void "@DependsOn creates the dependency first and destroys it last"() {
         given:
         ApplicationContext ctx = buildContext(HEADER + '''
-@Singleton @Order(30)
-class Producer {
-    @PreDestroy void close() { Log.add("producer"); }
-}
-@Singleton @Order(10)
+@Singleton
+@DependsOn(Producer.class)
 class Consumer {
-    @PreDestroy void close() { Log.add("consumer"); }
-}
-@Singleton @Order(20)
-class Dao {
-    @PreDestroy void close() { Log.add("dao"); }
-}
-@Singleton @Order(-5)
-class Cache {
-    @PreDestroy void close() { Log.add("cache"); }
+    Consumer() { Log.add("consumer created"); }
+    @PreDestroy void close() { Log.add("consumer destroyed"); }
 }
 @Singleton
-class Unordered {
-    @PreDestroy void close() { Log.add("unordered"); }
-}
-''')
-        def log = ctx.classLoader.loadClass('test.Log')
-        ['Producer', 'Unordered', 'Dao', 'Cache', 'Consumer'].each { ctx.getBean(ctx.classLoader.loadClass("test.$it")) }
-
-        when:
-        ctx.close()
-
-        then:
-        log.EVENTS == ['cache', 'unordered', 'consumer', 'dao', 'producer']
-    }
-
-    void "Ordered interface controls the destruction order of independent beans"() {
-        given:
-        ApplicationContext ctx = buildContext(HEADER + '''
-@Singleton
-class Second implements Ordered {
-    public int getOrder() { return 2; }
-    @PreDestroy void close() { Log.add("second"); }
-}
-@Singleton
-class First implements Ordered {
-    public int getOrder() { return 1; }
-    @PreDestroy void close() { Log.add("first"); }
-}
-@Singleton
-class Third implements Ordered {
-    public int getOrder() { return 3; }
-    @PreDestroy void close() { Log.add("third"); }
-}
-''')
-        def log = ctx.classLoader.loadClass('test.Log')
-        ['Third', 'First', 'Second'].each { ctx.getBean(ctx.classLoader.loadClass("test.$it")) }
-
-        when:
-        ctx.close()
-
-        then:
-        log.EVENTS == ['first', 'second', 'third']
-    }
-
-    void "dependencies take precedence over @Order"() {
-        given:
-        ApplicationContext ctx = buildContext(HEADER + '''
-@Singleton @Order(1)
 class Producer {
-    @PreDestroy void close() { Log.add("producer"); }
-}
-@Singleton @Order(2)
-class Consumer {
-    Consumer(Producer producer) {}
-    @PreDestroy void close() { Log.add("consumer"); }
-}
-@Singleton @Order(3)
-class Other {
-    @PreDestroy void close() { Log.add("other"); }
+    Producer() { Log.add("producer created"); }
+    @PreDestroy void close() { Log.add("producer destroyed"); }
 }
 ''')
         def log = ctx.classLoader.loadClass('test.Log')
-        ['Producer', 'Consumer', 'Other'].each { ctx.getBean(ctx.classLoader.loadClass("test.$it")) }
+        def consumer = ctx.classLoader.loadClass("test.Consumer")
+        def producer = ctx.classLoader.loadClass("test.Producer")
+
+        when:
+        ctx.getBean(consumer)
+
+        then:
+        ctx.getBeanDefinition(consumer).requiredComponents == [producer] as Set
+        log.EVENTS == ['producer created', 'consumer created']
 
         when:
         ctx.close()
 
         then:
-        log.EVENTS == ['consumer', 'producer', 'other']
+        log.EVENTS == ['producer created', 'consumer created', 'consumer destroyed', 'producer destroyed']
     }
 
-    void "beans of equal precedence are destroyed in a stable order"() {
+    void "@DependsOn on an interface applies to every implementation"() {
+        given:
+        ApplicationContext ctx = buildContext(HEADER + '''
+interface Channel {}
+@Singleton
+@DependsOn(Channel.class)
+class Consumer {
+    Consumer() { Log.add("consumer created"); }
+    @PreDestroy void close() { Log.add("consumer destroyed"); }
+}
+@Singleton
+class TopicChannel implements Channel {
+    TopicChannel() { Log.add("topic created"); }
+    @PreDestroy void close() { Log.add("topic destroyed"); }
+}
+@Singleton
+class QueueChannel implements Channel {
+    QueueChannel() { Log.add("queue created"); }
+    @PreDestroy void close() { Log.add("queue destroyed"); }
+}
+''')
+        def log = ctx.classLoader.loadClass('test.Log')
+
+        when:
+        ctx.getBean(ctx.classLoader.loadClass("test.Consumer"))
+
+        then:
+        log.EVENTS.indexOf('consumer created') == 2
+
+        when:
+        ctx.close()
+
+        then:
+        log.EVENTS.indexOf('consumer destroyed') == 3
+        log.EVENTS.indexOf('topic destroyed') > 3
+        log.EVENTS.indexOf('queue destroyed') > 3
+    }
+
+    void "@DependsOn on a factory method"() {
+        given:
+        ApplicationContext ctx = buildContext(HEADER + '''
+class Consumer {
+    Consumer() { Log.add("consumer created"); }
+    void stop() { Log.add("consumer destroyed"); }
+}
+@Factory
+class ConsumerFactory {
+    @Singleton
+    @Bean(preDestroy = "stop")
+    @DependsOn(Producer.class)
+    Consumer consumer() { return new Consumer(); }
+}
+@Singleton
+class Producer {
+    Producer() { Log.add("producer created"); }
+    @PreDestroy void close() { Log.add("producer destroyed"); }
+}
+''')
+        def log = ctx.classLoader.loadClass('test.Log')
+
+        when:
+        ctx.getBean(ctx.classLoader.loadClass("test.Consumer"))
+
+        then:
+        log.EVENTS == ['producer created', 'consumer created']
+
+        when:
+        ctx.close()
+
+        then:
+        log.EVENTS == ['producer created', 'consumer created', 'consumer destroyed', 'producer destroyed']
+    }
+
+    void "@DependsOn on a type with no bean fails"() {
+        given:
+        ApplicationContext ctx = buildContext(HEADER + '''
+interface Missing {}
+@Singleton
+@DependsOn(Missing.class)
+class Consumer {
+}
+''')
+
+        when:
+        ctx.getBean(ctx.classLoader.loadClass("test.Consumer"))
+
+        then:
+        def e = thrown(BeanInstantiationException)
+        e.message.contains('depends on [test.Missing] but no bean of that type exists')
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "beans without dependencies are destroyed in a stable order"() {
         given:
         def source = new StringBuilder(HEADER)
         def names = (0..<12).collect { "Bean${String.format('%02d', it)}" }
@@ -232,15 +272,15 @@ class $name {
         log.EVENTS == names
     }
 
-    void "a dependency cycle is destroyed starting with the highest precedence bean"() {
+    void "a dependency cycle is still destroyed"() {
         given:
         ApplicationContext ctx = buildContext(HEADER + '''
-@Singleton @Order(2)
+@Singleton
 class A {
     A(BeanProvider<B> b) {}
     @PreDestroy void close() { Log.add("a"); }
 }
-@Singleton @Order(1)
+@Singleton
 class B {
     B(BeanProvider<A> a) {}
     @PreDestroy void close() { Log.add("b"); }
@@ -253,7 +293,7 @@ class B {
         ctx.close()
 
         then:
-        log.EVENTS == ['b', 'a']
+        log.EVENTS == ['a', 'b']
     }
 
     void "@Order on @EventListener methods orders ShutdownEvent listeners"() {

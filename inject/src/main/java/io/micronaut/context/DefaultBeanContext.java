@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.DependsOn;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Primary;
@@ -2161,6 +2162,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         Qualifier<?> prevQualifier = resolutionContext.getCurrentQualifier();
         try {
             resolutionContext.setCurrentQualifier(declaredQualifier != null && !AnyQualifier.INSTANCE.equals(declaredQualifier) ? declaredQualifier : qualifier);
+            createDependsOnBeans(resolutionContext, beanDefinition);
             T bean;
             if (beanDefinition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
                 Argument<Object>[] requiredArguments = parametrizedInstantiatableBeanDefinition.getRequiredArguments();
@@ -2188,6 +2190,24 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             throw new BeanInstantiationException(beanDefinition, e);
         } finally {
             resolutionContext.setCurrentQualifier(prevQualifier);
+        }
+    }
+
+    /**
+     * Creates the beans a definition declares with {@link DependsOn} so that they exist before the bean is
+     * instantiated. Being required components they are also destroyed after the bean.
+     *
+     * @param resolutionContext The resolution context
+     * @param beanDefinition    The definition about to be instantiated
+     */
+    private void createDependsOnBeans(BeanResolutionContext resolutionContext, BeanDefinition<?> beanDefinition) {
+        if (!beanDefinition.hasAnnotation(DependsOn.class)) {
+            return;
+        }
+        for (Class<?> dependency : beanDefinition.classValues(DependsOn.class)) {
+            if (getBeansOfType(resolutionContext, Argument.of(dependency)).isEmpty()) {
+                throw new BeanInstantiationException(resolutionContext, "Bean [" + beanDefinition.getName() + "] depends on [" + dependency.getName() + "] but no bean of that type exists");
+            }
         }
     }
 
@@ -3408,21 +3428,19 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     /**
      * Sorts the singleton registrations into the order in which they should be destroyed.
      *
-     * <p>A bean is destroyed before every bean it requires, so that a dependency outlives its dependents. Where the
-     * dependencies leave the order open, beans with a lower {@link io.micronaut.core.annotation.Order} value (or
-     * {@link io.micronaut.core.order.Ordered#getOrder()}) are destroyed first, and beans of equal precedence are
-     * destroyed in bean name order so that the sequence is stable between runs. Dependency cycles are broken by
-     * destroying the highest precedence bean of the cycle first.</p>
+     * <p>A bean is destroyed before every bean it requires, whether the requirement comes from an injection point or
+     * from {@link DependsOn}, so that a dependency outlives its dependents. Where the dependencies leave the order
+     * open, beans are destroyed in bean name order so that the sequence is stable between runs. Dependency cycles are
+     * broken by destroying the first bean of the cycle in that order.</p>
      *
      * @param beans The registrations
      * @return The registrations in destruction order
      */
     private List<BeanRegistration> topologicalSort(Collection<BeanRegistration> beans) {
         final int size = beans.size();
-        // The index of a node is its precedence: lower @Order first, then bean name so the order is deterministic
+        // Nodes are indexed in bean name order so that the destruction sequence is deterministic
         final List<BeanRegistration> nodes = new ArrayList<>(beans);
-        nodes.sort(Comparator.<BeanRegistration>comparingInt(registration -> registration.getOrder())
-            .thenComparing(registration -> registration.getBeanDefinition().getName()));
+        nodes.sort(Comparator.comparing(registration -> registration.getBeanDefinition().getName()));
 
         final Map<Class<?>, List<Integer>> nodesByType = new HashMap<>(size);
         for (int i = 0; i < size; i++) {
@@ -3457,7 +3475,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             dependencies.add(nodeDependencies);
         }
 
-        // Kahn's algorithm: repeatedly destroy the highest precedence bean that no remaining bean requires
+        // Kahn's algorithm: repeatedly destroy the first bean that no remaining bean requires
         final List<BeanRegistration> sorted = new ArrayList<>(size);
         final boolean[] destroyed = new boolean[size];
         final PriorityQueue<Integer> ready = new PriorityQueue<>(Math.max(1, size));
@@ -3469,7 +3487,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         int nextCycleCandidate = 0;
         while (sorted.size() < size) {
             if (ready.isEmpty()) {
-                // every remaining bean is part of a dependency cycle, break it at the highest precedence bean
+                // every remaining bean is part of a dependency cycle, break it at the first bean
                 while (destroyed[nextCycleCandidate]) {
                     nextCycleCandidate++;
                 }
