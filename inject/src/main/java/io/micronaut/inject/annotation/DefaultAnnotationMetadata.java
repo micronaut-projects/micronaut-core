@@ -1047,17 +1047,17 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Override
     public boolean hasDeclaredAnnotation(@Nullable String annotation) {
-        return containsAnnotation(declaredAnnotations, annotation);
+        return declaredAnnotations != null && StringUtils.isNotEmpty(annotation) && declaredAnnotations.containsKey(annotation);
     }
 
     @Override
     public boolean hasAnnotation(@Nullable String annotation) {
-        return hasDeclaredAnnotation(annotation) || containsAnnotation(allAnnotations, annotation);
+        return hasDeclaredAnnotation(annotation) || (allAnnotations != null && StringUtils.isNotEmpty(annotation) && allAnnotations.containsKey(annotation));
     }
 
     @Override
     public boolean hasStereotype(@Nullable String annotation) {
-        return hasAnnotation(annotation) || containsAnnotation(allStereotypes, annotation);
+        return hasAnnotation(annotation) || (allStereotypes != null && StringUtils.isNotEmpty(annotation) && allStereotypes.containsKey(annotation));
     }
 
     @Override
@@ -1074,7 +1074,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Override
     public boolean hasDeclaredStereotype(@Nullable String annotation) {
-        return hasDeclaredAnnotation(annotation) || containsAnnotation(declaredStereotypes, annotation);
+        return hasDeclaredAnnotation(annotation) || (declaredStereotypes != null && StringUtils.isNotEmpty(annotation) && declaredStereotypes.containsKey(annotation));
     }
 
     @Override
@@ -1140,7 +1140,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 return Collections.unmodifiableList(annotations);
             }
         }
-        if (containsAnnotation(allAnnotations, stereotype) || containsAnnotation(declaredAnnotations, stereotype)) {
+        if (allAnnotations != null && allAnnotations.containsKey(stereotype)) {
+            return List.of(stereotype);
+        }
+        if (declaredAnnotations != null && declaredAnnotations.containsKey(stereotype)) {
             return List.of(stereotype);
         }
         return List.of();
