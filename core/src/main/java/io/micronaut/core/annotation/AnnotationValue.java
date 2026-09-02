@@ -134,6 +134,24 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
+     * @param annotationName        The annotation name
+     * @param values                The values
+     * @param defaultValuesProvider The default values provider
+     * @param stereotypes           The annotations composed by this annotation, retained because the annotation is
+     *                              meta-annotated with {@link RetainStereotypes}
+     * @since 5.2
+     */
+    @UsedByGeneratedCode
+    @Internal
+    public AnnotationValue(String annotationName,
+                           Map<CharSequence, Object> values,
+                           AnnotationDefaultValuesProvider defaultValuesProvider,
+                           @Nullable
+                           List<AnnotationValue<?>> stereotypes) {
+        this(annotationName, values, null, RetentionPolicy.RUNTIME, stereotypes, defaultValuesProvider);
+    }
+
+    /**
      * @param annotationName  The annotation name
      * @param values          The values
      * @param defaultValues   The default values

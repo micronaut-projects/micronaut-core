@@ -132,6 +132,9 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 hasPropertyExpressions,
                 hasEvaluatedExpressions
         );
+        if (stereotypesByAnnotation != null) {
+            cloned.stereotypesByAnnotation = cloneMapOfListValue(stereotypesByAnnotation);
+        }
         if (annotationDefaultValues != null) {
             cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
         }
@@ -380,6 +383,26 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
 
             addRepeatable(annotationName, annotationValue);
         }
+    }
+
+    /**
+     * Retains the annotations composed by the given annotation, so that the association between a composing
+     * annotation occurrence and the annotation that introduced it survives the flattening of the annotation tree
+     * into the stereotype indexes. Only annotations meta-annotated with
+     * {@link io.micronaut.core.annotation.RetainStereotypes} are retained.
+     *
+     * @param annotation  The composing annotation name
+     * @param stereotypes The annotations it composes, with member overrides applied
+     * @since 5.2
+     */
+    public void addRetainedStereotypes(String annotation, List<AnnotationValue<?>> stereotypes) {
+        if (StringUtils.isEmpty(annotation) || CollectionUtils.isEmpty(stereotypes)) {
+            return;
+        }
+        if (stereotypesByAnnotation == null) {
+            stereotypesByAnnotation = new LinkedHashMap<>(2);
+        }
+        stereotypesByAnnotation.put(annotation, stereotypes);
     }
 
     /**
@@ -733,7 +756,11 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         if (defaultValues == null) {
             defaultValues = AnnotationMetadataSupport.getDefaultValuesOrNull(annotationType);
         }
-        return new AnnotationValue<>(annotationType, values, defaultValues);
+        List<AnnotationValue<?>> stereotypes = stereotypesByAnnotation == null ? null : stereotypesByAnnotation.get(annotationType);
+        if (stereotypes == null) {
+            return new AnnotationValue<>(annotationType, values, defaultValues);
+        }
+        return new AnnotationValue<>(annotationType, values, defaultValues, RetentionPolicy.RUNTIME, stereotypes);
     }
 
     /**
@@ -836,6 +863,13 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 annotationRepeatableContainer = new LinkedHashMap<>(annotationMetadata.annotationRepeatableContainer);
             } else {
                 annotationRepeatableContainer.putAll(annotationMetadata.annotationRepeatableContainer);
+            }
+        }
+        if (annotationMetadata.stereotypesByAnnotation != null) {
+            if (stereotypesByAnnotation == null) {
+                stereotypesByAnnotation = new LinkedHashMap<>(annotationMetadata.stereotypesByAnnotation);
+            } else {
+                stereotypesByAnnotation.putAll(annotationMetadata.stereotypesByAnnotation);
             }
         }
     }

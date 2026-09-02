@@ -83,6 +83,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -105,6 +106,11 @@ import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
  */
 @Internal
 public final class AnnotationMetadataSupport {
+
+    /**
+     * The name of {@link io.micronaut.core.annotation.RetainStereotypes}.
+     */
+    private static final String RETAIN_STEREOTYPES = "io.micronaut.core.annotation.RetainStereotypes";
 
     private static final Map<String, Map<CharSequence, Object>> CORE_ANNOTATION_DEFAULTS;
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
@@ -628,4 +634,57 @@ public final class AnnotationMetadataSupport {
             }
         }
     }
+
+    /**
+     * Whether the annotations composed by the given annotation should be retained in the annotation metadata of the
+     * elements it is applied to, which is the case when {@link io.micronaut.core.annotation.RetainStereotypes} is
+     * present anywhere in the annotation's stereotype closure.
+     *
+     * <p>Only meaningful while the annotation tree is being built, when
+     * {@link AnnotationValue#getStereotypes()} is populated.</p>
+     *
+     * @param annotationValue The annotation value
+     * @return Whether the composed annotations should be retained
+     * @since 5.2
+     */
+    @Internal
+    public static boolean retainsStereotypes(@Nullable AnnotationValue<?> annotationValue) {
+        if (annotationValue == null) {
+            return false;
+        }
+        List<AnnotationValue<?>> stereotypes = annotationValue.getStereotypes();
+        if (stereotypes == null || stereotypes.isEmpty()) {
+            return false;
+        }
+        for (AnnotationValue<?> stereotype : stereotypes) {
+            if (RETAIN_STEREOTYPES.equals(stereotype.getAnnotationName()) || retainsStereotypes(stereotype)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The annotations composed by the given annotation, without the
+     * {@link io.micronaut.core.annotation.RetainStereotypes} marker itself.
+     *
+     * @param annotationValue The annotation value
+     * @return The composed annotations, never {@code null}
+     * @since 5.2
+     */
+    @Internal
+    public static List<AnnotationValue<?>> retainedStereotypesOf(AnnotationValue<?> annotationValue) {
+        List<AnnotationValue<?>> stereotypes = annotationValue.getStereotypes();
+        if (stereotypes == null || stereotypes.isEmpty()) {
+            return List.of();
+        }
+        List<AnnotationValue<?>> retained = new ArrayList<>(stereotypes.size());
+        for (AnnotationValue<?> stereotype : stereotypes) {
+            if (!RETAIN_STEREOTYPES.equals(stereotype.getAnnotationName())) {
+                retained.add(stereotype);
+            }
+        }
+        return retained;
+    }
+
 }

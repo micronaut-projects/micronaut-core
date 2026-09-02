@@ -1553,6 +1553,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             throw new IllegalStateException("Annotation should contain default values and an empty list " + annotationValue.getAnnotationName());
         }
 
+        if (AnnotationMetadataSupport.retainsStereotypes(annotationValue)) {
+            // The annotation opts into keeping the annotations it composes, so that the association between a
+            // composing annotation and the annotation that introduced it survives the flattening below
+            mutableAnnotationMetadata.addRetainedStereotypes(annotationName, AnnotationMetadataSupport.retainedStereotypesOf(annotationValue));
+        }
+
         String repeatableContainer = repeatableToContainer.get(annotationName);
         if (repeatableContainer == null) {
             repeatableContainer = AnnotationMetadataSupport.getCoreRepeatableAnnotationsContainers().get(annotationName);
