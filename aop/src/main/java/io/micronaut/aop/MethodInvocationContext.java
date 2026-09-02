@@ -39,16 +39,16 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
     /**
      * The concrete executable methods represented by this invocation.
      *
-     * <p>For ordinary method interception, the list contains {@link #getExecutableMethod()}. A lifecycle
-     * interception represents a whole phase and can therefore contain more than one method: for
-     * {@link InterceptorKind#POST_CONSTRUCT} these are the {@code @PostConstruct} methods of the target bean, and
-     * for {@link InterceptorKind#PRE_DESTROY} its {@code @PreDestroy} methods, in the order {@link #proceed()}
-     * invokes them, superclass callbacks first. In that case {@link #getExecutableMethod()} continues to describe
-     * the phase from which interceptor bindings are resolved.</p>
+     * <p>For ordinary method interception, and for a {@link InterceptorKind#POST_CONSTRUCT} or
+     * {@link InterceptorKind#PRE_DESTROY} interception of a callback, the list contains
+     * {@link #getExecutableMethod()}. Each {@code @PostConstruct} and {@code @PreDestroy} method of a bean is
+     * intercepted separately, so {@link #getExecutableMethod()} is the callback itself. A bean that binds a lifecycle
+     * kind without declaring a callback of that kind is intercepted once as a phase: there
+     * {@link #getExecutableMethod()} describes the phase rather than a method of the bean and this list is empty,
+     * as it is for a bean compiled by an earlier version of the framework.</p>
      *
      * <p>An executable method can be invoked, when needed, through
-     * {@link ExecutableMethod#invoke(Object, Object...)} on {@link #getTarget()}. A lifecycle phase without known
-     * callback methods yields an empty list, including for a bean compiled by an earlier version of the framework.</p>
+     * {@link ExecutableMethod#invoke(Object, Object...)} on {@link #getTarget()}.</p>
      *
      * @return The executable methods represented by this invocation
      * @since 5.2.0

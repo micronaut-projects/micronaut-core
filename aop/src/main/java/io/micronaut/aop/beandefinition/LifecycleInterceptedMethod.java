@@ -21,10 +21,11 @@ import io.micronaut.inject.ExecutableMethod;
 import java.util.List;
 
 /**
- * An intercepted lifecycle phase of a bean that knows the callbacks the phase invokes.
+ * An intercepted lifecycle method of a bean that knows the methods of the bean it stands for.
  *
- * <p>Implemented by the executable methods that stand for the intercepted {@code @PostConstruct} and
- * {@code @PreDestroy} phases, so that the interceptor chain can expose the callbacks through
+ * <p>Implemented by the executable method that stands for one intercepted {@code @PostConstruct} or
+ * {@code @PreDestroy} callback, which reports itself, and by the ones that stand for a whole phase of a bean
+ * without callbacks, which report nothing, so that the interceptor chain can answer
  * {@link io.micronaut.aop.MethodInvocationContext#getExecutableMethods()}.</p>
  *
  * @param <T> The bean type
@@ -35,9 +36,9 @@ import java.util.List;
 public interface LifecycleInterceptedMethod<T> {
 
     /**
-     * Returns the callbacks represented by this lifecycle phase.
+     * Returns the methods of the bean represented by this lifecycle method.
      *
-     * @return The callbacks of the phase, in invocation order, or an empty list
+     * @return The callback this method stands for, or an empty list for a phase without callbacks
      */
     List<ExecutableMethod<T, ?>> getExecutableMethods();
 }

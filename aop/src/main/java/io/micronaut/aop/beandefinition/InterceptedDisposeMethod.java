@@ -39,7 +39,6 @@ final class InterceptedDisposeMethod<T> extends InterceptedMethod<T, T> {
     private final BeanResolutionContext beanResolutionContext;
     private final BeanContext beanContext;
     private final T bean;
-    private final List<ExecutableMethod<T, ?>> callbacks;
 
     /**
      * @param disposableIntercepted The intercepted dispose bean definition
@@ -56,7 +55,6 @@ final class InterceptedDisposeMethod<T> extends InterceptedMethod<T, T> {
         this.beanResolutionContext = beanResolutionContext;
         this.beanContext = beanContext;
         this.bean = bean;
-        this.callbacks = disposableIntercepted.getPreDestroyExecutableMethods();
     }
 
     @Override
@@ -66,7 +64,8 @@ final class InterceptedDisposeMethod<T> extends InterceptedMethod<T, T> {
 
     @Override
     public List<ExecutableMethod<T, ?>> getExecutableMethods() {
-        return callbacks;
+        // the phase runs only for a bean without callbacks of its kind, so there is no method of the bean to report
+        return List.of();
     }
 
     @Override

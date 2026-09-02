@@ -590,6 +590,12 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final Method METHOD_DEFAULT_DISPOSE =
         ReflectionUtils.getRequiredInternalMethod(DisposableIntercepted.class, "dispose", BeanResolutionContext.class, BeanContext.class, Object.class);
 
+    private static final Method METHOD_INTERCEPT_POST_CONSTRUCT =
+        ReflectionUtils.getRequiredInternalMethod(InitializableIntercepted.class, "interceptPostConstruct", BeanResolutionContext.class, BeanContext.class, Object.class, int.class, Object[].class);
+
+    private static final Method METHOD_INTERCEPT_PRE_DESTROY =
+        ReflectionUtils.getRequiredInternalMethod(DisposableIntercepted.class, "interceptPreDestroy", BeanResolutionContext.class, BeanContext.class, Object.class, int.class, Object[].class);
+
     private static final Method DESTROY_INJECT_SCOPED_BEANS_METHOD = ReflectionUtils.getRequiredInternalMethod(BeanResolutionContext.class, "destroyInjectScopedBeans");
     private static final Method CHECK_IF_SHOULD_LOAD_METHOD = ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class,
         "checkIfShouldLoad",
@@ -1433,12 +1439,12 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                             .invoke(METHOD_DEFAULT_INITIALIZE, methodParameters).returning()));
                 }
                 classDefBuilder.addMethod(
-                    buildInitializeMethod(MethodDef.override(METHOD_DO_INITIALIZE))
+                    buildInitializeMethod(MethodDef.override(METHOD_DO_INITIALIZE), METHOD_INTERCEPT_POST_CONSTRUCT)
                 );
             } else if (!superBeanDefinition) {
                 //  for "super bean definition" we only add code to trigger "initialize"
                 classDefBuilder.addMethod(
-                    buildInitializeMethod(MethodDef.override(METHOD_INITIALIZE))
+                    buildInitializeMethod(MethodDef.override(METHOD_INITIALIZE), null)
                 );
             }
         }
@@ -1453,11 +1459,11 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                             .invoke(METHOD_DEFAULT_DISPOSE, methodParameters).returning()));
                 }
                 classDefBuilder.addMethod(
-                    buildDisposeMethod(MethodDef.override(METHOD_DO_DISPOSE))
+                    buildDisposeMethod(MethodDef.override(METHOD_DO_DISPOSE), METHOD_INTERCEPT_PRE_DESTROY)
                 );
             } else {
                 classDefBuilder.addMethod(
-                    buildDisposeMethod(MethodDef.override(METHOD_DISPOSE))
+                    buildDisposeMethod(MethodDef.override(METHOD_DISPOSE), null)
                 );
             }
         }
@@ -1867,17 +1873,34 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         return !preDestroyMethods.isEmpty() || isPreDestroyIntercepted();
     }
 
-    private MethodDef buildDisposeMethod(MethodDef.MethodDefBuilder override) {
-        return buildLifeCycleMethod(override, PRE_DESTROY_METHOD, preDestroyMethods);
+    private MethodDef buildDisposeMethod(MethodDef.MethodDefBuilder override, @Nullable Method interceptMethod) {
+        return buildLifeCycleMethod(override, PRE_DESTROY_METHOD, preDestroyMethods, interceptMethod);
     }
 
-    private MethodDef buildInitializeMethod(MethodDef.MethodDefBuilder override) {
-        return buildLifeCycleMethod(override, POST_CONSTRUCT_METHOD, postConstructMethods);
+    private MethodDef buildInitializeMethod(MethodDef.MethodDefBuilder override, @Nullable Method interceptMethod) {
+        return buildLifeCycleMethod(override, POST_CONSTRUCT_METHOD, postConstructMethods, interceptMethod);
     }
 
+    /**
+     * Builds a lifecycle method: the inherited hook first, then every callback in order, then the release of the
+     * inject-scoped beans the callbacks received.
+     *
+     * <p>When the phase is intercepted each callback is handed to the given interceptor entry point together with
+     * its resolved arguments, so that it runs in its own interceptor chain and the chain sees the callback as the
+     * intercepted method. The hook and the release stay outside the chains: they are the work of the phase, not of
+     * a callback.</p>
+     *
+     * @param methodDefBuilder The method to build
+     * @param superMethod      The inherited hook
+     * @param lifecycleMethods The callbacks
+     * @param interceptMethod  The interceptor entry point of the phase, or {@code null} when it is not intercepted
+     * @return The method
+     */
     private MethodDef buildLifeCycleMethod(MethodDef.MethodDefBuilder methodDefBuilder,
                                            Method superMethod,
-                                           List<MethodDefinition<ClassElement, MethodElement>> lifecycleMethods) {
+                                           List<MethodDefinition<ClassElement, MethodElement>> lifecycleMethods,
+                                           @Nullable Method interceptMethod) {
+        boolean postConstruct = superMethod == POST_CONSTRUCT_METHOD;
         return methodDefBuilder.build((aThis, methodParameters) -> {
             return aThis.invoke(superMethod, methodParameters).cast(beanTypeDef).newLocal("beanInstance", beanInstance -> {
                 List<StatementDef> statements = new ArrayList<>();
@@ -1885,7 +1908,11 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 InjectMethodSignature injectMethodSignature = new InjectMethodSignature(aThis, methodParameters, beanInstance);
 
                 for (MethodDefinition<ClassElement, MethodElement> lifecycleMethod : lifecycleMethods) {
-                    statements.add(injectStatement(injectMethodSignature, lifecycleMethod));
+                    if (interceptMethod == null) {
+                        statements.add(injectStatement(injectMethodSignature, lifecycleMethod));
+                    } else {
+                        statements.add(interceptedLifecycleStatement(injectMethodSignature, lifecycleMethod, interceptMethod, postConstruct));
+                    }
                     if (!hasInjectScope) {
                         for (ParameterElement parameter : lifecycleMethod.methodElement().getSuspendParameters()) {
                             if (hasInjectScope(parameter)) {
@@ -1903,6 +1930,49 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 statements.add(beanInstance.returning());
                 return StatementDef.multi(statements);
             });
+        });
+    }
+
+    /**
+     * Invokes one callback of an intercepted lifecycle phase through the interceptor entry point of the phase.
+     *
+     * <p>The arguments are resolved here, by the definition, exactly as for a direct invocation, and travel with the
+     * chain as its parameter values; the callback itself is dispatched by the executable methods definition when
+     * the chain proceeds, so a private callback needs no reflection of its own. The bean the chain returns replaces
+     * the local instance, as the result of a phase chain does.</p>
+     *
+     * @param injectMethodSignature The signature of the lifecycle method being built
+     * @param methodDefinition      The callback
+     * @param interceptMethod       The interceptor entry point of the phase
+     * @param postConstruct         {@code true} for a post-construct callback, {@code false} for a pre-destroy one
+     * @return The statement
+     */
+    private StatementDef interceptedLifecycleStatement(InjectMethodSignature injectMethodSignature,
+                                                       MethodDefinition<ClassElement, MethodElement> methodDefinition,
+                                                       Method interceptMethod,
+                                                       boolean postConstruct) {
+        VariableDef.This aThis = injectMethodSignature.aThis;
+        MethodElement methodElement = methodDefinition.methodElement();
+        int methodIndex = allMethods.indexOf(methodDefinition);
+        ExecutableMethodsDefinitionWriter methodsWriter = getExecutableMethodsWriter();
+        int position = methodsWriter.getLifecycleMethodPosition(methodsWriter.findIndexOfExecutableMethod(methodElement), postConstruct);
+        List<ExpressionDef> invocationValues = injectMethodValues(aThis, injectMethodSignature.methodParameters, methodDefinition.injectionPoints(), methodIndex);
+        boolean isRequiredInjection = InjectionPoint.isInjectionRequired(methodDefinition.annotationMetadata());
+        return TypeDef.OBJECT.array().instantiate(invocationValues).newLocal("values" + position, valuesVar -> {
+            StatementDef intercept = injectMethodSignature.instanceVar.assign(
+                aThis.invoke(
+                    interceptMethod,
+                    injectMethodSignature.beanResolutionContext,
+                    injectMethodSignature.beanContext,
+                    injectMethodSignature.instanceVar,
+                    ExpressionDef.constant(position),
+                    valuesVar
+                ).cast(beanTypeDef)
+            );
+            if (!isRequiredInjection && methodElement.hasParameters()) {
+                return aThis.invoke(IS_METHOD_RESOLVED, ExpressionDef.constant(methodIndex), valuesVar).ifTrue(intercept);
+            }
+            return intercept;
         });
     }
 

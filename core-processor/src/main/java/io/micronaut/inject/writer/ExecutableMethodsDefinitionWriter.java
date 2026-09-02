@@ -223,6 +223,27 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
         return postConstructIndexes.contains(index) || preDestroyIndexes.contains(index);
     }
 
+    /**
+     * The position of a lifecycle callback among the callbacks of its kind, which is its index in
+     * {@link ExecutableMethodsDefinition#getPostConstructExecutableMethods()} or
+     * {@link ExecutableMethodsDefinition#getPreDestroyExecutableMethods()} at runtime.
+     *
+     * @param index         The index returned by {@link #addLifecycleMethod(TypedElement, MethodElement, boolean)}
+     * @param postConstruct {@code true} for a post-construct callback, {@code false} for a pre-destroy one
+     * @return The position
+     * @since 5.2.0
+     */
+    public int getLifecycleMethodPosition(int index, boolean postConstruct) {
+        int position = 0;
+        for (int lifecycleIndex : postConstruct ? postConstructIndexes : preDestroyIndexes) {
+            if (lifecycleIndex == index) {
+                return position;
+            }
+            position++;
+        }
+        throw new IllegalStateException("Not a lifecycle method: " + index);
+    }
+
     private void addMethod(TypedElement declaringType, MethodElement methodElement) {
         evaluatedExpressionProcessor.processEvaluatedExpressions(methodElement);
 
