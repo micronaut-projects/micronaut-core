@@ -988,7 +988,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             results = List.of();
         }
         annotationValuesByType.put(annotationType, results);
-        return List.of();
+        return results;
     }
 
     protected <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
