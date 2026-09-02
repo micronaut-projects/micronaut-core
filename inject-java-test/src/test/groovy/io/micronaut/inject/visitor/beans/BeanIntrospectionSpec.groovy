@@ -6416,6 +6416,146 @@ class Order {
         introspection.getConstructors()[0].arguments.length == 1
     }
 
+    void "a described constructor of a non-static inner class describes the enclosing instance"() {
+        given:
+        def introspection = buildBeanIntrospection('test.CustomerService$InnerClass', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotNull;
+
+class CustomerService {
+    @Introspected(constructors = true)
+    public class InnerClass {
+        public InnerClass(@NotNull String s) {}
+    }
+}
+''')
+
+        when:
+        def described = introspection.getConstructors()[0]
+
+        then: 'the described arguments line up with the reflective signature'
+        introspection.getConstructors().size() == 1
+        Argument.toClassArray(described.arguments) ==
+            introspection.beanType.getDeclaredConstructors()[0].parameterTypes
+
+        and: 'the enclosing instance comes first, under the name the JDK gives it'
+        described.arguments.length == 2
+        described.arguments[0].name == 'this$0'
+        described.arguments[0].type.name == 'test.CustomerService'
+
+        and: 'the source level parameter keeps its annotations'
+        described.arguments[1].type == String
+        described.arguments[1].annotationMetadata.hasAnnotation(NotNull)
+    }
+
+    void "a described constructor of a non-static inner class instantiates with the enclosing instance"() {
+        given:
+        def introspection = buildBeanIntrospection('test.CustomerService$InnerClass', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+class CustomerService {
+    @Introspected(constructors = true)
+    public class InnerClass {
+        private final String name;
+        public InnerClass(String name) { this.name = name; }
+        public String getName() { return name; }
+    }
+}
+''')
+        def enclosing = introspection.getConstructors()[0].arguments[0].type
+            .getDeclaredConstructor().tap { it.accessible = true }.newInstance()
+
+        when:
+        def inner = introspection.getConstructors()[0].instantiate(enclosing, "abc")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(inner) == "abc"
+
+        when: 'the enclosing instance is left out'
+        introspection.getConstructors()[0].instantiate("abc")
+
+        then:
+        thrown(InstantiationException)
+    }
+
+    void "a constructor of a non-static inner class annotated as executable describes the enclosing instance"() {
+        given:
+        def introspection = buildBeanIntrospection('test.CustomerService$InnerClass', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import jakarta.validation.constraints.NotNull;
+
+class CustomerService {
+    @Introspected
+    public class InnerClass {
+        @Executable
+        public InnerClass(@NotNull String s) {}
+    }
+}
+''')
+
+        expect:
+        Argument.toClassArray(introspection.getConstructors()[0].arguments) ==
+            introspection.beanType.getDeclaredConstructors()[0].parameterTypes
+    }
+
+    void "a described constructor of a static nested class does not describe an enclosing instance"() {
+        given:
+        def introspection = buildBeanIntrospection('test.CustomerService$Nested', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+class CustomerService {
+    @Introspected(constructors = true)
+    public static class Nested {
+        public Nested(String s) {}
+    }
+}
+''')
+
+        expect:
+        Argument.toClassArray(introspection.getConstructors()[0].arguments) ==
+            introspection.beanType.getDeclaredConstructors()[0].parameterTypes
+        introspection.getConstructors()[0].arguments.length == 1
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+    }
+
+    void "the instantiating constructor of a non-static inner class is unchanged"() {
+        given: 'the same inner class built with and without the member'
+        def source = '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+class CustomerService {
+    @Introspected(%s)
+    public class InnerClass {
+        public InnerClass(String s) {}
+    }
+}
+'''
+        def baseline = buildBeanIntrospection('test.CustomerService$InnerClass', String.format(source, ''))
+        def described = buildBeanIntrospection('test.CustomerService$InnerClass', String.format(source, 'constructors = true'))
+
+        expect: 'an inner class is still not buildable through the introspection itself'
+        described.constructorArguments.length == baseline.constructorArguments.length
+        described.constructorArguments.length == 0
+        described.constructor.arguments.length == 0
+
+        when:
+        described.instantiate()
+
+        then:
+        thrown(InstantiationException)
+    }
+
     void "@Executable on a constructor does not override an explicit @Creator"() {
         given:
         def introspection = buildBeanIntrospection('test.Order', '''

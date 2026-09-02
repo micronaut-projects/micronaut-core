@@ -395,6 +395,15 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * every described constructor is returned, including its own annotation metadata and the
      * annotation metadata of its parameters.</p>
      *
+     * <p>A described constructor reports the parameters of its JVM signature, which for a non-static
+     * inner class means that {@link BeanConstructor#getArguments()} starts with the implicit enclosing
+     * instance, named {@code this$0}, exactly as {@link java.lang.reflect.Constructor#getParameterTypes()}
+     * reports it. The enclosing instance must therefore be passed first to
+     * {@link BeanConstructor#instantiate(Object...)}. {@link #getConstructor()} and
+     * {@link #getConstructorArguments()} keep the source level view and never describe it, so for a
+     * non-static inner class the first element of this list does not report the same arguments as
+     * {@link #getConstructor()}.</p>
+     *
      * @return Every described constructor of the type, {@link #getConstructor()} first
      * @since 5.2.0
      */

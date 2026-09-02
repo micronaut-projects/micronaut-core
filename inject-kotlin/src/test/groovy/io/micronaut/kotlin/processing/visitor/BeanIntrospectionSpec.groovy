@@ -29,6 +29,7 @@ import javax.persistence.Version
 import jakarta.validation.Constraint
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
 import java.lang.reflect.Field
 
@@ -2674,6 +2675,107 @@ class Order(val name: String) {
 
         then:
         introspection.getRequiredProperty("name", String).get(order) == "abc"
+    }
+
+    void "a described constructor of a Kotlin inner class describes the enclosing instance"() {
+        when:
+        def introspection = buildBeanIntrospection('test.CustomerService$InnerClass', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import jakarta.validation.constraints.NotNull
+
+class CustomerService {
+    @Introspected(constructors = true)
+    inner class InnerClass(@NotNull val s: String)
+}
+''')
+        def described = introspection.getConstructors()[0]
+
+        then: 'the described arguments line up with the reflective signature'
+        introspection.getConstructors().size() == 1
+        Argument.toClassArray(described.arguments) ==
+            introspection.beanType.getDeclaredConstructors()[0].parameterTypes
+
+        and: 'the enclosing instance comes first, under the name the JDK gives it'
+        described.arguments.length == 2
+        described.arguments[0].name == 'this$0'
+        described.arguments[0].type.name == 'test.CustomerService'
+
+        and: 'the source level parameter keeps its annotations'
+        described.arguments[1].type == String
+        described.arguments[1].annotationMetadata.hasAnnotation(NotNull)
+    }
+
+    void "a described constructor of a Kotlin inner class instantiates with the enclosing instance"() {
+        when:
+        def introspection = buildBeanIntrospection('test.CustomerService$InnerClass', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+class CustomerService {
+    @Introspected(constructors = true)
+    inner class InnerClass(val name: String)
+}
+''')
+        def enclosing = introspection.getConstructors()[0].arguments[0].type
+            .getDeclaredConstructor().tap { it.accessible = true }.newInstance()
+        def inner = introspection.getConstructors()[0].instantiate(enclosing, "abc")
+
+        then:
+        introspection.getRequiredProperty("name", String).get(inner) == "abc"
+
+        when: 'the enclosing instance is left out'
+        introspection.getConstructors()[0].instantiate("abc")
+
+        then:
+        thrown(InstantiationException)
+    }
+
+    void "a described constructor of a Kotlin nested class does not describe an enclosing instance"() {
+        when:
+        def introspection = buildBeanIntrospection('test.CustomerService$Nested', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+class CustomerService {
+    @Introspected(constructors = true)
+    class Nested(val name: String)
+}
+''')
+
+        then:
+        Argument.toClassArray(introspection.getConstructors()[0].arguments) ==
+            introspection.beanType.getDeclaredConstructors()[0].parameterTypes
+        introspection.getConstructors()[0].arguments.length == 1
+        introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+    }
+
+    void "a secondary constructor of a Kotlin inner class describes the enclosing instance"() {
+        when:
+        def introspection = buildBeanIntrospection('test.CustomerService$InnerClass', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+class CustomerService {
+    @Introspected(constructors = true)
+    inner class InnerClass(val name: String) {
+        constructor() : this("none")
+    }
+}
+''')
+
+        then: 'every described constructor carries the enclosing instance'
+        introspection.getConstructors().size() == 2
+        introspection.getConstructors()*.arguments*.length.toSorted() == [1, 2]
+        introspection.getConstructors().every { it.arguments[0].name == 'this$0' }
+
+        and: 'each matches its reflective counterpart'
+        introspection.beanType.getDeclaredConstructors().collect { it.parameterTypes.length }.toSorted() ==
+            introspection.getConstructors()*.arguments*.length.toSorted()
     }
 
     void "a data class describes its constructor"() {
