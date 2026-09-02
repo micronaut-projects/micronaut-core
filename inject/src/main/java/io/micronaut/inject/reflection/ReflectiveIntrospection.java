@@ -49,6 +49,7 @@ public interface ReflectiveIntrospection<T> extends BeanIntrospection<T> {
     /**
      * @return Every constructor of the type, {@link #getConstructor()} first
      */
+    @Override
     List<BeanConstructor<T>> getConstructors();
 
     /**
