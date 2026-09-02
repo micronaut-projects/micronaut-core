@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -311,6 +312,25 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @return This builder
          */
         Builder<B> annotationMetadata(@Nullable AnnotationMetadata annotationMetadata);
+
+        /**
+         * The disposer to run when an instance created by this definition is destroyed.
+         *
+         * <p>The disposer is invoked once per instance, after the
+         * {@link io.micronaut.context.event.BeanPreDestroyEventListener} instances and before the
+         * {@link io.micronaut.context.event.BeanDestroyedEventListener} instances, whenever the instance is destroyed
+         * by the {@link BeanContext}: when the {@link BeanRegistration} of a non-singleton is closed, when a singleton
+         * is destroyed through {@link BeanContext#destroyBean(Object)} or when the context itself is closed.</p>
+         *
+         * <p>A definition built with a disposer is a {@link io.micronaut.inject.DisposableBeanDefinition}; a
+         * definition built without one is not, so existing definitions keep their current behaviour.</p>
+         *
+         * @param disposer The disposer, receiving the bean context and the instance being destroyed, or {@code null}
+         *                 to clear a previously set disposer
+         * @return This builder
+         * @since 5.2.0
+         */
+        Builder<B> disposer(@Nullable BiConsumer<BeanContext, B> disposer);
 
         /**
          * Builds the runtime bean.

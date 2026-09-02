@@ -28,6 +28,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.qualifiers.ClosestTypeArgumentQualifier;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
@@ -44,17 +45,22 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
  * Default implementation of {@link RuntimeBeanDefinition<T>}.
+ *
+ * <p>A definition built with a disposer is a {@link Disposable}, which is the only subclass, so that a definition
+ * built without one is not a {@link DisposableBeanDefinition} and the context never has to dispose of it.</p>
+ *
  * @param <T> The bean type
  * @author graemerocher
  * @since 3.6.0
  */
 @Experimental
-final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditional implements RuntimeBeanDefinition<T> {
+sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditional implements RuntimeBeanDefinition<T> {
     private static final AtomicInteger REF_COUNT = new AtomicInteger(0);
     private static final String MSG_BEAN_TYPE_CANNOT_BE_NULL = "Bean type cannot be null";
     private final Argument<T> beanType;
@@ -233,6 +239,46 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     /**
+     * A runtime bean definition built with a disposer.
+     *
+     * <p>Only this subclass is a {@link DisposableBeanDefinition}: the context disposes of a bean only when its
+     * definition is one, so a definition built without a disposer keeps the behaviour it had before disposers
+     * existed. The disposer takes no {@link BeanResolutionContext} because a runtime built bean has no injection
+     * points or lifecycle advice of its own that a resolution context could carry into the disposal, so
+     * {@link #dispose(BeanContext, Object)} skips creating one.</p>
+     *
+     * @param <T> The bean type
+     * @since 5.2.0
+     */
+    static final class Disposable<T> extends DefaultRuntimeBeanDefinition<T> implements DisposableBeanDefinition<T> {
+        private final BiConsumer<BeanContext, T> disposer;
+
+        Disposable(Argument<T> beanType,
+                   Function<BeanResolutionContext, T> beanFactory,
+                   @Nullable Qualifier<T> qualifier,
+                   @Nullable AnnotationMetadata annotationMetadata,
+                   boolean isSingleton,
+                   @Nullable Class<? extends Annotation> scope,
+                   Class<?>[] exposedTypes,
+                   @Nullable Map<Class<?>, List<Argument<?>>> typeArguments,
+                   BiConsumer<BeanContext, T> disposer) {
+            super(beanType, beanFactory, qualifier, annotationMetadata, isSingleton, scope, exposedTypes, typeArguments);
+            this.disposer = Objects.requireNonNull(disposer, "Disposer cannot be null");
+        }
+
+        @Override
+        public T dispose(BeanContext context, T bean) {
+            disposer.accept(context, bean);
+            return bean;
+        }
+
+        @Override
+        public T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+            return dispose(context, bean);
+        }
+    }
+
+    /**
      * Implementation of {@link RuntimeBeanDefinition.Builder}.
      * @param <B> The bean
      */
@@ -251,6 +297,8 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         private Map<Class<?>, List<Argument<?>>> typeArguments;
         @Nullable
         private Class<? extends B> replacesType;
+        @Nullable
+        private BiConsumer<BeanContext, B> disposer;
 
         RuntimeBeanBuilder(Argument<B> beanType, Supplier<B> supplier) {
             this.beanType = Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
@@ -337,6 +385,12 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         }
 
         @Override
+        public Builder<B> disposer(@Nullable BiConsumer<BeanContext, B> disposer) {
+            this.disposer = disposer;
+            return this;
+        }
+
+        @Override
         public RuntimeBeanDefinition<B> build() {
             if (replacesType != null) {
                 MutableAnnotationMetadata mutableAnnotationMetadata;
@@ -355,6 +409,19 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
                     values.put("named", named.getName());
                 }
                 mutableAnnotationMetadata.addAnnotation(Replaces.class.getName(), values);
+            }
+            if (disposer != null) {
+                return new Disposable<>(
+                    beanType,
+                    beanFactory,
+                    qualifier,
+                    annotationMetadata,
+                    singleton,
+                    scope,
+                    exposedTypes,
+                    typeArguments,
+                    disposer
+                );
             }
             return new DefaultRuntimeBeanDefinition<>(
                 beanType,
