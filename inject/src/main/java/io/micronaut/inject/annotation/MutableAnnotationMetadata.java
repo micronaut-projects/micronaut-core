@@ -132,9 +132,6 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 hasPropertyExpressions,
                 hasEvaluatedExpressions
         );
-        if (stereotypesByAnnotation != null) {
-            cloned.stereotypesByAnnotation = cloneMapOfListValue(stereotypesByAnnotation);
-        }
         if (annotationDefaultValues != null) {
             cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
         }
@@ -386,26 +383,6 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     /**
-     * Retains the annotations composed by the given annotation, so that the association between a composing
-     * annotation occurrence and the annotation that introduced it survives the flattening of the annotation tree
-     * into the stereotype indexes. Only annotations meta-annotated with
-     * {@link io.micronaut.core.annotation.RetainStereotypes} are retained.
-     *
-     * @param annotation  The composing annotation name
-     * @param stereotypes The annotations it composes, with member overrides applied
-     * @since 5.2
-     */
-    public void addRetainedStereotypes(String annotation, List<AnnotationValue<?>> stereotypes) {
-        if (StringUtils.isEmpty(annotation) || CollectionUtils.isEmpty(stereotypes)) {
-            return;
-        }
-        if (stereotypesByAnnotation == null) {
-            stereotypesByAnnotation = new LinkedHashMap<>(2);
-        }
-        stereotypesByAnnotation.put(annotation, stereotypes);
-    }
-
-    /**
      * Adds a stereotype and its member values, if the annotation already exists the data will be merged with existing
      * values replaced.
      *
@@ -613,26 +590,25 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     @SuppressWarnings("java:S2259")
     private void putValues(String annotation, Map<CharSequence, Object> values, Map<String, Map<CharSequence, Object>> currentAnnotationValues) {
         Map<CharSequence, Object> existing = currentAnnotationValues.get(annotation);
-        boolean hasValues = CollectionUtils.isNotEmpty(values);
-        if (existing != null && hasValues) {
-            if (existing.isEmpty()) {
-                existing = new LinkedHashMap<>();
-                currentAnnotationValues.put(annotation, existing);
-            }
+        if (existing == null) {
+            currentAnnotationValues.put(annotation, copyAnnotationValues(values));
+        } else if (CollectionUtils.isNotEmpty(values)) {
             for (CharSequence key : values.keySet()) {
                 if (!existing.containsKey(key)) {
                     existing.put(key, values.get(key));
                 }
             }
-        } else {
-            if (!hasValues) {
-                existing = existing == null ? CollectionUtils.newLinkedHashMap(3) : existing;
-            } else {
-                existing = CollectionUtils.newLinkedHashMap(values.size());
-                existing.putAll(values);
-            }
-            currentAnnotationValues.put(annotation, existing);
         }
+    }
+
+    private static Map<CharSequence, Object> copyAnnotationValues(Map<CharSequence, Object> values) {
+        Map<CharSequence, Object> copy = CollectionUtils.newLinkedHashMap(Math.max(values.size(), 3));
+        copy.putAll(values);
+        List<AnnotationValue<?>> retainedStereotypes = AnnotationMetadataSupport.getRetainedStereotypes(values);
+        if (retainedStereotypes != null) {
+            return AnnotationMetadataSupport.withRetainedStereotypes(copy, retainedStereotypes);
+        }
+        return copy;
     }
 
     @SuppressWarnings("MagicNumber")
@@ -756,7 +732,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         if (defaultValues == null) {
             defaultValues = AnnotationMetadataSupport.getDefaultValuesOrNull(annotationType);
         }
-        List<AnnotationValue<?>> stereotypes = stereotypesByAnnotation == null ? null : stereotypesByAnnotation.get(annotationType);
+        List<AnnotationValue<?>> stereotypes = AnnotationMetadataSupport.getRetainedStereotypes(values);
         if (stereotypes == null) {
             return new AnnotationValue<>(annotationType, values, defaultValues);
         }
@@ -863,13 +839,6 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 annotationRepeatableContainer = new LinkedHashMap<>(annotationMetadata.annotationRepeatableContainer);
             } else {
                 annotationRepeatableContainer.putAll(annotationMetadata.annotationRepeatableContainer);
-            }
-        }
-        if (annotationMetadata.stereotypesByAnnotation != null) {
-            if (stereotypesByAnnotation == null) {
-                stereotypesByAnnotation = new LinkedHashMap<>(annotationMetadata.stereotypesByAnnotation);
-            } else {
-                stereotypesByAnnotation.putAll(annotationMetadata.stereotypesByAnnotation);
             }
         }
     }

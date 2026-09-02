@@ -1553,18 +1553,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             throw new IllegalStateException("Annotation should contain default values and an empty list " + annotationValue.getAnnotationName());
         }
 
-        if (AnnotationMetadataSupport.retainsStereotypes(annotationValue)) {
-            // The annotation opts into keeping the annotations it composes, so that the association between a
-            // composing annotation and the annotation that introduced it survives the flattening below
-            mutableAnnotationMetadata.addRetainedStereotypes(annotationName, AnnotationMetadataSupport.retainedStereotypesOf(annotationValue));
-        }
-
         String repeatableContainer = repeatableToContainer.get(annotationName);
         if (repeatableContainer == null) {
             repeatableContainer = AnnotationMetadataSupport.getCoreRepeatableAnnotationsContainers().get(annotationName);
         }
         if (repeatableContainer == null) {
             repeatableContainer = findRepeatableContainerNameForType(annotationName);
+        }
+        Map<CharSequence, Object> annotationValues = annotationValue.getValues();
+        if (repeatableContainer == null && AnnotationMetadataSupport.retainsStereotypes(annotationValue)) {
+            // Non-repeatable occurrences are stored as value maps. Keep the tree on that map so existing metadata
+            // copy and merge operations cannot separate it from the annotation values it belongs to.
+            annotationValues = AnnotationMetadataSupport.withRetainedStereotypes(
+                annotationValues,
+                AnnotationMetadataSupport.retainedStereotypesOf(annotationValue)
+            );
         }
         if (isStereotype) {
             if (repeatableContainer != null) {
@@ -1586,14 +1589,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     mutableAnnotationMetadata.addDeclaredStereotype(
                             parentAnnotations,
                             annotationValue.getAnnotationName(),
-                            annotationValue.getValues(),
+                            annotationValues,
                             annotationValue.getRetentionPolicy()
                     );
                 } else {
                     mutableAnnotationMetadata.addStereotype(
                             parentAnnotations,
                             annotationValue.getAnnotationName(),
-                            annotationValue.getValues(),
+                            annotationValues,
                             annotationValue.getRetentionPolicy()
                         );
                 }
@@ -1609,13 +1612,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 if (isDeclared) {
                     mutableAnnotationMetadata.addDeclaredAnnotation(
                             annotationValue.getAnnotationName(),
-                            annotationValue.getValues(),
+                            annotationValues,
                             annotationValue.getRetentionPolicy()
                     );
                 } else {
                     mutableAnnotationMetadata.addAnnotation(
                             annotationValue.getAnnotationName(),
-                            annotationValue.getValues(),
+                            annotationValues,
                             annotationValue.getRetentionPolicy()
                     );
                 }

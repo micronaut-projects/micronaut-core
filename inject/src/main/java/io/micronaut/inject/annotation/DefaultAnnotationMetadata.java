@@ -32,7 +32,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 
 import java.lang.annotation.Annotation;
-import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -78,9 +77,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, Map<CharSequence, Object>> allStereotypes;
     @Nullable
     Map<String, List<String>> annotationsByStereotype;
-    @Nullable
-    Map<String, List<AnnotationValue<?>>> stereotypesByAnnotation;
-
     private final Map<String, List> annotationValuesByType = new ConcurrentHashMap<>(2);
 
     private final boolean hasPropertyExpressions;
@@ -158,34 +154,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             @Nullable Map<String, List<String>> annotationsByStereotype,
             boolean hasPropertyExpressions,
             boolean hasEvaluatedExpressions) {
-        this(declaredAnnotations, declaredStereotypes, allStereotypes, allAnnotations, annotationsByStereotype, hasPropertyExpressions, hasEvaluatedExpressions, null);
-    }
-
-    /**
-     * This constructor is designed to be used by compile time produced subclasses.
-     *
-     * @param declaredAnnotations      The directly declared annotations
-     * @param declaredStereotypes      The directly declared stereotypes
-     * @param allStereotypes           All stereotypes
-     * @param allAnnotations           All annotations
-     * @param annotationsByStereotype  The annotations by stereotype
-     * @param hasPropertyExpressions   Whether property expressions exist in the metadata
-     * @param hasEvaluatedExpressions  Whether evaluated expressions exist in the metadata
-     * @param stereotypesByAnnotation  The annotations composed by an annotation, retained for annotations
-     *                                 meta-annotated with {@link io.micronaut.core.annotation.RetainStereotypes}
-     * @since 5.2
-     */
-    @Internal
-    @UsedByGeneratedCode
-    public DefaultAnnotationMetadata(
-            @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
-            @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
-            @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
-            @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
-            @Nullable Map<String, List<String>> annotationsByStereotype,
-            boolean hasPropertyExpressions,
-            boolean hasEvaluatedExpressions,
-            @Nullable Map<String, List<AnnotationValue<?>>> stereotypesByAnnotation) {
         this.declaredAnnotations = declaredAnnotations;
         this.declaredStereotypes = declaredStereotypes;
         this.allStereotypes = allStereotypes;
@@ -193,12 +161,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         this.annotationsByStereotype = annotationsByStereotype;
         this.hasPropertyExpressions = hasPropertyExpressions;
         this.hasEvaluatedExpressions = hasEvaluatedExpressions;
-        this.stereotypesByAnnotation = CollectionUtils.isEmpty(stereotypesByAnnotation) ? null : stereotypesByAnnotation;
     }
 
     @Override
     public AnnotationMetadata getDeclaredMetadata() {
-        DefaultAnnotationMetadata declaredMetadata = new DefaultAnnotationMetadata(
+        return new DefaultAnnotationMetadata(
                 this.declaredAnnotations,
                 this.declaredStereotypes,
                 null,
@@ -206,8 +173,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 annotationsByStereotype,
                 hasPropertyExpressions
         );
-        declaredMetadata.stereotypesByAnnotation = stereotypesByAnnotation;
-        return declaredMetadata;
     }
 
     @Override
@@ -1025,11 +990,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     protected <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
-        List<AnnotationValue<?>> stereotypes = stereotypesByAnnotation == null ? null : stereotypesByAnnotation.get(annotationType);
+        List<AnnotationValue<?>> stereotypes = AnnotationMetadataSupport.getRetainedStereotypes(values);
         if (stereotypes == null) {
             return new AnnotationValue<>(annotationType, values, AnnotationMetadataSupport.getDefaultValuesOrNull(annotationType));
         }
-        return new AnnotationValue<>(annotationType, values, AnnotationMetadataSupport.getDefaultValuesOrNull(annotationType), RetentionPolicy.RUNTIME, stereotypes);
+        return new AnnotationValue<>(annotationType, values, AnnotationMetadataSupport.ANNOTATION_DEFAULT_VALUES_PROVIDER, stereotypes);
     }
 
     @Override
@@ -1417,9 +1382,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 annotationsByStereotype != null ? cloneMapOfListValue(annotationsByStereotype) : null,
                 hasPropertyExpressions
         );
-        if (stereotypesByAnnotation != null) {
-            cloned.stereotypesByAnnotation = cloneMapOfListValue(stereotypesByAnnotation);
-        }
         return cloned;
     }
 
@@ -1436,6 +1398,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     protected final <K, V> Map<K, V> cloneMap(Map<K, V> map) {
+        List<AnnotationValue<?>> retainedStereotypes = AnnotationMetadataSupport.getRetainedStereotypes(map);
         Map<K, V> newMap;
         if (map instanceof LinkedHashMap<K, V> linkedHashMap) {
             newMap = (Map<K, V>) linkedHashMap.clone();
@@ -1448,7 +1411,14 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 entry.setValue((V) newValue);
             }
         }
-        return new HashMap<>(newMap);
+        Map<K, V> cloned = new HashMap<>(newMap);
+        if (retainedStereotypes != null) {
+            return (Map<K, V>) AnnotationMetadataSupport.withRetainedStereotypes(
+                (Map<CharSequence, Object>) cloned,
+                retainedStereotypes
+            );
+        }
+        return cloned;
     }
 
     /**

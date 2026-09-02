@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2025 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,14 +22,15 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * <p>Retains the annotations composed by the annotated annotation in the {@link AnnotationMetadata} of every
- * element the annotation is applied to, instead of flattening them into the element's stereotypes.</p>
+ * <p>Retains the annotations composed by the annotated annotation on its {@link AnnotationValue} in the
+ * {@link AnnotationMetadata} of every element the annotation is applied to, in addition to flattening them into the
+ * element's stereotypes.</p>
  *
  * <p>{@link AnnotationMetadata} normally indexes stereotypes by name, which loses the association between an
  * individual stereotype occurrence and the annotation that introduced it: two annotations that each compose a
  * repeatable annotation contribute two indistinguishable occurrences. When this annotation is present — directly
- * or through the annotated annotation's own stereotypes — the composing annotations are kept as a tree under the
- * composing annotation instead, with member overrides declared through
+ * or through the annotated annotation's own stereotypes — the composing annotations are also kept as a tree under
+ * the composing annotation, with member overrides declared through
  * {@code io.micronaut.context.annotation.AliasFor} already applied, and are read back with
  * {@link AnnotationValue#getStereotypes()}:</p>
  *
@@ -48,7 +49,7 @@ import java.lang.annotation.Target;
  * <p>Retention costs generated code proportional to the size of the composition tree at every use site, so it is
  * opt-in and has no cost for annotations that do not declare it.</p>
  *
- * @since 5.2
+ * @since 5.2.0
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)

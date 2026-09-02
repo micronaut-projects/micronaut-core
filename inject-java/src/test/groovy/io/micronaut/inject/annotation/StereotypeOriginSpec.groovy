@@ -198,6 +198,95 @@ class Test {
                 .collect { it.getValues() } == [[min: 3]]
     }
 
+    @Unroll
+    void "written retained trees exclude #retention-retention annotations"() {
+        given:
+        def packageName = "retentionspec${retention.toLowerCase()}"
+        def annotationMetadata = writeAndLoadMetadata("${packageName}.Test", buildTypeAnnotationMetadata("""
+package ${packageName};
+
+import io.micronaut.core.annotation.RetainStereotypes;
+import java.lang.annotation.*;
+
+@Retaining
+class Test {
+}
+
+@RetainStereotypes
+@RuntimeStereotype
+@NotRuntime
+@Retention(RetentionPolicy.RUNTIME)
+@interface Retaining {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface RuntimeStereotype {
+}
+
+@Retention(RetentionPolicy.${retention})
+@interface NotRuntime {
+}
+"""))
+
+        expect:
+        annotationMetadata.getAnnotation("${packageName}.Retaining").getStereotypes()*.annotationName as Set ==
+                ["${packageName}.RuntimeStereotype"] as Set
+
+        where:
+        retention << ["SOURCE", "CLASS"]
+    }
+
+    @Unroll
+    void "retained stereotypes survive #operation"() {
+        when:
+        def result = transform(metadata(true))
+
+        then:
+        sizeOf(result.getAnnotation("originspec.ComposedA")) == [[min: 3]]
+        sizeOf(result.getAnnotation("originspec.ComposedB")) == [[max: 9]]
+
+        where:
+        operation                       | transform
+        "conversion to mutable metadata" | { MutableAnnotationMetadata.of(it) }
+        "mutable metadata cloning"       | { MutableAnnotationMetadata.of(it).clone() }
+        "default metadata cloning"       | { it.clone() }
+    }
+
+    @Unroll
+    void "merging a #kind hierarchy keeps the retained tree from the overriding metadata"() {
+        given:
+        def parent = buildTypeAnnotationMetadata("""
+package hierarchyspec;
+${IMPORTS}
+@ComposedA(min = 4)
+class Parent {
+}
+${COMPOSED}
+""")
+        def child = buildTypeAnnotationMetadata("""
+package hierarchyspec;
+${IMPORTS}
+@ComposedA(min = 3)
+class Child {
+}
+${COMPOSED}
+""")
+        if (kind == "written") {
+            parent = writeAndLoadMetadata("hierarchyspec.Parent", parent)
+            child = writeAndLoadMetadata("hierarchyspec.Child", child)
+        }
+
+        when:
+        def merged = new AnnotationMetadataHierarchy(parent, child).merge()
+
+        then:
+        merged.getAnnotation("hierarchyspec.ComposedA").getValues() == [min: 3]
+        sizeOf(merged.getAnnotation("hierarchyspec.ComposedA")) == [[min: 3]]
+
+        where:
+        kind << ["compiled", "written"]
+    }
+
     void "a repeated composed annotation attributes each of its own occurrences"() {
         given:
         def annotationMetadata = writeAndLoadMetadata('repeatspec.Test', buildTypeAnnotationMetadata('''

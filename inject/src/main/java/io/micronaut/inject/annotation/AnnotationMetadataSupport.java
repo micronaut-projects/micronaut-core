@@ -77,6 +77,7 @@ import jakarta.inject.Qualifier;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
 
+import java.io.Serial;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
@@ -645,7 +646,7 @@ public final class AnnotationMetadataSupport {
      *
      * @param annotationValue The annotation value
      * @return Whether the composed annotations should be retained
-     * @since 5.2
+     * @since 5.2.0
      */
     @Internal
     public static boolean retainsStereotypes(@Nullable AnnotationValue<?> annotationValue) {
@@ -670,7 +671,7 @@ public final class AnnotationMetadataSupport {
      *
      * @param annotationValue The annotation value
      * @return The composed annotations, never {@code null}
-     * @since 5.2
+     * @since 5.2.0
      */
     @Internal
     public static List<AnnotationValue<?>> retainedStereotypesOf(AnnotationValue<?> annotationValue) {
@@ -685,6 +686,46 @@ public final class AnnotationMetadataSupport {
             }
         }
         return retained;
+    }
+
+    /**
+     * Associates an annotation's values with the stereotypes retained for that annotation occurrence.
+     *
+     * @param values The annotation values
+     * @param stereotypes The retained stereotypes
+     * @return The annotation values carrying the retained stereotypes
+     * @since 5.2.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    public static Map<CharSequence, Object> withRetainedStereotypes(Map<CharSequence, Object> values,
+                                                                    List<AnnotationValue<?>> stereotypes) {
+        if (stereotypes.isEmpty()) {
+            return values;
+        }
+        return new AnnotationValuesWithStereotypes(values, stereotypes);
+    }
+
+    @Nullable
+    static List<AnnotationValue<?>> getRetainedStereotypes(Map<?, ?> values) {
+        if (values instanceof AnnotationValuesWithStereotypes annotationValues) {
+            return annotationValues.stereotypes;
+        }
+        return null;
+    }
+
+    private static final class AnnotationValuesWithStereotypes extends LinkedHashMap<CharSequence, Object> {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
+
+        private final List<AnnotationValue<?>> stereotypes;
+
+        private AnnotationValuesWithStereotypes(Map<CharSequence, Object> values,
+                                                List<AnnotationValue<?>> stereotypes) {
+            super(values);
+            this.stereotypes = List.copyOf(stereotypes);
+        }
     }
 
 }

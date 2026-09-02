@@ -139,7 +139,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param defaultValuesProvider The default values provider
      * @param stereotypes           The annotations composed by this annotation, retained because the annotation is
      *                              meta-annotated with {@link RetainStereotypes}
-     * @since 5.2
+     * @since 5.2.0
      */
     @UsedByGeneratedCode
     @Internal

@@ -35,11 +35,11 @@ import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 
 import javax.lang.model.element.Modifier;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -107,18 +107,6 @@ public final class AnnotationMetadataGenUtils {
         boolean.class
     );
 
-    private static final Constructor<?> CONSTRUCTOR_ANNOTATION_METADATA_WITH_RETAINED_STEREOTYPES = ReflectionUtils.getRequiredInternalConstructor(
-        DefaultAnnotationMetadata.class,
-        Map.class,
-        Map.class,
-        Map.class,
-        Map.class,
-        Map.class,
-        boolean.class,
-        boolean.class,
-        Map.class
-    );
-
     private static final Constructor<?> CONSTRUCTOR_ANNOTATION_METADATA_HIERARCHY = ReflectionUtils.getRequiredInternalConstructor(
         AnnotationMetadataHierarchy.class,
         AnnotationMetadata[].class
@@ -162,6 +150,13 @@ public final class AnnotationMetadataGenUtils {
     private static final Field ANNOTATION_DEFAULT_VALUES_PROVIDER = ReflectionUtils.getRequiredField(
         AnnotationMetadataSupport.class,
         "ANNOTATION_DEFAULT_VALUES_PROVIDER"
+    );
+
+    private static final Method METHOD_WITH_RETAINED_STEREOTYPES = ReflectionUtils.getRequiredInternalMethod(
+        AnnotationMetadataSupport.class,
+        "withRetainedStereotypes",
+        Map.class,
+        List.class
     );
 
     private AnnotationMetadataGenUtils() {
@@ -450,10 +445,8 @@ public final class AnnotationMetadataGenUtils {
                 annotationsByStereotype.remove(sourceRetentionAnnotation);
             }
         }
-        Map<String, List<AnnotationValue<?>>> stereotypesByAnnotation = annotationMetadata.stereotypesByAnnotation;
-        List<ExpressionDef> arguments = new ArrayList<>(8);
-        Collections.addAll(
-            arguments,
+        return TYPE_DEFAULT_ANNOTATION_METADATA.instantiate(
+            CONSTRUCTOR_ANNOTATION_METADATA,
             // 1st argument: the declared annotations
             pushCreateAnnotationData(annotationMetadata.declaredAnnotations, annotationMetadata.getSourceRetentionAnnotations(), loadClassValueExpressionFn),
             // 2nd argument: the declared stereotypes
@@ -469,14 +462,6 @@ public final class AnnotationMetadataGenUtils {
             // 7th argument: has evaluated expressions
             ExpressionDef.constant(annotationMetadata.hasEvaluatedExpressions())
         );
-        if (CollectionUtils.isEmpty(stereotypesByAnnotation)) {
-            // Nothing opted into retaining the annotations it composes, so the metadata is written exactly as before
-            return TYPE_DEFAULT_ANNOTATION_METADATA.instantiate(CONSTRUCTOR_ANNOTATION_METADATA, arguments);
-        }
-        // 8th argument: the annotations composed by an annotation that retains them
-        arguments.add(GenUtils.stringMapOf(stereotypesByAnnotation, false, Collections.emptyList(),
-            stereotypes -> retainedStereotypesOf(stereotypes, loadClassValueExpressionFn)));
-        return TYPE_DEFAULT_ANNOTATION_METADATA.instantiate(CONSTRUCTOR_ANNOTATION_METADATA_WITH_RETAINED_STEREOTYPES, arguments);
     }
 
     private static ExpressionDef pushCreateAnnotationData(Map<String, Map<CharSequence, Object>> annotationData,
@@ -490,8 +475,26 @@ public final class AnnotationMetadataGenUtils {
         }
 
         return GenUtils.stringMapOf(annotationData, false, Collections.emptyMap(),
-            attributes -> GenUtils.stringMapOf(attributes, true, null,
-                value -> asValueExpression(value, loadClassValueExpressionFn)));
+            attributes -> pushCreateAnnotationValues(attributes, loadClassValueExpressionFn));
+    }
+
+    private static ExpressionDef pushCreateAnnotationValues(Map<CharSequence, Object> attributes,
+                                                            Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        ExpressionDef values = GenUtils.stringMapOf(attributes, true, null,
+            value -> asValueExpression(value, loadClassValueExpressionFn));
+        List<AnnotationValue<?>> stereotypes = AnnotationMetadataSupport.getRetainedStereotypes(attributes);
+        if (stereotypes == null) {
+            return values;
+        }
+        stereotypes = runtimeRetainedStereotypes(stereotypes);
+        if (stereotypes.isEmpty()) {
+            return values;
+        }
+        return ClassTypeDef.of(AnnotationMetadataSupport.class).invokeStatic(
+            METHOD_WITH_RETAINED_STEREOTYPES,
+            values,
+            retainedStereotypesOf(stereotypes, loadClassValueExpressionFn)
+        );
     }
 
     private static ExpressionDef asValueExpression(Object value,
@@ -547,14 +550,19 @@ public final class AnnotationMetadataGenUtils {
         }
         if (value instanceof AnnotationValue<?> data) {
             if (AnnotationMetadataSupport.retainsStereotypes(data)) {
-                return ClassTypeDef.of(AnnotationValue.class)
-                    .instantiate(
-                        CONSTRUCTOR_ANNOTATION_VALUE_AND_STEREOTYPES,
-                        ExpressionDef.constant(data.getAnnotationName()),
-                        stringMapOf(data.getValues(), loadClassValueExpressionFn),
-                        ClassTypeDef.of(AnnotationMetadataSupport.class).getStaticField(ANNOTATION_DEFAULT_VALUES_PROVIDER),
-                        retainedStereotypesOf(AnnotationMetadataSupport.retainedStereotypesOf(data), loadClassValueExpressionFn)
-                    );
+                List<AnnotationValue<?>> stereotypes = runtimeRetainedStereotypes(
+                    AnnotationMetadataSupport.retainedStereotypesOf(data)
+                );
+                if (!stereotypes.isEmpty()) {
+                    return ClassTypeDef.of(AnnotationValue.class)
+                        .instantiate(
+                            CONSTRUCTOR_ANNOTATION_VALUE_AND_STEREOTYPES,
+                            ExpressionDef.constant(data.getAnnotationName()),
+                            stringMapOf(data.getValues(), loadClassValueExpressionFn),
+                            ClassTypeDef.of(AnnotationMetadataSupport.class).getStaticField(ANNOTATION_DEFAULT_VALUES_PROVIDER),
+                            retainedStereotypesOf(stereotypes, loadClassValueExpressionFn)
+                        );
+                }
             }
             return ClassTypeDef.of(AnnotationValue.class)
                 .instantiate(
@@ -582,12 +590,15 @@ public final class AnnotationMetadataGenUtils {
 
     private static ExpressionDef retainedStereotypesOf(List<AnnotationValue<?>> stereotypes,
                                                       Function<String, ExpressionDef> loadClassValueExpressionFn) {
-        if (stereotypes == null || stereotypes.isEmpty()) {
-            return GenUtils.listOf(List.of());
-        }
         return GenUtils.listOf(stereotypes.stream()
             .map(stereotype -> asValueExpression(stereotype, loadClassValueExpressionFn))
             .toList());
+    }
+
+    private static List<AnnotationValue<?>> runtimeRetainedStereotypes(List<AnnotationValue<?>> stereotypes) {
+        return stereotypes.stream()
+            .filter(stereotype -> stereotype.getRetentionPolicy() == RetentionPolicy.RUNTIME)
+            .toList();
     }
 
     private static <T> ExpressionDef stringMapOf(Map<? extends CharSequence, T> annotationData,
