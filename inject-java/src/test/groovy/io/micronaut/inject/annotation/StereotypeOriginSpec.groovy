@@ -3,6 +3,7 @@ package io.micronaut.inject.annotation
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
+import spock.lang.PendingFeature
 import spock.lang.Unroll
 
 /**
@@ -137,19 +138,17 @@ class Test {
     }
 
     /**
-     * {@code applyIntroducedAliases} rewrites the members of an intermediate annotation after that annotation's
-     * own subtree has been computed, and does not re-run down the tree. So {@code @Outer(shortest = 3)},
-     * overriding {@code Inner.min}, which itself overrides {@code Size.min}, reaches {@code @Inner(min = 3)} but
-     * leaves {@code @Size(min = 1)}.
+     * An overridden member may itself alias a member of an annotation the occurrence composes, and the
+     * occurrence's subtree was computed from the values it had before the override, so the override has to
+     * cascade: {@code @Outer(shortest = 3)} overriding {@code Inner.min}, which itself overrides
+     * {@code Size.min}, must reach {@code @Size(min = 3)} and not stop at {@code @Inner(min = 3)}.
      *
-     * <p>The tree and the flat index agree on the same wrong value, so the tree does not introduce this — but it
-     * blocks the motivating consumer. {@code micronaut-validation} cascades today: its
-     * {@code DefaultConstraintDescriptor} builds each composing descriptor from the already-overridden
-     * {@code AnnotationValue} of its parent, which re-applies {@code @OverridesAttribute} one level down, and the
-     * constraint-composition tests in the Jakarta Validation TCK cover that. Reading composing values off the
-     * tree instead of reflecting over the annotation types would silently regress it.</p>
+     * <p>This is what {@code micronaut-validation} does today, by building each composing descriptor from the
+     * already-overridden {@code AnnotationValue} of its parent and re-applying {@code @OverridesAttribute} one
+     * level down; the constraint-composition tests in the Jakarta Validation TCK cover it. Reading composing
+     * values off the tree instead of reflecting over the annotation types must not regress it.</p>
      *
-     * <p>Both views are asserted so that a fix moves them together.</p>
+     * <p>Both views are asserted, because the flat index took the same uncascaded value.</p>
      */
     void "a transitive override cascades to what the intermediate annotation composes"() {
         given:
@@ -170,6 +169,125 @@ class Test {
         and: "the flat index agrees"
         annotationMetadata.getAnnotationValuesByName("jakarta.validation.constraints.Size")
                 .collect { it.getValues() } == [[min: 3]]
+    }
+
+    /**
+     * The cascade stops after one intermediate level. For {@code @A(shortest = 7)} over
+     * {@code @B} over {@code @C} over {@code @Size}, the override reaches {@code @B(min = 7)} and
+     * {@code @C(min = 7)}, but {@code @Size} keeps the value it was computed with, {@code min = 1}.
+     *
+     * <p>{@code overrideMembers} overrides the occurrence's members first and only then re-applies its aliases,
+     * and the members of {@code @C} <em>are</em> overridden while its aliases are not re-applied — so the
+     * recursion is not stopping on the empty-subtree guard, which leaves {@code processAliases} returning early
+     * because the annotation type is null. The first level gets a {@code ProcessedAnnotation} straight out of
+     * the declared stereotype list, with its type; every level below is rebuilt by
+     * {@code toProcessedAnnotation}, which resolves the type by name through {@code getAnnotationMirror} and
+     * yields null when that lookup does not resolve.</p>
+     *
+     * <p>Two levels is not exotic for the motivating consumer: a composed constraint composing another composed
+     * constraint is ordinary, and {@code micronaut-validation} cascades to any depth today because each
+     * composing descriptor re-applies {@code @OverridesAttribute} from its own already-overridden value.</p>
+     */
+    @PendingFeature(reason = "the cascade re-applies aliases only one level below the overridden occurrence")
+    void "a transitive override cascades through more than one intermediate annotation"() {
+        given:
+        def annotationMetadata = writeAndLoadMetadata('deepspec.Test', buildTypeAnnotationMetadata('''
+package deepspec;
+
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.annotation.RetainStereotypes;
+import jakarta.validation.constraints.Size;
+import java.lang.annotation.*;
+
+@A(shortest = 7)
+class Test {
+}
+
+@RetainStereotypes
+@B(min = 1)
+@Retention(RetentionPolicy.RUNTIME)
+@interface A {
+    @AliasFor(annotationName = "deepspec.B", member = "min", applyDefault = true)
+    int shortest() default 1;
+}
+
+@RetainStereotypes
+@C(min = 2)
+@Retention(RetentionPolicy.RUNTIME)
+@interface B {
+    @AliasFor(annotationName = "deepspec.C", member = "min", applyDefault = true)
+    int min() default 2;
+}
+
+@RetainStereotypes
+@Size(min = 3)
+@Retention(RetentionPolicy.RUNTIME)
+@interface C {
+    @AliasFor(annotation = Size.class, member = "min", applyDefault = true)
+    int min() default 3;
+}
+'''))
+
+        when:
+        def b = annotationMetadata.getAnnotation("deepspec.A").getStereotypes()
+                .find { it.getAnnotationName() == "deepspec.B" }
+        def c = b.getStereotypes().find { it.getAnnotationName() == "deepspec.C" }
+
+        then: "the override reaches every level, not just the first"
+        b.getValues() == [min: 7]
+        c.getValues() == [min: 7]
+
+        and: "including the leaf three levels down"
+        c.getStereotypes()
+                .findAll { it.getAnnotationName() == "jakarta.validation.constraints.Size" }
+                .collect { it.getValues() } == [[min: 7]]
+
+        and: "the flat index agrees"
+        annotationMetadata.getAnnotationValuesByName("jakarta.validation.constraints.Size")
+                .collect { it.getValues() } == [[min: 7]]
+    }
+
+    /**
+     * The cascade lives in {@code applyIntroducedAliases}, which runs for every annotation the builder
+     * processes, so it is not a retention feature: an uncascaded override was reported by the flat index of
+     * annotations that retain nothing, and every existing {@code @AliasFor} user sees this change. Pinned
+     * separately so a regression here is not read as a retention regression.
+     */
+    void "the cascade is not tied to retention"() {
+        given: "no annotation opts in, so nothing is retained and only the flat index exists"
+        def annotationMetadata = writeAndLoadMetadata('plaincascadespec.Test', buildTypeAnnotationMetadata('''
+package plaincascadespec;
+
+import io.micronaut.context.annotation.AliasFor;
+import jakarta.validation.constraints.Size;
+import java.lang.annotation.*;
+
+@Outer(shortest = 4)
+class Test {
+}
+
+@Inner(min = 1)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Outer {
+    @AliasFor(annotationName = "plaincascadespec.Inner", member = "min", applyDefault = true)
+    int shortest() default 1;
+}
+
+@Size(min = 2)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Inner {
+    @AliasFor(annotation = Size.class, member = "min", applyDefault = true)
+    int min() default 2;
+}
+'''))
+
+        expect: "nothing is retained"
+        annotationMetadata.getAnnotation("plaincascadespec.Outer").getStereotypes() == null
+
+        and: "and the flat index still takes the cascaded value"
+        annotationMetadata.getAnnotation("plaincascadespec.Inner").getValues() == [min: 4]
+        annotationMetadata.getAnnotationValuesByName("jakarta.validation.constraints.Size")
+                .collect { it.getValues() } == [[min: 4]]
     }
 
     void "the marker opts in transitively, so a meta-annotation can opt a whole family in"() {
