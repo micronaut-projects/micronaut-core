@@ -315,7 +315,7 @@ public class Qualifiers {
         if (instance != null) {
             return instance;
         }
-        return new AnnotationStereotypeQualifier<>(stereotype.getName());
+        return new AnnotationStereotypeQualifier<>(stereotype);
     }
 
     /**
