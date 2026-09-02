@@ -6,7 +6,7 @@ import io.micronaut.inject.BeanDefinition
 
 /**
  * A lifecycle interceptor sees the real {@code @PostConstruct} and {@code @PreDestroy} callbacks of the target
- * through {@link io.micronaut.aop.MethodInvocationContext#getLifecycleCallbacks()}.
+ * through {@link io.micronaut.aop.MethodInvocationContext#getExecutableMethods()}.
  *
  * The callbacks are compiled in as reflection-free executable methods, but only for a bean that intercepts the
  * phase, and they never become executable methods of the bean, so processors and adapters do not observe them.
@@ -43,7 +43,7 @@ class TrackingInterceptor implements MethodInterceptor<Object, Object> {
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
-        List<ExecutableMethod<Object, ?>> callbacks = ctx.getLifecycleCallbacks();
+        List<ExecutableMethod<Object, ?>> callbacks = ctx.getExecutableMethods();
         callbackCount = callbacks.size();
         seen = callbacks.get(0);
         seen.invoke(ctx.getTarget());
@@ -67,6 +67,11 @@ class MyBean {
     String work() {
         return "done";
     }
+
+    @Executable String work2() { return "done"; }
+    @Executable String work3() { return "done"; }
+    @Executable String work4() { return "done"; }
+    @Executable String work5() { return "done"; }
 }
 ''')
         Class<?> interceptorType = context.classLoader.loadClass('callbacks.postconstruct.TrackingInterceptor')
@@ -91,7 +96,9 @@ class MyBean {
         bean.inits == 2
 
         and: 'the callback is not an executable method of the bean'
-        definition.executableMethods*.methodName == ['work']
+        definition.executableMethods*.methodName == ['work', 'work2', 'work3', 'work4', 'work5']
+        definition.findMethod('init').empty
+        definition.findPossibleMethods('init').findAny().empty
         definition.postConstructExecutableMethods*.methodName == ['init']
         definition.preDestroyExecutableMethods.empty
         definition.postConstructMethods*.name == ['init']
@@ -127,7 +134,7 @@ class TrackingInterceptor implements MethodInterceptor<Object, Object> {
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
         kind = ctx.getKind();
-        seen = ctx.getLifecycleCallbacks().get(0);
+        seen = ctx.getExecutableMethods().get(0);
         seen.invoke(ctx.getTarget());
         return ctx.proceed();
     }
@@ -158,6 +165,8 @@ class MyBean {
         then:
         bean.destroys == 0
         definition.executableMethods.empty
+        definition.findMethod('close').empty
+        definition.findPossibleMethods('close').findAny().empty
         definition.postConstructExecutableMethods.empty
         definition.preDestroyExecutableMethods*.methodName == ['close']
 
@@ -205,7 +214,7 @@ class TrackingInterceptor implements MethodInterceptor<Object, Object> {
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
-        List<ExecutableMethod<Object, ?>> callbacks = ctx.getLifecycleCallbacks();
+        List<ExecutableMethod<Object, ?>> callbacks = ctx.getExecutableMethods();
         names = new ArrayList<>();
         declaringTypes = new ArrayList<>();
         for (ExecutableMethod<Object, ?> callback : callbacks) {
@@ -275,7 +284,7 @@ class TrackingInterceptor implements MethodInterceptor<Object, Object> {
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
         intercepted++;
-        callbackCount = ctx.getLifecycleCallbacks().size();
+        callbackCount = ctx.getExecutableMethods().size();
         return ctx.proceed();
     }
 }
@@ -379,7 +388,7 @@ class TrackingInterceptor implements MethodInterceptor<Object, Object> {
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
         names = new ArrayList<>();
-        for (ExecutableMethod<Object, ?> callback : ctx.getLifecycleCallbacks()) {
+        for (ExecutableMethod<Object, ?> callback : ctx.getExecutableMethods()) {
             names.add(callback.getMethodName());
             callback.invoke(ctx.getTarget());
         }
@@ -445,7 +454,7 @@ class TrackingInterceptor implements MethodInterceptor<Object, Object> {
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
         declaringTypes = new ArrayList<>();
-        for (ExecutableMethod<Object, ?> callback : ctx.getLifecycleCallbacks()) {
+        for (ExecutableMethod<Object, ?> callback : ctx.getExecutableMethods()) {
             declaringTypes.add(callback.getDeclaringType());
             callback.invoke(ctx.getTarget());
         }
@@ -486,7 +495,83 @@ class Sub extends Base {
         context.close()
     }
 
-    void 'test the callbacks of a proxied bean are exposed to lifecycle advice only'() {
+    void 'test package private callbacks with the same signature in different packages are distinct'() {
+        given:
+        JavaFiles files = new JavaFiles()
+            .add('callbacks.packagebase.Base', '''
+package callbacks.packagebase;
+
+import jakarta.annotation.PostConstruct;
+import java.util.*;
+
+public class Base {
+    public final List<String> invoked = new ArrayList<>();
+
+    @PostConstruct
+    void init() {
+        invoked.add("Base.init");
+    }
+}
+''')
+            .add('callbacks.packagechild.Sub', '''
+package callbacks.packagechild;
+
+import callbacks.packagebase.Base;
+import io.micronaut.aop.*;
+import io.micronaut.inject.ExecutableMethod;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@interface Tracked {
+}
+
+@Singleton
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.POST_CONSTRUCT)
+class TrackingInterceptor implements MethodInterceptor<Object, Object> {
+    static List<Class<?>> declaringTypes;
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> ctx) {
+        declaringTypes = new ArrayList<>();
+        for (ExecutableMethod<Object, ?> callback : ctx.getExecutableMethods()) {
+            declaringTypes.add(callback.getDeclaringType());
+            callback.invoke(ctx.getTarget());
+        }
+        return ctx.proceed();
+    }
+}
+
+@Singleton
+@Tracked
+public class Sub extends Base {
+    @PostConstruct
+    void init() {
+        invoked.add("Sub.init");
+    }
+}
+''')
+        ApplicationContext context = buildContext(files)
+        Class<?> interceptorType = context.classLoader.loadClass('callbacks.packagechild.TrackingInterceptor')
+        Class<?> baseType = context.classLoader.loadClass('callbacks.packagebase.Base')
+        Class<?> subType = context.classLoader.loadClass('callbacks.packagechild.Sub')
+
+        when:
+        def bean = context.getBean(subType)
+
+        then:
+        interceptorType.declaringTypes == [baseType, subType]
+        bean.invoked == ['Base.init', 'Sub.init', 'Base.init', 'Sub.init']
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test executable methods represented by regular and lifecycle advice are exposed'() {
         given:
         ApplicationContext context = buildContext('''
 package callbacks.proxied;
@@ -509,15 +594,15 @@ import java.util.*;
 @InterceptorBinding(value = Tracked.class, kind = InterceptorKind.AROUND)
 @InterceptorBinding(value = Tracked.class, kind = InterceptorKind.POST_CONSTRUCT)
 class TrackingInterceptor implements MethodInterceptor<Object, Object> {
-    static final Map<String, List<String>> CALLBACKS = new LinkedHashMap<>();
+    static final Map<String, List<String>> METHODS = new LinkedHashMap<>();
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
         List<String> names = new ArrayList<>();
-        for (ExecutableMethod<Object, ?> callback : ctx.getLifecycleCallbacks()) {
+        for (ExecutableMethod<Object, ?> callback : ctx.getExecutableMethods()) {
             names.add(callback.getMethodName());
         }
-        CALLBACKS.put(ctx.getKind().name(), names);
+        METHODS.put(ctx.getKind().name(), names);
         return ctx.proceed();
     }
 }
@@ -548,7 +633,7 @@ class MyBean {
         then:
         bean instanceof io.micronaut.aop.Intercepted
         bean.inits == 1
-        interceptorType.CALLBACKS == [POST_CONSTRUCT: ['init'], AROUND: []]
+        interceptorType.METHODS == [POST_CONSTRUCT: ['init'], AROUND: ['work']]
         definition.executableMethods*.methodName == ['work']
         definition.postConstructExecutableMethods*.methodName == ['init']
 

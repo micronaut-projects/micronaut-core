@@ -238,7 +238,7 @@ abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>,
     @Override
     public Method getTargetMethod() {
         if (method == null) {
-            List<ExecutableMethod<T, ?>> callbacks = getLifecycleCallbacks();
+            List<ExecutableMethod<T, ?>> callbacks = getExecutableMethods();
             Method resolvedMethod;
             if (callbacks.isEmpty()) {
                 resolvedMethod = ReflectionUtils.getRequiredMethod(declaringType, methodName, argTypes);

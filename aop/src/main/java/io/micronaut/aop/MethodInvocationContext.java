@@ -37,24 +37,24 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
     ExecutableMethod<T, R> getExecutableMethod();
 
     /**
-     * The lifecycle callbacks of the target that this interception stands for, as reflection-free
-     * {@link ExecutableMethod} instances.
+     * The concrete executable methods represented by this invocation.
      *
-     * <p>For a {@link InterceptorKind#POST_CONSTRUCT} interception these are the {@code @PostConstruct} methods of
-     * the target bean, and for a {@link InterceptorKind#PRE_DESTROY} interception its {@code @PreDestroy} methods,
-     * in the order {@link #proceed()} invokes them, superclass callbacks first. The list identifies what
-     * {@link #proceed()} is about to run: {@link #getExecutableMethod()} describes the phase, not a method of the
-     * bean, so it is what interceptor bindings are resolved from and stays as it is.</p>
+     * <p>For ordinary method interception, the list contains {@link #getExecutableMethod()}. A lifecycle
+     * interception represents a whole phase and can therefore contain more than one method: for
+     * {@link InterceptorKind#POST_CONSTRUCT} these are the {@code @PostConstruct} methods of the target bean, and
+     * for {@link InterceptorKind#PRE_DESTROY} its {@code @PreDestroy} methods, in the order {@link #proceed()}
+     * invokes them, superclass callbacks first. In that case {@link #getExecutableMethod()} continues to describe
+     * the phase from which interceptor bindings are resolved.</p>
      *
-     * <p>A callback is invoked, when needed, through {@link ExecutableMethod#invoke(Object, Object...)} on
-     * {@link #getTarget()}. A bean without callbacks of the intercepted kind yields an empty list, as does a bean
-     * compiled by an earlier version of the framework and any other interception kind.</p>
+     * <p>An executable method can be invoked, when needed, through
+     * {@link ExecutableMethod#invoke(Object, Object...)} on {@link #getTarget()}. A lifecycle phase without known
+     * callback methods yields an empty list, including for a bean compiled by an earlier version of the framework.</p>
      *
-     * @return The lifecycle callbacks of the target, or an empty list
+     * @return The executable methods represented by this invocation
      * @since 5.2.0
      */
-    default List<ExecutableMethod<T, ?>> getLifecycleCallbacks() {
-        return List.of();
+    default List<ExecutableMethod<T, ?>> getExecutableMethods() {
+        return List.of(getExecutableMethod());
     }
 
     @Override

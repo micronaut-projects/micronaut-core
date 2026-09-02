@@ -186,7 +186,10 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
     @Override
     public <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name) {
+        int[] postConstructIndexes = getPostConstructMethodIndexes();
+        int[] preDestroyIndexes = getPreDestroyMethodIndexes();
         return IntStream.range(0, methodsReferences.length)
+                .filter(i -> !contains(postConstructIndexes, i) && !contains(preDestroyIndexes, i))
                 .filter(i -> methodsReferences[i].methodName.equals(name))
                 .mapToObj(this::getExecutableMethodByIndex);
     }
@@ -227,9 +230,13 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     @UsedByGeneratedCode
     @Nullable
     protected <R> ExecutableMethod<T, R> getMethod(String name, Class<?>... argumentTypes) {
+        int[] postConstructIndexes = getPostConstructMethodIndexes();
+        int[] preDestroyIndexes = getPreDestroyMethodIndexes();
         for (int i = 0; i < methodsReferences.length; i++) {
             MethodReference methodReference = methodsReferences[i];
-            if (methodReference.methodName.equals(name)
+            if (!contains(postConstructIndexes, i)
+                    && !contains(preDestroyIndexes, i)
+                    && methodReference.methodName.equals(name)
                     && methodReference.arguments.length == argumentTypes.length
                     && argumentsTypesMatch(argumentTypes, methodReference.arguments)) {
                 return getExecutableMethodByIndex(i);

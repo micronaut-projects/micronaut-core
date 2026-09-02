@@ -694,9 +694,16 @@ public final class DispatchWriter implements ClassOutputWriter {
     }
 
     private static String methodKey(MethodElement methodElement) {
-        // A private method cannot be overridden, so the same signature declared privately in two classes of the
-        // hierarchy names two different methods, for example a @PostConstruct init() in a bean and its superclass.
-        String owner = methodElement.isPrivate() ? methodElement.getDeclaringType().getName() + "#" : "";
+        // A private method cannot be overridden, and a package-private method can only be overridden from the same
+        // package. Include the narrowest owner that distinguishes methods which cannot override one another.
+        String owner;
+        if (methodElement.isPrivate()) {
+            owner = methodElement.getDeclaringType().getName() + "#";
+        } else if (methodElement.isPackagePrivate()) {
+            owner = methodElement.getDeclaringType().getPackageName() + "#";
+        } else {
+            owner = "";
+        }
         return owner +
             methodElement.getName() +
             "(" +

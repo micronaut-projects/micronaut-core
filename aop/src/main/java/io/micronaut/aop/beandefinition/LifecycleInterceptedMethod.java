@@ -25,7 +25,7 @@ import java.util.List;
  *
  * <p>Implemented by the executable methods that stand for the intercepted {@code @PostConstruct} and
  * {@code @PreDestroy} phases, so that the interceptor chain can expose the callbacks through
- * {@link io.micronaut.aop.MethodInvocationContext#getLifecycleCallbacks()}.</p>
+ * {@link io.micronaut.aop.MethodInvocationContext#getExecutableMethods()}.</p>
  *
  * @param <T> The bean type
  * @author Denis Stepanov
@@ -35,7 +35,9 @@ import java.util.List;
 public interface LifecycleInterceptedMethod<T> {
 
     /**
+     * Returns the callbacks represented by this lifecycle phase.
+     *
      * @return The callbacks of the phase, in invocation order, or an empty list
      */
-    List<ExecutableMethod<T, ?>> getLifecycleCallbacks();
+    List<ExecutableMethod<T, ?>> getExecutableMethods();
 }

@@ -65,7 +65,7 @@ final class InterceptedDisposeMethod<T> extends InterceptedMethod<T, T> {
     }
 
     @Override
-    public List<ExecutableMethod<T, ?>> getLifecycleCallbacks() {
+    public List<ExecutableMethod<T, ?>> getExecutableMethods() {
         return callbacks;
     }
 

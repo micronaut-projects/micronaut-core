@@ -186,11 +186,11 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     }
 
     @Override
-    public List<ExecutableMethod<T, ?>> getLifecycleCallbacks() {
+    public List<ExecutableMethod<T, ?>> getExecutableMethods() {
         if (executionHandle instanceof LifecycleInterceptedMethod<?> lifecycleMethod) {
-            return ((LifecycleInterceptedMethod<T>) lifecycleMethod).getLifecycleCallbacks();
+            return ((LifecycleInterceptedMethod<T>) lifecycleMethod).getExecutableMethods();
         }
-        return List.of();
+        return MethodInvocationContext.super.getExecutableMethods();
     }
 
     /**

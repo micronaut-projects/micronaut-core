@@ -394,9 +394,11 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
             .build((aThis, methodParameters) -> {
                 Map<ExpressionDef.Constant, StatementDef> switchCases = new HashMap<>();
                 Map<String, List<DispatchWriter.DispatchTarget>> hashToMethods = new TreeMap<>();
-                for (DispatchWriter.DispatchTarget dispatchTarget : methodDispatchWriter.getDispatchTargets()) {
+                List<DispatchWriter.DispatchTarget> dispatchTargets = methodDispatchWriter.getDispatchTargets();
+                for (int index = 0; index < dispatchTargets.size(); index++) {
+                    DispatchWriter.DispatchTarget dispatchTarget = dispatchTargets.get(index);
                     MethodElement methodElement = dispatchTarget.getMethodElement();
-                    if (methodElement == null) {
+                    if (methodElement == null || isLifecycleMethod(index)) {
                         continue;
                     }
                     hashToMethods.computeIfAbsent(methodElement.getName(), name -> new ArrayList<>()).add(dispatchTarget);
