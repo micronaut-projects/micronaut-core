@@ -78,7 +78,6 @@ public interface InitializableIntercepted<T> extends InitializingBeanDefinition<
         Collection<BeanRegistration<Interceptor<?, ?>>> shared = SharedInterceptorRegistrations.peek(resolutionContext, this);
         return Objects.requireNonNull(MethodInterceptorChain.initialize(
             resolutionContext,
-            context,
             this,
             new LifecycleCallbackMethod<>(this, callback),
             bean,

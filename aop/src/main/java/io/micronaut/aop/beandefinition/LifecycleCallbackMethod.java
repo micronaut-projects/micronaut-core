@@ -75,6 +75,16 @@ final class LifecycleCallbackMethod<T> extends InterceptedMethod<T, T> {
     }
 
     @Override
+    public boolean equals(Object o) {
+        return super.equals(o) && callback.equals(((LifecycleCallbackMethod<?>) o).callback);
+    }
+
+    @Override
+    public int hashCode() {
+        return 31 * super.hashCode() + callback.hashCode();
+    }
+
+    @Override
     protected T invokeInternal(T instance, @Nullable Object[] arguments) {
         try {
             callback.invoke(instance, arguments);

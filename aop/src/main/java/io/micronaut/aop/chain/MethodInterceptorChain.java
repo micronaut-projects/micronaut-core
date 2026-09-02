@@ -94,8 +94,8 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         T target,
         ExecutableMethod<T, R> executionHandle,
         @Nullable InterceptorKind kind,
-        @Nullable Object[] originalParameters) {
-        super(interceptors, target, executionHandle, originalParameters == null ? EMPTY_OBJECT_ARRAY : originalParameters);
+        Object[] originalParameters) {
+        super(interceptors, target, executionHandle, originalParameters);
         this.kind = kind;
     }
 
@@ -253,20 +253,20 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> postConstructMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
-        return initialize(resolutionContext, beanContext, definition, postConstructMethod, bean, interceptors, EMPTY_OBJECT_ARRAY);
+        return initialize(resolutionContext, definition, postConstructMethod, bean, interceptors, EMPTY_OBJECT_ARRAY);
     }
 
     /**
      * Variant of {@link #initialize(BeanResolutionContext, BeanContext, BeanDefinition, ExecutableMethod, Object, Collection)}
-     * for the interception of a single {@code @PostConstruct} callback with its resolved arguments.
+     * for the interception of a single {@code @PostConstruct} callback with its resolved arguments. The bean context is
+     * the one of the resolution context.
      *
      * @param resolutionContext   The resolution context
-     * @param beanContext         The bean context
      * @param definition          The definition
      * @param postConstructMethod The callback
      * @param bean                The bean
      * @param interceptors        Registrations resolved for this bean, or {@code null} to resolve them
-     * @param parameters          The resolved arguments of the callback
+     * @param parameters          The resolved arguments of the callback, never {@code null}
      * @param <T1>                The bean type
      * @return the bean instance
      * @since 5.2.0
@@ -275,15 +275,13 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     @Nullable
     public static <T1> T1 initialize(
         BeanResolutionContext resolutionContext,
-        BeanContext beanContext,
         BeanDefinition<T1> definition,
         ExecutableMethod<T1, T1> postConstructMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors,
-        @Nullable Object[] parameters) {
+        Object[] parameters) {
         return doIntercept(
             resolutionContext,
-            beanContext,
             definition,
             postConstructMethod,
             bean,
@@ -349,20 +347,20 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> preDestroyMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
-        return dispose(resolutionContext, beanContext, definition, preDestroyMethod, bean, interceptors, EMPTY_OBJECT_ARRAY);
+        return dispose(resolutionContext, definition, preDestroyMethod, bean, interceptors, EMPTY_OBJECT_ARRAY);
     }
 
     /**
      * Variant of {@link #dispose(BeanResolutionContext, BeanContext, BeanDefinition, ExecutableMethod, Object, Collection)}
-     * for the interception of a single {@code @PreDestroy} callback with its resolved arguments.
+     * for the interception of a single {@code @PreDestroy} callback with its resolved arguments. The bean context is
+     * the one of the resolution context.
      *
      * @param resolutionContext The resolution context
-     * @param beanContext       The bean context
      * @param definition        The definition
      * @param preDestroyMethod  The callback
      * @param bean              The bean
      * @param interceptors      Registrations resolved for this bean, or {@code null} to resolve them
-     * @param parameters        The resolved arguments of the callback
+     * @param parameters        The resolved arguments of the callback, never {@code null}
      * @param <T1>              The bean type
      * @return the bean instance
      * @since 5.2.0
@@ -371,15 +369,13 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     @Nullable
     public static <T1> T1 dispose(
         BeanResolutionContext resolutionContext,
-        BeanContext beanContext,
         BeanDefinition<T1> definition,
         ExecutableMethod<T1, T1> preDestroyMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors,
-        @Nullable Object[] parameters) {
+        Object[] parameters) {
         return doIntercept(
             resolutionContext,
-            beanContext,
             definition,
             preDestroyMethod,
             bean,
@@ -393,13 +389,12 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     @Nullable
     private static <T1> T1 doIntercept(
         BeanResolutionContext resolutionContext,
-        BeanContext beanContext,
         BeanDefinition<T1> definition,
         ExecutableMethod<T1, T1> interceptedMethod,
         T1 bean,
         InterceptorKind kind,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> shared,
-        @Nullable Object[] parameters) {
+        Object[] parameters) {
         final AnnotationMetadata annotationMetadata = interceptedMethod.getAnnotationMetadata();
         final Collection<AnnotationValue<?>> binding = resolveInterceptorValues(annotationMetadata, kind);
 
@@ -417,7 +412,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         } else {
             resolved = resolutionContext.getBeanRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBindingValues(binding));
         }
-        final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
+        final InterceptorRegistry interceptorRegistry = resolutionContext.getContext().getBean(InterceptorRegistry.ARGUMENT);
         final Interceptor[] resolvedInterceptors = interceptorRegistry
             .resolveInterceptors(
                 (ExecutableMethod) interceptedMethod,

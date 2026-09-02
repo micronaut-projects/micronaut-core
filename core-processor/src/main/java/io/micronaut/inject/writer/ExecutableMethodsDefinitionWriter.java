@@ -498,7 +498,7 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
         if (indexes.isEmpty()) {
             return null;
         }
-        List<ExpressionDef> values = indexes.stream().map(index -> (ExpressionDef) TypeDef.Primitive.INT.constant(index.intValue())).toList();
+        List<ExpressionDef> values = indexes.stream().map(index -> (ExpressionDef) TypeDef.Primitive.INT.constant(index)).toList();
         return MethodDef.override(method)
             .build((aThis, methodParameters) -> TypeDef.Primitive.INT.array().instantiate(values).returning());
     }

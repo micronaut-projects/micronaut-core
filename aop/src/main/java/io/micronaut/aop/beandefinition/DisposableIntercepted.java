@@ -72,7 +72,6 @@ public interface DisposableIntercepted<T> extends DisposableBeanDefinition<T> {
         ExecutableMethod<T, ?> callback = getPreDestroyExecutableMethods().get(index);
         return Objects.requireNonNull(MethodInterceptorChain.dispose(
             resolutionContext,
-            context,
             this,
             new LifecycleCallbackMethod<>(this, callback),
             bean,
