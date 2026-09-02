@@ -622,6 +622,147 @@ class Test {
         sizeOf(annotationMetadata.getAnnotation("opaquespec.Custom")) == [[min: 1], [max: 64]]
     }
 
+    /**
+     * A composed constraint in the shape a validation integration sees it. {@code @Inherited} is what
+     * {@code micronaut-validation}'s remapper adds to every constraint, and without it the composed annotation
+     * does not reach an implementing class at all — only its flattened stereotypes do.
+     */
+    private static final String SHAPES = '''
+@RetainStereotypes
+@Inherited
+@Size(min = 5)
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.TYPE_USE,
+          ElementType.ANNOTATION_TYPE, ElementType.RECORD_COMPONENT })
+@interface MinimumLength {
+    @AliasFor(annotation = Size.class, member = "min", applyDefault = true)
+    int min() default 5;
+}
+'''
+
+    private static final String SHAPE_IMPORTS = '''
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.RetainStereotypes;
+import jakarta.validation.constraints.Size;
+import java.lang.annotation.*;
+import java.util.List;
+'''
+
+    /**
+     * The element shapes a validation integration actually validates. Each reaches the metadata by its own
+     * route — a property merges the field and the accessors, a container element lands on a type argument, an
+     * implementation inherits from its interface, a record component feeds both the property and the
+     * constructor argument — and the reserved member travels in a values map through all of them.
+     */
+    void "the retained tree survives the merge into property metadata"() {
+        given:
+        def introspection = buildBeanIntrospection('propertyshape.Person', """
+package propertyshape;
+${SHAPE_IMPORTS}
+@Introspected
+class Person {
+    @MinimumLength(min = 8)
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+${SHAPES}
+""")
+
+        expect: "the merge neither drops the tree nor duplicates the composing occurrence"
+        sizeOf(introspection.getRequiredProperty("name", String)
+                .getAnnotationMetadata()
+                .getAnnotation('propertyshape.MinimumLength')) == [[min: 8]]
+    }
+
+    void "the retained tree survives into container element metadata"() {
+        given:
+        def introspection = buildBeanIntrospection('elementshape.Team', """
+package elementshape;
+${SHAPE_IMPORTS}
+@Introspected
+class Team {
+    private List<@MinimumLength(min = 8) String> members;
+
+    public List<String> getMembers() {
+        return members;
+    }
+
+    public void setMembers(List<String> members) {
+        this.members = members;
+    }
+}
+${SHAPES}
+""")
+
+        expect: "the type argument carries the constraint with its composing occurrence attributed"
+        sizeOf(introspection.getRequiredProperty("members", List)
+                .asArgument()
+                .getTypeParameters()[0]
+                .getAnnotationMetadata()
+                .getAnnotation('elementshape.MinimumLength')) == [[min: 8]]
+    }
+
+    void "the retained tree survives inheritance from an interface"() {
+        given: "the constraint is declared on the interface and validated on the implementation"
+        def introspection = buildBeanIntrospection('inheritedshape.Person', """
+package inheritedshape;
+${SHAPE_IMPORTS}
+interface Named {
+    @MinimumLength(min = 8)
+    String getName();
+}
+
+@Introspected
+class Person implements Named {
+
+    private String name;
+
+    @Override
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+${SHAPES}
+""")
+
+        expect: "the inherited constraint keeps the occurrence it introduced"
+        sizeOf(introspection.getRequiredProperty("name", String)
+                .getAnnotationMetadata()
+                .getAnnotation('inheritedshape.MinimumLength')) == [[min: 8]]
+    }
+
+    void "the retained tree survives onto a record component"() {
+        given:
+        def introspection = buildBeanIntrospection('recordshape.Person', """
+package recordshape;
+${SHAPE_IMPORTS}
+@Introspected
+record Person(@MinimumLength(min = 8) String name) {
+}
+${SHAPES}
+""")
+
+        expect: "both routes to the component carry the tree"
+        sizeOf(introspection.getRequiredProperty("name", String)
+                .getAnnotationMetadata()
+                .getAnnotation('recordshape.MinimumLength')) == [[min: 8]]
+        sizeOf(introspection.getConstructorArguments()[0]
+                .getAnnotationMetadata()
+                .getAnnotation('recordshape.MinimumLength')) == [[min: 8]]
+    }
+
     private static List<Map> sizeOf(AnnotationValue<?> annotationValue) {
         annotationValue.getStereotypes()
                 .findAll { it.getAnnotationName() == "jakarta.validation.constraints.Size" }
