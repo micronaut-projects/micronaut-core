@@ -361,6 +361,151 @@ class Test {
         occurrences.collect { sizeOf(it) } == [[[min: 3]], [[min: 7]]]
     }
 
+    /**
+     * A constraint composing the same constraint twice is the shape {@code AliasFor.index} exists for: the
+     * occurrences are what {@code jakarta.validation.OverridesAttribute.constraintIndex} selects between, and a
+     * flat name-keyed index cannot address them at all. The two occurrences are folded into the repeatable
+     * container by javac, so this also exercises the container flattening.
+     */
+    void "a constraint composing the same annotation twice attributes an index-selective override to each occurrence"() {
+        given:
+        def annotationMetadata = writeAndLoadMetadata('twicespec.Test', buildTypeAnnotationMetadata('''
+package twicespec;
+
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.annotation.RetainStereotypes;
+import jakarta.validation.constraints.Size;
+import java.lang.annotation.*;
+
+@Password(shortest = 8, longest = 64)
+class Test {
+}
+
+@RetainStereotypes
+@Size(min = 1)
+@Size(max = 5)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Password {
+    @AliasFor(annotation = Size.class, member = "min", index = 0, applyDefault = true)
+    int shortest() default 1;
+
+    @AliasFor(annotation = Size.class, member = "max", index = 1, applyDefault = true)
+    int longest() default 5;
+}
+'''))
+
+        expect: "each occurrence keeps the override addressed to it, and neither leaks into the other"
+        sizeOf(annotationMetadata.getAnnotation("twicespec.Password")) == [[min: 8], [max: 64]]
+    }
+
+    /**
+     * The default {@code AliasFor.index} of {@code -1} applies the override to every occurrence, which is what
+     * {@code @OverridesAttribute} without a {@code constraintIndex} means.
+     */
+    void "an override with no index reaches every occurrence of the composed annotation"() {
+        given:
+        def annotationMetadata = writeAndLoadMetadata('allspec.Test', buildTypeAnnotationMetadata('''
+package allspec;
+
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.annotation.RetainStereotypes;
+import jakarta.validation.constraints.Size;
+import java.lang.annotation.*;
+
+@Bounded(min = 5)
+class Test {
+}
+
+@RetainStereotypes
+@Size(min = 1, max = 10)
+@Size(min = 2, max = 20)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Bounded {
+    @AliasFor(annotation = Size.class, member = "min", applyDefault = true)
+    int min() default 1;
+}
+'''))
+
+        expect: "both occurrences take the override, and each keeps the member it was not overridden on"
+        sizeOf(annotationMetadata.getAnnotation("allspec.Bounded")) == [[min: 5, max: 10], [min: 5, max: 20]]
+    }
+
+    /**
+     * Writing the composing constraints inside the repeatable container by hand is the same declaration as
+     * repeating them, so it must produce the same tree — javac folds the repeated form into exactly this.
+     */
+    void "composing annotations written inside their container flatten like repeated ones"() {
+        given:
+        def annotationMetadata = writeAndLoadMetadata('containedspec.Test', buildTypeAnnotationMetadata('''
+package containedspec;
+
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.annotation.RetainStereotypes;
+import jakarta.validation.constraints.Size;
+import java.lang.annotation.*;
+
+@Contained(shortest = 8, longest = 64)
+class Test {
+}
+
+@RetainStereotypes
+@Size.List({@Size(min = 1), @Size(max = 5)})
+@Retention(RetentionPolicy.RUNTIME)
+@interface Contained {
+    @AliasFor(annotation = Size.class, member = "min", index = 0, applyDefault = true)
+    int shortest() default 1;
+
+    @AliasFor(annotation = Size.class, member = "max", index = 1, applyDefault = true)
+    int longest() default 5;
+}
+'''))
+
+        expect: "the container is flattened into its occurrences, addressable by index"
+        sizeOf(annotationMetadata.getAnnotation("containedspec.Contained")) == [[min: 8], [max: 64]]
+    }
+
+    /**
+     * A composing container need not be the one declared through {@code @Repeatable}: an annotation holding an
+     * array of annotations in its {@code value} is unwrapped too, which is what {@code micronaut-validation}
+     * does at runtime — {@code ConstraintContainers} resolves the constraint a container holds "whatever its
+     * name", and {@code DefaultConstraintDescriptor} unwraps any member returning an array of annotations.
+     *
+     * <p>So an occurrence contributed by a hand-rolled container is an occurrence like any other, and is
+     * addressable by index alongside a directly declared one.</p>
+     */
+    void "a container that is not the declared repeatable container is flattened too"() {
+        given:
+        def annotationMetadata = writeAndLoadMetadata('opaquespec.Test', buildTypeAnnotationMetadata('''
+package opaquespec;
+
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.annotation.RetainStereotypes;
+import jakarta.validation.constraints.Size;
+import java.lang.annotation.*;
+
+@Custom(longest = 64)
+class Test {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface Sizes {
+    Size[] value();
+}
+
+@RetainStereotypes
+@Size(min = 1)
+@Sizes({@Size(max = 5)})
+@Retention(RetentionPolicy.RUNTIME)
+@interface Custom {
+    @AliasFor(annotation = Size.class, member = "max", index = 1, applyDefault = true)
+    int longest() default 5;
+}
+'''))
+
+        expect: "the occurrence the hand-rolled container contributed is an occurrence, and takes an override by index"
+        sizeOf(annotationMetadata.getAnnotation("opaquespec.Custom")) == [[min: 1], [max: 64]]
+    }
+
     private static List<Map> sizeOf(AnnotationValue<?> annotationValue) {
         annotationValue.getStereotypes()
                 .findAll { it.getAnnotationName() == "jakarta.validation.constraints.Size" }
