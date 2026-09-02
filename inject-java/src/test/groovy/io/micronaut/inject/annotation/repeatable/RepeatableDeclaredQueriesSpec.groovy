@@ -77,6 +77,46 @@ class Rep {
 '''
 
     /**
+     * The same repeatable, inherited rather than declared: the container is not in the subclass's own
+     * annotations, so the member must not be named among its declared ones.
+     */
+    private static final String INHERITED_SOURCE = '''
+package repeatableinherited;
+
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import jakarta.inject.Named;
+import jakarta.inject.Qualifier;
+import jakarta.inject.Singleton;
+
+@Singleton
+@Named("n")
+class Child extends Parent {
+}
+
+@Q("a")
+@Q("b")
+class Parent {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Inherited
+@Qualifier
+@Repeatable(Qs.class)
+@interface Q {
+    String value();
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Inherited
+@interface Qs {
+    Q[] value();
+}
+'''
+
+    /**
      * What every by-name query answers on an element carrying {@code @Q("a") @Q("b")}. Only
      * {@code getDeclaredAnnotationNamesByStereotype} changes: it named nothing before, because the stereotype
      * index lists the member while the declared annotations hold the container. The {@code has*} queries by
@@ -133,6 +173,17 @@ class Rep {
         probe(metadata[1]) == EXPECTED
         probe(metadata[2]) == EXPECTED
         probe(metadata[3]) == EXPECTED
+    }
+
+    void "test declared queries by name do not see an inherited repeatable annotation"() {
+        given:
+        AnnotationMetadata metadata = buildClassElement(INHERITED_SOURCE).getAnnotationMetadata()
+
+        expect: 'the inherited member is indexed under the qualifier stereotype'
+        metadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER).contains('repeatableinherited.Q')
+
+        and: 'but only the qualifier the subclass declares itself is named among the declared ones'
+        metadata.getDeclaredAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER) == [AnnotationUtil.NAMED]
     }
 
     private static Map<String, Object> probe(AnnotationMetadata metadata) {

@@ -1235,7 +1235,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 }
             }
         }
-        if (containsAnnotation(declaredAnnotations, stereotype)) {
+        if (declaredAnnotations != null && containsAnnotation(declaredAnnotations, stereotype)) {
             return List.of(stereotype);
         }
         return List.of();
@@ -1569,10 +1569,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param annotation  The annotation name
      * @return True if present
      */
-    private boolean containsAnnotation(@Nullable Map<String, Map<CharSequence, Object>> annotations, @Nullable String annotation) {
-        if (annotations == null || annotation == null || annotation.isEmpty()) {
-            return false;
-        }
+    private boolean containsAnnotation(Map<String, Map<CharSequence, Object>> annotations, String annotation) {
         if (annotations.containsKey(annotation)) {
             return true;
         }
