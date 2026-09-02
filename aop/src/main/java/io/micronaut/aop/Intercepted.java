@@ -55,9 +55,14 @@ public interface Intercepted extends InterceptedBean {
      * <p>Proxies whose target declares no lifecycle binding, and proxies generated before this existed, keep the
      * empty default; the runtime then resolves interceptors by binding as it always did.</p>
      *
+     * <p>The context reads the same list through {@link InterceptedBean#$interceptorRegistrations()} when
+     * {@code destroyBean(Object)} is handed a proxy it tracks no registration for, so the non-singleton interceptors
+     * are destroyed with their target there too.</p>
+     *
      * @return The retained interceptor registrations, never {@code null}
      * @since 5.2.0
      */
+    @Override
     @Internal
     @UsedByGeneratedCode
     // The $ prefix marks this as generated-code infrastructure and keeps it clear of any method on the proxied type.
