@@ -26,16 +26,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Abstract implementation of the custom scope interface that simplifies defining new scopes using the Map interface.
  *
- * <p>Note this implementation uses a single{@link ReentrantReadWriteLock} to lock the entire scope hence it is designed for scopes that will hold a small amount of beans. For implementations that hold many beans it is recommended to use a lock per {@link BeanIdentifier}.</p>
+ * <p>By default this implementation uses a single {@link ReentrantReadWriteLock} to lock the entire scope, and holds
+ * its write lock while a bean is created, hence it is designed for scopes that will hold a small amount of beans whose
+ * creation never waits on another thread. A scope that holds many beans, or whose beans may wait during creation for
+ * another thread that creates a bean of the same scope, should opt into a lock per {@link BeanIdentifier} through
+ * {@link #AbstractConcurrentCustomScope(Class, boolean)}.</p>
  *
  * @param <A> The annotation type
  * @author graemerocher
@@ -44,9 +51,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public abstract class AbstractConcurrentCustomScope<A extends Annotation> implements CustomScope<A>, LifeCycle<AbstractConcurrentCustomScope<A>>, AutoCloseable {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractConcurrentCustomScope.class);
     private final Class<A> annotationType;
+    private final boolean lockPerBean;
     private final ReentrantReadWriteLock rwl = new ReentrantReadWriteLock();
     private final Lock r = rwl.readLock();
     private final Lock w = rwl.writeLock();
+    private final ConcurrentMap<BeanIdentifier, Object> creationLocks = new ConcurrentHashMap<>();
 
     /**
      * A custom scope annotation.
@@ -54,7 +63,29 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      * @param annotationType The annotation type
      */
     protected AbstractConcurrentCustomScope(Class<A> annotationType) {
+        this(annotationType, false);
+    }
+
+    /**
+     * A custom scope annotation, choosing how creation is locked.
+     *
+     * <p>With {@code lockPerBean} the scope-wide lock is not used at all. A bean is created under a lock that belongs
+     * to its {@link BeanIdentifier} alone, so that beans of different identifiers are created in parallel, a creation
+     * may wait for another thread that creates a bean of the same scope, and the fast path of a bean already held
+     * is a plain lookup. {@link #remove(BeanIdentifier)} takes the same lock, so it still waits for a creation of that
+     * identifier in flight and then destroys what was created. {@link #destroyScope(Map)} and
+     * {@link #findBeanRegistration(Object)} work on the scope map without any lock, which is why the map returned by
+     * {@link #getScopeMap(boolean)} must then be a {@link ConcurrentMap}: {@link #getOrCreate(BeanCreationContext)}
+     * rejects any other map with an {@link IllegalStateException}. The lock objects live as long as the scope, one
+     * per identifier ever created or removed through it.</p>
+     *
+     * @param annotationType The annotation type
+     * @param lockPerBean    Whether to lock creation per {@link BeanIdentifier} rather than for the whole scope
+     * @since 5.2.0
+     */
+    protected AbstractConcurrentCustomScope(Class<A> annotationType, boolean lockPerBean) {
         this.annotationType = Objects.requireNonNull(annotationType, "Annotation type cannot be null");
+        this.lockPerBean = lockPerBean;
     }
 
     /**
@@ -78,6 +109,15 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
 
     @Override
     public final AbstractConcurrentCustomScope<A> stop() {
+        if (lockPerBean) {
+            try {
+                destroyScope(getScopeMap(false));
+            } catch (IllegalStateException e) {
+                // scope map not available in current context
+            }
+            close();
+            return this;
+        }
         w.lock();
         try {
             try {
@@ -99,6 +139,10 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      * @param scopeMap The scope map
      */
     protected void destroyScope(@Nullable Map<BeanIdentifier, CreatedBean<?>> scopeMap) {
+        if (lockPerBean) {
+            destroyScopeLockingPerBean(scopeMap);
+            return;
+        }
         w.lock();
         try {
             if (CollectionUtils.isNotEmpty(scopeMap)) {
@@ -120,6 +164,9 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     @SuppressWarnings("unchecked")
     @Override
     public final <T> T getOrCreate(BeanCreationContext<T> creationContext) {
+        if (lockPerBean) {
+            return getOrCreateLockingPerBean(creationContext);
+        }
         r.lock();
         try {
             final Map<BeanIdentifier, CreatedBean<?>> scopeMap = Objects.requireNonNull(getScopeMap(true));
@@ -169,6 +216,9 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         if (identifier == null) {
             return Optional.empty();
         }
+        if (lockPerBean) {
+            return removeLockingPerBean(identifier);
+        }
         w.lock();
         try {
             final Map<BeanIdentifier, CreatedBean<?>> scopeMap;
@@ -210,7 +260,9 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     @SuppressWarnings("unchecked")
     @Override
     public final <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
-        r.lock();
+        if (!lockPerBean) {
+            r.lock();
+        }
         try {
             final Map<BeanIdentifier, CreatedBean<?>> scopeMap;
             try {
@@ -237,7 +289,100 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             }
             return Optional.empty();
         } finally {
-            r.unlock();
+            if (!lockPerBean) {
+                r.unlock();
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T getOrCreateLockingPerBean(BeanCreationContext<T> creationContext) {
+        final Map<BeanIdentifier, CreatedBean<?>> scopeMap = Objects.requireNonNull(getScopeMap(true));
+        if (!(scopeMap instanceof ConcurrentMap)) {
+            throw new IllegalStateException("The scope map of @" + annotationType.getSimpleName()
+                + " must be a ConcurrentMap when creation is locked per bean, but is " + scopeMap.getClass().getName());
+        }
+        final BeanIdentifier id = creationContext.id();
+        CreatedBean<?> createdBean = scopeMap.get(id);
+        if (createdBean != null) {
+            return (T) createdBean.bean();
+        }
+        // the lock is allocated in the map, never the bean: a creation that resolves another bean of this scope
+        // would otherwise be a recursive update of the map
+        final Object lock = creationLocks.computeIfAbsent(id, key -> new Object());
+        synchronized (lock) {
+            // re-check
+            createdBean = scopeMap.get(id);
+            if (createdBean == null) {
+                createdBean = doCreate(creationContext);
+                scopeMap.put(id, createdBean);
+            }
+            return (T) createdBean.bean();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> Optional<T> removeLockingPerBean(BeanIdentifier identifier) {
+        final Map<BeanIdentifier, CreatedBean<?>> scopeMap;
+        try {
+            scopeMap = getScopeMap(false);
+        } catch (IllegalStateException e) {
+            return Optional.empty();
+        }
+        if (scopeMap == null) {
+            return Optional.empty();
+        }
+        final CreatedBean<?> createdBean;
+        // under the identifier's lock so that a creation of the identifier in flight is waited for and then removed,
+        // as under the scope-wide lock
+        synchronized (creationLocks.computeIfAbsent(identifier, key -> new Object())) {
+            createdBean = scopeMap.remove(identifier);
+        }
+        if (createdBean == null) {
+            return Optional.empty();
+        }
+        try {
+            createdBean.close();
+        } catch (BeanDestructionException e) {
+            handleDestructionException(e);
+        }
+        //noinspection ConstantConditions
+        return (Optional<T>) Optional.ofNullable(createdBean.bean());
+    }
+
+    /**
+     * The identifier of any one entry of the map, or {@code null} where it holds none.
+     *
+     * @param scopeMap The scope map
+     * @return An identifier, or {@code null}
+     */
+    @Nullable
+    private static BeanIdentifier firstIdentifierOf(Map<BeanIdentifier, CreatedBean<?>> scopeMap) {
+        final Iterator<BeanIdentifier> identifiers = scopeMap.keySet().iterator();
+        return identifiers.hasNext() ? identifiers.next() : null;
+    }
+
+    private void destroyScopeLockingPerBean(@Nullable Map<BeanIdentifier, CreatedBean<?>> scopeMap) {
+        if (CollectionUtils.isEmpty(scopeMap)) {
+            return;
+        }
+        // the map is drained rather than cleared: each entry is taken out before it is closed, so that two
+        // destructions of one map close each bean once, and a bean that another thread put there while the
+        // destruction runs is closed by the pass that finds it instead of being dropped by a clear(). Nothing
+        // holds creation off in this mode, so the drain repeats until the map stays empty
+        for (BeanIdentifier id = firstIdentifierOf(scopeMap); id != null; id = firstIdentifierOf(scopeMap)) {
+            final CreatedBean<?> createdBean;
+            // under the identifier's lock, so that a creation of it in flight is waited for and then taken out
+            synchronized (creationLocks.computeIfAbsent(id, key -> new Object())) {
+                createdBean = scopeMap.remove(id);
+            }
+            if (createdBean != null) {
+                try {
+                    createdBean.close();
+                } catch (BeanDestructionException e) {
+                    handleDestructionException(e);
+                }
+            }
         }
     }
 }
