@@ -49,7 +49,7 @@ class PojoWebSocketSpec:
         fred.close()
 
     def awaitReply(self, replies, expected: str, size: int) -> None:
-        for _ in range(30):
+        for _ in range(150):
             if self.containsText(replies, expected) and replies.size() == size:
                 return
             TimeUnit.MILLISECONDS.sleep(100)

@@ -57,6 +57,8 @@ class CapturingInterceptor implements ConstructorInterceptor<Object> {
     static List<Class<?>> argumentTypes;
     static Object[] parameterValues;
     static String description;
+    static boolean annotationMetadataAvailable;
+    static String constructorString;
 
     @Override
     public Object intercept(ConstructorInvocationContext<Object> context) {
@@ -66,6 +68,8 @@ class CapturingInterceptor implements ConstructorInterceptor<Object> {
         argumentTypes = Arrays.stream(context.getArguments()).<Class<?>>map(Argument::getType).toList();
         parameterValues = context.getParameterValues();
         description = context.getConstructor().getDescription();
+        annotationMetadataAvailable = context.getConstructor().getAnnotationMetadata() != null;
+        constructorString = context.getConstructor().toString();
         return context.proceed();
     }
 }
@@ -90,6 +94,8 @@ class CapturingInterceptor implements ConstructorInterceptor<Object> {
         interceptorType.argumentNames == ['alpha', 'beta']
         interceptorType.argumentTypes == [alphaType, betaType]
         interceptorType.description == 'MyBean(Alpha alpha,Beta beta)'
+        interceptorType.annotationMetadataAvailable
+        interceptorType.constructorString == interceptorType.description
 
         and: 'the arguments and the parameter values line up'
         interceptorType.parameterValues.length == interceptorType.argumentNames.size()
