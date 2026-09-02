@@ -25,6 +25,7 @@ class IndexedByVisitorSpec extends AbstractTypeElementSpec {
         ApplicationContext context = buildContext('idx.Test', '''
 package idx;
 
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 
 @Singleton
@@ -33,9 +34,21 @@ class Test {
 
 interface Marker {
 }
+
+@Singleton
+@Requires(missingBeans = Marker.class)
+class MissingMarkerCondition {
+}
+
+@Singleton
+@Requires(beans = Marker.class)
+class PresentMarkerCondition {
+}
 ''')
         Class<?> test = context.classLoader.loadClass('idx.Test')
         Class<?> marker = context.classLoader.loadClass('idx.Marker')
+        Class<?> missingMarkerCondition = context.classLoader.loadClass('idx.MissingMarkerCondition')
+        Class<?> presentMarkerCondition = context.classLoader.loadClass('idx.PresentMarkerCondition')
 
         expect:
         !marker.isAssignableFrom(test)
@@ -57,6 +70,8 @@ interface Marker {
         !context.containsBean(marker)
         context.getBeansOfType(marker).isEmpty()
         context.findBeanDefinition(marker).isEmpty()
+        context.containsBean(missingMarkerCondition)
+        !context.containsBean(presentMarkerCondition)
 
         when:
         context.getBean(marker)
@@ -75,6 +90,7 @@ interface Marker {
 package idx2;
 
 import io.micronaut.core.annotation.Indexed;
+import io.micronaut.context.BeanProvider;
 import jakarta.inject.Singleton;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -97,9 +113,11 @@ class Impl implements Marker {
 @Singleton
 class Consumer {
     final List<Marker> markers;
+    final BeanProvider<Marker> provider;
 
-    Consumer(List<Marker> markers) {
+    Consumer(List<Marker> markers, BeanProvider<Marker> provider) {
         this.markers = markers;
+        this.provider = provider;
     }
 }
 
@@ -132,6 +150,10 @@ interface Marker {
         context.getBean(marker).getClass() == impl
         context.getBeansOfType(marker)*.getClass() == [impl]
         context.getBean(consumer).markers*.getClass() == [impl]
+        context.getBean(consumer).provider.present
+        context.getBean(consumer).provider.unique
+        context.getBean(consumer).provider.resolvable
+        context.getBean(consumer).provider.get().getClass() == impl
         context.findBeanDefinition(marker).get().beanType == impl
         context.containsBean(marker)
 
@@ -146,6 +168,7 @@ interface Marker {
     void "test a runtime registered bean definition with an index is enumerable by the indexed type"() {
         given:
         ApplicationContext context = ApplicationContext.run()
+        assert context.getBeanDefinitions(RuntimeMarker).isEmpty()
         RuntimeBeanDefinition<RuntimeBean> delegate = RuntimeBeanDefinition.builder(RuntimeBean, () -> new RuntimeBean())
                 .singleton(true)
                 .build()

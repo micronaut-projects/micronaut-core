@@ -1709,20 +1709,23 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @Override
     public <B> BeanContext registerBeanDefinition(RuntimeBeanDefinition<B> definition) {
         beanDefinitionProvider.addBeanDefinition(definition);
-        Class<B> beanType = definition.getBeanType();
-        purgeCacheForBeanType(beanType);
-        if (CustomScope.class.isAssignableFrom(beanType)) {
+        purgeCacheForBeanDefinition(definition);
+        if (CustomScope.class.isAssignableFrom(definition.getBeanType())) {
             // a bean of this scope resolved earlier left the scope's absence recorded in the registry
             customScopeRegistry.invalidate();
         }
         return this;
     }
 
-    private <B> void purgeCacheForBeanType(Class<B> beanType) {
-        beanCandidateCache.entrySet().removeIf(entry -> entry.getKey().isAssignableFrom(beanType));
-        beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(beanType));
-        singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(beanType));
-        containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(beanType));
+    private void purgeCacheForBeanDefinition(RuntimeBeanDefinition<?> definition) {
+        Class<?> beanType = definition.getBeanType();
+        Set<Class<?>> indexedTypes = CollectionUtils.setOf(definition.getIndexes());
+        Predicate<Argument<?>> isAffected = cachedType ->
+            cachedType.isAssignableFrom(beanType) || indexedTypes.contains(cachedType.getType());
+        beanCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey()));
+        beanConcreteCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
+        singletonBeanRegistrations.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
+        containsBeanCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
     }
 
     /**
@@ -2055,7 +2058,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     public final <T> Collection<BeanDefinition<T>> findBeanCandidates(@Nullable BeanResolutionContext resolutionContext,
                                                                       Argument<T> beanType,
                                                                       @Nullable BeanDefinition<?> filter) {
-        Predicate<BeanDefinition<T>> predicate = filter == null ? null : definition -> !definition.equals(filter);
+        Predicate<BeanDefinition<T>> predicate = candidate ->
+            isInjectableCandidate(beanType, candidate) && (filter == null || !candidate.equals(filter));
         return findBeanCandidates(resolutionContext, beanType, true, predicate);
     }
 
@@ -3440,6 +3444,24 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     private <T> boolean isInjectableCandidate(Argument<T> beanType, BeanDefinition<T> candidate) {
         return beanType.getType() == Object.class || beanResolutionCustomizer.isCandidateBean(beanType, candidate);
+    }
+
+    /**
+     * Whether exactly one injectable bean candidate exists for the requested type and qualifier.
+     *
+     * @param beanType  The requested bean type
+     * @param qualifier The requested qualifier
+     * @param <T>       The bean type
+     * @return True if exactly one injectable candidate exists
+     */
+    @Internal
+    public <T> boolean isUniqueBeanCandidate(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(null, beanType);
+        candidates = applyBeanResolutionFilters(null, beanType, candidates);
+        if (qualifier != null && !candidates.isEmpty()) {
+            candidates = qualifier.filterQualified(beanType.getType(), candidates);
+        }
+        return candidates.size() == 1;
     }
 
     private <T> void addCandidateToList(@Nullable BeanResolutionContext resolutionContext,
