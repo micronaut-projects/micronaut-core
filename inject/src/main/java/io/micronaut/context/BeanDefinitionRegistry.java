@@ -451,13 +451,15 @@ public interface BeanDefinitionRegistry {
      * identity: the compiled definition class itself, such as the one a
      * {@link ProxyBeanDefinition#getTargetDefinitionType() proxy names as its target}. The definition returned
      * is the instance the registry uses for every other lookup, so it can be compared by identity with them.
-     * Definitions whose names do not match are never loaded; the matching definition is then verified against
+     * Definitions whose names do not match are never loaded; a matching definition is then verified against
      * the requested class.</p>
      *
      * <p>Only definitions generated at compile time have a class of their own. A
      * {@link RuntimeBeanDefinition} shares its class with every other runtime definition and is not found here.</p>
      *
-     * <p>The default walks {@link #getBeanDefinitionReferences()} and loads the one reference whose name matches.
+     * <p>The default walks {@link #getBeanDefinitionReferences()} and loads every reference whose name matches
+     * until one of them turns out to be the requested class, so a name shared by two references, as class loaders
+     * can make happen, does not hide the definition that was asked for.
      * Whether a definition is enabled can only be decided against a {@link BeanContext}, so a registry that is not
      * one answers with the loaded definition as it is; a registry that is one answers only with an enabled definition.
      * Implementations that cache loaded definitions should override this so the instance returned is the one they
@@ -472,25 +474,22 @@ public interface BeanDefinitionRegistry {
     default <T> Optional<BeanDefinition<T>> findBeanDefinitionByDefinitionClass(Class<? extends BeanDefinition<T>> definitionClass) {
         Objects.requireNonNull(definitionClass, "Definition class cannot be null");
         String definitionName = definitionClass.getName();
+        BeanContext context = this instanceof BeanContext beanContext ? beanContext : null;
         for (BeanDefinitionReference<Object> reference : getBeanDefinitionReferences()) {
             if (!definitionName.equals(reference.getBeanDefinitionName())) {
                 continue;
             }
-            if (this instanceof BeanContext context) {
-                if (!reference.isEnabled(context)) {
-                    return Optional.empty();
+            if (context == null) {
+                BeanDefinition<Object> definition = reference.load();
+                if (definition != null && definition.getClass() == definitionClass) {
+                    return Optional.of((BeanDefinition<T>) definition);
                 }
+            } else if (reference.isEnabled(context)) {
                 BeanDefinition<Object> definition = reference.load(context);
-                if (definition == null || definition.getClass() != definitionClass || !definition.isEnabled(context)) {
-                    return Optional.empty();
+                if (definition != null && definition.getClass() == definitionClass && definition.isEnabled(context)) {
+                    return Optional.of((BeanDefinition<T>) definition);
                 }
-                return Optional.of((BeanDefinition<T>) definition);
             }
-            BeanDefinition<Object> definition = reference.load();
-            if (definition == null || definition.getClass() != definitionClass) {
-                return Optional.empty();
-            }
-            return Optional.of((BeanDefinition<T>) definition);
         }
         return Optional.empty();
     }

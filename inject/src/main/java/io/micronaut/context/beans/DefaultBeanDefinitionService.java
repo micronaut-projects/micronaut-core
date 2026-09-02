@@ -220,25 +220,29 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         if (current == null) {
             return null;
         }
-        String definitionName = definitionClass.getName();
-        BeanDefinitionProducer producer = findProducerByDefinitionName(current.all, definitionName);
-        if (producer == null) {
+        BeanDefinition<T> definition = findDefinitionByDefinitionClass(current.all, beanContext, definitionClass);
+        if (definition == null) {
             // A proxied bean is disabled in the main list and its target is kept apart, see createBeans
-            producer = findProducerByDefinitionName(current.proxyTargetBeans, definitionName);
+            definition = findDefinitionByDefinitionClass(current.proxyTargetBeans, beanContext, definitionClass);
         }
-        if (producer == null) {
-            return null;
-        }
-        BeanDefinition<T> definition = producer.getDefinitionIfEnabled(beanContext, null, beanResolutionCustomizer, null, null, null);
-        return definition != null && definition.getClass() == definitionClass ? definition : null;
+        return definition;
     }
 
     @Nullable
-    private static BeanDefinitionProducer findProducerByDefinitionName(List<BeanDefinitionProducer> producers, String definitionName) {
+    private <T> BeanDefinition<T> findDefinitionByDefinitionClass(List<BeanDefinitionProducer> producers,
+                                                                 BeanContext beanContext,
+                                                                 Class<? extends BeanDefinition<T>> definitionClass) {
+        String definitionName = definitionClass.getName();
         for (BeanDefinitionProducer producer : producers) {
             BeanDefinitionReference<?> reference = producer.reference;
-            if (reference != null && definitionName.equals(reference.getBeanDefinitionName())) {
-                return producer;
+            if (reference == null || !definitionName.equals(reference.getBeanDefinitionName())) {
+                continue;
+            }
+            // The name is only a cheap filter: two references can carry the same name across class loaders,
+            // so keep looking until one of them loads as the requested class
+            BeanDefinition<T> definition = producer.getDefinitionIfEnabled(beanContext, null, beanResolutionCustomizer, null, null, null);
+            if (definition != null && definition.getClass() == definitionClass) {
+                return definition;
             }
         }
         return null;

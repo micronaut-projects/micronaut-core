@@ -120,6 +120,26 @@ class ProxyTargetDefinitionLookupSpec extends Specification {
         found.get().getClass() == resolved.getClass()
     }
 
+    void "the interface default keeps looking past a reference that shares a definition name"() {
+        given: "a reference that answers the name of a real definition but does not load as it"
+        BeanDefinition<ArgMutatingInterceptor> resolved = context.getBeanDefinition(ArgMutatingInterceptor)
+        BeanDefinitionReference<Object> collision = Stub(BeanDefinitionReference) {
+            getBeanDefinitionName() >> resolved.getClass().name
+            isEnabled(_) >> true
+            isEnabled(_, _) >> true
+            load() >> Stub(BeanDefinition)
+            load(_) >> Stub(BeanDefinition)
+        }
+        List<BeanDefinitionReference<Object>> references = [collision] + context.getBeanDefinitionReferences().toList()
+
+        expect: "the name it shares, as class loaders can make happen, does not hide the definition asked for"
+        registryOver(registryType, references)
+            .findBeanDefinitionByDefinitionClass(resolved.getClass()).get().getClass() == resolved.getClass()
+
+        where:
+        registryType << [BeanDefinitionRegistry, BeanContext]
+    }
+
     /**
      * A registry of the given interface whose only knowledge is a fixed reference list; every default method of the
      * interface runs as written, every other method is refused, so the test exercises the default and nothing else.
