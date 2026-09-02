@@ -1595,8 +1595,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     public static <T extends Annotation> AnnotationValue<T> of(T annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         Class<? extends Annotation> annotationType = annotation.annotationType();
-        Map<CharSequence, Object> values = new LinkedHashMap<>();
-        for (Method member : annotationType.getDeclaredMethods()) {
+        Method[] members = annotationType.getDeclaredMethods();
+        Map<CharSequence, Object> values = CollectionUtils.newLinkedHashMap(members.length);
+        for (Method member : members) {
             if (member.getParameterCount() != 0 || member.isSynthetic()) {
                 continue;
             }

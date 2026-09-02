@@ -33,7 +33,6 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -137,7 +136,9 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
             // the member of an annotation this module cannot read is a member it cannot compare
             return null;
         }
-        Map<CharSequence, Object> bindingValues = new LinkedHashMap<>(annotationValue.getValues());
+        Map<CharSequence, Object> values = annotationValue.getValues();
+        Map<CharSequence, Object> bindingValues = CollectionUtils.newLinkedHashMap(values.size());
+        bindingValues.putAll(values);
         for (Method member : annotation.annotationType().getDeclaredMethods()) {
             if (member.isAnnotationPresent(NonBinding.class)) {
                 bindingValues.remove(member.getName());
