@@ -289,6 +289,10 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         private final BeanConstructor<T> proxyConstructor;
         private final Class<T> declaringBeanType;
         private final Argument<?>[] arguments;
+        /**
+         * The values of the internal parameters the proxy constructor declares after the bean's own ones. Never
+         * empty: this view only exists when the proxy constructor declares such parameters.
+         */
         private final @Nullable Object[] internalParameters;
 
         private InterceptedTargetConstructor(BeanConstructor<T> proxyConstructor,
@@ -318,10 +322,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
 
         @Override
         public T instantiate(@Nullable Object... parameterValues) {
-            if (ArrayUtils.isNotEmpty(internalParameters)) {
-                return proxyConstructor.instantiate(ArrayUtils.concat(parameterValues, internalParameters));
-            }
-            return proxyConstructor.instantiate(parameterValues);
+            return proxyConstructor.instantiate(ArrayUtils.concat(parameterValues, internalParameters));
         }
 
         @Override
