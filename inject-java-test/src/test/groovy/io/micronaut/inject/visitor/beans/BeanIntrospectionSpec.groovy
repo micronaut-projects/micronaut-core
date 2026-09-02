@@ -6050,6 +6050,8 @@ class PrivateNoAccessors {
         def introspection = buildBeanIntrospection('test.Person', '''
 package test;
 
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotNull;
 
 @Introspected
 class Person {
@@ -6068,6 +6070,9 @@ class Person {
         def introspection = buildBeanIntrospection('test.Person', '''
 package test;
 
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 @Introspected(accessKind = {Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD}, members = true)
 class Person {
@@ -6117,6 +6122,10 @@ class Person {
         def introspection = buildBeanIntrospection('test.Holder', '''
 package test;
 
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotNull;
+import java.util.List;
+import java.util.Set;
 
 @Introspected(members = true)
 class Holder {
@@ -6141,6 +6150,8 @@ class Holder {
         def introspection = buildBeanIntrospection('test.Person', '''
 package test;
 
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotNull;
 
 @Introspected(members = true)
 record Person(@NotNull String name) {
@@ -6161,6 +6172,7 @@ record Person(@NotNull String name) {
         def introspection = buildBeanIntrospection('test.Child', '''
 package test;
 
+import io.micronaut.core.annotation.Introspected;
 
 class Parent {
     private String name;

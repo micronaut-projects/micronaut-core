@@ -1416,6 +1416,9 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         final BeanPropertyRef<P> ref;
         private final Class<?> typeOrWrapperType;
         private final AnnotationMetadata annotationMetadata;
+        // The list is immutable and its computation idempotent, so we allow it to be
+        // initialized more than once when getMembers() is called concurrently.
+        @SuppressWarnings("java:S3077")
         @Nullable
         private volatile List<BeanPropertyMember<B, ?>> members;
 

@@ -20,6 +20,7 @@ import io.micronaut.inject.visitor.introspections.Person
 import spock.lang.Issue
 import spock.util.environment.RestoreSystemProperties
 
+import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
 
 import java.lang.annotation.ElementType
@@ -2654,6 +2655,8 @@ class Test extends MySuperclass {
         BeanIntrospection introspection = buildBeanIntrospection('test.Person', '''
 package test
 
+import io.micronaut.core.annotation.Introspected
+import jakarta.validation.constraints.NotNull
 
 @Introspected(members = true)
 class Person {

@@ -2570,6 +2570,8 @@ class MyMessage: Message()
         BeanIntrospection introspection = buildBeanIntrospection('test.Person', '''
 package test
 
+import io.micronaut.core.annotation.Introspected
+import jakarta.validation.constraints.NotNull
 
 @Introspected(members = true)
 class Person {
