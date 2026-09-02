@@ -13,6 +13,30 @@ class AnnotationValueSpec extends Specification {
         av.toString() == "@test.Foo(value=10)"
     }
 
+    void "the reserved stereotypes member is read through getStereotypes() and hidden from the attributes"() {
+        given:
+        def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
+        def retaining = new AnnotationValue("test.Composed", [min: 3, (AnnotationUtil.STEREOTYPES_MEMBER): [size] as AnnotationValue[]] as Map<CharSequence, Object>)
+        def plain = new AnnotationValue("test.Composed", [min: 3] as Map<CharSequence, Object>)
+
+        expect: "the member is the stereotypes"
+        retaining.getStereotypes() == [size]
+        plain.getStereotypes() == null
+
+        and: "it is not an attribute"
+        retaining.getValues() == [min: 3]
+        retaining.getMemberNames() == ["min"] as Set
+        retaining.toString() == "@test.Composed(min=3)"
+        retaining.contains(AnnotationUtil.STEREOTYPES_MEMBER)
+
+        and: "it takes no part in equality"
+        retaining == plain
+        retaining.hashCode() == plain.hashCode()
+
+        and: "it survives mutation"
+        retaining.mutate().member("min", 4).build().getStereotypes() == [size]
+    }
+
     void "test get properties"() {
         given:
         def av = AnnotationValue.builder("test.Foo")

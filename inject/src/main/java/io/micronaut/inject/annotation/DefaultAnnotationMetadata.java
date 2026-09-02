@@ -77,6 +77,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, Map<CharSequence, Object>> allStereotypes;
     @Nullable
     Map<String, List<String>> annotationsByStereotype;
+
     private final Map<String, List> annotationValuesByType = new ConcurrentHashMap<>(2);
 
     private final boolean hasPropertyExpressions;
@@ -990,11 +991,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     protected <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
-        List<AnnotationValue<?>> stereotypes = AnnotationMetadataSupport.getRetainedStereotypes(values);
-        if (stereotypes == null) {
-            return new AnnotationValue<>(annotationType, values, AnnotationMetadataSupport.getDefaultValuesOrNull(annotationType));
-        }
-        return new AnnotationValue<>(annotationType, values, AnnotationMetadataSupport.ANNOTATION_DEFAULT_VALUES_PROVIDER, stereotypes);
+        return new AnnotationValue<>(annotationType, values, AnnotationMetadataSupport.getDefaultValuesOrNull(annotationType));
     }
 
     @Override
@@ -1398,7 +1395,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     protected final <K, V> Map<K, V> cloneMap(Map<K, V> map) {
-        List<AnnotationValue<?>> retainedStereotypes = AnnotationMetadataSupport.getRetainedStereotypes(map);
         Map<K, V> newMap;
         if (map instanceof LinkedHashMap<K, V> linkedHashMap) {
             newMap = (Map<K, V>) linkedHashMap.clone();
@@ -1411,14 +1407,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 entry.setValue((V) newValue);
             }
         }
-        Map<K, V> cloned = new HashMap<>(newMap);
-        if (retainedStereotypes != null) {
-            return (Map<K, V>) AnnotationMetadataSupport.withRetainedStereotypes(
-                (Map<CharSequence, Object>) cloned,
-                retainedStereotypes
-            );
-        }
-        return cloned;
+        return new HashMap<>(newMap);
     }
 
     /**

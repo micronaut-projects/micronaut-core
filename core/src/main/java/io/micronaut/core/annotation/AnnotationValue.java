@@ -134,24 +134,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
-     * @param annotationName        The annotation name
-     * @param values                The values
-     * @param defaultValuesProvider The default values provider
-     * @param stereotypes           The annotations composed by this annotation, retained because the annotation is
-     *                              meta-annotated with {@link RetainStereotypes}
-     * @since 5.2.0
-     */
-    @UsedByGeneratedCode
-    @Internal
-    public AnnotationValue(String annotationName,
-                           Map<CharSequence, Object> values,
-                           AnnotationDefaultValuesProvider defaultValuesProvider,
-                           @Nullable
-                           List<AnnotationValue<?>> stereotypes) {
-        this(annotationName, values, null, RetentionPolicy.RUNTIME, stereotypes, defaultValuesProvider);
-    }
-
-    /**
      * @param annotationName  The annotation name
      * @param values          The values
      * @param defaultValues   The default values
@@ -289,11 +271,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
-     * @return The stereotypes of the annotation
+     * The stereotypes of the annotation: the annotations it is meta-annotated with while it is being mapped or
+     * remapped, or, for an annotation meta-annotated with {@link RetainStereotypes}, the annotations it composes,
+     * retained in the reserved {@link AnnotationUtil#STEREOTYPES_MEMBER} member with member overrides applied.
+     *
+     * @return The stereotypes of the annotation, or {@code null} if they are not known
      */
     @Nullable
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public List<AnnotationValue<?>> getStereotypes() {
-        return stereotypes;
+        if (stereotypes != null || !values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            return stereotypes;
+        }
+        return (List) getAnnotations(AnnotationUtil.STEREOTYPES_MEMBER);
     }
 
     /**
@@ -1169,14 +1159,25 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The names of the members
      */
     public final Set<CharSequence> getMemberNames() {
+        if (values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            return getValues().keySet();
+        }
         return values.keySet();
     }
 
     /**
+     * The attribute values. The reserved {@link AnnotationUtil#STEREOTYPES_MEMBER} member is not an attribute and
+     * is not included; it is read through {@link #getStereotypes()}.
+     *
      * @return The attribute values
      */
     @Override
     public Map<CharSequence, Object> getValues() {
+        if (values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            Map<CharSequence, Object> attributes = new LinkedHashMap<>(values);
+            attributes.remove(AnnotationUtil.STEREOTYPES_MEMBER);
+            return Collections.unmodifiableMap(attributes);
+        }
         return Collections.unmodifiableMap(values);
     }
 
@@ -1407,10 +1408,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public String toString() {
-        if (values.isEmpty()) {
+        Map<CharSequence, Object> attributes = getValues();
+        if (attributes.isEmpty()) {
             return "@" + annotationName;
         } else {
-            return "@" + annotationName + "(" + values.entrySet().stream().map(entry -> entry.getKey() + "=" + toStringValue(entry.getValue())).collect(
+            return "@" + annotationName + "(" + attributes.entrySet().stream().map(entry -> entry.getKey() + "=" + toStringValue(entry.getValue())).collect(
                     Collectors.joining(", ")) + ")";
         }
     }

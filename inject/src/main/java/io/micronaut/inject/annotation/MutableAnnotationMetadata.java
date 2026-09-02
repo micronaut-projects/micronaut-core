@@ -590,25 +590,26 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     @SuppressWarnings("java:S2259")
     private void putValues(String annotation, Map<CharSequence, Object> values, Map<String, Map<CharSequence, Object>> currentAnnotationValues) {
         Map<CharSequence, Object> existing = currentAnnotationValues.get(annotation);
-        if (existing == null) {
-            currentAnnotationValues.put(annotation, copyAnnotationValues(values));
-        } else if (CollectionUtils.isNotEmpty(values)) {
+        boolean hasValues = CollectionUtils.isNotEmpty(values);
+        if (existing != null && hasValues) {
+            if (existing.isEmpty()) {
+                existing = new LinkedHashMap<>();
+                currentAnnotationValues.put(annotation, existing);
+            }
             for (CharSequence key : values.keySet()) {
                 if (!existing.containsKey(key)) {
                     existing.put(key, values.get(key));
                 }
             }
+        } else {
+            if (!hasValues) {
+                existing = existing == null ? CollectionUtils.newLinkedHashMap(3) : existing;
+            } else {
+                existing = CollectionUtils.newLinkedHashMap(values.size());
+                existing.putAll(values);
+            }
+            currentAnnotationValues.put(annotation, existing);
         }
-    }
-
-    private static Map<CharSequence, Object> copyAnnotationValues(Map<CharSequence, Object> values) {
-        Map<CharSequence, Object> copy = CollectionUtils.newLinkedHashMap(Math.max(values.size(), 3));
-        copy.putAll(values);
-        List<AnnotationValue<?>> retainedStereotypes = AnnotationMetadataSupport.getRetainedStereotypes(values);
-        if (retainedStereotypes != null) {
-            return AnnotationMetadataSupport.withRetainedStereotypes(copy, retainedStereotypes);
-        }
-        return copy;
     }
 
     @SuppressWarnings("MagicNumber")
@@ -732,11 +733,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         if (defaultValues == null) {
             defaultValues = AnnotationMetadataSupport.getDefaultValuesOrNull(annotationType);
         }
-        List<AnnotationValue<?>> stereotypes = AnnotationMetadataSupport.getRetainedStereotypes(values);
-        if (stereotypes == null) {
-            return new AnnotationValue<>(annotationType, values, defaultValues);
-        }
-        return new AnnotationValue<>(annotationType, values, defaultValues, RetentionPolicy.RUNTIME, stereotypes);
+        return new AnnotationValue<>(annotationType, values, defaultValues);
     }
 
     /**
