@@ -5,7 +5,9 @@ import io.micronaut.inject.BeanIdentifier
 import jakarta.inject.Singleton
 import spock.lang.Specification
 
+import java.util.LinkedHashSet
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -247,6 +249,23 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         scope.getOrCreate(creationContext).is(bean)
     }
 
+    void "under a lock per bean a bean put there while the scope is destroyed is closed, not dropped"() {
+        given: "a map that gains one more entry the first time the destruction asks what is left"
+        def late = new TestCreatedBean(id: BeanIdentifier.of("late"), bean: new Object())
+        def latecomer = new LatecomerMap(late: late)
+        def scope = new TestScope(true, latecomer)
+        scope.getOrCreate(new TestCreationContext(BeanIdentifier.of("early")))
+        def early = latecomer.get(BeanIdentifier.of("early"))
+
+        when:
+        scope.destroyScope(latecomer)
+
+        then: "the one that arrived during the destruction is closed too, and nothing is left behind"
+        early.closed
+        late.closed
+        latecomer.isEmpty()
+    }
+
     void "under a lock per bean the scope map must be a concurrent map"() {
         given:
         def scope = new TestScope(true, new HashMap<BeanIdentifier, CreatedBean<?>>())
@@ -276,6 +295,42 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
 
         where:
         lockPerBean << [false, true]
+    }
+
+    /**
+     * A scope map that puts one more entry in the first time its keys are read, standing for a bean created by
+     * another thread while the scope is being destroyed.
+     */
+    static class LatecomerMap implements ConcurrentMap<BeanIdentifier, CreatedBean<?>> {
+
+        @Delegate
+        final ConcurrentMap<BeanIdentifier, CreatedBean<?>> delegate = new ConcurrentHashMap<>()
+
+        CreatedBean<?> late
+        boolean arrived
+
+        /**
+         * A snapshot, so that what arrives after this view is taken is not seen through it — which is what a
+         * destruction that reads the keys once and then clears the map would miss.
+         */
+        @Override
+        Set<BeanIdentifier> keySet() {
+            return new LinkedHashSet<BeanIdentifier>(delegate.keySet())
+        }
+
+        /**
+         * Stands for another thread creating a bean of this scope while the destruction is under way: the first
+         * entry taken out is followed by one more arriving.
+         */
+        @Override
+        CreatedBean<?> remove(Object key) {
+            def removed = delegate.remove(key)
+            if (!arrived) {
+                arrived = true
+                delegate.put(late.id(), late)
+            }
+            return removed
+        }
     }
 
     static class TestScope extends AbstractConcurrentCustomScope<Singleton> {

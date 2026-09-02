@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -349,13 +350,32 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         return (Optional<T>) Optional.ofNullable(createdBean.bean());
     }
 
+    /**
+     * The identifier of any one entry of the map, or {@code null} where it holds none.
+     *
+     * @param scopeMap The scope map
+     * @return An identifier, or {@code null}
+     */
+    @Nullable
+    private static BeanIdentifier firstIdentifierOf(Map<BeanIdentifier, CreatedBean<?>> scopeMap) {
+        final Iterator<BeanIdentifier> identifiers = scopeMap.keySet().iterator();
+        return identifiers.hasNext() ? identifiers.next() : null;
+    }
+
     private void destroyScopeLockingPerBean(@Nullable Map<BeanIdentifier, CreatedBean<?>> scopeMap) {
         if (CollectionUtils.isEmpty(scopeMap)) {
             return;
         }
-        // each entry is taken out before it is closed, so that two destructions of one map close each bean once
-        for (BeanIdentifier id : scopeMap.keySet()) {
-            final CreatedBean<?> createdBean = scopeMap.remove(id);
+        // the map is drained rather than cleared: each entry is taken out before it is closed, so that two
+        // destructions of one map close each bean once, and a bean that another thread put there while the
+        // destruction runs is closed by the pass that finds it instead of being dropped by a clear(). Nothing
+        // holds creation off in this mode, so the drain repeats until the map stays empty
+        for (BeanIdentifier id = firstIdentifierOf(scopeMap); id != null; id = firstIdentifierOf(scopeMap)) {
+            final CreatedBean<?> createdBean;
+            // under the identifier's lock, so that a creation of it in flight is waited for and then taken out
+            synchronized (creationLocks.computeIfAbsent(id, key -> new Object())) {
+                createdBean = scopeMap.remove(id);
+            }
             if (createdBean != null) {
                 try {
                     createdBean.close();
@@ -364,6 +384,5 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
                 }
             }
         }
-        scopeMap.clear();
     }
 }
