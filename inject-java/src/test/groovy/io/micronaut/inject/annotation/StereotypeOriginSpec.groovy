@@ -623,6 +623,40 @@ class Test {
     }
 
     /**
+     * A value rebuilt with {@code mutate()} carries the tree only in the transient {@code stereotypes} field,
+     * which the writer does not emit — see {@code AnnotationValueSpec}. Merging that value back into the
+     * metadata is nonetheless safe, because {@code addDeclaredAnnotation} merges into the entry already there
+     * rather than replacing it, so the member the rebuilt value lost is still on the original.
+     *
+     * <p>That is the path a {@code TypeElementVisitor} adjusting an annotation takes, so it is worth pinning:
+     * were the merge to become a replace, every visitor that touches an annotation would silently drop its
+     * tree, and nothing would fail until the metadata was read back after writing.</p>
+     */
+    void "an annotation rebuilt and merged back keeps its retained tree through the writer"() {
+        given: "metadata whose composed annotation is rebuilt the way a visitor would rebuild it"
+        def compiled = buildTypeAnnotationMetadata("""
+package rebuiltspec;
+${IMPORTS}
+@ComposedA(min = 3)
+class Test {
+}
+${COMPOSED}
+""")
+        def mutable = MutableAnnotationMetadata.of(compiled)
+        def original = mutable.getAnnotation("rebuiltspec.ComposedA")
+        def rebuilt = original.mutate().member("min", 9).build()
+        mutable.addDeclaredAnnotation(rebuilt.getAnnotationName(), rebuilt.getValues(), rebuilt.getRetentionPolicy())
+
+        expect: "the rebuilt value still reads its tree before being written"
+        rebuilt.getStereotypes() != null
+
+        and: "and the tree is still there once written"
+        writeAndLoadMetadata('rebuiltspec.Test', mutable)
+                .getAnnotation("rebuiltspec.ComposedA")
+                .getStereotypes() != null
+    }
+
+    /**
      * A composed constraint in the shape a validation integration sees it. {@code @Inherited} is what
      * {@code micronaut-validation}'s remapper adds to every constraint, and without it the composed annotation
      * does not reach an implementing class at all — only its flattened stereotypes do.

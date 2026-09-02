@@ -1,5 +1,6 @@
 package io.micronaut.core.annotation
 
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
 class AnnotationValueSpec extends Specification {
@@ -35,6 +36,36 @@ class AnnotationValueSpec extends Specification {
 
         and: "it survives mutation"
         retaining.mutate().member("min", 4).build().getStereotypes() == [size]
+    }
+
+    /**
+     * {@code AnnotationValueBuilder} copies the values it is seeded with from {@link AnnotationValue#getValues()},
+     * which hides the reserved member, and separately copies {@link AnnotationValue#getStereotypes()} into the
+     * transient {@code stereotypes} field. So {@code mutate()} and {@code AnnotationValue.builder(value)} move
+     * the tree out of the member and into the field.
+     *
+     * <p>The field is the representation the writer does not emit — moving the tree there is what this PR set
+     * out to avoid. Reads are unaffected, because {@code getStereotypes()} answers from the field, so a mutated
+     * value looks correct in memory and silently writes no tree. The assertion above covers exactly that reading
+     * path, which is what masks it.</p>
+     *
+     * <p>It also leaves the two accessors disagreeing: {@code getStereotypes()} answers while
+     * {@code contains($stereotypes)} does not.</p>
+     */
+    @PendingFeature(reason = "AnnotationValueBuilder seeds itself from getValues(), which hides the reserved member")
+    void "mutating an annotation keeps the stereotypes in the member the writer emits"() {
+        given:
+        def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
+        def retaining = new AnnotationValue("test.Composed", [min: 3, (AnnotationUtil.STEREOTYPES_MEMBER): [size] as AnnotationValue[]] as Map<CharSequence, Object>)
+
+        expect: "the value it is seeded from carries the member"
+        retaining.contains(AnnotationUtil.STEREOTYPES_MEMBER)
+
+        and: "and so does the mutated value, not only its transient field"
+        retaining.mutate().member("min", 4).build().contains(AnnotationUtil.STEREOTYPES_MEMBER)
+
+        and: "the same for a builder seeded from it"
+        AnnotationValue.builder(retaining).build().contains(AnnotationUtil.STEREOTYPES_MEMBER)
     }
 
     /**
