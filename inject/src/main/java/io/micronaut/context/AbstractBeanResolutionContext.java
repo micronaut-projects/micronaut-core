@@ -31,8 +31,8 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.core.type.TypeInformation;
 import io.micronaut.core.type.TypeInformation.TypeFormat;
 import io.micronaut.core.util.AnsiColour;
@@ -41,6 +41,7 @@ import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.*;
 
 import io.micronaut.inject.proxy.InterceptedBean;
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -1215,9 +1216,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     /**
-     * A segment that represents a field.
+     * A segment that represents a field. It is a {@link FieldInjectionPoint}, so the kind of
+     * injection can be told from the public injection point hierarchy alone; as a field has
+     * no enclosing constructor or method its {@link #getOuterInjectionPoint()} is {@code null}.
+     *
+     * @param <B> The declaring bean type
+     * @param <T> The field type
      */
-    public static final class FieldSegment<B, T> extends AbstractSegment<B, T> implements InjectionPoint<B>, ArgumentCoercible<T>, ArgumentInjectionPoint<B, T> {
+    public static final class FieldSegment<B, T> extends AbstractSegment<B, T> implements FieldInjectionPoint<B, T>, ArgumentInjectionPoint<B, T> {
 
         /**
          * @param declaringClass The declaring class
@@ -1258,8 +1264,20 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         }
 
         @Override
+        @Nullable
         public CallableInjectionPoint<B> getOuterInjectionPoint() {
-            throw new UnsupportedOperationException("Outer injection point not retrievable from here");
+            // a field is not an argument of a constructor or method
+            return null;
+        }
+
+        @Override
+        public Class<T> getType() {
+            return getArgument().getType();
+        }
+
+        @Override
+        public Field getField() {
+            return ReflectionUtils.getRequiredField(getDeclaringType().getBeanType(), getName());
         }
 
         @Override
