@@ -20,7 +20,10 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * Executable method that delegates {@link DisposableIntercepted} disposal to the interceptor chain.
@@ -36,6 +39,7 @@ final class InterceptedDisposeMethod<T> extends InterceptedMethod<T, T> {
     private final BeanResolutionContext beanResolutionContext;
     private final BeanContext beanContext;
     private final T bean;
+    private final List<ExecutableMethod<T, ?>> callbacks;
 
     /**
      * @param disposableIntercepted The intercepted dispose bean definition
@@ -52,11 +56,17 @@ final class InterceptedDisposeMethod<T> extends InterceptedMethod<T, T> {
         this.beanResolutionContext = beanResolutionContext;
         this.beanContext = beanContext;
         this.bean = bean;
+        this.callbacks = disposableIntercepted.getPreDestroyExecutableMethods();
     }
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return disposableIntercepted.getAnnotationMetadata();
+    }
+
+    @Override
+    public List<ExecutableMethod<T, ?>> getLifecycleCallbacks() {
+        return callbacks;
     }
 
     @Override

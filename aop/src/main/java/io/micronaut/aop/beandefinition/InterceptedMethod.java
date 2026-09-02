@@ -33,6 +33,7 @@ import org.jspecify.annotations.Nullable;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -47,7 +48,7 @@ import java.util.Objects;
  * @since 5.1.0
  */
 @Internal
-abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>, ExecutableMethod<T, R>, EnvironmentConfigurable, io.micronaut.core.type.Executable<T, R> permits InterceptedDisposeMethod, InitializableInterceptedMethod {
+abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>, ExecutableMethod<T, R>, EnvironmentConfigurable, io.micronaut.core.type.Executable<T, R>, LifecycleInterceptedMethod<T> permits InterceptedDisposeMethod, InitializableInterceptedMethod {
 
     protected final Class<T> declaringType;
     protected final String methodName;
@@ -227,14 +228,24 @@ abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>,
     /**
      * Soft resolves the target {@link Method} avoiding reflection until as late as possible.
      *
+     * <p>This method stands for a lifecycle phase rather than for a method of the bean, so when the phase has
+     * callbacks the first one invoked is the method resolved; the phase itself has no method of the bean to
+     * resolve.</p>
+     *
      * @return The method
      * @throws NoSuchMethodError if the method doesn't exist
      */
     @Override
-    public final Method getTargetMethod() {
+    public Method getTargetMethod() {
         if (method == null) {
-            Method resolvedMethod = ReflectionUtils.getRequiredMethod(declaringType, methodName, argTypes);
-            resolvedMethod.setAccessible(true);
+            List<ExecutableMethod<T, ?>> callbacks = getLifecycleCallbacks();
+            Method resolvedMethod;
+            if (callbacks.isEmpty()) {
+                resolvedMethod = ReflectionUtils.getRequiredMethod(declaringType, methodName, argTypes);
+                resolvedMethod.setAccessible(true);
+            } else {
+                resolvedMethod = callbacks.get(0).getTargetMethod();
+            }
             this.method = resolvedMethod;
         }
         return this.method;
