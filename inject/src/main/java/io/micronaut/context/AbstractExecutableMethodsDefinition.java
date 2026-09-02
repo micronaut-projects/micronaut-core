@@ -34,7 +34,9 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -60,6 +62,10 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     private BeanContext beanContext;
     @Nullable
     private List<DispatchedExecutableMethod<T, ?>> executableMethodsList;
+    @Nullable
+    private List<ExecutableMethod<T, ?>> postConstructMethodsList;
+    @Nullable
+    private List<ExecutableMethod<T, ?>> preDestroyMethodsList;
 
     protected AbstractExecutableMethodsDefinition(MethodReference[] methodsReferences) {
         this.methodsReferences = methodsReferences;
@@ -93,9 +99,84 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             for (int i = 0, methodsReferencesLength = methodsReferences.length; i < methodsReferencesLength; i++) {
                 getExecutableMethodByIndex(i);
             }
-            executableMethodsList = Arrays.asList(executableMethods);
+            int[] postConstructIndexes = getPostConstructMethodIndexes();
+            int[] preDestroyIndexes = getPreDestroyMethodIndexes();
+            if (postConstructIndexes == null && preDestroyIndexes == null) {
+                executableMethodsList = Arrays.asList(executableMethods);
+            } else {
+                // Lifecycle callbacks are dispatched through this definition so that lifecycle interceptors can
+                // see and invoke them, but they are not executable methods of the bean: processors and adapters
+                // must not observe them.
+                List<DispatchedExecutableMethod<T, ?>> methods = new ArrayList<>(executableMethods.length);
+                for (int i = 0; i < executableMethods.length; i++) {
+                    if (!contains(postConstructIndexes, i) && !contains(preDestroyIndexes, i)) {
+                        methods.add(executableMethods[i]);
+                    }
+                }
+                executableMethodsList = Collections.unmodifiableList(methods);
+            }
         }
         return (List) executableMethodsList;
+    }
+
+    @Override
+    public List<ExecutableMethod<T, ?>> getPostConstructExecutableMethods() {
+        if (postConstructMethodsList == null) {
+            postConstructMethodsList = methodsAt(getPostConstructMethodIndexes());
+        }
+        return postConstructMethodsList;
+    }
+
+    @Override
+    public List<ExecutableMethod<T, ?>> getPreDestroyExecutableMethods() {
+        if (preDestroyMethodsList == null) {
+            preDestroyMethodsList = methodsAt(getPreDestroyMethodIndexes());
+        }
+        return preDestroyMethodsList;
+    }
+
+    /**
+     * The indexes of the {@link jakarta.annotation.PostConstruct} callbacks compiled into this definition, in
+     * invocation order. Generated code overrides this when the bean intercepts its post-construct phase.
+     *
+     * @return The indexes, or {@code null} when no callbacks were compiled in
+     * @since 5.2.0
+     */
+    protected int @Nullable [] getPostConstructMethodIndexes() {
+        return null;
+    }
+
+    /**
+     * The indexes of the {@link jakarta.annotation.PreDestroy} callbacks compiled into this definition, in
+     * invocation order. Generated code overrides this when the bean intercepts its pre-destroy phase.
+     *
+     * @return The indexes, or {@code null} when no callbacks were compiled in
+     * @since 5.2.0
+     */
+    protected int @Nullable [] getPreDestroyMethodIndexes() {
+        return null;
+    }
+
+    private List<ExecutableMethod<T, ?>> methodsAt(int @Nullable [] indexes) {
+        if (indexes == null || indexes.length == 0) {
+            return List.of();
+        }
+        List<ExecutableMethod<T, ?>> methods = new ArrayList<>(indexes.length);
+        for (int index : indexes) {
+            methods.add(getExecutableMethodByIndex(index));
+        }
+        return Collections.unmodifiableList(methods);
+    }
+
+    private static boolean contains(int @Nullable [] indexes, int index) {
+        if (indexes != null) {
+            for (int i : indexes) {
+                if (i == index) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Override
