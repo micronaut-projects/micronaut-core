@@ -3095,7 +3095,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                          @Nullable Qualifier<T> qualifier,
                                                                          boolean throwNonUnique) {
 
-        Predicate<BeanDefinition<T>> predicate = candidate -> !candidate.isAbstract();
+        Predicate<BeanDefinition<T>> predicate = candidate -> !candidate.isAbstract() && isInjectableCandidate(beanType, candidate);
         Collection<BeanDefinition<T>> candidates = findBeanCandidates(resolutionContext, beanType, true, predicate);
         Optional<BeanDefinition<T>> beanDefinition = pickOneBean(beanType, qualifier, throwNonUnique, candidates);
         if (beanDefinition.isPresent()) {
@@ -3103,7 +3103,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
         if (!lookupBeanType.equals(beanType)) {
-            candidates = findBeanCandidates(resolutionContext, lookupBeanType, true, predicate);
+            Predicate<BeanDefinition<T>> lookupPredicate = candidate -> !candidate.isAbstract() && isInjectableCandidate(lookupBeanType, candidate);
+            candidates = findBeanCandidates(resolutionContext, lookupBeanType, true, lookupPredicate);
             return pickOneBean(lookupBeanType, qualifier, throwNonUnique, candidates);
         }
         return Optional.empty();
@@ -3335,7 +3336,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
         Collection<BeanDefinition<T>> beanDefinitions = findBeanCandidatesInternal(resolutionContext, beanType);
         if (!beanDefinitions.isEmpty()) {
-            beanDefinitions = applyBeanResolutionFilters(resolutionContext, beanDefinitions);
+            beanDefinitions = applyBeanResolutionFilters(resolutionContext, beanType, beanDefinitions);
             if (qualifier != null) {
                 beanDefinitions = qualifier.filterQualified(beanType.getType(), beanDefinitions);
             }
@@ -3400,7 +3401,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    private <T> Collection<BeanDefinition<T>> applyBeanResolutionFilters(@Nullable BeanResolutionContext resolutionContext, Collection<BeanDefinition<T>> candidates) {
+    private <T> Collection<BeanDefinition<T>> applyBeanResolutionFilters(@Nullable BeanResolutionContext resolutionContext,
+                                                                         Argument<T> beanType,
+                                                                         Collection<BeanDefinition<T>> candidates) {
+        Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
         BeanResolutionContext.Segment<?, ?> segment = resolutionContext != null ? resolutionContext.getPath().peek() : null;
         BeanDefinition<?> declaringBean = null;
         Class<?> proxyTargetDefinitionType = null;
@@ -3417,9 +3421,25 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             BeanDefinition<T> c = iterator.next();
             if (c.isAbstract() || declaringBean != null && c.equals(declaringBean) || proxyTargetDefinitionType != null && proxyTargetDefinitionType.equals(c.getClass())) {
                 iterator.remove();
+            } else if (!isInjectableCandidate(beanType, c) && (lookupBeanType.equals(beanType) || !isInjectableCandidate(lookupBeanType, c))) {
+                iterator.remove();
             }
         }
         return candidates;
+    }
+
+    /**
+     * Whether the candidate can be provided as the requested type. A bean that is only enumerable by the
+     * requested type because it is {@link io.micronaut.core.annotation.Indexed} by it, without implementing it,
+     * can be listed via {@link #getBeanDefinitions(Argument)} but cannot be instantiated or injected as that type.
+     *
+     * @param beanType  The requested bean type
+     * @param candidate The candidate
+     * @param <T>       The bean type
+     * @return True if the candidate is a candidate for the requested type
+     */
+    private <T> boolean isInjectableCandidate(Argument<T> beanType, BeanDefinition<T> candidate) {
+        return beanType.getType() == Object.class || beanResolutionCustomizer.isCandidateBean(beanType, candidate);
     }
 
     private <T> void addCandidateToList(@Nullable BeanResolutionContext resolutionContext,
@@ -3485,7 +3505,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private <T> boolean isCandidatePresent(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        final Collection<BeanDefinition<T>> candidates = findBeanCandidates(null, beanType, true, null);
+        final Collection<BeanDefinition<T>> candidates = findBeanCandidates(null, beanType, true, candidate -> isInjectableCandidate(beanType, candidate));
         if (!candidates.isEmpty()) {
             filterReplacedBeans(candidates);
             if (qualifier != null) {
