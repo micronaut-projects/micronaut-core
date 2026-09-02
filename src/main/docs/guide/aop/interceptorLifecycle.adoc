@@ -73,15 +73,21 @@ public class TrackingInterceptor implements Interceptor<Object, Object> {
 <2> State that belongs to a single intercepted bean, which a singleton interceptor could not hold safely
 <3> The same instance handles `@PreDestroy`, so it can release what it acquired in `@PostConstruct`
 
+NOTE: A lifecycle interception runs once per callback, so a bean with several `@PostConstruct` methods in its class
+hierarchy is intercepted once for each of them, with `getExecutableMethod()` naming the callback. See
+<<lifecycleAdvice, Bean Life Cycle Advice>>.
+
 == Life Cycle of a Non-Singleton Interceptor
 
 For one intercepted bean, in order:
 
 . The interceptors bound to that bean are resolved once, while the bean is being created.
 . `AROUND_CONSTRUCT` interception runs, then the bean's constructor.
-. `POST_CONSTRUCT` interception runs, then the bean's `@PostConstruct` methods.
+. `POST_CONSTRUCT` interception runs around each of the bean's `@PostConstruct` methods, superclass methods first,
+  or once for the bean when it declares none.
 . `AROUND` or `INTRODUCTION` interception runs on each method call, for as long as the bean lives.
-. `PRE_DESTROY` interception runs, then the bean's `@PreDestroy` methods.
+. `PRE_DESTROY` interception runs around each of the bean's `@PreDestroy` methods, or once for the bean when it
+  declares none.
 . The interceptor is destroyed as a dependent of the intercepted bean, so its own `@PreDestroy` runs *after* the
 target's.
 

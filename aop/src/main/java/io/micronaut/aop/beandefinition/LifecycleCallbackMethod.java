@@ -17,11 +17,13 @@ package io.micronaut.aop.beandefinition;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.exception.InvocationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 /**
@@ -74,7 +76,20 @@ final class LifecycleCallbackMethod<T> extends InterceptedMethod<T, T> {
 
     @Override
     protected T invokeInternal(T instance, @Nullable Object[] arguments) {
-        callback.invoke(instance, arguments);
+        try {
+            callback.invoke(instance, arguments);
+        } catch (InvocationException e) {
+            // A private callback is dispatched reflectively, which wraps what it threw. Unwrap so that an interceptor
+            // sees the same exception whether or not the callback needed reflection.
+            Throwable cause = e.getCause() instanceof InvocationTargetException targetException ? targetException.getCause() : null;
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw e;
+        }
         return instance;
     }
 }
