@@ -55,6 +55,58 @@ class Test {
         kind << ["compiled", "written"]
     }
 
+    /**
+     * The cascade lives in the shared builder, but each language frontend resolves an annotation type by name
+     * differently, and that resolution is what carries an override down the subtree.
+     */
+    void "a transitive override cascades to what the intermediate annotation composes"() {
+        given:
+        def annotationMetadata = buildTypeAnnotationMetadata('cascadespec.Test', '''
+package cascadespec
+
+import io.micronaut.context.annotation.AliasFor
+import io.micronaut.core.annotation.RetainStereotypes
+import jakarta.validation.constraints.Size
+import java.lang.annotation.Retention
+import java.lang.annotation.RetentionPolicy
+
+@RetainStereotypes
+@Inner(min = 1)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Outer {
+    @AliasFor(annotationName = "cascadespec.Inner", member = "min", applyDefault = true)
+    int shortest() default 1
+}
+
+@RetainStereotypes
+@Size(min = 2)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Inner {
+    @AliasFor(annotation = Size.class, member = "min", applyDefault = true)
+    int min() default 2
+}
+
+@Outer(shortest = 3)
+class Test {
+}
+''')
+
+        when:
+        def inner = annotationMetadata.getAnnotation("cascadespec.Outer")
+                .getStereotypes()
+                .find { it.getAnnotationName() == "cascadespec.Inner" }
+
+        then: "the override reaches the intermediate annotation"
+        inner.getValues() == [min: 3]
+
+        and: "and cascades to what that annotation composes"
+        sizeOf(inner) == [[min: 3]]
+
+        and: "the flat index agrees"
+        annotationMetadata.getAnnotationValuesByName("jakarta.validation.constraints.Size")
+                .collect { it.getValues() } == [[min: 3]]
+    }
+
     private static List<Map> sizeOf(AnnotationValue<?> annotationValue) {
         annotationValue.getStereotypes()
                 .findAll { it.getAnnotationName() == "jakarta.validation.constraints.Size" }
