@@ -488,7 +488,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         }
         if (fieldInjection != null) {
             for (FieldReference fieldReference : fieldInjection) {
-                if (annotationMetadata != null && annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
+                // Only injected fields are dependencies. @Value and @Property fields are also recorded here.
+                if (fieldReference.argument.getAnnotationMetadata().hasAnnotation(AnnotationUtil.INJECT)) {
                     argumentConsumer.accept(fieldReference.argument);
                 }
             }

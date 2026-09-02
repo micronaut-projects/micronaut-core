@@ -129,6 +129,7 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -3404,70 +3405,88 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return false;
     }
 
-    private static <T> List<T> nullSafe(@Nullable List<T> list) {
-        if (list == null) {
-            return Collections.emptyList();
-        }
-        return list;
-    }
-
+    /**
+     * Sorts the singleton registrations into the order in which they should be destroyed.
+     *
+     * <p>A bean is destroyed before every bean it requires, so that a dependency outlives its dependents. Where the
+     * dependencies leave the order open, beans with a lower {@link io.micronaut.core.annotation.Order} value (or
+     * {@link io.micronaut.core.order.Ordered#getOrder()}) are destroyed first, and beans of equal precedence are
+     * destroyed in bean name order so that the sequence is stable between runs. Dependency cycles are broken by
+     * destroying the highest precedence bean of the cycle first.</p>
+     *
+     * @param beans The registrations
+     * @return The registrations in destruction order
+     */
     private List<BeanRegistration> topologicalSort(Collection<BeanRegistration> beans) {
-        Map<Boolean, List<BeanRegistration>> initial = beans.stream()
-            .sorted(Comparator.comparing(s -> s.getBeanDefinition().getRequiredComponents().size()))
-            .collect(Collectors.groupingBy(b -> b.getBeanDefinition().getRequiredComponents().isEmpty()));
-        List<BeanRegistration> sorted = new ArrayList<>(nullSafe(initial.get(true)));
-        List<BeanRegistration> unsorted = new ArrayList<>(nullSafe(initial.get(false)));
-        // Optimization which knows about types which are already in the sorted list
-        Set<Class<?>> satisfied = new HashSet<>();
+        final int size = beans.size();
+        // The index of a node is its precedence: lower @Order first, then bean name so the order is deterministic
+        final List<BeanRegistration> nodes = new ArrayList<>(beans);
+        nodes.sort(Comparator.<BeanRegistration>comparingInt(registration -> registration.getOrder())
+            .thenComparing(registration -> registration.getBeanDefinition().getName()));
 
-        // Optimization for types which we know are already unsatisified
-        // in a single iteration, allowing to skip the loop on unsorted elements
-        Set<Class<?>> unsatisfied = new HashSet<>();
-
-        //loop until all items have been sorted
-        while (!unsorted.isEmpty()) {
-            boolean acyclic = false;
-
-            unsatisfied.clear();
-            Iterator<BeanRegistration> i = unsorted.iterator();
-            while (i.hasNext()) {
-                BeanRegistration bean = i.next();
-                boolean found = false;
-
-                //determine if any components are in the unsorted list
-                Collection<Class<?>> components = bean.getBeanDefinition().getRequiredComponents();
-                for (Class<?> clazz : components) {
-                    if (satisfied.contains(clazz)) {
-                        continue;
-                    }
-                    if (unsatisfied.contains(clazz) || unsorted.stream()
-                        .map(BeanRegistration::getBeanDefinition)
-                        .map(BeanDefinition::getBeanType)
-                        .anyMatch(clazz::isAssignableFrom)) {
-                        found = true;
-                        unsatisfied.add(clazz);
-                        break;
-                    }
-                    satisfied.add(clazz);
-                }
-
-                //none of the required components are in the unsorted list,
-                //so it can be added to the sorted list
-                if (!found) {
-                    acyclic = true;
-                    i.remove();
-                    sorted.add(0, bean);
-                }
-            }
-
-            //rather than throw an exception here because there is a cyclical dependency
-            //just add the first item to the list and keep trying. It may be possible to
-            //see a cycle here because qualifiers are not taken into account.
-            if (!acyclic) {
-                sorted.add(0, unsorted.remove(0));
-            }
+        final Map<Class<?>, List<Integer>> nodesByType = new HashMap<>(size);
+        for (int i = 0; i < size; i++) {
+            nodesByType.computeIfAbsent(nodes.get(i).getBeanDefinition().getBeanType(), type -> new ArrayList<>(1)).add(i);
         }
 
+        // qualifiers are not taken into account, so every singleton assignable to a required type is a candidate
+        final Map<Class<?>, List<Integer>> candidatesByRequiredType = new HashMap<>();
+        // dependencies[i] holds the nodes that node i requires; each of them must be destroyed after node i
+        final List<List<Integer>> dependencies = new ArrayList<>(size);
+        final int[] dependents = new int[size];
+        for (int i = 0; i < size; i++) {
+            final Collection<Class<?>> required = nodes.get(i).getBeanDefinition().getRequiredComponents();
+            final List<Integer> nodeDependencies = new ArrayList<>(required.size());
+            for (Class<?> requiredType : required) {
+                final List<Integer> candidates = candidatesByRequiredType.computeIfAbsent(requiredType, type -> {
+                    final List<Integer> assignable = new ArrayList<>();
+                    for (Map.Entry<Class<?>, List<Integer>> entry : nodesByType.entrySet()) {
+                        if (type.isAssignableFrom(entry.getKey())) {
+                            assignable.addAll(entry.getValue());
+                        }
+                    }
+                    return assignable;
+                });
+                for (int j : candidates) {
+                    if (j != i && !nodeDependencies.contains(j)) {
+                        nodeDependencies.add(j);
+                        dependents[j]++;
+                    }
+                }
+            }
+            dependencies.add(nodeDependencies);
+        }
+
+        // Kahn's algorithm: repeatedly destroy the highest precedence bean that no remaining bean requires
+        final List<BeanRegistration> sorted = new ArrayList<>(size);
+        final boolean[] destroyed = new boolean[size];
+        final PriorityQueue<Integer> ready = new PriorityQueue<>(Math.max(1, size));
+        for (int i = 0; i < size; i++) {
+            if (dependents[i] == 0) {
+                ready.add(i);
+            }
+        }
+        int nextCycleCandidate = 0;
+        while (sorted.size() < size) {
+            if (ready.isEmpty()) {
+                // every remaining bean is part of a dependency cycle, break it at the highest precedence bean
+                while (destroyed[nextCycleCandidate]) {
+                    nextCycleCandidate++;
+                }
+                ready.add(nextCycleCandidate);
+            }
+            final int i = ready.poll();
+            if (destroyed[i]) {
+                continue;
+            }
+            destroyed[i] = true;
+            sorted.add(nodes.get(i));
+            for (int j : dependencies.get(i)) {
+                if (--dependents[j] == 0 && !destroyed[j]) {
+                    ready.add(j);
+                }
+            }
+        }
         return sorted;
     }
 

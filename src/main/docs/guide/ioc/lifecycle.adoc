@@ -32,6 +32,42 @@ snippet::io.micronaut.docs.lifecycle.Connection[tags="class", indent=0]
 
 NOTE: Simply implementing the `Closeable` or `AutoCloseable` interface is not enough for a bean to be closed with the context. One of the above methods must be used.
 
+=== Destruction Order
+
+When the context is closed, singletons are destroyed in dependency order: a bean is always destroyed before the beans injected into it, whether they were injected through the constructor, a method or a field. This lets a bean use its dependencies from its `@PreDestroy` method.
+
+Where the dependencies leave the order open, annotate the beans with ann:core.annotation.Order[] or implement api:core.order.Ordered[]. Beans with a lower value are destroyed first, so a consumer that should stop reading before the producer it feeds is closed can be declared as:
+
+[source,java]
+----
+@Singleton
+@Order(1) // <1>
+class MessageConsumer {
+
+    @PreDestroy
+    void stop() {
+        // stop consuming and flush pending messages
+    }
+}
+
+@Singleton
+@Order(2) // <2>
+class MessagePublisher {
+
+    @PreDestroy
+    void close() {
+        // close the connection
+    }
+}
+----
+
+<1> The consumer has the lowest value and is destroyed first
+<2> The publisher is destroyed once the consumer has stopped
+
+A dependency always outlives its dependents, regardless of the `@Order` values. Beans of equal precedence are destroyed in bean name order, so the destruction sequence is the same from run to run.
+
+TIP: Shutdown logic that spans several beans can also be placed in ann:runtime.event.annotation.EventListener[] methods for api:context.event.ShutdownEvent[], which is published before any bean is destroyed. Such methods can be ordered with ann:core.annotation.Order[] as well.
+
 == Dependent Beans
 
 Dependent beans are the beans used in the construction of your bean.
