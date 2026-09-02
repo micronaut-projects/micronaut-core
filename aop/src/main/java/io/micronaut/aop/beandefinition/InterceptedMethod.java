@@ -47,7 +47,7 @@ import java.util.Objects;
  * @since 5.1.0
  */
 @Internal
-abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>, ExecutableMethod<T, R>, EnvironmentConfigurable, io.micronaut.core.type.Executable<T, R>, LifecycleInterceptedMethod<T> permits InterceptedDisposeMethod, InitializableInterceptedMethod, LifecycleCallbackMethod {
+abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>, ExecutableMethod<T, R>, EnvironmentConfigurable, io.micronaut.core.type.Executable<T, R> permits InterceptedDisposeMethod, InitializableInterceptedMethod, LifecycleCallbackMethod {
 
     protected final Class<T> declaringType;
     protected final String methodName;

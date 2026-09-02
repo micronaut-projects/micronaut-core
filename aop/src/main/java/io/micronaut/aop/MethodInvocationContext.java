@@ -17,8 +17,6 @@ package io.micronaut.aop;
 import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
 
-import java.util.List;
-
 /**
  * Extended version of {@link InvocationContext} for {@link MethodInterceptor} instances.
  *
@@ -35,27 +33,6 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
      * @return The underlying method reference.
      */
     ExecutableMethod<T, R> getExecutableMethod();
-
-    /**
-     * The concrete executable methods represented by this invocation.
-     *
-     * <p>For ordinary method interception, and for a {@link InterceptorKind#POST_CONSTRUCT} or
-     * {@link InterceptorKind#PRE_DESTROY} interception of a callback, the list contains
-     * {@link #getExecutableMethod()}. Each {@code @PostConstruct} and {@code @PreDestroy} method of a bean is
-     * intercepted separately, so {@link #getExecutableMethod()} is the callback itself. A bean that binds a lifecycle
-     * kind without declaring a callback of that kind is intercepted once as a phase: there
-     * {@link #getExecutableMethod()} describes the phase rather than a method of the bean and this list is empty,
-     * as it is for a bean compiled by an earlier version of the framework.</p>
-     *
-     * <p>An executable method can be invoked, when needed, through
-     * {@link ExecutableMethod#invoke(Object, Object...)} on {@link #getTarget()}.</p>
-     *
-     * @return The executable methods represented by this invocation
-     * @since 5.2.0
-     */
-    default List<ExecutableMethod<T, ?>> getExecutableMethods() {
-        return List.of(getExecutableMethod());
-    }
 
     @Override
     default boolean isSuspend() {

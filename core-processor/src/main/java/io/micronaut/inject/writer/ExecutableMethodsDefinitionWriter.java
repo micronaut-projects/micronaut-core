@@ -195,20 +195,19 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
      * {@link ExecutableMethodsDefinition#getExecutableMethods()} and never marked for startup processing, so
      * executable method processors and adapters do not observe it. It is only reachable through
      * {@link ExecutableMethodsDefinition#getPostConstructExecutableMethods()} and
-     * {@link ExecutableMethodsDefinition#getPreDestroyExecutableMethods()}, in the order it was added, which is
-     * the order the bean definition invokes the callbacks.</p>
+     * {@link ExecutableMethodsDefinition#getPreDestroyExecutableMethods()}, at the returned position.</p>
      *
      * @param declaringType The declaring type
      * @param methodElement The callback
      * @param postConstruct {@code true} for a post-construct callback, {@code false} for a pre-destroy one
-     * @return The index of the callback
+     * @return The position of the callback among the callbacks of its kind
      * @since 5.2.0
      */
     public int addLifecycleMethod(TypedElement declaringType, MethodElement methodElement, boolean postConstruct) {
         addMethod(declaringType, methodElement);
-        int index = findIndexOfExecutableMethod(methodElement);
-        (postConstruct ? postConstructIndexes : preDestroyIndexes).add(index);
-        return index;
+        Set<Integer> indexes = postConstruct ? postConstructIndexes : preDestroyIndexes;
+        indexes.add(findIndexOfExecutableMethod(methodElement));
+        return indexes.size() - 1;
     }
 
     /**
@@ -221,27 +220,6 @@ public class ExecutableMethodsDefinitionWriter implements Buildable<OutputObject
      */
     public boolean isLifecycleMethod(int index) {
         return postConstructIndexes.contains(index) || preDestroyIndexes.contains(index);
-    }
-
-    /**
-     * The position of a lifecycle callback among the callbacks of its kind, which is its index in
-     * {@link ExecutableMethodsDefinition#getPostConstructExecutableMethods()} or
-     * {@link ExecutableMethodsDefinition#getPreDestroyExecutableMethods()} at runtime.
-     *
-     * @param index         The index returned by {@link #addLifecycleMethod(TypedElement, MethodElement, boolean)}
-     * @param postConstruct {@code true} for a post-construct callback, {@code false} for a pre-destroy one
-     * @return The position
-     * @since 5.2.0
-     */
-    public int getLifecycleMethodPosition(int index, boolean postConstruct) {
-        int position = 0;
-        for (int lifecycleIndex : postConstruct ? postConstructIndexes : preDestroyIndexes) {
-            if (lifecycleIndex == index) {
-                return position;
-            }
-            position++;
-        }
-        throw new IllegalStateException("Not a lifecycle method: " + index);
     }
 
     private void addMethod(TypedElement declaringType, MethodElement methodElement) {

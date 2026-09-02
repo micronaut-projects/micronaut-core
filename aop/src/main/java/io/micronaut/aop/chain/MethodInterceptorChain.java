@@ -22,7 +22,6 @@ import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
-import io.micronaut.aop.beandefinition.LifecycleInterceptedMethod;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
@@ -192,14 +191,6 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     @Override
     public ExecutableMethod<T, R> getExecutableMethod() {
         return executionHandle;
-    }
-
-    @Override
-    public List<ExecutableMethod<T, ?>> getExecutableMethods() {
-        if (executionHandle instanceof LifecycleInterceptedMethod<?> lifecycleMethod) {
-            return ((LifecycleInterceptedMethod<T>) lifecycleMethod).getExecutableMethods();
-        }
-        return MethodInvocationContext.super.getExecutableMethods();
     }
 
     /**

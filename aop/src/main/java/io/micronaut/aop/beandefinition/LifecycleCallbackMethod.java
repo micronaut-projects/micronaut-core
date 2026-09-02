@@ -23,7 +23,6 @@ import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
-import java.util.List;
 
 /**
  * Executable method that stands for one {@code @PostConstruct} or {@code @PreDestroy} callback of a bean in the
@@ -74,18 +73,8 @@ final class LifecycleCallbackMethod<T> extends InterceptedMethod<T, T> {
     }
 
     @Override
-    public List<ExecutableMethod<T, ?>> getExecutableMethods() {
-        return List.of(this);
-    }
-
-    @Override
     protected T invokeInternal(T instance, @Nullable Object[] arguments) {
         callback.invoke(instance, arguments);
         return instance;
-    }
-
-    @Override
-    public String toString() {
-        return callback.toString();
     }
 }

@@ -39,7 +39,6 @@ import java.util.*;
 class TrackingInterceptor implements MethodInterceptor<Object, Object> {
     static int intercepted;
     static ExecutableMethod<Object, ?> seen;
-    static List<ExecutableMethod<Object, ?>> seenMethods;
     static String targetMethodName;
     static Object proceeded;
 
@@ -47,7 +46,6 @@ class TrackingInterceptor implements MethodInterceptor<Object, Object> {
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
         intercepted++;
         seen = ctx.getExecutableMethod();
-        seenMethods = ctx.getExecutableMethods();
         targetMethodName = ctx.getTargetMethod().getName();
         seen.invoke(ctx.getTarget());
         proceeded = ctx.proceed();
@@ -89,7 +87,6 @@ class MyBean {
         interceptorType.seen.declaringType == beanType
         interceptorType.seen.hasAnnotation('jakarta.annotation.PostConstruct')
         interceptorType.seen.arguments.length == 0
-        interceptorType.seenMethods == [interceptorType.seen]
         interceptorType.targetMethodName == 'init'
 
         and: 'proceed() returns the bean'
@@ -280,14 +277,12 @@ import java.util.*;
 @InterceptorBinding(value = Tracked.class, kind = InterceptorKind.POST_CONSTRUCT)
 class TrackingInterceptor implements MethodInterceptor<Object, Object> {
     static int intercepted;
-    static int methodCount = -1;
     static String methodName;
     static Object proceeded;
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
         intercepted++;
-        methodCount = ctx.getExecutableMethods().size();
         methodName = ctx.getExecutableMethod().getMethodName();
         proceeded = ctx.proceed();
         return proceeded;
@@ -312,7 +307,6 @@ class MyBean {
         then:
         bean.work() == 'done'
         interceptorType.intercepted == 1
-        interceptorType.methodCount == 0
         interceptorType.methodName == 'initialize'
         interceptorType.proceeded.is(bean)
         definition.executableMethods.empty
@@ -635,7 +629,7 @@ public class Sub extends Base {
         context.close()
     }
 
-    void 'test executable methods represented by regular and lifecycle advice are exposed'() {
+    void 'test the callback of a proxied bean is the intercepted method of lifecycle advice only'() {
         given:
         ApplicationContext context = buildContext('''
 package callbacks.proxied;
@@ -662,11 +656,7 @@ class TrackingInterceptor implements MethodInterceptor<Object, Object> {
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
-        List<String> names = new ArrayList<>();
-        for (ExecutableMethod<Object, ?> method : ctx.getExecutableMethods()) {
-            names.add(method.getMethodName());
-        }
-        METHODS.put(ctx.getKind().name(), names);
+        METHODS.computeIfAbsent(ctx.getKind().name(), k -> new ArrayList<>()).add(ctx.getExecutableMethod().getMethodName());
         return ctx.proceed();
     }
 }

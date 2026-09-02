@@ -68,8 +68,8 @@ public Object intercept(MethodInvocationContext<Object, Object> context) {
 
 A bean that binds the interception kind but declares no callback of that kind is still intercepted once, as a phase, so
 that the binding on the class can be relied on regardless of what the bean declares. In that case
-`getExecutableMethod()` describes the phase rather than a method of the bean and `getExecutableMethods()` is empty. The
-same applies to a bean compiled by an earlier version of the framework.
+`getExecutableMethod()` describes the phase rather than a method of the bean. The same applies to a bean compiled by an
+earlier version of the framework.
 
 The callbacks are not part of the bean definition's executable methods: `BeanDefinition.getExecutableMethods()` does
 not include them, so executable method processors and adapters are not affected.

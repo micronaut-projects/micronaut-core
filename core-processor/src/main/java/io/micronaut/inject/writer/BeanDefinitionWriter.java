@@ -906,7 +906,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         postConstructMethods.add(methodDefinition);
         postProcessMethod(methodDefinition);
         if (isPostConstructIntercepted()) {
-            addLifecycleExecutableMethod(methodDefinition, true);
+            addLifecycleExecutableMethod(methodDefinition, postConstructMethods, true);
         }
         return this;
     }
@@ -917,27 +917,32 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         preDestroyMethods.add(methodDefinition);
         postProcessMethod(methodDefinition);
         if (isPreDestroyIntercepted()) {
-            addLifecycleExecutableMethod(methodDefinition, false);
+            addLifecycleExecutableMethod(methodDefinition, preDestroyMethods, false);
         }
         return this;
     }
 
     /**
-     * Makes a lifecycle callback of an intercepted phase available to the interceptors of that phase.
+     * Registers a callback of an intercepted phase with the executable methods definition, so that the interceptor
+     * chain of the callback can dispatch it without reflection and see it as the intercepted method.
      *
-     * <p>The callbacks of an intercepted phase are still invoked by the generated {@code doInitialize} or
-     * {@code doDispose}, one chain per phase; registering them with the executable methods definition only gives
-     * the interceptors a reflection-free {@link io.micronaut.inject.ExecutableMethod} for each of them, in
-     * invocation order. The executable methods definition keeps them out of the executable methods of the bean,
-     * which is why it can be shared with an AOP proxy of the bean without the proxy observing them either. A
-     * private callback is dispatched reflectively, which is what the generated lifecycle method does as well.</p>
+     * <p>The executable methods definition keeps the callback out of the executable methods of the bean, which is
+     * why it can be shared with an AOP proxy of the bean without the proxy observing it either. The generated
+     * lifecycle method addresses the callback by its position in the phase, so that position has to be the one the
+     * executable methods definition reports.</p>
      *
      * @param methodDefinition The callback
+     * @param lifecycleMethods The callbacks of the phase, the callback being the last one
      * @param postConstruct    {@code true} for a post-construct callback, {@code false} for a pre-destroy one
      */
-    private void addLifecycleExecutableMethod(MethodDefinition<ClassElement, MethodElement> methodDefinition, boolean postConstruct) {
+    private void addLifecycleExecutableMethod(MethodDefinition<ClassElement, MethodElement> methodDefinition,
+                                              List<MethodDefinition<ClassElement, MethodElement>> lifecycleMethods,
+                                              boolean postConstruct) {
         MethodElement methodElement = methodDefinition.methodElement();
-        getExecutableMethodsWriter().addLifecycleMethod(methodElement.getDeclaringType(), methodElement, postConstruct);
+        int position = getExecutableMethodsWriter().addLifecycleMethod(methodElement.getDeclaringType(), methodElement, postConstruct);
+        if (position != lifecycleMethods.size() - 1) {
+            throw new IllegalStateException("Lifecycle callback " + methodElement + " registered at position " + position + " but invoked at position " + (lifecycleMethods.size() - 1));
+        }
     }
 
     /**
@@ -1900,18 +1905,18 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                            Method superMethod,
                                            List<MethodDefinition<ClassElement, MethodElement>> lifecycleMethods,
                                            @Nullable Method interceptMethod) {
-        boolean postConstruct = superMethod == POST_CONSTRUCT_METHOD;
         return methodDefBuilder.build((aThis, methodParameters) -> {
             return aThis.invoke(superMethod, methodParameters).cast(beanTypeDef).newLocal("beanInstance", beanInstance -> {
                 List<StatementDef> statements = new ArrayList<>();
                 boolean hasInjectScope = false;
                 InjectMethodSignature injectMethodSignature = new InjectMethodSignature(aThis, methodParameters, beanInstance);
 
-                for (MethodDefinition<ClassElement, MethodElement> lifecycleMethod : lifecycleMethods) {
+                for (int position = 0; position < lifecycleMethods.size(); position++) {
+                    MethodDefinition<ClassElement, MethodElement> lifecycleMethod = lifecycleMethods.get(position);
                     if (interceptMethod == null) {
                         statements.add(injectStatement(injectMethodSignature, lifecycleMethod));
                     } else {
-                        statements.add(interceptedLifecycleStatement(injectMethodSignature, lifecycleMethod, interceptMethod, postConstruct));
+                        statements.add(interceptedLifecycleStatement(injectMethodSignature, lifecycleMethod, interceptMethod, position));
                     }
                     if (!hasInjectScope) {
                         for (ParameterElement parameter : lifecycleMethod.methodElement().getSuspendParameters()) {
@@ -1944,18 +1949,16 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
      * @param injectMethodSignature The signature of the lifecycle method being built
      * @param methodDefinition      The callback
      * @param interceptMethod       The interceptor entry point of the phase
-     * @param postConstruct         {@code true} for a post-construct callback, {@code false} for a pre-destroy one
+     * @param position              The position of the callback in the phase
      * @return The statement
      */
     private StatementDef interceptedLifecycleStatement(InjectMethodSignature injectMethodSignature,
                                                        MethodDefinition<ClassElement, MethodElement> methodDefinition,
                                                        Method interceptMethod,
-                                                       boolean postConstruct) {
+                                                       int position) {
         VariableDef.This aThis = injectMethodSignature.aThis;
         MethodElement methodElement = methodDefinition.methodElement();
         int methodIndex = allMethods.indexOf(methodDefinition);
-        ExecutableMethodsDefinitionWriter methodsWriter = getExecutableMethodsWriter();
-        int position = methodsWriter.getLifecycleMethodPosition(methodsWriter.findIndexOfExecutableMethod(methodElement), postConstruct);
         List<ExpressionDef> invocationValues = injectMethodValues(aThis, injectMethodSignature.methodParameters, methodDefinition.injectionPoints(), methodIndex);
         boolean isRequiredInjection = InjectionPoint.isInjectionRequired(methodDefinition.annotationMetadata());
         return TypeDef.OBJECT.array().instantiate(invocationValues).newLocal("values" + position, valuesVar -> {

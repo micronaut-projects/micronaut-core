@@ -20,10 +20,7 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
-import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
-
-import java.util.List;
 
 /**
  * Executable method that delegates {@link InitializableIntercepted} initialization to the interceptor chain.
@@ -60,12 +57,6 @@ final class InitializableInterceptedMethod<T> extends InterceptedMethod<T, T> {
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return initializableIntercepted.getAnnotationMetadata();
-    }
-
-    @Override
-    public List<ExecutableMethod<T, ?>> getExecutableMethods() {
-        // the phase runs only for a bean without callbacks of its kind, so there is no method of the bean to report
-        return List.of();
     }
 
     @Override
