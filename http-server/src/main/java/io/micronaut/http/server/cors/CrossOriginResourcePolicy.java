@@ -17,6 +17,8 @@ package io.micronaut.http.server.cors;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Map;
+
 /**
  * The possible values of the {@code Cross-Origin-Resource-Policy} header.
  *
@@ -27,6 +29,12 @@ public enum CrossOriginResourcePolicy implements CharSequence {
     SAME_ORIGIN("same-origin"),
     SAME_SITE("same-site"),
     CROSS_ORIGIN("cross-origin");
+
+    private static final Map<String, CrossOriginResourcePolicy> BY_VALUE = Map.of(
+        "same-origin", SAME_ORIGIN,
+        "same-site", SAME_SITE,
+        "cross-origin", CROSS_ORIGIN
+    );
 
     private final String value;
 
@@ -45,12 +53,7 @@ public enum CrossOriginResourcePolicy implements CharSequence {
         if (value == null) {
             return null;
         }
-        for (CrossOriginResourcePolicy policy : values()) {
-            if (policy.value.equals(value)) {
-                return policy;
-            }
-        }
-        return null;
+        return BY_VALUE.get(value);
     }
 
     @Override
