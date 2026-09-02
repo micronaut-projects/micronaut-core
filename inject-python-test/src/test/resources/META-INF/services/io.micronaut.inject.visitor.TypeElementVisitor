@@ -19,4 +19,5 @@ io.micronaut.python.annotation.processing.test.CustomVisitorSpec$GetMethodVisito
 io.micronaut.python.annotation.processing.test.CustomVisitorSpec$InjectElementVisitor
 io.micronaut.python.annotation.processing.test.annotate.StereotypeVisitorSpec$StereotypeAddingVisitor
 io.micronaut.python.annotation.processing.test.annotate.AnnotationMetadataSpec$MutatingVisitor
+io.micronaut.python.annotation.processing.test.annotate.InheritedParameterAnnotationMutationSpec$InheritedParameterMutationVisitor
 io.micronaut.python.compiler.FailingTypeElementVisitor
