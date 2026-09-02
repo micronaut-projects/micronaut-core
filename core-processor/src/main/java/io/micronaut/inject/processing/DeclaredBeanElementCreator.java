@@ -29,6 +29,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
+import io.micronaut.core.annotation.Order;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.processing.definition.ElementBeanDefinitionBuilder;
@@ -638,6 +639,11 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
 
         ClassElement finalInterfaceToAdapt1 = interfaceToAdapt;
         interfaceToAdapt.annotate(Indexed.class, builder -> builder.member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(finalInterfaceToAdapt1.getName())));
+
+        // The adapter is a bean of its own, so an @Order declared on the adapted method (which wins over one declared
+        // on the class) has to be carried over for the adapter to be ordered, e.g. among event listeners
+        methodAnnotationMetadata.intValue(Order.class)
+            .ifPresent(order -> finalInterfaceToAdapt1.annotate(Order.class, builder -> builder.value(order)));
 
         MutableAnnotationMetadata proxyAnnotationMetadata = MutableAnnotationMetadata.of(
             new AnnotationMetadataHierarchy(classElement, interfaceToAdapt)

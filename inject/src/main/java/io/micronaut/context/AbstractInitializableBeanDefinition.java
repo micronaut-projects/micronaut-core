@@ -17,6 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.DefaultBeanContext.ListenersSupplier;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.DependsOn;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Property;
@@ -488,7 +489,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         }
         if (fieldInjection != null) {
             for (FieldReference fieldReference : fieldInjection) {
-                if (annotationMetadata != null && annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
+                // Only injected fields are dependencies. @Value and @Property fields are also recorded here.
+                if (fieldReference.argument.getAnnotationMetadata().hasAnnotation(AnnotationUtil.INJECT)) {
                     argumentConsumer.accept(fieldReference.argument);
                 }
             }
@@ -499,6 +501,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                     argumentConsumer.accept(annotationReference.argument);
                 }
             }
+        }
+        if (annotationMetadata != null) {
+            Collections.addAll(requiredComponents, annotationMetadata.classValues(DependsOn.class));
         }
         this.requiredComponents = Collections.unmodifiableSet(requiredComponents);
         return this.requiredComponents;
