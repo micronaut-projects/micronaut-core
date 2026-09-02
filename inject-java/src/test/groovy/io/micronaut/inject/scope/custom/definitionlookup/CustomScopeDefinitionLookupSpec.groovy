@@ -4,13 +4,14 @@ import io.micronaut.aop.Intercepted
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanDestructionException
 import io.micronaut.inject.ProxyBeanDefinition
+import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.AutoCleanup
 import spock.lang.Specification
 
 class CustomScopeDefinitionLookupSpec extends Specification {
 
     @AutoCleanup
-    ApplicationContext context = ApplicationContext.run("spec": getClass().getSimpleName())
+    ApplicationContext context = ApplicationContext.run("spec": getClass().getSimpleName(), "proxies.one": "one")
 
     def setup() {
         PlainBean.created = 0
@@ -171,5 +172,27 @@ class CustomScopeDefinitionLookupSpec extends Specification {
         scope.beans.size() == 1
         context.getBean(PlainBean).is(bean)
         PlainBean.destroyed == 0
+    }
+
+    void "a delegated each-bean proxy definition finds and removes its target registration"() {
+        given:
+        LookupProxyScopeImpl scope = context.getBean(LookupProxyScopeImpl)
+        def qualifier = Qualifiers.byName("one")
+        def proxyDefinition = context.getBeanDefinition(EachProxiedBean, qualifier)
+        def proxy = context.getBean(EachProxiedBean, qualifier)
+        proxy.hello()
+
+        expect:
+        proxyDefinition.isProxy()
+        !(proxyDefinition instanceof ProxyBeanDefinition)
+        scope.beans.size() == 1
+        scope.findBeanRegistration(proxyDefinition).present
+
+        when:
+        def removed = scope.remove(proxyDefinition)
+
+        then:
+        removed.present
+        scope.beans.isEmpty()
     }
 }

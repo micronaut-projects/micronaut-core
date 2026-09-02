@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
+import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -312,18 +313,35 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         if (CollectionUtils.isEmpty(scopeMap)) {
             return null;
         }
-        final Class<?> targetDefinitionType = beanDefinition instanceof ProxyBeanDefinition<?> proxyBeanDefinition
-            ? proxyBeanDefinition.getTargetDefinitionType() : null;
+        final Class<?> targetDefinitionType = getTargetDefinitionType(beanDefinition);
         for (CreatedBean<?> createdBean : scopeMap.values()) {
             final BeanDefinition<?> held = createdBean.definition();
             if (held == null) {
                 continue;
             }
-            if (held.equals(beanDefinition) || (targetDefinitionType != null && targetDefinitionType == held.getClass())) {
+            if (held.equals(beanDefinition) || (targetDefinitionType != null && targetDefinitionType == unwrap(held).getClass())) {
                 return createdBean;
             }
         }
         return null;
+    }
+
+    @Nullable
+    private static Class<?> getTargetDefinitionType(BeanDefinition<?> beanDefinition) {
+        if (beanDefinition instanceof ProxyBeanDefinition<?> proxyBeanDefinition) {
+            return proxyBeanDefinition.getTargetDefinitionType();
+        }
+        if (beanDefinition instanceof DelegatingBeanDefinition<?> delegatingBeanDefinition) {
+            return getTargetDefinitionType(delegatingBeanDefinition.getTarget());
+        }
+        return null;
+    }
+
+    private static BeanDefinition<?> unwrap(BeanDefinition<?> beanDefinition) {
+        if (beanDefinition instanceof DelegatingBeanDefinition<?> delegatingBeanDefinition) {
+            return unwrap(delegatingBeanDefinition.getTarget());
+        }
+        return beanDefinition;
     }
 
     @SuppressWarnings("unchecked")
