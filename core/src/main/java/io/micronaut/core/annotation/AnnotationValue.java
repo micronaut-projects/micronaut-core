@@ -68,6 +68,26 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
  */
 public class AnnotationValue<A extends Annotation> implements AnnotationValueResolver {
 
+    private static final String ANNOTATION_PARAMETER = "annotation";
+
+    /**
+     * The members of each annotation type, by name, in declaration order: the zero-argument methods it declares,
+     * looked up once per type rather than on every read of an instance.
+     */
+    private static final ClassValue<Map<String, Method>> ANNOTATION_MEMBERS = new ClassValue<>() {
+        @Override
+        protected Map<String, Method> computeValue(Class<?> annotationType) {
+            Method[] declared = annotationType.getDeclaredMethods();
+            Map<String, Method> members = CollectionUtils.newLinkedHashMap(declared.length);
+            for (Method member : declared) {
+                if (member.getParameterCount() == 0 && !member.isSynthetic()) {
+                    members.put(member.getName(), member);
+                }
+            }
+            return Collections.unmodifiableMap(members);
+        }
+    };
+
     private final String annotationName;
     private final ConvertibleValues<Object> convertibleValues;
     private final Map<CharSequence, Object> values;
@@ -1549,7 +1569,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @since 4.0.0
      */
     public static <T extends Annotation> AnnotationValueBuilder<T> builder(AnnotationValue<T> annotation) {
-        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull(ANNOTATION_PARAMETER, annotation);
         return new AnnotationValueBuilder<>(annotation, annotation.getRetentionPolicy());
     }
 
@@ -1562,7 +1582,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The builder
      */
     public static <T extends Annotation> AnnotationValueBuilder<T> builder(AnnotationValue<T> annotation, @Nullable RetentionPolicy retentionPolicy) {
-        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull(ANNOTATION_PARAMETER, annotation);
         return new AnnotationValueBuilder<>(annotation, retentionPolicy);
     }
 
@@ -1593,7 +1613,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @since 5.2.0
      */
     public static <T extends Annotation> AnnotationValue<T> of(T annotation) {
-        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull(ANNOTATION_PARAMETER, annotation);
         Class<? extends Annotation> annotationType = annotation.annotationType();
         Map<String, Method> members = ANNOTATION_MEMBERS.get(annotationType);
         Map<CharSequence, Object> values = CollectionUtils.newLinkedHashMap(members.size());
@@ -1602,24 +1622,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         }
         return new AnnotationValue<>(annotationType.getName(), values, RetentionPolicy.RUNTIME);
     }
-
-    /**
-     * The members of each annotation type, by name, in declaration order: the zero-argument methods it declares,
-     * looked up once per type rather than on every read of an instance.
-     */
-    private static final ClassValue<Map<String, Method>> ANNOTATION_MEMBERS = new ClassValue<>() {
-        @Override
-        protected Map<String, Method> computeValue(Class<?> annotationType) {
-            Method[] declared = annotationType.getDeclaredMethods();
-            Map<String, Method> members = CollectionUtils.newLinkedHashMap(declared.length);
-            for (Method member : declared) {
-                if (member.getParameterCount() == 0 && !member.isSynthetic()) {
-                    members.put(member.getName(), member);
-                }
-            }
-            return Collections.unmodifiableMap(members);
-        }
-    };
 
     /**
      * A member read off an annotation instance.
