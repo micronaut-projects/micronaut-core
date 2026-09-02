@@ -1718,14 +1718,33 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private void purgeCacheForBeanDefinition(RuntimeBeanDefinition<?> definition) {
+        if (beanCandidateCache.isEmpty() && beanConcreteCandidateCache.isEmpty() &&
+            singletonBeanRegistrations.isEmpty() && containsBeanCache.isEmpty()) {
+            return;
+        }
         Class<?> beanType = definition.getBeanType();
-        Set<Class<?>> indexedTypes = CollectionUtils.setOf(definition.getIndexes());
+        Class<?>[] indexedTypes = definition.getIndexes();
         Predicate<Argument<?>> isAffected = cachedType ->
-            cachedType.isAssignableFrom(beanType) || indexedTypes.contains(cachedType.getType());
+            isAffectedByRegistration(cachedType, beanType, indexedTypes);
         beanCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey()));
         beanConcreteCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         singletonBeanRegistrations.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
         containsBeanCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
+    }
+
+    private static boolean isAffectedByRegistration(Argument<?> cachedType,
+                                                     Class<?> beanType,
+                                                     Class<?>[] indexedTypes) {
+        if (cachedType.isAssignableFrom(beanType)) {
+            return true;
+        }
+        Class<?> rawCachedType = cachedType.getType();
+        for (Class<?> indexedType : indexedTypes) {
+            if (indexedType == rawCachedType) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
