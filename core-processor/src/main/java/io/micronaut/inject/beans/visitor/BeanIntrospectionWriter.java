@@ -102,6 +102,10 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
     private static final String FIELD_BEAN_CONSTRUCTORS_REFERENCES = "$CONSTRUCTORS_REFERENCES";
     private static final String FIELD_ENUM_CONSTANTS_REFERENCES = "$ENUM_CONSTANTS_REFERENCES";
     private static final String METADATA_METHOD_SUFFIX = "$metadata";
+    /**
+     * The name the JDK gives the synthetic enclosing instance parameter of an inner class constructor.
+     */
+    private static final String ENCLOSING_INSTANCE_PARAMETER_NAME = "this$0";
     private static final java.lang.reflect.Method FIND_PROPERTY_BY_INDEX_METHOD =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getPropertyByIndex", int.class);
 
@@ -1055,7 +1059,36 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                 ordered.add(0, instantiatingConstructor);
             }
         }
-        return ordered;
+        return ordered.stream().map(BeanIntrospectionWriter::withEnclosingInstanceParameter).toList();
+    }
+
+    /**
+     * The constructor of a non-static inner class takes the enclosing instance as an implicit first
+     * parameter. {@link java.lang.reflect.Constructor#getParameterTypes()} reports it, the source level
+     * view of the element does not. Describe it, so that a described constructor lines up with its
+     * reflective counterpart and can be instantiated through
+     * {@link io.micronaut.core.beans.BeanConstructor#instantiate(Object...)}.
+     *
+     * @param constructor The declared constructor
+     * @return The constructor, with the enclosing instance parameter prepended if one is implied
+     */
+    private static MethodElement withEnclosingInstanceParameter(MethodElement constructor) {
+        if (!(constructor instanceof ConstructorElement)) {
+            // a static creator takes no enclosing instance
+            return constructor;
+        }
+        ClassElement declaringType = constructor.getDeclaringType();
+        if (!declaringType.isInner() || declaringType.isStatic()) {
+            return constructor;
+        }
+        ClassElement enclosingType = declaringType.getEnclosingType().orElse(null);
+        if (enclosingType == null) {
+            return constructor;
+        }
+        return constructor.withParameters(ArrayUtils.concat(
+            new ParameterElement[]{ParameterElement.of(enclosingType, ENCLOSING_INSTANCE_PARAMETER_NAME)},
+            constructor.getParameters()
+        ));
     }
 
     private static boolean isSameConstructor(MethodElement a, MethodElement b) {

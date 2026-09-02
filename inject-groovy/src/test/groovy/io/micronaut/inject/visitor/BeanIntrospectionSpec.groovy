@@ -13,6 +13,7 @@ import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.beans.UnsafeBeanProperty
 import io.micronaut.core.reflect.exception.InstantiationException
+import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.introspections.Person
@@ -2710,5 +2711,28 @@ class Order {
         then:
         introspection.getConstructors().size() == 1
         introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
+    }
+
+    // a non-static inner class is never introspected here: TypeElementVisitorTransform skips it
+    void "a described constructor of a static nested class does not describe an enclosing instance"() {
+        when:
+        def introspection = buildBeanIntrospection('test.CustomerService$Nested', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+class CustomerService {
+    @Introspected(constructors = true)
+    static class Nested {
+        String name
+        Nested(String name) { this.name = name }
+    }
+}
+''')
+
+        then:
+        Argument.toClassArray(introspection.getConstructors()[0].arguments) ==
+            introspection.beanType.getDeclaredConstructors()[0].parameterTypes
+        introspection.getConstructors()[0].arguments.length == 1
     }
 }
