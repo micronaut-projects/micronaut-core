@@ -97,12 +97,17 @@ class AnnotationValueOfAnnotationSpec extends Specification {
     }
 
     void 'test a member that cannot be read is reported rather than skipped'() {
-        given: 'an annotation that will not answer for one of its members'
+        given: 'an annotation that will not answer for one of its members, and answers the rest with their defaults'
+        // only one member fails: the order in which the members are read is not specified, and the message
+        // must name the member that failed, whichever came first
         Chunky unreadable = (Chunky) Proxy.newProxyInstance(Chunky.classLoader, [Chunky] as Class[], { Object proxy, Method method, Object[] args ->
             if (method.name == 'annotationType') {
                 return Chunky
             }
-            throw new UnsupportedOperationException("the member ${method.name} cannot be read")
+            if (method.name == 'realChunky') {
+                throw new UnsupportedOperationException("the member ${method.name} cannot be read")
+            }
+            return method.defaultValue
         } as InvocationHandler)
 
         when:
