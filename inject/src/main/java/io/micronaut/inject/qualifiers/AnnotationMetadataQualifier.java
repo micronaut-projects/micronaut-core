@@ -16,13 +16,11 @@
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.annotation.NonBinding;
-import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanType;
@@ -119,101 +117,33 @@ final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
 
     /**
      * The members of an annotation instance that take part in the comparison of two qualifiers, or {@code null}
-     * when one of them cannot be read.
-     */
-    @Nullable
-    private static Map<CharSequence, Object> resolveAnnotationBindingValues(Annotation annotation) {
-        Map<CharSequence, Object> bindingValues = new LinkedHashMap<>();
-        for (Method member : annotation.annotationType().getDeclaredMethods()) {
-            if (member.getParameterCount() != 0 || member.isSynthetic() || member.isAnnotationPresent(NonBinding.class)) {
-                continue;
-            }
-            Object value = readMember(annotation, member);
-            if (value == null) {
-                return null;
-            }
-            bindingValues.put(member.getName(), asMemberValue(value));
-        }
-        return bindingValues;
-    }
-
-    /**
-     * A member read off an annotation instance, or {@code null} when it cannot be read: the annotation type is
-     * not open to this module, or the instance would not answer for the member. A member of an annotation is
-     * never null itself, so the two do not overlap.
+     * when one of them cannot be read: the annotation type is not open to this module, or the instance would not
+     * answer for the member.
+     *
+     * <p>The members are read as {@link AnnotationValue#of(Annotation)} records them, which is the form the
+     * metadata of an annotated element records them in, so that the two sides of the comparison are the same
+     * values. {@link NonBinding} excludes a member from the comparison of the qualifier it is declared on, which is
+     * the annotation on the element, so a nested annotation is read whole.</p>
      *
      * <p>A qualifier that cannot read one of its members cannot compare it either, and it goes on qualifying by
      * its type alone rather than by the members it did manage to read.</p>
      */
     @Nullable
-    private static Object readMember(Annotation annotation, Method member) {
+    private static Map<CharSequence, Object> resolveAnnotationBindingValues(Annotation annotation) {
+        AnnotationValue<Annotation> annotationValue;
         try {
-            return ReflectionUtils.invokeInaccessibleMethod(annotation, member);
-        } catch (RuntimeException e) {
+            annotationValue = AnnotationValue.of(annotation);
+        } catch (IllegalStateException e) {
             // the member of an annotation this module cannot read is a member it cannot compare
             return null;
         }
-    }
-
-    /**
-     * A member value read off an annotation instance, as the metadata of an annotated element records it: a class
-     * is recorded as an {@link AnnotationClassValue}, an enum by the name of its constant and a nested annotation
-     * as an {@link AnnotationValue}, so that the two sides of the comparison are the same values.
-     */
-    private static Object asMemberValue(Object value) {
-        if (value instanceof Class<?> type) {
-            return new AnnotationClassValue<>(type);
-        }
-        if (value instanceof Enum<?> constant) {
-            return constant.name();
-        }
-        if (value instanceof Annotation nested) {
-            return asAnnotationValue(nested);
-        }
-        if (value instanceof Class<?>[] types) {
-            AnnotationClassValue<?>[] classValues = new AnnotationClassValue[types.length];
-            for (int i = 0; i < types.length; i++) {
-                classValues[i] = new AnnotationClassValue<>(types[i]);
-            }
-            return classValues;
-        }
-        if (value instanceof Enum<?>[] constants) {
-            String[] names = new String[constants.length];
-            for (int i = 0; i < constants.length; i++) {
-                names[i] = constants[i].name();
-            }
-            return names;
-        }
-        if (value instanceof Annotation[] nested) {
-            AnnotationValue<?>[] annotationValues = new AnnotationValue[nested.length];
-            for (int i = 0; i < nested.length; i++) {
-                annotationValues[i] = asAnnotationValue(nested[i]);
-            }
-            return annotationValues;
-        }
-        return value;
-    }
-
-    private static AnnotationValue<Annotation> asAnnotationValue(Annotation nested) {
-        return new AnnotationValue<>(nested.annotationType().getName(), resolveAllValues(nested));
-    }
-
-    /**
-     * Every member of a nested annotation. {@link NonBinding} excludes a member from the comparison of the
-     * qualifier it is declared on, which is the annotation on the element, so a nested one is read whole.
-     */
-    private static Map<CharSequence, Object> resolveAllValues(Annotation annotation) {
-        Map<CharSequence, Object> values = new LinkedHashMap<>();
+        Map<CharSequence, Object> bindingValues = new LinkedHashMap<>(annotationValue.getValues());
         for (Method member : annotation.annotationType().getDeclaredMethods()) {
-            if (member.getParameterCount() != 0 || member.isSynthetic()) {
-                continue;
-            }
-            Object value = readMember(annotation, member);
-            if (value != null) {
-                values.put(member.getName(), asMemberValue(value));
+            if (member.isAnnotationPresent(NonBinding.class)) {
+                bindingValues.remove(member.getName());
             }
         }
-        return values;
+        return bindingValues;
     }
 
     @Override
