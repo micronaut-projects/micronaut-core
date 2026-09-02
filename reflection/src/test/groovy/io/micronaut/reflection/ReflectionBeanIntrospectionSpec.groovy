@@ -32,6 +32,20 @@ class ReflectionBeanIntrospectionSpec extends Specification {
         constructors*.arguments*.type == [[String, int], [], [String]]
     }
 
+    void "the read and write property views are the ones a caller reading a bean asks for"() {
+        given:
+        def introspection = ReflectionBeanIntrospection.of(Book)
+
+        expect: "every property that yields a value is a read property, every one that takes one is a write property"
+        introspection.beanReadProperties*.name.toSet() == introspection.beanProperties.findAll { !it.writeOnly }*.name.toSet()
+        introspection.beanWriteProperties*.name.toSet() == introspection.beanProperties.findAll { !it.readOnly }*.name.toSet()
+        !introspection.beanReadProperties.empty
+
+        and: "they are the properties themselves, so they read and write what the property does"
+        def title = introspection.beanReadProperties.find { it.name == "title" }
+        title.get(new Book("t", 1)) == "t"
+    }
+
     void "instantiation reports what it cannot do"() {
         given:
         def introspection = ReflectionBeanIntrospection.of(Book)

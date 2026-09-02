@@ -61,6 +61,19 @@ micronaut:
 
 A pattern is a class name where `*` stands for any sequence of characters; `*` alone allows every class. The same patterns can be allowed programmatically through api:reflection.ReflectionIntrospectionPolicy[]. The policy guards only the shared introspector: code that reflects on a type explicitly, through the types above, made its own choice.
 
+Everything built on introspections then sees the type. Serialization, for one, asks the shared introspector for the introspection and asks for its own opt-in as well, so a class it should read without being annotated needs both:
+
+[configuration]
+----
+micronaut:
+  introspection:
+    allow-reflection:
+      - com.example.model.*
+  serde:
+    included-introspection-packages:
+      - com.example.model
+----
+
 === Bean Definitions
 
 api:reflection.ReflectionBeanDefinition[] is a api:inject.BeanDefinition[] over a class, registered with a bean context at runtime, with the injection points, the executable methods and the life cycle a generated definition would have: the constructor the processors would select, the `@Inject`, `@Value` and `@Property` fields and methods, the `@PostConstruct` and `@PreDestroy` methods, the `@Executable` methods, and the scope, qualifier, order and conditions of the class.

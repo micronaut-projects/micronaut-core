@@ -24,6 +24,8 @@ import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.BeanReadProperty;
+import io.micronaut.core.beans.BeanWriteProperty;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -135,6 +137,42 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     @Override
     public Collection<BeanProperty<T, Object>> getBeanProperties() {
         return properties;
+    }
+
+    /**
+     * The properties a value can be read from: every property but a write only one. A generated introspection
+     * keeps this view apart from {@link #getBeanProperties()}, and the code reading a bean - serialization
+     * among it - asks for this one.
+     *
+     * @return The read properties
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<BeanReadProperty<T, Object>> getBeanReadProperties() {
+        List<BeanReadProperty<T, Object>> readProperties = new ArrayList<>(properties.size());
+        for (BeanProperty<T, Object> property : properties) {
+            if (!property.isWriteOnly()) {
+                readProperties.add((BeanReadProperty<T, Object>) property);
+            }
+        }
+        return Collections.unmodifiableList(readProperties);
+    }
+
+    /**
+     * The properties a value can be written to: every property but a read only one.
+     *
+     * @return The write properties
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<BeanWriteProperty<T, Object>> getBeanWriteProperties() {
+        List<BeanWriteProperty<T, Object>> writeProperties = new ArrayList<>(properties.size());
+        for (BeanProperty<T, Object> property : properties) {
+            if (!property.isReadOnly()) {
+                writeProperties.add((BeanWriteProperty<T, Object>) property);
+            }
+        }
+        return Collections.unmodifiableList(writeProperties);
     }
 
     @Override

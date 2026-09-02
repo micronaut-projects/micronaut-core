@@ -21,6 +21,8 @@ import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.BeanReadProperty;
+import io.micronaut.core.beans.BeanWriteProperty;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
@@ -164,6 +166,28 @@ public final class SupplementedBeanIntrospection<T> implements ReflectiveIntrosp
             properties.add(reflectedProperty == null ? property : new DescribedBeanProperty<>(property, reflectedProperty.asArgument()));
         }
         return Collections.unmodifiableList(properties);
+    }
+
+    /**
+     * The read properties of the generated introspection, which describes them itself.
+     *
+     * @return The read properties
+     */
+    @Override
+    public List<BeanReadProperty<T, Object>> getBeanReadProperties() {
+        List<BeanReadProperty<T, Object>> generatedProperties = generated.getBeanReadProperties();
+        return generatedProperties.isEmpty() ? reflected.getBeanReadProperties() : generatedProperties;
+    }
+
+    /**
+     * The write properties of the generated introspection, which describes them itself.
+     *
+     * @return The write properties
+     */
+    @Override
+    public List<BeanWriteProperty<T, Object>> getBeanWriteProperties() {
+        List<BeanWriteProperty<T, Object>> generatedProperties = generated.getBeanWriteProperties();
+        return generatedProperties.isEmpty() ? reflected.getBeanWriteProperties() : generatedProperties;
     }
 
     @Override
