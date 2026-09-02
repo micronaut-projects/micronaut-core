@@ -176,19 +176,19 @@ class Test {
      * {@code @B} over {@code @C} over {@code @Size}, the override reaches {@code @B(min = 7)} and
      * {@code @C(min = 7)}, but {@code @Size} keeps the value it was computed with, {@code min = 1}.
      *
-     * <p>{@code overrideMembers} overrides the occurrence's members first and only then re-applies its aliases,
-     * and the members of {@code @C} <em>are</em> overridden while its aliases are not re-applied — so the
-     * recursion is not stopping on the empty-subtree guard, which leaves {@code processAliases} returning early
-     * because the annotation type is null. The first level gets a {@code ProcessedAnnotation} straight out of
-     * the declared stereotype list, with its type; every level below is rebuilt by
-     * {@code toProcessedAnnotation}, which resolves the type by name through {@code getAnnotationMirror} and
-     * yields null when that lookup does not resolve.</p>
+     * <p>The recursion itself is not what fails. Instrumenting {@code overrideMembers} shows the annotation type
+     * resolves at every level and that the cascade does compute the right answer: {@code @C(min = 7)} is
+     * produced carrying {@code @Size(min = 7)}, and {@code @B}'s rebuilt subtree carries both. A later
+     * processing pass then overwrites it — it rebuilds {@code @B}'s subtree from a {@code @C} whose own
+     * subtree was computed before the override, and the last write wins, so the leaf reverts to the
+     * {@code min = 1} it was first computed with. The value is computed correctly and then lost, rather than
+     * never being computed.</p>
      *
      * <p>Two levels is not exotic for the motivating consumer: a composed constraint composing another composed
      * constraint is ordinary, and {@code micronaut-validation} cascades to any depth today because each
      * composing descriptor re-applies {@code @OverridesAttribute} from its own already-overridden value.</p>
      */
-    @PendingFeature(reason = "the cascade re-applies aliases only one level below the overridden occurrence")
+    @PendingFeature(reason = "a later processing pass overwrites the cascaded subtree with one computed before the override")
     void "a transitive override cascades through more than one intermediate annotation"() {
         given:
         def annotationMetadata = writeAndLoadMetadata('deepspec.Test', buildTypeAnnotationMetadata('''

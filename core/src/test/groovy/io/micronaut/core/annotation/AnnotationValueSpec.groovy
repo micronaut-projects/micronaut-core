@@ -1,6 +1,5 @@
 package io.micronaut.core.annotation
 
-import spock.lang.PendingFeature
 import spock.lang.Specification
 
 class AnnotationValueSpec extends Specification {
@@ -52,7 +51,6 @@ class AnnotationValueSpec extends Specification {
      * <p>It also leaves the two accessors disagreeing: {@code getStereotypes()} answers while
      * {@code contains($stereotypes)} does not.</p>
      */
-    @PendingFeature(reason = "AnnotationValueBuilder seeds itself from getValues(), which hides the reserved member")
     void "mutating an annotation keeps the stereotypes in the member the writer emits"() {
         given:
         def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
