@@ -141,10 +141,12 @@ internal class KotlinElementAnnotationMetadataFactory(
 
     override fun lookupForParameter(parameterElement: ParameterElement): CachedAnnotationMetadata {
         val kotlinParameterElement = parameterElement as KotlinParameterElement
-        val owner = kotlinParameterElement.methodElement.owningType
+        // Keyed by the declaring type, not the owning type: a parameter of an inherited method is the same
+        // parameter whichever class it is read through, so a mutation must be visible through all of them
+        val declaringType = kotlinParameterElement.methodElement.declaringType as KotlinClassElement
         return metadataBuilder.lookupOrBuild(
             Key3(
-                getClassDefinitionCacheKey(owner),
+                getClassDefinitionCacheKey(declaringType),
                 kotlinParameterElement.methodElement.nativeType,
                 kotlinParameterElement.nativeType
             ),
@@ -154,17 +156,19 @@ internal class KotlinElementAnnotationMetadataFactory(
 
     override fun lookupForField(fieldElement: FieldElement): CachedAnnotationMetadata {
         val kotlinFieldElement = fieldElement as AbstractKotlinElement<*>
-        val owner: KotlinClassElement
+        // Keyed by the declaring type, not the owning type: an inherited field is the same field whichever
+        // class it is read through, so a mutation must be visible through all of them
+        val declaringType: KotlinClassElement
         if (kotlinFieldElement is KotlinFieldElement) {
-            owner = kotlinFieldElement.owningType as KotlinClassElement
+            declaringType = kotlinFieldElement.declaringType as KotlinClassElement
         } else if (kotlinFieldElement is KotlinEnumConstantElement) {
-            owner = kotlinFieldElement.owningType as KotlinClassElement
+            declaringType = kotlinFieldElement.declaringType as KotlinClassElement
         } else {
             throw RuntimeException("Unknown field element type ${fieldElement.javaClass}")
         }
         return metadataBuilder.lookupOrBuild(
             Key2(
-                getClassDefinitionCacheKey(owner),
+                getClassDefinitionCacheKey(declaringType),
                 kotlinFieldElement.nativeType,
             ),
             kotlinFieldElement.nativeType.element

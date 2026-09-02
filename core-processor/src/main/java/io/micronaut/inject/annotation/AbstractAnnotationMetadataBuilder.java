@@ -283,15 +283,19 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Build the metadata for the given element. If the element is a method the class metadata will be included.
+     * Build the metadata for the given parameter element. The metadata is keyed by the type that <em>declares</em>
+     * the method, not by the type the method is reached through: a parameter of an inherited method is the same
+     * parameter whether it is read through the declaring class or through a subclass, so a mutation made through
+     * one must be visible through the other. Unlike a method, a parameter's metadata never includes the owning
+     * type's annotations, so nothing distinguishes it per owner.
      *
-     * @param owningType       The owning type
+     * @param declaringType    The type declaring the method
      * @param methodElement    The method element
      * @param parameterElement The parameter element
      * @return The {@link AnnotationMetadata}
      */
-    public CachedAnnotationMetadata lookupOrBuildForParameter(T owningType, T methodElement, T parameterElement) {
-        return lookupOrBuild(new Key3<>(owningType, methodElement, parameterElement), parameterElement);
+    public CachedAnnotationMetadata lookupOrBuildForParameter(T declaringType, T methodElement, T parameterElement) {
+        return lookupOrBuild(new Key3<>(declaringType, methodElement, parameterElement), parameterElement);
     }
 
     /**
@@ -316,14 +320,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Build the metadata for the given field element excluding any class metadata.
+     * Build the metadata for the given field element excluding any class metadata. The metadata is keyed by the
+     * type that <em>declares</em> the field, not by the type the field is reached through: an inherited field is
+     * the same field whether it is read through the declaring class or through a subclass, so a mutation made
+     * through one must be visible through the other.
      *
-     * @param owningType The owningType
-     * @param element    The element
+     * @param declaringType The type declaring the field
+     * @param element       The element
      * @return The {@link CachedAnnotationMetadata}
      */
-    public CachedAnnotationMetadata lookupOrBuildForField(T owningType, T element) {
-        return lookupOrBuild(new Key2<>(owningType, element), element);
+    public CachedAnnotationMetadata lookupOrBuildForField(T declaringType, T element) {
+        return lookupOrBuild(new Key2<>(declaringType, element), element);
     }
 
     /**
@@ -2117,33 +2124,36 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Key used to reference mutated metadata.
+     * Key used to reference mutated metadata. The first element is the type the entry belongs to (the owning type
+     * for a method, the declaring type for a field) so that {@link #clearMutated(Object)} can drop the entry when
+     * that type is cleared.
      *
-     * @param owningType  The element 1
-     * @param e2  The element 2
-     * @param <T> the element type
+     * @param type The type the entry belongs to
+     * @param e2   The element 2
+     * @param <T>  the element type
      */
     @Internal
-    private record Key2<T>(T owningType, T e2) implements Iterable<T> {
+    private record Key2<T>(T type, T e2) implements Iterable<T> {
         @Override
         public Iterator<T> iterator() {
-            return List.of(owningType, e2).iterator();
+            return List.of(type, e2).iterator();
         }
     }
 
     /**
-     * Key used to reference mutated metadata.
+     * Key used to reference mutated metadata. The first element is the type the entry belongs to (the declaring
+     * type for a parameter) so that {@link #clearMutated(Object)} can drop the entry when that type is cleared.
      *
-     * @param owningType  The element 1
-     * @param e2  The element 2
-     * @param e3  The element 3
-     * @param <T> the element type
+     * @param type The type the entry belongs to
+     * @param e2   The element 2
+     * @param e3   The element 3
+     * @param <T>  the element type
      */
     @Internal
-    private record Key3<T>(T owningType, T e2, T e3) implements Iterable<T> {
+    private record Key3<T>(T type, T e2, T e3) implements Iterable<T> {
         @Override
         public Iterator<T> iterator() {
-            return List.of(owningType, e2, e3).iterator();
+            return List.of(type, e2, e3).iterator();
         }
     }
 

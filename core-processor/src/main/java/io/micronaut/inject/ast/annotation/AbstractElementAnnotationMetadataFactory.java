@@ -154,28 +154,32 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
     }
 
     /**
-     * Lookup annotation metadata for the parameter.
+     * Lookup annotation metadata for the parameter. The entry is keyed by the declaring type of the method, not
+     * by the owning type, so that a parameter of an inherited method shares one entry whichever class it is read
+     * through.
      *
      * @param parameterElement The element
      * @return The annotation metadata
      */
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForParameter(ParameterElement parameterElement) {
+        MethodElement methodElement = parameterElement.getMethodElement();
         return metadataBuilder.lookupOrBuildForParameter(
-            getNativeElement(parameterElement.getMethodElement().getOwningType()),
-            getNativeElement(parameterElement.getMethodElement()),
+            getNativeElement(methodElement.getDeclaringType()),
+            getNativeElement(methodElement),
             getNativeElement(parameterElement)
         );
     }
 
     /**
-     * Lookup annotation metadata for the field.
+     * Lookup annotation metadata for the field. The entry is keyed by the declaring type of the field, not by the
+     * owning type, so that an inherited field shares one entry whichever class it is read through.
      *
      * @param fieldElement The element
      * @return The annotation metadata
      */
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForField(FieldElement fieldElement) {
         return metadataBuilder.lookupOrBuildForField(
-            getNativeElement(fieldElement.getOwningType()),
+            getNativeElement(fieldElement.getDeclaringType()),
             getNativeElement(fieldElement)
         );
     }

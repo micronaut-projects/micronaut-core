@@ -121,8 +121,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    public CachedAnnotationMetadata lookupOrBuildForParameter(AnnotatedNode owningType, AnnotatedNode methodElement, AnnotatedNode parameterElement) {
-        return super.lookupOrBuildForParameter(owningType, methodElement, new ExtendedParameter((MethodNode) methodElement, (Parameter) parameterElement));
+    public CachedAnnotationMetadata lookupOrBuildForParameter(AnnotatedNode declaringType, AnnotatedNode methodElement, AnnotatedNode parameterElement) {
+        return super.lookupOrBuildForParameter(declaringType, methodElement, new ExtendedParameter((MethodNode) methodElement, (Parameter) parameterElement));
     }
 
     @Override
