@@ -3,6 +3,7 @@ package io.micronaut.inject.annotation
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
+import spock.lang.PendingFeature
 import spock.lang.Unroll
 
 /**
@@ -91,9 +92,7 @@ import java.lang.annotation.*;
         kind << ["compiled", "written"]
     }
 
-    void "the retained tree nests; a transitive override does not cascade"() {
-        given:
-        def annotationMetadata = writeAndLoadMetadata('nestedspec.Test', buildTypeAnnotationMetadata('''
+    private static final String NESTED = '''
 package nestedspec;
 
 import io.micronaut.context.annotation.AliasFor;
@@ -120,7 +119,43 @@ class Test {
     @AliasFor(annotation = Size.class, member = "min", applyDefault = true)
     int min() default 2;
 }
-'''))
+'''
+
+    void "the retained tree nests"() {
+        given:
+        def annotationMetadata = writeAndLoadMetadata('nestedspec.Test', buildTypeAnnotationMetadata(NESTED))
+
+        when:
+        def outer = annotationMetadata.getAnnotation("nestedspec.Outer")
+        def inner = outer.getStereotypes().find { it.getAnnotationName() == "nestedspec.Inner" }
+
+        then: "the subtree of the intermediate annotation is reachable through it"
+        inner != null
+        inner.getStereotypes()*.getAnnotationName().contains("jakarta.validation.constraints.Size")
+
+        and: "the override reaches the intermediate annotation"
+        inner.getValues() == [min: 3]
+    }
+
+    /**
+     * {@code applyIntroducedAliases} rewrites the members of an intermediate annotation after that annotation's
+     * own subtree has been computed, and does not re-run down the tree. So {@code @Outer(shortest = 3)},
+     * overriding {@code Inner.min}, which itself overrides {@code Size.min}, reaches {@code @Inner(min = 3)} but
+     * leaves {@code @Size(min = 1)}.
+     *
+     * <p>The tree and the flat index agree on the same wrong value, so the tree does not introduce this — but it
+     * blocks the motivating consumer. {@code micronaut-validation} cascades today: its
+     * {@code DefaultConstraintDescriptor} builds each composing descriptor from the already-overridden
+     * {@code AnnotationValue} of its parent, which re-applies {@code @OverridesAttribute} one level down, and the
+     * constraint-composition tests in the Jakarta Validation TCK cover that. Reading composing values off the
+     * tree instead of reflecting over the annotation types would silently regress it.</p>
+     *
+     * <p>Both views are asserted so that a fix moves them together.</p>
+     */
+    @PendingFeature(reason = "applyIntroducedAliases does not re-run down the subtree whose members it rewrote")
+    void "a transitive override cascades to what the intermediate annotation composes"() {
+        given:
+        def annotationMetadata = writeAndLoadMetadata('nestedspec.Test', buildTypeAnnotationMetadata(NESTED))
 
         when:
         def outer = annotationMetadata.getAnnotation("nestedspec.Outer")
@@ -129,12 +164,14 @@ class Test {
         then: "the override reaches the intermediate annotation"
         inner.getValues() == [min: 3]
 
-        and: "but it does not cascade to what the intermediate annotation composes, matching the flat index"
+        and: "and cascades to what that annotation composes"
         inner.getStereotypes()
                 .findAll { it.getAnnotationName() == "jakarta.validation.constraints.Size" }
-                .collect { it.getValues() } == [[min: 1]]
+                .collect { it.getValues() } == [[min: 3]]
+
+        and: "the flat index agrees"
         annotationMetadata.getAnnotationValuesByName("jakarta.validation.constraints.Size")
-                .collect { it.getValues() } == [[min: 1]]
+                .collect { it.getValues() } == [[min: 3]]
     }
 
     void "the marker opts in transitively, so a meta-annotation can opt a whole family in"() {

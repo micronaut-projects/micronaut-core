@@ -1,5 +1,6 @@
 package io.micronaut.core.annotation
 
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
 class AnnotationValueSpec extends Specification {
@@ -35,6 +36,28 @@ class AnnotationValueSpec extends Specification {
 
         and: "it survives mutation"
         retaining.mutate().member("min", 4).build().getStereotypes() == [size]
+    }
+
+    /**
+     * {@code convertibleValues} is built once in the constructor from the raw values map, before
+     * {@link AnnotationValue#getValues()} gets the chance to hide the reserved member, so every bulk view
+     * reached through {@link AnnotationValue#getConvertibleValues()} — {@code names()}, {@code values()},
+     * {@code asMap()}, iteration — reports {@code $stereotypes} as if it were an attribute of the annotation.
+     *
+     * <p>Anything walking the members of an annotation generically goes through that view: it is what
+     * {@code AnnotationValueResolver} is backed by. The member is hidden from {@code getValues()},
+     * {@code getMemberNames()} and {@code toString()}, so this is the one hole left in "it is not an
+     * attribute", and it widens the blast radius of the reserved member beyond the opted-in consumers.</p>
+     */
+    @PendingFeature(reason = "convertibleValues is constructed from the raw values map, bypassing getValues()")
+    void "the reserved stereotypes member is hidden from the convertible values"() {
+        given:
+        def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
+        def retaining = new AnnotationValue("test.Composed", [min: 3, (AnnotationUtil.STEREOTYPES_MEMBER): [size] as AnnotationValue[]] as Map<CharSequence, Object>)
+
+        expect:
+        retaining.getConvertibleValues().names() == ["min"] as Set
+        retaining.getConvertibleValues().asMap().keySet() == ["min"] as Set
     }
 
     void "test get properties"() {
