@@ -43,6 +43,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -381,6 +382,13 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                     continue;
                 }
                 members.computeIfAbsent(field.getName(), PropertyMembers::new).addField(field);
+            }
+        }
+        // the accessor of a record component is a getter under the name of the component, which the naming rules
+        // below do not match: an annotation of the component whose target is a method lands there and nowhere else
+        if (beanType.isRecord()) {
+            for (RecordComponent component : beanType.getRecordComponents()) {
+                members.computeIfAbsent(component.getName(), PropertyMembers::new).addGetter(component.getAccessor());
             }
         }
         // the getters of the interfaces, which declare the type-use annotations of the implementations' properties

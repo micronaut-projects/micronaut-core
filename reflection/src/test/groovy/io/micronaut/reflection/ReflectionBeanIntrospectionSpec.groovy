@@ -46,6 +46,27 @@ class ReflectionBeanIntrospectionSpec extends Specification {
         title.get(new Book("t", 1)) == "t"
     }
 
+    void "a record is described through its components"() {
+        given:
+        def introspection = ReflectionBeanIntrospection.of(Coordinate)
+
+        expect: "the canonical constructor and a property per component"
+        introspection.constructorArguments*.name == ["label", "value"]
+        introspection.beanProperties*.name.toSet() == ["label", "value"].toSet()
+        introspection.beanReadProperties*.name.toSet() == ["label", "value"].toSet()
+
+        and: "the component is read through the accessor, so an annotation that can only land there is carried"
+        def label = introspection.getRequiredProperty("label", String)
+        label.stringValue(Coordinate.Axis).get() == "x"
+        label.get(new Coordinate("origin", 1)) == "origin"
+
+        and: "the accessor is a member of the property, with the type declaring it"
+        introspection.getPropertyMembers("label").any { it.member instanceof java.lang.reflect.Method && it.declaringType == Coordinate }
+
+        and:
+        introspection.instantiate("origin", 2) == new Coordinate("origin", 2)
+    }
+
     void "instantiation reports what it cannot do"() {
         given:
         def introspection = ReflectionBeanIntrospection.of(Book)

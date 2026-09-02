@@ -181,6 +181,64 @@ public final class ReflectionAnnotations {
     }
 
     /**
+     * The metadata of an element that declares an annotation type, without an instance of it: the annotation
+     * with the values given, its defaults and its stereotypes, as the processors record it.
+     *
+     * <p>Code that adapts another container - a Guice binding annotation, a Spring bean marked primary - knows
+     * the annotation type and the members it means, and has no instance to read. Declaring the annotation by
+     * name alone loses its defaults and its stereotypes, and a qualifier built from such metadata then fails to
+     * match one built from the generated metadata of a bean.</p>
+     *
+     * @param annotationType The annotation type, filed under its container when it is repeatable
+     * @param values         The values of the members, empty when the annotation is written bare
+     * @return The metadata
+     */
+    public static AnnotationMetadata declaring(Class<? extends Annotation> annotationType, Map<CharSequence, Object> values) {
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
+        declare(metadata, annotationType, values);
+        return metadata;
+    }
+
+    /**
+     * The metadata of an element that declares an annotation type with the defaults of its members.
+     *
+     * @param annotationType The annotation type
+     * @return The metadata
+     * @see #declaring(Class, Map)
+     */
+    public static AnnotationMetadata declaring(Class<? extends Annotation> annotationType) {
+        return declaring(annotationType, Map.of());
+    }
+
+    /**
+     * Adds an annotation type, the values given, its defaults and its stereotypes to a metadata under
+     * construction.
+     *
+     * @param metadata       The metadata
+     * @param annotationType The annotation type
+     * @param values         The values of the members, empty when the annotation is written bare
+     * @see #declaring(Class, Map)
+     */
+    public static void declare(MutableAnnotationMetadata metadata,
+                               Class<? extends Annotation> annotationType,
+                               Map<CharSequence, Object> values) {
+        register(metadata, annotationType);
+        String name = annotationType.getName();
+        Repeatable repeatable = annotationType.getAnnotation(Repeatable.class);
+        if (repeatable == null) {
+            metadata.addDeclaredAnnotation(name, new LinkedHashMap<>(values));
+        } else {
+            // a repeatable annotation is filed under its container, whether it is written once or several times
+            Class<? extends Annotation> container = repeatable.value();
+            register(metadata, container);
+            DefaultAnnotationMetadata.registerRepeatableAnnotations(Map.of(name, container.getName()));
+            metadata.addDeclaredRepeatable(container.getName(),
+                new AnnotationValue<>(name, new LinkedHashMap<>(values), defaultValues(annotationType)));
+        }
+        addStereotypes(metadata, annotationType, List.of(name), true);
+    }
+
+    /**
      * Adds the annotations of an element to a metadata under construction.
      *
      * @param metadata The metadata

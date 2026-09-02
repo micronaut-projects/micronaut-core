@@ -4,6 +4,7 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValueProvider
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
+import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import spock.lang.Specification
 
 import java.lang.reflect.ParameterizedType
@@ -106,6 +107,47 @@ class ReflectionTypesSpec extends Specification {
         value.stringValue().get() == "b"
         value.stringValue("comment").get() == "ignored"
         value.get(AnnotationUtil.NON_BINDING_ATTRIBUTE, String[]).get() == ["comment", AnnotationUtil.NON_BINDING_ATTRIBUTE] as String[]
+    }
+
+    void "an annotation type is declared with its defaults and its stereotypes, without an instance"() {
+        when: "a container adapting another one knows the type and the members it means"
+        def metadata = ReflectionAnnotations.declaring(Restricted, [level: 3])
+
+        then:
+        metadata.hasDeclaredAnnotation(Restricted)
+        metadata.intValue(Restricted, "level").get() == 3
+
+        and: "the members it did not give are carried in the defaults, where the generated metadata carries them"
+        metadata.getDefaultValues(Restricted.name).get("name") == "unnamed"
+        !metadata.stringValue(Restricted, "name").present
+
+        and: "a type declared bare carries its defaults all the same"
+        ReflectionAnnotations.declaring(Restricted).getDefaultValues(Restricted.name).get("level") == 1
+    }
+
+    void "an annotation type is declared into a metadata under construction"() {
+        given:
+        def metadata = new MutableAnnotationMetadata()
+
+        when:
+        ReflectionAnnotations.declare(metadata, Restricted, [level: 5])
+
+        then:
+        metadata.hasDeclaredAnnotation(Restricted)
+        metadata.intValue(Restricted, "level").get() == 5
+        metadata.getDefaultValues(Restricted.name).get("name") == "unnamed"
+    }
+
+    void "a repeatable annotation type is declared under its container, with its stereotypes"() {
+        when:
+        def metadata = ReflectionAnnotations.declaring(Tag, [value: "declared"])
+
+        then: "it is found the way the generated metadata is read"
+        metadata.getAnnotationValuesByType(Tag)*.stringValue()*.get() == ["declared"]
+
+        and: "the meta annotations are stereotypes, so a qualifier built from it matches one built from generated metadata"
+        metadata.hasStereotype(Stereo)
+        metadata.stringValue(Stereo, "kind").get() == "tag"
     }
 
     void "annotation instances become declared metadata"() {
