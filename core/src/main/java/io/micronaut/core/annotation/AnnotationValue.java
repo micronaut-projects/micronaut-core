@@ -21,6 +21,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.expressions.EvaluatedExpression;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -31,6 +32,7 @@ import org.jspecify.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -1582,6 +1584,113 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     public static <T extends Annotation> AnnotationValueBuilder<T> builder(AnnotationValue<T> annotation, @Nullable RetentionPolicy retentionPolicy) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return new AnnotationValueBuilder<>(annotation, retentionPolicy);
+    }
+
+    /**
+     * Reads a live annotation instance as an annotation value.
+     *
+     * <p>Code handed annotation instances at runtime, such as a qualifier passed to a bean lookup, needs them in
+     * the form compiled metadata records them so that the two compare equal. Every zero-argument member of the
+     * annotation is read, the ones left at their default included since an instance answers every one of its
+     * members, and converted the way an annotation processor records it:</p>
+     *
+     * <ul>
+     *     <li>a {@link Class} becomes an {@link AnnotationClassValue}</li>
+     *     <li>an {@link Enum} becomes the name of its constant</li>
+     *     <li>a nested {@link Annotation} becomes an {@link AnnotationValue} of every one of its members, recursively</li>
+     *     <li>an array of any of the above becomes an array of the converted form</li>
+     *     <li>any other value, such as a primitive, a {@link String} or an array of either, is kept as it is</li>
+     * </ul>
+     *
+     * <p>No member is left out. Whether a member takes part in the comparison of two qualifiers is a concern of the
+     * qualifier rather than of the conversion, so {@code @NonBinding} is not applied here.</p>
+     *
+     * @param annotation The annotation instance
+     * @param <T>        The annotation type
+     * @return The annotation value, with {@link RetentionPolicy#RUNTIME} retention
+     * @throws IllegalStateException When a member cannot be read, because the annotation type is not open to this
+     *                               module or because the instance does not answer for it
+     * @since 5.2.0
+     */
+    public static <T extends Annotation> AnnotationValue<T> of(T annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        Class<? extends Annotation> annotationType = annotation.annotationType();
+        Map<CharSequence, Object> values = new LinkedHashMap<>();
+        for (Method member : annotationType.getDeclaredMethods()) {
+            if (member.getParameterCount() != 0 || member.isSynthetic()) {
+                continue;
+            }
+            values.put(member.getName(), toMemberValue(readMember(annotation, member)));
+        }
+        return new AnnotationValue<>(annotationType.getName(), values, RetentionPolicy.RUNTIME);
+    }
+
+    /**
+     * A member read off an annotation instance.
+     *
+     * @param annotation The annotation instance
+     * @param member     The member
+     * @return The value, never null
+     * @throws IllegalStateException When the member cannot be read
+     */
+    private static Object readMember(Annotation annotation, Method member) {
+        Object value;
+        try {
+            value = ReflectionUtils.invokeInaccessibleMethod(annotation, member);
+        } catch (RuntimeException e) {
+            // the reflective wrappers say nothing an invocation target's own exception does not say better
+            Throwable cause = e;
+            while (cause.getCause() != null) {
+                cause = cause.getCause();
+            }
+            throw new IllegalStateException("Cannot read member [" + member.getName() + "] of annotation ["
+                + annotation.annotationType().getName() + "]: " + cause, e);
+        }
+        if (value == null) {
+            throw new IllegalStateException("Cannot read member [" + member.getName() + "] of annotation ["
+                + annotation.annotationType().getName() + "]: the instance answered null");
+        }
+        return value;
+    }
+
+    /**
+     * A member value read off an annotation instance, in the form compiled metadata records it.
+     *
+     * @param value The value as reflection returns it
+     * @return The value as metadata records it
+     */
+    private static Object toMemberValue(Object value) {
+        if (value instanceof Class<?> type) {
+            return new AnnotationClassValue<>(type);
+        }
+        if (value instanceof Enum<?> constant) {
+            return constant.name();
+        }
+        if (value instanceof Annotation nested) {
+            return of(nested);
+        }
+        if (value instanceof Class<?>[] types) {
+            AnnotationClassValue<?>[] classValues = new AnnotationClassValue[types.length];
+            for (int i = 0; i < types.length; i++) {
+                classValues[i] = new AnnotationClassValue<>(types[i]);
+            }
+            return classValues;
+        }
+        if (value instanceof Enum<?>[] constants) {
+            String[] names = new String[constants.length];
+            for (int i = 0; i < constants.length; i++) {
+                names[i] = constants[i].name();
+            }
+            return names;
+        }
+        if (value instanceof Annotation[] nested) {
+            AnnotationValue<?>[] annotationValues = new AnnotationValue[nested.length];
+            for (int i = 0; i < nested.length; i++) {
+                annotationValues[i] = of(nested[i]);
+            }
+            return annotationValues;
+        }
+        return value;
     }
 
     /**
