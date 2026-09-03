@@ -42,7 +42,6 @@ import org.jspecify.annotations.NullMarked;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -88,6 +87,7 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
             interceptors,
             interceptorKind,
             applicableBindings,
+            annotationMetadata,
             true,
             false
         );
@@ -121,11 +121,12 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
                                                      Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
                                                      InterceptorKind interceptorKind,
                                                      Collection<AnnotationValue<?>> interceptPointBindings,
+                                                     AnnotationMetadata interceptPointMetadata,
                                                      boolean selectMethodInterceptor,
                                                      boolean selectConstructorInterceptor) {
         List<BeanRegistration<Interceptor<T, ?>>> selectedInterceptorRegistrations = new ArrayList<>(interceptors.size());
         for (BeanRegistration<Interceptor<T, ?>> beanRegistration : interceptors) {
-            if (selectInterceptor(declaringType, interceptorKind, interceptPointBindings, beanRegistration)) {
+            if (selectInterceptor(declaringType, interceptorKind, interceptPointBindings, interceptPointMetadata, beanRegistration)) {
                 selectedInterceptorRegistrations.add(beanRegistration);
             }
         }
@@ -145,6 +146,7 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
     private <T> boolean selectInterceptor(Class<?> declaringType,
                                           InterceptorKind interceptorKind,
                                           Collection<AnnotationValue<?>> interceptPointBindings,
+                                          AnnotationMetadata interceptPointMetadata,
                                           BeanRegistration<Interceptor<T, ?>> beanRegistration) {
         final List<Argument<?>> typeArgs = beanRegistration.getBeanDefinition().getTypeArguments(ConstructorInterceptor.class);
         if (!typeArgs.isEmpty()) {
@@ -164,10 +166,9 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
         }
         // these are the binding declared on the interceptor itself
         // an interceptor can declare one or more bindings
+        final AnnotationMetadata interceptorMetadata = beanRegistration.getBeanDefinition().getAnnotationMetadata();
         final Collection<AnnotationValue<?>> interceptorValues = AbstractInterceptorChain
-            .resolveInterceptorValues(
-                beanRegistration.getBeanDefinition().getAnnotationMetadata(), interceptorKind
-            );
+            .resolveInterceptorValues(interceptorMetadata, interceptorKind);
         if (interceptorValues.isEmpty()) {
             // Bean is an interceptor but no bindings???
             return false;
@@ -180,32 +181,41 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
                 continue;
             }
             hasInterceptorBinding = true;
-            if (!matches(interceptorAnnotationValue, interceptPointBindings)) {
+            if (!matches(interceptorAnnotationValue, interceptorMetadata, interceptPointBindings, interceptPointMetadata)) {
                 return false;
             }
         }
         return hasInterceptorBinding;
     }
 
-    private boolean matches(AnnotationValue<?> interceptorAnnotationValue, Collection<AnnotationValue<?>> interceptPointBindings) {
-        final AnnotationValue<Annotation> memberBinding = interceptorAnnotationValue
-            .getAnnotation(InterceptorBindingQualifier.META_BINDING_VALUES).orElse(null);
+    /**
+     * Whether a binding declared on an interceptor applies to one of the bindings of an interception point: the
+     * binding annotation is the same and, when the interceptor binds members, one of the occurrences it was declared
+     * through is the same annotation as one of the occurrences at the interception point, with the occurrence
+     * declared on the method replacing the one on its class.
+     */
+    private boolean matches(AnnotationValue<?> interceptorAnnotationValue,
+                            AnnotationMetadata interceptorMetadata,
+                            Collection<AnnotationValue<?>> interceptPointBindings,
+                            AnnotationMetadata interceptPointMetadata) {
         final String annotationName = interceptorAnnotationValue.stringValue().orElse(null);
         if (annotationName == null) {
             // This shouldn't happen
             return false;
         }
+        final List<AnnotationValue<?>> interceptorOccurrences =
+            InterceptorBindingQualifier.resolveBoundOccurrences(interceptorAnnotationValue, interceptorMetadata);
         for (AnnotationValue<?> applicableValue : interceptPointBindings) {
             String interceptPointAnnotation = applicableValue.stringValue().orElse(null);
             if (!annotationName.equals(interceptPointAnnotation)) {
                 continue;
             }
-            if (memberBinding == null) {
+            if (interceptorOccurrences == null) {
                 return true;
             }
-            AnnotationValue<Annotation> otherMembers =
-                applicableValue.getAnnotation(InterceptorBindingQualifier.META_BINDING_VALUES).orElse(null);
-            if (otherMembers != null && !InterceptorBindingQualifier.bindingValuesMatch(memberBinding, otherMembers)) {
+            final List<AnnotationValue<?>> interceptPointOccurrences =
+                InterceptorBindingQualifier.resolveBoundOccurrences(applicableValue, interceptPointMetadata, true);
+            if (interceptPointOccurrences != null && !InterceptorBindingQualifier.anyMatch(interceptorOccurrences, interceptPointOccurrences)) {
                 continue;
             }
             return true;
@@ -241,6 +251,7 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
             (Collection) interceptors,
             InterceptorKind.AROUND_CONSTRUCT,
             applicableBindings,
+            constructor.getAnnotationMetadata(),
             false,
             true
         );

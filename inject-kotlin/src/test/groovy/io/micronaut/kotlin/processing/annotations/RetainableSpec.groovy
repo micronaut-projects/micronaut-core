@@ -3,9 +3,9 @@ package io.micronaut.kotlin.processing.annotations
 import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.core.annotation.AnnotationValue
 
-class RetainStereotypesSpec extends AbstractKotlinCompilerSpec {
+class RetainableSpec extends AbstractKotlinCompilerSpec {
 
-    void 'test @RetainStereotypes attributes each composing occurrence to the annotation that introduced it'() {
+    void 'test a retainable composed annotation is attributed to the annotation that introduced it'() {
         given:
         def definition = buildBeanDefinition('retainspec.Test', '''
 package retainspec
@@ -13,12 +13,12 @@ package retainspec
 import io.micronaut.context.annotation.AliasFor
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Executable
-import io.micronaut.core.annotation.RetainStereotypes
+import io.micronaut.core.annotation.Retainable
 
+@Retainable
 @Retention(AnnotationRetention.RUNTIME)
 annotation class SizeLike(val min: Int = 0, val max: Int = 100)
 
-@RetainStereotypes
 @SizeLike(min = 5)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class ComposedA(
@@ -26,7 +26,6 @@ annotation class ComposedA(
     val min: Int = 5
 )
 
-@RetainStereotypes
 @SizeLike(max = 50)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class ComposedB(

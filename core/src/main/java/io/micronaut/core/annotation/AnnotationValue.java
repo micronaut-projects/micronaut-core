@@ -272,8 +272,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     /**
      * The stereotypes of the annotation: the annotations it is meta-annotated with while it is being mapped or
-     * remapped, or, for an annotation meta-annotated with {@link RetainStereotypes}, the annotations it composes,
-     * retained in the reserved {@link AnnotationUtil#STEREOTYPES_MEMBER} member with member overrides applied.
+     * remapped, or the {@link Retainable} annotations it composes, retained in the reserved
+     * {@link AnnotationUtil#STEREOTYPES_MEMBER} member with member overrides applied.
      *
      * @return The stereotypes of the annotation, or {@code null} if they are not known
      */

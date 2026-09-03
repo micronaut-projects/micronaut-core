@@ -198,8 +198,8 @@ public class AnnotationUtil {
     public static final String NON_BINDING_ATTRIBUTE = "$nonBinding";
 
     /**
-     * The reserved member holding the annotations composed by an annotation that is meta-annotated with
-     * {@link RetainStereotypes}, as an array of {@link AnnotationValue}. It is stored, copied and written like
+     * The reserved member holding the {@link Retainable} annotations composed by an annotation, as an array of
+     * {@link AnnotationValue}. It is stored, copied and written like
      * any other member value, but it is not an attribute of the annotation: it is hidden from
      * {@link AnnotationValue#getValues()} and read through {@link AnnotationValue#getStereotypes()}.
      *

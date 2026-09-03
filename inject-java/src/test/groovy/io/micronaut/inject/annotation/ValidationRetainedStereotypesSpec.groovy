@@ -5,7 +5,7 @@ import io.micronaut.context.annotation.AliasFor
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.AnnotationValueBuilder
-import io.micronaut.core.annotation.RetainStereotypes
+import io.micronaut.core.annotation.Retainable
 import io.micronaut.inject.visitor.VisitorContext
 import jakarta.validation.Constraint
 import jakarta.validation.OverridesAttribute
@@ -102,8 +102,8 @@ class Test {
         maximumLength.getStereotypes()*.annotationName.contains(Constraint.name)
 
         and: 'the Micronaut implementation marker does not leak into the public tree'
-        !minimumLength.getStereotypes()*.annotationName.contains(RetainStereotypes.name)
-        !maximumLength.getStereotypes()*.annotationName.contains(RetainStereotypes.name)
+        !minimumLength.getStereotypes()*.annotationName.contains(Retainable.name)
+        !maximumLength.getStereotypes()*.annotationName.contains(Retainable.name)
 
         cleanup:
         this.strategy = null
@@ -137,7 +137,7 @@ class Test {
 
     private static AnnotationValue<?> makeRetainable(AnnotationValue<?> annotation) {
         return annotation.mutate()
-                .stereotype(AnnotationValue.builder(RetainStereotypes).build())
+                .stereotype(AnnotationValue.builder(Retainable).build())
                 .build()
     }
 

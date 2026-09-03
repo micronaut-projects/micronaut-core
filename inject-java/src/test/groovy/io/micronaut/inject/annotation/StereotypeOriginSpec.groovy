@@ -3,24 +3,56 @@ package io.micronaut.inject.annotation
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.annotation.Retainable
+import io.micronaut.inject.annotation.AnnotationTransformer
+import io.micronaut.inject.annotation.NamedAnnotationTransformer
+import io.micronaut.inject.visitor.VisitorContext
+import jakarta.validation.Constraint
+import org.jspecify.annotations.NonNull
 import spock.lang.Unroll
+
+import java.lang.annotation.Annotation
 
 /**
  * The association between a composing annotation occurrence and the annotation that introduced it is lost when
- * the annotation tree is flattened into the name-keyed stereotype indexes. {@code @RetainStereotypes} keeps it.
+ * the annotation tree is flattened into the name-keyed stereotype indexes. A {@code @Retainable} annotation keeps
+ * it: every annotation composing it retains the occurrence.
+ *
+ * <p>The constraint annotations composed throughout are {@code jakarta.validation}'s, which cannot carry the
+ * marker themselves, so {@code @Constraint} is marked through a transformer, the way micronaut-validation marks
+ * it.</p>
  */
 class StereotypeOriginSpec extends AbstractTypeElementSpec {
 
+    @Override
+    protected List<AnnotationTransformer<? extends Annotation>> getLocalAnnotationTransformers(@NonNull String annotationName) {
+        if (annotationName == Constraint.name) {
+            return [new RetainableConstraintTransformer()]
+        }
+        return super.getLocalAnnotationTransformers(annotationName)
+    }
+
+    private static class RetainableConstraintTransformer implements NamedAnnotationTransformer {
+
+        @Override
+        String getName() {
+            return Constraint.name
+        }
+
+        @Override
+        List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
+            return [annotation.mutate().stereotype(AnnotationValue.builder(Retainable).build()).build()]
+        }
+    }
+
     private static final String IMPORTS = '''
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.core.annotation.RetainStereotypes;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.lang.annotation.*;
 '''
 
     private static final String COMPOSED = '''
-@RetainStereotypes
 @Size(min = 5)
 @NotNull
 @Retention(RetentionPolicy.RUNTIME)
@@ -29,7 +61,6 @@ import java.lang.annotation.*;
     int min() default 5;
 }
 
-@RetainStereotypes
 @Size(max = 50)
 @Retention(RetentionPolicy.RUNTIME)
 @interface ComposedB {
@@ -61,7 +92,7 @@ import java.lang.annotation.*;
     }
 
     @Unroll
-    void "@RetainStereotypes attributes each occurrence to the annotation that introduced it (#kind)"() {
+    void "a retainable composed annotation is attributed to the annotation that introduced it (#kind)"() {
         given:
         def annotationMetadata = metadata(kind == "written")
 
@@ -82,10 +113,10 @@ import java.lang.annotation.*;
         composedA.getStereotypes()*.getAnnotationName().contains("jakarta.validation.constraints.NotNull")
         !composedB.getStereotypes()*.getAnnotationName().contains("jakarta.validation.constraints.NotNull")
 
-        and: "a composing annotation that does not itself opt in stops the tree in the written metadata"
-        kind != "written" || composedA.getStereotypes()
+        and: "a retained occurrence keeps its own retainable stereotypes and nothing else"
+        composedA.getStereotypes()
                 .find { it.getAnnotationName() == "jakarta.validation.constraints.Size" }
-                .getStereotypes() == null
+                .getStereotypes()*.getAnnotationName() == ["jakarta.validation.Constraint"]
 
         where:
         kind << ["compiled", "written"]
@@ -95,7 +126,6 @@ import java.lang.annotation.*;
 package nestedspec;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.core.annotation.RetainStereotypes;
 import jakarta.validation.constraints.Size;
 import java.lang.annotation.*;
 
@@ -103,7 +133,6 @@ import java.lang.annotation.*;
 class Test {
 }
 
-@RetainStereotypes
 @Inner(min = 1)
 @Retention(RetentionPolicy.RUNTIME)
 @interface Outer {
@@ -111,7 +140,6 @@ class Test {
     int shortest() default 1;
 }
 
-@RetainStereotypes
 @Size(min = 2)
 @Retention(RetentionPolicy.RUNTIME)
 @interface Inner {
@@ -192,7 +220,6 @@ class Test {
 package deepspec;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.core.annotation.RetainStereotypes;
 import jakarta.validation.constraints.Size;
 import java.lang.annotation.*;
 
@@ -200,7 +227,6 @@ import java.lang.annotation.*;
 class Test {
 }
 
-@RetainStereotypes
 @B(min = 1)
 @Retention(RetentionPolicy.RUNTIME)
 @interface A {
@@ -208,7 +234,6 @@ class Test {
     int shortest() default 1;
 }
 
-@RetainStereotypes
 @C(min = 2)
 @Retention(RetentionPolicy.RUNTIME)
 @interface B {
@@ -216,7 +241,6 @@ class Test {
     int min() default 2;
 }
 
-@RetainStereotypes
 @Size(min = 3)
 @Retention(RetentionPolicy.RUNTIME)
 @interface C {
@@ -251,12 +275,11 @@ class Test {
      * separately so a regression here is not read as a retention regression.
      */
     void "the cascade is not tied to retention"() {
-        given: "no annotation opts in, so nothing is retained and only the flat index exists"
+        given: "nothing composed is retainable, so nothing is retained and only the flat index exists"
         def annotationMetadata = writeAndLoadMetadata('plaincascadespec.Test', buildTypeAnnotationMetadata('''
 package plaincascadespec;
 
 import io.micronaut.context.annotation.AliasFor;
-import jakarta.validation.constraints.Size;
 import java.lang.annotation.*;
 
 @Outer(shortest = 4)
@@ -270,11 +293,16 @@ class Test {
     int shortest() default 1;
 }
 
-@Size(min = 2)
+@Limit(min = 2)
 @Retention(RetentionPolicy.RUNTIME)
 @interface Inner {
-    @AliasFor(annotation = Size.class, member = "min", applyDefault = true)
+    @AliasFor(annotation = Limit.class, member = "min", applyDefault = true)
     int min() default 2;
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface Limit {
+    int min() default 0;
 }
 '''))
 
@@ -283,69 +311,80 @@ class Test {
 
         and: "and the flat index still takes the cascaded value"
         annotationMetadata.getAnnotation("plaincascadespec.Inner").getValues() == [min: 4]
-        annotationMetadata.getAnnotationValuesByName("jakarta.validation.constraints.Size")
-                .collect { it.getValues() } == [[min: 4]]
+        annotationMetadata.getAnnotation("plaincascadespec.Limit").getValues() == [min: 4]
     }
 
-    void "the marker opts in transitively, so a meta-annotation can opt a whole family in"() {
-        given: "MyConstraint stands in for an annotation a transformer has added the marker to"
+    void "the marker on a framework annotation makes every annotation meta-annotated with it retainable"() {
+        given: "Family stands in for a framework annotation such as jakarta.validation.Constraint"
         def annotationMetadata = writeAndLoadMetadata('familyspec.Test', buildTypeAnnotationMetadata('''
 package familyspec;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.core.annotation.RetainStereotypes;
-import jakarta.validation.constraints.Size;
+import io.micronaut.core.annotation.Retainable;
 import java.lang.annotation.*;
 
 @Composed(min = 3)
 class Test {
 }
 
-@RetainStereotypes
+@Retainable
 @Retention(RetentionPolicy.RUNTIME)
-@interface MyConstraint {
+@interface Family {
 }
 
-@MyConstraint
-@Size(min = 5)
+@Family
+@Retention(RetentionPolicy.RUNTIME)
+@interface Member {
+    int min() default 0;
+}
+
+@Member(min = 5)
 @Retention(RetentionPolicy.RUNTIME)
 @interface Composed {
-    @AliasFor(annotation = Size.class, member = "min", applyDefault = true)
+    @AliasFor(annotation = Member.class, member = "min", applyDefault = true)
     int min() default 5;
 }
 '''))
 
-        expect: "Composed retains without declaring the marker itself"
-        annotationMetadata.getAnnotation("familyspec.Composed").getStereotypes()
-                .findAll { it.getAnnotationName() == "jakarta.validation.constraints.Size" }
-                .collect { it.getValues() } == [[min: 3]]
+        when:
+        def member = annotationMetadata.getAnnotation("familyspec.Composed").getStereotypes()
+                .find { it.getAnnotationName() == "familyspec.Member" }
+
+        then: "Member is retained without declaring the marker itself, with the override applied"
+        member.getValues() == [min: 3]
+
+        and: "and keeps the framework annotation that made it retainable, but not the marker"
+        member.getStereotypes()*.getAnnotationName() == ["familyspec.Family"]
     }
 
-    void "annotations that do not opt in retain nothing"() {
+    void "annotations composing nothing retainable retain nothing"() {
         given:
         def annotationMetadata = writeAndLoadMetadata('plainspec.Test', buildTypeAnnotationMetadata('''
 package plainspec;
 
 import io.micronaut.context.annotation.AliasFor;
-import jakarta.validation.constraints.Size;
 import java.lang.annotation.*;
 
 @Plain(min = 3)
 class Test {
 }
 
-@Size(min = 5)
+@Limit(min = 5)
 @Retention(RetentionPolicy.RUNTIME)
 @interface Plain {
-    @AliasFor(annotation = Size.class, member = "min", applyDefault = true)
+    @AliasFor(annotation = Limit.class, member = "min", applyDefault = true)
     int min() default 5;
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface Limit {
+    int min() default 0;
 }
 '''))
 
         expect:
         annotationMetadata.getAnnotation("plainspec.Plain").getStereotypes() == null
-        annotationMetadata.getAnnotationValuesByName("jakarta.validation.constraints.Size")
-                .collect { it.getValues() } == [[min: 3]]
+        annotationMetadata.getAnnotation("plainspec.Limit").getValues() == [min: 3]
     }
 
     @Unroll
@@ -355,24 +394,25 @@ class Test {
         def annotationMetadata = writeAndLoadMetadata("${packageName}.Test", buildTypeAnnotationMetadata("""
 package ${packageName};
 
-import io.micronaut.core.annotation.RetainStereotypes;
+import io.micronaut.core.annotation.Retainable;
 import java.lang.annotation.*;
 
 @Retaining
 class Test {
 }
 
-@RetainStereotypes
 @RuntimeStereotype
 @NotRuntime
 @Retention(RetentionPolicy.RUNTIME)
 @interface Retaining {
 }
 
+@Retainable
 @Retention(RetentionPolicy.RUNTIME)
 @interface RuntimeStereotype {
 }
 
+@Retainable
 @Retention(RetentionPolicy.${retention})
 @interface NotRuntime {
 }
@@ -443,7 +483,6 @@ ${COMPOSED}
 package repeatspec;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.core.annotation.RetainStereotypes;
 import jakarta.validation.constraints.Size;
 import java.lang.annotation.*;
 
@@ -452,7 +491,6 @@ import java.lang.annotation.*;
 class Test {
 }
 
-@RetainStereotypes
 @Size(min = 5)
 @Repeatable(Bounded.List.class)
 @Retention(RetentionPolicy.RUNTIME)
@@ -486,7 +524,6 @@ class Test {
 package twicespec;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.core.annotation.RetainStereotypes;
 import jakarta.validation.constraints.Size;
 import java.lang.annotation.*;
 
@@ -494,7 +531,6 @@ import java.lang.annotation.*;
 class Test {
 }
 
-@RetainStereotypes
 @Size(min = 1)
 @Size(max = 5)
 @Retention(RetentionPolicy.RUNTIME)
@@ -521,7 +557,6 @@ class Test {
 package allspec;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.core.annotation.RetainStereotypes;
 import jakarta.validation.constraints.Size;
 import java.lang.annotation.*;
 
@@ -529,7 +564,6 @@ import java.lang.annotation.*;
 class Test {
 }
 
-@RetainStereotypes
 @Size(min = 1, max = 10)
 @Size(min = 2, max = 20)
 @Retention(RetentionPolicy.RUNTIME)
@@ -553,7 +587,6 @@ class Test {
 package containedspec;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.core.annotation.RetainStereotypes;
 import jakarta.validation.constraints.Size;
 import java.lang.annotation.*;
 
@@ -561,7 +594,6 @@ import java.lang.annotation.*;
 class Test {
 }
 
-@RetainStereotypes
 @Size.List({@Size(min = 1), @Size(max = 5)})
 @Retention(RetentionPolicy.RUNTIME)
 @interface Contained {
@@ -592,7 +624,6 @@ class Test {
 package opaquespec;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.core.annotation.RetainStereotypes;
 import jakarta.validation.constraints.Size;
 import java.lang.annotation.*;
 
@@ -605,7 +636,6 @@ class Test {
     Size[] value();
 }
 
-@RetainStereotypes
 @Size(min = 1)
 @Sizes({@Size(max = 5)})
 @Retention(RetentionPolicy.RUNTIME)
@@ -656,26 +686,32 @@ ${COMPOSED}
     /**
      * A composed constraint in the shape a validation integration sees it. {@code @Inherited} is what
      * {@code micronaut-validation}'s remapper adds to every constraint, and without it the composed annotation
-     * does not reach an implementing class at all — only its flattened stereotypes do.
+     * does not reach an implementing class at all — only its flattened stereotypes do. The composed annotation is
+     * a retainable one declared alongside, because these shapes are built by the annotation processor itself,
+     * which the transformer this spec registers does not reach.
      */
     private static final String SHAPES = '''
-@RetainStereotypes
 @Inherited
-@Size(min = 5)
+@Limit(min = 5)
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.TYPE_USE,
           ElementType.ANNOTATION_TYPE, ElementType.RECORD_COMPONENT })
 @interface MinimumLength {
-    @AliasFor(annotation = Size.class, member = "min", applyDefault = true)
+    @AliasFor(annotation = Limit.class, member = "min", applyDefault = true)
     int min() default 5;
+}
+
+@Retainable
+@Retention(RetentionPolicy.RUNTIME)
+@interface Limit {
+    int min() default 0;
 }
 '''
 
     private static final String SHAPE_IMPORTS = '''
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.RetainStereotypes;
-import jakarta.validation.constraints.Size;
+import io.micronaut.core.annotation.Retainable;
 import java.lang.annotation.*;
 import java.util.List;
 '''
@@ -708,9 +744,9 @@ ${SHAPES}
 """)
 
         expect: "the merge neither drops the tree nor duplicates the composing occurrence"
-        sizeOf(introspection.getRequiredProperty("name", String)
+        limitOf(introspection.getRequiredProperty("name", String)
                 .getAnnotationMetadata()
-                .getAnnotation('propertyshape.MinimumLength')) == [[min: 8]]
+                .getAnnotation('propertyshape.MinimumLength'), 'propertyshape') == [[min: 8]]
     }
 
     void "the retained tree survives into container element metadata"() {
@@ -734,11 +770,11 @@ ${SHAPES}
 """)
 
         expect: "the type argument carries the constraint with its composing occurrence attributed"
-        sizeOf(introspection.getRequiredProperty("members", List)
+        limitOf(introspection.getRequiredProperty("members", List)
                 .asArgument()
                 .getTypeParameters()[0]
                 .getAnnotationMetadata()
-                .getAnnotation('elementshape.MinimumLength')) == [[min: 8]]
+                .getAnnotation('elementshape.MinimumLength'), 'elementshape') == [[min: 8]]
     }
 
     void "the retained tree survives inheritance from an interface"() {
@@ -769,9 +805,9 @@ ${SHAPES}
 """)
 
         expect: "the inherited constraint keeps the occurrence it introduced"
-        sizeOf(introspection.getRequiredProperty("name", String)
+        limitOf(introspection.getRequiredProperty("name", String)
                 .getAnnotationMetadata()
-                .getAnnotation('inheritedshape.MinimumLength')) == [[min: 8]]
+                .getAnnotation('inheritedshape.MinimumLength'), 'inheritedshape') == [[min: 8]]
     }
 
     void "the retained tree survives onto a record component"() {
@@ -786,12 +822,18 @@ ${SHAPES}
 """)
 
         expect: "both routes to the component carry the tree"
-        sizeOf(introspection.getRequiredProperty("name", String)
+        limitOf(introspection.getRequiredProperty("name", String)
                 .getAnnotationMetadata()
-                .getAnnotation('recordshape.MinimumLength')) == [[min: 8]]
-        sizeOf(introspection.getConstructorArguments()[0]
+                .getAnnotation('recordshape.MinimumLength'), 'recordshape') == [[min: 8]]
+        limitOf(introspection.getConstructorArguments()[0]
                 .getAnnotationMetadata()
-                .getAnnotation('recordshape.MinimumLength')) == [[min: 8]]
+                .getAnnotation('recordshape.MinimumLength'), 'recordshape') == [[min: 8]]
+    }
+
+    private static List<Map> limitOf(AnnotationValue<?> annotationValue, String packageName) {
+        annotationValue.getStereotypes()
+                .findAll { it.getAnnotationName() == "${packageName}.Limit".toString() }
+                .collect { it.getValues() }
     }
 
     private static List<Map> sizeOf(AnnotationValue<?> annotationValue) {
