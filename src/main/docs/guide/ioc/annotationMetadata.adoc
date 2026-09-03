@@ -129,3 +129,48 @@ include::core-processor/src/main/java/io/micronaut/inject/beans/visitor/EntityIn
 <2> One or more annotations can be returned.
 
 NOTE: The example above implements the api:io.micronaut.inject.annotation.NamedAnnotationMapper[] interface which allows annotations to be mixed with runtime code. To operate against a concrete annotation type, use api:io.micronaut.inject.annotation.TypedAnnotationMapper[] instead. However, api:io.micronaut.inject.annotation.TypedAnnotationMapper[] requires both the mapper and the annotation class itself to be available on the annotation processor classpath of the consuming project. If the annotation and mapper are defined in regular application code and not packaged as an annotation-processor-visible dependency, use api:io.micronaut.inject.annotation.NamedAnnotationMapper[] instead.
+
+=== Retaining Composed Annotations
+
+api:core.annotation.AnnotationMetadata[] indexes annotations by name, so when an annotation is composed as a stereotype of another annotation the association between an individual occurrence and the annotation that introduced it is lost. Consider two annotations that each compose the same annotation with different members:
+
+snippet::io.micronaut.docs.inject.retainable.MinLength[tags="imports, class", indent=0, title="An Annotation Composing @Limit"]
+
+<1> `@Limit` is declared as a stereotype with `min` set to `5`
+<2> The `value()` member aliases `Limit.min`, overriding the declared value
+
+A second annotation, `@MaxLength`, composes `@Limit(max = 50)` in the same way and aliases `Limit.max`. Both are then applied to one bean:
+
+snippet::io.micronaut.docs.inject.retainable.CodeValidator[tags="imports, class", indent=0, title="Applying Both Composing Annotations"]
+
+For this bean `getAnnotationValuesByName(Limit.class)` reports two occurrences and `getAnnotationNamesByStereotype(Limit.class)` reports that both `@MinLength` and `@MaxLength` introduced a `@Limit`, but nothing says which occurrence came from which composing annotation — and the correspondence cannot be recovered from the order, since equal occurrences contributed by different annotations collapse into one.
+
+Meta-annotating the composed annotation with ann:core.annotation.Retainable[] solves this. Every annotation that composes a retainable annotation keeps the composed occurrence on its own api:core.annotation.AnnotationValue[], in addition to flattening it into the element's stereotypes:
+
+snippet::io.micronaut.docs.inject.retainable.Limit[tags="imports, class", indent=0, title="Declaring a Retainable Annotation"]
+
+<1> The marker sits on the *composed* annotation, not on the annotations composing it
+<2> Only annotations with `RUNTIME` retention are retained in the metadata written for runtime
+
+The retained occurrences are read back with the `getStereotypes()` method of api:core.annotation.AnnotationValue[], with member overrides declared through ann:context.annotation.AliasFor[] already applied:
+
+snippet::io.micronaut.docs.inject.retainable.RetainableSpec[tags="read", indent=0, title="Reading Retained Stereotypes"]
+
+Here `min` is `@Limit(min = 3)` and `max` is `@Limit(max = 9)`: each composing annotation reports exactly the occurrence it introduced.
+
+An annotation is retainable when ann:core.annotation.Retainable[] is present anywhere in its own stereotypes, so a framework annotation that is itself meta-annotated with `@Retainable` opts in a whole family of annotations at once. A retained occurrence in turn keeps its own retainable stereotypes, so `getStereotypes()` can be walked as a tree, and a transitive `@AliasFor` override cascades to every level of it.
+
+Retention costs generated code proportional to the number of retainable occurrences at every use site, so it is opt-in and has no cost at all for annotations that compose nothing retainable. The marker itself is never retained.
+
+NOTE: The retained occurrences are stored in the reserved annotation member `AnnotationUtil.STEREOTYPES_MEMBER` (`$stereotypes`), following the same convention as `$nonBinding`. It is not an attribute of the annotation: it is hidden from `getValues()`, `getMemberNames()`, the convertible values view and `toString()`, and it takes no part in equality. Read it through `getStereotypes()` rather than through the member.
+
+==== When to Retain a Composed Annotation
+
+Retention is worth adding when the *identity of the occurrence* matters, not just its presence or its merged values:
+
+* *Composed constraints* - a validation-style annotation composes several constraints, and a violation has to be reported against the constraint that produced it. This is also what makes an individual occurrence addressable: `applyDefault` and `index` on ann:context.annotation.AliasFor[] (and the `jakarta.validation.OverridesAttribute` semantics they model) target one occurrence of a repeated composed constraint, which the name-keyed index cannot distinguish.
+* *Interceptor binding* - ann:aop.InterceptorBinding[] is meta-annotated with `@Retainable`, so every annotation used to bind an interceptor retains its binding occurrence. Bindings are compared on the retained occurrence rather than on a copy of its members, and two annotations composing the same binding annotation with different members on one element — which the name-keyed index collapses into one — resolve to both bindings.
+* *Behaviour driven by a meta-annotation contract* - when a api:inject.visitor.TypeElementVisitor[], interceptor or bean introspection acts on a meta-annotation you define, retaining it lets that code recover which user-written annotation asked for the behaviour, and with what members, instead of seeing one merged occurrence. Marking your meta-annotation `@Retainable` opts in every annotation built on it.
+* *Diagnostics* - error messages and tooling can name the annotation the user actually wrote rather than the internal stereotype it expands to.
+
+Retention is not needed to test for the presence of a stereotype, to read its merged values, or to find the annotations that introduced it by name. The `hasAnnotation`, `hasStereotype`, `getAnnotationValuesByName` and `getAnnotationNamesByStereotype` methods of api:core.annotation.AnnotationMetadata[] already answer those questions, and they cost nothing extra in the generated metadata.
