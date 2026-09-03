@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import javax.lang.model.element.TypeElement;
@@ -85,7 +86,7 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     /** Query implementation for enclosed elements. */
     private final PythonEnclosedElementsQuery enclosedElementsQuery = new PythonEnclosedElementsQuery();
     private Map<InheritedMethodKey, ElementAnnotationMetadata> inheritedInterfaceMethodAnnotationMetadata = new LinkedHashMap<>();
-    private volatile List<PropertyElement> beanProperties;
+    private final AtomicReference<List<PropertyElement>> beanProperties = new AtomicReference<>();
 
     protected ElementDef typeAnnotationsKey;
     private ElementAnnotationMetadata typeAnnotationMetadata;
@@ -596,14 +597,14 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
 
     @Override
     public List<PropertyElement> getBeanProperties(PropertyElementQuery propertyElementQuery) {
-        List<PropertyElement> allProperties = beanProperties;
+        List<PropertyElement> allProperties = beanProperties.get();
         if (allProperties == null) {
             // Python class definitions are immutable for a processing run, so retain the
             // property elements and only reapply the caller-specific query filters.
             List<PropertyElement> properties = new ArrayList<>(getEnclosedElements(ElementQuery.of(PropertyElement.class)));
             addAttributeBackedProperties(this, this, properties);
             allProperties = List.copyOf(properties);
-            beanProperties = allProperties;
+            beanProperties.compareAndSet(null, allProperties);
         }
         return filterProperties(allProperties, propertyElementQuery);
     }

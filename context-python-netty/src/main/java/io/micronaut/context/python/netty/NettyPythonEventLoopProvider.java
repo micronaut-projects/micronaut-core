@@ -35,7 +35,7 @@ import java.util.concurrent.CompletionStage;
  */
 @Internal
 @Singleton
-@Requires(property = PythonAsyncioConfiguration.ENABLED, notEquals = "false")
+@Requires(property = PythonAsyncioConfiguration.ENABLED_PROPERTY, notEquals = "false")
 @Experimental
 public final class NettyPythonEventLoopProvider implements PythonEventLoopProvider, GracefulShutdownCapable {
     private static final ScopedValue<NettyPythonEventLoop> CURRENT = ScopedValue.newInstance();

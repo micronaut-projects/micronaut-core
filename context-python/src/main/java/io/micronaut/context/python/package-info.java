@@ -18,7 +18,7 @@
  */
 @io.micronaut.context.annotation.Configuration
 @io.micronaut.context.annotation.Requires(
-    property = PythonConfiguration.ENABLED,
+    property = PythonConfiguration.ENABLED_PROPERTY,
     notEquals = io.micronaut.core.util.StringUtils.FALSE
 )
 @NullMarked

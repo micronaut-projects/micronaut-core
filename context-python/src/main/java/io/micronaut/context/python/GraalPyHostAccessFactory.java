@@ -50,6 +50,9 @@ final class GraalPyHostAccessFactory {
 
     public static final String CLASS_META = "__class__";
 
+    /** The Python module the date and time types are defined in. */
+    private static final String DATETIME_MODULE = "datetime";
+
     /**
      * Builds a HostAccess instance and registers all TargetTypeMapping beans.
      *
@@ -88,19 +91,19 @@ final class GraalPyHostAccessFactory {
 
     private static void registerStandardLibraryMappings(HostAccess.Builder builder) {
         builder.targetTypeMapping(Value.class, LocalDate.class,
-            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "date"),
+            value -> GraalPyRuntimeUtil.isPythonType(value, DATETIME_MODULE, "date"),
             GraalPyRuntimeUtil::convertLocalDate);
         builder.targetTypeMapping(Value.class, LocalTime.class,
-            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "time"),
+            value -> GraalPyRuntimeUtil.isPythonType(value, DATETIME_MODULE, "time"),
             GraalPyRuntimeUtil::convertLocalTime);
         builder.targetTypeMapping(Value.class, LocalDateTime.class,
-            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "datetime"),
+            value -> GraalPyRuntimeUtil.isPythonType(value, DATETIME_MODULE, "datetime"),
             GraalPyRuntimeUtil::convertLocalDateTime);
         builder.targetTypeMapping(Value.class, Duration.class,
-            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "timedelta"),
+            value -> GraalPyRuntimeUtil.isPythonType(value, DATETIME_MODULE, "timedelta"),
             GraalPyRuntimeUtil::convertDuration);
         builder.targetTypeMapping(Value.class, ZoneOffset.class,
-            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "timezone"),
+            value -> GraalPyRuntimeUtil.isPythonType(value, DATETIME_MODULE, "timezone"),
             GraalPyRuntimeUtil::convertZoneOffset);
         builder.targetTypeMapping(Value.class, UUID.class,
             value -> GraalPyRuntimeUtil.isPythonType(value, "uuid", "UUID"),

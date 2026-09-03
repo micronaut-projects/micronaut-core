@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import java.lang.ScopedValue.CallableOp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -1597,6 +1598,38 @@ public final class PythonContextRuntime {
         @Override
         public String[] nestedMemberNames() {
             return nestedMemberNames.clone();
+        }
+
+        // the generated members of a record compare an array by identity, which would make two references to
+        // the same class unequal: the nested member names are compared, hashed and printed by their content
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof PythonClassReference other)) {
+                return false;
+            }
+            return Objects.equals(packageName, other.packageName)
+                && Objects.equals(rootName, other.rootName)
+                && Arrays.equals(nestedMemberNames, other.nestedMemberNames)
+                && Objects.equals(displayName, other.displayName)
+                && Objects.equals(cacheKey, other.cacheKey);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(packageName, rootName, Arrays.hashCode(nestedMemberNames), displayName, cacheKey);
+        }
+
+        @Override
+        public String toString() {
+            return "PythonClassReference[packageName=" + packageName
+                + ", rootName=" + rootName
+                + ", nestedMemberNames=" + Arrays.toString(nestedMemberNames)
+                + ", displayName=" + displayName
+                + ", cacheKey=" + cacheKey
+                + ']';
         }
     }
 

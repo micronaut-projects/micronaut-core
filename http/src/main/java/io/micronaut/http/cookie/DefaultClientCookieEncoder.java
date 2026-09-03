@@ -17,6 +17,8 @@ package io.micronaut.http.cookie;
 
 import io.micronaut.core.annotation.Internal;
 
+import java.util.Objects;
+
 /**
  * @author Sergio del Amo
  * @since 4.3.0
@@ -28,8 +30,9 @@ public final class DefaultClientCookieEncoder implements ClientCookieEncoder {
     @Override
     public String encode(Cookie cookie) {
         String name = cookie.getName();
-        String value = cookie.getValue();
-        value = value == null ? "" : value;
+        // the value is non-null by the contract of Cookie, and an implementation that breaks it must
+        // not encode the four characters of "null": the fallback keeps what this encoder always emitted
+        String value = Objects.requireNonNullElse(cookie.getValue(), "");
         CookieUtils.verifyCookieName(name);
         CookieUtils.verifyCookieValue(value);
         return name + EQUAL + value;

@@ -33,7 +33,7 @@ import org.jspecify.annotations.Nullable;
  */
 @Singleton
 @Requires(classes = NettyServerCustomizer.class)
-@Requires(property = PythonAsyncioConfiguration.ENABLED, notEquals = "false")
+@Requires(property = PythonAsyncioConfiguration.ENABLED_PROPERTY, notEquals = "false")
 final class NettyPythonEventLoopServerCustomizer implements BeanCreatedEventListener<NettyServerCustomizer.Registry> {
     static final String HANDLER_NAME = "python-asyncio-event-loop";
 
