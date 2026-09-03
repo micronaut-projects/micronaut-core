@@ -617,6 +617,36 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     /**
+     * The {@link jakarta.annotation.PostConstruct} callbacks compiled in as executable methods, in invocation
+     * order. Populated only for a bean that intercepts its post-construct phase.
+     *
+     * @return The post-construct callbacks, or an empty list
+     * @see io.micronaut.inject.InitializingBeanDefinition#getPostConstructExecutableMethods()
+     * @since 5.2.0
+     */
+    public final List<ExecutableMethod<T, ?>> getPostConstructExecutableMethods() {
+        if (executableMethodsDefinition == null) {
+            return Collections.emptyList();
+        }
+        return executableMethodsDefinition.getPostConstructExecutableMethods();
+    }
+
+    /**
+     * The {@link jakarta.annotation.PreDestroy} callbacks compiled in as executable methods, in invocation
+     * order. Populated only for a bean that intercepts its pre-destroy phase.
+     *
+     * @return The pre-destroy callbacks, or an empty list
+     * @see io.micronaut.inject.DisposableBeanDefinition#getPreDestroyExecutableMethods()
+     * @since 5.2.0
+     */
+    public final List<ExecutableMethod<T, ?>> getPreDestroyExecutableMethods() {
+        if (executableMethodsDefinition == null) {
+            return Collections.emptyList();
+        }
+        return executableMethodsDefinition.getPreDestroyExecutableMethods();
+    }
+
+    /**
      * Configures the bean for the given {@link BeanContext}. If the context features an
      * {@link Environment} this method configures the annotation metadata such that
      * environment aware values are returned.

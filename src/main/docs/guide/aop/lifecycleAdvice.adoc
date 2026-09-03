@@ -43,6 +43,33 @@ snippet::io.micronaut.docs.aop.lifecycle.ProductInterceptors[tags="method-interc
 <2> `@PostConstruct` interception is handled
 <3> `@PreDestroy` interception is handled
 
-An interceptor bound to these lifecycle kinds is a singleton by default, and one instance is then shared by every bean
-it is applied to. To give each intercepted bean its own interceptor, so that state set up in `@PostConstruct` is still
-available in `@PreDestroy`, see <<interceptorLifecycle, Interceptor Life Cycle>>.
+=== Intercepted Callbacks
+
+Each `@PostConstruct` and `@PreDestroy` method of the bean is intercepted separately, in invocation order, superclass
+callbacks first. The api:aop.MethodInvocationContext[] passed to the interceptor describes the callback:
+`getExecutableMethod()` is the callback as a reflection-free api:inject.ExecutableMethod[], with the declaring type,
+name, arguments and annotation metadata of the method, `getTargetMethod()` resolves to it, and `getParameterValues()`
+holds the arguments the framework resolved for it. `proceed()` invokes that one callback with those arguments and
+returns the bean:
+
+[source,java]
+----
+@Override
+public Object intercept(MethodInvocationContext<Object, Object> context) {
+    if (context.getKind() == InterceptorKind.POST_CONSTRUCT) {
+        LOG.info("Initializing {} via {}", context.getTarget(), context.getExecutableMethod().getName()); // <1>
+    }
+    return context.proceed(); // <2>
+}
+----
+
+<1> The intercepted method carries the annotation metadata of the callback, for example its `@PostConstruct` annotation
+<2> `proceed()` invokes the callback; invoking `getExecutableMethod()` on the target runs it in addition
+
+A bean that binds the interception kind but declares no callback of that kind is still intercepted once, as a phase, so
+that the binding on the class can be relied on regardless of what the bean declares. In that case
+`getExecutableMethod()` describes the phase rather than a method of the bean. The same applies to a bean compiled by an
+earlier version of the framework.
+
+The callbacks are not part of the bean definition's executable methods: `BeanDefinition.getExecutableMethods()` does
+not include them, so executable method processors and adapters are not affected.

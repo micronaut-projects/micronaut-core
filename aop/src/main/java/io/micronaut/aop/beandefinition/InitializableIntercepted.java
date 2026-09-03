@@ -21,6 +21,8 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.InitializingBeanDefinition;
 
 import java.util.Collection;
@@ -38,6 +40,13 @@ public interface InitializableIntercepted<T> extends InitializingBeanDefinition<
 
     @Override
     default T initialize(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+        if (!getPostConstructExecutableMethods().isEmpty()) {
+            // each callback runs in its own chain, see interceptPostConstruct
+            return doInitialize(resolutionContext, context, bean);
+        }
+        // A bean without callbacks is still intercepted once, as a phase: the binding on the class promises an
+        // interception whether or not the bean declares a callback, and definitions compiled by an earlier version
+        // report no callbacks at all.
         Collection<BeanRegistration<Interceptor<?, ?>>> shared = SharedInterceptorRegistrations.peek(resolutionContext, this);
         return Objects.requireNonNull(MethodInterceptorChain.initialize(
             resolutionContext,
@@ -46,6 +55,34 @@ public interface InitializableIntercepted<T> extends InitializingBeanDefinition<
             new InitializableInterceptedMethod<>(this, resolutionContext, context, bean),
             bean,
             shared
+        ));
+    }
+
+    /**
+     * Runs the interceptor chain of one {@link jakarta.annotation.PostConstruct} callback and invokes the callback
+     * when the chain proceeds. Called by the generated
+     * {@link #doInitialize(BeanResolutionContext, BeanContext, Object)} for each callback, in invocation order,
+     * with the arguments it resolved for the callback.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The bean context
+     * @param bean              The bean
+     * @param index             The index of the callback in {@link #getPostConstructExecutableMethods()}
+     * @param arguments         The resolved arguments of the callback
+     * @return The bean returned by the chain
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    default T interceptPostConstruct(BeanResolutionContext resolutionContext, BeanContext context, T bean, int index, Object[] arguments) {
+        ExecutableMethod<T, ?> callback = getPostConstructExecutableMethods().get(index);
+        Collection<BeanRegistration<Interceptor<?, ?>>> shared = SharedInterceptorRegistrations.peek(resolutionContext, this);
+        return Objects.requireNonNull(MethodInterceptorChain.initialize(
+            resolutionContext,
+            this,
+            new LifecycleCallbackMethod<>(this, callback),
+            bean,
+            shared,
+            arguments
         ));
     }
 

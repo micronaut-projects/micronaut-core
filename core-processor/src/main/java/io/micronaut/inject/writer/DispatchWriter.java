@@ -694,7 +694,18 @@ public final class DispatchWriter implements ClassOutputWriter {
     }
 
     private static String methodKey(MethodElement methodElement) {
-        return methodElement.getName() +
+        // A private method cannot be overridden, and a package-private method can only be overridden from the same
+        // package. Include the narrowest owner that distinguishes methods which cannot override one another.
+        String owner;
+        if (methodElement.isPrivate()) {
+            owner = methodElement.getDeclaringType().getName() + "#";
+        } else if (methodElement.isPackagePrivate()) {
+            owner = methodElement.getDeclaringType().getPackageName() + "#";
+        } else {
+            owner = "";
+        }
+        return owner +
+            methodElement.getName() +
             "(" +
             Arrays.stream(methodElement.getSuspendParameters())
                 .map(p -> toTypeString(p.getType()))

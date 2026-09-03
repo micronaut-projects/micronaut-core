@@ -47,7 +47,7 @@ import java.util.Objects;
  * @since 5.1.0
  */
 @Internal
-abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>, ExecutableMethod<T, R>, EnvironmentConfigurable, io.micronaut.core.type.Executable<T, R> permits InterceptedDisposeMethod, InitializableInterceptedMethod {
+abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>, ExecutableMethod<T, R>, EnvironmentConfigurable, io.micronaut.core.type.Executable<T, R> permits InterceptedDisposeMethod, InitializableInterceptedMethod, LifecycleCallbackMethod {
 
     protected final Class<T> declaringType;
     protected final String methodName;
@@ -231,7 +231,7 @@ abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>,
      * @throws NoSuchMethodError if the method doesn't exist
      */
     @Override
-    public final Method getTargetMethod() {
+    public Method getTargetMethod() {
         if (method == null) {
             Method resolvedMethod = ReflectionUtils.getRequiredMethod(declaringType, methodName, argTypes);
             resolvedMethod.setAccessible(true);
