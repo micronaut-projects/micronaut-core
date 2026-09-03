@@ -38,7 +38,7 @@ import java.util.Locale;
  * downloading it.</p>
  *
  * @author Shubham Jain
- * @since 4.10.0
+ * @since 5.2.0
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
@@ -58,7 +58,7 @@ public @interface ContentDisposition {
     /**
      * The {@code Content-Disposition} type.
      *
-     * @since 4.10.0
+     * @since 5.2.0
      */
     enum Type {
         /**
