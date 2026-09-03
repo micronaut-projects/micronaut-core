@@ -24,6 +24,7 @@ import org.jspecify.annotations.Nullable;
  * @author Shubham Jain
  * @since 5.2.0
  */
+@Internal
 public final class ContentDispositionUtils {
 
     private static final char[] HEX_DIGITS = "0123456789ABCDEF".toCharArray();
