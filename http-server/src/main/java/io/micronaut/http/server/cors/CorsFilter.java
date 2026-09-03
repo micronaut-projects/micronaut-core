@@ -209,6 +209,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setAllowCredentials(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
+        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
     }
 
     /**
@@ -220,6 +221,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setAllowPrivateNetwork(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
+        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
     }
 
     /**
@@ -229,6 +231,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setExposeHeaders(List<String> exposedHeaders, MutableHttpResponse<?> response) {
+        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
     }
 
     /**
@@ -237,6 +240,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setVary(MutableHttpResponse<?> response) {
+        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
     }
 
     /**
@@ -246,6 +250,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setOrigin(@Nullable String origin, MutableHttpResponse<?> response) {
+        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
     }
 
     /**
@@ -255,6 +260,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setAllowMethods(HttpMethod method, MutableHttpResponse<?> response) {
+        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
     }
 
     /**
@@ -264,6 +270,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setAllowHeaders(List<?> optionalAllowHeaders, MutableHttpResponse<?> response) {
+        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
     }
 
     /**
@@ -273,6 +280,7 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setMaxAge(long maxAge, MutableHttpResponse<?> response) {
+        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
     }
 
     /**
