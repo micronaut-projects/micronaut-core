@@ -22,5 +22,7 @@ NOTE: For Kotlin instead of an optional type (a type ending with `?`) you can us
 --
 Trying to inject a field that is declared `final` will result in a compilation error. Field injection should be seen as inferior to constructor injection as explained in the previous sections since it can result in the code being less-structured, harder to read and harder to test.
 
+NOTE: In Scala, prefer constructor injection in normal application code. The Scala example in this section intentionally demonstrates field injection; other Scala examples use constructor, method, or test-parameter injection where possible.
+
 WARNING: If the field is `private` scope or inaccessible then the field will be injected using the Java reflection API which is not recommended.
 --

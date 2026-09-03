@@ -1,0 +1,104 @@
+https://www.scala-lang.org[Scala] support in Micronaut is implemented for Scala 3.
+
+Scala 2.x is not supported by this language adapter.
+
+== How Scala Support Works
+
+Micronaut processes Scala source with `micronaut-inject-scala`, a Scala 3 compiler plugin. The plugin is a standard Scala compiler plugin that runs after type checking and before pickling. It reads typed compiler trees and compiler symbols, adapts them to Micronaut's Element API, and then reuses the same visitor, annotation metadata, bean-definition, AOP, and introspection infrastructure used by the other language adapters.
+
+The Scala adapter models classes, traits, methods, fields, properties, constructors, parameters, enums, generic placeholders, wildcard bounds, and package elements through Scala-specific Element API wrappers. Annotation metadata is built from compiler symbols and annotation trees, including annotation stereotypes, parent annotations, aliases, defaults, repeatable annotations, retention, targets, class literals, enum constants, arrays, and type-use nullability where the Scala compiler exposes that information.
+
+The adapter should favor compiler symbols and typed trees over reflection or class loading. Runtime class loading is not part of the Scala source model.
+
+== Build Setup
+
+Scala support requires the Scala 3 library, the Micronaut Scala compiler plugin on the Scala compiler plugin path, and `micronaut-inject-scala` at runtime when Scala-specific converters such as Scala collection converters are needed.
+
+The following examples show the relevant build-tool configuration. The Scala compiler version and Micronaut Scala integration version are independent of the Micronaut Core version. Each integration artifact is fully cross-versioned with the Scala compiler release.
+
+.Gradle
+[source,kotlin]
+----
+include::{testsuitescala}/language/scalasupport/build.gradle.kts[tag=gradle,indent=0]
+----
+
+.Maven
+[source,xml]
+----
+include::{testsuitescala}/language/scalasupport/pom.xml[tag=maven,indent=0]
+----
+
+.sbt
+[source,scala]
+----
+include::{testsuitescala}/language/scalasupport/build.sbt[tag=sbt,indent=0]
+----
+
+.Mill
+[source,scala]
+----
+include::{testsuitescala}/language/scalasupport/build.mill[tag=mill,indent=0]
+----
+
+`-Yexplicit-nulls` is optional, but recommended when you want the Scala compiler and Micronaut metadata to agree on explicit `Null` unions.
+
+== Scala Collections and Option
+
+Micronaut supports idiomatic Scala collection injection for common collection abstractions and implementations, including immutable `List`, `Seq`, `Set`, `IndexedSeq`, `Vector`, mutable collection variants, and string-keyed Scala `Map` types. The generated injection path adapts Micronaut's collection values to the Scala collection type declared by the constructor, field, or method signature.
+
+Micronaut also supports `Option[T]` for optional bean injection.
+
+[source,scala]
+----
+include::{testsuitescala}/language/scalasupport/ScalaFeatures.scala[tags="injection",indent=0]
+----
+
+Configuration binding also supports common Scala collection targets:
+
+[source,scala]
+----
+include::{testsuitescala}/language/scalasupport/ScalaFeatures.scala[tags="configuration",indent=0]
+----
+
+== Explicit Nulls and Union Types
+
+When Scala 3 explicit nulls are enabled, Micronaut maps `T | Null` to nullable Element API metadata. This works for method return types, parameters, constructor properties, bean properties, and nested generic type arguments where the compiler exposes the union type.
+
+[source,scala]
+----
+include::{testsuitescala}/language/scalasupport/ScalaFeatures.scala[tags="dto",indent=0]
+----
+
+Use `T | Null` when `null` is a real Java interop boundary. Prefer `Option[T]` for ordinary optional values inside Scala APIs.
+
+== Case Classes, DTOs, and Configuration
+
+Case classes are the preferred shape for immutable DTOs, request and response bodies, and immutable configuration properties. Use `@Introspected` for DTOs that need Micronaut Bean Introspection, and use constructor-bound `@ConfigurationProperties` case classes for immutable configuration.
+
+[source,scala]
+----
+include::{testsuitescala}/language/scalasupport/ScalaFeatures.scala[tags="dto",indent=0]
+----
+
+[source,scala]
+----
+include::{testsuitescala}/language/scalasupport/ScalaFeatures.scala[tags="configuration",indent=0]
+----
+
+Validation and binding annotations can be applied directly to constructor parameters in constructor-bound configuration case classes:
+
+[source,scala]
+----
+include::{testsuitescala}/language/scalasupport/ScalaFeatures.scala[tags="validatedConfiguration",indent=0]
+----
+
+== Additional Scala Notes
+
+Use Scala traits for interfaces and introduction advice contracts. Micronaut resolves inherited generic method metadata through source-defined trait type arguments.
+
+Scala `val` constructor parameters model read-only bean properties. Scala `var` members model writable properties and generate setters. Prefer constructor parameters for dependency injection and immutable state.
+
+Scala companion objects and synthetic compiler artifacts are filtered from the source model unless they represent a usable element such as a companion-defined nested bean.
+
+Importing already compiled Scala library beans with bean import remains unsupported in the initial Scala adapter. Define Scala beans in source compiled with the Micronaut Scala compiler plugin. Scala 3.3.8 is the initial compiler target for this adapter and its compiler plugin artifact.
+The full Scala compiler version remains part of the compiler-plugin artifact name.

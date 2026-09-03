@@ -24,8 +24,8 @@ Whilst generally this approach should be discouraged in favour for factory metho
 
 snippet::io.micronaut.docs.factories.VehicleMockSpec[tags="imports, class",indent=0]
 
-<1> A bean is defined from a field that replaces the existing `Engine`.
-<2> The `Vehicle` is injected.
+<1> A bean is defined from a method that replaces the existing `Engine`.
+<2> The `Vehicle` is injected into the test method.
 <3> The code asserts that the mock implementation is called.
 
 Note that only public or package protected fields are supported on non-primitive types. If the field is `static`, `private`, or `protected` a compilation error will occur.

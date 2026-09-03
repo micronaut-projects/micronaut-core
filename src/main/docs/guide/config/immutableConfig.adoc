@@ -21,20 +21,20 @@ This has the advantage that if the application configuration is <<refreshable, r
 
 NOTE: If you try to specify any other abstract method other than a getter, a compilation error occurs (default methods are supported).
 
-Another way to implement immutable configuration is to define a class and use the ann:context.annotation.ConfigurationInject[] annotation on a constructor of a ann:context.annotation.ConfigurationProperties[] or ann:context.annotation.EachProperty[] bean.
+Another way to implement immutable configuration is to define a class with constructor parameters for a ann:context.annotation.ConfigurationProperties[] or ann:context.annotation.EachProperty[] bean.
 
 For example:
 
 snippet::io.micronaut.docs.config.immutable.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
 
 <1> The ann:context.annotation.ConfigurationProperties[] annotation takes the configuration prefix
-<2> The ann:context.annotation.ConfigurationInject[] annotation is defined on the constructor
+<2> Configuration values are bound to constructor parameters
 <3> You can use ann:core.bind.annotation.Bindable[] to set a default value
 <4> Validation annotations can be used too
 <5> You can nest immutable configuration
 <6> Optional configuration can be indicated with `@Nullable`
 
-The ann:context.annotation.ConfigurationInject[] annotation provides a hint to the Micronaut framework to prioritize binding values from configuration instead of injecting beans.
+The Micronaut framework prioritizes binding values from configuration for constructor parameters.
 
 NOTE: Using this approach, to make the configuration refreshable, add the ann:runtime.context.scope.Refreshable[] annotation to the class as well. This allows the bean to be re-created in the case of a <<refreshable,runtime configuration refresh event>>.
 

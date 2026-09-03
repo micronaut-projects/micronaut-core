@@ -1,6 +1,8 @@
 You can use the ann:context.annotation.Import[] annotation to import beans from external, already compiled libraries that use JSR-330 annotations.
 
-NOTE: Bean import is currently only supported in the Java language as other languages have limitations on classpath scanning during source code processing.
+NOTE: Bean import is currently only supported in the Java language as other
+languages have limitations on classpath scanning during source code processing.
+The Scala 3 compiler plugin does not support ann:context.annotation.Import[].
 
 For example, to import the JSR-330 TCK into an application, add a dependency on the TCK:
 

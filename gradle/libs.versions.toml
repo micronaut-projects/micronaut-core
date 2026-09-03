@@ -8,6 +8,8 @@ bytebuddy = "1.18.12"
 caffeine = "2.9.3"
 classgraph = "4.8.192"
 compile-testing = "0.21.0"
+scala3 = "3.3.8"
+micronaut-scala-integration = "1.0.0-SNAPSHOT"
 
 geb = "7.0"
 h2 = "2.4.240"
@@ -120,6 +122,10 @@ managed-polyglot-tools = { module = 'org.graalvm.polyglot:tools', version.ref = 
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
 boms-jackson = { module = "tools.jackson:jackson-bom", version.ref = "managed-jackson" }
 boms-micronaut-sourcegen = { module = "io.micronaut.sourcegen:micronaut-sourcegen-bom", version.ref = "micronaut-sourcegen" }
+
+scala3-library = { module = "org.scala-lang:scala3-library_3", version.ref = "scala3" }
+scala3-compiler = { module = "org.scala-lang:scala3-compiler_3", version.ref = "scala3" }
+micronaut-scala-inject = { module = "io.micronaut.scala:micronaut-inject-scala_3.3.8", version.ref = "micronaut-scala-integration" }
 
 #
 # Libraries which start with managed- are managed by Micronaut in the sense

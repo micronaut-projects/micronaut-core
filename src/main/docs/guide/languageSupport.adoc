@@ -1,6 +1,6 @@
 Micronaut framework supports any JVM language that implements the link:{jdkapi}/java.compiler/javax/annotation/processing/package-summary.html[Java Annotation Processor] API.
 
-Although Groovy does not support this API, special support has been built using AST transformations. The current list of supported languages is: Java, Groovy, Kotlin (via the `kapt` tool), and Python.
+Although Groovy does not support this API, special support has been built using AST transformations. The current list of supported languages is: Java, Groovy, Kotlin (via the `kapt` tool), Python, and Scala 3.
 
 NOTE: Theoretically any language that supports a way to analyze the AST at compile time could be supported. The pkg:inject.writer[] package includes language-neutral classes that build api:inject.BeanDefinition[] classes at compile time using the ASM tool.
 

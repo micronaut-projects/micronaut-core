@@ -1,0 +1,50 @@
+<!-- tag::maven[] -->
+<project>
+  <properties>
+    <scala.version>3.3.8</scala.version>
+    <micronaut.scala.version>1.0.0-SNAPSHOT</micronaut.scala.version>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.scala-lang</groupId>
+      <artifactId>scala3-library_3</artifactId>
+      <version>${scala.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.micronaut.scala</groupId>
+      <artifactId>micronaut-inject-scala_3.3.8</artifactId>
+      <version>${micronaut.scala.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>net.alchim31.maven</groupId>
+        <artifactId>scala-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>compile</goal>
+              <goal>testCompile</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <compilerPlugins>
+            <compilerPlugin>
+              <groupId>io.micronaut.scala</groupId>
+              <artifactId>micronaut-inject-scala_3.3.8</artifactId>
+              <version>${micronaut.scala.version}</version>
+            </compilerPlugin>
+          </compilerPlugins>
+          <args>
+            <arg>-release:25</arg>
+            <arg>-Yexplicit-nulls</arg>
+          </args>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+<!-- end::maven[] -->

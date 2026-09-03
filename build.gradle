@@ -2,6 +2,7 @@ import io.micronaut.build.docs.PublishGuideTask
 import org.gradle.api.tasks.PathSensitivity
 
 plugins {
+    id "idea"
     id "io.micronaut.build.internal.parent"
     id "io.micronaut.build.internal.dependency-updates"
     id "io.micronaut.build.internal.version-catalog-updates"
@@ -14,6 +15,11 @@ plugins {
 }
 
 repositories {
+    mavenLocal {
+        content {
+            includeGroup "io.micronaut.scala"
+        }
+    }
     mavenCentral()
 }
 
@@ -29,6 +35,9 @@ def languageSnippetSources = files(
         },
         fileTree("test-suite-python/src/test/python") {
             include "**/*.py"
+        },
+        fileTree("test-suite-scala/src/test/scala") {
+            include "**/*.scala"
         }
 )
 
