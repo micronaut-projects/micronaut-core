@@ -4159,7 +4159,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                                                 @Nullable ClassElement genericType,
                                                                 int argumentIndex,
                                                                 Supplier<VariableDef> constructorMethodVarSupplier) {
-        if (genericType != null) {
+        if (requiresDeclaredGenericType(type, genericType)) {
             return ArgumentExpUtils.pushCreateArgument(
                 annotationMetadataDefaults,
                 beanTypeElement,
@@ -4196,7 +4196,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                                            @Nullable ClassElement genericType,
                                                            int methodIndex,
                                                            int argumentIndex) {
-        if (genericType != null) {
+        if (requiresDeclaredGenericType(type, genericType)) {
             return ArgumentExpUtils.pushCreateArgument(
                 annotationMetadataDefaults,
                 beanTypeElement,
@@ -4234,7 +4234,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private ExpressionDef resolveFieldArgumentGenericType(ClassElement type,
                                                           @Nullable ClassElement genericType,
                                                           int fieldIndex) {
-        if (genericType != null) {
+        if (requiresDeclaredGenericType(type, genericType)) {
             return ArgumentExpUtils.pushCreateArgument(
                 annotationMetadataDefaults,
                 beanTypeElement,
@@ -4267,6 +4267,56 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         return beanDefinitionTypeDef.getStaticField(FIELD_INJECTION_FIELDS, TypeDef.of(AbstractInitializableBeanDefinition.FieldReference[].class))
             .arrayElement(fieldIndex)
             .field(ARGUMENT_MEMBER, TypeDef.of(Argument.class));
+    }
+
+    /**
+     * Whether the generic type reported by the injection point has to be written out as a new
+     * {@link Argument}, rather than derived from the injection point argument at runtime.
+     *
+     * <p>The runtime derivation is cheaper - it reads a type parameter off the argument that is
+     * already generated for the injection point - and it is what Core has always emitted for the
+     * Java type model. It is only unusable when a language model reports a bean type that the
+     * derivation would not arrive at, for example a map type that is not a {@link Map}, where the
+     * derivation would pick the key type.</p>
+     *
+     * @param type        The injection point type
+     * @param genericType The generic type reported by the injection point, or {@code null}
+     * @return True if the generic type has to be written out explicitly
+     */
+    private boolean requiresDeclaredGenericType(ClassElement type, @Nullable ClassElement genericType) {
+        if (genericType == null) {
+            return false;
+        }
+        ClassElement derived = runtimeDerivedGenericType(type);
+        return derived == null || !derived.getName().equals(genericType.getName());
+    }
+
+    /**
+     * The generic type that {@link #resolveArgumentGenericType(ClassElement)} and the argument type
+     * parameter fallback would resolve for the given injection point type.
+     *
+     * @param type The injection point type
+     * @return The derived generic type, or {@code null} if it cannot be determined
+     */
+    @Nullable
+    private ClassElement runtimeDerivedGenericType(ClassElement type) {
+        if (type.isArray()) {
+            ClassElement componentType = type.fromArray();
+            // arrays of BeanRegistration fall back to the argument type parameters
+            return isInternalGenericTypeContainer(componentType) ? null : componentType;
+        }
+        Collection<ClassElement> typeArguments = type.getTypeArguments().values();
+        if (typeArguments.isEmpty()) {
+            return null;
+        }
+        ClassElement derived = type.isAssignable(Map.class)
+            ? typeArguments.stream().skip(1).findFirst().orElse(null)
+            : typeArguments.iterator().next();
+        if (derived != null && isInternalGenericTypeContainer(type.getFirstTypeArgument().orElse(null))) {
+            // mirrors resolveInnerTypeArgumentIfNeeded
+            return derived.getFirstTypeArgument().orElse(null);
+        }
+        return derived;
     }
 
     @Nullable
