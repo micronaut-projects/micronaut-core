@@ -1,0 +1,22 @@
+// tag::mill[]
+import mill.*, scalalib.*
+
+object app extends ScalaModule:
+  def scalaVersion = "3.3.8"
+  def micronautVersion = sys.props.getOrElse("micronaut.version", "5.0.1-SNAPSHOT")
+  def micronautScalaVersion = sys.props.getOrElse("micronaut.scala.version", "1.0.0-SNAPSHOT")
+
+  def ivyDeps = Agg(
+    ivy"io.micronaut:micronaut-runtime:$micronautVersion"
+  )
+
+  def runIvyDeps = Agg(
+    ivy"io.micronaut.scala:::micronaut-inject-scala:$micronautScalaVersion"
+  )
+
+  def scalacPluginIvyDeps = Agg(
+    ivy"io.micronaut.scala:::micronaut-inject-scala:$micronautScalaVersion"
+  )
+
+  def scalacOptions = Seq("-release:25", "-Yexplicit-nulls")
+// end::mill[]

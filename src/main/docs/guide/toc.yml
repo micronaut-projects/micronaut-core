@@ -361,6 +361,7 @@ languageSupport:
     coroutines: Coroutines Support
     coroutineTracingContextPropagation: Coroutine Tracing Context Propagation
     kotlinContextPropagation: Reactive Context Propagation
+  scala: Micronaut for Scala
   graal:
     title: Micronaut for GraalVM
     graalServices: Microservices as GraalVM native images

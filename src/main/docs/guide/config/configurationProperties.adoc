@@ -9,9 +9,9 @@ snippet::io.micronaut.docs.config.properties.EngineConfig[tags="imports,class",i
 
 <1> The `@ConfigurationProperties` annotation takes the configuration prefix
 <2> You can use `jakarta.validation` annotations to validate the configuration
-<3> Default values can be assigned to the property
-<4> Static inner classes can provide nested configuration
-<5> Optional configuration values can be wrapped in `java.util.Optional`
+<3> Default values can be assigned with ann:core.bind.annotation.Bindable[]
+<4> Nested configuration types can provide nested configuration
+<5> Optional configuration values can use language-specific nullable or optional types; Scala can use explicit-null union types
 
 Once you have prepared a type-safe configuration it can be injected into your beans like any other bean:
 

@@ -6,6 +6,10 @@ For example if you are trying to build an extensible system where a default impl
 --
 One way to make injection optional is to annotate the injected type with `org.jspecify.annotations.Nullable` which will result in `null` being injected by the framework if the bean is unavailable:
 --
+[.lang-scala]
+--
+Scala can declare the injected type with a nullable union type such as `Engine | Null`. The framework injects `null` if the bean is unavailable.
+--
 
 .Example of Injecting `null`
 snippet::io.micronaut.docs.ioc.injection.nullable.Vehicle[indent="0"]
@@ -13,6 +17,10 @@ snippet::io.micronaut.docs.ioc.injection.nullable.Vehicle[indent="0"]
 [.lang-kotlin.lang-java.lang-groovy]
 --
 <1> Here the constructor argument is annotated with `org.jspecify.annotations.Nullable`
+--
+[.lang-scala]
+--
+<1> Here the constructor argument is declared with the `Engine | Null` union type.
 --
 [.lang-python]
 --
@@ -28,4 +36,3 @@ Using `org.jspecify.annotations.Nullable` has the following considerations:
 * Somewhere the code has to handle what happens if `null` is injected, for constructors this is easy since the constructor can handle the `null`, but for fields and methods a `@PostConstruct` method would need to be implemented to handle `null` if `null` is not desirable.
 * Finally, `@Nullable` cannot be used on primitive types like `int`, `long` etc. when using <<valueAnnotation, configuration injection>>. To handle primitives you need to specify `@Bindable(defaultValue="..")` and provide a default value.
 --
-

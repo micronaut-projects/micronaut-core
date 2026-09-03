@@ -1,4 +1,13 @@
 pluginManagement {
+    def micronautBuildCheckout = providers.gradleProperty("micronautBuildCheckout")
+            .orElse(providers.environmentVariable("MICRONAUT_BUILD_CHECKOUT"))
+            .map { file(it) }
+            .getOrElse(file("../build"))
+
+    if (file("${micronautBuildCheckout}/micronaut-gradle-plugins").directory) {
+        includeBuild(micronautBuildCheckout)
+    }
+
     repositories {
         gradlePluginPortal()
         mavenCentral()
@@ -12,6 +21,11 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 dependencyResolutionManagement {
     repositories {
+        mavenLocal {
+            content {
+                includeGroup("io.micronaut.scala")
+            }
+        }
         mavenCentral()
     }
 }
@@ -85,6 +99,7 @@ include "test-suite-kotlin"
 include "test-suite-kotlin-ksp-all-open"
 include "test-suite-groovy"
 include "test-suite-python"
+include "test-suite-scala"
 include "test-suite-logback"
 include "test-suite-logback-external-configuration"
 include "test-suite-logback-graalvm"
