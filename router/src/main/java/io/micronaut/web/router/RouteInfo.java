@@ -297,7 +297,7 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      * {@link io.micronaut.http.annotation.ContentDisposition}, if any.
      *
      * @return The header value, or {@code null} if none was declared
-     * @since 4.10.0
+     * @since 5.2.0
      */
     @Nullable
     default String findContentDispositionHeader() {
