@@ -196,7 +196,7 @@ public final class CrossOriginUtil {
      * @param request the CORS request
      * @param config the CORS configuration
      * @return {@code true} if the request method is allowed
-     * @since 5.4.0
+     * @since 5.2.0
      */
     public static boolean matchesMethod(HttpRequest<?> request,
                                         CorsOriginConfiguration config) {
