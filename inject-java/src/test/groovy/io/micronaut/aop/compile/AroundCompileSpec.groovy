@@ -610,9 +610,12 @@ class TestInterceptor implements Interceptor {
         def instance = getBean(context, 'annbinding1.MyBean')
         def interceptor = getBean(context, 'annbinding1.TestInterceptor')
         instance.test()
+        interceptor.invoked = false
+        def updateResult = instance.updateResource("request", "parent")
 
         expect:"the interceptor was invoked"
         instance instanceof Intercepted
+        updateResult == "ok"
         interceptor.invoked
 
         cleanup:

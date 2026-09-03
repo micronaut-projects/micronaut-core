@@ -183,8 +183,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", InterceptorRegistry.class, ExecutableMethod.class, List.class);
 
     private static final Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", InterceptorRegistry.class, ExecutableMethod.class, List.class);
-
-
     private static final Constructor<?> CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class, Object[].class).orElseThrow(() ->
         new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
     );
@@ -550,15 +548,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         if (!targetType.isInterface()) {
             proxyBuilder.superclass(classTargetType);
         }
-        List<ClassTypeDef> interfaces = new ArrayList<>();
-        Set<String> interfaceNames = new HashSet<>();
-        interfaceTypes.stream().map(typedElement -> (ClassTypeDef) TypeDef.erasure(typedElement)).forEach(interfaceType -> addInterface(interfaces, interfaceNames, interfaceType));
-        defaultMethodInterfaceTypes.stream().map(typedElement -> (ClassTypeDef) TypeDef.erasure(typedElement)).forEach(interfaceType -> addInterface(interfaces, interfaceNames, interfaceType));
-        if (targetType.isInterface() && implementInterface) {
-            addInterface(interfaces, interfaceNames, classTargetType);
-        }
-        interfaces.sort(Comparator.comparing(ClassTypeDef::getName));
-        interfaces.forEach(proxyBuilder::addSuperinterface);
 
         proxyBuilder.addAnnotation(Generated.class);
 
@@ -575,6 +564,16 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 addInterceptedIfNeeded(proxyBuilder, aroundMethod, uniqueInterceptedMethodsRefs, interceptedMethods);
             }
         }
+
+        List<ClassTypeDef> interfaces = new ArrayList<>();
+        Set<String> interfaceNames = new HashSet<>();
+        interfaceTypes.stream().map(typedElement -> (ClassTypeDef) TypeDef.erasure(typedElement)).forEach(interfaceType -> addInterface(interfaces, interfaceNames, interfaceType));
+        defaultMethodInterfaceTypes.stream().map(typedElement -> (ClassTypeDef) TypeDef.erasure(typedElement)).forEach(interfaceType -> addInterface(interfaces, interfaceNames, interfaceType));
+        if (targetType.isInterface() && implementInterface) {
+            addInterface(interfaces, interfaceNames, classTargetType);
+        }
+        interfaces.sort(Comparator.comparing(ClassTypeDef::getName));
+        interfaces.forEach(proxyBuilder::addSuperinterface);
 
         int index = 0;
         for (MethodElement method : interceptedMethods) {

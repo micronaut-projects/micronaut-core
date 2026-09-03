@@ -72,6 +72,20 @@ enum MyEnum {
         element.values().size() == 2;
     }
 
+    void "Java enums retain the standard enum value lookup path"() {
+        given:
+        def element = (EnumElement) buildClassElement("""
+package test;
+
+enum MyEnum {
+    A, B
+}
+""")
+
+        expect:
+        element.getEnumValueOfMethod().empty
+    }
+
     void "get enum constantValue for final fields"() {
         given:
         def element = (EnumElement) buildClassElement("""
