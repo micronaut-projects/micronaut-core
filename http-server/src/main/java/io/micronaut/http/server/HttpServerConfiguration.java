@@ -914,7 +914,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
          * Returns the CORS filter configuration.
          *
          * @return The CORS filter configuration
-         * @since 5.4.0
+         * @since 5.2.0
          */
         public CorsFilterConfiguration getFilter() {
             return filter;
