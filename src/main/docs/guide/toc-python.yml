@@ -288,6 +288,7 @@ languageSupport:
   title: Language Support
   python:
     title: Micronaut for Python
+    pythonThreading: Python Threading
     typeOrdering: Type Ordering and Forward References
     keywords: Python Keywords in Java APIs
     asyncAwait:

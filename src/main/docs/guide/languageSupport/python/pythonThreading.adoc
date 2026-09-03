@@ -1,0 +1,59 @@
+== Python Threading
+
+=== The Python GIL
+
+GraalPy currently uses a Global Interpreter Lock (GIL). The GIL allows only one thread to execute Python code at a time in a given GraalPy context. GraalPy can release the GIL while calling native code or performing I/O, but you should not assume that Python code in the same context executes in parallel. See the https://github.com/oracle/graalpython/blob/master/docs/user/Interoperability.md[GraalPy multithreading documentation] for more information.
+
+Micronaut can run Python code in multiple GraalPy contexts. Each context has its own GIL, so a pool of contexts can reduce GIL contention when several requests execute Python concurrently. Context pooling is experimental and should be enabled and tuned only after measuring the workload.
+
+=== Do not use virtual threads for Python execution
+
+The current GraalPy runtime does not support executing Python code on Java virtual threads. Micronaut's `blocking` executor uses virtual threads when they are available, so configure the executors used by Python as caching, platform-thread executors instead:
+
+[configuration]
+----
+micronaut:
+  executors:
+    io:
+      type: cached
+      virtual: false
+    blocking:
+      type: cached
+      virtual: false
+----
+
+Micronaut routes synchronous generated Python methods and `asyncio.run_in_executor(None, ...)` to the `io` executor. The `blocking` executor is used when an operation is explicitly annotated with `@ExecuteOn(TaskExecutors.BLOCKING)`. Configure both when Python code can use either path. The `io` executor is a caching, platform-thread executor by default; specifying it explicitly makes the configuration safe if executor defaults change.
+
+=== Configuring the Python context pool
+
+The Python context pool is configured under `micronaut.python.pool`:
+
+[configuration]
+----
+micronaut:
+  python:
+    pool:
+      enabled: true
+      size: 8
+      warn-wait: 2s
+----
+
+`enabled` defaults to `true`. `size` is the target number of additional GraalPy contexts; a value of `0` selects the default of twice the number of available processors. Contexts are created lazily and each one consumes memory and requires initialization work. Compiled Python code is shared across contexts where possible. For CPU-bound Python code, start with a pool size near the number of available processors and increase it only when measurements show useful parallelism. For I/O-heavy Python code, a larger pool may improve throughput, but it should remain bounded by the concurrency the application can sustain. Set `warn-wait` to a useful threshold, such as `2s`, to log when requests wait for an available context and use that signal when tuning `size`.
+
+Disabling the pool is useful for applications that use one context deliberately or do not need concurrent Python execution:
+
+[configuration]
+----
+micronaut:
+  python:
+    pool:
+      enabled: false
+----
+
+For the complete list of pool properties, see the generated configuration reference:
+
+include::{includedir}configurationProperties/io.micronaut.context.python.PythonPoolConfiguration.adoc[]
+
+WARNING: Python context pooling, including the `@ContextPooled` scope, is experimental. Test pooled applications carefully, especially when Python code relies on mutable module or global state, because each pooled context has its own Python state.
+
+The current GIL and virtual-thread limitations are temporary. A future GraalPy release will provide GIL-free Python execution and virtual-thread support; revisit the executor and pool recommendations when using that runtime.
