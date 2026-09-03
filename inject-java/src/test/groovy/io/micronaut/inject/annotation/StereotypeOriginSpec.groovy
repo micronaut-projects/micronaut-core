@@ -171,17 +171,16 @@ class Test {
     }
 
     /**
-     * The cascade stops after one intermediate level. For {@code @A(shortest = 7)} over
-     * {@code @B} over {@code @C} over {@code @Size}, the override reaches {@code @B(min = 7)} and
-     * {@code @C(min = 7)}, but {@code @Size} keeps the value it was computed with, {@code min = 1}.
+     * The cascade recurses, so it has to reach the leaves and not just the first intermediate level: for
+     * {@code @A(shortest = 7)} over {@code @B} over {@code @C} over {@code @Size}, every level takes the
+     * override, {@code @Size} included.
      *
-     * <p>The recursion itself is not what fails. Instrumenting {@code overrideMembers} shows the annotation type
-     * resolves at every level and that the cascade does compute the right answer: {@code @C(min = 7)} is
-     * produced carrying {@code @Size(min = 7)}, and {@code @B}'s rebuilt subtree carries both. A later
-     * processing pass then overwrites it — it rebuilds {@code @B}'s subtree from a {@code @C} whose own
-     * subtree was computed before the override, and the last write wins, so the leaf reverts to the
-     * {@code min = 1} it was first computed with. The value is computed correctly and then lost, rather than
-     * never being computed.</p>
+     * <p>Re-deriving the aliases of a node further down the subtree needs that node's annotation type, and the
+     * tree holds only annotation values, so the type is looked up by name. Where an implementation cannot
+     * resolve an annotation type from a name alone — the builder notes this for KSP and Groovy, and this spec
+     * reproduces it because {@code writeAndLoadMetadata} builds with a parser that never entered the source —
+     * that lookup returns nothing and the cascade used to stop at the first intermediate annotation, leaving
+     * {@code @Size(min = 1)}. The builder now falls back to the annotation types it saw during processing.</p>
      *
      * <p>Two levels is not exotic for the motivating consumer: a composed constraint composing another composed
      * constraint is ordinary, and {@code micronaut-validation} cascades to any depth today because each
