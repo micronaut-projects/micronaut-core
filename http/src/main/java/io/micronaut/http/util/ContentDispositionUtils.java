@@ -17,6 +17,7 @@ package io.micronaut.http.util;
 
 import io.micronaut.core.util.StringUtils;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.annotation.Internal;
 
 /**
  * Utility class to build RFC 6266 compliant {@code Content-Disposition} header values.
