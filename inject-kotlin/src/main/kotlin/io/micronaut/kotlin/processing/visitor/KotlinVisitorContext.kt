@@ -297,12 +297,14 @@ internal class KotlinVisitorContext(
         // old session, so they must go: reading one afterwards throws
         // KaInvalidLifetimeOwnerAccessException ("PSI has changed since creation"). The
         // node-keyed memos would merely miss, since the nodes are new objects, but classByNameCache
-        // is keyed on a String and would hit and hand back a dead declaration.
+        // and the builder's remembered annotation types are keyed on a String and would hit and hand
+        // back a dead declaration.
         binaryNameCache.clear()
         annotationTypeCache.clear()
         repeatableContainerCache.clear()
         jvmNameCache.clear()
         classByNameCache.clear()
+        annotationMetadataBuilder.clearProcessedAnnotationTypes()
         this.resolver = resolver
         annotationMetadataBuilder.resolver = resolver
         nativeElementsHelper.resolver = resolver
