@@ -15,9 +15,9 @@
  */
 package io.micronaut.http.util;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import org.jspecify.annotations.Nullable;
-import io.micronaut.core.annotation.Internal;
 
 /**
  * Utility class to build RFC 6266 compliant {@code Content-Disposition} header values.
@@ -39,7 +39,7 @@ public final class ContentDispositionUtils {
      * @param type     The disposition type, typically {@code attachment} or {@code inline}
      * @param filename The filename to include, or {@code null}/empty to omit the filename parameters
      * @return The header value
-     * @since 4.10.0
+     * @since 5.2.0
      */
     public static String toHeaderValue(String type, @Nullable String filename) {
         if (StringUtils.isEmpty(filename)) {
