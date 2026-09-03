@@ -87,9 +87,10 @@ import java.util.stream.Stream;
  *     <li>the bean is instantiated by the static method annotated {@link Creator} the class declares, else by
  *     one of its accessible - non-private - constructors: the only one, else the one annotated
  *     {@code @Inject}, else the one annotated {@link Creator}, else the canonical constructor of a record,
- *     else the first public one, which is the selection {@code ClassElement#getPrimaryConstructor()} makes at
- *     compilation time. An annotation counts through its stereotypes, so a meta-annotated {@code @Creator}
- *     counts;</li>
+ *     else the first public one. That is the selection {@code ClassElement#getPrimaryConstructor()} makes at
+ *     compilation time, but for a record whose constructors carry no annotation: the processors take the
+ *     first public one there, where this takes the canonical one, which is the one the components describe.
+ *     An annotation counts through its stereotypes, so a meta-annotated {@code @Creator} counts;</li>
  *     <li>the non-static, non-final fields annotated {@code @Inject}, {@link Value} or {@link Property}, and
  *     the ones declaring a qualifier without {@code @Inject}, are injected, the super classes' first;</li>
  *     <li>the methods annotated {@code @Inject} and the setters annotated with a qualifier - {@link Value} is
@@ -887,6 +888,12 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
          * the one annotated {@code @Inject}, else the one annotated {@link Creator}, else the canonical
          * constructor of a record, else the first public one. A private constructor is not selected, and an
          * annotation counts through its stereotypes.
+         *
+         * <p>Two places read differently from the compilation time selection, both where it has nothing to
+         * read: it filters the constructors annotated {@code @Inject} or {@link Creator} in one pass and
+         * takes the first, where this prefers {@code @Inject}; and it has no record branch, so for a record
+         * whose constructors carry no annotation it takes the first public one where this takes the
+         * canonical one.</p>
          */
         @Nullable
         @SuppressWarnings("unchecked")

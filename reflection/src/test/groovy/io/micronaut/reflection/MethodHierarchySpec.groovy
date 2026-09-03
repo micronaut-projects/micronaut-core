@@ -317,4 +317,16 @@ it merges from the methods it overrides, so the declaration is not exact and the
             super.count(value) * 2
         }
     }
+
+    void "a method read reflectively is read as the type asking for it sees it"() {
+        given: "a type with neither an introspection nor a bean definition, inheriting the method of a generic super class"
+        def hierarchy = MethodHierarchy.resolve(BeanIntrospector.SHARED, ExecStringStore, "last")
+
+        expect: "the return is the type the implementation gives the variable, not the bound of the variable"
+        hierarchy.returnArgument().type == String
+
+        and: "the declaration is still the one of the type declaring the method, which is what the hierarchy is walked from"
+        hierarchy.local().declaringType() == ExecStore
+        hierarchy.annotationMetadata().getAnnotationValuesByType(Tag)*.stringValue()*.get() == ["store"]
+    }
 }

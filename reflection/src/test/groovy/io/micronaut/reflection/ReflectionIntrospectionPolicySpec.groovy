@@ -268,4 +268,42 @@ class ReflectionIntrospectionPolicySpec extends Specification {
             Ordered.HIGHEST_PRECEDENCE
         }
     }
+
+    void "two contributions of the same patterns are withdrawn one by one"() {
+        given: "two configurations allowing everything, which compiles to the one predicate the JVM caches"
+        def first = ReflectionIntrospectionPolicy.configure(["*"])
+        def second = ReflectionIntrospectionPolicy.configure(["*"])
+
+        when: "one of them is withdrawn"
+        first.close()
+
+        then: "what the other one contributed still applies"
+        ReflectionIntrospectionPolicy.isAllowed(Book)
+
+        when:
+        second.close()
+
+        then:
+        !ReflectionIntrospectionPolicy.isAllowed(Book)
+
+        cleanup:
+        ReflectionIntrospectionPolicy.reset()
+    }
+
+    void "the fallback never describes a type of the platform"() {
+        given:
+        def registration = ReflectionIntrospectionPolicy.configure(["*"])
+        def fallback = new ReflectionBeanIntrospectionFallback()
+
+        expect: "a type of the platform is not served, whatever the patterns allow"
+        fallback.findIntrospection(Thread).empty
+        fallback.findIntrospection(StringBuilder).empty
+
+        and: "a type of the application is"
+        fallback.findIntrospection(Book).present
+
+        cleanup:
+        registration.close()
+        ReflectionIntrospectionPolicy.reset()
+    }
 }

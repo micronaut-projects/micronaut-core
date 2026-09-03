@@ -98,7 +98,7 @@ public record MethodHierarchy(Declaration local,
                                           String name,
                                           Class<?>... parameterTypes) {
         Declaration local = declaredBy(introspector, type, name, parameterTypes)
-            .or(() -> findMethod(type, name, parameterTypes).map(Declaration::of))
+            .or(() -> findMethod(type, name, parameterTypes).map(method -> Declaration.of(method, type)))
             .orElseThrow(() -> new IllegalArgumentException(
                 "No method " + name + Arrays.toString(parameterTypes) + " on type " + type.getName()));
         return resolve(introspector, local, name);
@@ -472,6 +472,25 @@ public record MethodHierarchy(Declaration local,
                 ReflectionAnnotations.metadataOf(method),
                 ReflectionArguments.argumentsOf(method),
                 ReflectionArguments.returnOf(method),
+                true);
+        }
+
+        /**
+         * The declaration a type reads under a method, with the arguments and the return that type sees: a
+         * method a generic super type declares is read with the values the reading type gives the variables,
+         * as the processors generate them for it, rather than with the bounds of the variables. The type
+         * declaring the method is still the type of the declaration, which is what the hierarchy is walked
+         * from.
+         *
+         * @param method  The method
+         * @param context The type reading the method, an implementation of its declaring type
+         * @return The declaration
+         */
+        public static Declaration of(Method method, Class<?> context) {
+            return new Declaration(method.getDeclaringClass(),
+                ReflectionAnnotations.metadataOf(method),
+                ReflectionArguments.argumentsOf(method, context),
+                ReflectionArguments.returnOf(method, context),
                 true);
         }
 

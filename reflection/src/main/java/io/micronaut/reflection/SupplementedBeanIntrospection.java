@@ -82,8 +82,8 @@ public final class SupplementedBeanIntrospection<T> implements ReflectiveIntrosp
             }
         }
         this.methods = Collections.unmodifiableList(merged);
-        // the merged view is built once: a caller reading a bean asks for a property per value it reads, and
-        // the property it is given is the same instance every time
+        // every view is built once: a caller reading a bean asks for a property per value it reads, and the
+        // property it is given is the same instance every time
         Map<String, BeanProperty<T, Object>> reflectedProperties = new HashMap<>();
         for (BeanProperty<T, Object> property : reflected.getBeanProperties()) {
             reflectedProperties.putIfAbsent(property.getName(), property);
@@ -91,8 +91,6 @@ public final class SupplementedBeanIntrospection<T> implements ReflectiveIntrosp
         Collection<BeanProperty<T, Object>> generatedProperties = generated.getBeanProperties();
         List<BeanProperty<T, Object>> mergedProperties = new ArrayList<>(generatedProperties.size());
         Map<String, BeanProperty<T, Object>> byName = new LinkedHashMap<>(generatedProperties.size());
-        List<BeanReadProperty<T, Object>> read = new ArrayList<>(generatedProperties.size());
-        List<BeanWriteProperty<T, Object>> write = new ArrayList<>(generatedProperties.size());
         for (BeanProperty<T, Object> property : generatedProperties) {
             BeanProperty<T, Object> reflectedProperty = reflectedProperties.get(property.getName());
             BeanProperty<T, Object> describedProperty = reflectedProperty == null
@@ -100,17 +98,18 @@ public final class SupplementedBeanIntrospection<T> implements ReflectiveIntrosp
                 : new DescribedBeanProperty<>(property, reflectedProperty.asArgument());
             mergedProperties.add(describedProperty);
             byName.putIfAbsent(describedProperty.getName(), describedProperty);
-            if (!describedProperty.isWriteOnly()) {
-                read.add(describedProperty);
-            }
-            if (!describedProperty.isReadOnly()) {
-                write.add(describedProperty);
-            }
         }
         this.properties = Collections.unmodifiableList(mergedProperties);
         this.propertiesByName = Collections.unmodifiableMap(byName);
-        this.readProperties = Collections.unmodifiableList(read);
-        this.writeProperties = Collections.unmodifiableList(write);
+        // the read and the write views are the ones the generated introspection reports, not the merged view
+        // filtered: a generated introspection describes a read property and a write property of its own, each
+        // carrying the argument of the member behind it - a List<String> getTags() paired with a
+        // setTags(Collection<String>) - which the one property merged from both cannot carry
+        // the properties of a supplemented introspection are the ones the generated introspection describes,
+        // so the read and the write views are its own: never the reflected members standing in for a view the
+        // processor left empty, and never a property only reflection knows, which the merged view has not either
+        this.readProperties = List.copyOf(generated.getBeanReadProperties());
+        this.writeProperties = List.copyOf(generated.getBeanWriteProperties());
     }
 
     /**
@@ -200,9 +199,12 @@ public final class SupplementedBeanIntrospection<T> implements ReflectiveIntrosp
     }
 
     /**
-     * The read properties of the generated introspection, as {@link #getBeanProperties()} describes them: a
-     * generated introspection that legitimately has none - a type written to and never read from - has none
-     * here either, the reflective members of the type do not stand in for them.
+     * The read properties the generated introspection reports, each as it reports it, completed by the ones
+     * of a property it does not describe at all.
+     *
+     * <p>A generated introspection that legitimately reads nothing - a type written to and never read from -
+     * reads nothing here either: the reflective members of the type do not stand in for the properties it
+     * has none of.</p>
      *
      * @return The read properties
      */
@@ -212,7 +214,9 @@ public final class SupplementedBeanIntrospection<T> implements ReflectiveIntrosp
     }
 
     /**
-     * The write properties of the generated introspection, as {@link #getBeanProperties()} describes them.
+     * The write properties the generated introspection reports, each as it reports it, completed by the ones
+     * of a property it does not describe at all, the way {@link #getBeanReadProperties()} completes the read
+     * ones.
      *
      * @return The write properties
      */

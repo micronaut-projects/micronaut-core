@@ -146,7 +146,7 @@ class SupplementedBeanIntrospectionSpec extends Specification {
         introspection.getProperty("missing").empty
     }
 
-    void "the merged properties are built once, and every view yields the same property"() {
+    void "the merged properties are built once, and every view is built with them"() {
         given:
         def introspection = supplemented(Catalogue)
 
@@ -157,15 +157,69 @@ class SupplementedBeanIntrospectionSpec extends Specification {
         introspection.getProperty("entries").get().is(property)
         introspection.beanProperties.find { it.name == "entries" }.is(property)
 
-        and: "and so do the read and the write views, which describe the property the way the merged view does"
-        introspection.beanReadProperties.find { it.name == "entries" }.is(property)
-        introspection.beanWriteProperties.find { it.name == "entries" }.is(property)
-        introspection.beanReadProperties.find { it.name == "entries" }.asArgument().typeParameters[0]
-                .annotationMetadata.getAnnotationValuesByType(Tag)*.stringValue()*.get() == ["elem"]
+        and: "the read and the write views are built once too, and hold the same properties every time"
+        introspection.beanReadProperties.is(introspection.beanReadProperties)
+        introspection.beanWriteProperties.is(introspection.beanWriteProperties)
 
         and: "the views hold the properties a value can be read from and written to, as the merged view reports them"
         introspection.beanReadProperties*.name.toSet() == introspection.beanProperties.findAll { !it.writeOnly }*.name.toSet()
         introspection.beanWriteProperties*.name.toSet() == introspection.beanProperties.findAll { !it.readOnly }*.name.toSet()
+    }
+
+    void "a property read and written as different types keeps the arguments the generated introspection reports"() {
+        given: "a type read as a List and written as a Collection"
+        def generated = BeanIntrospection.getIntrospection(SupTags)
+        def introspection = supplemented(SupTags)
+
+        expect: "the processor describes one property, whose read and write arguments are not the same"
+        generated.beanProperties*.name == ["tags"]
+        generated.beanReadProperties*.type == [List]
+        generated.beanWriteProperties*.type == [Collection]
+
+        when:
+        def read = introspection.beanReadProperties
+        def write = introspection.beanWriteProperties
+
+        then: "the supplemented introspection serves those very properties, not the merged view filtered"
+        read*.name == ["tags"]
+        write*.name == ["tags"]
+        read[0].is(generated.beanReadProperties[0])
+        write[0].is(generated.beanWriteProperties[0])
+
+        and: "so the argument of the accessor behind each of them is the one it reports"
+        read[0].type == List
+        write[0].type == Collection
+        read[0].get(new SupTags(tags: ["a"])) == ["a"]
+
+        and: "while the merged view is the one property the processor describes"
+        introspection.beanProperties*.name == ["tags"]
+        introspection.getProperty("tags").get().is(introspection.beanProperties[0])
+    }
+
+    void "a property only the reflective introspection knows is in no view of the properties"() {
+        given: "a reflective introspection asked for field access, which makes a property of a bare field"
+        def generated = BeanIntrospection.getIntrospection(SupNotes)
+        def reflected = ReflectionBeanIntrospection.of(SupNotes,
+                Set.of(Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD))
+        def introspection = new SupplementedBeanIntrospection<SupNotes>(generated, reflected)
+
+        expect: "the processor describes the property of the accessors alone"
+        generated.beanProperties*.name == ["title"]
+        reflected.beanProperties*.name.toSet() == ["title", "note"].toSet()
+
+        when:
+        def read = introspection.beanReadProperties
+        def write = introspection.beanWriteProperties
+
+        then: "the properties are the ones the processor describes, which is what the merged view holds too"
+        read*.name == ["title"]
+        write*.name == ["title"]
+        introspection.beanProperties*.name == ["title"]
+        introspection.getProperty("note").empty
+
+        and: "and they are the generated properties themselves, each carrying the argument of its own accessor"
+        read[0].is(generated.beanReadProperties[0])
+        write[0].is(generated.beanWriteProperties[0])
     }
 
     void "a generated introspection that reads nothing exposes nothing to read"() {
@@ -183,6 +237,9 @@ class SupplementedBeanIntrospectionSpec extends Specification {
         and: "which does not stand in for the read properties the generated introspection legitimately has none of"
         introspection.beanReadProperties.isEmpty()
         introspection.beanWriteProperties*.name == ["secret"]
+
+        and: "the write property being the one the generated introspection reports"
+        introspection.beanWriteProperties[0].is(generated.beanWriteProperties[0])
     }
 
     void "the members a property is made of come from reflection"() {
@@ -255,4 +312,12 @@ class SupplementedBeanIntrospectionSpec extends Specification {
             "omitted"
         }
     }
+}
+
+/**
+ * The generated introspections of the Java fixtures of this spec: they are compiled without the processor,
+ * so a class of the Groovy sources asks for their introspections the way the module's specs do.
+ */
+@Introspected(classes = [SupTags, SupNotes])
+class SupplementedFixtures {
 }

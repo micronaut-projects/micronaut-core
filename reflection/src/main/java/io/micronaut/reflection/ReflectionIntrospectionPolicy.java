@@ -60,7 +60,7 @@ public final class ReflectionIntrospectionPolicy {
     // the policy is static, while a JVM can run several contexts at once: each configuration contributes its own
     // patterns and withdraws exactly those when it shuts down, so what applies is the union of the live ones and
     // one context neither replaces what another allowed nor takes it away by closing
-    private static final Collection<Predicate<Class<?>>> CONFIGURED = new CopyOnWriteArrayList<>();
+    private static final Collection<Contribution> CONFIGURED = new CopyOnWriteArrayList<>();
     // a predicate is added rather than folded into an or-chain, which makes the update atomic and bounds what a
     // check has to walk to the number of calls
     private static final Collection<Predicate<Class<?>>> ALLOWED = new CopyOnWriteArrayList<>();
@@ -75,7 +75,7 @@ public final class ReflectionIntrospectionPolicy {
      * @return Whether the shared introspector may describe the type reflectively
      */
     public static boolean isAllowed(Class<?> type) {
-        return SYSTEM.test(type) || anyAllows(CONFIGURED, type) || anyAllows(ALLOWED, type);
+        return SYSTEM.test(type) || anyContributionAllows(type) || anyAllows(ALLOWED, type);
     }
 
     /**
@@ -118,9 +118,9 @@ public final class ReflectionIntrospectionPolicy {
      * away
      */
     public static Registration configure(Collection<String> patterns) {
-        Predicate<Class<?>> contribution = patterns(patterns);
+        Contribution contribution = new Contribution(patterns(patterns));
         CONFIGURED.add(contribution);
-        return new Contribution(contribution);
+        return contribution;
     }
 
     /**
@@ -186,6 +186,15 @@ public final class ReflectionIntrospectionPolicy {
         return List.of(value.split(","));
     }
 
+    private static boolean anyContributionAllows(Class<?> type) {
+        for (Contribution contribution : CONFIGURED) {
+            if (contribution.patterns.test(type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean anyAllows(Collection<Predicate<Class<?>>> predicates, Class<?> type) {
         for (Predicate<Class<?>> predicate : predicates) {
             if (predicate.test(type)) {
@@ -221,9 +230,10 @@ public final class ReflectionIntrospectionPolicy {
         @Override
         public void close() {
             if (closed.compareAndSet(false, true)) {
-                // by identity: two configurations contributing the same patterns hold two contributions, and
-                // closing one has to leave the other one's
-                CONFIGURED.remove(patterns);
+                // by identity, and never by the patterns themselves: two configurations allowing the same
+                // patterns hold two contributions - and a pattern list of `*` compiles to the one predicate
+                // the JVM caches for that lambda - so closing one has to leave what the other contributed
+                CONFIGURED.removeIf(contribution -> contribution == this);
             }
         }
     }

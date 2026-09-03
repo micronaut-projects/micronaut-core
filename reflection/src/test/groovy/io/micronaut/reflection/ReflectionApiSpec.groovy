@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
@@ -418,6 +419,81 @@ class ReflectionApiSpec extends Specification {
 
         then: "it is told, since there is nothing else to give it"
         thrown(IllegalStateException)
+    }
+
+    void "a nested annotation is recorded the way the annotation holding it is"() {
+        when: "an annotation whose members hold annotations, one of them an array of them"
+        def values = ReflectionAnnotations.values(AnnNesting.Holder.getAnnotation(AnnNesting.Outer))
+
+        then: "the member of the nested annotation left at its default is left out, as one of the outer is"
+        values.get("nested").stringValue().get() == "written"
+        values.get("nested").getValues().keySet() == ["value", AnnotationUtil.NON_BINDING_ATTRIBUTE].toSet()
+
+        and: "and its non binding members are recorded, which the shared conversion does not do either"
+        values.get("nested").get(AnnotationUtil.NON_BINDING_ATTRIBUTE, String[]).get() ==
+                ["comment", AnnotationUtil.NON_BINDING_ATTRIBUTE] as String[]
+
+        and: "a member holding an array of annotations is walked element by element"
+        values.get("several")*.stringValue()*.get() == ["first", "second"]
+        values.get("several")[0].getValues().keySet() == ["value", AnnotationUtil.NON_BINDING_ATTRIBUTE].toSet()
+        values.get("several")[1].stringValue("comment").get() == "said"
+    }
+
+    void "the defaults of a nested annotation are registered, as the defaults of the outer one are"() {
+        when: "an annotation holding one of a type nothing else has converted"
+        def values = ReflectionAnnotations.values(AnnNesting.RegisteredHolder.getAnnotation(AnnNesting.Outer))
+
+        then: "the member equal to its default is left out of the nested values"
+        values.get("registered").getValues().keySet() == ["value"].toSet()
+
+        and: "and the defaults of the nested type are registered, as the defaults of a type on an element are"
+        new MutableAnnotationMetadata().getDefaultValues(AnnNesting.Registered.name).get("level") == 7
+
+        and: "so an accessor of the nested value serves the member it leaves out"
+        values.get("registered").get("level", Integer).get() == 7
+    }
+
+    void "a customizer runs for a nested annotation as it does for one of an element"() {
+        when: "an annotation holding the annotation the registered customizer supports"
+        def values = ReflectionAnnotations.values(AnnNesting.CustomizedHolder.getAnnotation(AnnNesting.Outer))
+
+        then: "the customizer derived the member of the nested annotation too"
+        values.get("customized").stringValue().get() == "inner"
+        values.get("customized").stringValue("derived").get() == "from-inner"
+    }
+
+    void "an array member value is a copy, so mutating it does not reach the annotation"() {
+        given: "an annotation implemented by hand, which answers the same array every time where the proxy the compiler builds clones it"
+        def shared = ["a", "b"] as String[]
+        def annotation = (AnnArrays) Proxy.newProxyInstance(
+                AnnArrays.classLoader,
+                [AnnArrays] as Class[],
+                new InvocationHandler() {
+                    Object invoke(Object proxy, Method method, Object[] args) {
+                        switch (method.name) {
+                            case "annotationType":
+                                return AnnArrays
+                            case "labels":
+                                return shared
+                            case "toString":
+                                return "@AnnArrays"
+                            case "hashCode":
+                                return 0
+                            case "equals":
+                                return proxy.is(args[0])
+                            default:
+                                return null
+                        }
+                    }
+                })
+
+        when: "the caller mutates the array it was handed"
+        def values = ReflectionAnnotations.values(annotation)
+        values.get("labels")[0] = "mutated"
+
+        then: "the array of the annotation is untouched, and a second read gives what the first one gave"
+        shared == ["a", "b"] as String[]
+        ReflectionAnnotations.values(annotation).get("labels") == ["a", "b"] as String[]
     }
 
     @Restricted

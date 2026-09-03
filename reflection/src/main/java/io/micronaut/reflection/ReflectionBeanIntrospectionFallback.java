@@ -33,6 +33,10 @@ import java.util.Optional;
 @Experimental
 public final class ReflectionBeanIntrospectionFallback implements BeanIntrospectionFallback {
 
+    private static final String[] PLATFORM_PACKAGES = {
+        "java.", "javax.", "jakarta.", "jdk.", "sun.", "com.sun.", "kotlin.", "groovy.", "scala."
+    };
+
     // a lookup miss is frequent - InstantiationUtils, BeanWrapper and the binders ask for a type they expect
     // not to find - so what a miss costs is what this fallback costs. The cache therefore holds the whole
     // outcome and not only the introspections: a type this fallback cannot describe, and a type whose
@@ -44,7 +48,7 @@ public final class ReflectionBeanIntrospectionFallback implements BeanIntrospect
         @Override
         @SuppressWarnings("java:S1181")
         protected Optional<ReflectionBeanIntrospection<?>> computeValue(Class<?> type) {
-            if (!ReflectionBeanIntrospection.isIntrospectable(type)) {
+            if (!ReflectionBeanIntrospection.isIntrospectable(type) || isPlatformType(type)) {
                 return Optional.empty();
             }
             if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
@@ -52,10 +56,12 @@ public final class ReflectionBeanIntrospectionFallback implements BeanIntrospect
             }
             try {
                 return Optional.of(ReflectionBeanIntrospection.of(type));
-            } catch (Throwable e) {
+            } catch (Exception | LinkageError e) {
                 // describing a class reads every declared member, which throws NoClassDefFoundError when a
                 // member's type is an optional dependency the application does not have: a type this fallback
-                // cannot serve, not a lookup that should fail
+                // cannot serve, not a lookup that should fail. An error that says nothing about the type -
+                // the stack or the heap running out - is not caught, as remembering the type as not served
+                // would outlive the condition that caused it
                 if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
                     ClassUtils.REFLECTION_LOGGER.debug("Cannot reflectively introspect '{}', it is not served", type.getName(), e);
                 }
@@ -81,6 +87,21 @@ public final class ReflectionBeanIntrospectionFallback implements BeanIntrospect
             return Optional.empty();
         }
         return Optional.of((BeanIntrospection<T>) introspection.get());
+    }
+
+    /**
+     * Whether a type belongs to the platform or to a language running on it, which this fallback never
+     * describes: it serves the types an application allowed of its own, and a caller meaning to reflect on a
+     * platform type says so through {@link ReflectionBeanIntrospection#of(Class)} instead.
+     */
+    private static boolean isPlatformType(Class<?> type) {
+        String name = type.getName();
+        for (String platformPackage : PLATFORM_PACKAGES) {
+            if (name.startsWith(platformPackage)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

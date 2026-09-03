@@ -84,15 +84,6 @@ import java.util.Set;
 @Experimental
 public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospection<T> {
 
-    /**
-     * The packages of the platform and of the languages running on it, which a reflective introspection never
-     * describes: they are not what an application means to expose, and their members are closed to reflection
-     * as often as not.
-     */
-    private static final String[] PLATFORM_PACKAGES = {
-        "java.", "javax.", "jakarta.", "jdk.", "sun.", "com.sun.", "kotlin.", "groovy.", "scala."
-    };
-
     private static final Set<Introspected.AccessKind> METHOD_ACCESS = Set.of(Introspected.AccessKind.METHOD);
 
     private final Class<T> beanType;
@@ -225,16 +216,13 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
      */
     public static boolean isIntrospectable(Class<?> type) {
         // an interface is introspected for its declarations, it cannot be instantiated
-        if (type.isPrimitive() || type.isArray() || type.isAnnotation() || type.isEnum()) {
-            return false;
-        }
-        String name = type.getName();
-        for (String platformPackage : PLATFORM_PACKAGES) {
-            if (name.startsWith(platformPackage)) {
-                return false;
-            }
-        }
-        return true;
+        return !type.isPrimitive()
+            && !type.isArray()
+            && !type.isAnnotation()
+            && !type.isEnum()
+            && !type.getName().startsWith("java.")
+            && !type.getName().startsWith("javax.")
+            && !type.getName().startsWith("jdk.");
     }
 
     @Override
@@ -779,10 +767,10 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             // a field is declared once per class, and the classes are walked from the most derived one
             field = fields.isEmpty() ? null : fields.get(0);
             getter = selectGetter();
-            Class<?> readType = getter != null ? getter.getReturnType() : (field == null ? null : field.getType());
-            if (readType != null && !setters.isEmpty()) {
-                // `setValue(Object)` of a `String` property takes more than the property holds: the processor
-                // drops such a setter rather than writing through it
+            if (getter != null && !setters.isEmpty()) {
+                // a setter of another type is not the setter of this property: the processor drops it rather
+                // than writing through it, and only when a getter says what the property holds
+                Class<?> readType = getter.getReturnType();
                 setters.removeIf(candidate -> isIncompatibleSetter(readType, candidate));
             }
             setter = selectSetter();
@@ -861,12 +849,18 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         }
 
         /**
-         * Whether the value of the property cannot be given to the parameter of a setter, the way the
-         * processor tells a setter of another type from an overload of the property type.
+         * Whether the value of the property cannot be given to the parameter of a setter, the way
+         * {@code AstBeanPropertiesUtils.isIncompatibleSetterType} tells a setter of another type from the
+         * setter of this property: the parameter takes what the property holds - a {@code setValue(Object)}
+         * of a {@code String} property is the setter of that property - and a parameter of the very type of
+         * the property is one whatever the assignability of the two erasures says.
          */
         private static boolean isIncompatibleSetter(Class<?> readType, Method setter) {
             Class<?> parameterType = setter.getParameterTypes()[0];
-            return !ReflectionUtils.getWrapperType(readType).isAssignableFrom(ReflectionUtils.getWrapperType(parameterType));
+            if (parameterType == readType) {
+                return false;
+            }
+            return !ReflectionUtils.getWrapperType(parameterType).isAssignableFrom(ReflectionUtils.getWrapperType(readType));
         }
 
         /**

@@ -124,12 +124,11 @@ class ReflectionBeanIntrospectionSpec extends Specification {
             introspection.getRequiredProperty("value", String).get(bean) == "written"
         }
 
-        and: "the overload is not a member of the property either, the way the processor drops it"
+        and: "the overload is a member all the same: the value of the property can be given to its parameter, which is what the processor keeps a setter for"
         def setters = introspections.first().getPropertyMembers("value").findAll {
             it.member instanceof Method && ((Method) it.member).parameterCount == 1
         }
-        setters.size() == 1
-        ((Method) setters.first().member).parameterTypes[0] == String
+        setters.collect { ((Method) it.member).parameterTypes[0] } as Set == [String, Object] as Set
 
         and: "isActive reads the boolean, which is the accessor the naming rules generate for it"
         introspections.every { introspection ->
@@ -327,5 +326,20 @@ class ReflectionBeanIntrospectionSpec extends Specification {
 
         and: "build with method arguments builds the same bean: there is no build method"
         introspection.builder().with("title", "Same").with("pages", 2).build("ignored").title == "Same"
+    }
+
+    void "a setter taking more than the property holds is the setter of the property"() {
+        given: "a type whose only setter takes Object where the property holds a String"
+        def introspection = ReflectionBeanIntrospection.of(IntroWidening)
+        def bean = new IntroWidening()
+
+        expect: "the property is there, where dropping the setter would have left the type no property at all"
+        introspection.propertyNames.toList() == ["value"]
+
+        when:
+        introspection.getRequiredProperty("value", Object).set(bean, "written")
+
+        then: "it is written through the setter"
+        bean.read() == "written"
     }
 }

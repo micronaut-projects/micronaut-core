@@ -343,6 +343,9 @@ public final class ReflectionAnnotations {
      * name, a nested annotation is an {@link AnnotationValue} and the members annotated {@link NonBinding} are
      * listed under {@link AnnotationUtil#NON_BINDING_ATTRIBUTE}.
      *
+     * <p>A nested annotation is given the same treatment as the annotation holding it, recursively, and an
+     * array value is a copy the caller owns.</p>
+     *
      * @param annotation The annotation
      * @return The values, mutable
      * @throws IllegalStateException When a member of the annotation cannot be read
@@ -367,11 +370,13 @@ public final class ReflectionAnnotations {
                 nonBinding.add(name);
             }
             Object value = read.get(name);
-            // the converted forms are compared, and by content: a member holding an array answers a fresh one
+            // the converted forms are compared, and by content: a member holding an array answers a fresh one.
+            // both sides are the form the shared conversion gives, the defaults included, so the comparison is
+            // made before the policies below reshape a nested annotation
             if (value == null || Objects.deepEquals(value, defaults.get(name))) {
                 continue;
             }
-            values.put(name, value);
+            values.put(name, memberValue(annotation, member, value));
         }
         if (nonBinding != null) {
             // the attribute lists itself, as the processors record it
@@ -699,6 +704,82 @@ public final class ReflectionAnnotations {
         }
         value.trySetAccessible();
         return (Annotation[]) ReflectionUtils.invokeMethod(annotation, value);
+    }
+
+    /**
+     * A member value as this module records it, on top of the form the shared conversion gives it.
+     *
+     * <p>{@link AnnotationValue#of(Annotation)} converts the whole tree, so a member holding an annotation comes
+     * out as an {@link AnnotationValue} the shared rules built: it carries the members left at their default, its
+     * defaults are not registered, its non binding members are not recorded and no customizer has seen it. Those
+     * are the policies of this module and they hold at every level, so the nested annotation is read off the
+     * instance and converted by {@link #valueOf(Annotation)}, which recurses; only the shape of the conversion
+     * stays the concern of the core API.</p>
+     *
+     * @param annotation The annotation the member is read from
+     * @param member     The member
+     * @param value      The value of the member, as the shared conversion gives it
+     * @return The value to record
+     * @throws IllegalStateException When the member cannot be read
+     */
+    private static Object memberValue(Annotation annotation, Method member, Object value) {
+        if (value instanceof AnnotationValue<?>) {
+            if (readMember(annotation, member) instanceof Annotation nested) {
+                return valueOf(nested);
+            }
+        } else if (value instanceof AnnotationValue<?>[]) {
+            // an array of annotations is walked element by element: each element is an annotation of its own
+            if (readMember(annotation, member) instanceof Annotation[] nested) {
+                AnnotationValue<?>[] converted = new AnnotationValue[nested.length];
+                for (int i = 0; i < nested.length; i++) {
+                    converted[i] = valueOf(nested[i]);
+                }
+                return converted;
+            }
+        }
+        // a value that is not an annotation is left as the conversion gave it, copied when it is an array
+        return copied(value);
+    }
+
+    /**
+     * A member read off an annotation instance again, to convert the annotation it holds rather than the
+     * converted form of it. A failure is reported the way {@link AnnotationValue#of(Annotation)} reports one, so
+     * that a member read here fails no differently from the same member read there.
+     */
+    @Nullable
+    private static Object readMember(Annotation annotation, Method member) {
+        try {
+            return ReflectionUtils.invokeInaccessibleMethod(annotation, member);
+        } catch (RuntimeException e) {
+            // the reflective wrappers say nothing an invocation target's own exception does not say better
+            Throwable cause = e;
+            while (cause.getCause() != null) {
+                cause = cause.getCause();
+            }
+            throw new IllegalStateException("Cannot read member [" + member.getName() + "] of annotation ["
+                + annotation.annotationType().getName() + "]: " + cause, e);
+        }
+    }
+
+    /**
+     * A value copied when it is an array, so that a caller mutating what it is handed cannot reach the array of
+     * the annotation.
+     *
+     * <p>The copy is made here rather than in the core API because the shared conversion keeps an array it has
+     * no shape to change - one of primitives or of strings - as the instance answered it, which is safe for the
+     * proxy the compiler builds, since that one clones an array member on every call, and is not safe for an
+     * annotation written by hand nor for the one {@link #synthesize(Class, AnnotationValue)} builds, both of
+     * which answer the same array every time. The values this class builds are handed to a customizer and stored
+     * in a metadata, so the array they hold is to be theirs.</p>
+     */
+    private static Object copied(Object value) {
+        if (!value.getClass().isArray()) {
+            return value;
+        }
+        int length = Array.getLength(value);
+        Object copy = Array.newInstance(value.getClass().getComponentType(), length);
+        System.arraycopy(value, 0, copy, 0, length);
+        return copy;
     }
 
     /**
