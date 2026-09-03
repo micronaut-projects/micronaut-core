@@ -2,7 +2,7 @@
 
 === The Python GIL
 
-GraalPy currently uses a Global Interpreter Lock (GIL). The GIL allows only one thread to execute Python code at a time in a given GraalPy context. GraalPy can release the GIL while calling foreign code or performing I/O, but you should not assume that Python code in the same context executes in parallel. See the https://github.com/oracle/graalpython/blob/master/docs/user/Interoperability.md[GraalPy multithreading documentation] for more information.
+GraalPy currently uses a Global Interpreter Lock (GIL). The GIL allows only one thread to execute Python code at a time in a given GraalPy context. GraalPy can release the GIL while calling native code or performing I/O, but you should not assume that Python code in the same context executes in parallel. See the https://github.com/oracle/graalpython/blob/master/docs/user/Interoperability.md[GraalPy multithreading documentation] for more information.
 
 Micronaut can run Python code in multiple GraalPy contexts. Each context has its own GIL, so a pool of contexts can reduce GIL contention when several requests execute Python concurrently. Context pooling is experimental and should be enabled and tuned only after measuring the workload.
 
@@ -38,7 +38,7 @@ micronaut:
       warn-wait: 2s
 ----
 
-`enabled` defaults to `true`. `size` is the target number of additional GraalPy contexts; a value of `0` selects the default of twice the number of available processors. Contexts are created lazily and each context has a memory and warm-up cost. For CPU-bound Python code, start with a pool size near the number of available processors and increase it only when measurements show useful parallelism. For I/O-heavy Python code, a larger pool may improve throughput, but it should remain bounded by the concurrency the application can sustain. Set `warn-wait` to a useful threshold, such as `2s`, to log when requests wait for an available context and use that signal when tuning `size`.
+`enabled` defaults to `true`. `size` is the target number of additional GraalPy contexts; a value of `0` selects the default of twice the number of available processors. Contexts are created lazily and each one consumes memory and requires initialization work. Compiled Python code is shared across contexts where possible. For CPU-bound Python code, start with a pool size near the number of available processors and increase it only when measurements show useful parallelism. For I/O-heavy Python code, a larger pool may improve throughput, but it should remain bounded by the concurrency the application can sustain. Set `warn-wait` to a useful threshold, such as `2s`, to log when requests wait for an available context and use that signal when tuning `size`.
 
 Disabling the pool is useful for applications that use one context deliberately or do not need concurrent Python execution:
 
