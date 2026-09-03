@@ -1343,7 +1343,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         );
     }
 
-
     /**
      * Reconciles annotations introduced by aliases with the declared stereotypes. An alias whose
      * target annotation is declared as a stereotype overrides the declared member values — for a
