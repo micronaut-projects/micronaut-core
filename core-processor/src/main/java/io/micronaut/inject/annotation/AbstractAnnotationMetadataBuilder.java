@@ -147,6 +147,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * The annotation types seen with their native element during the processing, by annotation name. The
      * fallback for {@link #getAnnotationMirror(String)} when an implementation cannot resolve an annotation type
      * from its name alone, so that aliases can be derived again for an annotation the tree already holds.
+     *
+     * <p>The entries are native elements of the session that produced them, so an implementation whose builder
+     * outlives a processing round has to clear them at that boundary with
+     * {@link #clearProcessedAnnotationTypes()}.</p>
      */
     private final Map<String, T> processedAnnotationTypes = new HashMap<>();
 
@@ -1960,6 +1964,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
         }
+    }
+
+    /**
+     * Forgets the annotation types remembered during the processing, which are the fallback used to derive the
+     * aliases of an annotation the retained tree holds and to decide whether one is {@link Retainable}.
+     *
+     * <p>An implementation that rebuilds its builder for every processing round need not call this. One that
+     * reuses a builder across rounds has to call it at the boundary: the entries are native elements of the
+     * session that has ended, and the map is keyed by annotation name, so a later round would hit and be handed
+     * a dead element rather than miss.</p>
+     */
+    @Internal
+    public void clearProcessedAnnotationTypes() {
+        processedAnnotationTypes.clear();
     }
 
     /**
