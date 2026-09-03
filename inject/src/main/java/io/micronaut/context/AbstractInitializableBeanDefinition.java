@@ -2628,7 +2628,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     private <V> Map<String, V> resolveBeanMapOfType(
         BeanResolutionContext resolutionContext,
         Argument<?> returnType,
-        Argument<V> beanType,
+        @Nullable Argument<V> beanType,
         Qualifier<V> qualifier) {
         if (beanType == null) {
             throw noGenericsError(resolutionContext, returnType);

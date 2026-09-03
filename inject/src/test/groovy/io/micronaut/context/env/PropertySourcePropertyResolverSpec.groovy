@@ -20,6 +20,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import org.jspecify.annotations.NonNull
 import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.convert.MutableConversionService
 import io.micronaut.core.convert.format.MapFormat
 import io.micronaut.core.naming.conventions.StringConvention
 import io.micronaut.core.value.MapPropertyResolver
@@ -33,6 +34,7 @@ import spock.lang.Unroll
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.function.Function
 
 /**
  * @author Graeme Rocher
@@ -259,6 +261,39 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         resolver.getProperty('my.property', Map).isPresent()
         resolver.getProperty('my.property', Map).get() == [one: '10 + 50 + 10', two: '10', three: '10 + 20']
+    }
+
+    void "map sub-properties use a Map conversion when the requested type is not a Map"() {
+        given:
+        MutableConversionService conversionService = MutableConversionService.create()
+        conversionService.addConverter(Map, MapConvertible, new Function<Map, MapConvertible>() {
+            @Override
+            MapConvertible apply(Map value) {
+                return new MapConvertible(value)
+            }
+        })
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(conversionService, false)
+        resolver.addPropertySource(PropertySource.of("test", ["target.value": "converted"]))
+
+        expect:
+        resolver.getProperty("target", MapConvertible).get().values == [value: "converted"]
+    }
+
+    void "empty map sub-properties are only returned for Map targets"() {
+        given:
+        MutableConversionService conversionService = MutableConversionService.create()
+        conversionService.addConverter(Map, MapConvertible, new Function<Map, MapConvertible>() {
+            @Override
+            MapConvertible apply(Map value) {
+                return new MapConvertible(value)
+            }
+        })
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(conversionService, false)
+        resolver.addPropertySource(PropertySource.of("test", [target: null]))
+
+        expect:
+        resolver.getProperty("target", Map).get().isEmpty()
+        !resolver.getProperty("target", MapConvertible).isPresent()
     }
 
     void "test resolve placeholders for lists of map"() {
@@ -825,6 +860,14 @@ class PropertySourcePropertyResolverSpec extends Specification {
                 return conversionService.convert("loaded", requiredType)
             }
             Optional.empty()
+        }
+    }
+
+    static class MapConvertible {
+        final Map<String, Object> values
+
+        MapConvertible(Map<String, Object> values) {
+            this.values = values
         }
     }
 }

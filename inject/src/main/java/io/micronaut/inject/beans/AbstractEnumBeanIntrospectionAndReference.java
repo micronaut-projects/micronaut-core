@@ -103,7 +103,7 @@ public abstract class AbstractEnumBeanIntrospectionAndReference<E extends Enum<E
                                                         BeanMethodRef<Object>[] methodsRefs,
                                                         EnumConstantObjectRef<?>[] enumValueRefs) {
         super(beanType, annotationMetadata, constructorAnnotationMetadata, constructorArguments, propertiesRefs, methodsRefs);
-        this.enumConstantRefs = (List) List.of(enumValueRefs);
+        this.enumConstantRefs = (List<EnumConstant<E>>) (List<?>) List.of(enumValueRefs);
     }
 
     @Override

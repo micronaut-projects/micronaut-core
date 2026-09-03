@@ -47,6 +47,7 @@ import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.beans.AbstractEnumBeanIntrospectionAndReference;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospectionAndReference;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
 import io.micronaut.inject.writer.DispatchWriter;
@@ -313,9 +314,24 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
 
     private static Optional<MethodElement> enumValueOfMethod(ClassElement beanClassElement) {
         if (beanClassElement instanceof EnumElement enumElement) {
-            return enumElement.getEnumValueOfMethod();
+            return enumElement.getEnumValueOfMethod().map(method -> validateEnumValueOfMethod(beanClassElement, method));
         }
         return Optional.empty();
+    }
+
+    private static MethodElement validateEnumValueOfMethod(ClassElement beanClassElement, MethodElement method) {
+        ParameterElement[] parameters = method.getParameters();
+        boolean validParameter = parameters.length == 1 && (
+            String.class.getName().equals(parameters[0].getType().getName()) ||
+                CharSequence.class.getName().equals(parameters[0].getType().getName())
+        );
+        if (!method.isStatic() || !validParameter || !beanClassElement.isAssignable(method.getReturnType())) {
+            throw new ProcessingException(beanClassElement,
+                "The enum value lookup method [" + method.getName() + "] for [" + beanClassElement.getName() + "] " +
+                    "must be static, accept exactly one java.lang.String or java.lang.CharSequence parameter, " +
+                    "and return a value assignable to the enum type.");
+        }
+        return method;
     }
 
     /**
