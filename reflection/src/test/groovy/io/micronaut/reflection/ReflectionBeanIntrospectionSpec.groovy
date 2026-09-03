@@ -1,5 +1,6 @@
 package io.micronaut.reflection
 
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.reflect.exception.InstantiationException
@@ -44,6 +45,98 @@ class ReflectionBeanIntrospectionSpec extends Specification {
         and: "they are the properties themselves, so they read and write what the property does"
         def title = introspection.beanReadProperties.find { it.name == "title" }
         title.get(new Book("t", 1)) == "t"
+    }
+
+    void "a property declared by a generic type is of the type the bean type gives it"() {
+        given:
+        def introspection = ReflectionBeanIntrospection.of(IntroStringBox)
+
+        expect: "the variable the super class leaves open is the type the sub class passes, as a generated introspection reads it"
+        introspection.getProperty("value").get().type == String
+
+        and: "every member of the property is read through the bean type, so all of them agree"
+        def members = introspection.getPropertyMembers("value")
+        members.size() == 3
+        members*.argument*.type.every { it == String }
+
+        and: "and the property is read and written through the members the super class declares"
+        def box = new IntroStringBox()
+        introspection.getRequiredProperty("value", String).set(box, "boxed")
+        introspection.getRequiredProperty("value", String).get(box) == "boxed"
+
+        and: "a type argument of that type is resolved too"
+        def nested = ReflectionBeanIntrospection.of(IntroStringListBox).getProperty("value").get()
+        nested.type == List
+        nested.asArgument().typeParameters*.type == [String]
+
+        and: "the getter of a generic interface is read through the type that gives the variable its type"
+        ReflectionBeanIntrospection.of(IntroBoxView).getProperty("value").get().type == String
+    }
+
+    void "a field alone is a property only when field access is asked for"() {
+        given:
+        def introspection = ReflectionBeanIntrospection.of(IntroSecrets)
+
+        expect: "the property the accessors declare, and nothing the type keeps to itself"
+        introspection.beanProperties*.name.toSet() == ["name"].toSet()
+
+        and: "a private field with no accessor is neither a property nor a member of one"
+        introspection.getProperty("password").empty
+        introspection.getPropertyMembers("password").isEmpty()
+
+        and: "a package private field with no accessor is not one either"
+        introspection.getProperty("note").empty
+
+        and: "a private getter describes what it declares, it does not make a property"
+        introspection.getProperty("hidden").empty
+
+        when: "the caller asks for the fields of the type to be properties"
+        def fields = ReflectionBeanIntrospection.of(IntroSecrets,
+                Set.of(Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD))
+
+        then: "every field is one, whatever its visibility: reflection reaches them and the caller asked for them"
+        fields.beanProperties*.name.toSet() == ["name", "note", "password", "hidden"].toSet()
+        fields.getRequiredProperty("password", String).get(new IntroSecrets()) == "secret"
+    }
+
+    void "a type that asks for field access has its fields as properties"() {
+        given:
+        def introspection = ReflectionBeanIntrospection.of(IntroFieldAccess)
+
+        expect: "the fields the visibility of the annotation admits, the private one left out as the processor leaves it out"
+        introspection.beanProperties*.name.toSet() == ["label", "note"].toSet()
+        introspection.getRequiredProperty("label", String).get(new IntroFieldAccess()) == "label"
+
+        and: "and a field with no setter is written through the field itself"
+        def bean = new IntroFieldAccess()
+        introspection.getRequiredProperty("note", String).set(bean, "written")
+        introspection.getRequiredProperty("note", String).get(bean) == "written"
+    }
+
+    void "the accessors a property is read and written through are the ones the processor selects"() {
+        given: "a type with an overloaded setter and both accessors a boolean is named by"
+        def introspections = (1..5).collect { ReflectionBeanIntrospection.of(IntroOverloads) }
+
+        expect: "the setter taking the type of the property writes it, not the overload taking more than it holds"
+        introspections.every { introspection ->
+            def bean = new IntroOverloads()
+            introspection.getRequiredProperty("value", String).set(bean, "written")
+            introspection.getRequiredProperty("value", String).get(bean) == "written"
+        }
+
+        and: "the overload is not a member of the property either, the way the processor drops it"
+        def setters = introspections.first().getPropertyMembers("value").findAll {
+            it.member instanceof Method && ((Method) it.member).parameterCount == 1
+        }
+        setters.size() == 1
+        ((Method) setters.first().member).parameterTypes[0] == String
+
+        and: "isActive reads the boolean, which is the accessor the naming rules generate for it"
+        introspections.every { introspection ->
+            def bean = new IntroOverloads()
+            introspection.getRequiredProperty("active", boolean).set(bean, true)
+            introspection.getRequiredProperty("active", boolean).get(bean) == true
+        }
     }
 
     void "a record is described through its components"() {

@@ -35,6 +35,7 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Array;
@@ -42,11 +43,12 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.IdentityHashMap;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,8 +73,9 @@ import java.util.function.Consumer;
  *     {@link AnnotationValue};</li>
  *     <li>the members annotated {@link NonBinding} are recorded, so that a qualifier built from the metadata
  *     ignores them;</li>
- *     <li>an annotation inherited by a class through {@link java.lang.annotation.Inherited} is present but not
- *     declared.</li>
+ *     <li>an annotation a class inherits through {@link Inherited} is present but not declared, from a super
+ *     class as from an interface of its hierarchy, which the processors walk and {@link Class#getAnnotations()}
+ *     leaves out.</li>
  * </ul>
  *
  * <p>An annotation instance does not say which members were written, so a member whose value equals its
@@ -96,7 +99,9 @@ public final class ReflectionAnnotations {
         SoftServiceLoader.load(ReflectionAnnotationCustomizer.class, ReflectionAnnotations.class.getClassLoader()).collectAll();
 
     /**
-     * The members of an annotation type, sorted by name, made accessible: the type may not be public.
+     * The members of an annotation type, made accessible - the type may not be public - and sorted by name:
+     * {@link Class#getDeclaredMethods()} gives no order, and the members of the metadata are to come out the
+     * same on every run.
      */
     private static final ClassValue<List<Method>> MEMBERS = new ClassValue<>() {
         @Override
@@ -114,8 +119,8 @@ public final class ReflectionAnnotations {
     };
 
     /**
-     * The defaults of an annotation type, converted as the values are, registered with the shared registry the
-     * value accessors consult on first use.
+     * The defaults of an annotation type, converted in the shapes the values are given, registered with the
+     * shared registry the value accessors consult on first use.
      */
     private static final ClassValue<Map<CharSequence, Object>> DEFAULTS = new ClassValue<>() {
         @Override
@@ -260,13 +265,17 @@ public final class ReflectionAnnotations {
         if (first.isEmpty()) {
             return second;
         }
-        MutableAnnotationMetadata merged = MutableAnnotationMetadata.of(second);
-        merged.addAnnotationMetadata(MutableAnnotationMetadata.of(first));
+        // adding fills in the members the target does not carry and leaves the ones it does alone, so the
+        // metadata whose values are to win is the one to start from
+        MutableAnnotationMetadata merged = MutableAnnotationMetadata.of(first);
+        merged.addAnnotationMetadata(MutableAnnotationMetadata.of(second));
         return merged;
     }
 
     /**
-     * Adds the annotations of an element to a metadata under construction.
+     * Adds the annotations of an element to a metadata under construction. An annotation whose values cannot be
+     * read is left out, with a message logged at debug level: the generated metadata of an element records it,
+     * and the element must not lose the annotations that can be read because of it.
      *
      * @param metadata The metadata
      * @param element  The element
@@ -274,14 +283,29 @@ public final class ReflectionAnnotations {
     public static void add(MutableAnnotationMetadata metadata, AnnotatedElement element) {
         Annotation[] declared = element.getDeclaredAnnotations();
         for (Annotation annotation : declared) {
-            addAnnotation(metadata, annotation, true);
+            addAnnotationOf(metadata, element, annotation, true);
         }
-        if (element instanceof Class<?>) {
-            Set<Annotation> declaredSet = Collections.newSetFromMap(new IdentityHashMap<>());
-            declaredSet.addAll(Arrays.asList(declared));
-            for (Annotation annotation : element.getAnnotations()) {
-                if (!declaredSet.contains(annotation)) {
-                    addAnnotation(metadata, annotation, false);
+        if (!(element instanceof Class<?> type)) {
+            return;
+        }
+        // the names the annotations are filed under, so that one inherited neither displaces nor duplicates one
+        // declared: a declared annotation wins over the same annotation inherited
+        Set<String> present = new HashSet<>();
+        for (Annotation annotation : declared) {
+            present.add(filedUnder(annotation.annotationType()));
+        }
+        for (Annotation annotation : type.getAnnotations()) {
+            if (present.add(filedUnder(annotation.annotationType()))) {
+                addAnnotationOf(metadata, type, annotation, false);
+            }
+        }
+        // getAnnotations() is built from the super class chain alone, so an @Inherited annotation an implemented
+        // interface declares is missing from it, while the hierarchy the processors walk includes the interfaces
+        for (Class<?> interfaceType : interfaceHierarchy(type)) {
+            for (Annotation annotation : interfaceType.getDeclaredAnnotations()) {
+                Class<? extends Annotation> annotationType = annotation.annotationType();
+                if (isInheritable(annotationType) && present.add(filedUnder(annotationType))) {
+                    addAnnotationOf(metadata, type, annotation, false);
                 }
             }
         }
@@ -321,27 +345,33 @@ public final class ReflectionAnnotations {
      *
      * @param annotation The annotation
      * @return The values, mutable
+     * @throws IllegalStateException When a member of the annotation cannot be read
      */
     public static Map<CharSequence, Object> values(Annotation annotation) {
-        Map<CharSequence, Object> values = new LinkedHashMap<>();
         Class<? extends Annotation> type = annotation.annotationType();
-        // a member equal to its default is left out of the values, as it is at compilation time; registering the
-        // defaults is what lets the accessors serve it afterwards
-        defaultValues(type);
+        // reading the instance and converting its members is the shared conversion of the core API, a nested
+        // annotation and the members of it included; what this module adds on top of it is the policies below
+        Map<CharSequence, Object> read = AnnotationValue.of(annotation).getValues();
+        // a member equal to its default is left out of the values, as it is at compilation time: an instance
+        // answers every one of its members while the processors record only what the source writes, and
+        // registering the defaults is what lets the accessors serve the members left out
+        Map<CharSequence, Object> defaults = defaultValues(type);
+        Map<CharSequence, Object> values = new LinkedHashMap<>();
         List<String> nonBinding = null;
         for (Method member : MEMBERS.get(type)) {
+            String name = member.getName();
             if (member.isAnnotationPresent(NonBinding.class)) {
                 if (nonBinding == null) {
                     nonBinding = new ArrayList<>(2);
                 }
-                nonBinding.add(member.getName());
+                nonBinding.add(name);
             }
-            Object value = ReflectionUtils.invokeMethod(annotation, member);
-            Object defaultValue = member.getDefaultValue();
-            if (value == null || (defaultValue != null && Objects.deepEquals(value, defaultValue))) {
+            Object value = read.get(name);
+            // the converted forms are compared, and by content: a member holding an array answers a fresh one
+            if (value == null || Objects.deepEquals(value, defaults.get(name))) {
                 continue;
             }
-            values.put(member.getName(), convert(value));
+            values.put(name, value);
         }
         if (nonBinding != null) {
             // the attribute lists itself, as the processors record it
@@ -357,8 +387,8 @@ public final class ReflectionAnnotations {
     }
 
     /**
-     * The defaults of the members of an annotation type, converted as {@link #values(Annotation)} converts
-     * the values.
+     * The defaults of the members of an annotation type, in the shapes {@link #values(Annotation)} gives the
+     * values.
      *
      * @param annotationType The annotation type
      * @return The defaults, unmodifiable
@@ -446,6 +476,81 @@ public final class ReflectionAnnotations {
             throw new IllegalArgumentException("The type " + type.getName() + " is not an annotation");
         }
         return synthesize((Class<A>) type, annotationValue);
+    }
+
+    /**
+     * Adds one annotation of an element, an annotation whose values cannot be read left out rather than failing
+     * the element. An annotation naming a class that is absent from the class path is read by the processor and
+     * recorded, while reading it reflectively throws; the entry points a caller asks a named annotation of still
+     * propagate, since the caller has nothing else to be given.
+     */
+    private static void addAnnotationOf(MutableAnnotationMetadata metadata,
+                                        AnnotatedElement element,
+                                        Annotation annotation,
+                                        boolean declared) {
+        try {
+            addAnnotation(metadata, annotation, declared);
+        } catch (RuntimeException e) {
+            ClassUtils.REFLECTION_LOGGER.debug("Skipping the annotation [{}] of [{}], its values cannot be read",
+                annotation.annotationType().getName(), element, e);
+        }
+    }
+
+    /**
+     * @return The name the metadata files an annotation type under: the container of a repeatable annotation, or
+     * the type itself
+     */
+    private static String filedUnder(Class<? extends Annotation> type) {
+        Repeatable repeatable = type.getAnnotation(Repeatable.class);
+        return repeatable == null ? type.getName() : repeatable.value().getName();
+    }
+
+    /**
+     * @return Whether an annotation type is meta-annotated {@link Inherited}, which is what makes the processors
+     * keep it on a type that does not declare it
+     */
+    private static boolean isInheritable(Class<? extends Annotation> type) {
+        if (type.isAnnotationPresent(Inherited.class)) {
+            return true;
+        }
+        // a repeatable annotation written more than once is the container the compiler generates, which carries
+        // no meta-annotation of its own: the annotation it holds is what says whether it is inherited
+        for (Method member : MEMBERS.get(type)) {
+            if (AnnotationMetadata.VALUE_MEMBER.equals(member.getName())) {
+                Class<?> returnType = member.getReturnType();
+                return returnType.isArray()
+                    && returnType.getComponentType().isAnnotation()
+                    && returnType.getComponentType().isAnnotationPresent(Inherited.class);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The interfaces of the hierarchy of a type, breadth first from the type down its super class chain and then
+     * up the super interfaces, each interface once: the order a nearer declaration is seen before a farther one.
+     */
+    private static List<Class<?>> interfaceHierarchy(Class<?> type) {
+        List<Class<?>> hierarchy = new ArrayList<>();
+        Set<Class<?>> visited = new HashSet<>();
+        Deque<Class<?>> queue = new ArrayDeque<>();
+        for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
+            for (Class<?> interfaceType : current.getInterfaces()) {
+                if (visited.add(interfaceType)) {
+                    queue.add(interfaceType);
+                }
+            }
+        }
+        while (!queue.isEmpty()) {
+            Class<?> interfaceType = queue.poll();
+            hierarchy.add(interfaceType);
+            for (Class<?> superInterface : interfaceType.getInterfaces()) {
+                if (visited.add(superInterface)) {
+                    queue.add(superInterface);
+                }
+            }
+        }
+        return hierarchy;
     }
 
     private static void addAnnotation(MutableAnnotationMetadata metadata, Annotation annotation, boolean declared) {
@@ -596,6 +701,14 @@ public final class ReflectionAnnotations {
         return (Annotation[]) ReflectionUtils.invokeMethod(annotation, value);
     }
 
+    /**
+     * The default of a member, in the form the metadata records a value.
+     *
+     * <p>{@link AnnotationValue#of(Annotation)} converts what it reads off an annotation instance, and a default
+     * has no instance behind it: {@link Method#getDefaultValue()} is the only source of it, so the module
+     * converts a default itself. The shapes are the ones that method produces, so that a value read off an
+     * instance and the default of its member compare equal and the member is left out of the values.</p>
+     */
     private static Object convert(Object value) {
         if (value instanceof Class<?> type) {
             return new AnnotationClassValue<>(type);
@@ -604,7 +717,7 @@ public final class ReflectionAnnotations {
             return constant.name();
         }
         if (value instanceof Annotation annotation) {
-            return valueOf(annotation);
+            return AnnotationValue.of(annotation);
         }
         if (value instanceof Class<?>[] types) {
             AnnotationClassValue<?>[] converted = new AnnotationClassValue[types.length];
@@ -623,16 +736,9 @@ public final class ReflectionAnnotations {
         if (value instanceof Annotation[] annotations) {
             AnnotationValue<?>[] converted = new AnnotationValue[annotations.length];
             for (int i = 0; i < annotations.length; i++) {
-                converted[i] = valueOf(annotations[i]);
+                converted[i] = AnnotationValue.of(annotations[i]);
             }
             return converted;
-        }
-        if (value.getClass().isArray() && !value.getClass().getComponentType().isPrimitive()) {
-            // an array of strings, kept as it is, copied so that the annotation instance is not shared
-            int length = Array.getLength(value);
-            Object copy = Array.newInstance(value.getClass().getComponentType(), length);
-            System.arraycopy(value, 0, copy, 0, length);
-            return copy;
         }
         return value;
     }

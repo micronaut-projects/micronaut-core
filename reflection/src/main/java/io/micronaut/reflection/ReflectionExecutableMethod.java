@@ -19,7 +19,6 @@ import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import org.jspecify.annotations.Nullable;
@@ -99,7 +98,7 @@ public final class ReflectionExecutableMethod<T, R> extends AbstractReflectionEx
      * @return The method
      */
     public Method getMethod() {
-        return method;
+        return getTargetMethod();
     }
 
     @Override
@@ -134,9 +133,9 @@ public final class ReflectionExecutableMethod<T, R> extends AbstractReflectionEx
 
     @Override
     @Nullable
-    @SuppressWarnings("NullAway") // a method can return null
+    @SuppressWarnings({"NullAway", "unchecked"}) // a method can return null
     public R invokeUnsafe(T instance, @Nullable Object... arguments) {
-        return ReflectionUtils.invokeMethod(instance, method, arguments);
+        return (R) invokeTarget(method, instance, arguments);
     }
 
     /**

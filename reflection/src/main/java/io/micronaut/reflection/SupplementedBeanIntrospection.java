@@ -32,7 +32,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -53,6 +56,10 @@ public final class SupplementedBeanIntrospection<T> implements ReflectiveIntrosp
     private final BeanIntrospection<T> generated;
     private final ReflectionBeanIntrospection<T> reflected;
     private final List<BeanMethod<T, Object>> methods;
+    private final List<BeanProperty<T, Object>> properties;
+    private final Map<String, BeanProperty<T, Object>> propertiesByName;
+    private final List<BeanReadProperty<T, Object>> readProperties;
+    private final List<BeanWriteProperty<T, Object>> writeProperties;
 
     /**
      * Creates an introspection completing a generated one with a reflective one.
@@ -75,6 +82,35 @@ public final class SupplementedBeanIntrospection<T> implements ReflectiveIntrosp
             }
         }
         this.methods = Collections.unmodifiableList(merged);
+        // the merged view is built once: a caller reading a bean asks for a property per value it reads, and
+        // the property it is given is the same instance every time
+        Map<String, BeanProperty<T, Object>> reflectedProperties = new HashMap<>();
+        for (BeanProperty<T, Object> property : reflected.getBeanProperties()) {
+            reflectedProperties.putIfAbsent(property.getName(), property);
+        }
+        Collection<BeanProperty<T, Object>> generatedProperties = generated.getBeanProperties();
+        List<BeanProperty<T, Object>> mergedProperties = new ArrayList<>(generatedProperties.size());
+        Map<String, BeanProperty<T, Object>> byName = new LinkedHashMap<>(generatedProperties.size());
+        List<BeanReadProperty<T, Object>> read = new ArrayList<>(generatedProperties.size());
+        List<BeanWriteProperty<T, Object>> write = new ArrayList<>(generatedProperties.size());
+        for (BeanProperty<T, Object> property : generatedProperties) {
+            BeanProperty<T, Object> reflectedProperty = reflectedProperties.get(property.getName());
+            BeanProperty<T, Object> describedProperty = reflectedProperty == null
+                ? property
+                : new DescribedBeanProperty<>(property, reflectedProperty.asArgument());
+            mergedProperties.add(describedProperty);
+            byName.putIfAbsent(describedProperty.getName(), describedProperty);
+            if (!describedProperty.isWriteOnly()) {
+                read.add(describedProperty);
+            }
+            if (!describedProperty.isReadOnly()) {
+                write.add(describedProperty);
+            }
+        }
+        this.properties = Collections.unmodifiableList(mergedProperties);
+        this.propertiesByName = Collections.unmodifiableMap(byName);
+        this.readProperties = Collections.unmodifiableList(read);
+        this.writeProperties = Collections.unmodifiableList(write);
     }
 
     /**
@@ -160,44 +196,34 @@ public final class SupplementedBeanIntrospection<T> implements ReflectiveIntrosp
      */
     @Override
     public Collection<BeanProperty<T, Object>> getBeanProperties() {
-        List<BeanProperty<T, Object>> properties = new ArrayList<>();
-        for (BeanProperty<T, Object> property : generated.getBeanProperties()) {
-            BeanProperty<T, Object> reflectedProperty = reflected.getProperty(property.getName()).orElse(null);
-            properties.add(reflectedProperty == null ? property : new DescribedBeanProperty<>(property, reflectedProperty.asArgument()));
-        }
-        return Collections.unmodifiableList(properties);
+        return properties;
     }
 
     /**
-     * The read properties of the generated introspection, which describes them itself.
+     * The read properties of the generated introspection, as {@link #getBeanProperties()} describes them: a
+     * generated introspection that legitimately has none - a type written to and never read from - has none
+     * here either, the reflective members of the type do not stand in for them.
      *
      * @return The read properties
      */
     @Override
     public List<BeanReadProperty<T, Object>> getBeanReadProperties() {
-        List<BeanReadProperty<T, Object>> generatedProperties = generated.getBeanReadProperties();
-        return generatedProperties.isEmpty() ? reflected.getBeanReadProperties() : generatedProperties;
+        return readProperties;
     }
 
     /**
-     * The write properties of the generated introspection, which describes them itself.
+     * The write properties of the generated introspection, as {@link #getBeanProperties()} describes them.
      *
      * @return The write properties
      */
     @Override
     public List<BeanWriteProperty<T, Object>> getBeanWriteProperties() {
-        List<BeanWriteProperty<T, Object>> generatedProperties = generated.getBeanWriteProperties();
-        return generatedProperties.isEmpty() ? reflected.getBeanWriteProperties() : generatedProperties;
+        return writeProperties;
     }
 
     @Override
     public Optional<BeanProperty<T, Object>> getProperty(String name) {
-        for (BeanProperty<T, Object> property : getBeanProperties()) {
-            if (property.getName().equals(name)) {
-                return Optional.of(property);
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(propertiesByName.get(name));
     }
 
     @Override

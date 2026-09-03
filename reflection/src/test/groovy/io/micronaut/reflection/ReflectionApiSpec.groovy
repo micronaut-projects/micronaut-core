@@ -6,8 +6,14 @@ import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
+import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import spock.lang.Specification
 
+import java.lang.annotation.Annotation
+import java.lang.reflect.AnnotatedElement
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
 import java.util.function.Supplier
 
 /**
@@ -273,21 +279,25 @@ class ReflectionApiSpec extends Specification {
 
         when:
         configuration.allowReflection = ["io.micronaut.reflection.*"]
-        ReflectionIntrospectionPolicy.configure(configuration.allowReflection)
+        def registration = ReflectionIntrospectionPolicy.configure(configuration.allowReflection)
 
         then:
         configuration.allowReflection == ["io.micronaut.reflection.*"]
         ReflectionIntrospectionPolicy.isAllowed(Book)
         new ReflectionBeanIntrospectionFallback().findIntrospection(Book).present
 
-        when: "the configuration is cleared, as it is when the context stops"
-        configuration.allowReflection = null
-        ReflectionIntrospectionPolicy.configure(configuration.allowReflection)
+        when: "the contribution is withdrawn, as it is when the context that made it stops"
+        registration.close()
 
         then:
-        configuration.allowReflection == []
         !ReflectionIntrospectionPolicy.isAllowed(Book)
         new ReflectionBeanIntrospectionFallback().findIntrospection(Book).empty
+
+        when: "a configuration is answered no pattern at all"
+        configuration.allowReflection = null
+
+        then: "it holds none, so it contributes none"
+        configuration.allowReflection == []
     }
 
     void "the values of an annotation register the defaults of its type"() {
@@ -302,7 +312,112 @@ class ReflectionApiSpec extends Specification {
 
         then: "nothing is stored, and the defaults of the type are registered for the accessors to serve"
         bare.isEmpty()
-        new io.micronaut.inject.annotation.MutableAnnotationMetadata().getDefaultValues(Restricted.name).get("name") == "unnamed"
+        new MutableAnnotationMetadata().getDefaultValues(Restricted.name).get("name") == "unnamed"
+
+        when: "an annotation whose class, enum and nested annotation members are left at their defaults"
+        def converted = ReflectionAnnotations.values(Book.getAnnotation(Tag))
+
+        then: "each is compared with its default in the converted form, so each is left out too"
+        converted.keySet() == ["value"].toSet()
+        converted.get("value") == "entity"
+    }
+
+    void "the values of the first metadata merged win where both declare the same annotation"() {
+        given:
+        def first = ReflectionAnnotations.declaring(Restricted, [name: "first"])
+        def second = ReflectionAnnotations.declaring(Restricted, [name: "second", level: 9])
+
+        when:
+        def merged = ReflectionAnnotations.merge(first, second)
+
+        then: "the member both carry is the one of the first, as the contract says"
+        merged.stringValue(Restricted, "name").get() == "first"
+
+        and: "a member only the second carries is added, and both count as declared"
+        merged.intValue(Restricted, "level").get() == 9
+        merged.hasDeclaredAnnotation(Restricted)
+    }
+
+    void "an inherited annotation an interface of the hierarchy declares is present but not declared"() {
+        when: "an interface the class implements directly"
+        def direct = ReflectionAnnotations.metadataOf(AnnHierarchy.Direct)
+
+        then: "the annotation is there, inherited rather than declared"
+        direct.hasAnnotation(AnnInherited)
+        !direct.hasDeclaredAnnotation(AnnInherited)
+        direct.stringValue(AnnInherited).get() == "direct"
+
+        and: "an annotation that is not meta-annotated @Inherited stays on the interface"
+        !direct.hasAnnotation(AnnNotInherited)
+
+        when: "a super interface of the interface the class implements"
+        def deep = ReflectionAnnotations.metadataOf(AnnHierarchy.Deep)
+
+        then:
+        deep.stringValue(AnnInherited).get() == "super"
+
+        when: "an interface a super class implements"
+        def sub = ReflectionAnnotations.metadataOf(AnnHierarchy.Sub)
+
+        then:
+        sub.stringValue(AnnInherited).get() == "base"
+
+        when: "the class declares the annotation the interface it implements declares too"
+        def declared = ReflectionAnnotations.metadataOf(AnnHierarchy.Declared)
+
+        then: "the declared one wins and the inherited one does not duplicate it"
+        declared.hasDeclaredAnnotation(AnnInherited)
+        declared.stringValue(AnnInherited).get() == "declared"
+    }
+
+    void "an annotation of an element whose member cannot be read is skipped rather than losing the element"() {
+        given: "an annotation that throws when its member is read, as one naming an absent class does"
+        def broken = (AnnBroken) Proxy.newProxyInstance(
+                AnnBroken.classLoader,
+                [AnnBroken] as Class[],
+                new InvocationHandler() {
+                    Object invoke(Object proxy, Method method, Object[] args) {
+                        switch (method.name) {
+                            case "annotationType":
+                                return AnnBroken
+                            case "toString":
+                                return "@AnnBroken"
+                            case "hashCode":
+                                return 0
+                            case "equals":
+                                return proxy.is(args[0])
+                            default:
+                                throw new TypeNotPresentException("io.micronaut.reflection.AnnAbsent", null)
+                        }
+                    }
+                })
+        def element = new AnnotatedElement() {
+            Annotation getAnnotation(Class annotationClass) {
+                getDeclaredAnnotations().find { annotationClass.isInstance(it) }
+            }
+
+            Annotation[] getAnnotations() {
+                getDeclaredAnnotations()
+            }
+
+            Annotation[] getDeclaredAnnotations() {
+                [broken, Tagged.getAnnotation(Tags)] as Annotation[]
+            }
+        }
+
+        when:
+        def metadata = new MutableAnnotationMetadata()
+        ReflectionAnnotations.add(metadata, element)
+
+        then: "the annotation that cannot be read is left out, and the others of the element are read"
+        !metadata.hasAnnotation(AnnBroken)
+        metadata.getAnnotationValuesByType(Tag)*.stringValue()*.get() == ["ledger", "book"]
+
+        when: "the caller asks for that one annotation instead"
+        ReflectionAnnotations.values(broken)
+
+        then: "it is told, since there is nothing else to give it"
+        thrown(IllegalStateException)
     }
 
     @Restricted

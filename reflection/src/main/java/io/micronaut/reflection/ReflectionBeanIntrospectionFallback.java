@@ -33,13 +33,34 @@ import java.util.Optional;
 @Experimental
 public final class ReflectionBeanIntrospectionFallback implements BeanIntrospectionFallback {
 
-    private static final ClassValue<ReflectionBeanIntrospection<?>> INTROSPECTIONS = new ClassValue<>() {
+    // a lookup miss is frequent - InstantiationUtils, BeanWrapper and the binders ask for a type they expect
+    // not to find - so what a miss costs is what this fallback costs. The cache therefore holds the whole
+    // outcome and not only the introspections: a type this fallback cannot describe, and a type whose
+    // description fails, are remembered as not served, so neither reflecting on the class nor a failure that
+    // will happen again is repeated. Only the part of the answer that cannot change is cached; the policy is
+    // asked on every call, as a type is allowed while a context runs and by an allow(...) call at any time.
+    private static final ClassValue<Optional<ReflectionBeanIntrospection<?>>> INTROSPECTIONS = new ClassValue<>() {
+
         @Override
-        protected ReflectionBeanIntrospection<?> computeValue(Class<?> type) {
+        @SuppressWarnings("java:S1181")
+        protected Optional<ReflectionBeanIntrospection<?>> computeValue(Class<?> type) {
+            if (!ReflectionBeanIntrospection.isIntrospectable(type)) {
+                return Optional.empty();
+            }
             if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
                 ClassUtils.REFLECTION_LOGGER.debug("Reflectively introspecting '{}', which has no generated BeanIntrospection", type.getName());
             }
-            return ReflectionBeanIntrospection.of(type);
+            try {
+                return Optional.of(ReflectionBeanIntrospection.of(type));
+            } catch (Throwable e) {
+                // describing a class reads every declared member, which throws NoClassDefFoundError when a
+                // member's type is an optional dependency the application does not have: a type this fallback
+                // cannot serve, not a lookup that should fail
+                if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
+                    ClassUtils.REFLECTION_LOGGER.debug("Cannot reflectively introspect '{}', it is not served", type.getName(), e);
+                }
+                return Optional.empty();
+            }
         }
     };
 
@@ -52,10 +73,14 @@ public final class ReflectionBeanIntrospectionFallback implements BeanIntrospect
     @Override
     @SuppressWarnings("unchecked")
     public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
-        if (!ReflectionBeanIntrospection.isIntrospectable(beanType) || !ReflectionIntrospectionPolicy.isAllowed(beanType)) {
+        if (!ReflectionIntrospectionPolicy.isAllowed(beanType)) {
             return Optional.empty();
         }
-        return Optional.of((BeanIntrospection<T>) INTROSPECTIONS.get(beanType));
+        Optional<ReflectionBeanIntrospection<?>> introspection = INTROSPECTIONS.get(beanType);
+        if (introspection.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of((BeanIntrospection<T>) introspection.get());
     }
 
     @Override

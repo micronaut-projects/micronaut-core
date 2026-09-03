@@ -91,13 +91,14 @@ public final class ReflectionBeanConstructor<T> implements BeanConstructor<T> {
 
     @Override
     public T instantiate(@Nullable Object... parameterValues) {
-        Object[] values = parameterValues == null ? new Object[0] : parameterValues;
-        if (values.length != arguments.length) {
+        // the nullness annotation of a varargs parameter annotates the values, not the array: the array itself
+        // is there even for a constructor taking nothing
+        if (parameterValues.length != arguments.length) {
             throw new InstantiationException("The constructor " + getDescription() + " expects "
-                + arguments.length + " argument(s), " + values.length + " given");
+                + arguments.length + " argument(s), " + parameterValues.length + " given");
         }
         try {
-            return constructor.newInstance(values);
+            return constructor.newInstance(parameterValues);
         } catch (InvocationTargetException e) {
             throw new InstantiationException("Cannot instantiate " + constructor.getDeclaringClass().getName() + ": " + e.getTargetException().getMessage(), e.getTargetException());
         } catch (ReflectiveOperationException | IllegalArgumentException e) {

@@ -4,10 +4,15 @@ import io.micronaut.core.annotation.Creator;
 
 /**
  * The four rules a reflective introspection selects a constructor by.
+ *
+ * <p>Every constructor here has an empty body and takes parameters it does not use: what the specs read is
+ * which constructor the introspection picks and what arguments it reports, so the declarations are the whole
+ * fixture and running one has nothing to do.</p>
  */
 public final class Constructors {
 
     private Constructors() {
+        // the fixture is only ever described, never instantiated
     }
 
     /**
@@ -15,13 +20,16 @@ public final class Constructors {
      */
     public static class Annotated {
         public Annotated() {
+            // empty on purpose - only the declaration is read
         }
 
-        public Annotated(String only) {
+        public Annotated(String only) { // NOSONAR - the parameter is unused on purpose, it is what is described
+            // empty on purpose - only the declaration is read
         }
 
         @Creator
-        Annotated(String first, int second) {
+        Annotated(String first, int second) { // NOSONAR - the parameters are unused on purpose, they are what is described
+            // empty on purpose - only the declaration is read
         }
     }
 
@@ -29,10 +37,12 @@ public final class Constructors {
      * With no {@link Creator}, the only public constructor.
      */
     public static class OnlyPublic {
-        OnlyPublic(String only) {
+        OnlyPublic(String only) { // NOSONAR - the parameter is unused on purpose, it is what is described
+            // empty on purpose - only the declaration is read
         }
 
-        public OnlyPublic(String first, int second) {
+        public OnlyPublic(String first, int second) { // NOSONAR - the parameters are unused on purpose, they are what is described
+            // empty on purpose - only the declaration is read
         }
     }
 
@@ -40,13 +50,16 @@ public final class Constructors {
      * Among several public ones, the one taking no parameter.
      */
     public static class NoArgAmongMany {
-        public NoArgAmongMany(String only) {
+        public NoArgAmongMany(String only) { // NOSONAR - the parameter is unused on purpose, it is what is described
+            // empty on purpose - only the declaration is read
         }
 
-        public NoArgAmongMany(String first, int second) {
+        public NoArgAmongMany(String first, int second) { // NOSONAR - the parameters are unused on purpose, they are what is described
+            // empty on purpose - only the declaration is read
         }
 
         public NoArgAmongMany() {
+            // empty on purpose - only the declaration is read
         }
     }
 
@@ -54,10 +67,12 @@ public final class Constructors {
      * With none public, the declared one taking the most parameters.
      */
     public static class NonePublic {
-        NonePublic(String only) {
+        NonePublic(String only) { // NOSONAR - the parameter is unused on purpose, it is what is described
+            // empty on purpose - only the declaration is read
         }
 
-        private NonePublic(String first, int second) {
+        private NonePublic(String first, int second) { // NOSONAR - never called on purpose, the introspection selects it as the declared constructor with the most parameters
+            // empty on purpose - only the declaration is read
         }
     }
 }

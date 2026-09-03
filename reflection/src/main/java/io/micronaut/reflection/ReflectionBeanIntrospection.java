@@ -18,6 +18,7 @@ package io.micronaut.reflection;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.beans.AbstractBeanMethod;
 import io.micronaut.core.beans.AbstractBeanProperty;
 import io.micronaut.core.beans.BeanConstructor;
@@ -41,6 +42,7 @@ import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
@@ -53,18 +55,27 @@ import java.util.List;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * A {@link BeanIntrospection} over a {@link Class}, with the properties, the constructor and the methods a
  * generated introspection would have.
  *
- * <p>A property is a field, a getter or a setter of the type or of its super classes, merged by name: it is
- * read through the getter when there is one and through the field otherwise, written through the setter when
- * there is one and through a non-final field otherwise, and its metadata holds the annotations of all three
- * together with the type-use annotations of the property type. A bean method is a public instance method of
- * the type or of its super classes, {@link Object} excluded. The constructor is the one annotated
- * {@link Creator}, else the only public one, else the public one with no parameter, else the declared one
- * with the most parameters.</p>
+ * <p>A property is a getter or a setter of the type or of its super classes, merged by name, with the field
+ * of that name as a member of it: it is read through the getter when there is one and through the field
+ * otherwise, written through the setter when there is one and through a non-final field otherwise, and its
+ * metadata holds the annotations of all three together with the type-use annotations of the property type.
+ * Only an accessor the visibility of the type admits - a non-private one by default - makes a property, and
+ * a field alone makes one only when field access is asked for - {@link Introspected#accessKind()} on the
+ * type, or the access kinds given to {@link #of(Class, Set)} - which is what the processors admit; the
+ * accessor of a record component always makes one. A bean method is a public instance method of the type or
+ * of its super classes, {@link Object} excluded. The constructor is the one annotated {@link Creator}, else
+ * the only public one, else the public one with no parameter, else the declared one with the most
+ * parameters.</p>
+ *
+ * <p>The type of a property, of a method argument and of a return type is the type the bean type sees:
+ * {@code T} declared by a {@code Box<T>} and read through a {@code StringBox extends Box<String>} is
+ * {@code String}, not the bound of the variable.</p>
  *
  * @param <T> The bean type
  * @author Denis Stepanov
@@ -73,27 +84,63 @@ import java.util.Optional;
 @Experimental
 public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospection<T> {
 
+    /**
+     * The packages of the platform and of the languages running on it, which a reflective introspection never
+     * describes: they are not what an application means to expose, and their members are closed to reflection
+     * as often as not.
+     */
+    private static final String[] PLATFORM_PACKAGES = {
+        "java.", "javax.", "jakarta.", "jdk.", "sun.", "com.sun.", "kotlin.", "groovy.", "scala."
+    };
+
+    private static final Set<Introspected.AccessKind> METHOD_ACCESS = Set.of(Introspected.AccessKind.METHOD);
+
     private final Class<T> beanType;
     private final AnnotationMetadata annotationMetadata;
+    private final Set<Introspected.AccessKind> accessKinds;
+    private final Set<Introspected.Visibility> visibility;
     private final @Nullable Constructor<T> constructor;
     private final Argument<?>[] constructorArguments;
     private final BeanConstructor<T> beanConstructor;
     private final Map<String, PropertyMembers> propertyMembers = new LinkedHashMap<>();
     private final List<BeanProperty<T, Object>> properties;
+    private final Map<String, BeanProperty<T, Object>> propertiesByName;
     private final List<BeanMethod<T, Object>> methods;
 
-    private ReflectionBeanIntrospection(Class<T> beanType, AnnotationMetadata additionalAnnotationMetadata) {
+    private ReflectionBeanIntrospection(Class<T> beanType,
+                                        AnnotationMetadata additionalAnnotationMetadata,
+                                        @Nullable Set<Introspected.AccessKind> requestedAccessKinds) {
         this.beanType = beanType;
-        this.annotationMetadata = ReflectionAnnotations.merge(ReflectionAnnotations.metadataOf(beanType), additionalAnnotationMetadata);
+        // the annotations the caller means the type to carry win where both declare the same one: a
+        // specification told to handle a type says what that type is, over what the class says of itself
+        this.annotationMetadata = ReflectionAnnotations.merge(additionalAnnotationMetadata, ReflectionAnnotations.metadataOf(beanType));
+        if (requestedAccessKinds == null) {
+            // the type was annotated: the introspection describes it the way the processor would have
+            Set<Introspected.AccessKind> declared = annotationMetadata.enumValuesSet(Introspected.class, "accessKind", Introspected.AccessKind.class);
+            Set<Introspected.Visibility> declaredVisibility = annotationMetadata.enumValuesSet(Introspected.class, "visibility", Introspected.Visibility.class);
+            this.accessKinds = declared.isEmpty() ? METHOD_ACCESS : Set.copyOf(declared);
+            this.visibility = declaredVisibility.isEmpty() ? Set.of(Introspected.Visibility.DEFAULT) : Set.copyOf(declaredVisibility);
+        } else {
+            // the caller asked for the kinds itself, and reflection reaches a member of any visibility
+            this.accessKinds = requestedAccessKinds.isEmpty() ? METHOD_ACCESS : Set.copyOf(requestedAccessKinds);
+            this.visibility = Set.of(Introspected.Visibility.ANY);
+        }
         this.constructor = selectConstructor(beanType);
         this.constructorArguments = constructor == null ? Argument.ZERO_ARGUMENTS : ReflectionArguments.argumentsOf(constructor);
         this.beanConstructor = new SelectedBeanConstructor();
         this.properties = Collections.unmodifiableList(discoverProperties());
+        Map<String, BeanProperty<T, Object>> byName = new LinkedHashMap<>(properties.size());
+        for (BeanProperty<T, Object> property : properties) {
+            byName.putIfAbsent(property.getName(), property);
+        }
+        this.propertiesByName = Collections.unmodifiableMap(byName);
         this.methods = Collections.unmodifiableList(discoverMethods());
     }
 
     /**
-     * Introspects a type.
+     * Introspects a type through its accessors, which is what a generated introspection describes by default:
+     * a field of the type is a member of the property of its name, it does not make one of its own unless
+     * the type carries {@link Introspected#accessKind()} asking for field access.
      *
      * @param beanType The type
      * @param <T>      The type
@@ -115,14 +162,58 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
      * @param beanType                     The bean type
      * @param additionalAnnotationMetadata The annotations to carry beyond the ones of the class
      * @param <T>                          The bean type
-     * @return The introspection
+     * @return The introspection, describing the type through its accessors unless the annotations ask for
+     * field access
      * @throws IllegalArgumentException When the type cannot be described reflectively
      */
     public static <T> ReflectionBeanIntrospection<T> of(Class<T> beanType, AnnotationMetadata additionalAnnotationMetadata) {
         if (!isIntrospectable(beanType)) {
             throw new IllegalArgumentException("The type " + beanType.getName() + " cannot be introspected reflectively");
         }
-        return new ReflectionBeanIntrospection<>(beanType, additionalAnnotationMetadata);
+        return new ReflectionBeanIntrospection<>(beanType, additionalAnnotationMetadata, null);
+    }
+
+    /**
+     * The reflective introspection of a type described through the access kinds the caller asks for, rather
+     * than through the ones {@link Introspected#accessKind()} declares.
+     *
+     * <p>A reflective introspection exists for the types the processors never saw, which carry no annotation
+     * to read the kinds from: a caller that means the fields of such a type to be properties - a mapping
+     * layer over a class of plain fields - says so here. The members of the kinds asked for are taken
+     * whatever their visibility, a private field included: reflection reaches them, and asking for field
+     * access is asking for exactly that.</p>
+     *
+     * @param beanType    The bean type
+     * @param accessKinds The kinds of member that make a property, empty for
+     *                    {@link Introspected.AccessKind#METHOD} alone
+     * @param <T>         The bean type
+     * @return The introspection
+     * @throws IllegalArgumentException When the type cannot be described reflectively
+     */
+    public static <T> ReflectionBeanIntrospection<T> of(Class<T> beanType, Set<Introspected.AccessKind> accessKinds) {
+        return of(beanType, AnnotationMetadata.EMPTY_METADATA, accessKinds);
+    }
+
+    /**
+     * The reflective introspection of a type described through the access kinds the caller asks for, carrying
+     * annotations the caller means it to have beyond the ones the class declares.
+     *
+     * @param beanType                     The bean type
+     * @param additionalAnnotationMetadata The annotations to carry beyond the ones of the class
+     * @param accessKinds                  The kinds of member that make a property, empty for
+     *                                     {@link Introspected.AccessKind#METHOD} alone
+     * @param <T>                          The bean type
+     * @return The introspection
+     * @throws IllegalArgumentException When the type cannot be described reflectively
+     * @see #of(Class, Set)
+     */
+    public static <T> ReflectionBeanIntrospection<T> of(Class<T> beanType,
+                                                        AnnotationMetadata additionalAnnotationMetadata,
+                                                        Set<Introspected.AccessKind> accessKinds) {
+        if (!isIntrospectable(beanType)) {
+            throw new IllegalArgumentException("The type " + beanType.getName() + " cannot be introspected reflectively");
+        }
+        return new ReflectionBeanIntrospection<>(beanType, additionalAnnotationMetadata, accessKinds);
     }
 
     /**
@@ -134,13 +225,16 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
      */
     public static boolean isIntrospectable(Class<?> type) {
         // an interface is introspected for its declarations, it cannot be instantiated
-        return !type.isPrimitive()
-            && !type.isArray()
-            && !type.isAnnotation()
-            && !type.isEnum()
-            && !type.getName().startsWith("java.")
-            && !type.getName().startsWith("javax.")
-            && !type.getName().startsWith("jdk.");
+        if (type.isPrimitive() || type.isArray() || type.isAnnotation() || type.isEnum()) {
+            return false;
+        }
+        String name = type.getName();
+        for (String platformPackage : PLATFORM_PACKAGES) {
+            if (name.startsWith(platformPackage)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
@@ -156,6 +250,18 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     @Override
     public Collection<BeanProperty<T, Object>> getBeanProperties() {
         return properties;
+    }
+
+    /**
+     * The property of a name, from the properties indexed by name rather than by walking them: a caller
+     * reading a bean asks for a property per value it reads.
+     *
+     * @param name The property name
+     * @return The property, empty when the type has none of that name
+     */
+    @Override
+    public Optional<BeanProperty<T, Object>> getProperty(String name) {
+        return Optional.ofNullable(propertiesByName.get(name));
     }
 
     /**
@@ -388,7 +494,9 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     }
 
     private List<BeanProperty<T, Object>> discoverProperties() {
-        Map<String, PropertyMembers> members = propertyMembers;
+        Map<String, PropertyMembers> candidates = new LinkedHashMap<>();
+        // the accessors first, as the processor resolves them: a field is a member of a property they
+        // discovered, it makes one of its own only when field access is asked for
         for (Class<?> type = beanType; type != null && type != Object.class; type = type.getSuperclass()) {
             for (Method method : type.getDeclaredMethods()) {
                 // an accessor of any visibility is a member of the property: what it declares holds
@@ -400,25 +508,19 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                 if (parameters == 0 && method.getReturnType() != void.class) {
                     String property = accessorProperty(name, method.getReturnType());
                     if (property != null) {
-                        members.computeIfAbsent(property, PropertyMembers::new).addGetter(method);
+                        candidate(candidates, property).addGetter(method);
                     }
                 } else if (parameters == 1 && name.startsWith("set") && name.length() > 3 && Character.isUpperCase(name.charAt(3))) {
                     String property = decapitalize(name.substring(3));
-                    members.computeIfAbsent(property, PropertyMembers::new).addSetter(method);
+                    candidate(candidates, property).addSetter(method);
                 }
-            }
-            for (Field field : type.getDeclaredFields()) {
-                if (Modifier.isStatic(field.getModifiers()) || field.isSynthetic()) {
-                    continue;
-                }
-                members.computeIfAbsent(field.getName(), PropertyMembers::new).addField(field);
             }
         }
         // the accessor of a record component is a getter under the name of the component, which the naming rules
         // below do not match: an annotation of the component whose target is a method lands there and nowhere else
         if (beanType.isRecord()) {
             for (RecordComponent component : beanType.getRecordComponents()) {
-                members.computeIfAbsent(component.getName(), PropertyMembers::new).addGetter(component.getAccessor());
+                candidate(candidates, component.getName()).addComponentAccessor(component.getAccessor());
             }
         }
         // the getters of the interfaces, which declare the type-use annotations of the implementations' properties
@@ -430,18 +532,79 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                 }
                 String property = accessorProperty(method.getName(), method.getReturnType());
                 if (property != null) {
-                    members.computeIfAbsent(property, PropertyMembers::new).addGetter(method);
+                    candidate(candidates, property).addGetter(method);
                 }
             }
         }
-        List<BeanProperty<T, Object>> discovered = new ArrayList<>(members.size());
-        for (PropertyMembers property : members.values()) {
-            if (property.getter() == null && property.field() == null && property.setter() == null) {
+        boolean fieldAccess = accessKinds.contains(Introspected.AccessKind.FIELD);
+        for (Class<?> type = beanType; type != null && type != Object.class; type = type.getSuperclass()) {
+            for (Field field : type.getDeclaredFields()) {
+                if (Modifier.isStatic(field.getModifiers()) || field.isSynthetic()) {
+                    continue;
+                }
+                PropertyMembers property = candidates.get(field.getName());
+                if (property != null) {
+                    property.addField(field);
+                } else if (fieldAccess && isVisible(field)) {
+                    candidate(candidates, field.getName()).addField(field);
+                }
+            }
+        }
+        List<BeanProperty<T, Object>> discovered = new ArrayList<>(candidates.size());
+        for (Map.Entry<String, PropertyMembers> entry : candidates.entrySet()) {
+            PropertyMembers property = entry.getValue();
+            property.resolve();
+            if (!isProperty(property)) {
                 continue;
             }
+            propertyMembers.put(entry.getKey(), property);
             discovered.add(new ReflectionProperty<>(this, property));
         }
         return discovered;
+    }
+
+    private PropertyMembers candidate(Map<String, PropertyMembers> candidates, String name) {
+        return candidates.computeIfAbsent(name, key -> new PropertyMembers(key, beanType));
+    }
+
+    /**
+     * Whether the members of a name make a property: an accessor of a visibility the type admits, a field when
+     * field access is asked for, or the accessor of a record component, which describes the component whatever
+     * the kinds asked for. A private accessor describes the property it is a member of, it does not make one.
+     */
+    private boolean isProperty(PropertyMembers property) {
+        if (property.isRecordComponent()) {
+            return true;
+        }
+        if (accessKinds.contains(Introspected.AccessKind.METHOD)) {
+            for (Method accessor : property.accessors()) {
+                if (isVisible(accessor)) {
+                    return true;
+                }
+            }
+        }
+        if (accessKinds.contains(Introspected.AccessKind.FIELD)) {
+            for (Field field : property.declaredFields()) {
+                if (isVisible(field)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a member is visible enough to make a property, the way {@link Introspected#visibility()} is
+     * applied by the processor: everything but a private declaration by default.
+     */
+    private boolean isVisible(Member member) {
+        if (visibility.contains(Introspected.Visibility.ANY)) {
+            return true;
+        }
+        if (visibility.contains(Introspected.Visibility.DEFAULT)) {
+            return !Modifier.isPrivate(member.getModifiers());
+        }
+        return Modifier.isPublic(member.getModifiers());
     }
 
     @Nullable
@@ -567,12 +730,19 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     private static final class PropertyMembers {
 
         private final String name;
+        private final Class<?> beanType;
         private final List<Field> fields = new ArrayList<>(1);
         private final List<Method> getters = new ArrayList<>(1);
         private final List<Method> setters = new ArrayList<>(1);
+        private boolean component;
+        private boolean resolved;
+        private @Nullable Field field;
+        private @Nullable Method getter;
+        private @Nullable Method setter;
 
-        PropertyMembers(String name) {
+        PropertyMembers(String name, Class<?> beanType) {
             this.name = name;
+            this.beanType = beanType;
         }
 
         void addField(Field field) {
@@ -583,31 +753,147 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             getters.add(getter);
         }
 
+        void addComponentAccessor(Method accessor) {
+            component = true;
+            getters.add(accessor);
+        }
+
         void addSetter(Method setter) {
             setters.add(setter);
         }
 
+        boolean isRecordComponent() {
+            return component;
+        }
+
+        /**
+         * Selects the members the property is read and written through, and drops the setters the value of the
+         * property cannot be given to. Reflection reports the declarations of a class in no order, so the
+         * choice is made on the declarations themselves and is the same on every JVM.
+         */
+        void resolve() {
+            if (resolved) {
+                return;
+            }
+            resolved = true;
+            // a field is declared once per class, and the classes are walked from the most derived one
+            field = fields.isEmpty() ? null : fields.get(0);
+            getter = selectGetter();
+            Class<?> readType = getter != null ? getter.getReturnType() : (field == null ? null : field.getType());
+            if (readType != null && !setters.isEmpty()) {
+                // `setValue(Object)` of a `String` property takes more than the property holds: the processor
+                // drops such a setter rather than writing through it
+                setters.removeIf(candidate -> isIncompatibleSetter(readType, candidate));
+            }
+            setter = selectSetter();
+        }
+
         @Nullable Field field() {
-            return fields.isEmpty() ? null : fields.get(0);
+            return field;
         }
 
         @Nullable Method getter() {
-            return getters.isEmpty() ? null : getters.get(0);
+            return getter;
         }
 
         @Nullable Method setter() {
-            return setters.isEmpty() ? null : setters.get(0);
+            return setter;
+        }
+
+        /**
+         * The accessors of the property, the ones an incompatible parameter dropped excluded.
+         */
+        List<Method> accessors() {
+            List<Method> accessors = new ArrayList<>(getters.size() + setters.size());
+            accessors.addAll(getters);
+            accessors.addAll(setters);
+            return accessors;
+        }
+
+        List<Field> declaredFields() {
+            return fields;
+        }
+
+        /**
+         * The most specific getter: the one declaring the narrowest return type, which is what a covariant
+         * override declares, {@code isX} before {@code getX} of a boolean as the naming rules generate it,
+         * then the declaration of the most derived type and then the name.
+         */
+        private @Nullable Method selectGetter() {
+            if (getters.size() < 2) {
+                return getters.isEmpty() ? null : getters.get(0);
+            }
+            List<Method> ordered = new ArrayList<>(getters);
+            ordered.sort(Comparator.comparingInt((Method candidate) -> candidate.getName().startsWith("is") ? 0 : 1)
+                .thenComparingInt(candidate -> rankOf(candidate.getDeclaringClass()))
+                .thenComparing(Method::getName));
+            Method selected = ordered.get(0);
+            for (Method candidate : ordered) {
+                if (selected.getReturnType() != candidate.getReturnType()
+                    && selected.getReturnType().isAssignableFrom(candidate.getReturnType())) {
+                    selected = candidate;
+                }
+            }
+            return selected;
+        }
+
+        /**
+         * The setter taking the narrowest parameter the property value can be given to, then the declaration
+         * of the most derived type and then the name: an overload taking a wider type writes the same
+         * property, and a generated introspection writes through the narrow one.
+         */
+        private @Nullable Method selectSetter() {
+            if (setters.size() < 2) {
+                return setters.isEmpty() ? null : setters.get(0);
+            }
+            List<Method> ordered = new ArrayList<>(setters);
+            ordered.sort(Comparator.comparingInt((Method candidate) -> rankOf(candidate.getDeclaringClass()))
+                .thenComparing(Method::getName));
+            Method selected = ordered.get(0);
+            for (Method candidate : ordered) {
+                Class<?> selectedType = selected.getParameterTypes()[0];
+                Class<?> candidateType = candidate.getParameterTypes()[0];
+                if (selectedType != candidateType && selectedType.isAssignableFrom(candidateType)) {
+                    selected = candidate;
+                }
+            }
+            return selected;
+        }
+
+        /**
+         * Whether the value of the property cannot be given to the parameter of a setter, the way the
+         * processor tells a setter of another type from an overload of the property type.
+         */
+        private static boolean isIncompatibleSetter(Class<?> readType, Method setter) {
+            Class<?> parameterType = setter.getParameterTypes()[0];
+            return !ReflectionUtils.getWrapperType(readType).isAssignableFrom(ReflectionUtils.getWrapperType(parameterType));
+        }
+
+        /**
+         * The rank of the type declaring a member: the bean type first, then its super classes, then the
+         * interfaces, so that the declaration of the most derived type is the one that wins.
+         */
+        private int rankOf(Class<?> declaringType) {
+            int rank = 0;
+            for (Class<?> type = beanType; type != null && type != Object.class; type = type.getSuperclass()) {
+                if (type == declaringType) {
+                    return rank;
+                }
+                rank++;
+            }
+            int index = allInterfaces(beanType).indexOf(declaringType);
+            return index == -1 ? Integer.MAX_VALUE : rank + index;
         }
 
         /**
          * The argument of the property: its type and type arguments with their type-use annotations. Every
          * declaration can annotate the type arguments — {@code List<@Size String>} on the field, on the
-         * return type of the getter of an interface — so the arguments of all of them are merged.
+         * return type of the getter of an interface — so the arguments of all of them are merged, the
+         * selected member first because it declares the type of the property.
          */
         Argument<?> argument() {
             Argument<?> merged = null;
-            for (AnnotatedType annotatedType : annotatedTypes()) {
-                Argument<?> argument = ReflectionArguments.of(name, annotatedType);
+            for (Argument<?> argument : candidateArguments()) {
                 merged = merged == null ? argument : mergeTypeArguments(merged, argument);
             }
             if (merged == null) {
@@ -616,18 +902,40 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             return merged;
         }
 
-        private List<AnnotatedType> annotatedTypes() {
-            List<AnnotatedType> types = new ArrayList<>(3);
-            for (Field field : fields) {
-                types.add(field.getAnnotatedType());
+        /**
+         * The type of the property as every member declares it, read through the bean type: a variable the
+         * declaring type leaves open is the type the bean type gives it, which is what the processors generate.
+         */
+        private List<Argument<?>> candidateArguments() {
+            List<Argument<?>> arguments = new ArrayList<>(fields.size() + getters.size() + setters.size());
+            for (Field candidate : selectedFirst(fields, field)) {
+                arguments.add(ReflectionArguments.of(name, candidate, beanType));
             }
-            for (Method getter : getters) {
-                types.add(getter.getAnnotatedReturnType());
+            for (Method candidate : selectedFirst(getters, getter)) {
+                arguments.add(ReflectionArguments.returnOf(name, candidate, beanType));
             }
-            for (Method setter : setters) {
-                types.add(setter.getAnnotatedParameterTypes()[0]);
+            for (Method candidate : selectedFirst(setters, setter)) {
+                arguments.add(ReflectionArguments.of(name, candidate.getParameters()[0], beanType));
             }
-            return types;
+            return arguments;
+        }
+
+        /**
+         * The members with the selected one first: it declares the type of the property, the others complete
+         * the annotations of its type arguments.
+         */
+        private static <M> List<M> selectedFirst(List<M> members, @Nullable M selected) {
+            if (selected == null || members.size() < 2 || members.get(0) == selected) {
+                return members;
+            }
+            List<M> ordered = new ArrayList<>(members.size());
+            ordered.add(selected);
+            for (M member : members) {
+                if (member != selected) {
+                    ordered.add(member);
+                }
+            }
+            return ordered;
         }
 
         /**
@@ -638,19 +946,19 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             for (Field field : fields) {
                 members.add(new PropertyMember(ElementType.FIELD, field.getDeclaringClass(),
                     withType(ReflectionAnnotations.metadataOf(field), field.getAnnotatedType()),
-                    ReflectionArguments.of(name, field.getAnnotatedType()),
+                    ReflectionArguments.of(name, field, beanType),
                     field));
             }
             for (Method getter : getters) {
                 members.add(new PropertyMember(ElementType.METHOD, getter.getDeclaringClass(),
                     withType(ReflectionAnnotations.metadataOf(getter), getter.getAnnotatedReturnType()),
-                    ReflectionArguments.of(name, getter.getAnnotatedReturnType()),
+                    ReflectionArguments.returnOf(name, getter, beanType),
                     getter));
             }
             for (Method setter : setters) {
                 members.add(new PropertyMember(ElementType.METHOD, setter.getDeclaringClass(),
                     ReflectionAnnotations.metadataOf(setter, setter.getParameters()[0]),
-                    ReflectionArguments.of(name, setter.getAnnotatedParameterTypes()[0]),
+                    ReflectionArguments.of(name, setter.getParameters()[0], beanType),
                     setter));
             }
             return members;
@@ -812,13 +1120,24 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
 
         private final ReflectionExecutableMethod<B, R> executable;
 
+        @SuppressWarnings("unchecked")
         ReflectionMethod(BeanIntrospection<B> introspection, ReflectionExecutableMethod<B, R> executable) {
             super(introspection,
-                executable.getReturnType().asArgument(),
+                (Argument<R>) resolvedReturn(executable, introspection.getBeanType()),
                 executable.getMethodName(),
                 executable.getAnnotationMetadata(),
-                executable.getArguments());
+                ReflectionArguments.argumentsOf(executable.getMethod(), introspection.getBeanType()));
             this.executable = executable;
+        }
+
+        /**
+         * The return type as the bean type sees it: a variable the type declaring the method leaves open is
+         * the type the bean type gives it rather than the bound of the variable, which is what a generated
+         * bean method reports. Its metadata is the metadata of the method, as for a generated one.
+         */
+        private static Argument<?> resolvedReturn(ReflectionExecutableMethod<?, ?> executable, Class<?> beanType) {
+            Argument<?> resolved = ReflectionArguments.returnOf(executable.getMethod(), beanType);
+            return Argument.of(resolved.getType(), executable.getAnnotationMetadata(), resolved.getTypeParameters());
         }
 
         /**

@@ -6,7 +6,7 @@ import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospector
 import spock.lang.Specification
 
-@Introspected(classes = [Ledger])
+@Introspected(classes = [Ledger, IntroWriteOnly])
 class SupplementedBeanIntrospectionSpec extends Specification {
 
     private static <T> SupplementedBeanIntrospection<T> supplemented(Class<T> type) {
@@ -144,6 +144,45 @@ class SupplementedBeanIntrospectionSpec extends Specification {
         property.get(new Catalogue("art", ["a", "b"])) == ["a", "b"]
         !property.readOnly
         introspection.getProperty("missing").empty
+    }
+
+    void "the merged properties are built once, and every view yields the same property"() {
+        given:
+        def introspection = supplemented(Catalogue)
+
+        when:
+        def property = introspection.getProperty("entries").get()
+
+        then: "the lookup by name yields the property the merged view holds, not a description of it built again"
+        introspection.getProperty("entries").get().is(property)
+        introspection.beanProperties.find { it.name == "entries" }.is(property)
+
+        and: "and so do the read and the write views, which describe the property the way the merged view does"
+        introspection.beanReadProperties.find { it.name == "entries" }.is(property)
+        introspection.beanWriteProperties.find { it.name == "entries" }.is(property)
+        introspection.beanReadProperties.find { it.name == "entries" }.asArgument().typeParameters[0]
+                .annotationMetadata.getAnnotationValuesByType(Tag)*.stringValue()*.get() == ["elem"]
+
+        and: "the views hold the properties a value can be read from and written to, as the merged view reports them"
+        introspection.beanReadProperties*.name.toSet() == introspection.beanProperties.findAll { !it.writeOnly }*.name.toSet()
+        introspection.beanWriteProperties*.name.toSet() == introspection.beanProperties.findAll { !it.readOnly }*.name.toSet()
+    }
+
+    void "a generated introspection that reads nothing exposes nothing to read"() {
+        given: "a type written to and never read from"
+        def generated = BeanIntrospection.getIntrospection(IntroWriteOnly)
+        def introspection = supplemented(IntroWriteOnly)
+
+        expect: "the processor describes one write property and no read one: the field is private"
+        generated.beanReadProperties.isEmpty()
+        generated.beanWriteProperties*.name == ["secret"]
+
+        and: "where reflection does read the value, through the field the setter names"
+        ReflectionBeanIntrospection.of(IntroWriteOnly).beanReadProperties*.name == ["secret"]
+
+        and: "which does not stand in for the read properties the generated introspection legitimately has none of"
+        introspection.beanReadProperties.isEmpty()
+        introspection.beanWriteProperties*.name == ["secret"]
     }
 
     void "the members a property is made of come from reflection"() {

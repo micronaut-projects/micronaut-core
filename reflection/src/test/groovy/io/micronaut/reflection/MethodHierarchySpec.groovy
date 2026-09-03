@@ -194,6 +194,65 @@ it merges from the methods it overrides, so the declaration is not exact and the
         tags(MethodHierarchy.Declaration.declaredOf(executable.annotationMetadata)) == ["counting-child"]
     }
 
+    void "a method overriding the declaration of a generic interface reads that declaration"() {
+        when: "the interface declares `save(T)`, which is `save(Object)` once erased, and the type `save(String)`"
+        def hierarchy = MethodHierarchy.resolve(reflective, ExecUserRepo, "save", String)
+
+        then: "the declaration of the interface is found all the same"
+        hierarchy.local().declaringType() == ExecUserRepo
+        hierarchy.inherited()*.declaringType() == [ExecRepo]
+
+        and: "one interface declares the method, so it is not declared in parallel branches"
+        !hierarchy.parallel()
+
+        and: "the annotations of the interface are part of the merged view, the ones of its parameter included"
+        tags(hierarchy.annotationMetadata()) as Set == ["repo", "user"] as Set
+        tags(hierarchy.arguments()[0].getAnnotationMetadata()) as Set == ["repo-param", "user-param"] as Set
+
+        and: "the merged parameter keeps the type of the local declaration, not the erasure of the interface"
+        hierarchy.arguments()[0].type == String
+    }
+
+    void "an overload of the same arity stays a declaration of its own"() {
+        when: "the interface declares `save(T)` and `save(Long)`, and the type overrides both"
+        def generic = MethodHierarchy.resolve(reflective, ExecUserRepo, "save", String)
+        def overload = MethodHierarchy.resolve(reflective, ExecUserRepo, "save", Long)
+
+        then: "each reads the declaration it overrides, and neither reads the other"
+        tags(generic.annotationMetadata()) as Set == ["repo", "user"] as Set
+        tags(overload.annotationMetadata()) as Set == ["repo-id", "user-id"] as Set
+
+        and: "the parameters are kept apart too"
+        tags(generic.arguments()[0].getAnnotationMetadata()) as Set == ["repo-param", "user-param"] as Set
+        tags(overload.arguments()[0].getAnnotationMetadata()) as Set == ["repo-id-param", "user-id-param"] as Set
+    }
+
+    void "a method overriding the declaration of a generic super class reads that declaration"() {
+        when: "the super class declares `keep(T)`, which is `keep(Object)` once erased"
+        def hierarchy = MethodHierarchy.resolve(reflective, ExecBookStore, "keep", Book)
+
+        then:
+        hierarchy.inherited()*.declaringType() == [ExecGenericStore]
+        tags(hierarchy.annotationMetadata()) as Set == ["store", "book-store"] as Set
+        tags(hierarchy.arguments()[0].getAnnotationMetadata()) as Set == ["store-param", "book-store-param"] as Set
+    }
+
+    void "a package private method is overridden by a type of its own package only"() {
+        when: "the super class is of the same package"
+        def same = MethodHierarchy.resolve(reflective, ExecPackageAudited, "audit", String)
+
+        then: "the method of the super class is a declaration the local one overrides"
+        same.inherited()*.declaringType() == [ExecPackageAudit]
+        tags(same.annotationMetadata()) as Set == ["package-audit", "audited"] as Set
+
+        when: "the super class is of another package, so its method is hidden rather than overridden"
+        def foreign = MethodHierarchy.resolve(reflective, ExecForeignAudited, "audit", String)
+
+        then:
+        foreign.inherited().isEmpty()
+        tags(foreign.annotationMetadata()) == ["foreign-audited"]
+    }
+
     void "a type with no introspection declares nothing"() {
         expect:
         MethodHierarchy.declaredBy(BeanIntrospector.SHARED, Reservation, "reserve", String).isEmpty()

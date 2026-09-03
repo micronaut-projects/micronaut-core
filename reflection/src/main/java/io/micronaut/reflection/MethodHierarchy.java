@@ -21,11 +21,15 @@ import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.GenericPlaceholder;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -111,10 +115,14 @@ public record MethodHierarchy(Declaration local,
      */
     public static MethodHierarchy resolve(BeanIntrospector introspector, Declaration local, String name) {
         Class<?>[] parameterTypes = Argument.toClassArray(local.arguments());
-        Declaration declared = declaredBy(introspector, local.declaringType(), name, parameterTypes)
+        Class<?> declaringType = local.declaringType();
+        Declaration declared = declaredBy(introspector, declaringType, name, parameterTypes)
+            // the arguments of a declaration read through a generic type hold the resolved types, where the
+            // method declares the erasure: `save(Book)` of a `Base<Book>` is `save(Object)` on `Base`
+            .or(() -> overriddenBy(introspector, declaringType, declaringType, name, parameterTypes))
             .filter(Declaration::exact)
             .orElse(local);
-        List<Declaration> inherited = inherited(introspector, local.declaringType(), name, parameterTypes);
+        List<Declaration> inherited = inherited(introspector, declaringType, name, parameterTypes);
         if (inherited.isEmpty()) {
             return new MethodHierarchy(local, declared, inherited, local.annotationMetadata(), local.arguments(), local.returnArgument());
         }
@@ -234,25 +242,111 @@ public record MethodHierarchy(Declaration local,
         List<Declaration> declarations = new ArrayList<>();
         Set<Class<?>> visitedInterfaces = new HashSet<>();
         for (Class<?> current = declaringType.getSuperclass(); current != null && current != Object.class; current = current.getSuperclass()) {
-            declaredBy(introspector, current, name, parameterTypes).ifPresent(declarations::add);
-            collectInterfaceDeclarations(introspector, current, name, parameterTypes, visitedInterfaces, declarations);
+            overriddenBy(introspector, current, declaringType, name, parameterTypes).ifPresent(declarations::add);
+            collectInterfaceDeclarations(introspector, current, declaringType, name, parameterTypes, visitedInterfaces, declarations);
         }
-        collectInterfaceDeclarations(introspector, declaringType, name, parameterTypes, visitedInterfaces, declarations);
+        collectInterfaceDeclarations(introspector, declaringType, declaringType, name, parameterTypes, visitedInterfaces, declarations);
         return List.copyOf(declarations);
     }
 
     private static void collectInterfaceDeclarations(BeanIntrospector introspector,
                                                      Class<?> type,
+                                                     Class<?> context,
                                                      String name,
                                                      Class<?>[] parameterTypes,
                                                      Set<Class<?>> visitedInterfaces,
                                                      List<Declaration> declarations) {
         for (Class<?> interfaceType : type.getInterfaces()) {
             if (visitedInterfaces.add(interfaceType)) {
-                declaredBy(introspector, interfaceType, name, parameterTypes).ifPresent(declarations::add);
-                collectInterfaceDeclarations(introspector, interfaceType, name, parameterTypes, visitedInterfaces, declarations);
+                overriddenBy(introspector, interfaceType, context, name, parameterTypes).ifPresent(declarations::add);
+                collectInterfaceDeclarations(introspector, interfaceType, context, name, parameterTypes, visitedInterfaces, declarations);
             }
         }
+    }
+
+    /**
+     * The declaration of the method by one type of the hierarchy that the method read through another type
+     * overrides. The lookup is the one of {@link #declaredBy}, the erasure of a generic declaration tolerated:
+     * an {@code interface Repo<T>} declaring {@code save(T)} declares {@code save(Object)} once erased, where
+     * a {@code Repo<String>} declares {@code save(String)}, and asking the interface for {@code save(String)}
+     * would find nothing.
+     */
+    private static Optional<Declaration> overriddenBy(BeanIntrospector introspector,
+                                                      Class<?> type,
+                                                      Class<?> context,
+                                                      String name,
+                                                      Class<?>[] parameterTypes) {
+        Method overridden = overriddenMethod(type, context, name, parameterTypes);
+        if (overridden == null) {
+            return Optional.empty();
+        }
+        return declaredBy(introspector, type, name, overridden.getParameterTypes());
+    }
+
+    /**
+     * The method a type declares that a method read through the reading type overrides: a declaration of the
+     * very erasure of the read method wins, else one whose parameters, resolved for the reading type, are the
+     * parameters of the read method. At most one declaration can resolve that way - two would be a name clash
+     * in the reading type - so the erasure tolerant match does not depend on the order the methods are read in.
+     */
+    @Nullable
+    private static Method overriddenMethod(Class<?> type, Class<?> context, String name, Class<?>[] parameterTypes) {
+        Method resolved = null;
+        for (Method candidate : type.getDeclaredMethods()) {
+            if (!overridable(candidate, context, name, parameterTypes.length)) {
+                continue;
+            }
+            if (Arrays.equals(candidate.getParameterTypes(), parameterTypes)) {
+                return candidate;
+            }
+            if (resolved == null && overrides(candidate, context, parameterTypes)) {
+                resolved = candidate;
+            }
+        }
+        return resolved;
+    }
+
+    /**
+     * Whether a method of a type can be overridden at all by a method the reading type declares: a bridge is a
+     * copy of the declaration it forwards to, neither a static nor a private method is ever overridden, and a
+     * package private one only by a type of its own package.
+     */
+    private static boolean overridable(Method candidate, Class<?> context, String name, int parameterCount) {
+        if (!candidate.getName().equals(name)
+            || candidate.getParameterCount() != parameterCount
+            || candidate.isBridge()
+            || candidate.isSynthetic()) {
+            return false;
+        }
+        int modifiers = candidate.getModifiers();
+        if (Modifier.isStatic(modifiers) || Modifier.isPrivate(modifiers)) {
+            return false;
+        }
+        return Modifier.isPublic(modifiers)
+            || Modifier.isProtected(modifiers)
+            || candidate.getDeclaringClass().getPackageName().equals(context.getPackageName());
+    }
+
+    /**
+     * Whether every parameter of a declaration, resolved for the type reading the method, is the parameter the
+     * read method declares: an overload of the same arity whose parameters resolve to other types stays a
+     * declaration of its own.
+     */
+    private static boolean overrides(Method candidate, Class<?> context, Class<?>[] parameterTypes) {
+        Parameter[] parameters = candidate.getParameters();
+        for (int i = 0; i < parameters.length; i++) {
+            Argument<?> resolved = ReflectionArguments.of(parameters[i], context);
+            if (resolved.getType() == parameterTypes[i]) {
+                continue;
+            }
+            // a variable the reading type leaves open stands for the erasure of its bound, which is what a
+            // read method of a type that is generic itself erases to
+            if (resolved instanceof GenericPlaceholder<?> && resolved.getType().isAssignableFrom(parameterTypes[i])) {
+                continue;
+            }
+            return false;
+        }
+        return true;
     }
 
     /**

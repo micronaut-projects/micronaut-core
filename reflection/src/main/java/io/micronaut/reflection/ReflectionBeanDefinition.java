@@ -23,6 +23,7 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.context.annotation.Any;
+import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Primary;
@@ -49,10 +50,12 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
@@ -81,18 +84,27 @@ import java.util.stream.Stream;
  *
  * <p>The definition is read from the class as the processors read it at compilation time:</p>
  * <ul>
- *     <li>the constructor is the one annotated {@code @Inject} or {@link Creator}, else the only accessible one,
- *     else the accessible one with no parameter;</li>
- *     <li>the non-static, non-final fields annotated {@code @Inject}, {@link Value} or {@link Property} are
- *     injected, the super classes' first;</li>
+ *     <li>the bean is instantiated by the static method annotated {@link Creator} the class declares, else by
+ *     one of its accessible - non-private - constructors: the only one, else the one annotated
+ *     {@code @Inject}, else the one annotated {@link Creator}, else the canonical constructor of a record,
+ *     else the first public one, which is the selection {@code ClassElement#getPrimaryConstructor()} makes at
+ *     compilation time. An annotation counts through its stereotypes, so a meta-annotated {@code @Creator}
+ *     counts;</li>
+ *     <li>the non-static, non-final fields annotated {@code @Inject}, {@link Value} or {@link Property}, and
+ *     the ones declaring a qualifier without {@code @Inject}, are injected, the super classes' first;</li>
  *     <li>the methods annotated {@code @Inject} and the setters annotated with a qualifier - {@link Value} is
  *     one - are injected, the methods annotated {@code @PostConstruct} and {@code @PreDestroy} are the life cycle
  *     methods;</li>
  *     <li>the methods annotated {@link Executable}, and the public methods of a type annotated {@link Executable},
  *     are the executable methods;</li>
- *     <li>the scope, the qualifier, the order and the conditions come from the annotations of the class, unless the
- *     {@link Builder builder} overrides them.</li>
+ *     <li>the scope, the qualifier, the order, the exposed types of {@code @Bean(typed = ...)} and the
+ *     conditions come from the annotations of the class, unless the {@link Builder builder} overrides them.</li>
  * </ul>
+ *
+ * <p>An inherited injection point is read as the bean type sees it: a member a generic super class declares
+ * over a variable that the bean type gives a value to - a {@code T dep} of a {@code class Base<T>} inherited by
+ * a {@code class Impl extends Base<Book>} - is injected as the value, a {@code Book}, which is what a generated
+ * definition of the bean type asks for.</p>
  *
  * <p>Each injected argument is resolved as a generated definition resolves it: a bean by type and qualifier, a
  * {@link Collection}, an array, a {@link Stream}, an {@link Optional} or a {@link Map} of beans, a
@@ -113,7 +125,10 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
     private static final AtomicInteger COUNTER = new AtomicInteger();
 
     private final String beanDefinitionName;
+    @Nullable
     private final Constructor<T> constructor;
+    @Nullable
+    private final Method factoryMethod;
     private final Argument<?>[] constructorArguments;
     private final Field[] fields;
     private final Argument<?>[] fieldArguments;
@@ -145,6 +160,7 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
             precalculatedInfo);
         this.beanDefinitionName = type.getName() + "$ReflectionDefinition" + COUNTER.incrementAndGet();
         this.constructor = members.constructor;
+        this.factoryMethod = members.factoryMethod;
         this.constructorArguments = members.constructorReference.arguments;
         this.fields = members.fields.toArray(Field[]::new);
         this.fieldArguments = new Argument[members.fieldReferences.length];
@@ -202,10 +218,23 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
     /**
      * The constructor the bean is instantiated with.
      *
-     * @return The constructor
+     * @return The constructor, {@code null} when the bean is instantiated by a {@link Creator} factory method
+     * @see #getTargetFactoryMethod()
      */
+    @Nullable
     public Constructor<T> getTargetConstructor() {
         return constructor;
+    }
+
+    /**
+     * The static {@link Creator} method the bean is instantiated with, when the class declares one.
+     *
+     * @return The factory method, {@code null} when the bean is instantiated by a constructor
+     * @see #getTargetConstructor()
+     */
+    @Nullable
+    public Method getTargetFactoryMethod() {
+        return factoryMethod;
     }
 
     @Override
@@ -248,6 +277,7 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
         Object[] arguments = new Object[constructorArguments.length];
         for (int i = 0; i < arguments.length; i++) {
@@ -255,14 +285,22 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
         }
         T bean;
         try {
-            bean = constructor.newInstance(arguments);
+            if (factoryMethod == null) {
+                bean = Objects.requireNonNull(constructor).newInstance(arguments);
+            } else {
+                // a static factory is the instantiation route of a class that keeps its constructors to itself
+                Object created = factoryMethod.invoke(null, arguments);
+                if (created == null) {
+                    throw new BeanInstantiationException(resolutionContext, "The factory method '" + factoryMethod.getName() + "' returned null");
+                }
+                bean = (T) created;
+            }
         } catch (InvocationTargetException e) {
             throw new BeanInstantiationException(resolutionContext, e.getTargetException());
         } catch (ReflectiveOperationException | IllegalArgumentException e) {
             throw new BeanInstantiationException(resolutionContext, e);
         }
-        bean = inject(resolutionContext, context, bean);
-        return initialize(resolutionContext, context, bean);
+        return initialize(resolutionContext, context, inject(resolutionContext, context, bean));
     }
 
     @Override
@@ -475,8 +513,10 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
     /**
      * The members read from the class, with the references the base definition is built from.
      *
-     * @param constructor          The selected constructor
-     * @param constructorReference The reference of the selected constructor
+     * @param constructor          The selected constructor, {@code null} when a factory method instantiates
+     * @param factoryMethod        The selected static factory method, {@code null} when a constructor
+     *                             instantiates
+     * @param constructorReference The reference of the selected constructor or factory method
      * @param fields               The injected fields
      * @param fieldReferences      The references of the injected fields
      * @param methods              The injected and life cycle methods
@@ -484,7 +524,8 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
      * @param executableMethods    The executable methods, {@code null} when there is none
      * @param <T>                  The bean type
      */
-    private record Members<T>(Constructor<T> constructor,
+    private record Members<T>(@Nullable Constructor<T> constructor,
+                              @Nullable Method factoryMethod,
                               MethodReference constructorReference,
                               List<Field> fields,
                               FieldReference[] fieldReferences,
@@ -745,19 +786,40 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
             if (type.isMemberClass() && !Modifier.isStatic(type.getModifiers())) {
                 throw new IllegalArgumentException("The type " + type.getName() + " cannot be a bean: it is a non-static inner class");
             }
+            // the annotations the caller means the bean to carry win where both declare the same one: a
+            // container adapting another one says what that one says, over what the class says of itself
             AnnotationMetadata metadata = ReflectionAnnotations.merge(
-                annotationMetadata != null ? annotationMetadata : ReflectionAnnotations.metadataOf(type),
-                additionalAnnotationMetadata);
-            Constructor<T> selected = constructor != null ? constructor : selectConstructor(type);
+                additionalAnnotationMetadata,
+                annotationMetadata != null ? annotationMetadata : ReflectionAnnotations.metadataOf(type));
+            Method factory = null;
+            Constructor<T> selected = constructor;
             if (selected == null) {
+                // a static `@Creator` factory is the instantiation route the processors select first
+                factory = selectFactoryMethod(type);
+                if (factory == null) {
+                    selected = selectConstructor(type);
+                }
+            }
+            MethodReference constructorReference;
+            if (selected != null) {
+                open(selected);
+                constructorReference = new MethodReference(
+                    selected.getDeclaringClass(),
+                    "<init>",
+                    ReflectionArguments.argumentsOf(selected, type),
+                    ReflectionAnnotations.metadataOf(selected));
+            } else if (factory != null) {
+                open(factory);
+                // a factory method is referenced by its name, as a generated definition references the factory
+                // method of the bean it produces
+                constructorReference = new MethodReference(
+                    factory.getDeclaringClass(),
+                    factory.getName(),
+                    ReflectionArguments.argumentsOf(factory, type),
+                    ReflectionAnnotations.metadataOf(factory));
+            } else {
                 throw new IllegalArgumentException("The type " + type.getName() + " cannot be a bean: it has no accessible constructor");
             }
-            selected.trySetAccessible();
-            MethodReference constructorReference = new MethodReference(
-                selected.getDeclaringClass(),
-                "<init>",
-                ReflectionArguments.argumentsOf(selected),
-                ReflectionAnnotations.metadataOf(selected));
 
             List<Field> fields = new ArrayList<>();
             List<Method> methods = new ArrayList<>();
@@ -768,7 +830,7 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
 
             ReflectionExecutableMethodsDefinition<T> executableMethods = executables.isEmpty()
                 ? null
-                : new ReflectionExecutableMethodsDefinition<>(metadata, executables);
+                : new ReflectionExecutableMethodsDefinition<>(metadata, executables, type);
 
             Optional<String> scopeName = scope != null
                 ? Optional.of(scope.getName())
@@ -789,6 +851,7 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
                 false);
             Members<T> members = new Members<>(
                 selected,
+                factory,
                 constructorReference,
                 fields,
                 fieldReferences.toArray(FieldReference[]::new),
@@ -802,46 +865,61 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
                 typeArgumentsOf(type),
                 info,
                 qualifier,
-                exposedTypes.length == 0 ? Collections.emptySet() : Set.of(exposedTypes));
+                exposedTypes.length == 0 ? exposedTypesOf(metadata) : Set.of(exposedTypes));
         }
 
         /**
-         * The constructor as the processors select it: the one annotated {@code @Inject} or {@link Creator},
-         * else the only accessible one, else the accessible one with no parameter, else the first public one.
+         * The types the {@code @Bean(typed = ...)} annotation of the class exposes the bean as, which the
+         * builder overrides when it sets any: the base definition answers no exposed type, so the annotation
+         * is read here as {@link io.micronaut.inject.BeanType#getExposedTypes()} reads it for a generated one.
+         */
+        private static Set<Class<?>> exposedTypesOf(AnnotationMetadata metadata) {
+            if (!metadata.hasDeclaredAnnotation(Bean.class)) {
+                return Collections.emptySet();
+            }
+            Class<?>[] typed = metadata.classValues(Bean.class, "typed");
+            return typed.length == 0 ? Collections.emptySet() : Collections.unmodifiableSet(CollectionUtils.setOf(typed));
+        }
+
+        /**
+         * The constructor as the processors select it - the selection of
+         * {@code ClassElement#getPrimaryConstructor()}: among the accessible constructors, the only one, else
+         * the one annotated {@code @Inject}, else the one annotated {@link Creator}, else the canonical
+         * constructor of a record, else the first public one. A private constructor is not selected, and an
+         * annotation counts through its stereotypes.
          */
         @Nullable
         @SuppressWarnings("unchecked")
         private static <T> Constructor<T> selectConstructor(Class<T> type) {
-            Constructor<?>[] declared = type.getDeclaredConstructors();
-            if (type.isRecord()) {
-                // the canonical constructor is the one a record is built by; another one it declares delegates to it
-                Class<?>[] components = Arrays.stream(type.getRecordComponents())
-                    .map(RecordComponent::getType)
-                    .toArray(Class<?>[]::new);
-                for (Constructor<?> candidate : declared) {
-                    if (Arrays.equals(candidate.getParameterTypes(), components)) {
-                        return (Constructor<T>) candidate;
-                    }
-                }
-            }
-            for (Constructor<?> candidate : declared) {
-                if (candidate.isAnnotationPresent(Creator.class)
-                    || ReflectionAnnotations.metadataOf(candidate).hasStereotype(AnnotationUtil.INJECT)) {
-                    return (Constructor<T>) candidate;
-                }
-            }
-            List<Constructor<?>> accessible = new ArrayList<>(declared.length);
-            for (Constructor<?> candidate : declared) {
+            List<Constructor<?>> accessible = new ArrayList<>();
+            for (Constructor<?> candidate : type.getDeclaredConstructors()) {
                 if (!Modifier.isPrivate(candidate.getModifiers()) && !candidate.isSynthetic()) {
                     accessible.add(candidate);
                 }
             }
+            if (accessible.isEmpty()) {
+                return null;
+            }
             if (accessible.size() == 1) {
                 return (Constructor<T>) accessible.get(0);
             }
-            for (Constructor<?> candidate : accessible) {
-                if (candidate.getParameterCount() == 0) {
-                    return (Constructor<T>) candidate;
+            Constructor<?> annotated = annotatedWith(accessible, AnnotationUtil.INJECT);
+            if (annotated == null) {
+                annotated = annotatedWith(accessible, Creator.class.getName());
+            }
+            if (annotated != null) {
+                return (Constructor<T>) annotated;
+            }
+            if (type.isRecord()) {
+                // with nothing annotated, the canonical constructor is the one a record is built by; another
+                // one it declares delegates to it
+                Class<?>[] components = Arrays.stream(type.getRecordComponents())
+                    .map(RecordComponent::getType)
+                    .toArray(Class<?>[]::new);
+                for (Constructor<?> candidate : accessible) {
+                    if (Arrays.equals(candidate.getParameterTypes(), components)) {
+                        return (Constructor<T>) candidate;
+                    }
                 }
             }
             for (Constructor<?> candidate : accessible) {
@@ -850,6 +928,63 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
                 }
             }
             return null;
+        }
+
+        @Nullable
+        private static Constructor<?> annotatedWith(List<Constructor<?>> constructors, String annotation) {
+            for (Constructor<?> candidate : constructors) {
+                if (ReflectionAnnotations.metadataOf(candidate).hasStereotype(annotation)) {
+                    return candidate;
+                }
+            }
+            return null;
+        }
+
+        /**
+         * The static factory method as the processors select it - the selection of
+         * {@code ClassElement#findStaticCreator()}: an accessible static method the type itself declares,
+         * annotated {@link Creator} through its metadata and returning the type or a sub type of it. When the
+         * type declares several, the only one taking parameters, else the first public one.
+         */
+        @Nullable
+        private static Method selectFactoryMethod(Class<?> type) {
+            List<Method> creators = new ArrayList<>();
+            for (Method candidate : type.getDeclaredMethods()) {
+                int modifiers = candidate.getModifiers();
+                if (!Modifier.isStatic(modifiers) || Modifier.isPrivate(modifiers) || candidate.isSynthetic()) {
+                    continue;
+                }
+                if (type.isAssignableFrom(candidate.getReturnType())
+                    && ReflectionAnnotations.metadataOf(candidate).hasStereotype(Creator.class)) {
+                    creators.add(candidate);
+                }
+            }
+            if (creators.size() < 2) {
+                return creators.isEmpty() ? null : creators.get(0);
+            }
+            // a no-argument factory loses to one taking parameters, as it does at compilation time
+            List<Method> withArguments = creators.stream().filter(candidate -> candidate.getParameterCount() > 0).toList();
+            if (withArguments.size() == 1) {
+                return withArguments.get(0);
+            }
+            return withArguments.stream()
+                .filter(candidate -> Modifier.isPublic(candidate.getModifiers()))
+                .findFirst()
+                .orElse(null);
+        }
+
+        /**
+         * Opens a member for reflective access, failing at build time - rather than at injection time, with a
+         * {@link DependencyInjectionException} the caller cannot act on - when the module declaring the type
+         * does not open its package.
+         */
+        private static <M extends AccessibleObject & Member> void open(M member) {
+            if (!member.trySetAccessible()) {
+                Class<?> declaringType = member.getDeclaringClass();
+                throw new IllegalArgumentException("The type " + declaringType.getName() + " cannot be a bean: its member '"
+                    + member.getName() + "' cannot be made accessible, the " + declaringType.getModule()
+                    + " does not open the package " + declaringType.getPackageName() + " for reflection");
+            }
         }
 
         private static boolean isSingleton(AnnotationMetadata metadata) {
@@ -886,22 +1021,33 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
                         continue;
                     }
                     AnnotationMetadata fieldMetadata = ReflectionAnnotations.metadataOf(field);
+                    // a field declaring a qualifier is injected without `@Inject`, as the processors inject it
                     if (fieldMetadata.hasStereotype(Value.class)
                         || fieldMetadata.hasStereotype(Property.class)
-                        || fieldMetadata.hasStereotype(AnnotationUtil.INJECT)) {
-                        field.trySetAccessible();
+                        || fieldMetadata.hasStereotype(AnnotationUtil.INJECT)
+                        || fieldMetadata.hasDeclaredStereotype(AnnotationUtil.QUALIFIER)) {
+                        open(field);
                         fields.add(field);
-                        fieldReferences.add(new FieldReference(field.getDeclaringClass(), ReflectionArguments.of(field)));
+                        fieldReferences.add(new FieldReference(field.getDeclaringClass(), ReflectionArguments.of(field, type)));
                     }
                 }
             }
             // the methods nearest to the type first, so that an overriding declaration hides the overridden one
             for (int i = hierarchy.size() - 1; i >= 0; i--) {
-                for (Method method : hierarchy.get(i).getDeclaredMethods()) {
+                Method[] declared = hierarchy.get(i).getDeclaredMethods();
+                for (Method method : declared) {
                     if (method.isSynthetic() || method.isBridge() || !seen.add(signature(method))) {
                         continue;
                     }
                     candidates.add(method);
+                }
+                // then the bridges the class declares: a bridge carries the erased signature of the generic
+                // declaration its target overrides, so recording it hides that declaration, which the
+                // processors treat as overridden rather than as a second injection point
+                for (Method method : declared) {
+                    if (method.isBridge()) {
+                        seen.add(signature(method));
+                    }
                 }
             }
             // then in the order the processors visit them: the super classes first
@@ -926,14 +1072,14 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
             }
         }
 
-        private static void addInjectedMethod(List<Method> methods,
-                                              List<MethodReference> methodReferences,
-                                              Method method,
-                                              AnnotationMetadata methodMetadata,
-                                              boolean postConstruct,
-                                              boolean preDestroy) {
-            method.trySetAccessible();
-            Argument<?>[] arguments = ReflectionArguments.argumentsOf(method);
+        private void addInjectedMethod(List<Method> methods,
+                                       List<MethodReference> methodReferences,
+                                       Method method,
+                                       AnnotationMetadata methodMetadata,
+                                       boolean postConstruct,
+                                       boolean preDestroy) {
+            open(method);
+            Argument<?>[] arguments = ReflectionArguments.argumentsOf(method, type);
             if (arguments.length == 1 && !methodMetadata.isEmpty()) {
                 // a setter is annotated on the method: the annotations bind its one parameter, as they do for a
                 // processed setter

@@ -21,12 +21,14 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
 /**
  * Applies the {@value ReflectionIntrospectionPolicy#PROPERTY_ALLOW_REFLECTION} property of the application
- * configuration to the {@link ReflectionIntrospectionPolicy} when the context starts.
+ * configuration to the {@link ReflectionIntrospectionPolicy} when the context starts, and takes it back when
+ * the context closes, leaving the patterns of the contexts that are still running.
  *
  * @author Denis Stepanov
  * @since 5.2.0
@@ -43,6 +45,9 @@ public final class ReflectionIntrospectionConfiguration {
     public static final String PREFIX = "micronaut.introspection";
 
     private List<String> allowReflection = List.of();
+    // the contribution of this context only, so closing this context leaves the patterns the contexts still
+    // running contributed
+    private ReflectionIntrospectionPolicy.@Nullable Registration registration;
 
     /**
      * Creates the configuration; it is instantiated by the context.
@@ -73,11 +78,15 @@ public final class ReflectionIntrospectionConfiguration {
 
     @PostConstruct
     void apply() {
-        ReflectionIntrospectionPolicy.configure(allowReflection);
+        registration = ReflectionIntrospectionPolicy.configure(allowReflection);
     }
 
     @PreDestroy
-    void reset() {
-        ReflectionIntrospectionPolicy.configure(List.of());
+    void withdraw() {
+        ReflectionIntrospectionPolicy.@Nullable Registration contributed = registration;
+        if (contributed != null) {
+            registration = null;
+            contributed.close();
+        }
     }
 }

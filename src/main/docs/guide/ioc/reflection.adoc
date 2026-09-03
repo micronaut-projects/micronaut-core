@@ -6,6 +6,8 @@ dependency:micronaut-reflection[]
 
 WARNING: Every type of the module is experimental, and reflective metadata is slower to build and larger to hold than generated metadata. Use it for the types you cannot compile with the processors, not instead of them.
 
+WARNING: Reflection reports the name of a parameter only for a class compiled with `-parameters`, and answers `arg0`, `arg1` and so on otherwise. Whatever reads an argument by name - a named injection point, `@Property`, binding a constructor argument to a property of the same name - therefore needs the classes it describes to carry their parameter names. The canonical constructor of a record always carries them, as the compiler records the names of the components.
+
 === Annotation Metadata and Arguments
 
 api:reflection.ReflectionAnnotations[] builds the metadata of an `AnnotatedElement` with the stereotypes, the repeatable containers, the defaults and the non-binding members the processors record, and converts an annotation instance to an api:core.annotation.AnnotationValue[] and back. api:reflection.ReflectionArguments[] builds the arguments of parameters, fields and return types with the type-use annotations of every level of their type, resolves the type arguments a type gives to a super type, and renders an argument as a `java.lang.reflect.Type`.
@@ -63,6 +65,8 @@ micronaut:
 
 A pattern is a class name where `*` stands for any sequence of characters; `*` alone allows every class. The same patterns can be allowed programmatically through api:reflection.ReflectionIntrospectionPolicy[]. The policy guards only the shared introspector: code that reflects on a type explicitly, through the types above, made its own choice.
 
+The policy is one per JVM, as the shared introspector is, and what each context configures is a contribution of its own: several contexts running together allow the union of their patterns, and a context that stops withdraws exactly what it contributed. `ReflectionIntrospectionPolicy.configure` returns that contribution, for code applying a configuration of its own to withdraw later, and `reset` forgets every one of them.
+
 Everything built on introspections then sees the type. Serialization, for one, asks the shared introspector for the introspection and asks for its own opt-in as well, so a class it should read without being annotated needs both:
 
 [configuration]
@@ -92,7 +96,7 @@ beanContext.registerBeanDefinition(
 );
 ----
 
-Each injected argument is resolved as a generated definition resolves it, including collections, arrays, streams, optionals and maps of beans, api:context.BeanRegistration[] and configuration values. A record is instantiated by its canonical constructor. The features that need the processors - `@ConfigurationProperties` binding, `@EachProperty` and `@EachBean`, `@Parameter` arguments and AOP advice - are not available to a reflective definition.
+Each injected argument is resolved as a generated definition resolves it, including collections, arrays, streams, optionals and maps of beans, api:context.BeanRegistration[] and configuration values, and a member a super type declares of a variable the bean gives a value to is injected as that value. The bean is built the way the processors build it: a static `@Creator` factory when the class declares one, else the annotated constructor, else the only accessible one, else the canonical constructor of a record, else the first public one. The features that need the processors - `@ConfigurationProperties` binding, `@EachProperty` and `@EachBean`, `@Parameter` arguments and AOP advice - are not available to a reflective definition.
 
 Code adapting another container has two more needs the builder covers. `additionalAnnotationMetadata` adds the annotations that container means the bean to carry without losing the ones its class declares, both counting as declared, which is how the framework reads a scope, a qualifier or a primary marker. And `postConstruct` and `preDestroy` take method names, for a container that names its life cycle methods instead of annotating them:
 

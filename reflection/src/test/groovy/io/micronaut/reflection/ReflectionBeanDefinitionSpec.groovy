@@ -2,6 +2,7 @@ package io.micronaut.reflection
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.RuntimeBeanDefinition
+import io.micronaut.core.type.Argument
 import io.micronaut.inject.qualifiers.Qualifiers
 import jakarta.inject.Singleton
 import spock.lang.Specification
@@ -169,6 +170,158 @@ class ReflectionBeanDefinitionSpec extends Specification {
         Dispatcher.Missing  | "not a class"
         AbstractReservation | "abstract"
         Outer.Inner         | "non-static inner"
+    }
+
+    void "an injection point a generic super class declares is read as the bean type sees it"() {
+        given:
+        def context = ApplicationContext.run()
+        context.registerBeanDefinition(ReflectionBeanDefinition.of(Warehouse))
+        def definition = ReflectionBeanDefinition.of(DefGenerics.Impl)
+        context.registerBeanDefinition(definition)
+
+        when:
+        def bean = context.getBean(DefGenerics.Impl)
+
+        then: "the variable the bean type gives a value to is injected as that value, not as its bound"
+        bean.dep.is(context.getBean(Warehouse))
+        bean.service.is(bean.dep)
+
+        and: "the definition describes the injection points with the resolved type"
+        definition.injectedFields.find { it.name == "dep" }.type == Warehouse
+        definition.injectedMethods.find { it.name == "setService" }.arguments[0].type == Warehouse
+        definition.requiredComponents.contains(Warehouse)
+
+        cleanup:
+        context.close()
+    }
+
+    void "a variable an intermediate super class passes on is resolved as well"() {
+        given:
+        def context = ApplicationContext.run()
+        context.registerBeanDefinition(ReflectionBeanDefinition.of(Warehouse))
+        context.registerBeanDefinition(ReflectionBeanDefinition.of(DefGenerics.TwoLevel))
+
+        when:
+        def bean = context.getBean(DefGenerics.TwoLevel)
+
+        then: "the chain up to the declaring class is walked"
+        bean.dep.is(context.getBean(Warehouse))
+        bean.service.is(bean.dep)
+
+        cleanup:
+        context.close()
+    }
+
+    void "a generic collection injection point is resolved to the beans of the element type"() {
+        given:
+        def context = ApplicationContext.run()
+        context.registerBeanDefinition(RuntimeBeanDefinition.builder(Courier, { new Courier("express") } as Supplier<Courier>).named("express").singleton(true).build())
+        context.registerBeanDefinition(RuntimeBeanDefinition.builder(Courier, { new Courier("slow") } as Supplier<Courier>).named("slow").singleton(true).build())
+        def definition = ReflectionBeanDefinition.of(DefGenerics.AllCouriers)
+        context.registerBeanDefinition(definition)
+
+        when:
+        def bean = context.getBean(DefGenerics.AllCouriers)
+
+        then:
+        bean.all*.code.sort() == ["express", "slow"]
+        definition.injectedMethods.find { it.name == "setAll" }.arguments[0].firstTypeVariable.get().type == Courier
+
+        cleanup:
+        context.close()
+    }
+
+    void "an overridden generic member is one injection point, not two"() {
+        given:
+        def context = ApplicationContext.run()
+        context.registerBeanDefinition(ReflectionBeanDefinition.of(Warehouse))
+        def definition = ReflectionBeanDefinition.of(DefOverrides.Impl)
+        context.registerBeanDefinition(definition)
+
+        when:
+        def bean = context.getBean(DefOverrides.Impl)
+
+        then: "the bridge hides the erased declaration it stands for, so each method runs once"
+        bean.events == ["setService:Warehouse", "init:Warehouse"]
+
+        and: "the definition holds the override alone"
+        definition.injectedMethods*.name.sort() == ["init", "setService"]
+        definition.postConstructMethods*.name == ["init"]
+
+        cleanup:
+        context.close()
+    }
+
+    void "the exposed types of the class annotation limit the bean"() {
+        given:
+        def context = ApplicationContext.run()
+        context.registerBeanDefinition(ReflectionBeanDefinition.of(DefJob))
+
+        expect: "the @Bean(typed = ...) annotation of the class is honoured: the class itself is not exposed"
+        context.getBeanDefinition(DefTask).exposedTypes == [DefTask] as Set
+        !context.getBeanDefinition(DefTask).isCandidateBean(Argument.of(DefJob))
+        context.findBean(DefJob).empty
+
+        and: "the bean is served as the type it exposes"
+        context.findBean(DefTask).present
+
+        cleanup:
+        context.close()
+    }
+
+    void "the exposed types of the builder override the ones of the class annotation"() {
+        given:
+        def context = ApplicationContext.run()
+        context.registerBeanDefinition(ReflectionBeanDefinition.builder(DefJob).exposedTypes(DefJob).build())
+
+        expect:
+        context.findBean(DefJob).present
+        context.findBean(DefTask).empty
+
+        cleanup:
+        context.close()
+    }
+
+    void "the bean is instantiated by the constructor or the factory the processors select"() {
+        given:
+        def context = ApplicationContext.run()
+        context.registerBeanDefinition(ReflectionBeanDefinition.of(Warehouse))
+        def publicOverNoArg = ReflectionBeanDefinition.of(DefConstructors.PublicOverNoArg)
+        def factory = ReflectionBeanDefinition.of(DefConstructors.Factory)
+        def annotatedRecord = ReflectionBeanDefinition.of(DefConstructors.Annotated)
+        [publicOverNoArg, factory, annotatedRecord].each { context.registerBeanDefinition(it) }
+
+        expect: "with nothing annotated, the public constructor wins over the one taking no parameter"
+        publicOverNoArg.targetConstructor.parameterCount == 1
+        context.getBean(DefConstructors.PublicOverNoArg).warehouse.is(context.getBean(Warehouse))
+
+        and: "a static @Creator factory is the route of a class that keeps its constructors to itself"
+        factory.targetConstructor == null
+        factory.targetFactoryMethod == DefConstructors.Factory.getDeclaredMethod("of", Warehouse)
+        context.getBean(DefConstructors.Factory).warehouse.is(context.getBean(Warehouse))
+
+        and: "the annotated constructor of a record wins over its canonical one"
+        annotatedRecord.targetConstructor.parameterCount == 1
+        context.getBean(DefConstructors.Annotated).label() == "created"
+
+        cleanup:
+        context.close()
+    }
+
+    void "a field carrying a qualifier and no @Inject is injected"() {
+        given:
+        def context = ApplicationContext.run()
+        context.registerBeanDefinition(RuntimeBeanDefinition.builder(Courier, { new Courier("express") } as Supplier<Courier>).named("express").singleton(true).build())
+        context.registerBeanDefinition(RuntimeBeanDefinition.builder(Courier, { new Courier("slow") } as Supplier<Courier>).named("slow").singleton(true).build())
+        def definition = ReflectionBeanDefinition.of(DefQualified)
+        context.registerBeanDefinition(definition)
+
+        expect: "the qualifier of the field selects the bean, as it does for a processed field"
+        definition.injectedFields*.name == ["courier"]
+        context.getBean(DefQualified).courier.code == "express"
+
+        cleanup:
+        context.close()
     }
 
     void "the definition of a class without an accessible constructor is rejected"() {

@@ -6,6 +6,8 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospector
+import io.micronaut.core.type.Argument
+import io.micronaut.inject.MethodReference
 import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -71,6 +73,98 @@ class ReflectionExecutablesSpec extends Specification {
         then: "that answer is rejected: the method named is the one the super type declares"
         executable.declaringType == Greeter
         executable.invoke(new Greeter(), "sam") == "hello sam"
+    }
+
+    void "an executable method of a bean definition is taken only when it describes the method named"() {
+        given: "a bean of a generic super class declaring two methods of one name, the list one declared first"
+        def method = ExecBase.getDeclaredMethod("save", Object)
+        def store = context.getBean(ExecStore)
+
+        expect: "the locator answers for the super type, falling back to a match on the name alone"
+        context.findExecutableMethod(ExecBase, "save", Object).isPresent()
+
+        when:
+        def executable = ReflectionExecutables.executableMethod(context, BeanIntrospector.SHARED, method)
+        executable.invoke(store, "single")
+
+        then: "the method named is the one invoked, not the other method of the same name"
+        executable.arguments.length == 1
+        executable.arguments[0].type != List
+        store.saved == ["one:single"]
+
+        when: "the other method is the one named"
+        def other = ReflectionExecutables.executableMethod(context, BeanIntrospector.SHARED,
+                ExecBase.getDeclaredMethod("save", List))
+        other.invoke(store, ["a", "b"])
+
+        then: "the executable method that does describe it is taken as it is"
+        other.arguments[0].type == List
+        store.saved == ["one:single", "many:2"]
+    }
+
+    void "the method of a name and argument types is the most specific declaration that applies"() {
+        expect: "a declaration of the very types wins"
+        ReflectionExecutables.findMethod(ExecHandlers, "on", Number).get() == ExecHandlers.getDeclaredMethod("on", Number)
+
+        and: "of the two declarations that apply to an Integer, the most specific one, whatever order the \
+methods of the type are reported in"
+        ReflectionExecutables.findMethod(ExecHandlers, "on", Integer).get() == ExecHandlers.getDeclaredMethod("on", Number)
+
+        and: "the erasure of the type variable when it is the only declaration that applies"
+        ReflectionExecutables.findMethod(ExecHandlers, "on", String).get() == ExecHandlers.getDeclaredMethod("on", Object)
+    }
+
+    void "a static method is found too, so a reference that cannot report its target method still resolves"() {
+        given: "a reference of a static method whose own target method lookup fails"
+        def reference = [
+                getDeclaringType: { ExecHandlers },
+                getMethodName   : { "register" },
+                getArguments    : { [Argument.of(String)] as Argument[] },
+                getArgumentTypes: { [String] as Class[] },
+                getTargetMethod : { throw new NoSuchMethodError("no target method") }
+        ] as MethodReference
+
+        expect:
+        ReflectionExecutables.findMethod(ExecHandlers, "register", String).get() ==
+                ExecHandlers.getDeclaredMethod("register", String)
+        ReflectionExecutables.targetMethod(reference) == ExecHandlers.getDeclaredMethod("register", String)
+    }
+
+    void "the exception a method throws is the exception the caller catches"() {
+        given:
+        def bean = new ExecThrowing()
+        def unchecked = ReflectionExecutables.executableMethod(context, BeanIntrospector.SHARED,
+                ExecThrowing.getDeclaredMethod("unchecked"))
+        def checked = ReflectionExecutables.executableMethod(context, BeanIntrospector.SHARED,
+                ExecThrowing.getDeclaredMethod("checked"))
+
+        when: "an unchecked exception"
+        unchecked.invoke(bean)
+
+        then: "the exception of the method, not the InvocationException a reflective invocation wraps it in"
+        def raised = thrown(IllegalStateException)
+        raised.message == "unchecked"
+
+        when: "a checked exception, which a generated dispatcher lets through as it is as well"
+        def escaped = raise { checked.invoke(bean) }
+
+        then:
+        escaped instanceof IOException
+        escaped.message == "checked"
+    }
+
+    void "two executable methods over one method are equal, the way the generated ones are"() {
+        given:
+        def method = Plain.getMethod("shout", String)
+        def executable = ReflectionExecutableMethod.of(method)
+
+        expect: "the declaring type, the name and the erased argument types decide, as in AbstractExecutableMethod"
+        executable == ReflectionExecutableMethod.of(method)
+        executable.hashCode() == ReflectionExecutableMethod.of(method).hashCode()
+        executable != ReflectionExecutableMethod.of(ExecThrowing.getMethod("unchecked"))
+
+        and: "the method it invokes is the method it reports as its target"
+        executable.method.is(executable.targetMethod)
     }
 
     void "a constructor of an introspected type resolves to the bean constructor of the introspection"() {
@@ -139,10 +233,44 @@ class ReflectionExecutablesSpec extends Specification {
         constructor.instantiate("only").first == "only"
     }
 
+    /**
+     * The exception an invocation lets through, a dynamic Groovy call site wrapping a checked one of a
+     * reflective invocation unwrapped.
+     */
+    private static Throwable raise(Closure<?> invocation) {
+        try {
+            invocation.call()
+        } catch (GroovyRuntimeException e) {
+            return e.cause == null ? e : e.cause
+        } catch (Throwable e) {
+            return e
+        }
+        throw new AssertionError("The invocation threw nothing" as Object)
+    }
+
     static class Plain {
         String shout(String value) {
             value.toUpperCase()
         }
+    }
+
+    static class ExecBase<T> {
+        List<String> saved = []
+
+        @Executable
+        void save(List<T> items) {
+            saved << "many:${items.size()}".toString()
+        }
+
+        @Executable
+        void save(T item) {
+            saved << "one:$item".toString()
+        }
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = "ReflectionExecutablesSpec")
+    static class ExecStore extends ExecBase<String> {
     }
 
     static class Greeter {

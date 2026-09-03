@@ -17,7 +17,6 @@ package io.micronaut.reflection;
 
 import io.micronaut.context.AbstractExecutableMethodsDefinition;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import org.jspecify.annotations.Nullable;
 
@@ -39,15 +38,15 @@ final class ReflectionExecutableMethodsDefinition<T> extends AbstractExecutableM
 
     private final Method[] methods;
 
-    ReflectionExecutableMethodsDefinition(AnnotationMetadata typeMetadata, List<Method> methods) {
-        super(references(typeMetadata, methods));
+    ReflectionExecutableMethodsDefinition(AnnotationMetadata typeMetadata, List<Method> methods, Class<?> beanType) {
+        super(references(typeMetadata, methods, beanType));
         this.methods = methods.toArray(Method[]::new);
         for (Method method : this.methods) {
             method.trySetAccessible();
         }
     }
 
-    private static MethodReference[] references(AnnotationMetadata typeMetadata, List<Method> methods) {
+    private static MethodReference[] references(AnnotationMetadata typeMetadata, List<Method> methods, Class<?> beanType) {
         MethodReference[] references = new MethodReference[methods.size()];
         for (int i = 0; i < references.length; i++) {
             Method method = methods.get(i);
@@ -56,8 +55,8 @@ final class ReflectionExecutableMethodsDefinition<T> extends AbstractExecutableM
                 method.getDeclaringClass(),
                 metadataOf(typeMetadata, method),
                 method.getName(),
-                ReflectionArguments.returnOf(method),
-                ReflectionArguments.argumentsOf(method),
+                ReflectionArguments.returnOf(method, beanType),
+                ReflectionArguments.argumentsOf(method, beanType),
                 Modifier.isAbstract(method.getModifiers()),
                 parameterTypes.length > 0 && KOTLIN_CONTINUATION.equals(parameterTypes[parameterTypes.length - 1].getName())
             );
@@ -82,9 +81,12 @@ final class ReflectionExecutableMethodsDefinition<T> extends AbstractExecutableM
         return methods[index];
     }
 
+    // a generated definition returns null for the dispatch of a method returning nothing, so the declaration of
+    // dispatch, which predates the nullness annotations, is nullable in fact
     @Override
-    @SuppressWarnings("NullAway") // a method can return null, the declaration of dispatch predates the nullness annotations
+    @Nullable
+    @SuppressWarnings("NullAway")
     protected Object dispatch(int index, T target, @Nullable Object[] args) {
-        return ReflectionUtils.invokeMethod(target, methods[index], args);
+        return AbstractReflectionExecutable.invokeTarget(methods[index], target, args);
     }
 }

@@ -132,7 +132,14 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                     }
                 }
             }
-            for (BeanIntrospectionFallback fallback : getFallbacks()) {
+        } catch (Throwable e) {
+            throw new IntrospectionException("Error loading BeanIntrospection for type [" + beanType + "]: " + e.getMessage(), e);
+        }
+        // a fallback describes a class it was never compiled against, so asking it can fail on a type it does
+        // not serve - reading a member whose type is an absent optional dependency throws NoClassDefFoundError -
+        // and a failure of one fallback must stay a lookup miss, which is what the callers of a find expect
+        for (BeanIntrospectionFallback fallback : getFallbacks(effectiveClassLoader)) {
+            try {
                 Optional<BeanIntrospection<T>> fallbackIntrospection = fallback.findIntrospection(beanType);
                 if (fallbackIntrospection.isPresent()) {
                     if (LOG.isDebugEnabled()) {
@@ -140,14 +147,16 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                     }
                     return fallbackIntrospection;
                 }
+            } catch (Throwable e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Fallback {} failed to supply a BeanIntrospection for type {}, continuing", fallback, beanType, e);
+                }
             }
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("No BeanIntrospection found for bean type: {}", beanType);
-            }
-            return Optional.empty();
-        } catch (Throwable e) {
-            throw new IntrospectionException("Error loading BeanIntrospection for type [" + beanType + "]: " + e.getMessage(), e);
         }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("No BeanIntrospection found for bean type: {}", beanType);
+        }
+        return Optional.empty();
     }
 
     @Nullable
@@ -187,22 +196,32 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     }
 
     /**
-     * The fallbacks registered as services with the class loader of this introspector, in order.
+     * The fallbacks registered as services, in order, resolved with the same class loader the introspections
+     * are resolved with so that a fallback and a generated introspection are never looked for in two places.
+     * Only the fallbacks of the class loader of this introspector are cached, as {@link #getIntrospections()}
+     * caches only that class loader's introspections.
      */
-    private List<BeanIntrospectionFallback> getFallbacks() {
+    private List<BeanIntrospectionFallback> getFallbacks(ClassLoader effectiveClassLoader) {
+        if (effectiveClassLoader != classLoader) {
+            return resolveFallbacks(effectiveClassLoader);
+        }
         List<BeanIntrospectionFallback> resolvedFallbacks = this.fallbacks;
         if (resolvedFallbacks == null) {
             synchronized (this) { // double check
                 resolvedFallbacks = this.fallbacks;
                 if (resolvedFallbacks == null) {
-                    resolvedFallbacks = SoftServiceLoader.load(BeanIntrospectionFallback.class, classLoader).collectAll();
-                    OrderUtil.sort(resolvedFallbacks);
-                    this.fallbacks = List.copyOf(resolvedFallbacks);
-                    resolvedFallbacks = this.fallbacks;
+                    resolvedFallbacks = resolveFallbacks(classLoader);
+                    this.fallbacks = resolvedFallbacks;
                 }
             }
         }
         return resolvedFallbacks;
+    }
+
+    private List<BeanIntrospectionFallback> resolveFallbacks(ClassLoader classLoader) {
+        List<BeanIntrospectionFallback> resolvedFallbacks = SoftServiceLoader.load(BeanIntrospectionFallback.class, classLoader).collectAll();
+        OrderUtil.sort(resolvedFallbacks);
+        return List.copyOf(resolvedFallbacks);
     }
 
     private ClassLoader resolveClassLoader() {
