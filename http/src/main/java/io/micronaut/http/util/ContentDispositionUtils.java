@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
  * Utility class to build RFC 6266 compliant {@code Content-Disposition} header values.
  *
  * @author Shubham Jain
- * @since 4.10.0
+ * @since 5.2.0
  */
 public final class ContentDispositionUtils {
 
