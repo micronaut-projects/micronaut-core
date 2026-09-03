@@ -144,6 +144,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private final Set<T> erroneousElements = new HashSet<>();
 
     /**
+     * The annotation types seen with their native element during the processing, by annotation name. The
+     * fallback for {@link #getAnnotationMirror(String)} when an implementation cannot resolve an annotation type
+     * from its name alone, so that aliases can be derived again for an annotation the tree already holds.
+     */
+    private final Map<String, T> processedAnnotationTypes = new HashMap<>();
+
+    /**
      * Default constructor.
      */
     protected AbstractAnnotationMetadataBuilder() {
@@ -1336,6 +1343,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         );
     }
 
+
     /**
      * Reconciles annotations introduced by aliases with the declared stereotypes. An alias whose
      * target annotation is declared as a stereotype overrides the declared member values — for a
@@ -1909,10 +1917,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private ProcessedAnnotation toProcessedAnnotation(AnnotationValue<?> av) {
-        return new ProcessedAnnotation(
-                getAnnotationMirror(av.getAnnotationName()).orElse(null),
-                av
-        );
+        String annotationName = av.getAnnotationName();
+        T annotationType = getAnnotationMirror(annotationName)
+            // An annotation type seen with its native element earlier in the processing, for the implementations
+            // that cannot resolve an annotation type from its name
+            .orElseGet(() -> processedAnnotationTypes.get(annotationName));
+        return new ProcessedAnnotation(annotationType, av);
     }
 
 
@@ -2137,6 +2147,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                     AnnotationValue<?> annotationValue) {
             this.annotationType = annotationType;
             this.annotationValue = annotationValue;
+            if (annotationType != null) {
+                processedAnnotationTypes.putIfAbsent(annotationValue.getAnnotationName(), annotationType);
+            }
         }
 
         public ProcessedAnnotation withAnnotationValue(AnnotationValue<?> annotationValue) {

@@ -3,7 +3,6 @@ package io.micronaut.inject.annotation
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
-import spock.lang.PendingFeature
 import spock.lang.Unroll
 
 /**
@@ -188,7 +187,6 @@ class Test {
      * constraint is ordinary, and {@code micronaut-validation} cascades to any depth today because each
      * composing descriptor re-applies {@code @OverridesAttribute} from its own already-overridden value.</p>
      */
-    @PendingFeature(reason = "a later processing pass overwrites the cascaded subtree with one computed before the override")
     void "a transitive override cascades through more than one intermediate annotation"() {
         given:
         def annotationMetadata = writeAndLoadMetadata('deepspec.Test', buildTypeAnnotationMetadata('''
