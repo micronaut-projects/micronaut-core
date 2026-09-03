@@ -1,7 +1,9 @@
 package io.micronaut.inject.qualifiers
 
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import spock.lang.Specification
 
@@ -91,6 +93,33 @@ class BindingOccurrenceResolutionSpec extends Specification {
 
         and: "and does not match one bound to something else"
         !InterceptorBindingQualifier.anyMatch(written, [zone("south")])
+    }
+
+    void "a binding that binds members with nothing to read them from resolves to none"() {
+        expect: "no metadata at all, which is the shape a qualifier built from a plain collection has"
+        InterceptorBindingQualifier.resolveBoundOccurrences(binding(), null) == null
+
+        and: "and metadata carrying no occurrence of the binding annotation"
+        InterceptorBindingQualifier.resolveBoundOccurrences(binding(), AnnotationMetadata.EMPTY_METADATA) == null
+    }
+
+    void "an occurrence declared on the element replaces the one it inherits"() {
+        given: "a method declaring the binding annotation, over a class carrying it composed by another"
+        def declared = new MutableAnnotationMetadata()
+        declared.addDeclaredAnnotation(ZONE, [value: "south"] as Map<CharSequence, Object>, RetentionPolicy.RUNTIME)
+        def root = new MutableAnnotationMetadata()
+        root.addDeclaredAnnotation("test.NorthZone", [
+                (AnnotationUtil.STEREOTYPES_MEMBER): [zone("north")] as AnnotationValue[]
+        ] as Map<CharSequence, Object>, RetentionPolicy.RUNTIME)
+        root.addDeclaredStereotype(["test.NorthZone"], ZONE, [value: "north"] as Map<CharSequence, Object>, RetentionPolicy.RUNTIME)
+        def hierarchy = new AnnotationMetadataHierarchy(root, declared)
+
+        expect: "resolving the way an interception point does binds only what the method declares"
+        InterceptorBindingQualifier.resolveBoundOccurrences(binding(), hierarchy, true) == [zone("south")]
+
+        and: "where without that preference the inherited occurrence is bound as well"
+        InterceptorBindingQualifier.resolveBoundOccurrences(binding(), hierarchy).toSet() ==
+                [zone("south"), zone("north")].toSet()
     }
 
     private static AnnotationValue<?> binding() {
