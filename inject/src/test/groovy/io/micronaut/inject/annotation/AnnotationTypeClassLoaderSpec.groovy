@@ -32,6 +32,12 @@ class AnnotationTypeClassLoaderSpec extends Specification {
         AnnotationMetadataSupport.getAnnotationType(Portable.name, empty).get().is(Portable)
     }
 
+    void "a caller asking with no loader of its own is served the registered type"() {
+        expect: "the bootstrap loader defines no copy of an application annotation, so resolving again would only\
+ answer from whatever loader the fallback picks"
+        AnnotationMetadataSupport.getAnnotationType(Portable.name, null).get().is(Portable)
+    }
+
     void "an annotation type of the JDK is served whatever the loader asks"() {
         expect: "a type the bootstrap loader defines cannot be shadowed"
         Deprecated.classLoader == null

@@ -355,7 +355,10 @@ public final class AnnotationMetadataSupport {
     static Optional<Class<? extends Annotation>> getAnnotationType(String name, ClassLoader classLoader) {
         final Class<? extends Annotation> type = ANNOTATION_TYPES.get(name);
         if (type != null) {
-            if (type.getClassLoader() == null || type.getClassLoader() == classLoader) {
+            // a type the bootstrap loader defines cannot be shadowed, and a caller that asks with no loader of
+            // its own has none to define a copy in either: resolving again would answer from whatever loader
+            // ClassUtils falls back to, which is not the caller's
+            if (classLoader == null || type.getClassLoader() == null || type.getClassLoader() == classLoader) {
                 return Optional.of(type);
             }
             // the registered type was loaded by another class loader: the caller's loader may define its own
