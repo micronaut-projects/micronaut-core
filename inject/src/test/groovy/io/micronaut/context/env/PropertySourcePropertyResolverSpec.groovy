@@ -296,6 +296,36 @@ class PropertySourcePropertyResolverSpec extends Specification {
         !resolver.getProperty("target", MapConvertible).isPresent()
     }
 
+    void "sub-properties are not resolved for types only reachable through a generic Object converter"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(ConversionService.SHARED, false)
+        resolver.addPropertySource(PropertySource.of("test", ["target.value": "one"]))
+
+        expect: "types such as List or String have an Object -> X converter, but must not consume the sub-map"
+        !resolver.getProperty("target", List).isPresent()
+        !resolver.getProperty("target", String[]).isPresent()
+        !resolver.getProperty("target", MapConvertible).isPresent()
+
+        and: "the leaf property is still resolvable"
+        resolver.getProperty("target.value", String).get() == "one"
+    }
+
+    void "a PropertyResolver target keeps precedence over a registered Map conversion"() {
+        given:
+        MutableConversionService conversionService = MutableConversionService.create()
+        conversionService.addConverter(Map, MapPropertyResolver, new Function<Map, MapPropertyResolver>() {
+            @Override
+            MapPropertyResolver apply(Map value) {
+                throw new IllegalStateException("Should not be used")
+            }
+        })
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(conversionService, false)
+        resolver.addPropertySource(PropertySource.of("test", ["target.value": "one"]))
+
+        expect:
+        resolver.getProperty("target", MapPropertyResolver).get().getProperty("value", String).get() == "one"
+    }
+
     void "test resolve placeholders for lists of map"() {
         given:
         def values = [

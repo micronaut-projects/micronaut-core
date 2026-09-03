@@ -3390,7 +3390,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Nullable
-    private Iterable<?> asIterable(Object container) {
+    private Iterable<?> asIterable(@Nullable Object container) {
         if (container == null) {
             return null;
         }
@@ -3400,10 +3400,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (container instanceof Iterable<?> iterable) {
             return iterable;
         }
-        if (getConversionService().canConvert(container.getClass(), Iterable.class)) {
-            return getConversionService().convert(container, Iterable.class).orElse(null);
-        }
-        return null;
+        // a language integration may model a container that is not a java.lang.Iterable
+        return getConversionService().convert(container, Iterable.class).orElse(null);
     }
 
     private <T> boolean isCandidatePresent(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {

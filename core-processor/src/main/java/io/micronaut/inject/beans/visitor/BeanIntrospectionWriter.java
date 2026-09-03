@@ -325,10 +325,10 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             String.class.getName().equals(parameters[0].getType().getName()) ||
                 CharSequence.class.getName().equals(parameters[0].getType().getName())
         );
-        if (!method.isStatic() || !validParameter || !beanClassElement.isAssignable(method.getReturnType())) {
+        if (!method.isStatic() || method.isPrivate() || !validParameter || !method.getReturnType().isAssignable(beanClassElement)) {
             throw new ProcessingException(beanClassElement,
                 "The enum value lookup method [" + method.getName() + "] for [" + beanClassElement.getName() + "] " +
-                    "must be static, accept exactly one java.lang.String or java.lang.CharSequence parameter, " +
+                    "must be static, non-private, accept exactly one java.lang.String or java.lang.CharSequence parameter, " +
                     "and return a value assignable to the enum type.");
         }
         return method;
@@ -588,47 +588,30 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
     }
 
     private ExpressionDef newEnumConstantRef(EnumConstantElement enumConstantElement, Function<String, ExpressionDef> loadClassValueExpressionFn) {
-        Class<?> enumConstantRefType = enumValueOfMethod.isPresent()
-            ? AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef.class
-            : AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class;
-        java.lang.reflect.Constructor<?> enumConstantRefConstructor = enumValueOfMethod.isPresent()
-            ? ENUM_CONSTANT_OBJECT_REF_CONSTRUCTOR
-            : ENUM_CONSTANT_DYNAMIC_REF_CONSTRUCTOR;
         ExpressionDef annotationMetadataExpression;
         if (enumConstantElement.getAnnotationMetadata() == null || enumConstantElement.getAnnotationMetadata().isEmpty()) {
             annotationMetadataExpression = ClassTypeDef.of(AnnotationMetadata.class).getStaticField("EMPTY_METADATA", TypeDef.of(AnnotationMetadata.class));
         } else {
             annotationMetadataExpression = getAnnotationMetadataExpression(enumConstantElement.getAnnotationMetadata(), loadClassValueExpressionFn);
         }
-        if (enumValueOfMethod.isPresent()) {
-            return ClassTypeDef.of(enumConstantRefType).instantiate(
-                enumConstantRefConstructor,
-                enumValueExpression(enumConstantElement),
+        MethodElement valueOfMethod = enumValueOfMethod.orElse(null);
+        if (valueOfMethod != null) {
+            return ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef.class).instantiate(
+                ENUM_CONSTANT_OBJECT_REF_CONSTRUCTOR,
+                ClassTypeDef.of(enumConstantElement.getOwningType())
+                    .invokeStatic(valueOfMethod, List.of(ExpressionDef.constant(enumConstantElement.getName()))),
                 annotationMetadataExpression
             );
         }
-        return ClassTypeDef.of(enumConstantRefType).instantiate(
-            enumConstantRefConstructor,
+        return ClassTypeDef.of(AbstractEnumBeanIntrospectionAndReference.EnumConstantDynamicRef.class).instantiate(
+            ENUM_CONSTANT_DYNAMIC_REF_CONSTRUCTOR,
+            // 1: push annotation class value
             loadClassValueExpressionFn.apply(enumConstantElement.getOwningType().getName()),
+            // 2: push enum name
             ExpressionDef.constant(enumConstantElement.getName()),
+            // 3: annotation metadata
             annotationMetadataExpression
         );
-    }
-
-    private ExpressionDef enumValueExpression(EnumConstantElement enumConstantElement) {
-        if (enumValueOfMethod.isPresent()) {
-            return ClassTypeDef.of(enumConstantElement.getOwningType())
-                .invokeStatic(
-                    enumValueOfMethod.get(),
-                    List.of(ExpressionDef.constant(enumConstantElement.getName()))
-                );
-        }
-        return ClassTypeDef.of(enumConstantElement.getOwningType())
-            .invokeStatic(
-                "valueOf",
-                TypeDef.erasure(enumConstantElement.getOwningType()),
-                ExpressionDef.constant(enumConstantElement.getName())
-            );
     }
 
     private boolean hasAssociatedConstructorArgument(String name, TypedElement typedElement) {

@@ -186,7 +186,8 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
             beanDefinitionBuilder = beanDefinitionBuilderFactory.factoryField((FieldElement) producingElement);
         }
 
-        if (producedAnnotationMetadata.hasStereotype(ConfigurationReader.class)) {
+        if (producedAnnotationMetadata.hasStereotype(ConfigurationReader.class)
+            && !producedType.isPrimitive() && !producedType.isArray()) {
             for (PropertyElement propertyElement : producedType.getBeanProperties()) {
                 if (!propertyElement.isExcluded()) {
                     ConfigurationReaderBeanElementCreator.visitPropertyValue(beanDefinitionBuilder, producedType, visitorContext, propertyElement);

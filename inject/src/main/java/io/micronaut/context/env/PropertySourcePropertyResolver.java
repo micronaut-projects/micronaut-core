@@ -531,18 +531,22 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             } else if (Properties.class.isAssignableFrom(requiredType)) {
                 Properties properties = resolveSubProperties(name, entries, conversionContext);
                 return Optional.of((T) properties);
-            } else if (isMapConvertible(requiredType)) {
+            } else if (Map.class.isAssignableFrom(requiredType)) {
                 Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
                 if (!subMap.isEmpty()) {
                     return conversionService.convert(subMap, Map.class, requiredType, conversionContext);
-                } else if (Map.class.isAssignableFrom(requiredType)) {
-                    return (Optional<T>) Optional.of(subMap);
                 } else {
-                    return Optional.empty();
+                    return (Optional<T>) Optional.of(subMap);
                 }
             } else if (PropertyResolver.class.isAssignableFrom(requiredType)) {
                 Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
                 return Optional.of((T) new MapPropertyResolver(subMap, conversionService));
+            } else if (isMapConvertible(requiredType)) {
+                Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
+                if (subMap.isEmpty()) {
+                    return Optional.empty();
+                }
+                return conversionService.convert(subMap, Map.class, requiredType, conversionContext);
             }
         }
 
@@ -556,8 +560,21 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return Optional.empty();
     }
 
+    /**
+     * Whether the given type is a map-like type that sub-properties can be resolved into.
+     *
+     * <p>A converter is only considered when it is registered for a {@link Map} source. Converters
+     * that are merely reachable through the generic {@link Object} source (for example
+     * {@code Object -> List} or {@code Object -> String}) must not divert a property lookup into
+     * sub-map resolution, as that would change the meaning of unrelated {@code @Value} injection
+     * points.</p>
+     *
+     * @param requiredType The required type
+     * @return True if sub-properties should be resolved and converted into the required type
+     */
     private boolean isMapConvertible(Class<?> requiredType) {
-        return Map.class.isAssignableFrom(requiredType) || conversionService.canConvert(Map.class, requiredType);
+        return conversionService.canConvert(Map.class, requiredType)
+            && !conversionService.canConvert(Object.class, requiredType);
     }
 
     /**
