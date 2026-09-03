@@ -175,7 +175,7 @@ class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param response the response to decorate
      */
     protected void setAllowHeaders(List<?> optionalAllowHeaders, MutableHttpResponse<?> response) {
-        List<String> allowHeaders = optionalAllowHeaders.stream().map(Object::toString).collect(Collectors.toList());
+        List<String> allowHeaders = optionalAllowHeaders.stream().map(Object::toString).toList();
         if (corsConfiguration.isSingleHeader()) {
             String headerValue = String.join(",", allowHeaders);
             if (StringUtils.isNotEmpty(headerValue)) {
