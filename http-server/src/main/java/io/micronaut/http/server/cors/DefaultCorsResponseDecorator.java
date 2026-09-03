@@ -77,7 +77,8 @@ class DefaultCorsResponseDecorator implements CorsResponseDecorator {
         headers.get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING)
             .ifPresent(val -> setAllowHeaders(val, response));
         headers.getFirst(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, ConversionContext.BOOLEAN)
-            .ifPresent(value -> setAllowPrivateNetwork(config, response));
+            .filter(Boolean.TRUE::equals)
+            .ifPresent(ignored -> setAllowPrivateNetwork(config, response));
         setMaxAge(config.getMaxAge(), response);
     }
 
