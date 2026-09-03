@@ -45,6 +45,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     private List<AnnotationValue<?>> stereotypes;
     @Nullable
     private Map<CharSequence, Object> defaultValues;
+    private boolean retainedStereotypes;
 
     /**
      * Default constructor.
@@ -91,6 +92,9 @@ public class AnnotationValueBuilder<T extends Annotation> {
         this.defaultValues = value.getDefaultValues();
         this.stereotypes = value.getStereotypes() == null ? null : new ArrayList<>(value.getStereotypes());
         this.retentionPolicy = retentionPolicy != null ? retentionPolicy : RetentionPolicy.RUNTIME;
+        // getValues() hides the reserved member, so remember that the value being copied persisted its
+        // tree there and put it back when building, rather than leaving it only in the transient field
+        this.retainedStereotypes = value.contains(AnnotationUtil.STEREOTYPES_MEMBER);
     }
 
     /**
@@ -99,6 +103,11 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return The {@link AnnotationValue}
      */
     public AnnotationValue<T> build() {
+        if (retainedStereotypes && stereotypes != null) {
+            Map<CharSequence, Object> retaining = new LinkedHashMap<>(values);
+            retaining.put(AnnotationUtil.STEREOTYPES_MEMBER, stereotypes.toArray(new AnnotationValue<?>[0]));
+            return new AnnotationValue<>(annotationName, retaining, defaultValues, retentionPolicy, stereotypes);
+        }
         return new AnnotationValue<>(annotationName, values, defaultValues, retentionPolicy, stereotypes);
     }
 

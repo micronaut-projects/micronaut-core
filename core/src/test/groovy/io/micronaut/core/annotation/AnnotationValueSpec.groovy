@@ -13,6 +13,122 @@ class AnnotationValueSpec extends Specification {
         av.toString() == "@test.Foo(value=10)"
     }
 
+    void "the reserved stereotypes member is read through getStereotypes() and hidden from the attributes"() {
+        given:
+        def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
+        def retaining = new AnnotationValue("test.Composed", [min: 3, (AnnotationUtil.STEREOTYPES_MEMBER): [size] as AnnotationValue[]] as Map<CharSequence, Object>)
+        def plain = new AnnotationValue("test.Composed", [min: 3] as Map<CharSequence, Object>)
+
+        expect: "the member is the stereotypes"
+        retaining.getStereotypes() == [size]
+        plain.getStereotypes() == null
+
+        and: "it is not an attribute"
+        retaining.getValues() == [min: 3]
+        retaining.getMemberNames() == ["min"] as Set
+        retaining.toString() == "@test.Composed(min=3)"
+        retaining.contains(AnnotationUtil.STEREOTYPES_MEMBER)
+
+        and: "it takes no part in equality"
+        retaining == plain
+        retaining.hashCode() == plain.hashCode()
+
+        and: "it survives mutation"
+        retaining.mutate().member("min", 4).build().getStereotypes() == [size]
+    }
+
+    /**
+     * {@code AnnotationValueBuilder} copies the values it is seeded with from {@link AnnotationValue#getValues()},
+     * which hides the reserved member, and separately copies {@link AnnotationValue#getStereotypes()} into the
+     * transient {@code stereotypes} field. So {@code mutate()} and {@code AnnotationValue.builder(value)} move
+     * the tree out of the member and into the field.
+     *
+     * <p>The field is the representation the writer does not emit — moving the tree there is what this PR set
+     * out to avoid. Reads are unaffected, because {@code getStereotypes()} answers from the field, so a mutated
+     * value looks correct in memory and silently writes no tree. The assertion above covers exactly that reading
+     * path, which is what masks it.</p>
+     *
+     * <p>It also leaves the two accessors disagreeing: {@code getStereotypes()} answers while
+     * {@code contains($stereotypes)} does not.</p>
+     */
+    void "mutating an annotation keeps the stereotypes in the member the writer emits"() {
+        given:
+        def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
+        def retaining = new AnnotationValue("test.Composed", [min: 3, (AnnotationUtil.STEREOTYPES_MEMBER): [size] as AnnotationValue[]] as Map<CharSequence, Object>)
+
+        expect: "the value it is seeded from carries the member"
+        retaining.contains(AnnotationUtil.STEREOTYPES_MEMBER)
+
+        and: "and so does the mutated value, not only its transient field"
+        retaining.mutate().member("min", 4).build().contains(AnnotationUtil.STEREOTYPES_MEMBER)
+
+        and: "the same for a builder seeded from it"
+        AnnotationValue.builder(retaining).build().contains(AnnotationUtil.STEREOTYPES_MEMBER)
+    }
+
+    /**
+     * Seeding a builder from a retaining value and adding a stereotype is the shape an integration takes to opt
+     * an annotation in: {@code micronaut-validation}'s remapper does exactly
+     * {@code annotation.mutate().stereotype(...).build()}. The added stereotype has to reach the member too,
+     * otherwise the rebuilt value writes the tree it was seeded with and silently drops the addition.
+     */
+    void "a stereotype added to a seeded builder reaches the member as well as the field"() {
+        given:
+        def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
+        def notNull = AnnotationValue.builder("jakarta.validation.constraints.NotNull").build()
+        def retaining = new AnnotationValue("test.Composed", [min: 3, (AnnotationUtil.STEREOTYPES_MEMBER): [size] as AnnotationValue[]] as Map<CharSequence, Object>)
+
+        when:
+        def rebuilt = retaining.mutate().stereotype(notNull).build()
+
+        then: "the addition is readable"
+        rebuilt.getStereotypes() == [size, notNull]
+
+        and: "and is in the member the writer emits, not only in the transient field"
+        rebuilt.getAnnotations(AnnotationUtil.STEREOTYPES_MEMBER) == [size, notNull]
+    }
+
+    /**
+     * A builder that was never seeded from a retaining value must stay untouched, because the transient field
+     * carries the mapping protocol there: null means "fill the stereotypes from the annotation definition" and
+     * empty means "skip". Writing the member for those would turn a mapping instruction into retained state.
+     */
+    void "a builder not seeded from a retaining value gains no reserved member"() {
+        given:
+        def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
+
+        expect: "a stereotype on a fresh builder stays in the field only"
+        def built = AnnotationValue.builder("test.Composed").stereotype(size).build()
+        built.getStereotypes() == [size]
+        !built.contains(AnnotationUtil.STEREOTYPES_MEMBER)
+
+        and: "and a plain value seeded from a non-retaining one gains nothing"
+        !AnnotationValue.builder(new AnnotationValue("test.Plain", [min: 3] as Map<CharSequence, Object>))
+                .build()
+                .contains(AnnotationUtil.STEREOTYPES_MEMBER)
+    }
+
+    /**
+     * {@code convertibleValues} is built once in the constructor from the raw values map, before
+     * {@link AnnotationValue#getValues()} gets the chance to hide the reserved member, so every bulk view
+     * reached through {@link AnnotationValue#getConvertibleValues()} — {@code names()}, {@code values()},
+     * {@code asMap()}, iteration — reports {@code $stereotypes} as if it were an attribute of the annotation.
+     *
+     * <p>Anything walking the members of an annotation generically goes through that view: it is what
+     * {@code AnnotationValueResolver} is backed by. The member is hidden from {@code getValues()},
+     * {@code getMemberNames()} and {@code toString()}, so this is the one hole left in "it is not an
+     * attribute", and it widens the blast radius of the reserved member beyond the opted-in consumers.</p>
+     */
+    void "the reserved stereotypes member is hidden from the convertible values"() {
+        given:
+        def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
+        def retaining = new AnnotationValue("test.Composed", [min: 3, (AnnotationUtil.STEREOTYPES_MEMBER): [size] as AnnotationValue[]] as Map<CharSequence, Object>)
+
+        expect:
+        retaining.getConvertibleValues().names() == ["min"] as Set
+        retaining.getConvertibleValues().asMap().keySet() == ["min"] as Set
+    }
+
     void "test get properties"() {
         given:
         def av = AnnotationValue.builder("test.Foo")

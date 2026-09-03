@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.InstantiatedMember;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Retainable;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -79,6 +80,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     @Nullable
     protected static final AnnotatedElementValidator ELEMENT_VALIDATOR;
+    private static final String RETAINABLE = Retainable.class.getName();
     private static final Map<String, String> DEPRECATED_ANNOTATION_NAMES = Collections.emptyMap();
     private static final Map<String, List<AnnotationMapper<?>>> ANNOTATION_MAPPERS = new HashMap<>(10);
     private static final Map<String, List<AnnotationTransformer<?>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
@@ -140,6 +142,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     private boolean validating = true;
     private final Set<T> erroneousElements = new HashSet<>();
+
+    /**
+     * The annotation types seen with their native element during the processing, by annotation name. The
+     * fallback for {@link #getAnnotationMirror(String)} when an implementation cannot resolve an annotation type
+     * from its name alone, so that aliases can be derived again for an annotation the tree already holds.
+     *
+     * <p>The entries are native elements of the session that produced them, so an implementation whose builder
+     * outlives a processing round has to clear them at that boundary with
+     * {@link #clearProcessedAnnotationTypes()}.</p>
+     */
+    private final Map<String, T> processedAnnotationTypes = new HashMap<>();
 
     /**
      * Default constructor.
@@ -809,6 +822,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
+     * Obtain the remappers for the given annotation package.
+     *
+     * @param packageName The annotation package
+     * @return The remappers
+     * @since 5.2.0
+     */
+    protected List<AnnotationRemapper> getAnnotationRemappers(String packageName) {
+        List<AnnotationRemapper> annotationRemappers = ANNOTATION_REMAPPERS.get(packageName);
+        if (annotationRemappers == null) {
+            return ALL_ANNOTATION_REMAPPERS;
+        }
+        return CollectionUtils.concat(annotationRemappers, ALL_ANNOTATION_REMAPPERS);
+    }
+
+    /**
      * Returns the visitor context for this implementation.
      *
      * @return The visitor context
@@ -1356,11 +1384,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 unmatched.add(alias.getAnnotation());
             } else if (alias.getIndex() < 0) {
                 for (int position : occurrences) {
-                    result.set(position, result.get(position).mutateAnnotationValue(builder -> builder.members(aliasValue.getValues())));
+                    result.set(position, overrideMembers(context, result.get(position), aliasValue.getValues()));
                 }
             } else if (alias.getIndex() < occurrences.size()) {
                 int position = occurrences.get(alias.getIndex());
-                result.set(position, result.get(position).mutateAnnotationValue(builder -> builder.members(aliasValue.getValues())));
+                result.set(position, overrideMembers(context, result.get(position), aliasValue.getValues()));
             }
             // An index outside the declared occurrences has no target and the alias is dropped
         }
@@ -1368,6 +1396,38 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             result.addAll(0, unmatched.stream().flatMap(a -> processAnnotation(context, a)).toList());
         }
         return result;
+    }
+
+    /**
+     * Overrides the members of a declared stereotype occurrence with the values an alias introduces, and cascades
+     * the override: an overridden member may itself alias a member of an annotation the occurrence composes, and
+     * the occurrence's subtree was computed from the values it had before the override. The occurrence's aliases
+     * are applied again with the overridden values, down to the leaves.
+     *
+     * @param context    The processing context
+     * @param occurrence The declared stereotype occurrence, with its subtree computed
+     * @param members    The member values the alias introduces
+     * @return The overridden occurrence
+     */
+    private ProcessedAnnotation overrideMembers(ProcessingContext context,
+                                                ProcessedAnnotation occurrence,
+                                                Map<CharSequence, Object> members) {
+        ProcessedAnnotation overridden = occurrence.mutateAnnotationValue(builder -> builder.members(members));
+        List<AnnotationValue<?>> stereotypes = overridden.getAnnotationValue().getStereotypes();
+        if (stereotypes == null || stereotypes.isEmpty()) {
+            return overridden;
+        }
+        List<IntroducedAlias> cascaded = new ArrayList<>(2);
+        overridden = processAliases(overridden, cascaded);
+        if (cascaded.isEmpty()) {
+            return overridden;
+        }
+        List<AnnotationValue<?>> overriddenStereotypes = applyIntroducedAliases(
+            context,
+            stereotypes.stream().map(this::toProcessedAnnotation).toList(),
+            cascaded
+        ).stream().<AnnotationValue<?>>map(ProcessedAnnotation::getAnnotationValue).toList();
+        return overridden.mutateAnnotationValue(builder -> builder.replaceStereotypes(overriddenStereotypes));
     }
 
     private ProcessedAnnotation addDefaults(ProcessedAnnotation processedAnnotation) {
@@ -1567,6 +1627,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (repeatableContainer == null) {
             repeatableContainer = findRepeatableContainerNameForType(annotationName);
         }
+        Map<CharSequence, Object> annotationValues = annotationValue.getValues();
+        Map<CharSequence, Object> retaining = withRetainedStereotypes(annotationValue);
+        if (retaining != null) {
+            // The retainable part of the computed tree is kept in a reserved member, so that it is stored, copied,
+            // merged and written like any other member value. AnnotationValue#getValues() hides the member, so
+            // the raw map is passed on from here.
+            annotationValues = retaining;
+            annotationValue = new AnnotationValue<>(annotationName, annotationValues, annotationDefaults, annotationValue.getRetentionPolicy(), null);
+        }
         if (isStereotype) {
             if (repeatableContainer != null) {
                 if (isDeclared) {
@@ -1587,14 +1656,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     mutableAnnotationMetadata.addDeclaredStereotype(
                             parentAnnotations,
                             annotationValue.getAnnotationName(),
-                            annotationValue.getValues(),
+                            annotationValues,
                             annotationValue.getRetentionPolicy()
                     );
                 } else {
                     mutableAnnotationMetadata.addStereotype(
                             parentAnnotations,
                             annotationValue.getAnnotationName(),
-                            annotationValue.getValues(),
+                            annotationValues,
                             annotationValue.getRetentionPolicy()
                         );
                 }
@@ -1610,18 +1679,82 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 if (isDeclared) {
                     mutableAnnotationMetadata.addDeclaredAnnotation(
                             annotationValue.getAnnotationName(),
-                            annotationValue.getValues(),
+                            annotationValues,
                             annotationValue.getRetentionPolicy()
                     );
                 } else {
                     mutableAnnotationMetadata.addAnnotation(
                             annotationValue.getAnnotationName(),
-                            annotationValue.getValues(),
+                            annotationValues,
                             annotationValue.getRetentionPolicy()
                     );
                 }
             }
         }
+    }
+
+    /**
+     * Whether the given annotation is {@link Retainable}, which is the case when the marker is present anywhere
+     * in its stereotype closure. An occurrence whose stereotypes were not computed, such as one flattened out of
+     * a container, is answered from the metadata of its annotation type.
+     *
+     * @param annotationValue The annotation value
+     * @return Whether the annotations composing it retain it
+     */
+    private boolean isRetainable(AnnotationValue<?> annotationValue) {
+        List<AnnotationValue<?>> stereotypes = annotationValue.getStereotypes();
+        if (stereotypes == null) {
+            String annotationName = annotationValue.getAnnotationName();
+            T annotationType = getAnnotationMirror(annotationName)
+                .orElseGet(() -> processedAnnotationTypes.get(annotationName));
+            return annotationType != null && lookupOrBuildForType(annotationType).hasStereotype(RETAINABLE);
+        }
+        for (AnnotationValue<?> stereotype : stereotypes) {
+            if (RETAINABLE.equals(stereotype.getAnnotationName()) || isRetainable(stereotype)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The values of an annotation composing {@link Retainable} annotations, with those occurrences moved into the
+     * reserved {@link AnnotationUtil#STEREOTYPES_MEMBER} member, where they are read back with
+     * {@link AnnotationValue#getStereotypes()}. Each retained occurrence keeps its own retainable stereotypes in
+     * turn; the marker itself and annotations that are not retainable are left out.
+     *
+     * @param annotationValue The annotation value, with its stereotypes computed
+     * @return The values carrying the retained stereotypes, or {@code null} when nothing is retainable
+     */
+    @Nullable
+    private Map<CharSequence, Object> withRetainedStereotypes(AnnotationValue<?> annotationValue) {
+        List<AnnotationValue<?>> stereotypes = annotationValue.getStereotypes();
+        if (stereotypes == null || stereotypes.isEmpty()) {
+            return null;
+        }
+        List<AnnotationValue<?>> retained = new ArrayList<>(stereotypes.size());
+        for (AnnotationValue<?> stereotype : stereotypes) {
+            if (!RETAINABLE.equals(stereotype.getAnnotationName()) && isRetainable(stereotype)) {
+                retained.add(retainedStereotype(stereotype));
+            }
+        }
+        if (retained.isEmpty()) {
+            return null;
+        }
+        Map<CharSequence, Object> values = new LinkedHashMap<>(annotationValue.getValues());
+        values.put(AnnotationUtil.STEREOTYPES_MEMBER, retained.toArray(AnnotationValue[]::new));
+        return values;
+    }
+
+    private AnnotationValue<?> retainedStereotype(AnnotationValue<?> stereotype) {
+        Map<CharSequence, Object> values = withRetainedStereotypes(stereotype);
+        return new AnnotationValue<>(
+            stereotype.getAnnotationName(),
+            values == null ? stereotype.getValues() : values,
+            stereotype.getDefaultValues(),
+            stereotype.getRetentionPolicy(),
+            null
+        );
     }
 
     /**
@@ -1708,12 +1841,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                                                    ProcessedAnnotation processedAnnotation) {
         AnnotationValue<?> annotationValue = processedAnnotation.getAnnotationValue();
         String packageName = NameUtils.getPackageName(annotationValue.getAnnotationName());
-        List<AnnotationRemapper> annotationRemappers = ANNOTATION_REMAPPERS.get(packageName);
-        if (annotationRemappers == null) {
-            annotationRemappers = ALL_ANNOTATION_REMAPPERS;
-        } else {
-            annotationRemappers = CollectionUtils.concat(annotationRemappers, ALL_ANNOTATION_REMAPPERS);
-        }
+        List<AnnotationRemapper> annotationRemappers = getAnnotationRemappers(packageName);
         annotationRemappers = eliminateProcessed(context, annotationRemappers);
         return remapAnnotation(
                 context,
@@ -1809,10 +1937,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     private ProcessedAnnotation toProcessedAnnotation(AnnotationValue<?> av) {
-        return new ProcessedAnnotation(
-                getAnnotationMirror(av.getAnnotationName()).orElse(null),
-                av
-        );
+        String annotationName = av.getAnnotationName();
+        T annotationType = getAnnotationMirror(annotationName)
+            // An annotation type seen with its native element earlier in the processing, for the implementations
+            // that cannot resolve an annotation type from its name
+            .orElseGet(() -> processedAnnotationTypes.get(annotationName));
+        return new ProcessedAnnotation(annotationType, av);
     }
 
 
@@ -1841,6 +1971,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
         }
+    }
+
+    /**
+     * Forgets the annotation types remembered during the processing, which are the fallback used to derive the
+     * aliases of an annotation the retained tree holds and to decide whether one is {@link Retainable}.
+     *
+     * <p>An implementation that rebuilds its builder for every processing round need not call this. One that
+     * reuses a builder across rounds has to call it at the boundary: the entries are native elements of the
+     * session that has ended, and the map is keyed by annotation name, so a later round would hit and be handed
+     * a dead element rather than miss.</p>
+     */
+    @Internal
+    public void clearProcessedAnnotationTypes() {
+        processedAnnotationTypes.clear();
     }
 
     /**
@@ -2037,6 +2181,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                     AnnotationValue<?> annotationValue) {
             this.annotationType = annotationType;
             this.annotationValue = annotationValue;
+            if (annotationType != null) {
+                processedAnnotationTypes.putIfAbsent(annotationValue.getAnnotationName(), annotationType);
+            }
         }
 
         public ProcessedAnnotation withAnnotationValue(AnnotationValue<?> annotationValue) {

@@ -271,11 +271,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
-     * @return The stereotypes of the annotation
+     * The stereotypes of the annotation: the annotations it is meta-annotated with while it is being mapped or
+     * remapped, or the {@link Retainable} annotations it composes, retained in the reserved
+     * {@link AnnotationUtil#STEREOTYPES_MEMBER} member with member overrides applied.
+     *
+     * @return The stereotypes of the annotation, or {@code null} if they are not known
      */
     @Nullable
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public List<AnnotationValue<?>> getStereotypes() {
-        return stereotypes;
+        if (stereotypes != null || !values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            return stereotypes;
+        }
+        return (List) getAnnotations(AnnotationUtil.STEREOTYPES_MEMBER);
     }
 
     /**
@@ -1151,14 +1159,25 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The names of the members
      */
     public final Set<CharSequence> getMemberNames() {
+        if (values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            return getValues().keySet();
+        }
         return values.keySet();
     }
 
     /**
+     * The attribute values. The reserved {@link AnnotationUtil#STEREOTYPES_MEMBER} member is not an attribute and
+     * is not included; it is read through {@link #getStereotypes()}.
+     *
      * @return The attribute values
      */
     @Override
     public Map<CharSequence, Object> getValues() {
+        if (values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            Map<CharSequence, Object> attributes = new LinkedHashMap<>(values);
+            attributes.remove(AnnotationUtil.STEREOTYPES_MEMBER);
+            return Collections.unmodifiableMap(attributes);
+        }
         return Collections.unmodifiableMap(values);
     }
 
@@ -1389,10 +1408,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public String toString() {
-        if (values.isEmpty()) {
+        Map<CharSequence, Object> attributes = getValues();
+        if (attributes.isEmpty()) {
             return "@" + annotationName;
         } else {
-            return "@" + annotationName + "(" + values.entrySet().stream().map(entry -> entry.getKey() + "=" + toStringValue(entry.getValue())).collect(
+            return "@" + annotationName + "(" + attributes.entrySet().stream().map(entry -> entry.getKey() + "=" + toStringValue(entry.getValue())).collect(
                     Collectors.joining(", ")) + ")";
         }
     }
@@ -1729,9 +1749,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     private ConvertibleValues<Object> newConvertibleValues(Map<CharSequence, Object> values) {
         if (CollectionUtils.isEmpty(values)) {
             return ConvertibleValues.EMPTY;
-        } else {
-            return ConvertibleValues.of(values);
         }
+        if (values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            // The reserved member is not an attribute, so it is not part of the convertible view either
+            Map<CharSequence, Object> attributes = new LinkedHashMap<>(values);
+            attributes.remove(AnnotationUtil.STEREOTYPES_MEMBER);
+            return attributes.isEmpty() ? ConvertibleValues.EMPTY : ConvertibleValues.of(attributes);
+        }
+        return ConvertibleValues.of(values);
     }
 
     @Nullable
