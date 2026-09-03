@@ -1622,6 +1622,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
+    public <T> Optional<BeanDefinition<T>> findBeanDefinitionByDefinitionClass(Class<? extends BeanDefinition<T>> definitionClass) {
+        ArgumentUtils.requireNonNull("definitionClass", definitionClass);
+        return Optional.ofNullable(beanDefinitionProvider.findBeanDefinitionByDefinitionClass(this, definitionClass));
+    }
+
+    @Override
+    public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(BeanDefinition<T> proxyBeanDefinition) {
+        ArgumentUtils.requireNonNull("proxyBeanDefinition", proxyBeanDefinition);
+        if (proxyBeanDefinition instanceof ProxyBeanDefinition<T> proxyDefinition) {
+            return findBeanDefinitionByDefinitionClass(proxyDefinition.getTargetDefinitionType());
+        }
+        return Optional.empty();
+    }
+
+    @Override
     @SuppressWarnings("java:S2789") // performance optimization
     public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);

@@ -48,6 +48,7 @@ import jakarta.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -108,6 +109,18 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     private final ClassLoader classLoader;
     @Nullable
     private Beans beans;
+
+    /**
+     * The producers of {@link #beans}, keyed by the definition name their reference reports. Built on the first
+     * lookup by definition class and dropped as soon as the producers are rebuilt, which the {@link Beans} the
+     * index was built from detects. Only a {@link io.micronaut.context.RuntimeBeanDefinition} is added to a live
+     * {@code Beans}, and the name it generates is never a compiled definition class name, so an index built
+     * before such an addition cannot answer a lookup wrongly.
+     */
+    @Nullable
+    @SuppressWarnings("java:S3077")
+    private volatile ProducersByDefinitionName producersByDefinitionName;
+
     private final BeanResolutionCustomizer beanResolutionCustomizer;
 
     private final List<BeanDefinitionProducer> additionalBeanDefinitions = new ArrayList<>();
@@ -211,6 +224,50 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             }
         }
         return references;
+    }
+
+    @Override
+    @Nullable
+    public <T> BeanDefinition<T> findBeanDefinitionByDefinitionClass(BeanContext beanContext, Class<? extends BeanDefinition<T>> definitionClass) {
+        Beans current = beans;
+        if (current == null) {
+            return null;
+        }
+        List<BeanDefinitionProducer> candidates = producersByDefinitionName(current).get(definitionClass.getName());
+        if (candidates == null) {
+            return null;
+        }
+        for (BeanDefinitionProducer producer : candidates) {
+            // The name is only a cheap filter: two references can carry the same name across class loaders,
+            // so keep looking until one of them loads as the requested class
+            BeanDefinition<T> definition = producer.getDefinitionIfEnabled(beanContext, null, beanResolutionCustomizer, null, null, null);
+            if (definition != null && definition.getClass() == definitionClass) {
+                return definition;
+            }
+        }
+        return null;
+    }
+
+    private Map<String, List<BeanDefinitionProducer>> producersByDefinitionName(Beans current) {
+        ProducersByDefinitionName cached = producersByDefinitionName;
+        if (cached != null && cached.beans == current) {
+            return cached.index;
+        }
+        Map<String, List<BeanDefinitionProducer>> index = new HashMap<>();
+        indexByDefinitionName(index, current.all);
+        // A proxied bean is disabled in the main list and its target is kept apart, see createBeans
+        indexByDefinitionName(index, current.proxyTargetBeans);
+        producersByDefinitionName = new ProducersByDefinitionName(current, index);
+        return index;
+    }
+
+    private static void indexByDefinitionName(Map<String, List<BeanDefinitionProducer>> index, List<BeanDefinitionProducer> producers) {
+        for (BeanDefinitionProducer producer : producers) {
+            BeanDefinitionReference<?> reference = producer.reference;
+            if (reference != null) {
+                index.computeIfAbsent(reference.getBeanDefinitionName(), name -> new ArrayList<>(1)).add(producer);
+            }
+        }
     }
 
     @Override
@@ -581,6 +638,9 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             refs = list;
         }
         return refs;
+    }
+
+    private record ProducersByDefinitionName(Beans beans, Map<String, List<BeanDefinitionProducer>> index) {
     }
 
     private record Beans(
