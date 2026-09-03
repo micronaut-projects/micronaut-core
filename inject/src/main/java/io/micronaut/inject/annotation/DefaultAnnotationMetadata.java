@@ -1228,7 +1228,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             if (annotations != null) {
                 annotations = new ArrayList<>(annotations);
                 if (declaredAnnotations != null) {
-                    annotations.removeIf(s -> !declaredAnnotations.containsKey(s));
+                    annotations.removeIf(s -> !containsAnnotation(declaredAnnotations, s));
                     return Collections.unmodifiableList(annotations);
                 } else {
                     // no declared
@@ -1236,7 +1236,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 }
             }
         }
-        if (declaredAnnotations != null && declaredAnnotations.containsKey(stereotype)) {
+        if (declaredAnnotations != null && containsAnnotation(declaredAnnotations, stereotype)) {
             return List.of(stereotype);
         }
         return List.of();
@@ -1269,7 +1269,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 return Optional.of(newAnnotationValue(annotation, values));
             }
         }
-        return Optional.empty();
+        return firstRepeatedValue(getAnnotationValuesByName(annotation));
     }
 
     @SuppressWarnings("Duplicates")
@@ -1289,7 +1289,22 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 return Optional.of(newAnnotationValue(annotation, values));
             }
         }
-        return Optional.empty();
+        return firstRepeatedValue(getDeclaredAnnotationValuesByName(annotation));
+    }
+
+    /**
+     * The value a repeatable annotation answers with when it is looked up as a single one: the first of the
+     * repeated values, which is what the {@link AnnotationMetadata} {@code Class} overloads return.
+     *
+     * @param values The repeated values, empty when the annotation is not repeatable or not present
+     * @param <T>    The annotation type
+     * @return The first value, if any
+     */
+    private <T extends Annotation> Optional<AnnotationValue<T>> firstRepeatedValue(List<AnnotationValue<T>> values) {
+        if (values.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(values.get(0));
     }
 
     @Override
@@ -1550,7 +1565,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 return values.get(member);
             }
         }
-        return null;
+        // a repeatable is stored under its container, so read the member off the first repeated value,
+        // which is the one the Class overloads answer with
+        List<AnnotationValue<Annotation>> repeated = getAnnotationValuesByName(annotation);
+        if (repeated.isEmpty()) {
+            return null;
+        }
+        return repeated.get(0).getValues().get(member);
     }
 
     /**
@@ -1561,6 +1582,22 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Nullable
     protected String findRepeatableAnnotationContainerInternal(String annotation) {
         return AnnotationMetadataSupport.getRepeatableAnnotation(annotation);
+    }
+
+    /**
+     * Whether the annotation is present in the given map, either under its own name or, for a repeatable
+     * annotation, under the name of its container (the form in which repeated values are stored).
+     *
+     * @param annotations The annotations or stereotypes, keyed by name
+     * @param annotation  The annotation name
+     * @return True if present
+     */
+    private boolean containsAnnotation(Map<String, Map<CharSequence, Object>> annotations, String annotation) {
+        if (annotations.containsKey(annotation)) {
+            return true;
+        }
+        String repeatableContainer = findRepeatableAnnotationContainerInternal(annotation);
+        return repeatableContainer != null && annotations.containsKey(repeatableContainer);
     }
 
     @Nullable
