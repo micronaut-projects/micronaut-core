@@ -2949,7 +2949,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (scopeAnnotation == Prototype.class) {
                 // a prototype bean has no lifecycle of its own, so a scope declared on the
                 // injection point (such as @InjectScope) still applies to it
-                return findInjectionPointDeclaredScope(resolutionContext);
+                return findInjectionPointDeclaredScope(resolutionContext, definition);
             }
             CustomScope<?> customScope = customScopeRegistry.findScope(scopeAnnotation).orElse(null);
             if (customScope != null) {
@@ -2962,7 +2962,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (Prototype.class.getName().equals(scopeAnnotation)) {
                     // a prototype bean has no lifecycle of its own, so a scope declared on the
                     // injection point (such as @InjectScope) still applies to it
-                    return findInjectionPointDeclaredScope(resolutionContext);
+                    return findInjectionPointDeclaredScope(resolutionContext, definition);
                 }
                 CustomScope<?> customScope = customScopeRegistry.findScope(scopeAnnotation).orElse(null);
                 if (customScope != null) {
@@ -2971,7 +2971,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
 
-        CustomScope<?> injectionPointScope = findInjectionPointDeclaredScope(resolutionContext);
+        CustomScope<?> injectionPointScope = findInjectionPointDeclaredScope(resolutionContext, definition);
         if (injectionPointScope != null) {
             return injectionPointScope;
         }
@@ -2983,18 +2983,37 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Nullable
-    private CustomScope<?> findInjectionPointDeclaredScope(@Nullable BeanResolutionContext resolutionContext) {
+    private CustomScope<?> findInjectionPointDeclaredScope(@Nullable BeanResolutionContext resolutionContext,
+                                                           @Nullable BeanDefinition<?> definition) {
         if (resolutionContext != null) {
             BeanResolutionContext.Segment<?, ?> currentSegment = resolutionContext
                 .getPath()
                 .currentSegment()
                 .orElse(null);
             if (currentSegment != null) {
+                if (definition != null && isFactoryOf(definition, currentSegment.getDeclaringType())) {
+                    // the bean is the factory that produces the segment's bean rather than an injection point of
+                    // it, and a scope declared on the produced bean does not apply to its factory. Applying it
+                    // would resolve the factory through the very scope that is creating the produced bean,
+                    // re-entering that scope for a second bean while the first is still being created.
+                    return null;
+                }
                 Argument<?> argument = currentSegment.getArgument();
                 return customScopeRegistry.findDeclaredScope(argument).orElse(null);
             }
         }
         return null;
+    }
+
+    /**
+     * Whether the given definition is the factory the produced bean's definition declares its factory method on.
+     *
+     * @param definition   The definition being resolved
+     * @param producedBean The definition of the bean the current segment produces
+     * @return True if the definition is the factory of the produced bean
+     */
+    private static boolean isFactoryOf(BeanDefinition<?> definition, @Nullable BeanDefinition<?> producedBean) {
+        return producedBean != null && producedBean.getDeclaringType().orElse(null) == definition.getBeanType();
     }
 
     private <T> BeanRegistration<T> getOrCreateScopedRegistration(@Nullable BeanResolutionContext resolutionContext,
