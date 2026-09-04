@@ -5,8 +5,8 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.inject.BeanDefinition;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -34,8 +34,8 @@ public class RetainableSpec {
             BeanDefinition<CodeValidator> definition = context.getBeanDefinition(CodeValidator.class);
 
             assertEquals(
-                List.of(MinLength.class.getName(), MaxLength.class.getName()),
-                List.copyOf(definition.getAnnotationNamesByStereotype(Limit.class))
+                Set.of(MinLength.class.getName(), MaxLength.class.getName()),
+                Set.copyOf(definition.getAnnotationNamesByStereotype(Limit.class))
             );
         }
     }

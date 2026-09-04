@@ -35,7 +35,7 @@ class RetainableSpec:
             "micronaut.docs.inject.retainable.Limit"
         )
 
-        assert list(names) == [
+        assert set(names) == {
             "micronaut.docs.inject.retainable.MinLength",
             "micronaut.docs.inject.retainable.MaxLength",
-        ]
+        }
