@@ -173,6 +173,45 @@ class CaseInsensitiveMutableHttpHeadersSpec extends Specification {
         cex.message == "The header value for 'foo' contains prohibited character 0xa at index 3."
     }
 
+    void "cannot add a header value with a character that is not an octet"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
+
+        when: "a character above 0xFF whose low byte is a line feed"
+        headers.add("foo", "bar" + ((char) 0x010A) + "Origin: localhost")
+
+        then:
+        IllegalArgumentException ex = thrown()
+        ex.message == "The header value for 'foo' contains prohibited character 0x10a at index 3."
+
+        when: "the value starts with one"
+        headers.add("foo", "" + ((char) 0x010A) + "bar")
+
+        then:
+        IllegalArgumentException fex = thrown()
+        fex.message == "The header value for 'foo' contains prohibited character 0x10a at index 0."
+
+        when: "it arrives through the defaults constructor"
+        new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED, "foo": ["bar" + ((char) 0x010A)])
+
+        then:
+        IllegalArgumentException cex = thrown()
+        cex.message == "The header value for 'foo' contains prohibited character 0x10a at index 3."
+    }
+
+    void "obs-text remains a valid header value"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
+        String disposition = 'attachment; filename="r' + ((char) 0xE9) + 'sum' + ((char) 0xE9) + '.pdf"'
+
+        when: "the value only uses characters that are representable as a single octet"
+        headers.add("Content-Disposition", disposition)
+
+        then: "it is accepted, as RFC 7230 obs-text (%x80-FF)"
+        noExceptionThrown()
+        headers.get("Content-Disposition") == disposition
+    }
+
     void "can switch off validation"() {
         given:
         CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(false, ConversionService.SHARED)

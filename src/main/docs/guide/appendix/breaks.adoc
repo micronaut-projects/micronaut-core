@@ -8,6 +8,14 @@ This applies to both normal redirects and preserve-body redirects (`307` and `30
 
 If needed, this behavior can be customized through `HttpClientConfiguration`.
 
+=== Header values may no longer contain characters above U+00FF
+
+`SimpleHttpHeaders` (and the `CaseInsensitiveMutableHttpHeaders` behind it, used when Netty is not on the classpath) now rejects a header value containing a character above `U+00FF` with an `IllegalArgumentException`.
+
+RFC 7230 defines a header value over octets — `field-vchar = VCHAR / obs-text`, where `obs-text` is `%x80-FF` — so a character that is not representable as a single octet is not a valid header value. Previously such a value was accepted and then handled inconsistently by whichever transport sent it: Netty substitutes `?` for each offending character, while the JDK HTTP client throws from its own request builder. The value is now rejected where it is set, naming the header and the offending index.
+
+Characters in `%x80-FF` are unaffected and remain valid, so a `Content-Disposition` filename using Latin-1 accented characters continues to work. Only characters above `U+00FF` — for example CJK text or emoji — are rejected, and those were already being replaced with `?` on the wire.
+
 == 5.0
 
 === Core Changes
