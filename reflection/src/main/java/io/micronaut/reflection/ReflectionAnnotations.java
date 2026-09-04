@@ -33,6 +33,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.inject.annotation.AnnotationMetadataException;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataSupport;
+import io.micronaut.inject.annotation.AnnotationDefaults;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import org.jspecify.annotations.Nullable;
@@ -128,18 +129,15 @@ public final class ReflectionAnnotations {
      */
     private static final ClassValue<Map<CharSequence, Object>> DEFAULTS = new ClassValue<>() {
         @Override
+        @SuppressWarnings("unchecked")
         protected Map<CharSequence, Object> computeValue(Class<?> type) {
-            Map<CharSequence, Object> defaults = new LinkedHashMap<>();
-            for (Method member : MEMBERS.get(type)) {
-                Object defaultValue = member.getDefaultValue();
-                if (defaultValue != null) {
-                    defaults.put(member.getName(), convert(defaultValue));
-                }
-            }
-            // keyed by name and not by class: a type loaded by several class loaders - the same annotation in
-            // several deployments - must resolve to the class of the loader asking for it, not to the first one seen
+            // the reading and the conversion are AnnotationDefaults, keyed by the class, so that the same
+            // annotation name in two deployments keeps two sets of defaults
+            Map<CharSequence, Object> defaults = AnnotationDefaults.of((Class<? extends Annotation>) type);
+            // the accessors of the shared metadata answer a member left out from the registry keyed by name,
+            // which is the only place they look
             DefaultAnnotationMetadata.registerAnnotationDefaults(type.getName(), defaults);
-            return Collections.unmodifiableMap(defaults);
+            return defaults;
         }
     };
 
