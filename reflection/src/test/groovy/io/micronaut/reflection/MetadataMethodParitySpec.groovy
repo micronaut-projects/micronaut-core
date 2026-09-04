@@ -5,6 +5,11 @@ import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.beans.BeanIntrospector
 import spock.lang.Specification
 
+import static io.micronaut.reflection.DeepAliasAnnotations.DeepA
+import static io.micronaut.reflection.DeepAliasAnnotations.DeepB
+import static io.micronaut.reflection.DeepAliasAnnotations.DeepC
+import static io.micronaut.reflection.DeepAliasAnnotations.DeepLimit
+
 /**
  * Every read method of {@link AnnotationMetadata}, answered by the metadata the processors generate for an
  * element and by the metadata {@link ReflectionAnnotations} builds for the same element, compared answer by
@@ -260,5 +265,66 @@ class MetadataMethodParitySpec extends Specification {
 
         where:
         property << ["name", "code", "labelled", "spread", "tagged", "bare", "plain", "duplicated"]
+    }
+
+    void "an explicitly written repeatable container keeps all of its members for #property"() {
+        given:
+        def compileTime = BeanIntrospector.SHARED.getIntrospection(RetainedBean)
+            .getRequiredProperty(property, String).getAnnotationMetadata()
+        def reflective = ReflectionAnnotations.metadataOf(RetainedBean.getDeclaredField(property))
+
+        expect:
+        canonical(reflective.getAnnotation(Tags)) == canonical(compileTime.getAnnotation(Tags))
+
+        where:
+        property << ["explicitTags", "emptyTags"]
+    }
+
+    void "a member explicitly written as its default has the same presence, built either way"() {
+        given:
+        def compileTime = BeanIntrospector.SHARED.getIntrospection(EveryKindBean)
+            .getRequiredProperty("explicitlyDefaulted", String).getAnnotationMetadata()
+        def reflective = ReflectionAnnotations.metadataOf(EveryKindBean.getDeclaredField("explicitlyDefaulted"))
+
+        expect:
+        verifyAll {
+            canonical(reflective.getValues(Every.name)) == canonical(compileTime.getValues(Every.name))
+            reflective.getValue(Every.name, "anInt", Integer) == compileTime.getValue(Every.name, "anInt", Integer)
+            reflective.intValue(Every, "anInt") == compileTime.intValue(Every, "anInt")
+            reflective.isPresent(Every.name, "anInt") == compileTime.isPresent(Every.name, "anInt")
+        }
+    }
+
+    void "an alias override cascades through every composed stereotype, built either way"() {
+        given:
+        def compileTime = BeanIntrospector.SHARED.getIntrospection(RetainedBean)
+            .getRequiredProperty("deepAlias", String).getAnnotationMetadata()
+        def reflective = ReflectionAnnotations.metadataOf(RetainedBean.getDeclaredField("deepAlias"))
+
+        expect:
+        verifyAll {
+            reflective.intValue(DeepB, "min") == compileTime.intValue(DeepB, "min")
+            reflective.intValue(DeepC, "min") == compileTime.intValue(DeepC, "min")
+            reflective.intValue(DeepLimit, "min") == compileTime.intValue(DeepLimit, "min")
+        }
+    }
+
+    void "an alias override cascades through the retained stereotype tree, built either way"() {
+        given:
+        def compileTime = BeanIntrospector.SHARED.getIntrospection(RetainedBean)
+            .getRequiredProperty("deepAlias", String).getAnnotationMetadata()
+        def reflective = ReflectionAnnotations.metadataOf(RetainedBean.getDeclaredField("deepAlias"))
+
+        expect:
+        retainedTree(reflective.getAnnotation(DeepA)) == retainedTree(compileTime.getAnnotation(DeepA))
+    }
+
+    private static Object retainedTree(AnnotationValue<?> value) {
+        if (value == null) {
+            return null
+        }
+        return [name: value.annotationName,
+                values: canonical(value.values.findAll { it.key.toString() != '$stereotypes' }),
+                stereotypes: value.stereotypes?.collect { retainedTree(it) }]
     }
 }

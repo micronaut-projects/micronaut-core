@@ -54,4 +54,21 @@ class SynthesizedAnnotationSpec extends Specification {
         ReflectionAnnotations.synthesize(Tag, value).value() == "shared"
         ReflectionAnnotations.synthesize(Tag, value).annotationType() == Tag
     }
+
+    void "annotations synthesized from implicit and explicit defaults obey the annotation equality contract"() {
+        given:
+        Every written = EveryKindBean.getDeclaredField("defaulted").getAnnotation(Every)
+        Every implicitDefaults = ReflectionAnnotations.synthesize(Every, ReflectionAnnotations.valueOf(written))
+        Every explicitDefaults = ReflectionAnnotations.synthesize(Every, AnnotationValue.of(written))
+
+        expect:
+        verifyAll {
+            implicitDefaults.equals(explicitDefaults)
+            explicitDefaults.equals(implicitDefaults)
+            implicitDefaults.equals(written)
+            written.equals(implicitDefaults)
+            implicitDefaults.hashCode() == explicitDefaults.hashCode()
+            new HashSet<>([implicitDefaults, explicitDefaults]).size() == 1
+        }
+    }
 }

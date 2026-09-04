@@ -29,6 +29,9 @@ class EveryKindBean extends InheritedParent implements Marked {
     @Every
     String defaulted
 
+    @Every(anInt = 3, aString = "one", strings = ["a", "b"], classes = [String, Integer])
+    String explicitlyDefaulted
+
     EveryKindBean(@Every(anInt = 33) String annotated) {
         this.annotated = annotated
     }

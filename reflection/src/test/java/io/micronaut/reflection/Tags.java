@@ -9,4 +9,9 @@ import java.lang.annotation.Target;
 @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE, ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.TYPE_USE})
 public @interface Tags {
     Tag[] value();
+
+    /**
+     * @return An additional member used to verify that explicit container annotations are preserved intact
+     */
+    String note() default "default-note";
 }
