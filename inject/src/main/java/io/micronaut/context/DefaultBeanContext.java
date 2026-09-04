@@ -159,6 +159,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
+    /**
+     * The maximum number of additional destruction passes performed during {@link #stop()} to destroy
+     * singletons created by {@code @PreDestroy} hooks, bounding a hook that always creates a new bean.
+     */
+    private static final int MAX_SHUTDOWN_PASSES = 10;
 
     private static final Predicate<BeanDefinition<?>> FILTER_OUT_ANY_PROVIDERS = new Predicate<BeanDefinition<?>>() { // Keep anonymous for hot path
         @Override
@@ -407,40 +412,29 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             publishEvent(new ShutdownEvent(this));
             attributes.clear();
 
-            // need to sort registered singletons so that beans with that require other beans appear first
-            List<BeanRegistration> objects = topologicalSort(singletonScope.getBeanRegistrations());
+            // dedup by identity: identity hash codes are not unique across live objects
+            Set<Object> processed = Collections.newSetFromMap(new IdentityHashMap<>());
+            destroySingletons(singletonScope.getBeanRegistrations(), processed);
 
-            Map<Boolean, List<BeanRegistration>> result = objects.stream().collect(Collectors.groupingBy(br -> br.bean != null
-                && (br.bean instanceof BeanPreDestroyEventListener || br.bean instanceof BeanDestroyedEventListener)));
-
-            List<BeanRegistration> listeners = result.get(true);
-            if (listeners != null) {
-                // destroy all bean destroy listeners at the end
-                objects.clear();
-                objects.addAll(result.get(false));
-                objects.addAll(listeners);
-            }
-
-            Set<Integer> processed = new HashSet<>();
-            for (BeanRegistration beanRegistration : objects) {
-                Object bean = beanRegistration.bean;
-                int sysId = System.identityHashCode(bean);
-                if (processed.contains(sysId)) {
-                    continue;
+            // a @PreDestroy hook is free to resolve beans, which may create brand-new singletons
+            // registered after the snapshot above was taken. Destroy those stragglers too, with a
+            // bound so a pathological hook that always creates a bean cannot spin forever
+            for (int pass = 0; ; pass++) {
+                List<BeanRegistration> stragglers = singletonScope.getBeanRegistrations()
+                    .stream()
+                    .filter(br -> !processed.contains(br.bean))
+                    .toList();
+                if (stragglers.isEmpty()) {
+                    break;
                 }
-
-                if (LOG_LIFECYCLE.isDebugEnabled()) {
-                    LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", bean, beanRegistration.identifier);
-                }
-
-                processed.add(sysId);
-                try {
-                    destroyBean(beanRegistration);
-                } catch (BeanDestructionException e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error(e.getMessage(), e);
+                if (pass == MAX_SHUTDOWN_PASSES) {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("Singletons are still being created during shutdown after {} destruction passes. "
+                            + "Giving up, {} bean(s) will not be destroyed.", MAX_SHUTDOWN_PASSES, stragglers.size());
                     }
+                    break;
                 }
+                destroySingletons(stragglers, processed);
             }
 
             if (checkEnabledBeans != null) {
@@ -3507,6 +3501,47 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param beans The registrations
      * @return The registrations in destruction order
      */
+    /**
+     * Destroys the given singleton registrations, skipping any bean already present in {@code processed}.
+     *
+     * @param registrations The registrations to destroy
+     * @param processed     The identity set of already destroyed beans, added to as beans are destroyed
+     */
+    private void destroySingletons(Collection<BeanRegistration> registrations, Set<Object> processed) {
+        // need to sort registered singletons so that beans with that require other beans appear first
+        List<BeanRegistration> objects = topologicalSort(registrations);
+
+        Map<Boolean, List<BeanRegistration>> result = objects.stream().collect(Collectors.groupingBy(br -> br.bean != null
+            && (br.bean instanceof BeanPreDestroyEventListener || br.bean instanceof BeanDestroyedEventListener)));
+
+        List<BeanRegistration> listeners = result.get(true);
+        if (listeners != null) {
+            // destroy all bean destroy listeners at the end
+            objects.clear();
+            objects.addAll(result.getOrDefault(false, Collections.emptyList()));
+            objects.addAll(listeners);
+        }
+
+        for (BeanRegistration beanRegistration : objects) {
+            Object bean = beanRegistration.bean;
+            if (!processed.add(bean)) {
+                continue;
+            }
+
+            if (LOG_LIFECYCLE.isDebugEnabled()) {
+                LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", bean, beanRegistration.identifier);
+            }
+
+            try {
+                destroyBean(beanRegistration);
+            } catch (BeanDestructionException e) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error(e.getMessage(), e);
+                }
+            }
+        }
+    }
+
     private List<BeanRegistration> topologicalSort(Collection<BeanRegistration> beans) {
         final int size = beans.size();
         // Nodes are indexed in bean name order so that the destruction sequence is deterministic
