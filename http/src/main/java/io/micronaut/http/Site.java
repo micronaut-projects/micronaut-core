@@ -39,7 +39,8 @@ public enum Site {
      * Finds the site relationship for the given Fetch Metadata value.
      *
      * @param value The site relationship value
-     * @return The matching site relationship, or {@code null} if there is no match
+     * @return The matching site relationship, or {@code null} if there is no match. {@link SecFetch}
+     * reports such a value as a {@code null} component and keeps the rest of the metadata readable
      * @since 5.1.12
      */
     public static @Nullable Site of(String value) {
