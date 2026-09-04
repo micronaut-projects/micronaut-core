@@ -9,5 +9,6 @@ public class ExecBookStore extends ExecGenericStore<Book> {
     @Override
     @Tag("book-store")
     public void keep(@Tag("book-store-param") Book item) {
+        // empty on purpose - only the declaration is read
     }
 }

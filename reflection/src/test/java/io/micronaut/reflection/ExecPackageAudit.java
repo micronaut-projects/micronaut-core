@@ -7,5 +7,6 @@ public class ExecPackageAudit {
 
     @Tag("package-audit")
     void audit(String value) {
+        // empty on purpose - only the declaration is read
     }
 }

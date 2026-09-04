@@ -1,7 +1,5 @@
 package io.micronaut.reflection;
 
-import io.micronaut.reflection.Customized;
-
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.annotation.AnnotationValue;
 

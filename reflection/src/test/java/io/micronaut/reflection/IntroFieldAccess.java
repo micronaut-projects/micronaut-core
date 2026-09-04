@@ -13,5 +13,5 @@ public class IntroFieldAccess {
 
     String note = "note";
 
-    private String secret = "secret";
+    private String secret = "secret"; // NOSONAR - unread on purpose, the specs assert the introspection leaves it out
 }

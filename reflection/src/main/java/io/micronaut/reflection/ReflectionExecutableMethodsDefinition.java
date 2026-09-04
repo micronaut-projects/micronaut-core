@@ -87,7 +87,7 @@ final class ReflectionExecutableMethodsDefinition<T> extends AbstractExecutableM
     // dispatch, which predates the nullness annotations, is nullable in fact
     @Override
     @Nullable
-    @SuppressWarnings("NullAway")
+    @SuppressWarnings({"NullAway", "java:S2638"})
     protected Object dispatch(int index, T target, @Nullable Object[] args) {
         return AbstractReflectionExecutable.invokeTarget(methods[index], target, args);
     }

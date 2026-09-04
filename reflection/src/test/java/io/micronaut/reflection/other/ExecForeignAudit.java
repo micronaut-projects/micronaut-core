@@ -9,5 +9,6 @@ public class ExecForeignAudit {
 
     @Tag("foreign-audit")
     void audit(String value) {
+        // empty on purpose - only the declaration is read
     }
 }

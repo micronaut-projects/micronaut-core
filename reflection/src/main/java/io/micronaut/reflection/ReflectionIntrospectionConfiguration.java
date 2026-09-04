@@ -104,7 +104,7 @@ public final class ReflectionIntrospectionConfiguration {
      *
      * @param allowReflection The patterns
      */
-    public void setAllowReflection(List<String> allowReflection) {
+    public void setAllowReflection(@Nullable List<String> allowReflection) {
         this.allowReflection = allowReflection == null ? List.of() : allowReflection;
     }
 
@@ -164,6 +164,7 @@ public final class ReflectionIntrospectionConfiguration {
          * Creates the description; it is instantiated by the context.
          */
         public Description() {
+            // empty on purpose - the context instantiates it and binds the configuration to the setters
         }
 
         /**
@@ -182,7 +183,7 @@ public final class ReflectionIntrospectionConfiguration {
          *
          * @param types The patterns
          */
-        public void setTypes(List<String> types) {
+        public void setTypes(@Nullable List<String> types) {
             this.types = types == null ? List.of() : types;
         }
 
@@ -201,7 +202,7 @@ public final class ReflectionIntrospectionConfiguration {
          * @param accessKind The access kinds, {@link Introspected.AccessKind#METHOD} by default
          * @see Introspected#accessKind()
          */
-        public void setAccessKind(List<Introspected.AccessKind> accessKind) {
+        public void setAccessKind(@Nullable List<Introspected.AccessKind> accessKind) {
             this.accessKind = accessKind == null ? List.of() : accessKind;
         }
 
@@ -220,7 +221,7 @@ public final class ReflectionIntrospectionConfiguration {
          * @param visibility The visibilities, {@link Introspected.Visibility#DEFAULT} by default
          * @see Introspected#visibility()
          */
-        public void setVisibility(List<Introspected.Visibility> visibility) {
+        public void setVisibility(@Nullable List<Introspected.Visibility> visibility) {
             this.visibility = visibility == null ? List.of() : visibility;
         }
 
@@ -239,7 +240,7 @@ public final class ReflectionIntrospectionConfiguration {
          * @param includes The property names
          * @see Introspected#includes()
          */
-        public void setIncludes(List<String> includes) {
+        public void setIncludes(@Nullable List<String> includes) {
             this.includes = includes == null ? List.of() : includes;
         }
 
@@ -258,7 +259,7 @@ public final class ReflectionIntrospectionConfiguration {
          * @param excludes The property names
          * @see Introspected#excludes()
          */
-        public void setExcludes(List<String> excludes) {
+        public void setExcludes(@Nullable List<String> excludes) {
             this.excludes = excludes == null ? List.of() : excludes;
         }
 
@@ -277,7 +278,7 @@ public final class ReflectionIntrospectionConfiguration {
          * @param excludedAnnotations The annotation names
          * @see Introspected#excludedAnnotations()
          */
-        public void setExcludedAnnotations(List<String> excludedAnnotations) {
+        public void setExcludedAnnotations(@Nullable List<String> excludedAnnotations) {
             this.excludedAnnotations = excludedAnnotations == null ? List.of() : excludedAnnotations;
         }
 
@@ -317,7 +318,7 @@ public final class ReflectionIntrospectionConfiguration {
          * @param indexed The annotations
          * @see Introspected#indexed()
          */
-        public void setIndexed(List<Indexed> indexed) {
+        public void setIndexed(@Nullable List<Indexed> indexed) {
             this.indexed = indexed == null ? List.of() : indexed;
         }
 
@@ -366,6 +367,7 @@ public final class ReflectionIntrospectionConfiguration {
              * Creates the entry; it is instantiated by the context.
              */
             public Indexed() {
+                // empty on purpose - the context instantiates it and binds the configuration to the setters
             }
 
             /**

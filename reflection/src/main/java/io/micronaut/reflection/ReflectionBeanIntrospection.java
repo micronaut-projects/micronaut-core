@@ -463,7 +463,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         if (constructor == null) {
             throw new InstantiationException("The type " + beanType.getName() + " declares no constructor a reflective introspection can invoke");
         }
-        Object[] values = arguments == null ? new Object[0] : arguments;
+        Object[] values = arguments == null ? new Object[0] : arguments; // NOSONAR - the annotation marks the elements nullable, a caller can still pass a null array
         if (values.length != constructorArguments.length) {
             throw new InstantiationException("The constructor of " + beanType.getName() + " expects "
                 + constructorArguments.length + " argument(s), " + values.length + " given");

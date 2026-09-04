@@ -547,6 +547,7 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
      * @param <T>                  The bean type
      */
     @Internal
+    @SuppressWarnings("java:S6218") // a private carrier the definition reads its members off; it is never compared or printed
     private record Members<T>(@Nullable Constructor<T> constructor,
                               @Nullable Method factoryMethod,
                               MethodReference constructorReference,

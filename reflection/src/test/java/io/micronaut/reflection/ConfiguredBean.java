@@ -10,7 +10,7 @@ public class ConfiguredBean {
     private String password;
     @Hidden("kept-out")
     private String secret;
-    private String tucked;
+    private String tucked; // NOSONAR - unread on purpose, the specs assert the introspection leaves it out
 
     public String getKept() {
         return kept;

@@ -10,7 +10,7 @@ public class SelfDescribed {
 
     private String kept;
     private String password;
-    private String tucked;
+    private String tucked; // NOSONAR - unread on purpose, the specs assert the introspection leaves it out
 
     public String getKept() {
         return kept;
