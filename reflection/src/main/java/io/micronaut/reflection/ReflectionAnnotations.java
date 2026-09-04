@@ -204,13 +204,15 @@ public final class ReflectionAnnotations {
      *
      * @return The retained occurrences, or {@code null} when the annotation composes none
      */
-    private static AnnotationValue<?> @Nullable [] retainedStereotypes(Annotation annotation, Set<Class<?>> chain) {
+    private static AnnotationValue<?> @Nullable [] retainedStereotypes(Annotation annotation,
+                                                                      Set<Class<?>> chain,
+                                                                      @Nullable Map<CharSequence, Object> applied) {
         Class<? extends Annotation> type = annotation.annotationType();
         if (!chain.add(type)) {
             return null;
         }
         try {
-            Map<String, Map<Integer, Map<CharSequence, Object>>> overrides = aliasedMembers(annotation);
+            Map<String, Map<Integer, Map<CharSequence, Object>>> overrides = aliasedMembers(annotation, applied);
             List<AnnotationValue<?>> retained = new ArrayList<>();
             // an annotation written more than once on the type is the container the compiler generates, which is
             // not retainable itself: the occurrences it holds are the ones retained, as the processors retain them
@@ -260,10 +262,7 @@ public final class ReflectionAnnotations {
                                                          @Nullable Map<CharSequence, Object> overrides,
                                                          Set<Class<?>> chain) {
         Class<? extends Annotation> metaType = meta.annotationType();
-        Map<CharSequence, Object> values = new LinkedHashMap<>(values(meta, chain));
-        if (overrides != null) {
-            values.putAll(overrides);
-        }
+        Map<CharSequence, Object> values = new LinkedHashMap<>(values(meta, chain, overrides));
         return new AnnotationValue<>(metaType.getName(), values, defaultValues(metaType));
     }
 
@@ -278,6 +277,24 @@ public final class ReflectionAnnotations {
      * @return The overrides by the name of the annotation they apply to, the annotation itself under {@code ""}
      */
     private static Map<String, Map<Integer, Map<CharSequence, Object>>> aliasedMembers(Annotation annotation) {
+        return aliasedMembers(annotation, null);
+    }
+
+    /**
+     * The members an annotation overrides on the annotations it composes, read off the values the annotation
+     * carries once the annotation composing <em>it</em> has had its own aliases applied.
+     *
+     * <p>An alias is a chain: {@code @DeepA(shortest = 7)} sets {@code DeepB.min}, and it is that value, not the
+     * {@code min = 1} the declaration of {@code @DeepB} writes, which {@code DeepB} then aliases onto
+     * {@code DeepC}. Reading the members off the instance alone stops the override after one level, so the
+     * members already overridden are passed in and win over what the instance answers.</p>
+     *
+     * @param annotation The annotation
+     * @param applied    The members of this annotation the composing annotation overrides, or {@code null}
+     */
+    private static Map<String, Map<Integer, Map<CharSequence, Object>>> aliasedMembers(
+        Annotation annotation,
+        @Nullable Map<CharSequence, Object> applied) {
         Class<? extends Annotation> type = annotation.annotationType();
         Map<String, Map<Integer, Map<CharSequence, Object>>> overrides = null;
         Map<CharSequence, Object> defaults = defaultValues(type);
@@ -287,7 +304,7 @@ public final class ReflectionAnnotations {
                     ? aliasFor.annotationName()
                     : aliasFor.annotation().getName();
                 overrides = alias(overrides, annotation, member, defaults, target, aliasFor.member(),
-                    aliasFor.applyDefault(), aliasFor.index());
+                    aliasFor.applyDefault(), aliasFor.index(), applied);
             }
             // an override declared in the terms of a specification, which a transformer maps onto @AliasFor at
             // compilation time and a customizer states here
@@ -299,7 +316,7 @@ public final class ReflectionAnnotations {
                     overrides = alias(overrides, annotation, member, defaults, target,
                         aliasFor.stringValue("member").orElse(""),
                         aliasFor.booleanValue("applyDefault").orElse(false),
-                        aliasFor.intValue("index").orElse(-1));
+                        aliasFor.intValue("index").orElse(-1), applied);
                 }
             }
         }
@@ -319,11 +336,15 @@ public final class ReflectionAnnotations {
         String target,
         String aliasedMember,
         boolean applyDefault,
-        int index) {
+        int index,
+        @Nullable Map<CharSequence, Object> applied) {
         if (aliasedMember.isEmpty()) {
             return overrides;
         }
-        Object value = memberOf(annotation, member);
+        Object value = applied == null ? null : applied.get(member.getName());
+        if (value == null) {
+            value = memberOf(annotation, member);
+        }
         if (value == null) {
             return overrides;
         }
@@ -561,6 +582,17 @@ public final class ReflectionAnnotations {
      * composing itself through its stereotypes is not followed round.
      */
     private static Map<CharSequence, Object> values(Annotation annotation, Set<Class<?>> chain) {
+        return values(annotation, chain, null);
+    }
+
+    /**
+     * The values of an annotation with the members the annotation composing it overrides already applied, so
+     * that what it derives from itself - a member aliasing another member of the same annotation, and the
+     * retained tree below it - is derived from the overridden values rather than the declared ones.
+     */
+    private static Map<CharSequence, Object> values(Annotation annotation,
+                                                    Set<Class<?>> chain,
+                                                    @Nullable Map<CharSequence, Object> applied) {
         Class<? extends Annotation> type = annotation.annotationType();
         // reading the instance and converting its members is the shared conversion of the core API, a nested
         // annotation and the members of it included; what this module adds on top of it is the policies below
@@ -598,14 +630,17 @@ public final class ReflectionAnnotations {
                 customizer.customize(annotation, values);
             }
         }
+        if (applied != null) {
+            values.putAll(applied);
+        }
         // a member aliasing another member of the same annotation sets it, unless the source wrote it itself
-        Map<Integer, Map<CharSequence, Object>> selfAliases = aliasedMembers(annotation).get("");
+        Map<Integer, Map<CharSequence, Object>> selfAliases = aliasedMembers(annotation, applied).get("");
         if (selfAliases != null) {
             selfAliases.values().forEach(aliased -> aliased.forEach(values::putIfAbsent));
         }
         // the retained tree is added after the customizers, so that a customizer deriving a member of an
         // annotation - the validators a constraint is validated by - has it on every retained occurrence too
-        AnnotationValue<?>[] retained = retainedStereotypes(annotation, chain);
+        AnnotationValue<?>[] retained = retainedStereotypes(annotation, chain, applied);
         if (retained != null) {
             values.put(AnnotationUtil.STEREOTYPES_MEMBER, retained);
         }
@@ -789,6 +824,7 @@ public final class ReflectionAnnotations {
             for (Annotation repeated : contained) {
                 addRepeated(metadata, repeated, type, declared);
             }
+            addContainerItself(metadata, annotation, contained, declared);
             return;
         }
         Repeatable repeatable = type.getAnnotation(Repeatable.class);
@@ -824,6 +860,40 @@ public final class ReflectionAnnotations {
     }
 
     /**
+     * Records a repeatable container that the source wrote itself, rather than one the compiler synthesized for
+     * an annotation repeated on the element.
+     *
+     * <p>A container may declare members of its own besides the occurrences it holds, provided they have
+     * defaults, and the processors record those members on the container. The two cases are told apart the only
+     * way an instance allows: a synthesized container carries nothing but its occurrences, so it has no member
+     * left once the ones equal to their defaults are dropped, while a written one does. A container written with
+     * no occurrence at all is recorded whole, since the flattening above had nothing to file and the annotation
+     * would otherwise disappear from the element.</p>
+     */
+    private static void addContainerItself(MutableAnnotationMetadata metadata,
+                                           Annotation annotation,
+                                           Annotation[] contained,
+                                           boolean declared) {
+        Class<? extends Annotation> type = annotation.annotationType();
+        Map<CharSequence, Object> values = values(annotation);
+        if (contained.length > 0) {
+            // the occurrences are filed under the container by addRepeated, which appends to this same member
+            values.remove(AnnotationMetadata.VALUE_MEMBER);
+            if (values.isEmpty()) {
+                return;
+            }
+        }
+        register(metadata, type);
+        String name = type.getName();
+        if (declared) {
+            metadata.addDeclaredAnnotation(name, values);
+        } else {
+            metadata.addAnnotation(name, values);
+        }
+        addStereotypes(metadata, type, List.of(name), declared, aliasedMembers(annotation));
+    }
+
+    /**
      * Adds the meta-annotations of an annotation type as stereotypes of the given parents, recursively. The
      * parents are the chain from the annotation on the element down to the current type, and a type already
      * in the chain is a cycle, which is skipped.
@@ -856,14 +926,16 @@ public final class ReflectionAnnotations {
                 continue;
             }
             register(metadata, metaType);
-            Map<CharSequence, Object> values = overridden(values(meta),
-                overridesFor(overrides, metaType.getName(), occurrences));
+            // resolved once: reading it counts the occurrence, and the members it overrides are what the next
+            // level down aliases from
+            Map<CharSequence, Object> applied = overridesFor(overrides, metaType.getName(), occurrences);
+            Map<CharSequence, Object> values = overridden(values(meta), applied);
             if (declared) {
                 metadata.addDeclaredStereotype(parents, metaType.getName(), values);
             } else {
                 metadata.addStereotype(parents, metaType.getName(), values);
             }
-            addStereotypes(metadata, metaType, chain(parents, metaType), declared, aliasedMembers(meta));
+            addStereotypes(metadata, metaType, chain(parents, metaType), declared, aliasedMembers(meta, applied));
         }
     }
 
@@ -914,7 +986,7 @@ public final class ReflectionAnnotations {
         } else {
             metadata.addRepeatableStereotype(parents, container.getName(), value);
         }
-        addStereotypes(metadata, metaType, chain(parents, metaType), declared, aliasedMembers(meta));
+        addStereotypes(metadata, metaType, chain(parents, metaType), declared, aliasedMembers(meta, overrides));
     }
 
     private static List<String> chain(List<String> parents, Class<? extends Annotation> type) {
