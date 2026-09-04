@@ -62,7 +62,7 @@ final class ResponseHeaderPopulatorFilter implements Ordered {
         for (ResponseHeaderPopulator responseHeaderPopulator : responseHeaderPopulators) {
             HttpHeaderTuple httpHeader = responseHeaderPopulator.findHttpHeader(request);
             if (httpHeader != null && !response.getHeaders().contains(httpHeader.name())) {
-                    response.getHeaders().add(httpHeader.name(), httpHeader.value());
+                response.getHeaders().add(httpHeader.name(), httpHeader.value());
             }
         }
     }
