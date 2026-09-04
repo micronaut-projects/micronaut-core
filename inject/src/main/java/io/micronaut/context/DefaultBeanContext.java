@@ -1660,6 +1660,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         Collection<BeanDefinition<Object>> candidates;
         if (qualifier instanceof FilteringQualifier<Object> filteringQualifier) {
+            Class<?> indexedType = filteringQualifier.getIndexedType();
+            if (indexedType != null) {
+                // the compile-time index holds every bean this qualifier selects, so there is nothing to filter
+                return (Collection) getBeanDefinitions(Argument.of(indexedType));
+            }
             // Keep anonymous
             Predicate<BeanDefinitionReference<Object>> predicate = new Predicate<>() {
                 @Override
@@ -2136,7 +2141,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         Iterator<BeanDefinition<T>> iterator = beanDefinitions.iterator();
         Set<BeanDefinition<T>> candidates;
         if (iterator.hasNext()) {
-            candidates = new HashSet<>();
+            candidates = new LinkedHashSet<>();
             while (iterator.hasNext()) {
                 BeanDefinition<T> candidate = iterator.next();
                 if (collectIterables && candidate.isConfigurationProperties()) {
