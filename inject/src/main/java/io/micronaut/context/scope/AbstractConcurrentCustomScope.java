@@ -28,10 +28,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.Lock;
@@ -58,6 +60,13 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     private final Lock r = rwl.readLock();
     private final Lock w = rwl.writeLock();
     private final ConcurrentMap<BeanIdentifier, Object> creationLocks = new ConcurrentHashMap<>();
+    /**
+     * The identifier of every creation in flight in the {@code lockPerBean} mode, against the scope map it creates
+     * into, published before the creation begins and removed once it has published its bean or failed. It is what
+     * makes a creation that is not yet in the scope map visible to a destruction of that map, which would otherwise
+     * see an empty map, finish, and leave the bean that the creation then publishes to be never destroyed.
+     */
+    private final ConcurrentMap<BeanIdentifier, Map<BeanIdentifier, CreatedBean<?>>> creationsInFlight = new ConcurrentHashMap<>();
 
     /**
      * A custom scope annotation.
@@ -75,8 +84,11 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      * to its {@link BeanIdentifier} alone, so that beans of different identifiers are created in parallel, a creation
      * may wait for another thread that creates a bean of the same scope, and the fast path of a bean already held
      * is a plain lookup. {@link #remove(BeanIdentifier)} takes the same lock, so it still waits for a creation of that
-     * identifier in flight and then destroys what was created. {@link #destroyScope(Map)} and
-     * {@link #findBeanRegistration(Object)} work on the scope map without any lock, which is why the map returned by
+     * identifier in flight and then destroys what was created, and so do {@link #remove(BeanDefinition)} and
+     * {@link #destroyScope(Map)}, which wait for the creations in flight of the map they work on. Nothing else holds
+     * creation off: a creation that has not begun when a destruction of the scope map ends publishes its bean into
+     * that map afterwards, exactly as one that arrives after the scope-wide write lock is released does.
+     * {@link #findBeanRegistration(Object)} works on the scope map without any lock, which is why the map returned by
      * {@link #getScopeMap(boolean)} must then be a {@link ConcurrentMap}: {@link #getOrCreate(BeanCreationContext)}
      * rejects any other map with an {@link IllegalStateException}. The lock objects live as long as the scope, one
      * per identifier ever created or removed through it.</p>
@@ -255,9 +267,11 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      * Remove and destroy the bean held for the given definition. The definition may be the
      * {@link ProxyBeanDefinition} of a scoped proxy, in which case the target it stands for is removed.
      *
-     * <p>The bean is taken out of the scope under the write lock and closed after the lock is released, so a
-     * {@code @PreDestroy} hook may reach into the scope from another thread without deadlocking on it. Unlike
-     * {@link #remove(BeanIdentifier)} a destruction failure is not routed through
+     * <p>The bean is taken out of the scope under the write lock, or, where creation is locked per bean, under the
+     * lock of the identifier it is held under, having first waited for the creations into the scope map that are in
+     * flight so that a bean of the definition one of them is about to publish is not missed. It is closed after the
+     * lock is released, so a {@code @PreDestroy} hook may reach into the scope from another thread without
+     * deadlocking on it. Unlike {@link #remove(BeanIdentifier)} a destruction failure is not routed through
      * {@link #handleDestructionException(BeanDestructionException)} but propagated to the caller.</p>
      *
      * @param beanDefinition The bean definition
@@ -268,6 +282,9 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      */
     @SuppressWarnings("unchecked")
     public <T> Optional<T> remove(BeanDefinition<T> beanDefinition) {
+        if (lockPerBean) {
+            return removeLockingPerBean(beanDefinition);
+        }
         final CreatedBean<?> createdBean;
         w.lock();
         try {
@@ -345,8 +362,16 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             // re-check
             createdBean = scopeMap.get(id);
             if (createdBean == null) {
-                createdBean = doCreate(creationContext);
-                scopeMap.put(id, createdBean);
+                // announced before the bean is created, and while this thread holds the identifier's lock, so that a
+                // destruction of this map sees the creation and waits on that lock for what is published here,
+                // instead of observing an empty map and leaving the bean behind undestroyed
+                creationsInFlight.put(id, scopeMap);
+                try {
+                    createdBean = doCreate(creationContext);
+                    scopeMap.put(id, createdBean);
+                } finally {
+                    creationsInFlight.remove(id);
+                }
             }
             return (T) createdBean.bean();
         }
@@ -382,6 +407,87 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     }
 
     /**
+     * Remove and destroy the bean held for the given definition, waiting for the creations of this scope map that are
+     * in flight rather than missing a bean of the definition that one of them is about to publish.
+     *
+     * <p>The identifier is only known once the entry is found, so the entry is located, then its identifier is
+     * locked against a creation or a removal of it, and only then is the entry removed, and only if it is still the
+     * one that was located.</p>
+     *
+     * @param beanDefinition The bean definition
+     * @param <T>            The generic type
+     * @return An {@link Optional} of the instance that was destroyed if it exists
+     */
+    @SuppressWarnings("unchecked")
+    private <T> Optional<T> removeLockingPerBean(BeanDefinition<T> beanDefinition) {
+        final Map<BeanIdentifier, CreatedBean<?>> scopeMap;
+        try {
+            scopeMap = getScopeMap(false);
+        } catch (IllegalStateException e) {
+            return Optional.empty();
+        }
+        if (scopeMap == null) {
+            return Optional.empty();
+        }
+        // the creations already waited for: once one is done it has published its bean or failed, so waiting for it
+        // again would not make a bean of the definition appear, and the search ends rather than following creations
+        // that keep arriving
+        final Set<BeanIdentifier> awaited = new HashSet<>();
+        while (true) {
+            final CreatedBean<?> createdBean = findCreatedBean(scopeMap, beanDefinition);
+            if (createdBean == null) {
+                final BeanIdentifier inFlight = identifierInFlightFor(scopeMap, awaited);
+                if (inFlight == null) {
+                    return Optional.empty();
+                }
+                awaited.add(inFlight);
+                awaitCreation(inFlight);
+                continue;
+            }
+            final boolean removed;
+            synchronized (creationLocks.computeIfAbsent(createdBean.id(), key -> new Object())) {
+                // only the entry that was located, another thread may have removed or replaced it since
+                removed = scopeMap.remove(createdBean.id(), createdBean);
+            }
+            if (!removed) {
+                continue;
+            }
+            // closed outside the lock, so that a @PreDestroy hook may reach into the scope from another thread
+            createdBean.close();
+            return (Optional<T>) Optional.ofNullable(createdBean.bean());
+        }
+    }
+
+    /**
+     * Waits for a creation of the given identifier to have published its bean or to have failed. A creation holds
+     * the identifier's lock from before it begins until after it publishes, so having taken that lock is the wait.
+     *
+     * @param identifier The identifier
+     */
+    private void awaitCreation(BeanIdentifier identifier) {
+        synchronized (creationLocks.computeIfAbsent(identifier, key -> new Object())) {
+            LOG.trace("Waited for the creation of {} of scope @{}", identifier, annotationType.getSimpleName());
+        }
+    }
+
+    /**
+     * The identifier of any one creation in flight into the given scope map, or {@code null} where there is none.
+     *
+     * @param scopeMap The scope map
+     * @param exclude  Identifiers not to answer
+     * @return An identifier, or {@code null}
+     */
+    @Nullable
+    private BeanIdentifier identifierInFlightFor(Map<BeanIdentifier, CreatedBean<?>> scopeMap, Set<BeanIdentifier> exclude) {
+        for (Map.Entry<BeanIdentifier, Map<BeanIdentifier, CreatedBean<?>>> creation : creationsInFlight.entrySet()) {
+            if (creation.getValue() == scopeMap && !exclude.contains(creation.getKey())) {
+                return creation.getKey();
+            }
+        }
+        return null;
+    }
+
+    /**
      * The identifier of any one entry of the map, or {@code null} where it holds none.
      *
      * @param scopeMap The scope map
@@ -393,15 +499,30 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         return identifiers.hasNext() ? identifiers.next() : null;
     }
 
+    /**
+     * The identifier of the next bean a destruction of the given scope map has to take out: one the map holds, or
+     * failing that one whose creation into the map is in flight, or {@code null} where there is neither.
+     *
+     * @param scopeMap The scope map
+     * @return An identifier, or {@code null}
+     */
+    @Nullable
+    private BeanIdentifier nextIdentifierToDestroy(Map<BeanIdentifier, CreatedBean<?>> scopeMap) {
+        final BeanIdentifier held = firstIdentifierOf(scopeMap);
+        return held != null ? held : identifierInFlightFor(scopeMap, Set.of());
+    }
+
     private void destroyScopeLockingPerBean(@Nullable Map<BeanIdentifier, CreatedBean<?>> scopeMap) {
-        if (CollectionUtils.isEmpty(scopeMap)) {
+        if (scopeMap == null) {
             return;
         }
         // the map is drained rather than cleared: each entry is taken out before it is closed, so that two
         // destructions of one map close each bean once, and a bean that another thread put there while the
         // destruction runs is closed by the pass that finds it instead of being dropped by a clear(). Nothing
-        // holds creation off in this mode, so the drain repeats until the map stays empty
-        for (BeanIdentifier id = firstIdentifierOf(scopeMap); id != null; id = firstIdentifierOf(scopeMap)) {
+        // holds creation off in this mode, so the drain repeats until the map stays empty and no creation into
+        // it is in flight; a creation that is in flight is waited for on its identifier's lock and the bean it
+        // publishes is then taken out, rather than being left behind by a drain that saw an empty map
+        for (BeanIdentifier id = nextIdentifierToDestroy(scopeMap); id != null; id = nextIdentifierToDestroy(scopeMap)) {
             final CreatedBean<?> createdBean;
             // under the identifier's lock, so that a creation of it in flight is waited for and then taken out
             synchronized (creationLocks.computeIfAbsent(id, key -> new Object())) {
