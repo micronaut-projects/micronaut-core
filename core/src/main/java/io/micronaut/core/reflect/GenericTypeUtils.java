@@ -29,6 +29,14 @@ import java.util.Set;
  * Utility methods for dealing with generic types via reflection. Generally reflection is to be avoided in Micronaut. Hence,
  * this class is regarded as internal and used for only certain niche cases.
  *
+ * <p>Every method here answers in erasure: a raw {@link Class}, with neither the nested type arguments nor the
+ * type-use annotations of the declaration. A caller that wants those - an {@link io.micronaut.core.type.Argument}
+ * shaped like the one the annotation processors generate - wants
+ * {@code io.micronaut.reflection.ReflectionArguments#resolveGenericToArgument(Class, Class)} of the
+ * {@code micronaut-reflection} module instead. This class stays: the compiler side of Micronaut resolves the type
+ * arguments of a {@code TypeElementVisitor} through it, and a runtime module is not something the annotation
+ * processor classpath can carry.</p>
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
