@@ -65,8 +65,6 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK;
-import static io.micronaut.http.HttpHeaders.CROSS_ORIGIN_EMBEDDER_POLICY;
-import static io.micronaut.http.HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY;
 import static io.micronaut.http.HttpHeaders.ORIGIN;
 import static io.micronaut.http.HttpHeaders.VARY;
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
@@ -180,8 +178,6 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             }
             decorateResponseWithHeaders(request, response, corsOriginConfiguration);
         }
-        setCrossOriginEmbedderPolicy(corsConfiguration, response);
-        setCrossOriginResourcePolicy(corsConfiguration, response);
     }
 
     /**
@@ -299,38 +295,6 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     protected void setAllowPrivateNetwork(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
         if (config.isAllowPrivateNetwork()) {
             response.header(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK, StringUtils.TRUE);
-        }
-    }
-
-    /**
-     * Sets the Cross-Origin-Embedder-Policy header from the CORS configuration when it is not already present.
-     *
-     * @param corsConfiguration CORS Configuration
-     * @param response The {@link MutableHttpResponse} object
-     * @since 5.2.0
-     */
-    protected void setCrossOriginEmbedderPolicy(HttpServerConfiguration.CorsConfiguration corsConfiguration, MutableHttpResponse<?> response) {
-        if (!response.getHeaders().contains(CROSS_ORIGIN_EMBEDDER_POLICY)) {
-            CrossOriginEmbedderPolicy value = corsConfiguration.getCrossOriginEmbedderPolicy();
-            if (value != null) {
-                response.header(CROSS_ORIGIN_EMBEDDER_POLICY, value);
-            }
-        }
-    }
-
-    /**
-     * Sets the Cross-Origin-Resource-Policy header from the CORS configuration when it is not already present.
-     *
-     * @param corsConfiguration CORS Configuration
-     * @param response The {@link MutableHttpResponse} object
-     * @since 5.2.0
-     */
-    protected void setCrossOriginResourcePolicy(HttpServerConfiguration.CorsConfiguration corsConfiguration, MutableHttpResponse<?> response) {
-        if (!response.getHeaders().contains(CROSS_ORIGIN_RESOURCE_POLICY)) {
-            CrossOriginResourcePolicy value = corsConfiguration.getCrossOriginResourcePolicy();
-            if (value != null) {
-                response.header(CROSS_ORIGIN_RESOURCE_POLICY, value);
-            }
         }
     }
 

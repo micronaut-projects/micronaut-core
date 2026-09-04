@@ -183,6 +183,7 @@ httpServer:
       title: HttpServerFilter
       httpServerFilterExample: HttpServerFilter Example
       httpServerFilterErrorStates: HttpServerFilter Error States
+    responseHeaderPopulator: Response Header Populators
   byteBody:
     title: Advanced body access
     byteBodyPrimary: Primary operations

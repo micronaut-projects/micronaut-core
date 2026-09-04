@@ -1,0 +1,15 @@
+The api:http.server.filter.ResponseHeaderPopulator[] interface provides a lightweight way to add a response header without implementing a complete api:http.filter.HttpServerFilter[].
+
+Register an implementation as a bean. The `findHttpHeader` method receives the current api:http.HttpRequest[] and returns the header to add:
+
+snippet::io.micronaut.docs.server.filters.SecurityHeaderPopulator[tags="imports,clazz", indent=0, title="A ResponseHeaderPopulator example"]
+
+<1> The `@Singleton` annotation registers the populator as a bean.
+<2> `findHttpHeader` receives the current request.
+<3> The api:http.HttpHeaderTuple[] contains the response header name and value.
+
+The HTTP server invokes each `ResponseHeaderPopulator` for every response. Return `null` when the header does not apply to the request. If the response already contains the returned header, its existing value takes precedence.
+
+`ResponseHeaderPopulator` extends api:core.order.Ordered[]. If multiple populators are registered, implement `getOrder()` to control their invocation order.
+
+Micronaut's built-in support for the Cross-Origin-Embedder-Policy and Cross-Origin-Resource-Policy response headers uses response header populators. See <<corsCrossOriginEmbedderPolicy, Cross-Origin-Embedder-Policy>> and <<corsCrossOriginResourcePolicy, Cross-Origin-Resource-Policy>>.

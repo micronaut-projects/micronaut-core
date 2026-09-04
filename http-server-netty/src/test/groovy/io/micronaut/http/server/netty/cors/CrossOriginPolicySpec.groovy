@@ -55,6 +55,15 @@ class CrossOriginPolicySpec extends Specification {
         response.headers.get(HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY) == "same-site"
     }
 
+    void "configured cross-origin policies do not overwrite existing response headers"() {
+        when:
+        HttpResponse<?> response = httpClient.toBlocking().exchange(HttpRequest.GET("/cross-origin-policy-with-headers"))
+
+        then:
+        response.headers.get(HttpHeaders.CROSS_ORIGIN_EMBEDDER_POLICY) == "unsafe-none"
+        response.headers.get(HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY) == "same-origin"
+    }
+
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller
     static class TestController {
@@ -62,6 +71,13 @@ class CrossOriginPolicySpec extends Specification {
         @Get("/cross-origin-policy")
         String index() {
             "ok"
+        }
+
+        @Get("/cross-origin-policy-with-headers")
+        HttpResponse<?> indexWithHeaders() {
+            HttpResponse.ok("ok")
+                .header(HttpHeaders.CROSS_ORIGIN_EMBEDDER_POLICY, "unsafe-none")
+                .header(HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY, "same-origin")
         }
     }
 }
