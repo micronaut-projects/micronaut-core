@@ -27,7 +27,6 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS;
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS;
@@ -99,7 +98,7 @@ class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param config the resolved CORS configuration
      * @param response the response to decorate
      */
-    protected void setAllowCredentials(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
+    public void setAllowCredentials(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
         if (config.isAllowCredentials()) {
             response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS, StringUtils.TRUE);
         }
@@ -112,7 +111,7 @@ class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param config the resolved CORS configuration
      * @param response the response to decorate
      */
-    protected void setAllowPrivateNetwork(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
+    public void setAllowPrivateNetwork(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
         if (config.isAllowPrivateNetwork()) {
             response.header(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK, StringUtils.TRUE);
         }
@@ -125,7 +124,7 @@ class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param exposedHeaders the header names exposed to the client
      * @param response the response to decorate
      */
-    protected void setExposeHeaders(List<String> exposedHeaders, MutableHttpResponse<?> response) {
+    public void setExposeHeaders(List<String> exposedHeaders, MutableHttpResponse<?> response) {
         if (corsConfiguration.isSingleHeader()) {
             String headerValue = String.join(",", exposedHeaders);
             if (StringUtils.isNotEmpty(headerValue)) {
@@ -141,7 +140,7 @@ class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      *
      * @param response the response to decorate
      */
-    protected void setVary(MutableHttpResponse<?> response) {
+    public void setVary(MutableHttpResponse<?> response) {
         response.header(VARY, ORIGIN);
     }
 
@@ -151,7 +150,7 @@ class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param origin the request origin, or {@code null} if absent
      * @param response the response to decorate
      */
-    protected void setOrigin(@Nullable String origin, MutableHttpResponse<?> response) {
+    public void setOrigin(@Nullable String origin, MutableHttpResponse<?> response) {
         if (origin != null) {
             response.header(ACCESS_CONTROL_ALLOW_ORIGIN, origin);
         }
@@ -163,7 +162,7 @@ class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param method the method requested by the preflight request
      * @param response the response to decorate
      */
-    protected void setAllowMethods(HttpMethod method, MutableHttpResponse<?> response) {
+    public void setAllowMethods(HttpMethod method, MutableHttpResponse<?> response) {
         response.header(ACCESS_CONTROL_ALLOW_METHODS, method);
     }
 
@@ -174,7 +173,7 @@ class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param optionalAllowHeaders the header names requested by the preflight request
      * @param response the response to decorate
      */
-    protected void setAllowHeaders(List<?> optionalAllowHeaders, MutableHttpResponse<?> response) {
+    public void setAllowHeaders(List<?> optionalAllowHeaders, MutableHttpResponse<?> response) {
         List<String> allowHeaders = optionalAllowHeaders.stream().map(Object::toString).toList();
         if (corsConfiguration.isSingleHeader()) {
             String headerValue = String.join(",", allowHeaders);
@@ -195,7 +194,7 @@ class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param maxAge the maximum cache duration in seconds, or a negative value to omit the header
      * @param response the response to decorate
      */
-    protected void setMaxAge(long maxAge, MutableHttpResponse<?> response) {
+    public void setMaxAge(long maxAge, MutableHttpResponse<?> response) {
         if (maxAge > -1) {
             response.header(ACCESS_CONTROL_MAX_AGE, Long.toString(maxAge));
         }

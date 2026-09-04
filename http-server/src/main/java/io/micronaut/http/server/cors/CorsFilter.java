@@ -17,6 +17,7 @@ package io.micronaut.http.server.cors;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.StringUtils;
@@ -43,13 +44,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK;
 import static io.micronaut.http.HttpHeaders.CROSS_ORIGIN_EMBEDDER_POLICY;
 import static io.micronaut.http.HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY;
 import static io.micronaut.http.HttpHeaders.ORIGIN;
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
+import static io.micronaut.http.server.cors.CrossOriginUtil.CONVERSION_CONTEXT_HTTP_METHOD;
 import static io.micronaut.http.server.cors.CrossOriginUtil.isAny;
 import static io.micronaut.http.server.cors.CrossOriginUtil.validateMethodToMatch;
 
@@ -189,9 +195,9 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         CorsOriginConfiguration corsOriginConfiguration = corsOriginConfigurationRetriever.findCorsOriginConfiguration(request);
         if (corsOriginConfiguration != null) {
             if (CorsUtil.isPreflightRequest(request)) {
-                corsResponseDecorator.decorateResponseWithHeadersForPreflightRequest(request, response, corsOriginConfiguration);
+                decorateResponseWithHeadersForPreflightRequest(request, response, corsOriginConfiguration);
             }
-            corsResponseDecorator.decorateResponseWithHeaders(request, response, corsOriginConfiguration);
+            decorateResponseWithHeaders(request, response, corsOriginConfiguration);
         }
         setCrossOriginEmbedderPolicy(corsConfiguration, response);
         setCrossOriginResourcePolicy(corsConfiguration, response);
@@ -202,14 +208,49 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         return CORS_FILTER_ORDER;
     }
 
+    private void decorateResponseWithHeadersForPreflightRequest(HttpRequest<?> request,
+                                                                MutableHttpResponse<?> response,
+                                                                CorsOriginConfiguration config) {
+        // Keep the old hooks as the dispatch path for the default decorator so existing
+        // CorsFilter subclasses can still customize CORS response headers.
+        if (corsResponseDecorator instanceof DefaultCorsResponseDecorator) {
+            request.getHeaders().getFirst(ACCESS_CONTROL_REQUEST_METHOD, CONVERSION_CONTEXT_HTTP_METHOD)
+                .ifPresent(method -> setAllowMethods(method, response));
+            request.getHeaders().get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING)
+                .ifPresent(headers -> setAllowHeaders(headers, response));
+            request.getHeaders().getFirst(ACCESS_CONTROL_REQUEST_PRIVATE_NETWORK, ConversionContext.BOOLEAN)
+                .filter(Boolean.TRUE::equals)
+                .ifPresent(ignored -> setAllowPrivateNetwork(config, response));
+            setMaxAge(config.getMaxAge(), response);
+        } else {
+            corsResponseDecorator.decorateResponseWithHeadersForPreflightRequest(request, response, config);
+        }
+    }
+
+    private void decorateResponseWithHeaders(HttpRequest<?> request,
+                                             MutableHttpResponse<?> response,
+                                             CorsOriginConfiguration config) {
+        if (corsResponseDecorator instanceof DefaultCorsResponseDecorator) {
+            setOrigin(request.getOrigin().orElse(null), response);
+            setVary(response);
+            setExposeHeaders(config.getExposedHeaders(), response);
+            setAllowCredentials(config, response);
+        } else {
+            corsResponseDecorator.decorateResponseWithHeaders(request, response, config);
+        }
+    }
+
     /**
      * @param config   The {@link CorsOriginConfiguration} instance
      * @param response The {@link MutableHttpResponse} object
-     * @deprecated Unused. Use {@link CorsResponseDecorator} instead.
+     * @deprecated Use {@link CorsResponseDecorator} instead. This hook remains functional for
+     * compatibility with existing {@link CorsFilter} subclasses.
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setAllowCredentials(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
-        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
+        if (corsResponseDecorator instanceof DefaultCorsResponseDecorator decorator) {
+            decorator.setAllowCredentials(config, response);
+        }
     }
 
     /**
@@ -217,70 +258,91 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      *
      * @param config   The {@link CorsOriginConfiguration} instance
      * @param response The {@link MutableHttpResponse} object
-     * @deprecated Unused. Use {@link CorsResponseDecorator} instead.
+     * @deprecated Use {@link CorsResponseDecorator} instead. This hook remains functional for
+     * compatibility with existing {@link CorsFilter} subclasses.
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setAllowPrivateNetwork(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
-        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
+        if (corsResponseDecorator instanceof DefaultCorsResponseDecorator decorator) {
+            decorator.setAllowPrivateNetwork(config, response);
+        }
     }
 
     /**
      * @param exposedHeaders A list of the exposed headers
      * @param response       The {@link MutableHttpResponse} object
-     * @deprecated Unused. Use {@link CorsResponseDecorator} instead.
+     * @deprecated Use {@link CorsResponseDecorator} instead. This hook remains functional for
+     * compatibility with existing {@link CorsFilter} subclasses.
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setExposeHeaders(List<String> exposedHeaders, MutableHttpResponse<?> response) {
-        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
+        if (corsResponseDecorator instanceof DefaultCorsResponseDecorator decorator) {
+            decorator.setExposeHeaders(exposedHeaders, response);
+        }
     }
 
     /**
      * @param response The {@link MutableHttpResponse} object
-     * @deprecated Unused. Use {@link CorsResponseDecorator} instead.
+     * @deprecated Use {@link CorsResponseDecorator} instead. This hook remains functional for
+     * compatibility with existing {@link CorsFilter} subclasses.
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setVary(MutableHttpResponse<?> response) {
-        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
+        if (corsResponseDecorator instanceof DefaultCorsResponseDecorator decorator) {
+            decorator.setVary(response);
+        }
     }
 
     /**
      * @param origin   The origin
      * @param response The {@link MutableHttpResponse} object
-     * @deprecated Unused. Use {@link CorsResponseDecorator} instead.
+     * @deprecated Use {@link CorsResponseDecorator} instead. This hook remains functional for
+     * compatibility with existing {@link CorsFilter} subclasses.
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setOrigin(@Nullable String origin, MutableHttpResponse<?> response) {
-        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
+        if (corsResponseDecorator instanceof DefaultCorsResponseDecorator decorator) {
+            decorator.setOrigin(origin, response);
+        }
     }
 
     /**
      * @param method   The {@link HttpMethod} object
      * @param response The {@link MutableHttpResponse} object
-     * @deprecated Unused. Use {@link CorsResponseDecorator} instead.
+     * @deprecated Use {@link CorsResponseDecorator} instead. This hook remains functional for
+     * compatibility with existing {@link CorsFilter} subclasses.
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setAllowMethods(HttpMethod method, MutableHttpResponse<?> response) {
-        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
+        if (corsResponseDecorator instanceof DefaultCorsResponseDecorator decorator) {
+            decorator.setAllowMethods(method, response);
+        }
     }
 
     /**
      * @param optionalAllowHeaders A list with optional allow headers
      * @param response             The {@link MutableHttpResponse} object
-     * @deprecated Unused. Use {@link CorsResponseDecorator} instead.
+     * @deprecated Use {@link CorsResponseDecorator} instead. This hook remains functional for
+     * compatibility with existing {@link CorsFilter} subclasses.
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setAllowHeaders(List<?> optionalAllowHeaders, MutableHttpResponse<?> response) {
-        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
+        if (corsResponseDecorator instanceof DefaultCorsResponseDecorator decorator) {
+            decorator.setAllowHeaders(optionalAllowHeaders, response);
+        }
     }
 
     /**
      * @param maxAge   The max age
      * @param response The {@link MutableHttpResponse} object
-     * @deprecated Unused. Use {@link CorsResponseDecorator} instead.
+     * @deprecated Use {@link CorsResponseDecorator} instead. This hook remains functional for
+     * compatibility with existing {@link CorsFilter} subclasses.
      */
     @Deprecated(forRemoval = true, since = "5.2.0")
     protected void setMaxAge(long maxAge, MutableHttpResponse<?> response) {
-        throw new UnsupportedOperationException("The CORS response header populator is now handled via CorsResponseDecorator.");
+        if (corsResponseDecorator instanceof DefaultCorsResponseDecorator decorator) {
+            decorator.setMaxAge(maxAge, response);
+        }
     }
 
     /**
@@ -367,7 +429,9 @@ public class CorsFilter implements Ordered, ConditionalFilter {
 
     private Optional<CorsOriginConfiguration> getAnyConfiguration(HttpRequest<?> request) {
         String requestOrigin = request.getOrigin().orElse(null);
-        List<UriRouteMatch<Object, Object>> routeMatches = router.findAny(request);
+        List<UriRouteMatch<Object, Object>> routeMatches = router == null
+            ? Collections.emptyList()
+            : router.findAny(request);
         return Optional.ofNullable(corsOriginConfigurationRetriever.findCorsOriginConfiguration(requestOrigin, routeMatches));
     }
 
@@ -382,8 +446,8 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             return HttpResponse.status(HttpStatus.FORBIDDEN);
         }
         MutableHttpResponse<?> resp = HttpResponse.status(HttpStatus.OK);
-        corsResponseDecorator.decorateResponseWithHeadersForPreflightRequest(request, resp, corsOriginConfiguration);
-        corsResponseDecorator.decorateResponseWithHeaders(request, resp, corsOriginConfiguration);
+        decorateResponseWithHeadersForPreflightRequest(request, resp, corsOriginConfiguration);
+        decorateResponseWithHeaders(request, resp, corsOriginConfiguration);
         return resp;
     }
 
