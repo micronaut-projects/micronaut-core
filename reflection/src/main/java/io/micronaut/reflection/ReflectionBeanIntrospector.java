@@ -16,6 +16,7 @@
 package io.micronaut.reflection;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospectionReference;
 import io.micronaut.core.beans.BeanIntrospector;
@@ -24,6 +25,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
@@ -47,6 +49,7 @@ public final class ReflectionBeanIntrospector implements BeanIntrospector {
     private final BeanIntrospector delegate;
     private final Predicate<Class<?>> reflective;
     private final boolean supplementing;
+    private final Set<Introspected.AccessKind> accessKinds;
     private final Map<Class<?>, Optional<BeanIntrospection<?>>> reflected = new ConcurrentHashMap<>();
 
     /**
@@ -78,9 +81,31 @@ public final class ReflectionBeanIntrospector implements BeanIntrospector {
      *                      processor left out, as a {@link SupplementedBeanIntrospection}
      */
     public ReflectionBeanIntrospector(BeanIntrospector delegate, Predicate<Class<?>> reflective, boolean supplementing) {
+        this(delegate, reflective, supplementing, Set.of());
+    }
+
+    /**
+     * Creates an introspector describing the types the delegate does not know with the members a caller asks for.
+     *
+     * <p>A specification that reads a field directly, as Jakarta Validation does, asks for
+     * {@link Introspected.AccessKind#FIELD}: a type it describes carries no {@link Introspected} of its own to
+     * declare that, and the default of {@link Introspected.AccessKind#METHOD} alone leaves a field without
+     * accessors out of the properties.</p>
+     *
+     * @param delegate      The introspector consulted first
+     * @param reflective    The types a reflective introspection may be created for
+     * @param supplementing Whether a generated introspection is completed with the executables the
+     *                      processor left out, as a {@link SupplementedBeanIntrospection}
+     * @param accessKinds   The kinds of member that make a property, empty for what the type declares
+     */
+    public ReflectionBeanIntrospector(BeanIntrospector delegate,
+                                      Predicate<Class<?>> reflective,
+                                      boolean supplementing,
+                                      Set<Introspected.AccessKind> accessKinds) {
         this.delegate = delegate;
         this.reflective = reflective;
         this.supplementing = supplementing;
+        this.accessKinds = Set.copyOf(accessKinds);
     }
 
     @Override
@@ -105,7 +130,9 @@ public final class ReflectionBeanIntrospector implements BeanIntrospector {
             return Optional.empty();
         }
         return (Optional<BeanIntrospection<T>>) (Optional<?>) reflected.computeIfAbsent(beanType, type -> {
-            ReflectionBeanIntrospection<T> reflection = ReflectionBeanIntrospection.of(beanType);
+            ReflectionBeanIntrospection<T> reflection = accessKinds.isEmpty()
+                ? ReflectionBeanIntrospection.of(beanType)
+                : ReflectionBeanIntrospection.of(beanType, accessKinds);
             if (generated.isPresent()) {
                 return Optional.of(new SupplementedBeanIntrospection<>(generated.get(), reflection));
             }
