@@ -1028,7 +1028,7 @@ public final class ReflectionAnnotations {
         if (repeatable == null || repeatable.value() != type) {
             // a nested `List` of its enclosing annotation is a container by convention even without @Repeatable:
             // Bean Validation declared its constraint containers that way before Java had repeatable annotations
-            if (!("List".equals(type.getSimpleName()) && type.getEnclosingClass() == contained)) {
+            if (!("List".equals(type.getSimpleName()) && type.getEnclosingClass() == contained)) { // NOSONAR - the convention is the simple name, there is no type to compare against
                 return null;
             }
         }

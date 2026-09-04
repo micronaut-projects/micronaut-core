@@ -8,5 +8,6 @@ public class ExecPackageAudited extends ExecPackageAudit {
     @Override
     @Tag("audited")
     void audit(String value) {
+        // empty on purpose - only the declaration is read
     }
 }

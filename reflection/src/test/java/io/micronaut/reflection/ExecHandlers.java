@@ -10,13 +10,16 @@ public class ExecHandlers<T> {
 
     @Tag("static")
     public static void register(String name) {
+        // empty on purpose - only the declaration is read
     }
 
     @Tag("event")
     public void on(T event) {
+        // empty on purpose - only the declaration is read
     }
 
     @Tag("number")
     public void on(Number number) {
+        // empty on purpose - only the declaration is read
     }
 }

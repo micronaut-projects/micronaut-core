@@ -19,7 +19,7 @@ public class IntroOverloads {
         this.value = value;
     }
 
-    public void setValue(Object value) {
+    public void setValue(Object value) { // NOSONAR - the parameter is unused on purpose, the specs assert this overload is not selected
         this.value = "object";
     }
 

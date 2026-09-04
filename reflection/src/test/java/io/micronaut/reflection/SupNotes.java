@@ -8,7 +8,7 @@ public class SupNotes {
 
     private String title = "title";
 
-    private String note = "note";
+    private String note = "note"; // NOSONAR - unread on purpose, the specs assert the introspection leaves it out
 
     public String getTitle() {
         return title;

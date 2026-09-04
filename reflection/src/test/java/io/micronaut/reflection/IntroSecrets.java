@@ -8,7 +8,7 @@ public class IntroSecrets {
 
     String note = "note";
 
-    private String password = "secret";
+    private String password = "secret"; // NOSONAR - unread on purpose, the specs assert the introspection leaves it out
 
     private String hidden = "hidden";
 
@@ -22,7 +22,7 @@ public class IntroSecrets {
         this.name = name;
     }
 
-    private String getHidden() {
+    private String getHidden() { // NOSONAR - uncalled on purpose, the specs assert a private accessor makes no property
         return hidden;
     }
 }

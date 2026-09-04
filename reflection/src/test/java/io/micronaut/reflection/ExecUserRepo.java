@@ -9,10 +9,12 @@ public class ExecUserRepo implements ExecRepo<String> {
     @Override
     @Tag("user")
     public void save(@Tag("user-param") String item) {
+        // empty on purpose - only the declaration is read
     }
 
     @Override
     @Tag("user-id")
     public void save(@Tag("user-id-param") Long id) {
+        // empty on purpose - only the declaration is read
     }
 }

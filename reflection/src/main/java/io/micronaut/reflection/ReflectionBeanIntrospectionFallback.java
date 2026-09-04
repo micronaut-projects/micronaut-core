@@ -60,6 +60,7 @@ public final class ReflectionBeanIntrospectionFallback implements BeanIntrospect
      * Creates the fallback; it is instantiated by the service loader.
      */
     public ReflectionBeanIntrospectionFallback() {
+        // empty on purpose - the service loader needs a no-arg constructor and there is no state to set up
     }
 
     @SuppressWarnings("java:S1181")

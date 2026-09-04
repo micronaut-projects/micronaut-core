@@ -9,20 +9,24 @@ import java.util.function.Consumer;
  */
 public class ArgGenerics {
 
-    public <T extends Comparable<T>> T max(List<T> values) {
+    public <T extends Comparable<T>> T max(List<T> values) { // NOSONAR - the parameter is unused on purpose, the signature is what is described
         return null;
     }
 
     public <E extends Enum<E>> void constant(E value) {
+        // empty on purpose - only the declaration is read
     }
 
     public void receive(Consumer<? super String> consumer) {
+        // empty on purpose - only the declaration is read
     }
 
     public void supply(List<? extends Number> numbers) {
+        // empty on purpose - only the declaration is read
     }
 
     public void anything(List<?> values) {
+        // empty on purpose - only the declaration is read
     }
 
     /**
@@ -43,6 +47,7 @@ public class ArgGenerics {
         public List<T> all;
 
         public void accept(T value) {
+            // empty on purpose - only the declaration is read
         }
 
         public List<T> produce() {

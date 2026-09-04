@@ -13,7 +13,7 @@ public class Factories {
 
     private Map<String, @Tag("mapValue") List<@Tag("deep") String>> nested; // NOSONAR - unread on purpose, the field's annotated type is what is described
 
-    private String plain;
+    private String plain; // NOSONAR - unread on purpose, only the declaration is described
 
     public Factories(@Tag("ctorParam") String plain, List<@Tag("ctorElem") String> more) { // NOSONAR - "more" is unused on purpose, its annotated element type is what is described
         this.plain = plain;

@@ -45,6 +45,7 @@ public final class ReflectionExecutableMethod<T, R> extends AbstractReflectionEx
     private final AnnotationMetadata annotationMetadata;
     private final boolean suspend;
     @Nullable
+    @SuppressWarnings("java:S3077") // the environment is a shared singleton, published once by configure(Environment)
     private volatile Environment environment;
 
     /**
