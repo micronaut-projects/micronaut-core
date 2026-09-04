@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.util.Map;
 
 import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -56,6 +57,21 @@ final class GraalPyContextFactoryTest {
     @Test
     void ignoresBlankVirtualEnv() {
         assertTrue(GraalPyContextFactory.resolveVirtualEnvExecutable(Map.of("VIRTUAL_ENV", " ")).isEmpty());
+    }
+
+    @Test
+    void inheritsVirtualEnvIntoGuestPython() throws IOException {
+        String virtualEnv = System.getenv("VIRTUAL_ENV");
+        assumeTrue(virtualEnv != null && !virtualEnv.isBlank());
+
+        PythonContextRuntime.setReuseContext(false);
+        PythonContextRuntime.resetContext();
+        try (Context context = GraalPyContextFactory.bootstrapReusableContext(getClass().getClassLoader())) {
+            assertEquals(virtualEnv, context.eval(PYTHON, "import os; os.environ.get('VIRTUAL_ENV')").asString());
+        } finally {
+            PythonContextRuntime.setReuseContext(false);
+            PythonContextRuntime.resetContext();
+        }
     }
 
     @Test

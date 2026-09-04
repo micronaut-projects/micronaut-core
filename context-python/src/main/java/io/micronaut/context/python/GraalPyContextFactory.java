@@ -29,6 +29,7 @@ import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.EnvironmentAccess;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotAccess;
 import org.graalvm.polyglot.PolyglotException;
@@ -214,6 +215,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             .logHandler(new GraalPySlf4jLogHandler())
             .allowExperimentalOptions(true)
             .allowCreateProcess(true)
+            .allowEnvironmentAccess(EnvironmentAccess.INHERIT)
             .allowValueSharing(true)
             .allowPolyglotAccess(PolyglotAccess.ALL)
             // Allow access to host classes
