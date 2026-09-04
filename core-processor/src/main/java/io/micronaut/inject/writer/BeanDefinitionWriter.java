@@ -987,7 +987,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private void addInjectionMethod(MethodDefinition<ClassElement, MethodElement> methodDefinition) {
         if (inheritedMethodDefinitions) {
-            // the definitions are already present at the index of the super definition
+            if (!allMethods.contains(methodDefinition)) {
+                throw new IllegalStateException("Cannot add the method definition " + methodDefinition + " to " + this + " after the method definitions of the super bean definition have been inherited");
+            }
+            // the definition is already present at the index of the super definition
             return;
         }
         allMethods.add(methodDefinition);
