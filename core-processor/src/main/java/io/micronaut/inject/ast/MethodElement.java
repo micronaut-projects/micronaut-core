@@ -53,6 +53,7 @@ public interface MethodElement extends MemberElement {
      * The method will only return annotations defined on a method or inherited from the super methods,
      * while {@link #getAnnotationMetadata()} for a method combines the class and the method annotations.
      * NOTE: For a constructor {@link #getAnnotationMetadata()} will not combine the class annotations.
+     * See {@link #getDeclaredMethodAnnotationMetadata()} for the annotations of this declaration only.
      *
      * @return The method annotation metadata
      * @since 4.0.0
@@ -64,6 +65,22 @@ public interface MethodElement extends MemberElement {
                 return MethodElement.this.getAnnotationMetadata();
             }
         };
+    }
+
+    /**
+     * Returns the annotations of this method declaration only.
+     * Unlike {@link #getMethodAnnotationMetadata()} the annotations inherited from the super methods are
+     * excluded, and unlike {@link #getAnnotationMetadata()} the annotations of the class are excluded as well.
+     *
+     * @return The annotations declared by this method
+     * @since 5.2.0
+     */
+    default AnnotationMetadata getDeclaredMethodAnnotationMetadata() {
+        // the first call narrows a hierarchy of the class and the method metadata to the method metadata,
+        // the second one narrows the method metadata to what this declaration carries
+        return getMethodAnnotationMetadata().getAnnotationMetadata()
+            .getDeclaredMetadata()
+            .getDeclaredMetadata();
     }
 
     /**

@@ -153,6 +153,18 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     @Override
+    public AnnotationMetadata getDeclaredMetadata() {
+        // a clone is used to retain the build time only state, such as the repeatable containers
+        // of the annotations that are not on the classpath of the compiled sources,
+        // and to detach the returned view from the subsequent mutations of this metadata
+        MutableAnnotationMetadata declared = clone();
+        declared.allAnnotations = declared.declaredAnnotations == null ? null : cloneMapOfMapValue(declared.declaredAnnotations);
+        declared.allStereotypes = declared.declaredStereotypes == null ? null : cloneMapOfMapValue(declared.declaredStereotypes);
+        declared.annotationsByStereotype = declared.declaredAnnotationsByStereotype();
+        return declared;
+    }
+
+    @Override
     public Map<CharSequence, Object> getDefaultValues(String annotation) {
         Map<CharSequence, Object> values = super.getDefaultValues(annotation);
         if (!values.isEmpty() || annotationDefaultValues == null) {
