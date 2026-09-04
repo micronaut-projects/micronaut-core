@@ -18,8 +18,6 @@ package io.micronaut.management.endpoint
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanDefinitionReference
-import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.management.endpoint.annotation.Endpoint
 import spock.lang.Specification
 
@@ -48,7 +46,7 @@ class EndpointIndexedLookupSpec extends Specification {
         indexed*.beanType.name == scanned*.beanType.name
 
         and: 'every one of them carries the index, which is what makes the lookup exhaustive'
-        indexed.every { Endpoint in ((BeanDefinitionReference<?>) it).indexes }
+        context.getBeanDefinitionReferences().findAll { Endpoint in it.indexes }*.beanType.containsAll(indexed*.beanType)
 
         cleanup:
         context.close()

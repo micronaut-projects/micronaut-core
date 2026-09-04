@@ -17,7 +17,6 @@ package io.micronaut.function
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
 /**
@@ -36,8 +35,11 @@ class FunctionBeanIndexedLookupSpec extends Specification {
         and: 'and by scanning every bean definition, which is what the index replaces'
         Collection<BeanDefinition<?>> scanned = context.getAllBeanDefinitions().findAll { it.hasStereotype(FunctionBean) }
 
-        then: 'the factory-method functions are actually present'
-        indexed*.stringValue(FunctionBean)*.get().toSorted().containsAll(['fullname', 'round', 'supplier', 'upper'])
+        then: 'every definition names the function it declares'
+        indexed.every { it.stringValue(FunctionBean).isPresent() }
+
+        and: 'the factory-method functions are actually present'
+        indexed.collect { it.stringValue(FunctionBean).get() }.toSorted().containsAll(['fullname', 'round', 'supplier', 'upper'])
 
         and: 'both answer the same beans'
         indexed*.beanType.name.toSorted() == scanned*.beanType.name.toSorted()
