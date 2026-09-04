@@ -628,11 +628,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (beanType == null) {
             return Optional.empty();
         }
-        Collection<BeanDefinition<T>> definitions = getBeanDefinitions(beanType);
-        if (definitions.isEmpty()) {
+        Argument<T> beanArgument = Argument.of(beanType);
+        Collection<BeanDefinition<T>> definitions = getBeanDefinitions(beanArgument);
+        // a bean enumerable by this type only because it is @Indexed by it does not have the type's methods
+        BeanDefinition<T> beanDefinition = definitions.stream()
+            .filter(definition -> isInjectableCandidate(beanArgument, definition))
+            .findFirst()
+            .orElse(null);
+        if (beanDefinition == null) {
             return Optional.empty();
         }
-        BeanDefinition<T> beanDefinition = definitions.iterator().next();
         Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
         if (foundMethod.isPresent()) {
             return foundMethod;
@@ -1903,7 +1908,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     public <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         for (BeanDefinition<T> beanDefinition : getBeanDefinitions(beanType, qualifier)) {
-            if (beanDefinition.isProxy()) {
+            // a bean enumerable by this type only because it is @Indexed by it is never a proxy of it
+            if (beanDefinition.isProxy() && isInjectableCandidate(beanType, beanDefinition)) {
                 return Optional.of(beanDefinition);
             }
         }
