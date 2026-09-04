@@ -104,6 +104,46 @@ class PerBeanLockingScopeSpec extends Specification {
         !second.destroyed
     }
 
+    void "under a lock per bean remove by definition destroys the bean and the next resolution creates a new one"() {
+        given:
+        def scope = context.getBean(PerBeanScopeImpl)
+        def definition = context.getBeanDefinition(PerBeanRemoved)
+        def first = context.getBean(PerBeanRemoved)
+
+        expect:
+        scope.findBeanRegistration(definition).get().bean.is(first)
+
+        when:
+        def removed = scope.remove(definition)
+
+        then:
+        removed.present
+        removed.get().is(first)
+        first.destroyed
+        !scope.findBeanRegistration(definition).present
+
+        when:
+        def second = context.getBean(PerBeanRemoved)
+
+        then:
+        !second.is(first)
+        !second.destroyed
+    }
+
+    void "under a lock per bean remove by an unknown definition is empty and leaves the scope untouched"() {
+        given:
+        def scope = context.getBean(PerBeanScopeImpl)
+        def bean = context.getBean(PerBeanOther)
+
+        when:
+        def removed = scope.remove(context.getBeanDefinition(PerBeanFaulty))
+
+        then:
+        !removed.present
+        context.getBean(PerBeanOther).is(bean)
+        !bean.destroyed
+    }
+
     void "under a lock per bean the scope answers the registration of a bean it holds"() {
         given:
         def bean = context.getBean(PerBeanOther)
