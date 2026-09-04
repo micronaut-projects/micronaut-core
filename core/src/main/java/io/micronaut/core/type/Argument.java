@@ -447,6 +447,13 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     /**
      * Allows coercing a {@link Type} instance to an {@link Argument}.
      *
+     * <p>Only a {@link Class} and a {@link ParameterizedType} are coerced. A type argument that is neither -
+     * a wildcard, a type variable - makes the whole containing type raw, so {@code List<?>} yields {@code List};
+     * a wildcard, a {@link TypeVariable} or a {@link java.lang.reflect.GenericArrayType} on its own is rejected.
+     * A caller holding an arbitrary reflected type, rather than one it wrote itself, wants
+     * {@code io.micronaut.reflection.ReflectionArguments#of(Type)} of the {@code micronaut-reflection} module,
+     * which resolves all five and carries the type-use annotations.</p>
+     *
      * @param type The type
      * @return The argument
      * @throws IllegalArgumentException If the type cannot be coerced
