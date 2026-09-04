@@ -68,6 +68,7 @@ ioc:
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
   beanImport: Importing Beans from Libraries
+  reflection: Reflection Based Metadata
   classImport: Importing Classes from Libraries
   mixin: Modifying Class Annotations With A Mixin
   nullabilityAnnotations:
