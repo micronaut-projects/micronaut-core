@@ -3,6 +3,7 @@ package io.micronaut.inject.indexed
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.RuntimeBeanDefinition
+import io.micronaut.context.event.BeanDestroyedEventListener
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
@@ -196,6 +197,51 @@ interface Marker {
     @Override
     protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
         [new IndexingVisitor()]
+    }
+
+    void "test a bean indexed by a listener interface it does not implement is not treated as a listener"() {
+        given: "a factory that is a listener, and so is indexed by the listener type its produced bean inherits"
+        ApplicationContext context = buildContext('idx.Recorded', '''
+package idx;
+
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.event.BeanDestroyedEvent;
+import io.micronaut.context.event.BeanDestroyedEventListener;
+import io.micronaut.core.annotation.NonNull;
+import jakarta.inject.Singleton;
+
+class Recorded {
+}
+
+@Factory
+class RecordedFactory implements BeanDestroyedEventListener<Recorded> {
+
+    static boolean destroyed;
+
+    @Singleton
+    Recorded recorded() {
+        return new Recorded();
+    }
+
+    @Override
+    public void onDestroyed(@NonNull BeanDestroyedEvent<Recorded> event) {
+        destroyed = true;
+    }
+}
+''')
+        Class<?> recorded = context.classLoader.loadClass('idx.Recorded')
+        Class<?> factory = context.classLoader.loadClass('idx.RecordedFactory')
+
+        expect: "the produced bean is enumerable by the inherited index, though it is no listener"
+        !BeanDestroyedEventListener.isAssignableFrom(recorded)
+
+        when: "the produced bean is created, then destroyed with the context, which dispatches to the listeners"
+        def bean = context.getBean(recorded)
+        context.close()
+
+        then: "the factory listener ran and the produced bean was never cast to one"
+        bean != null
+        factory.destroyed
     }
 
     static class IndexingVisitor implements TypeElementVisitor<Object, Object> {

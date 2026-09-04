@@ -1955,12 +1955,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private <T extends EventListener> Map<Class<?>, List<BeanDefinition<T>>> getTypeToListenerMap(Class<T> listenerType) {
-        final Collection<BeanDefinition<T>> beanDefinitions = getBeanDefinitions(listenerType);
+        Argument<T> listenerArgument = Argument.of(listenerType);
+        final Collection<BeanDefinition<T>> beanDefinitions = getBeanDefinitions(listenerArgument);
         if (beanDefinitions.isEmpty()) {
             return Collections.emptyMap();
         }
         final HashMap<Class<?>, List<BeanDefinition<T>>> typeToListener = CollectionUtils.newHashMap(beanDefinitions.size());
         for (BeanDefinition<T> beanCreatedDefinition : beanDefinitions) {
+            // A bean only indexed by the listener type, without implementing it, is enumerable but is not a listener
+            if (!isInjectableCandidate(listenerArgument, beanCreatedDefinition)) {
+                continue;
+            }
             List<Argument<?>> typeArguments = beanCreatedDefinition.getTypeArguments(listenerType);
             Argument<?> argument = CollectionUtils.last(typeArguments);
             if (argument == null) {
