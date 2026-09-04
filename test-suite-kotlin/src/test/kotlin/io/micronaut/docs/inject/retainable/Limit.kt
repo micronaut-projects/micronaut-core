@@ -6,6 +6,6 @@ import io.micronaut.core.annotation.Retainable
 
 //tag::class[]
 @Retainable // <1>
-@Retention(AnnotationRetention.RUNTIME) // <2>
+@Retention(AnnotationRetention.RUNTIME)
 annotation class Limit(val min: Int = 0, val max: Int = 100)
 //end::class[]

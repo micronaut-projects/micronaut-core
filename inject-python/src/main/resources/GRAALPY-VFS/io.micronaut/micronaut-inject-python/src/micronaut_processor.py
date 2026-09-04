@@ -2553,11 +2553,17 @@ def decorator_targets_annotation_type(decorator, visitor=None, seen=None):
     return local_decorator_targets_annotation_type(decorator, visitor)
 
 def local_decorator_targets_annotation_type(decorator, visitor=None):
+    """
+    A decorator defined in an imported Python module is applicable to an annotation, the way a Java annotation
+    without @Target is: Python has no @Target to narrow it with, so being a decorator at all is the answer.
+    """
     if visitor is None:
         return False
     visitor_context = getattr(visitor, "visitor_context", None)
     if visitor_context is not None:
         try:
+            # A decorator the compiler can resolve was already answered for by annotation_targets_annotation_type,
+            # which reads its @Target. Reading its source too would let this override that answer.
             if visitor_context.getClassElement(decorator.annotationName()).orElse(None) is not None:
                 return False
         except Exception:
@@ -2566,17 +2572,23 @@ def local_decorator_targets_annotation_type(decorator, visitor=None):
     if source_file is None:
         return False
 
-    annotation_name = decorator.annotationName()
+    return decorator.annotationName() in local_annotation_definitions(visitor, source_file, decorator.annotationName())
+
+def local_annotation_definitions(visitor, source_file, annotation_name):
+    """
+    The annotation names the decorators of an imported module define, parsed once per module. Every decorator
+    imported from a module belongs to that module's package, so any one of their names gives the package the
+    nested visitor qualifies the definitions it finds with.
+    """
     cache = getattr(visitor, "local_annotation_definition_cache", {})
-    cache_key = (source_file, annotation_name)
-    cached = cache.get(cache_key)
+    cached = cache.get(source_file)
     if cached is not None:
         return cached
 
     loading = getattr(visitor, "local_annotation_source_loading", set())
-    if cache_key in loading:
-        return False
-    loading.add(cache_key)
+    if source_file in loading:
+        return frozenset()
+    loading.add(source_file)
     try:
         with open(source_file, "r", encoding="utf-8") as source:
             tree = ast.parse(source.read(), filename=source_file)
@@ -2596,17 +2608,17 @@ def local_decorator_targets_annotation_type(decorator, visitor=None):
         nested_visitor.local_annotation_definition_cache = cache
         nested_visitor.local_annotation_source_loading = loading
         nested_visitor.visit(tree)
-        result = any(
-            definition.annotationName() == annotation_name
+        definitions = frozenset(
+            definition.annotationName()
             for definition in nested_visitor.known_decorators.values()
         )
-        cache[cache_key] = result
-        return result
+        cache[source_file] = definitions
+        return definitions
     except Exception:
-        cache[cache_key] = False
-        return False
+        cache[source_file] = frozenset()
+        return frozenset()
     finally:
-        loading.discard(cache_key)
+        loading.discard(source_file)
 
 def annotation_targets_annotation_type(annotation_name, visitor=None):
     if visitor is None or annotation_name is None:

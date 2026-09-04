@@ -150,7 +150,8 @@ Meta-annotating the composed annotation with ann:core.annotation.Retainable[] so
 snippet::io.micronaut.docs.inject.retainable.Limit[tags="imports, class", indent=0, title="Declaring a Retainable Annotation"]
 
 <1> The marker sits on the *composed* annotation, not on the annotations composing it
-<2> Only annotations with `RUNTIME` retention are retained in the metadata written for runtime
+
+An annotation whose retention does not reach runtime is filtered out of the metadata the writer emits, so a composed annotation has to be retained at runtime to be read back there.
 
 The retained occurrences are read back with the `getStereotypes()` method of api:core.annotation.AnnotationValue[], with member overrides declared through ann:context.annotation.AliasFor[] already applied:
 

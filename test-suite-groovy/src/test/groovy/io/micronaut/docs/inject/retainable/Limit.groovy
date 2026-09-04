@@ -9,7 +9,7 @@ import java.lang.annotation.RetentionPolicy
 
 //tag::class[]
 @Retainable // <1>
-@Retention(RetentionPolicy.RUNTIME) // <2>
+@Retention(RetentionPolicy.RUNTIME)
 @interface Limit {
     int min() default 0
     int max() default 100
