@@ -24,4 +24,6 @@ dependencies {
     // the Groovy specs and fixtures are, through the Groovy AST transformations
     testImplementation(projects.micronautContext)
     testImplementation(projects.micronautInjectGroovy)
+    // compile Java sources in-memory so their generated metadata can be compared directly with reflection
+    testImplementation(projects.micronautInjectJavaTest)
 }
