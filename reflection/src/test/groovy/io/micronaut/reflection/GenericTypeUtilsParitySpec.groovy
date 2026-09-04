@@ -104,6 +104,29 @@ class GenericTypeUtilsParitySpec extends Specification {
 
     // =======================
 
+    void "an argument bound at an intermediate generic type is found, where GenericTypeUtils finds nothing"() {
+        expect: "Leaf extends Mid<String>, and Mid - not Leaf - is what implements Iface<T>"
+        GenericTypeUtils.resolveInterfaceTypeArguments(Leaf, Iface) == [] as Class[]
+        GenericTypeUtils.resolveInterfaceTypeArgument(Leaf, Iface).isEmpty()
+
+        and: "the variable is substituted, so the argument is the one Leaf gives it"
+        ReflectionArguments.resolveGenericToArgument(Leaf, Iface).typeParameters*.type == [String]
+    }
+
+    void "a super type argument bound at an intermediate generic type is found too"() {
+        expect: "Baz extends Bar<String>, and Bar - not Baz - is what extends Foo<T>"
+        GenericTypeUtils.resolveSuperTypeGenericArguments(Baz, Foo) == [] as Class[]
+
+        and:
+        ReflectionArguments.resolveGenericToArgument(Baz, Foo).typeParameters*.type == [String]
+    }
+
+    static abstract class Mid<T> implements Iface<T> {}
+
+    static class Leaf extends Mid<String> {}
+
+    // =======================
+
     void "the argument keeps what the erasure loses"() {
         when: "a super type argument is itself parameterized"
         def argument = ReflectionArguments.resolveGenericToArgument(Nested, Supplier)
