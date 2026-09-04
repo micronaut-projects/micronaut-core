@@ -146,6 +146,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.java_keyword_method_aliases = {}  # Track keyword-safe aliases on Java type references
         self.type_vars = {}  # Track TypeVar assignments: variable_name -> TypeVar
         self.imported_types = {}  # Track imported types: simple_name -> full_qualified_name
+        self.imported_source_files = {}  # Track local Python imports: simple_name -> source file
+        self.local_annotation_definition_cache = {}
+        self.local_annotation_source_loading = set()
         self.local_classes = set()  # Track class names defined in this file
         self.local_constant_values = {}  # Track local class constants visible to annotation expressions
         self.current_class_nested_types = {}  # Track nested classes visible in the current class body
@@ -414,6 +417,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             self.imported_types[alias.asname] = full_name
                             self._track_java_keyword_method_aliases(alias.asname, full_name)
                             self._track_imported_constant_assignment(alias.asname, node.level, node.module, alias.name)
+                            source_file = self._source_file_for_import(node.level, node.module)
+                            if source_file is not None:
+                                self.imported_source_files[alias.asname] = source_file
                         else:
                             existing = self.imported_types.get(alias.name)
                             if existing is not None:
@@ -429,6 +435,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
                                 self.imported_types[alias.name] = full_name
                                 self._track_java_keyword_method_aliases(alias.name, full_name)
                                 self._track_imported_constant_assignment(alias.name, node.level, node.module, alias.name)
+                                source_file = self._source_file_for_import(node.level, node.module)
+                                if source_file is not None:
+                                    self.imported_source_files[alias.name] = source_file
 
                 return super().visit(node)
             case ast.Import():
@@ -2539,7 +2548,77 @@ def decorator_targets_annotation_type(decorator, visitor=None, seen=None):
         annotation_type_targets = getattr(visitor, 'annotation_type_target_decorators', set())
         if annotation_name in annotation_type_targets or decorator.name() in annotation_type_targets:
             return True
-    return annotation_targets_annotation_type(annotation_name, visitor)
+    if annotation_targets_annotation_type(annotation_name, visitor):
+        return True
+    return local_decorator_targets_annotation_type(decorator, visitor)
+
+def local_decorator_targets_annotation_type(decorator, visitor=None):
+    """
+    A decorator defined in an imported Python module is applicable to an annotation, the way a Java annotation
+    without @Target is: Python has no @Target to narrow it with, so being a decorator at all is the answer.
+    """
+    if visitor is None:
+        return False
+    visitor_context = getattr(visitor, "visitor_context", None)
+    if visitor_context is not None:
+        try:
+            # A decorator the compiler can resolve was already answered for by annotation_targets_annotation_type,
+            # which reads its @Target. Reading its source too would let this override that answer.
+            if visitor_context.getClassElement(decorator.annotationName()).orElse(None) is not None:
+                return False
+        except Exception:
+            pass
+    source_file = getattr(visitor, "imported_source_files", {}).get(decorator.name())
+    if source_file is None:
+        return False
+
+    return decorator.annotationName() in local_annotation_definitions(visitor, source_file, decorator.annotationName())
+
+def local_annotation_definitions(visitor, source_file, annotation_name):
+    """
+    The annotation names the decorators of an imported module define, parsed once per module. Every decorator
+    imported from a module belongs to that module's package, so any one of their names gives the package the
+    nested visitor qualifies the definitions it finds with.
+    """
+    cache = getattr(visitor, "local_annotation_definition_cache", {})
+    cached = cache.get(source_file)
+    if cached is not None:
+        return cached
+
+    loading = getattr(visitor, "local_annotation_source_loading", set())
+    if source_file in loading:
+        return frozenset()
+    loading.add(source_file)
+    try:
+        with open(source_file, "r", encoding="utf-8") as source:
+            tree = ast.parse(source.read(), filename=source_file)
+
+        package_name = annotation_name.rsplit(".", 1)[0] if "." in annotation_name else ""
+        class NoOpCallback:
+            def apply(self, ignored):
+                return None
+
+        nested_visitor = MicronautAstVisitor(
+            NoOpCallback(),
+            package_name,
+            os.path.basename(source_file),
+            visitor.visitor_context,
+            visitor.source_root
+        )
+        nested_visitor.local_annotation_definition_cache = cache
+        nested_visitor.local_annotation_source_loading = loading
+        nested_visitor.visit(tree)
+        definitions = frozenset(
+            definition.annotationName()
+            for definition in nested_visitor.known_decorators.values()
+        )
+        cache[source_file] = definitions
+        return definitions
+    except Exception:
+        cache[source_file] = frozenset()
+        return frozenset()
+    finally:
+        loading.discard(source_file)
 
 def annotation_targets_annotation_type(annotation_name, visitor=None):
     if visitor is None or annotation_name is None:
@@ -2699,7 +2778,8 @@ def native_class_targets_annotation_type(native_type):
         Target = java.type("java.lang.annotation.Target")
         target_annotation = native_type.getAnnotation(Target)
         if target_annotation is None:
-            return False
+            # An annotation without @Target is applicable to every element type.
+            return True
         for target in target_annotation.value():
             if str(target).endswith("ANNOTATION_TYPE"):
                 return True
