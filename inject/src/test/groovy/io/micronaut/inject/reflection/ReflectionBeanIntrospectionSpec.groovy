@@ -28,8 +28,11 @@ class ReflectionBeanIntrospectionSpec extends Specification {
         when:
         def constructors = ReflectionBeanIntrospection.of(Constructors.Annotated).constructors
 
-        then: "the selected one, then the others, without repeating it"
-        constructors*.arguments*.type == [[String, int], [], [String]]
+        then: "the selected one comes first"
+        constructors*.arguments*.type.head() == [String, int]
+
+        and: "the others follow, without repeating it, in whatever order the JVM declares them"
+        constructors*.arguments*.type.tail() as Set == [[], [String]] as Set
     }
 
     void "instantiation reports what it cannot do"() {
