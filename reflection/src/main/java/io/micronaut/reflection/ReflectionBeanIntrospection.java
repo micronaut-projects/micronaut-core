@@ -35,7 +35,6 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -1081,22 +1080,27 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
          * of its type.
          */
         AnnotationMetadata annotationMetadata(Argument<?> typed) {
-            MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
-            for (Field field : fields) {
-                ReflectionAnnotations.add(metadata, field);
+            // the accessors of a property are read before its field and the more specific member wins, as the
+            // processors read them: an annotation the getter declares is the one the property carries, and the
+            // field completes what no accessor declares rather than adding to it. Adding every member instead
+            // lets a farther site override a nearer one and collects one occurrence of a repeatable annotation
+            // per site, where a generated property carries only the occurrence of the member it was read from.
+            // The parameter of a setter is not a site of the property at all: it annotates the value being
+            // passed, and a generated property does not carry it
+            AnnotationMetadata metadata = AnnotationMetadata.EMPTY_METADATA;
+            for (Method candidate : selectedFirst(getters, getter)) {
+                metadata = ReflectionAnnotations.merge(metadata, ReflectionAnnotations.metadataOf(candidate));
             }
-            for (Method getter : getters) {
-                ReflectionAnnotations.add(metadata, getter);
+            for (Method candidate : selectedFirst(setters, setter)) {
+                metadata = ReflectionAnnotations.merge(metadata, ReflectionAnnotations.metadataOf(candidate));
             }
-            for (Method setter : setters) {
-                ReflectionAnnotations.add(metadata, setter);
-                ReflectionAnnotations.add(metadata, setter.getParameters()[0]);
+            for (Field candidate : selectedFirst(fields, field)) {
+                metadata = ReflectionAnnotations.merge(metadata, ReflectionAnnotations.metadataOf(candidate));
             }
-            AnnotationMetadata typeMetadata = typed.getAnnotationMetadata();
-            if (typeMetadata.isEmpty()) {
-                return metadata.isEmpty() ? AnnotationMetadata.EMPTY_METADATA : metadata;
-            }
-            return metadata.isEmpty() ? typeMetadata : new AnnotationMetadataHierarchy(true, metadata, typeMetadata);
+            // the argument of the property carries the annotations of the member it was read from as well as
+            // the type-use ones, so it completes the members rather than overriding them: what an accessor
+            // declares stays what the property carries
+            return ReflectionAnnotations.merge(metadata, typed.getAnnotationMetadata());
         }
     }
 
