@@ -247,6 +247,20 @@ public final class ReflectionArguments {
     }
 
     /**
+     * Converts the type of a parameter to an {@link Argument} under a name of the caller's choosing, as the
+     * reading type sees it, carrying the annotations of the type but not the ones the parameter declares.
+     *
+     * <p>The parameter of a setter is not a site of the property it writes: it annotates the value being
+     * passed. A generated property is read from the type of the parameter and carries what that type is
+     * annotated with, so the argument of a reflective one is built the same way, as
+     * {@link #returnOf(String, Method, Class)} builds it from the return type of a getter.</p>
+     */
+    static Argument<?> ofType(@Nullable String name, Parameter parameter, Class<?> context) {
+        Class<?> declaringType = parameter.getDeclaringExecutable().getDeclaringClass();
+        return toArgument(name, parameter.getAnnotatedType(), bindings(context, declaringType), Set.of());
+    }
+
+    /**
      * Converts the return type of a method to an {@link Argument} under a name of the caller's choosing, as the
      * reading type sees it.
      */
@@ -553,16 +567,21 @@ public final class ReflectionArguments {
             if (sub != null) {
                 return toArgument(name, sub, Map.of(), resolving);
             }
+            // a variable is an annotated element of its own: `class Bean<@Mark T>` annotates the declaration
+            // of the variable rather than any use of it, and a generated argument standing for the variable
+            // carries it, so it is read before the annotations of the bound
+            AnnotationMetadata declared = ReflectionAnnotations.metadataOf(tv);
             if (resolving.contains(tv)) {
                 // a bound naming the variable it bounds - `T extends Comparable<T>` - would be converted for
                 // ever: inside its own bound the variable stands for the erasure of that bound
-                return Argument.ofTypeVariable(getRawType(tv.getBounds()[0]), name, tv.getName());
+                return Argument.ofTypeVariable(getRawType(tv.getBounds()[0]), name, tv.getName(), declared, Argument.ZERO_ARGUMENTS);
             }
             Set<TypeVariable<?>> nested = new HashSet<>(resolving);
             nested.add(tv);
             // an unresolved variable is a placeholder of its bound, as the processors generate it
             Argument<?> bound = toArgument(null, tv.getAnnotatedBounds()[0], Map.of(), nested);
-            return Argument.ofTypeVariable(bound.getType(), name, tv.getName(), bound.getAnnotationMetadata(), bound.getTypeParameters());
+            return Argument.ofTypeVariable(bound.getType(), name, tv.getName(),
+                combine(declared, bound.getAnnotationMetadata()), bound.getTypeParameters());
         } else {
             throw new IllegalArgumentException("Unsupported type " + type.getClass().getName());
         }

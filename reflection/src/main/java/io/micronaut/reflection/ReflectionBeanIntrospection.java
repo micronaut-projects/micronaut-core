@@ -585,7 +585,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         // below do not match: an annotation of the component whose target is a method lands there and nowhere else
         if (beanType.isRecord()) {
             for (RecordComponent component : beanType.getRecordComponents()) {
-                candidate(candidates, component.getName()).addComponentAccessor(component.getAccessor());
+                candidate(candidates, component.getName()).addComponent(component);
             }
         }
         // the getters of the interfaces, which declare the type-use annotations of the implementations' properties
@@ -827,7 +827,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         private final List<Field> fields = new ArrayList<>(1);
         private final List<Method> getters = new ArrayList<>(1);
         private final List<Method> setters = new ArrayList<>(1);
-        private boolean component;
+        private @Nullable RecordComponent component;
         private boolean resolved;
         private @Nullable Field field;
         private @Nullable Method getter;
@@ -846,9 +846,9 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             getters.add(getter);
         }
 
-        void addComponentAccessor(Method accessor) {
-            component = true;
-            getters.add(accessor);
+        void addComponent(RecordComponent recordComponent) {
+            component = recordComponent;
+            getters.add(recordComponent.getAccessor());
         }
 
         void addSetter(Method setter) {
@@ -856,7 +856,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         }
 
         boolean isRecordComponent() {
-            return component;
+            return component != null;
         }
 
         /**
@@ -1014,7 +1014,9 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                 arguments.add(ReflectionArguments.returnOf(name, candidate, beanType));
             }
             for (Method candidate : selectedFirst(setters, setter)) {
-                arguments.add(ReflectionArguments.of(name, candidate.getParameters()[0], beanType));
+                // the type of the parameter, not what the parameter declares: an annotation written on the
+                // parameter annotates the value passed to the setter, and a generated property does not carry it
+                arguments.add(ReflectionArguments.ofType(name, candidate.getParameters()[0], beanType));
             }
             return arguments;
         }
@@ -1088,6 +1090,12 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             // The parameter of a setter is not a site of the property at all: it annotates the value being
             // passed, and a generated property does not carry it
             AnnotationMetadata metadata = AnnotationMetadata.EMPTY_METADATA;
+            // the component of a record is the site the source writes, and the only one an annotation targeting
+            // ElementType.RECORD_COMPONENT lands on: javac copies an annotation to the field, the accessor and
+            // the constructor parameter only where the target admits it, so the component is read first
+            if (component != null) {
+                metadata = ReflectionAnnotations.merge(metadata, ReflectionAnnotations.metadataOf(component));
+            }
             for (Method candidate : selectedFirst(getters, getter)) {
                 metadata = ReflectionAnnotations.merge(metadata, ReflectionAnnotations.metadataOf(candidate));
             }
@@ -1269,13 +1277,17 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         /**
          * The return type as the bean type sees it: a variable the type declaring the method leaves open is
          * the type the bean type gives it rather than the bound of the variable, which is what a generated
-         * bean method reports. Its metadata is the metadata of the method, as for a generated one.
+         * bean method reports. Its metadata is the metadata of the method, as for a generated one, completed
+         * by what the return type itself carries: the annotations of the type and the ones declaring the
+         * variable it stands for, which a generated argument carries as well.
          */
         private static Argument<?> resolvedReturn(ReflectionExecutableMethod<?, ?> executable,
                                                   Class<?> beanType,
                                                   AnnotationMetadata metadata) {
             Argument<?> resolved = ReflectionArguments.returnOf(executable.getMethod(), beanType);
-            return Argument.of(resolved.getType(), metadata, resolved.getTypeParameters());
+            return Argument.of(resolved.getType(),
+                ReflectionAnnotations.merge(metadata, resolved.getAnnotationMetadata()),
+                resolved.getTypeParameters());
         }
 
         /**
