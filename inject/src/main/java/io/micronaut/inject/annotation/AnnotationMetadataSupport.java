@@ -621,7 +621,10 @@ public final class AnnotationMetadataSupport {
          * wrapped so that it compares by content the way {@link java.util.Arrays#deepEquals} does.
          */
         private Map<CharSequence, Object> effectiveValues(AnnotationValue<?> value) {
-            Map<CharSequence, Object> effective = new HashMap<>(getDefaultValues(annotationClass));
+            // read from the annotation type rather than from the registry keyed by annotation name: that
+            // registry is filled in as classes load, so consulting it would make equality depend on what the
+            // process has loaded so far, and on which of two class loaders defining the name registered last
+            Map<CharSequence, Object> effective = new HashMap<>(AnnotationDefaults.of(annotationClass));
             value.getValues().forEach((key, member) -> effective.put(key.toString(), member));
             effective.replaceAll((key, member) -> member != null && member.getClass().isArray()
                 ? new ArrayMembers(member)
