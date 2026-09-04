@@ -34,5 +34,5 @@ public record PythonConfiguration(
     public static final String PREFIX = "micronaut.python";
 
     /** The property used to enable or disable Python integration. */
-    public static final String ENABLED = PREFIX + ".enabled";
+    public static final String ENABLED_PROPERTY = PREFIX + ".enabled";
 }

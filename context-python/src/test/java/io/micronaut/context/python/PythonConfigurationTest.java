@@ -39,7 +39,7 @@ final class PythonConfigurationTest {
 
     @Test
     void pythonCanBeDisabledWithApplicationConfiguration() {
-        try (ApplicationContext context = ApplicationContext.run(Map.of(PythonConfiguration.ENABLED, false))) {
+        try (ApplicationContext context = ApplicationContext.run(Map.of(PythonConfiguration.ENABLED_PROPERTY, false))) {
             assertFalse(context.containsBean(Engine.class, Qualifiers.byName(PYTHON)));
             assertFalse(context.containsBean(Context.class, Qualifiers.byName(PYTHON)));
             assertFalse(context.containsBean(HostAccess.class, Qualifiers.byName(PYTHON)));
@@ -48,17 +48,17 @@ final class PythonConfigurationTest {
 
     @Test
     void pythonCanBeDisabledWithSystemProperty() {
-        String previous = System.getProperty(PythonConfiguration.ENABLED);
+        String previous = System.getProperty(PythonConfiguration.ENABLED_PROPERTY);
         try {
-            System.setProperty(PythonConfiguration.ENABLED, "false");
+            System.setProperty(PythonConfiguration.ENABLED_PROPERTY, "false");
             try (ApplicationContext context = ApplicationContext.run()) {
                 assertFalse(context.containsBean(Engine.class, Qualifiers.byName(PYTHON)));
             }
         } finally {
             if (previous == null) {
-                System.clearProperty(PythonConfiguration.ENABLED);
+                System.clearProperty(PythonConfiguration.ENABLED_PROPERTY);
             } else {
-                System.setProperty(PythonConfiguration.ENABLED, previous);
+                System.setProperty(PythonConfiguration.ENABLED_PROPERTY, previous);
             }
         }
     }

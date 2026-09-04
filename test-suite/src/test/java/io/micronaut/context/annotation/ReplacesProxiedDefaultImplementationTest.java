@@ -33,6 +33,7 @@ class ReplacesProxiedDefaultImplementationTest {
 
         @Async // any AOP advice: this makes the bean definition an intercepted proxy
         public void warmUp() {
+            // deliberately empty: the method exists to carry the advice, not to do work
         }
     }
 

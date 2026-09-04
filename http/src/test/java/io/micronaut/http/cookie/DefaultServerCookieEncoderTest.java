@@ -97,6 +97,14 @@ class DefaultServerCookieEncoderTest {
     }
 
     @Test
+    void encodeTreatsANullCookieValueAsEmpty() {
+        // Cookie::getValue is non-null by contract, so this cookie breaks it; the encoder still must not
+        // emit the four characters of "null"
+        ServerCookieEncoder cookieEncoder = new DefaultServerCookieEncoder();
+        assertEquals("SID=", cookieEncoder.encode(new NullValueCookie()).get(0));
+    }
+
+    @Test
     void encodeEmitsValidatedComponents() {
         ServerCookieEncoder cookieEncoder = new DefaultServerCookieEncoder();
         assertEquals("SID=value; Path=/safe; Domain=example.com", cookieEncoder.encode(new ChangingServerCookie()).get(0));
@@ -104,6 +112,18 @@ class DefaultServerCookieEncoderTest {
 
     private static Cookie cookie(String name, String value) {
         return new SimpleCookie(name, value).maxAge(Cookie.UNDEFINED_MAX_AGE);
+    }
+
+    private static final class NullValueCookie extends SimpleCookie {
+        private NullValueCookie() {
+            super("SID", "value");
+            maxAge(Cookie.UNDEFINED_MAX_AGE);
+        }
+
+        @Override
+        public String getValue() {
+            return null;
+        }
     }
 
     private static final class ChangingServerCookie extends SimpleCookie {

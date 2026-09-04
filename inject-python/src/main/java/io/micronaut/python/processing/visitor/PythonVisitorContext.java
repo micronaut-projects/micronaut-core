@@ -47,6 +47,8 @@ import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadata
  */
 @Experimental
 public final class PythonVisitorContext implements VisitorContext {
+
+    private static final String INFO_PREFIX = "INFO: ";
     private final MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
     private final Map<String, DecoratorDef> decorators;
     private final PythonProcessingEnvironment processingEnvironment;
@@ -104,15 +106,15 @@ public final class PythonVisitorContext implements VisitorContext {
     @Override
     public void info(String message, Element element) {
         if (element != null) {
-            System.out.println("INFO: " + message + " @ " + element);
+            System.out.println(INFO_PREFIX + message + " @ " + element);
         } else {
-            System.out.println("INFO: " + message);
+            System.out.println(INFO_PREFIX + message);
         }
     }
 
     @Override
     public void info(String message) {
-        System.out.println("INFO: " + message);
+        System.out.println(INFO_PREFIX + message);
     }
 
     @Override

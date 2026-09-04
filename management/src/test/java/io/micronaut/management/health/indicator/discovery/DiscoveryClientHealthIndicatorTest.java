@@ -71,6 +71,7 @@ class DiscoveryClientHealthIndicatorTest {
 
             @Override
             public void close() {
+                // nothing to release: the delegate of this test holds no resource
             }
         };
         DiscoveryClient decorated = new CompositeDiscoveryClient(new DiscoveryClient[]{delegate}) {

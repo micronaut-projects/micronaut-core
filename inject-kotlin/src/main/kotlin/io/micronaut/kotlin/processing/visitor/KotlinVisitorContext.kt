@@ -152,36 +152,22 @@ internal class KotlinVisitorContext(
         binaryNameCache.getOrPut(declaration) { computeBinaryName(declaration) }
 
     private fun computeBinaryName(decl: KSDeclaration): String {
-        var declaration = decl
-        if (declaration is KSFunctionDeclaration) {
-            val parent = declaration.parentDeclaration
-            if (parent != null) {
-                declaration = parent
-            }
-        }
-        val binaryName = if (declaration.qualifiedName != null) resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString() else null
-        if (binaryName != null) {
-            return binaryName
+        val declaration = enclosingDeclaration(decl)
+        val mappedName = mapQualifiedNameToJava(declaration)
+        if (mappedName != null) {
+            return mappedName
         }
         if (declaration.qualifiedName == null) {
             return "java.lang.Object" // Anonymous
         }
-        val classDeclaration = getClassDeclaration(declaration)
-        val qn = classDeclaration.qualifiedName
-        if (qn != null) {
-            val asString = resolver.mapKotlinNameToJava(qn)?.asString()
-            if (asString != null) {
-                return asString
-            }
+        val mappedClassName = mapQualifiedNameToJava(getClassDeclaration(declaration))
+        if (mappedClassName != null) {
+            return mappedClassName
         }
         if (declaration is KSClassDeclaration) {
-            val qualifiedName = declaration.qualifiedName
-            if (qualifiedName != null && qualifiedName.asString() == "kotlin.Unit") {
-                return "kotlin.Unit"
-            }
-            val signature = resolver.mapToJvmSignature(declaration)
-            if (signature != null) {
-                return Type.getType(signature).className
+            val classBinaryName = computeClassBinaryName(declaration)
+            if (classBinaryName != null) {
+                return classBinaryName
             }
         }
         if (declaration is KSTypeAlias) {
@@ -192,6 +178,36 @@ internal class KotlinVisitorContext(
         } else {
             declaration.simpleName.asString()
         }
+    }
+
+    /**
+     * A function is named after the class that declares it, so resolve to the parent when there is one.
+     */
+    private fun enclosingDeclaration(declaration: KSDeclaration): KSDeclaration =
+        if (declaration is KSFunctionDeclaration) {
+            declaration.parentDeclaration ?: declaration
+        } else {
+            declaration
+        }
+
+    /**
+     * The declaration's qualified name mapped to its Java counterpart, or `null` if it has no
+     * qualified name or no mapping exists.
+     */
+    private fun mapQualifiedNameToJava(declaration: KSDeclaration): String? {
+        val qualifiedName = declaration.qualifiedName ?: return null
+        return resolver.mapKotlinNameToJava(qualifiedName)?.asString()
+    }
+
+    /**
+     * The binary name derived from a class declaration's JVM signature, or `null` if it has none.
+     */
+    private fun computeClassBinaryName(declaration: KSClassDeclaration): String? {
+        if (declaration.qualifiedName?.asString() == "kotlin.Unit") {
+            return "kotlin.Unit"
+        }
+        val signature = resolver.mapToJvmSignature(declaration) ?: return null
+        return Type.getType(signature).className
     }
 
     private fun computeName(declaration: KSDeclaration): String {
