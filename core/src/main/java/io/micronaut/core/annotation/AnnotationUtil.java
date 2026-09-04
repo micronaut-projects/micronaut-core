@@ -62,6 +62,8 @@ public class AnnotationUtil {
             "kotlin.annotation.Target",
             Experimental.class.getName(),
             KOTLIN_METADATA,
+            // the Groovy compiler marks the members it synthesises, as the Kotlin one marks a class
+            "groovy.transform.Generated",
             "jdk.internal.ValueBased"
     );
 
