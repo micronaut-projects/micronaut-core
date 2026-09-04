@@ -2,12 +2,10 @@
 from typing import Annotated
 
 from micronaut.context.annotation import AliasFor
-from micronaut.core.annotation import Retainable
 from .Limit import Limit
 # end::imports[]
 
 # tag::class[]
-@Retainable
 @Limit(max=50)
 def MaxLength(value: Annotated[int, AliasFor(annotation=Limit, member="max", applyDefault=True)] = 50):
     def decorator(func):
