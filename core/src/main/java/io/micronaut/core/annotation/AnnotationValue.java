@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -717,6 +718,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES;
         }
         Object o = values.get(member);
+        if (o instanceof Collection<?> collection) {
+            o = heldValues(collection);
+        }
         if (o instanceof AnnotationClassValue<?> annotationClassValue) {
             return new AnnotationClassValue[]{annotationClassValue};
         }
@@ -728,6 +732,17 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         }
         if (o instanceof String[] classNames) {
             return Arrays.stream(classNames).map(AnnotationValue::getAnnotationClassValue).toArray(AnnotationClassValue[]::new);
+        }
+        if (o instanceof Object[] entries) {
+            List<AnnotationClassValue<?>> classValues = new ArrayList<>(entries.length);
+            for (Object entry : entries) {
+                if (entry instanceof AnnotationClassValue<?> annotationClassValue) {
+                    classValues.add(annotationClassValue);
+                } else if (entry instanceof CharSequence className) {
+                    classValues.add(getAnnotationClassValue(className.toString()));
+                }
+            }
+            return classValues.toArray(AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES);
         }
         return AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES;
     }
@@ -1368,6 +1383,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             }
             return Optional.empty();
         }
+        if (v instanceof Collection<?> collection) {
+            Iterator<?> i = collection.iterator();
+            if (i.hasNext() && i.next() instanceof AnnotationValue<?> value && value.getAnnotationName().equals(typeName)) {
+                return Optional.of((AnnotationValue<T>) value);
+            }
+        }
         return Optional.empty();
     }
 
@@ -1392,6 +1413,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             }
             return Optional.empty();
         }
+        if (v instanceof Collection<?> collection) {
+            Iterator<?> i = collection.iterator();
+            if (i.hasNext() && i.next() instanceof AnnotationValue<?> value) {
+                return Optional.of((AnnotationValue<T>) value);
+            }
+        }
         return Optional.empty();
     }
 
@@ -1412,8 +1439,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (attributes.isEmpty()) {
             return "@" + annotationName;
         } else {
-            return "@" + annotationName + "(" + attributes.entrySet().stream().map(entry -> entry.getKey() + "=" + toStringValue(entry.getValue())).collect(
-                    Collectors.joining(", ")) + ")";
+            // the members in name order: the map holds them in whichever order the builder filled it in, so a
+            // rendering that followed it would read differently for the same annotation described two ways
+            return "@" + annotationName + "(" + attributes.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(Comparator.comparing(CharSequence::toString)))
+                .map(entry -> entry.getKey() + "=" + toStringValue(entry.getValue()))
+                .collect(Collectors.joining(", ")) + ")";
         }
     }
 
@@ -1622,6 +1653,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             }
             return newArray;
         }
+        if (value instanceof Collection<?> collection) {
+            String[] newArray = new String[collection.size()];
+            int i = 0;
+            for (Object entry : collection) {
+                newArray[i++] = entry == null ? null : entry.toString();
+            }
+            return newArray;
+        }
         return new String[]{value.toString()};
     }
 
@@ -1678,6 +1717,24 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
+     * The values a collection holds, in an array of the type they would be held in had the metadata been
+     * generated: a metadata built at runtime accumulates the occurrences of a repeatable annotation in a
+     * collection, where a generated one holds them in an {@link AnnotationValue} array, and the accessors that
+     * map over a member value by value are to answer the same either way.
+     *
+     * @param collection The collection
+     * @return The values it holds, in an array
+     */
+    private static Object[] heldValues(Collection<?> collection) {
+        for (Object held : collection) {
+            if (!(held instanceof AnnotationValue)) {
+                return collection.toArray();
+            }
+        }
+        return collection.toArray(new AnnotationValue<?>[0]);
+    }
+
+    /**
      * The class values for the given value.
      *
      * @param value The value
@@ -1690,6 +1747,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         // A class can be present at compilation time
         if (value == null) {
             return null;
+        }
+        if (value instanceof Collection<?> collection) {
+            value = heldValues(collection);
         }
         if (value instanceof AnnotationClassValue<?> annotationClassValue) {
             Class<?> type = annotationClassValue.getType().orElse(null);

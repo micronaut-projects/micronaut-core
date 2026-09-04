@@ -128,6 +128,21 @@ class AnnotationMetadataSpec extends Specification {
         metadata.getAnnotationValuesByType(Requires).size() == 1
     }
 
+    void "test the occurrences of a repeatable annotation are read out one value per occurrence"() {
+        given: "a repeatable annotation added twice, which a metadata built at runtime accumulates in a collection"
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata()
+        metadata.addDeclaredRepeatable("foo.Tags", AnnotationValue.builder("foo.Tag").value("one").build(), RetentionPolicy.RUNTIME)
+        metadata.addDeclaredRepeatable("foo.Tags", AnnotationValue.builder("foo.Tag").value("two").build(), RetentionPolicy.RUNTIME)
+
+        expect: "the member holds both occurrences"
+        metadata.getAnnotationValuesByName("foo.Tag").size() == 2
+
+        and: "and the accessors that map over it answer one value per occurrence, not one holding the whole collection"
+        metadata.stringValues("foo.Tags", AnnotationMetadata.VALUE_MEMBER).length == 2
+        metadata.stringValues("foo.Tags", AnnotationMetadata.VALUE_MEMBER) ==
+            ['@foo.Tag(value=one)', '@foo.Tag(value=two)'] as String[]
+    }
+
     AnnotationMetadata newMetadata(AnnotationValueBuilder... builders) {
 
         def values = builders.collect({ it.build() })
