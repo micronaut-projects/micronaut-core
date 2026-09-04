@@ -32,15 +32,17 @@ class PojoWebSocketSpec:
         assert fred.getTopic() == "stuff"
         assert fred.getUsername() == "fred"
         assert bob.getUsername() == "bob"
-        self.awaitReply(fred.getReplies(), "[bob] Joined!", 1)
+        self.awaitReply(fred.getReplies(), "[bob] Joined!")
 
         fred.send(Message("Hello bob!"))
-        self.awaitReply(bob.getReplies(), "[fred] Hello bob!", 1)
+        self.awaitReply(bob.getReplies(), "[fred] Hello bob!")
+        assert not self.containsText(fred.getReplies(), "[fred] Hello bob!")
+        assert not self.containsText(bob.getReplies(), "[bob] Joined!")
 
         bob.send(Message("Hi fred. How are things?"))
-        self.awaitReply(fred.getReplies(), "[bob] Hi fred. How are things?", 2)
+        self.awaitReply(fred.getReplies(), "[bob] Hi fred. How are things?")
+        assert not self.containsText(bob.getReplies(), "[bob] Hi fred. How are things?")
         assert self.containsText(bob.getReplies(), "[fred] Hello bob!")
-        assert bob.getReplies().size() == 1
 
         assert fred.sendAsync(Message("foo")).get().getText() == "foo"
         assert Flux.from_(fred.sendRx(Message("bar"))).blockFirst().getText() == "bar"
@@ -48,13 +50,15 @@ class PojoWebSocketSpec:
         bob.close()
         fred.close()
 
-    def awaitReply(self, replies, expected: str, size: int) -> None:
+    def awaitReply(self, replies, expected: str) -> None:
+        # The reply count is deliberately not asserted: a broadcast only skips the session that
+        # sent it, so whether a client sees an earlier client's "Joined!" depends on whether it
+        # connected before that broadcast was delivered.
         for _ in range(150):
-            if self.containsText(replies, expected) and replies.size() == size:
+            if self.containsText(replies, expected):
                 return
             TimeUnit.MILLISECONDS.sleep(100)
         assert self.containsText(replies, expected)
-        assert replies.size() == size
 
     def containsText(self, replies, expected: str) -> bool:
         iterator = replies.iterator()
