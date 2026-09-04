@@ -62,7 +62,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     @Nullable
     private final ClassLoader classLoader;
     @Nullable
-    private Collection<PropertyExpressionResolver> expressionResolvers;
+    private volatile Collection<PropertyExpressionResolver> expressionResolvers;
 
     /**
      * @param environment The property resolver for the environment

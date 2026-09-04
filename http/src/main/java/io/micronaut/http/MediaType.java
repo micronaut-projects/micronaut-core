@@ -789,7 +789,7 @@ public class MediaType implements CharSequence {
 
     @SuppressWarnings("ConstantName")
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
-    private static @Nullable Map<String, String> mediaTypeFileExtensions;
+    private static volatile @Nullable Map<String, String> mediaTypeFileExtensions;
     @SuppressWarnings("ConstantName")
     private static final List<Pattern> textTypePatterns = new ArrayList<>(4);
 
@@ -1382,12 +1382,9 @@ public class MediaType implements CharSequence {
      */
     public static Optional<MediaType> forExtension(String extension) {
         if (StringUtils.isNotEmpty(extension)) {
-            Map<String, String> extensions = getMediaTypeFileExtensions();
-            if (extensions != null) {
-                String type = extensions.get(extension);
-                if (type != null) {
-                    return Optional.of(new MediaType(type, extension));
-                }
+            String type = getMediaTypeFileExtensions().get(extension);
+            if (type != null) {
+                return Optional.of(new MediaType(type, extension));
             }
         }
         return Optional.empty();
@@ -1408,7 +1405,7 @@ public class MediaType implements CharSequence {
     }
 
     @SuppressWarnings("MagicNumber")
-    private static @Nullable Map<String, String> getMediaTypeFileExtensions() {
+    private static Map<String, String> getMediaTypeFileExtensions() {
         Map<String, String> extensions = mediaTypeFileExtensions;
         if (extensions == null) {
             synchronized (MediaType.class) { // double check
@@ -1416,10 +1413,10 @@ public class MediaType implements CharSequence {
                 if (extensions == null) {
                     try {
                         extensions = loadMimeTypes();
-                        mediaTypeFileExtensions = extensions;
                     } catch (Exception e) {
-                        mediaTypeFileExtensions = Collections.emptyMap();
+                        extensions = Collections.emptyMap();
                     }
+                    mediaTypeFileExtensions = extensions;
                 }
             }
         }

@@ -44,7 +44,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     private static final String MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
 
     @Nullable
-    private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
+    private volatile Map<String, BeanIntrospectionReference<Object>> introspectionMap;
     private final ClassLoader classLoader;
     private final boolean useContextClassLoader;
 
