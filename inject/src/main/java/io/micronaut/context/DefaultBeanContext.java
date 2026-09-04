@@ -115,11 +115,13 @@ import org.slf4j.LoggerFactory;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.AbstractMap;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.EventListener;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -3501,8 +3503,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      *
      * <p>A bean is destroyed before every bean it requires, whether the requirement comes from an injection point or
      * from {@link DependsOn}, so that a dependency outlives its dependents. Where the dependencies leave the order
-     * open, beans are destroyed in bean name order so that the sequence is stable between runs. Dependency cycles are
-     * broken by destroying the first bean of the cycle in that order.</p>
+     * open, beans are destroyed in bean name order so that the sequence is stable between runs. A dependency cycle
+     * cannot satisfy that guarantee for every one of its members, so it is broken by destroying the first bean in
+     * name order that lies on a cycle; beans that merely depend on a cycle are never chosen to break it.</p>
      *
      * @param beans The registrations
      * @return The registrations in destruction order
@@ -3555,14 +3558,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 ready.add(i);
             }
         }
-        int nextCycleCandidate = 0;
         while (sorted.size() < size) {
             if (ready.isEmpty()) {
-                // every remaining bean is part of a dependency cycle, break it at the first bean
-                while (destroyed[nextCycleCandidate]) {
-                    nextCycleCandidate++;
-                }
-                ready.add(nextCycleCandidate);
+                // the remaining beans are a cycle plus whatever the cycle requires, so break the cycle itself
+                ready.add(findCycleNode(dependencies, destroyed));
             }
             final int i = ready.poll();
             if (destroyed[i]) {
@@ -3577,6 +3576,39 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
         return sorted;
+    }
+
+    /**
+     * Finds the first not yet destroyed node in index order that lies on a dependency cycle of the remaining graph.
+     *
+     * @param dependencies The dependencies of every node
+     * @param destroyed    The nodes that have already been sorted
+     * @return The index of the node to break the cycle at
+     */
+    private int findCycleNode(List<List<Integer>> dependencies, boolean[] destroyed) {
+        final boolean[] visited = new boolean[destroyed.length];
+        final Deque<Integer> stack = new ArrayDeque<>();
+        for (int candidate = 0; candidate < destroyed.length; candidate++) {
+            if (destroyed[candidate]) {
+                continue;
+            }
+            // the candidate is on a cycle when it can reach itself along the dependencies of the remaining nodes
+            Arrays.fill(visited, false);
+            stack.clear();
+            stack.push(candidate);
+            while (!stack.isEmpty()) {
+                for (int next : dependencies.get(stack.pop())) {
+                    if (next == candidate) {
+                        return candidate;
+                    }
+                    if (!destroyed[next] && !visited[next]) {
+                        visited[next] = true;
+                        stack.push(next);
+                    }
+                }
+            }
+        }
+        throw new IllegalStateException("No dependency cycle found among the remaining singletons");
     }
 
     @Override
