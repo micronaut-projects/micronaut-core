@@ -2,6 +2,7 @@ package io.micronaut.http.server
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.util.StringUtils
+import io.micronaut.http.server.cors.CorsFilter
 import spock.lang.Specification
 
 class HttpServerConfigurationSpec extends Specification {
@@ -53,6 +54,34 @@ class HttpServerConfigurationSpec extends Specification {
 
         expect:
         !httpServerConfiguration.redispatchNonBlockingOnly
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void corsFilterDefaultsToEnabled() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run()
+        HttpServerConfiguration httpServerConfiguration = applicationContext.getBean(HttpServerConfiguration)
+
+        expect:
+        httpServerConfiguration.cors.filter.enabled
+        applicationContext.containsBean(CorsFilter)
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void corsFilterCanBeDisabledViaConfiguration() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run([
+            'micronaut.server.cors.filter.enabled': StringUtils.FALSE
+        ])
+        HttpServerConfiguration httpServerConfiguration = applicationContext.getBean(HttpServerConfiguration)
+
+        expect:
+        !httpServerConfiguration.cors.filter.enabled
+        !applicationContext.containsBean(CorsFilter)
 
         cleanup:
         applicationContext.close()
