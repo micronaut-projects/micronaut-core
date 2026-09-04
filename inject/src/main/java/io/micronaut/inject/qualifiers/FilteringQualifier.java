@@ -18,6 +18,7 @@ package io.micronaut.inject.qualifiers;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.QualifiedBeanType;
 
@@ -41,11 +42,14 @@ public abstract class FilteringQualifier<T> implements Qualifier<T> {
      * answer for it. A qualifier that reports one can be answered by looking that type up in the index instead
      * of filtering every bean definition reference.
      *
+     * <p>An {@link Argument} rather than a {@link Class} so that the qualifier holds the one the index is keyed
+     * by, instead of a new one being built on every lookup.</p>
+     *
      * @return The indexed type, or {@code null} when the qualifier has to be answered by filtering
      * @since 5.2.0
      */
     @Nullable
-    public Class<?> getIndexedType() {
+    public Argument<?> getIndexedArgument() {
         return null;
     }
 

@@ -1660,11 +1660,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         Collection<BeanDefinition<Object>> candidates;
         if (qualifier instanceof FilteringQualifier<Object> filteringQualifier) {
-            Class<?> indexedType = filteringQualifier.getIndexedType();
-            if (indexedType != null) {
+            @SuppressWarnings("unchecked")
+            Argument<Object> indexedArgument = (Argument<Object>) filteringQualifier.getIndexedArgument();
+            if (indexedArgument != null) {
                 // the compile-time index holds every bean this qualifier selects, so there is nothing to filter
-                @SuppressWarnings("unchecked")
-                Argument<Object> indexedArgument = (Argument<Object>) Argument.of(indexedType);
                 return getBeanDefinitions(indexedArgument);
             }
             // Keep anonymous

@@ -22,6 +22,7 @@ import io.micronaut.inject.BeanType;
 
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.type.Argument;
 
 import java.lang.annotation.Annotation;
 import java.util.Objects;
@@ -43,14 +44,14 @@ final class AnnotationStereotypeQualifier<T> extends FilteringQualifier<T> {
      * which the compile-time index answers exhaustively. Null otherwise.
      */
     @Nullable
-    private final Class<? extends Annotation> indexedType;
+    private final Argument<?> indexedArgument;
 
     /**
      * @param stereotype The stereotype
      */
     AnnotationStereotypeQualifier(String stereotype) {
         this.stereotype = Objects.requireNonNull(stereotype, "Stereotype cannot be null");
-        this.indexedType = null;
+        this.indexedArgument = null;
     }
 
     /**
@@ -59,7 +60,7 @@ final class AnnotationStereotypeQualifier<T> extends FilteringQualifier<T> {
     AnnotationStereotypeQualifier(Class<? extends Annotation> stereotype) {
         Objects.requireNonNull(stereotype, "Stereotype cannot be null");
         this.stereotype = stereotype.getName();
-        this.indexedType = isSelfIndexed(stereotype) ? stereotype : null;
+        this.indexedArgument = isSelfIndexed(stereotype) ? Argument.of(stereotype) : null;
     }
 
     /**
@@ -80,8 +81,8 @@ final class AnnotationStereotypeQualifier<T> extends FilteringQualifier<T> {
 
     @Override
     @Nullable
-    public Class<?> getIndexedType() {
-        return indexedType;
+    public Argument<?> getIndexedArgument() {
+        return indexedArgument;
     }
 
     @Override

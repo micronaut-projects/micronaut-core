@@ -58,10 +58,10 @@ class Neither {
         Class<?> marked = context.classLoader.loadClass('nidx.Marked')
 
         expect: 'the plain annotation reports no indexed type, so the qualifier is answered by scanning'
-        ((FilteringQualifier) Qualifiers.byStereotype(plain)).getIndexedType() == null
+        ((FilteringQualifier) Qualifiers.byStereotype(plain)).getIndexedArgument() == null
 
         and: 'while the indexed one does take the index'
-        ((FilteringQualifier) Qualifiers.byStereotype(marked)).getIndexedType() == marked
+        ((FilteringQualifier) Qualifiers.byStereotype(marked)).getIndexedArgument().type == marked
 
         when: 'the plain stereotype is resolved the way it always was'
         Collection<BeanDefinition<?>> scanned = context.getBeanDefinitions(Qualifiers.byStereotype(plain))
@@ -109,7 +109,7 @@ class MarkedTwo {
         Class<?> marked = context.classLoader.loadClass('nidx2.Marked')
 
         expect: 'the qualifier built from the annotation name keeps the scan, having no type to index by'
-        ((FilteringQualifier) Qualifiers.byStereotype(marked.name)).getIndexedType() == null
+        ((FilteringQualifier) Qualifiers.byStereotype(marked.name)).getIndexedArgument() == null
 
         when: 'the same annotation is resolved by name and by type'
         Collection<BeanDefinition<?>> byName = context.getBeanDefinitions(Qualifiers.byStereotype(marked.name))
