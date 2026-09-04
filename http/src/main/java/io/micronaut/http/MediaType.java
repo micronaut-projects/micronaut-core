@@ -351,7 +351,7 @@ public class MediaType implements CharSequence {
     /**
      * XML: Microsoft Powerpoint Open XML (PPTX).
      */
-    public static final MediaType MICROSOFT_POWERPOINT_OPEN_XML_TYPE = new MediaType(MICROSOFT_WORD_OPEN_XML, EXTENSION_PPTX);
+    public static final MediaType MICROSOFT_POWERPOINT_OPEN_XML_TYPE = new MediaType(MICROSOFT_POWERPOINT_OPEN_XML, EXTENSION_PPTX);
 
     /**
      * Microsoft Powerpoint files in use between 97-2003.
