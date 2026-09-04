@@ -162,7 +162,8 @@ public @interface Introspected {
      * elements.</p>
      *
      * <p>Defaults to {@code false} since the additional metadata increases the size of the generated
-     * introspection.</p>
+     * introspection. Has no effect when {@link #annotationMetadata()} is {@code false}, since the members carry
+     * nothing but their own annotation metadata.</p>
      *
      * @return True if the property members should be included.
      * @since 5.2.0

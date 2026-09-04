@@ -1614,7 +1614,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         @Override
         public List<BeanPropertyMember<B, ?>> getMembers() {
-            BeanPropertyMemberRef[] memberRefs = ref.members;
+            BeanPropertyMemberRef @Nullable [] memberRefs = ref.members;
             if (memberRefs == null || memberRefs.length == 0) {
                 return Collections.emptyList();
             }
