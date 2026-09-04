@@ -17,6 +17,7 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.QualifiedBeanType;
 
@@ -34,6 +35,19 @@ import java.util.stream.Stream;
  */
 @Internal
 public abstract class FilteringQualifier<T> implements Qualifier<T> {
+
+    /**
+     * The type the beans this qualifier selects are indexed by, when the compile-time index is an exhaustive
+     * answer for it. A qualifier that reports one can be answered by looking that type up in the index instead
+     * of filtering every bean definition reference.
+     *
+     * @return The indexed type, or {@code null} when the qualifier has to be answered by filtering
+     * @since 5.2.0
+     */
+    @Nullable
+    public Class<?> getIndexedType() {
+        return null;
+    }
 
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
