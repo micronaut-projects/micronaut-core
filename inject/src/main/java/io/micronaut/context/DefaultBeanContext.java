@@ -400,7 +400,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     @Override
     public synchronized BeanContext stop() {
-        if (terminating.compareAndSet(false, true) && isRunning()) {
+        // Only mark as terminating if a shutdown is actually going to run, otherwise the flag would be left set forever
+        if (isRunning() && terminating.compareAndSet(false, true)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Stopping BeanContext");
             }
