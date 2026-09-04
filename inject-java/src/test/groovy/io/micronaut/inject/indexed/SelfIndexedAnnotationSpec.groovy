@@ -3,7 +3,6 @@ package io.micronaut.inject.indexed
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.qualifiers.Qualifiers
 
 /**
  * An annotation that is meta-annotated with {@code @Indexed} by its own type indexes every bean carrying it,

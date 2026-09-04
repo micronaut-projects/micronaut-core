@@ -17,7 +17,6 @@ package io.micronaut.messaging
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.messaging.annotation.MessageListener
 import spock.lang.Specification
 
