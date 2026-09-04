@@ -593,6 +593,19 @@ public final class ReflectionAnnotations {
     private static Map<CharSequence, Object> values(Annotation annotation,
                                                     Set<Class<?>> chain,
                                                     @Nullable Map<CharSequence, Object> applied) {
+        return values(annotation, chain, applied, null);
+    }
+
+    /**
+     * The values of an annotation, keeping a member the source wrote even where it is equal to the default of
+     * its type.
+     *
+     * @param written The members the source wrote, or {@code null} when the class file cannot say
+     */
+    private static Map<CharSequence, Object> values(Annotation annotation,
+                                                    Set<Class<?>> chain,
+                                                    @Nullable Map<CharSequence, Object> applied,
+                                                    @Nullable Set<String> written) {
         Class<? extends Annotation> type = annotation.annotationType();
         // reading the instance and converting its members is the shared conversion of the core API, a nested
         // annotation and the members of it included; what this module adds on top of it is the policies below
@@ -615,7 +628,12 @@ public final class ReflectionAnnotations {
             // the converted forms are compared, and by content: a member holding an array answers a fresh one.
             // both sides are the form the shared conversion gives, the defaults included, so the comparison is
             // made before the policies below reshape a nested annotation
-            if (value == null || Objects.deepEquals(value, defaults.get(name))) {
+            if (value == null) {
+                continue;
+            }
+            // a member equal to its default is left out, as it is at compilation time - unless the class file
+            // says the source wrote it, which is the one thing an instance cannot tell and the processors record
+            if (Objects.deepEquals(value, defaults.get(name)) && (written == null || !written.contains(name))) {
                 continue;
             }
             values.put(name, memberValue(annotation, member, value));
@@ -750,7 +768,7 @@ public final class ReflectionAnnotations {
                                         Annotation annotation,
                                         boolean declared) {
         try {
-            addAnnotation(metadata, annotation, declared);
+            addAnnotation(metadata, annotation, declared, WrittenMembers.of(element, annotation.annotationType()));
         } catch (RuntimeException e) {
             ClassUtils.REFLECTION_LOGGER.debug("Skipping the annotation [{}] of [{}], its values cannot be read",
                 annotation.annotationType().getName(), element, e);
@@ -815,6 +833,13 @@ public final class ReflectionAnnotations {
     }
 
     private static void addAnnotation(MutableAnnotationMetadata metadata, Annotation annotation, boolean declared) {
+        addAnnotation(metadata, annotation, declared, null);
+    }
+
+    private static void addAnnotation(MutableAnnotationMetadata metadata,
+                                      Annotation annotation,
+                                      boolean declared,
+                                      @Nullable Set<String> written) {
         Class<? extends Annotation> type = annotation.annotationType();
         if (isIgnored(type)) {
             return;
@@ -834,10 +859,11 @@ public final class ReflectionAnnotations {
         }
         register(metadata, type);
         String name = type.getName();
+        Map<CharSequence, Object> values = values(annotation, new HashSet<>(), null, written);
         if (declared) {
-            metadata.addDeclaredAnnotation(name, values(annotation));
+            metadata.addDeclaredAnnotation(name, values);
         } else {
-            metadata.addAnnotation(name, values(annotation));
+            metadata.addAnnotation(name, values);
         }
         addStereotypes(metadata, type, List.of(name), declared, aliasedMembers(annotation));
     }
