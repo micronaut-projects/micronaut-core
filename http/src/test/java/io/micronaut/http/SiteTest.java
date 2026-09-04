@@ -15,16 +15,41 @@
  */
 package io.micronaut.http;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class SiteTest {
+
+    /**
+     * The site values the specification lists, so that this enum drifting away from the
+     * specification fails here rather than silently dropping metadata at runtime.
+     *
+     * @see <a href="https://www.w3.org/TR/fetch-metadata/#sec-fetch-site-header">Site</a>
+     */
+    private static final Set<String> SPECIFICATION_VALUES = Set.of(
+        "cross-site",
+        "same-origin",
+        "same-site",
+        "none"
+    );
+
+    @Test
+    void listsExactlyTheSiteValuesOfTheSpecification() {
+        Set<String> declared = Stream.of(Site.values())
+            .map(Site::toString)
+            .collect(Collectors.toSet());
+
+        assertEquals(SPECIFICATION_VALUES, declared);
+    }
 
     @ParameterizedTest
     @MethodSource
