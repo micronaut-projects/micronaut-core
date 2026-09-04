@@ -33,9 +33,17 @@ import java.util.Set;
  * type-use annotations of the declaration. A caller that wants those - an {@link io.micronaut.core.type.Argument}
  * shaped like the one the annotation processors generate - wants
  * {@code io.micronaut.reflection.ReflectionArguments#resolveGenericToArgument(Class, Class)} of the
- * {@code micronaut-reflection} module instead. This class stays: the compiler side of Micronaut resolves the type
- * arguments of a {@code TypeElementVisitor} through it, and a runtime module is not something the annotation
- * processor classpath can carry.</p>
+ * {@code micronaut-reflection} module instead.</p>
+ *
+ * <p>The three methods that search a type hierarchy are deprecated, and not only for the erasure: they match the
+ * super type by its raw type without substituting the type variables of the levels between, so an argument bound
+ * at an intermediate generic type is not found at all. The methods that read one level - {@link
+ * #resolveTypeArguments(Type)}, {@link #resolveSuperGenericTypeArgument(Class)}, {@link
+ * #resolveGenericTypeArgument(Field)} - do what they say and stay.</p>
+ *
+ * <p>The class stays as well: the compiler side of Micronaut resolves the type arguments of a
+ * {@code TypeElementVisitor} through it, and a runtime module is not something the annotation processor
+ * classpath can carry.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -67,7 +75,13 @@ public class GenericTypeUtils {
      * @param type          The type to resolve from
      * @param interfaceType The interface to resolve from
      * @return The type arguments to the interface
+     * @deprecated The interface is matched by its raw type without substituting the type variables of the levels
+     * between, so an argument bound at an intermediate generic type is not found: for a
+     * {@code class Leaf extends Mid<String>} whose {@code Mid<T> implements Iface<T>}, this answers nothing
+     * rather than {@code String}. Use {@code io.micronaut.reflection.ReflectionArguments#resolveGenericToArgument(Class, Class)}
+     * of the {@code micronaut-reflection} module, which resolves the bindings of every level.
      */
+    @Deprecated(since = "5.2", forRemoval = true)
     public static Class<?>[] resolveInterfaceTypeArguments(Class<?> type, Class<?> interfaceType) {
         Optional<Type> resolvedType = getAllGenericInterfaces(type)
                 .stream()
@@ -89,7 +103,13 @@ public class GenericTypeUtils {
      * @param type      The type to resolve from
      * @param superTypeToResolve The suepr type to resolve from
      * @return The type arguments to the interface
+     * @deprecated The super class is matched by its raw type without substituting the type variables of the
+     * levels between, so an argument bound at an intermediate generic type is not found: for a
+     * {@code class Baz extends Bar<String>} whose {@code Bar<T> extends Foo<T>}, this answers nothing rather
+     * than {@code String}. Use {@code io.micronaut.reflection.ReflectionArguments#resolveGenericToArgument(Class, Class)}
+     * of the {@code micronaut-reflection} module, which resolves the bindings of every level.
      */
+    @Deprecated(since = "5.2", forRemoval = true)
     public static Class<?>[] resolveSuperTypeGenericArguments(Class<?> type, Class<?> superTypeToResolve) {
         Type supertype = type.getGenericSuperclass();
         Class<?> superclass = type.getSuperclass();
@@ -145,7 +165,12 @@ public class GenericTypeUtils {
      * @param type          The type to resolve from
      * @param interfaceType The interface to resolve for
      * @return The class or null
+     * @deprecated Carries the same limitation as {@link #resolveInterfaceTypeArguments(Class, Class)}: an
+     * argument bound at an intermediate generic type is not found. Use
+     * {@code io.micronaut.reflection.ReflectionArguments#resolveGenericToArgument(Class, Class)} of the
+     * {@code micronaut-reflection} module and read its first type parameter.
      */
+    @Deprecated(since = "5.2", forRemoval = true)
     public static Optional<Class<?>> resolveInterfaceTypeArgument(Class<?> type, Class<?> interfaceType) {
         Type[] genericInterfaces = type.getGenericInterfaces();
         for (Type genericInterface : genericInterfaces) {
