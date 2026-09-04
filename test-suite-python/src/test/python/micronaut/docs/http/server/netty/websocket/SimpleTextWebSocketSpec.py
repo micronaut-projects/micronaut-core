@@ -34,15 +34,17 @@ class SimpleTextWebSocketSpec:
         assert fred.getTopic() == "stuff"
         assert fred.getUsername() == "fred"
         assert bob.getUsername() == "bob"
-        self.awaitReply(fred.getReplies(), "[bob] Joined!", 1)
+        self.awaitReply(fred.getReplies(), "[bob] Joined!")
 
         fred.send("Hello bob!")
-        self.awaitReply(bob.getReplies(), "[fred] Hello bob!", 1)
+        self.awaitReply(bob.getReplies(), "[fred] Hello bob!")
+        assert not fred.getReplies().contains("[fred] Hello bob!")
+        assert not bob.getReplies().contains("[bob] Joined!")
 
         bob.send("Hi fred. How are things?")
-        self.awaitReply(fred.getReplies(), "[bob] Hi fred. How are things?", 2)
+        self.awaitReply(fred.getReplies(), "[bob] Hi fred. How are things?")
+        assert not bob.getReplies().contains("[bob] Hi fred. How are things?")
         assert bob.getReplies().contains("[fred] Hello bob!")
-        assert bob.getReplies().size() == 1
 
         assert fred.sendAsync("foo").get() == "foo"
         assert Flux.from_(fred.sendRx("bar")).blockFirst() == "bar"
@@ -56,10 +58,12 @@ class SimpleTextWebSocketSpec:
         assert not bob.getSession().isOpen()
         assert not fred.getSession().isOpen()
 
-    def awaitReply(self, replies, expected: str, size: int) -> None:
+    def awaitReply(self, replies, expected: str) -> None:
+        # The reply count is deliberately not asserted: a broadcast only skips the session that
+        # sent it, so whether a client sees an earlier client's "Joined!" depends on whether it
+        # connected before that broadcast was delivered.
         for _ in range(30):
-            if replies.contains(expected) and replies.size() == size:
+            if replies.contains(expected):
                 return
             TimeUnit.MILLISECONDS.sleep(100)
         assert replies.contains(expected)
-        assert replies.size() == size
