@@ -128,7 +128,7 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
             return false;
         }
         final AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
-        Collection<AnnotationValue<Annotation>> interceptorValues = resolveInterceptorAnnotationValues(annotationMetadata, null);
+        Collection<AnnotationValue<Annotation>> interceptorValues = resolveInterceptorAnnotationValues(annotationMetadata);
         for (AnnotationValue<?> interceptorBinding : interceptorValues) {
             final String annotationName = interceptorBinding.stringValue().orElse(null);
             if (annotationName == null || !supportedAnnotationNames.containsKey(annotationName)) {
@@ -314,9 +314,7 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
         }
     }
 
-    private static Collection<AnnotationValue<Annotation>> resolveInterceptorAnnotationValues(
-        AnnotationMetadata annotationMetadata,
-        @Nullable String kind) {
+    private static Collection<AnnotationValue<Annotation>> resolveInterceptorAnnotationValues(AnnotationMetadata annotationMetadata) {
         List<AnnotationValue<Annotation>> bindings = annotationMetadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
         if (CollectionUtils.isEmpty(bindings)) {
             return Collections.emptyList();
@@ -326,9 +324,7 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
             if (av.stringValue().isEmpty()) {
                 continue;
             }
-            if (kind == null || av.stringValue("kind").orElse(kind).equals(kind)) {
-                result.add(av);
-            }
+            result.add(av);
         }
         return result;
     }
