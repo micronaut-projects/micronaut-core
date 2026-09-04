@@ -19,6 +19,8 @@ import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
+import java.util.concurrent.TimeUnit
+
 class ParallelBeanSpec extends Specification {
 
     void "test initialize bean in parallel"() {
@@ -33,5 +35,46 @@ class ParallelBeanSpec extends Specification {
 
         cleanup:
         ctx.close()
+    }
+
+    void "test parallel bean still in construction when the context is closed is destroyed"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run('parallel.shutdown.bean.enabled': true)
+
+        expect: "the bean construction has started on a parallel thread"
+        SlowShutdownParallelBean.CONSTRUCTING.await(10, TimeUnit.SECONDS)
+
+        when: "the context is closed, releasing the construction only once shutdown has started"
+        ctx.close()
+
+        then: "the bean that registered during shutdown still had its @PreDestroy called"
+        SlowShutdownParallelBean.DESTROYED.await(10, TimeUnit.SECONDS)
+    }
+
+    void "test the parallel bean discovery thread does not outlive the context"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run('parallel.blocking.condition.enabled': true)
+
+        expect: "condition evaluation is blocking the discovery thread"
+        BlockingParallelCondition.EVALUATING.await(10, TimeUnit.SECONDS)
+
+        when:
+        Thread discoveryThread = findDiscoveryThread()
+
+        then:
+        discoveryThread != null
+
+        when:
+        ctx.close()
+
+        then: "close interrupted and joined the discovery thread"
+        !discoveryThread.isAlive()
+        findDiscoveryThread() == null
+    }
+
+    private static Thread findDiscoveryThread() {
+        Thread.getAllStackTraces().keySet().find {
+            it.isAlive() && it.name == BlockingParallelCondition.DISCOVERY_THREAD_NAME
+        }
     }
 }
