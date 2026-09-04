@@ -31,6 +31,7 @@ import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
+import java.lang.annotation.ElementType
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractKotlinCompilerSpec {
@@ -2562,6 +2563,30 @@ class MyMessage: Message()
 ''')
         then:
         noExceptionThrown()
+    }
+
+    void 'test property members'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Person', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import jakarta.validation.constraints.NotNull
+
+@Introspected(members = true)
+class Person {
+    @field:NotNull
+    var name: String? = null
+}
+''')
+        def members = introspection.getProperty("name").get().members
+
+        expect: "only the backing field is listed, the Kotlin generated accessors are synthetic"
+        members*.name == ["name"]
+        members*.elementType == [ElementType.FIELD]
+        members[0].annotationMetadata.hasAnnotation(NotNull)
+        members[0].readable
+        members[0].read(introspection.instantiate()) == null
     }
 
     void "constructors = true does not change the constructor beans are built with"() {

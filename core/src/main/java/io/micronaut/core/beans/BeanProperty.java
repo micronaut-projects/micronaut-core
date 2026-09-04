@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.beans;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NextMajorVersion;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -27,6 +28,8 @@ import io.micronaut.core.util.ArgumentUtils;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -294,5 +297,25 @@ public interface BeanProperty<B, T> extends BeanReadProperty<B, T>, BeanWritePro
     @Override
     default Class<B> getDeclaringType() {
         return getDeclaringBean().getBeanType();
+    }
+
+    /**
+     * The individual members (the field, the read method and the write method) that this property is composed of.
+     *
+     * <p>A property merges its members into a single element with a single merged
+     * {@link io.micronaut.core.annotation.AnnotationMetadata}. This method exposes each member separately, with its own
+     * annotation metadata, its own {@link Argument} and its own accessor, which is required by specifications such as
+     * Jakarta Bean Validation that treat a field and a getter as two distinct constrained elements.</p>
+     *
+     * <p>The members are only computed at compilation time if the introspection was generated with
+     * {@link io.micronaut.core.annotation.Introspected#members()} set to {@code true}. Otherwise, and for any
+     * {@link BeanProperty} implementation that doesn't support members, an empty list is returned.</p>
+     *
+     * @return The members of this property, or an empty list if unavailable
+     * @since 5.2.0
+     */
+    @Experimental
+    default List<BeanPropertyMember<B, ?>> getMembers() {
+        return Collections.emptyList();
     }
 }
