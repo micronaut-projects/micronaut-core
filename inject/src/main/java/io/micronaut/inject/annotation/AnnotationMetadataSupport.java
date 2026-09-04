@@ -550,6 +550,23 @@ public final class AnnotationMetadataSupport {
      * @param <A> The annotation type
      */
 
+    /**
+     * An array member of an annotation, comparing by content rather than by identity, so that the maps holding
+     * two annotations' members can be compared with {@link Map#equals}.
+     */
+    private record ArrayMembers(Object array) {
+
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof ArrayMembers other && Objects.deepEquals(array, other.array);
+        }
+
+        @Override
+        public int hashCode() {
+            return array instanceof Object[] members ? Arrays.deepHashCode(members) : 0;
+        }
+    }
+
     private static class AnnotationProxyHandler<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
         private final int hashCode;
         private final Class<A> annotationClass;
@@ -588,8 +605,28 @@ public final class AnnotationMetadataSupport {
             } else if (this.annotationValue == null || otherValues == null) {
                 return false;
             } else {
-                return annotationValue.equals(otherValues);
+                // the contract of Annotation#equals compares the members two annotations answer, not the way
+                // either of them stores them: a value that omits a member equal to its default and one that
+                // writes it out answer the same member, so both are completed by the defaults of the type
+                // before they are compared. Comparing the stored values instead makes equality depend on the
+                // representation, breaks symmetry against an annotation the JVM created, and leaves equivalent
+                // annotations as separate entries of a set, while hashCode - computed over the completed
+                // members - says they are the same
+                return effectiveValues(this.annotationValue).equals(effectiveValues(otherValues));
             }
+        }
+
+        /**
+         * The members an annotation answers: the values it stores over the defaults of its type, with an array
+         * wrapped so that it compares by content the way {@link java.util.Arrays#deepEquals} does.
+         */
+        private Map<CharSequence, Object> effectiveValues(AnnotationValue<?> value) {
+            Map<CharSequence, Object> effective = new HashMap<>(getDefaultValues(annotationClass));
+            value.getValues().forEach((key, member) -> effective.put(key.toString(), member));
+            effective.replaceAll((key, member) -> member != null && member.getClass().isArray()
+                ? new ArrayMembers(member)
+                : member);
+            return effective;
         }
 
         @Nullable
@@ -600,14 +637,10 @@ public final class AnnotationMetadataSupport {
             if (!annotationClass.equals(other.annotationType())) {
                 return null;
             }
-            Map<CharSequence, Object> values = new HashMap<>();
-            for (Method method : annotationClass.getDeclaredMethods()) {
-                Object value = ReflectionUtils.invokeMethod(other, method);
-                if (value != null) {
-                    values.put(method.getName(), value);
-                }
-            }
-            return new AnnotationValue<>(annotationClass.getName(), values);
+            // the shared conversion, so that a class member is an AnnotationClassValue and an enum member its
+            // constant name on this side too: comparing the raw forms an instance answers against the recorded
+            // ones never matches
+            return AnnotationValue.of(other);
         }
 
         @Override
