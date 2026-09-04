@@ -364,6 +364,52 @@ class AnnotationValueSpec extends Specification {
         av.isFalse("six")
     }
 
+    void "a member held in a collection is read through every branch an array is read through"() {
+        given:
+        def bar = AnnotationValue.builder(Bar).build()
+
+        expect: "a collection of class names reads as class values, as an array of them does"
+        def names = new AnnotationValue("test.Types", [value: ["java.lang.String", "java.util.Random"] as LinkedHashSet] as Map<CharSequence, Object>)
+        names.annotationClassValues("value")*.name == ["java.lang.String", "java.util.Random"]
+        names.annotationClassValues("absent").length == 0
+
+        and: "a collection holding only annotations is read as the array of them a generated metadata would hold"
+        def annotations = new AnnotationValue("test.Types", [value: [bar] as LinkedHashSet] as Map<CharSequence, Object>)
+        annotations.classValues("value") == [] as Class[]
+        annotations.annotationClassValues("value").length == 0
+
+        and: "an empty collection holds nothing to read"
+        def empty = new AnnotationValue("test.Types", [value: [] as LinkedHashSet] as Map<CharSequence, Object>)
+        empty.classValues("value") == [] as Class[]
+        !empty.getAnnotation("value").isPresent()
+
+        and: "an entry bound to null is rendered as one, rather than failing"
+        def nulls = new AnnotationValue("test.Strings", [value: ["a", null]] as Map<CharSequence, Object>)
+        nulls.stringValues("value") == ["a", null] as String[]
+    }
+
+    void "getAnnotation() reads the first occurrence out of a collection, as it does out of an array"() {
+        given:
+        def bar = AnnotationValue.builder(Bar).build()
+        def held = new AnnotationValue("test.Foo",
+            [bars: [bar] as LinkedHashSet, plain: ["one"] as LinkedHashSet] as Map<CharSequence, Object>)
+
+        expect: "the occurrence is read when its type matches, and not when it does not"
+        held.getAnnotation("bars", Bar).get() == bar
+        !held.getAnnotation("bars", Baz).isPresent()
+        held.getAnnotation("bars").get() == bar
+
+        and: "a collection holding something other than an annotation holds no occurrence"
+        !held.getAnnotation("plain", Bar).isPresent()
+        !held.getAnnotation("plain").isPresent()
+
+        and: "nor does an empty collection, or a member the annotation does not bind"
+        def empty = new AnnotationValue("test.Foo", [bars: [] as LinkedHashSet] as Map<CharSequence, Object>)
+        !empty.getAnnotation("bars", Bar).isPresent()
+        !held.getAnnotation("missing", Bar).isPresent()
+        !held.getAnnotation("missing").isPresent()
+    }
+
     void "test getAnnotation()"() {
         given:
         def innerAv = AnnotationValue.builder(Bar.class).build()
@@ -449,3 +495,5 @@ class AnnotationValueSpec extends Specification {
 }
 
 @interface Bar {}
+
+@interface Baz {}
