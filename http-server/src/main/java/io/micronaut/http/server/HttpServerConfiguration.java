@@ -924,7 +924,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
          * Sets the CORS filter configuration.
          *
          * @param filter The CORS filter configuration
-         * @since 5.4.0
+         * @since 5.2.0
          */
         public void setFilter(CorsFilterConfiguration filter) {
             this.filter = filter;
@@ -1047,7 +1047,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
          * {@link CorsConfiguration#isEnabled()}, which controls server-wide CORS
          * configurations but still permits route-level CORS annotations.</p>
          *
-         * @since 5.4.0
+         * @since 5.2.0
          */
         @ConfigurationProperties("filter")
         public static class CorsFilterConfiguration implements Toggleable {

@@ -221,7 +221,7 @@ public final class CrossOriginUtil {
      * @param annotationMetadataProvider the annotation metadata provider
      * @return the CORS configuration declared by the provider, or an empty optional if it
      * does not declare {@link CrossOrigin}
-     * @since 5.4.0
+     * @since 5.2.0
      */
     public static Optional<CorsOriginConfiguration> getCorsOriginConfigurationForAnnotationMetadataProvider(AnnotationMetadataProvider annotationMetadataProvider) {
         return getCorsOriginConfiguration(annotationMetadataProvider.getAnnotationMetadata());
