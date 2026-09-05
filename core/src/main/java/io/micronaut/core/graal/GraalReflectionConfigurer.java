@@ -18,12 +18,14 @@ package io.micronaut.core.graal;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueProvider;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.util.CollectionUtils;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -69,6 +71,12 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
                 );
                 if (accessType.contains(TypeHint.AccessType.DYNAMIC_PROXY)) {
                     context.registerDynamicProxy(t);
+                    if (Annotation.class.isAssignableFrom(t)) {
+                        // AnnotationMetadata.synthesize(..) hands out an annotation instance as a
+                        // proxy of the annotation type *and* AnnotationValueProvider, so the pair
+                        // has to be registered as well as the annotation type on its own.
+                        context.registerDynamicProxy(t, AnnotationValueProvider.class);
+                    }
                 }
                 if (accessType.contains(TypeHint.AccessType.ALL_PUBLIC_METHODS)) {
                     final Method[] methods = t.getMethods();
@@ -200,9 +208,14 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
         void register(Constructor<?>... constructors);
 
         /**
-         * Register a dynamic proxy.
-         * @param proxyClass The proxy class
+         * Register a dynamic proxy of the given interfaces.
+         *
+         * <p>The interfaces are the complete interface list of a single proxy, in the order they are
+         * passed to {@link java.lang.reflect.Proxy#getProxyClass(ClassLoader, Class[])}. Registering
+         * {@code A} and registering {@code A, B} are two distinct proxies.</p>
+         *
+         * @param interfaces The interfaces implemented by the proxy
          */
-        void registerDynamicProxy(Class<?> proxyClass);
+        void registerDynamicProxy(Class<?>... interfaces);
     }
 }
