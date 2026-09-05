@@ -946,8 +946,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     /**
-     * Registers a callback of an intercepted phase with the executable methods definition, so that the interceptor
-     * chain of the callback can dispatch it without reflection and see it as the intercepted method.
+     * Registers a callback of an intercepted phase with the executable methods definition, so that the definition
+     * can list it to lifecycle interceptors and dispatch it without reflection once the chain of the phase proceeds.
      *
      * <p>The executable methods definition keeps the callback out of the executable methods of the bean, which is
      * why it can be shared with an AOP proxy of the bean without the proxy observing it either. The generated
@@ -1916,15 +1916,15 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
      * Builds a lifecycle method: the inherited hook first, then every callback in order, then the release of the
      * inject-scoped beans the callbacks received.
      *
-     * <p>When the phase is intercepted each callback is handed to the given interceptor entry point together with
-     * its resolved arguments, so that it runs in its own interceptor chain and the chain sees the callback as the
-     * intercepted method. The hook and the release stay outside the chains: they are the work of the phase, not of
-     * a callback.</p>
+     * <p>When the phase is intercepted, one interceptor chain runs for the phase and proceeding it reaches the
+     * method built here. Each callback is then handed to the given entry point together with its resolved
+     * arguments, which dispatches it through the executable methods definition rather than by a direct call, so a
+     * private callback needs no reflection of its own.</p>
      *
      * @param methodDefBuilder The method to build
      * @param superMethod      The inherited hook
      * @param lifecycleMethods The callbacks
-     * @param interceptMethod  The interceptor entry point of the phase, or {@code null} when it is not intercepted
+     * @param interceptMethod  The callback entry point of the phase, or {@code null} when it is not intercepted
      * @return The method
      */
     private MethodDef buildLifeCycleMethod(MethodDef.MethodDefBuilder methodDefBuilder,
@@ -1965,16 +1965,15 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     }
 
     /**
-     * Invokes one callback of an intercepted lifecycle phase through the interceptor entry point of the phase.
+     * Invokes one callback of an intercepted lifecycle phase through the entry point of the phase.
      *
-     * <p>The arguments are resolved here, by the definition, exactly as for a direct invocation, and travel with the
-     * chain as its parameter values; the callback itself is dispatched by the executable methods definition when
-     * the chain proceeds, so a private callback needs no reflection of its own. The bean the chain returns replaces
-     * the local instance, as the result of a phase chain does.</p>
+     * <p>The arguments are resolved here, by the definition, exactly as for a direct invocation; the callback itself
+     * is dispatched by the executable methods definition, so a private callback needs no reflection of its own. The
+     * entry point returns the bean, which replaces the local instance.</p>
      *
      * @param injectMethodSignature The signature of the lifecycle method being built
      * @param methodDefinition      The callback
-     * @param interceptMethod       The interceptor entry point of the phase
+     * @param interceptMethod       The callback entry point of the phase
      * @param position              The position of the callback in the phase
      * @return The statement
      */
