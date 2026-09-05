@@ -231,8 +231,8 @@ class SupplementedBeanIntrospectionSpec extends Specification {
         generated.beanReadProperties.isEmpty()
         generated.beanWriteProperties*.name == ["secret"]
 
-        and: "where reflection does read the value, through the field the setter names"
-        ReflectionBeanIntrospection.of(IntroWriteOnly).beanReadProperties*.name == ["secret"]
+        and: "and so does reflection: the field the setter names is private, and no access kind admits it"
+        ReflectionBeanIntrospection.of(IntroWriteOnly).beanReadProperties.isEmpty()
 
         and: "which does not stand in for the read properties the generated introspection legitimately has none of"
         introspection.beanReadProperties.isEmpty()

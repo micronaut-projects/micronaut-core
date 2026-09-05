@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.exception.InvocationException;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.GenericPlaceholder;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.type.UnsafeExecutable;
 import io.micronaut.core.util.ArgumentUtils;
@@ -178,11 +177,10 @@ abstract class AbstractReflectionExecutable<T, R> implements ExecutableMethod<T,
 
         @Override
         public Argument<R> asArgument() {
-            if (returnArgument instanceof GenericPlaceholder<?> placeholder) {
-                // a variable stays a variable, as the return argument a generated executable writes is one
-                return Argument.ofTypeVariable(getType(), returnArgument.getName(), placeholder.getVariableName(), getAnnotationMetadata(), returnArgument.getTypeParameters());
-            }
-            return Argument.of(getType(), getAnnotationMetadata(), returnArgument.getTypeParameters());
+            // the return argument as written - its own type-use annotations, a variable kept a variable - which
+            // is what the return type of a generated executable answers; the metadata of the method is what
+            // getAnnotationMetadata() answers, on both sides
+            return returnArgument;
         }
     }
 }

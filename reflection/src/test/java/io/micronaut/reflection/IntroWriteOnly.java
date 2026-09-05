@@ -1,8 +1,8 @@
 package io.micronaut.reflection;
 
 /**
- * A type written to and never read from: the processor describes one write property and no read one, where
- * reflection reads the value through the field the setter names.
+ * A type written to and never read from: the processor describes one write property and no read one, and so
+ * does reflection - the field the setter names is private, and no access kind admits it.
  */
 public class IntroWriteOnly {
 
