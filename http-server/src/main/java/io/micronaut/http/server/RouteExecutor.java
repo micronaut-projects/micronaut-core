@@ -780,7 +780,12 @@ public final class RouteExecutor {
 
     private MutableHttpResponse<Object> forStatus(RouteInfo<?> routeMatch, @Nullable HttpStatus defaultStatus) {
         HttpStatus status = routeMatch.findStatus(defaultStatus);
-        return HttpResponse.status(status);
+        MutableHttpResponse<Object> response = HttpResponse.status(status);
+        String contentDisposition = routeMatch.findContentDispositionHeader();
+        if (contentDisposition != null) {
+            response.header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition);
+        }
+        return response;
     }
 
     static <K> ExecutionFlow<K> fromPublisher(Publisher<K> publisher) {
