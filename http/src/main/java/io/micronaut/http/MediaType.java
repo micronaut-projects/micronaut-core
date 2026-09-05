@@ -789,7 +789,9 @@ public class MediaType implements CharSequence {
 
     @SuppressWarnings("ConstantName")
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
-    @SuppressWarnings("java:S3077") // holds an immutable Map.copyOf or an empty map, published once under double checked locking
+    // Sonar java:S3077: the table is an immutable map, a Map.copyOf of the parsed table or an empty map
+    // when the load fails, assigned once under the double checked lock in getMediaTypeFileExtensions.
+    @SuppressWarnings("java:S3077")
     private static volatile @Nullable Map<String, String> mediaTypeFileExtensions;
     @SuppressWarnings("ConstantName")
     private static final List<Pattern> textTypePatterns = new ArrayList<>(4);
@@ -1411,15 +1413,7 @@ public class MediaType implements CharSequence {
             synchronized (MediaType.class) { // double check
                 extensions = mediaTypeFileExtensions;
                 if (extensions == null) {
-                    try {
-                        extensions = loadMimeTypes();
-                    } catch (RuntimeException e) {
-                        // loadMimeTypes reports and recovers from the failures it expects, so anything
-                        // arriving here is unexpected and would otherwise leave no trace at all.
-                        LoggerFactory.getLogger(MediaType.class)
-                            .warn("Failed to load {}, media type detection by file extension is disabled", MIME_TYPES_FILE_NAME, e);
-                        extensions = Collections.emptyMap();
-                    }
+                    extensions = loadMimeTypesReporting(MediaType.class.getClassLoader());
                     // An empty table is cached like any other. The class path does not change for the
                     // life of the JVM, so retrying the load on every lookup would only fail again; the
                     // warning logged by the failing branch is what explains the missing detection.
@@ -1430,8 +1424,24 @@ public class MediaType implements CharSequence {
         return extensions;
     }
 
-    private static Map<String, String> loadMimeTypes() {
-        return loadMimeTypes(MediaType.class.getClassLoader());
+    /**
+     * Reads the table and, as a safety net, reports and swallows any unexpected failure of the parse
+     * itself. {@link #loadMimeTypes(ClassLoader)} already recovers from the failures it expects, so
+     * dropping this would be defensible, but an unexpected one would then be thrown out of
+     * {@link #forExtension(String)}, which sits on request paths, rather than degrading quietly.
+     * Package private so that a test can reach the branch without touching the cache.
+     *
+     * @param classLoader The class loader to read the resource from, {@code null} for the bootstrap loader
+     * @return The table, or an empty map if it could not be loaded
+     */
+    static Map<String, String> loadMimeTypesReporting(@Nullable ClassLoader classLoader) {
+        try {
+            return loadMimeTypes(classLoader);
+        } catch (RuntimeException e) {
+            LoggerFactory.getLogger(MediaType.class)
+                .warn("Failed to load {}, media type detection by file extension is disabled", MIME_TYPES_FILE_NAME, e);
+            return Collections.emptyMap();
+        }
     }
 
     /**

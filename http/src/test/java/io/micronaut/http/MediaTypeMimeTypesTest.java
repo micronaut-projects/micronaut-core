@@ -21,19 +21,23 @@ import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Covers the loading of {@code META-INF/http/mime.types}. Every case goes through
- * {@link MediaType#loadMimeTypes(ClassLoader)}, which does not touch the static table that
+ * {@link MediaType#loadMimeTypes(ClassLoader)} or {@link MediaType#loadMimeTypesReporting(ClassLoader)},
+ * neither of which touches the static table that
  * {@link MediaType#forExtension(String)} caches, so the cache is left intact for the rest of the suite.
  */
 class MediaTypeMimeTypesTest {
@@ -84,6 +88,46 @@ class MediaTypeMimeTypesTest {
     }
 
     @Test
+    void skipsBlankAndCommentLines() {
+        Map<String, String> types = MediaType.loadMimeTypes(new StubClassLoader("""
+            # a comment
+
+            application/json\t\t\tjson
+            text/html   html  htm
+            """));
+
+        assertEquals(Map.of("json", MediaType.APPLICATION_JSON, "html", MediaType.TEXT_HTML, "htm", MediaType.TEXT_HTML), types);
+    }
+
+    @Test
+    void theLoadedTableIsImmutable() {
+        Map<String, String> types = MediaType.loadMimeTypes(MediaTypeMimeTypesTest.class.getClassLoader());
+
+        assertThrows(UnsupportedOperationException.class, () -> types.put("json", MediaType.TEXT_PLAIN),
+            "The table is published through a volatile field, so it must not be mutable");
+    }
+
+    @Test
+    void reportingLoadReturnsTheTable() {
+        assertFalse(MediaType.loadMimeTypesReporting(MediaTypeMimeTypesTest.class.getClassLoader()).isEmpty());
+    }
+
+    @Test
+    void reportingLoadReturnsAnEmptyTableAndWarnsOnAnUnexpectedFailure() {
+        List<ILoggingEvent> events = capturingWarnings(
+            () -> assertTrue(MediaType.loadMimeTypesReporting(new ThrowingClassLoader()).isEmpty(),
+                "An unexpected failure must degrade to an empty table rather than reach forExtension")
+        );
+
+        assertEquals(1, events.size());
+        ILoggingEvent event = events.get(0);
+        assertEquals(Level.WARN, event.getLevel());
+        assertTrue(event.getFormattedMessage().contains(RESOURCE));
+        assertTrue(event.getThrowableProxy() != null && event.getThrowableProxy().getMessage().contains("mime.types blew up"),
+            "The unexpected exception must reach the logger as the cause");
+    }
+
+    @Test
     void theCachedTableIsUnaffected() {
         Optional<MediaType> json = MediaType.forExtension("json");
 
@@ -120,6 +164,37 @@ class MediaTypeMimeTypesTest {
         @Override
         public InputStream getResourceAsStream(String name) {
             return null;
+        }
+    }
+
+    /**
+     * A class loader that serves the given table instead of the one on the class path.
+     */
+    private static final class StubClassLoader extends ClassLoader {
+        private final String content;
+
+        StubClassLoader(String content) {
+            super(null);
+            this.content = content;
+        }
+
+        @Override
+        public InputStream getResourceAsStream(String name) {
+            return new ByteArrayInputStream(content.getBytes(StandardCharsets.US_ASCII));
+        }
+    }
+
+    /**
+     * A class loader that fails with something other than an {@link IOException}, as the safety net expects.
+     */
+    private static final class ThrowingClassLoader extends ClassLoader {
+        ThrowingClassLoader() {
+            super(null);
+        }
+
+        @Override
+        public InputStream getResourceAsStream(String name) {
+            throw new IllegalStateException("mime.types blew up");
         }
     }
 
