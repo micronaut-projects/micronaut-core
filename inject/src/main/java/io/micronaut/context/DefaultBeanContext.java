@@ -143,6 +143,7 @@ import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -248,9 +249,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     /**
      * The thread that discovers {@link Parallel} beans, retained so that {@link #stop()} can
-     * interrupt and join it instead of letting it outlive the context.
+     * interrupt and join it instead of letting it outlive the context. An {@link AtomicReference}
+     * so that the shutdown claims the thread and clears the field in one step, and a discovery
+     * started concurrently cannot have its thread dropped without being joined.
      */
-    private volatile @Nullable Thread parallelBeanDiscoveryThread;
+    private final AtomicReference<Thread> parallelBeanDiscoveryThread = new AtomicReference<>();
 
     /**
      * The in-flight parallel bean initializations. Each entry is completed by its worker when the
@@ -2460,11 +2463,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         Thread thread = new Thread(this::discoverParallelBeans, PARALLEL_BEAN_DISCOVERY_THREAD);
         // a daemon thread cannot keep the JVM alive if condition evaluation below blocks
         thread.setDaemon(true);
-        parallelBeanDiscoveryThread = thread;
+        parallelBeanDiscoveryThread.set(thread);
         thread.start();
     }
 
     private void discoverParallelBeans() {
+        try {
+            runParallelBeanDiscovery();
+        } catch (Exception e) {
+            // the discovery thread is the last handler for its own failures. the definitions are
+            // iterated lazily, so a condition that throws fails in the loop header rather than in
+            // the guarded body below, and would otherwise vanish with the thread
+            LOG.error("Parallel bean discovery failed: {}", e.getMessage(), e);
+        }
+    }
+
+    private void runParallelBeanDiscovery() {
         Iterable<BeanDefinition<Object>> parallelBeans = beanDefinitionProvider.getParallelBeans(this);
         Collection<BeanDefinition<Object>> parallelDefinitions = new ArrayList<>(20);
         for (BeanDefinition<Object> beanDefinition : parallelBeans) {
@@ -2498,6 +2512,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      *
      * @param beanDefinition The definition to initialize
      */
+    @SuppressWarnings("java:S1181") // an Error from a bean constructor must still honour shutdownOnError; it is logged, not swallowed
     private void submitParallelInitialization(BeanDefinition<Object> beanDefinition) {
         ParallelInitialization task = new ParallelInitialization();
         // register before submitting so that a task can never run unobserved by stop()
@@ -2557,7 +2572,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (active != null) {
                 destroyBean(active);
             }
-        } catch (Throwable e) {
+        } catch (Exception e) {
             LOG.error("Error destroying parallel bean [{}] registered after the context was stopped: {}", registration.beanDefinition.getName(), e.getMessage(), e);
         }
     }
@@ -2599,7 +2614,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     private void awaitParallelStartupTermination() {
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(PARALLEL_SHUTDOWN_TIMEOUT_MS);
-        Thread discoveryThread = parallelBeanDiscoveryThread;
+        Thread discoveryThread = parallelBeanDiscoveryThread.getAndSet(null);
         if (discoveryThread != null && discoveryThread.isAlive() && discoveryThread != Thread.currentThread()) {
             discoveryThread.interrupt();
             try {
@@ -2612,7 +2627,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 LOG.warn("Parallel bean discovery thread [{}] did not terminate within {}ms of the context being stopped", discoveryThread.getName(), PARALLEL_SHUTDOWN_TIMEOUT_MS);
             }
         }
-        parallelBeanDiscoveryThread = null;
 
         ParallelInitialization ownTask = currentParallelInitialization.get();
         if (ownTask != null) {
@@ -2746,14 +2760,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     beanCandidate.asArgument(),
                     beanCandidate.hasAnnotation(Context.class) ? null : beanDefinition.getDeclaredQualifier()
                 );
-                if (registrationConsumer != null && registration != null) {
+                if (registrationConsumer != null) {
                     registrationConsumer.accept(registration);
                 }
             }
 
         } else {
             BeanRegistration<Object> registration = intializeEagerBean(null, beanDefinition, beanDefinition.asArgument(), null);
-            if (registrationConsumer != null && registration != null) {
+            if (registrationConsumer != null) {
                 registrationConsumer.accept(registration);
             }
         }
