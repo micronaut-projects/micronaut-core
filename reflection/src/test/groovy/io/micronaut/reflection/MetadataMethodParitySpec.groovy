@@ -62,15 +62,6 @@ class MetadataMethodParitySpec extends Specification {
         return String.valueOf(v)
     }
 
-    /** Whether a member holds annotation values rather than plain ones. */
-    private static boolean holdsAnnotations(Object value) {
-        if (value instanceof AnnotationValue) {
-            return true
-        }
-        Collection<?> held = value?.getClass()?.isArray() ? (value as Object[]).toList()
-            : (value instanceof Collection ? value : null)
-        return held != null && held.any { it instanceof AnnotationValue }
-    }
 
     /** Calls a method, so that a metadata answering by throwing is compared with one answering the same way. */
     private static Object answer(Closure<?> call) {
@@ -129,9 +120,8 @@ class MetadataMethodParitySpec extends Specification {
                 out << "getDefaultValue=" << answer { m.getDefaultValue(name, member, Object) } << " "
                 // the two implementations hold the occurrences of a repeatable annotation differently, which
                 // the string accessors render differently; the divergence is pinned by a test of its own below
-                boolean nested = holdsAnnotations(m.getValues(name).get(member))
-                out << "stringValue=" << (nested ? "<nested>" : answer { m.stringValue(name, member) }) << " "
-                out << "stringValues=" << (nested ? "<nested>" : answer { m.stringValues(name, member) }) << " "
+                out << "stringValue=" << answer { m.stringValue(name, member) } << " "
+                out << "stringValues=" << answer { m.stringValues(name, member) } << " "
                 out << "intValue=" << answer { m.intValue(name, member) } << " "
                 out << "longValue=" << answer { m.longValue(name, member) } << " "
                 out << "doubleValue=" << answer { m.doubleValue(name, member) } << " "
@@ -235,7 +225,7 @@ class MetadataMethodParitySpec extends Specification {
         onType.stringValue(Every, "aString") == onTypeGenerated.stringValue(Every, "aString")
     }
 
-    void "the occurrences of a repeatable annotation are held in a set rather than an array"() {
+    void "the occurrences of a repeatable annotation are read alike, held in a set or in an array"() {
         given: "a property carrying a repeatable annotation twice"
         def compileTime = BeanIntrospector.SHARED.getIntrospection(RetainedBean)
             .getRequiredProperty("tagged", String).getAnnotationMetadata()
@@ -244,14 +234,14 @@ class MetadataMethodParitySpec extends Specification {
         expect: "the occurrences and their values are the same"
         canonical(reflective.getValues(Tags.name).get("value")) == canonical(compileTime.getValues(Tags.name).get("value"))
 
-        and: "but a generated metadata holds them in an array, where one built at runtime holds them in a set"
+        and: "a generated metadata holds them in an array, where one built at runtime holds them in a set"
         compileTime.getValues(Tags.name).get("value").getClass().isArray()
         reflective.getValues(Tags.name).get("value") instanceof Set
 
-        and: "which is MutableAnnotationMetadata rather than anything this module does, and is why the string"
-        and: "accessors of such a member are left out of the sweep above"
-        reflective instanceof io.micronaut.inject.annotation.MutableAnnotationMetadata
-        compileTime instanceof io.micronaut.inject.annotation.DefaultAnnotationMetadata
+        and: "which the accessors no longer read differently: a member held in a collection is read value by"
+        and: "value, as one held in an array is, so the sweep above covers the string accessors of such a member"
+        reflective.stringValues(Tags.name, "value").length == compileTime.stringValues(Tags.name, "value").length
+        reflective.stringValues(Tags.name, "value").length == 2
     }
 
     void "the declared view of the property #property answers the same, built either way"() {
