@@ -33,6 +33,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
@@ -70,6 +71,17 @@ public final class InterceptorBindingMembers implements AnnotationRemapper {
             return List.of(annotationValue.mutate().replaceStereotypes(retainable).build());
         }
 
+        // A declared `@InterceptorBinding` stereotype already says everything about the kind it names, members
+        // included. The binding derived from `@Around` and friends carries no members, so for a kind that is
+        // already spelled out it would only add an occurrence matching anything. The stereotypes come in no
+        // guaranteed order, so gather the declared kinds before building any binding.
+        Set<InterceptorKind> declaredKinds = EnumSet.noneOf(InterceptorKind.class);
+        for (AnnotationValue<?> stereotype : annotationValue.getStereotypes()) {
+            if (InterceptorBinding.class.getName().equals(stereotype.getAnnotationName())) {
+                declaredKinds.add(stereotype.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND));
+            }
+        }
+
         List<AnnotationValueBuilder<?>> interceptorBindings = new ArrayList<>();
         for (AnnotationValue<?> stereotype : annotationValue.getStereotypes()) {
             String stereotypeName = stereotype.getAnnotationName();
@@ -79,15 +91,15 @@ public final class InterceptorBindingMembers implements AnnotationRemapper {
                 // occurrences of the binding annotation, which it retains
                 newInterceptorBinding = stereotype.mutate()
                         .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName));
-            } else if (Around.class.getName().equals(stereotypeName)) {
+            } else if (Around.class.getName().equals(stereotypeName) && !declaredKinds.contains(InterceptorKind.AROUND)) {
                 newInterceptorBinding = AnnotationValue.builder(InterceptorBinding.class)
                         .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName))
                         .member("kind", InterceptorKind.AROUND);
-            } else if (Introduction.class.getName().equals(stereotypeName)) {
+            } else if (Introduction.class.getName().equals(stereotypeName) && !declaredKinds.contains(InterceptorKind.INTRODUCTION)) {
                 newInterceptorBinding = AnnotationValue.builder(InterceptorBinding.class)
                         .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName))
                         .member("kind", InterceptorKind.INTRODUCTION);
-            } else if (AroundConstruct.class.getName().equals(stereotypeName)) {
+            } else if (AroundConstruct.class.getName().equals(stereotypeName) && !declaredKinds.contains(InterceptorKind.AROUND_CONSTRUCT)) {
                 newInterceptorBinding = AnnotationValue.builder(InterceptorBinding.class)
                         .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName))
                         .member("kind", InterceptorKind.AROUND_CONSTRUCT);
