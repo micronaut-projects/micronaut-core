@@ -6,15 +6,15 @@ import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.inject.BeanDefinition
 
 /**
- * The states a per-callback lifecycle interception can be in, beyond the shape of the callback itself, which
- * {@link LifecycleCallbackMethodSpec} covers: both kinds on one bean, a binding for one kind only, a phase with
- * no callback, the pre-destroy order, a proxied target, an interceptor that replaces the bean, skips a callback or
- * observes a failure, a per-target interceptor spanning several callbacks, a factory-declared pre-destroy method,
- * mutation of the resolved arguments and a callback with a return value.
+ * The states a lifecycle interception can be in, beyond the shape of the event itself, which
+ * {@link LifecycleCallbackMethodSpec} covers: both kinds on one bean, a binding for one kind only, an event with
+ * no callback, the pre-destroy order, a proxied target, an interceptor that replaces the bean, one that does not
+ * proceed or observes a failure, a per-target interceptor spanning both events, a factory-declared pre-destroy
+ * method, the resolved arguments of a callback and a callback with a return value.
  */
 class LifecycleCallbackStatesSpec extends AbstractTypeElementSpec {
 
-    void 'test a bean intercepting both kinds is intercepted per callback of each kind'() {
+    void 'test a bean intercepting both kinds is intercepted once per event'() {
         given:
         ApplicationContext context = buildContext('''
 package states.bothkinds;
@@ -70,7 +70,7 @@ class MyBean {
         BeanDefinition<?> definition = getBeanDefinition(context, beanType.name)
 
         then:
-        interceptorType.EVENTS == ['POST_CONSTRUCT:init']
+        interceptorType.EVENTS == ['POST_CONSTRUCT:initialize']
         beanType.EVENTS == ['init']
         definition.postConstructExecutableMethods*.methodName == ['init']
         definition.preDestroyExecutableMethods*.methodName == ['close']
@@ -80,7 +80,7 @@ class MyBean {
         context.stop()
 
         then:
-        interceptorType.EVENTS == ['POST_CONSTRUCT:init', 'PRE_DESTROY:close']
+        interceptorType.EVENTS == ['POST_CONSTRUCT:initialize', 'PRE_DESTROY:dispose']
         beanType.EVENTS == ['init', 'close']
 
         cleanup:
@@ -153,13 +153,13 @@ class MyBean {
 
         then:
         bean.closes == 1
-        interceptorType.EVENTS == ['PRE_DESTROY:close']
+        interceptorType.EVENTS == ['PRE_DESTROY:dispose']
 
         cleanup:
         context.close()
     }
 
-    void 'test pre destroy without a callback is intercepted once as a phase and callbacks in invocation order'() {
+    void 'test pre destroy is intercepted once as an event, with or without callbacks, which run in invocation order'() {
         given:
         ApplicationContext context = buildContext('''
 package states.predestroy;
@@ -226,11 +226,12 @@ class Sub extends Base {
         when:
         context.stop()
 
-        then: 'the bean without a callback is intercepted once as the dispose phase'
+        then: 'the bean without a callback is intercepted once as the dispose event'
         interceptorType.EVENTS.count('intercept NoCallback.dispose') == 1
 
-        and: 'each callback of the hierarchy is intercepted right before it runs, in the order the definition invokes them'
-        interceptorType.EVENTS.findAll { it != 'intercept NoCallback.dispose' } == invocationOrder.collectMany { ["intercept Sub.$it".toString(), it] }
+        and: 'the hierarchy is intercepted once, then every callback runs in the order the definition invokes them'
+        invocationOrder == ['baseClose', 'subClose']
+        interceptorType.EVENTS.findAll { it != 'intercept NoCallback.dispose' } == ['intercept Sub.dispose'] + invocationOrder
 
         cleanup:
         context.close()
@@ -293,7 +294,7 @@ class MyBean {
         then:
         result == 'done'
         bean instanceof io.micronaut.aop.Intercepted
-        interceptorType.EVENTS == ['POST_CONSTRUCT:init', 'AROUND:work']
+        interceptorType.EVENTS == ['POST_CONSTRUCT:initialize', 'AROUND:work']
 
         and: 'no definition of the type, proxy or target, lists the callback as an executable method'
         !definitions.empty
@@ -303,7 +304,7 @@ class MyBean {
         context.close()
     }
 
-    void 'test the bean returned by an interceptor replaces the instance for the following callbacks and the context'() {
+    void 'test the bean returned by an interceptor replaces the instance held by the context after every callback ran'() {
         given:
         ApplicationContext context = buildContext('''
 package states.replace;
@@ -325,19 +326,15 @@ import java.util.*;
 class TrackingInterceptor implements MethodInterceptor<Object, Object> {
     static Object original;
     static Object replacement;
-    static Object secondTarget;
+    static Object proceeded;
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
-        if (ctx.getExecutableMethod().getMethodName().equals("first")) {
-            original = ctx.getTarget();
-            ctx.proceed();
-            replacement = new MyBean();
-            ((MyBean) replacement).replaced = true;
-            return replacement;
-        }
-        secondTarget = ctx.getTarget();
-        return ctx.proceed();
+        original = ctx.getTarget();
+        proceeded = ctx.proceed();
+        replacement = new MyBean();
+        ((MyBean) replacement).replaced = true;
+        return replacement;
     }
 }
 
@@ -364,18 +361,18 @@ class MyBean {
         when:
         def bean = context.getBean(beanType)
 
-        then: 'the second callback is invoked on the replacement, which is what the context holds'
+        then: 'proceed() ran every callback on the original, and the context holds the replacement'
         bean.is(interceptorType.replacement)
         bean.replaced
-        interceptorType.secondTarget.is(interceptorType.replacement)
-        interceptorType.original.invoked == ['first']
-        bean.invoked == ['second']
+        interceptorType.proceeded.is(interceptorType.original)
+        interceptorType.original.invoked == ['first', 'second']
+        bean.invoked == []
 
         cleanup:
         context.close()
     }
 
-    void 'test an interceptor that does not proceed skips only its callback'() {
+    void 'test an interceptor that does not proceed keeps every callback of the event from running'() {
         given:
         ApplicationContext context = buildContext('''
 package states.skip;
@@ -395,12 +392,12 @@ import java.util.*;
 @Singleton
 @InterceptorBinding(value = Tracked.class, kind = InterceptorKind.POST_CONSTRUCT)
 class TrackingInterceptor implements MethodInterceptor<Object, Object> {
+    static int intercepted;
+
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
-        if (ctx.getExecutableMethod().getMethodName().equals("skipped")) {
-            return ctx.getTarget();
-        }
-        return ctx.proceed();
+        intercepted++;
+        return ctx.getTarget();
     }
 }
 
@@ -410,23 +407,25 @@ class MyBean {
     final List<String> invoked = new ArrayList<>();
 
     @PostConstruct
-    void skipped() {
-        invoked.add("skipped");
+    void first() {
+        invoked.add("first");
     }
 
     @PostConstruct
-    void invoked() {
-        invoked.add("invoked");
+    void second() {
+        invoked.add("second");
     }
 }
 ''')
+        Class<?> interceptorType = context.classLoader.loadClass('states.skip.TrackingInterceptor')
         Class<?> beanType = context.classLoader.loadClass('states.skip.MyBean')
 
         when:
         def bean = context.getBean(beanType)
 
-        then:
-        bean.invoked == ['invoked']
+        then: 'the one chain of the event was not proceeded, so no callback ran'
+        interceptorType.intercepted == 1
+        bean.invoked == []
 
         cleanup:
         context.close()
@@ -457,11 +456,12 @@ class TrackingInterceptor implements MethodInterceptor<Object, Object> {
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
-        intercepted.add(ctx.getExecutableMethod().getMethodName());
+        String target = ctx.getTarget().getClass().getSimpleName();
+        intercepted.add(target + "." + ctx.getExecutableMethod().getMethodName());
         try {
             return ctx.proceed();
         } catch (RuntimeException e) {
-            FAILURES.put(ctx.getExecutableMethod().getMethodName(), e);
+            FAILURES.put(target, e);
             throw e;
         }
     }
@@ -470,6 +470,8 @@ class TrackingInterceptor implements MethodInterceptor<Object, Object> {
 @Singleton
 @Tracked
 class PrivateFailure {
+    static boolean afterFailureRan;
+
     @PostConstruct
     private void privateFailing() {
         throw new IllegalStateException("private boom");
@@ -477,12 +479,15 @@ class PrivateFailure {
 
     @PostConstruct
     void afterFailure() {
+        afterFailureRan = true;
     }
 }
 
 @Singleton
 @Tracked
 class DirectFailure {
+    static boolean afterFailureRan;
+
     @PostConstruct
     void directFailing() {
         throw new IllegalStateException("direct boom");
@@ -490,6 +495,7 @@ class DirectFailure {
 
     @PostConstruct
     void afterFailure() {
+        afterFailureRan = true;
     }
 }
 ''')
@@ -502,27 +508,29 @@ class DirectFailure {
 
         then: 'a reflectively dispatched callback reports what it threw, not the reflection wrapper'
         BeanInstantiationException privateFailure = thrown()
-        interceptorType.FAILURES.privateFailing instanceof IllegalStateException
-        interceptorType.FAILURES.privateFailing.message == 'private boom'
+        interceptorType.FAILURES.PrivateFailure instanceof IllegalStateException
+        interceptorType.FAILURES.PrivateFailure.message == 'private boom'
         causes(privateFailure).any { it instanceof IllegalStateException && it.message == 'private boom' }
+        !privateType.afterFailureRan
 
         when:
         context.getBean(directType)
 
         then: 'a directly dispatched callback reports what it threw'
         BeanInstantiationException directFailure = thrown()
-        interceptorType.FAILURES.directFailing instanceof IllegalStateException
-        interceptorType.FAILURES.directFailing.message == 'direct boom'
+        interceptorType.FAILURES.DirectFailure instanceof IllegalStateException
+        interceptorType.FAILURES.DirectFailure.message == 'direct boom'
         causes(directFailure).any { it instanceof IllegalStateException && it.message == 'direct boom' }
+        !directType.afterFailureRan
 
-        and: 'the callback after the failing one was never intercepted'
-        interceptorType.intercepted == ['privateFailing', 'directFailing']
+        and: 'each event was intercepted once'
+        interceptorType.intercepted == ['PrivateFailure.initialize', 'DirectFailure.initialize']
 
         cleanup:
         context.close()
     }
 
-    void 'test a per target interceptor instance serves every callback of the bean'() {
+    void 'test a per target interceptor instance serves both lifecycle events of the bean'() {
         given:
         ApplicationContext context = buildContext('''
 package states.reuse;
@@ -599,22 +607,20 @@ class MyBean extends Base {
         bean.work()
         context.stop()
 
-        then: 'one instance serves construction, every post construct callback, the method call and every pre destroy callback'
+        then: 'one instance serves construction, the post construct event, the method call and the pre destroy event'
         interceptorType.instances == 1
         interceptorType.EVENTS == [
                 '1:AROUND_CONSTRUCT',
-                '1:POST_CONSTRUCT:baseInit',
-                '1:POST_CONSTRUCT:init',
+                '1:POST_CONSTRUCT:initialize',
                 '1:AROUND:work',
-                '1:PRE_DESTROY:baseClose',
-                '1:PRE_DESTROY:close'
+                '1:PRE_DESTROY:dispose'
         ]
 
         cleanup:
         context.close()
     }
 
-    void 'test the pre destroy method declared by a factory is the intercepted method'() {
+    void 'test the pre destroy method declared by a factory is exposed and invoked by the event'() {
         given:
         ApplicationContext context = buildContext('''
 package states.factory;
@@ -683,15 +689,16 @@ class ResourceFactory {
 
         then:
         resource.closed
-        interceptorType.methodName == 'close'
+        interceptorType.methodName == 'dispose'
         interceptorType.declaringType == resourceType
         interceptorType.target.is(resource)
+        definition.preDestroyExecutableMethods[0].declaringType == resourceType
 
         cleanup:
         context.close()
     }
 
-    void 'test an interceptor can replace the resolved argument of a callback'() {
+    void 'test the resolved arguments of a callback are not the parameter values of the event'() {
         given:
         ApplicationContext context = buildContext('''
 package states.mutate;
@@ -727,13 +734,11 @@ class DependencyProvider {
 @Singleton
 @InterceptorBinding(value = Tracked.class, kind = InterceptorKind.POST_CONSTRUCT)
 class TrackingInterceptor implements MethodInterceptor<Object, Object> {
-    static final Dependency REPLACEMENT = new Dependency("replacement");
-    static String seen;
+    static int parameterCount = -1;
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
-        seen = ((Dependency) ctx.getParameterValues()[0]).name;
-        ctx.getParameterValues()[0] = REPLACEMENT;
+        parameterCount = ctx.getParameterValues().length;
         return ctx.proceed();
     }
 }
@@ -755,9 +760,9 @@ class MyBean {
         when:
         def bean = context.getBean(beanType)
 
-        then:
-        interceptorType.seen == 'injected'
-        bean.received.is(interceptorType.REPLACEMENT)
+        then: 'the event carries no parameters; the argument is resolved for the callback when proceed() reaches it'
+        interceptorType.parameterCount == 0
+        bean.received.name == 'injected'
 
         cleanup:
         context.close()

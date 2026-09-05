@@ -5,17 +5,19 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
 
 /**
- * Each {@code @PostConstruct} and {@code @PreDestroy} callback of a bean that intercepts its lifecycle is
- * intercepted separately, and the interceptor sees the callback as {@code getExecutableMethod()}: a reflection-free
- * executable method carrying the declaring type, name, arguments, annotation metadata and resolved parameter values
- * of the callback. A bean without callbacks of the intercepted kind is intercepted once as a phase, as before.
+ * A bean that intercepts its lifecycle is intercepted once per event: {@code getExecutableMethod()} stands for the
+ * event ({@code initialize} or {@code dispose}) and {@code proceed()} invokes every callback of that kind, superclass
+ * first. The callbacks themselves are exposed by the bean definition, through
+ * {@code getPostConstructExecutableMethods()} and {@code getPreDestroyExecutableMethods()}, as reflection-free
+ * executable methods carrying the declaring type, name, arguments and annotation metadata of the callback, so an
+ * interceptor can inspect or invoke them.
  *
- * The callbacks are compiled in as executable methods only for a bean that intercepts the phase, and they never
+ * The callbacks are compiled in as executable methods only for a bean that intercepts the event, and they never
  * become executable methods of the bean, so processors and adapters do not observe them.
  */
 class LifecycleCallbackMethodSpec extends AbstractTypeElementSpec {
 
-    void 'test a post construct interceptor sees the callback as the intercepted method'() {
+    void 'test a post construct interceptor runs once for the event and the definition exposes the callback'() {
         given:
         ApplicationContext context = buildContext('''
 package callbacks.postconstruct;
@@ -39,15 +41,12 @@ import java.util.*;
 class TrackingInterceptor implements MethodInterceptor<Object, Object> {
     static int intercepted;
     static ExecutableMethod<Object, ?> seen;
-    static String targetMethodName;
     static Object proceeded;
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
         intercepted++;
         seen = ctx.getExecutableMethod();
-        targetMethodName = ctx.getTargetMethod().getName();
-        seen.invoke(ctx.getTarget());
         proceeded = ctx.proceed();
         return proceeded;
     }
@@ -81,33 +80,37 @@ class MyBean {
         def bean = context.getBean(beanType)
         BeanDefinition<?> definition = getBeanDefinition(context, beanType.name)
 
-        then: 'the callback is the intercepted method'
+        then: 'the event is the intercepted method, and it ran once'
         interceptorType.intercepted == 1
-        interceptorType.seen.methodName == 'init'
+        interceptorType.seen.methodName == 'initialize'
         interceptorType.seen.declaringType == beanType
-        interceptorType.seen.hasAnnotation('jakarta.annotation.PostConstruct')
         interceptorType.seen.arguments.length == 0
-        interceptorType.targetMethodName == 'init'
 
-        and: 'proceed() returns the bean'
+        and: 'proceed() returns the bean and ran the callback once'
         interceptorType.proceeded.is(bean)
+        bean.inits == 1
 
-        and: 'invoking the intercepted method and proceeding both run the callback'
-        bean.inits == 2
-
-        and: 'the callback is not an executable method of the bean'
+        and: 'the callback is exposed by the definition but is not an executable method of the bean'
         definition.executableMethods*.methodName == ['work', 'work2', 'work3', 'work4', 'work5']
         definition.findMethod('init').empty
         definition.findPossibleMethods('init').findAny().empty
         definition.postConstructExecutableMethods*.methodName == ['init']
+        definition.postConstructExecutableMethods[0].declaringType == beanType
+        definition.postConstructExecutableMethods[0].hasAnnotation('jakarta.annotation.PostConstruct')
         definition.preDestroyExecutableMethods.empty
         definition.postConstructMethods*.name == ['init']
+
+        when: 'the exposed callback is invoked directly'
+        definition.postConstructExecutableMethods[0].invoke(bean)
+
+        then:
+        bean.inits == 2
 
         cleanup:
         context.close()
     }
 
-    void 'test a pre destroy interceptor sees the callback as the intercepted method'() {
+    void 'test a pre destroy interceptor runs once for the event and the definition exposes the callback'() {
         given:
         ApplicationContext context = buildContext('''
 package callbacks.predestroy;
@@ -137,7 +140,6 @@ class TrackingInterceptor implements MethodInterceptor<Object, Object> {
         intercepted++;
         kind = ctx.getKind();
         seen = ctx.getExecutableMethod();
-        seen.invoke(ctx.getTarget());
         return ctx.proceed();
     }
 }
@@ -179,16 +181,23 @@ class MyBean {
         then:
         interceptorType.intercepted == 1
         interceptorType.kind == io.micronaut.aop.InterceptorKind.PRE_DESTROY
-        interceptorType.seen.methodName == 'close'
+        interceptorType.seen.methodName == 'dispose'
         interceptorType.seen.declaringType == beanType
-        interceptorType.seen.hasAnnotation('jakarta.annotation.PreDestroy')
+        bean.destroys == 1
+        definition.preDestroyExecutableMethods[0].declaringType == beanType
+        definition.preDestroyExecutableMethods[0].hasAnnotation('jakarta.annotation.PreDestroy')
+
+        when: 'the exposed callback is invoked directly'
+        definition.preDestroyExecutableMethods[0].invoke(bean)
+
+        then:
         bean.destroys == 2
 
         cleanup:
         context.close()
     }
 
-    void 'test callbacks of a superclass and a subclass are intercepted separately in invocation order'() {
+    void 'test callbacks of a superclass and a subclass run in one chain in invocation order'() {
         given:
         ApplicationContext context = buildContext('''
 package callbacks.hierarchy;
@@ -248,10 +257,16 @@ class Sub extends Base {
         when:
         context.getBean(subType)
 
-        then: 'the superclass callback is intercepted and invoked first'
-        events.LOG == ['intercept baseInit', 'baseInit', 'intercept subInit', 'subInit']
-        interceptorType.names == ['baseInit', 'subInit']
-        interceptorType.declaringTypes == [baseType, subType]
+        BeanDefinition<?> definition = getBeanDefinition(context, subType.name)
+
+        then: 'one interception precedes both callbacks, the superclass one first'
+        events.LOG == ['intercept initialize', 'baseInit', 'subInit']
+        interceptorType.names == ['initialize']
+        interceptorType.declaringTypes == [subType]
+
+        and: 'the definition exposes the callbacks in that order'
+        definition.postConstructExecutableMethods*.methodName == ['baseInit', 'subInit']
+        definition.postConstructExecutableMethods*.declaringType == [baseType, subType]
 
         cleanup:
         context.close()
@@ -363,7 +378,7 @@ class MyBean {
         context.close()
     }
 
-    void 'test the resolved arguments of a callback are the parameter values of the interception'() {
+    void 'test the event has no parameter values while the callback receives its resolved arguments'() {
         given:
         ApplicationContext context = buildContext('''
 package callbacks.arguments;
@@ -419,20 +434,26 @@ class MyBean {
         def bean = context.getBean(beanType)
         def dependency = context.getBean(dependencyType)
 
+        BeanDefinition<?> definition = getBeanDefinition(context, beanType.name)
+
         then: 'the callback received the injected argument'
         bean.received.is(dependency)
 
-        and: 'the interceptor saw the same value as the parameter of the callback'
-        interceptorType.argumentNames == ['dependency'] as String[]
-        interceptorType.parameterValues.length == 1
-        interceptorType.parameterValues[0].is(dependency)
-        interceptorType.parameterValueMap == [dependency: dependency]
+        and: 'the event itself has no parameters: the arguments are resolved when proceed() reaches the callback'
+        interceptorType.argumentNames.length == 0
+        interceptorType.parameterValues.length == 0
+        interceptorType.parameterValueMap.isEmpty()
+
+        and: 'the exposed callback describes the argument'
+        definition.postConstructExecutableMethods*.methodName == ['init']
+        definition.postConstructExecutableMethods[0].arguments*.name == ['dependency']
+        definition.postConstructExecutableMethods[0].arguments*.type == [dependencyType]
 
         cleanup:
         context.close()
     }
 
-    void 'test package private and private callbacks are intercepted and invokable'() {
+    void 'test package private and private callbacks run in the chain and are invokable through the definition'() {
         given:
         ApplicationContext context = buildContext('''
 package callbacks.visibility;
@@ -457,7 +478,6 @@ class TrackingInterceptor implements MethodInterceptor<Object, Object> {
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
         names.add(ctx.getExecutableMethod().getMethodName());
-        ctx.getExecutableMethod().invoke(ctx.getTarget());
         return ctx.proceed();
     }
 }
@@ -483,9 +503,18 @@ class MyBean {
 
         when:
         def bean = context.getBean(beanType)
+        BeanDefinition<?> definition = getBeanDefinition(context, beanType.name)
 
-        then: 'both callbacks are intercepted and each ran once via invoke and once via proceed'
-        interceptorType.names.toSet() == ['packagePrivateInit', 'privateInit'].toSet()
+        then: 'one interception ran both callbacks once'
+        interceptorType.names == ['initialize']
+        bean.invoked.toSet() == ['packagePrivateInit', 'privateInit'].toSet()
+        bean.invoked.size() == 2
+        definition.postConstructExecutableMethods*.methodName.toSet() == ['packagePrivateInit', 'privateInit'].toSet()
+
+        when: 'the exposed callbacks are invoked directly, the private one reflectively'
+        definition.postConstructExecutableMethods*.invoke(bean)
+
+        then:
         bean.invoked.count('packagePrivateInit') == 2
         bean.invoked.count('privateInit') == 2
         bean.invoked.size() == 4
@@ -514,12 +543,11 @@ import java.util.*;
 @Singleton
 @InterceptorBinding(value = Tracked.class, kind = InterceptorKind.POST_CONSTRUCT)
 class TrackingInterceptor implements MethodInterceptor<Object, Object> {
-    static final List<Class<?>> declaringTypes = new ArrayList<>();
+    static int intercepted;
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
-        declaringTypes.add(ctx.getExecutableMethod().getDeclaringType());
-        ctx.getExecutableMethod().invoke(ctx.getTarget());
+        intercepted++;
         return ctx.proceed();
     }
 }
@@ -548,10 +576,19 @@ class Sub extends Base {
 
         when:
         def bean = context.getBean(subType)
+        BeanDefinition<?> definition = getBeanDefinition(context, subType.name)
+
+        then: 'both were invoked by the one chain, and are exposed as two distinct callbacks'
+        interceptorType.intercepted == 1
+        bean.invoked == ['Base.init', 'Sub.init']
+        definition.postConstructExecutableMethods*.declaringType == [baseType, subType]
+        definition.postConstructExecutableMethods*.methodName == ['init', 'init']
+
+        when:
+        definition.postConstructExecutableMethods*.invoke(bean)
 
         then:
-        interceptorType.declaringTypes == [baseType, subType]
-        bean.invoked == ['Base.init', 'Base.init', 'Sub.init', 'Sub.init']
+        bean.invoked == ['Base.init', 'Sub.init', 'Base.init', 'Sub.init']
 
         cleanup:
         context.close()
@@ -594,12 +631,11 @@ import java.util.*;
 @Singleton
 @InterceptorBinding(value = Tracked.class, kind = InterceptorKind.POST_CONSTRUCT)
 class TrackingInterceptor implements MethodInterceptor<Object, Object> {
-    static final List<Class<?>> declaringTypes = new ArrayList<>();
+    static int intercepted;
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> ctx) {
-        declaringTypes.add(ctx.getExecutableMethod().getDeclaringType());
-        ctx.getExecutableMethod().invoke(ctx.getTarget());
+        intercepted++;
         return ctx.proceed();
     }
 }
@@ -620,16 +656,25 @@ public class Sub extends Base {
 
         when:
         def bean = context.getBean(subType)
+        BeanDefinition<?> definition = getBeanDefinition(context, subType.name)
+
+        then: 'both were invoked by the one chain, and are exposed as two distinct callbacks'
+        interceptorType.intercepted == 1
+        bean.invoked == ['Base.init', 'Sub.init']
+        definition.postConstructExecutableMethods*.declaringType == [baseType, subType]
+        definition.postConstructExecutableMethods*.methodName == ['init', 'init']
+
+        when:
+        definition.postConstructExecutableMethods*.invoke(bean)
 
         then:
-        interceptorType.declaringTypes == [baseType, subType]
-        bean.invoked == ['Base.init', 'Base.init', 'Sub.init', 'Sub.init']
+        bean.invoked == ['Base.init', 'Sub.init', 'Base.init', 'Sub.init']
 
         cleanup:
         context.close()
     }
 
-    void 'test the callback of a proxied bean is the intercepted method of lifecycle advice only'() {
+    void 'test a proxied bean is intercepted once for the event and exposes the callback to lifecycle advice only'() {
         given:
         ApplicationContext context = buildContext('''
 package callbacks.proxied;
@@ -687,7 +732,7 @@ class MyBean {
         then:
         bean instanceof io.micronaut.aop.Intercepted
         bean.inits == 1
-        interceptorType.METHODS == [POST_CONSTRUCT: ['init'], AROUND: ['work']]
+        interceptorType.METHODS == [POST_CONSTRUCT: ['initialize'], AROUND: ['work']]
         definition.executableMethods*.methodName == ['work']
         definition.postConstructExecutableMethods*.methodName == ['init']
 
