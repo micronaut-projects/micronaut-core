@@ -1,0 +1,1462 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.reflection;
+
+import io.micronaut.context.annotation.NonBinding;
+import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Retainable;
+import io.micronaut.core.annotation.AnnotationValueProvider;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.inject.annotation.AnnotationMetadataException;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.AnnotationMetadataSupport;
+import io.micronaut.inject.annotation.AnnotationDefaults;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
+import org.jspecify.annotations.Nullable;
+
+import java.lang.annotation.Annotation;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Repeatable;
+import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Array;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Consumer;
+
+/**
+ * Builds {@link AnnotationMetadata} and {@link AnnotationValue}s from the annotations read reflectively from an
+ * {@link AnnotatedElement}, in the shape the annotation processors give the metadata they generate at
+ * compilation time.
+ *
+ * <p>Code written against generated metadata then works unchanged for an element that has none:</p>
+ * <ul>
+ *     <li>the meta-annotations of an annotation are its stereotypes, recursively, with their values;</li>
+ *     <li>a repeatable annotation is filed under its container, whether it was written once, several times or
+ *     inside the container, and the container is registered so that
+ *     {@link AnnotationMetadata#getAnnotationValuesByType(Class)} finds it;</li>
+ *     <li>the defaults of the members are registered and reachable through
+ *     {@link AnnotationMetadata#getDefaultValues(String)} and the value accessors;</li>
+ *     <li>a class value is an {@link AnnotationClassValue}, an enum value is its name, a nested annotation is an
+ *     {@link AnnotationValue};</li>
+ *     <li>the members annotated {@link NonBinding} are recorded, so that a qualifier built from the metadata
+ *     ignores them;</li>
+ *     <li>an annotation a class inherits through {@link Inherited} is present but not declared, from a super
+ *     class as from an interface of its hierarchy, which the processors walk and {@link Class#getAnnotations()}
+ *     leaves out.</li>
+ * </ul>
+ *
+ * <p>An annotation instance does not say which members were written, so a member whose value equals its
+ * default is not part of the values of the annotation; it is served by the defaults, as a member that was not
+ * written is at compilation time.</p>
+ *
+ * <p>The annotation mappers, transformers and remappers of the annotation processors are not applied: they
+ * are part of {@code micronaut-core-processor} and are not on a runtime classpath. The
+ * {@link ReflectionAnnotationCustomizer} services are their runtime counterpart, and receive the values of
+ * every annotation this class converts.</p>
+ *
+ * @author Denis Stepanov
+ * @since 5.2.0
+ */
+@Experimental
+public final class ReflectionAnnotations {
+
+    private static final String JAVA_LANG_ANNOTATION = "java.lang.annotation.";
+    private static final String KOTLIN = "kotlin.";
+    private static final List<ReflectionAnnotationCustomizer> CUSTOMIZERS =
+        SoftServiceLoader.load(ReflectionAnnotationCustomizer.class, ReflectionAnnotations.class.getClassLoader()).collectAll();
+
+    /**
+     * The members of an annotation type, made accessible - the type may not be public - and sorted by name:
+     * {@link Class#getDeclaredMethods()} gives no order, and the members of the metadata are to come out the
+     * same on every run.
+     */
+    private static final ClassValue<List<Method>> MEMBERS = new ClassValue<>() {
+        @Override
+        protected List<Method> computeValue(Class<?> type) {
+            List<Method> members = new ArrayList<>();
+            for (Method method : type.getDeclaredMethods()) {
+                if (!Modifier.isStatic(method.getModifiers()) && !method.isSynthetic() && method.getParameterCount() == 0) {
+                    method.trySetAccessible();
+                    members.add(method);
+                }
+            }
+            members.sort(Comparator.comparing(Method::getName));
+            return Collections.unmodifiableList(members);
+        }
+    };
+
+    /**
+     * The defaults of an annotation type, converted in the shapes the values are given, registered with the
+     * shared registry the value accessors consult on first use.
+     */
+    private static final ClassValue<Map<CharSequence, Object>> DEFAULTS = new ClassValue<>() {
+        @Override
+        @SuppressWarnings("unchecked")
+        protected Map<CharSequence, Object> computeValue(Class<?> type) {
+            // the reading and the conversion are AnnotationDefaults, keyed by the class, so that the same
+            // annotation name in two deployments keeps two sets of defaults
+            Map<CharSequence, Object> defaults = AnnotationDefaults.of((Class<? extends Annotation>) type);
+            // the accessors of the shared metadata answer a member left out from the registry keyed by name,
+            // which is the only place they look
+            DefaultAnnotationMetadata.registerAnnotationDefaults(type.getName(), defaults);
+            return defaults;
+        }
+    };
+
+    private static final String RETAINABLE = Retainable.class.getName();
+
+    // whether an annotation type is retainable is a property of the type alone, and answering it walks its whole
+    // meta-annotation closure: it is asked for every annotation converted, so it is answered once per type
+    private static final ClassValue<Boolean> RETAINABLE_TYPES = new ClassValue<>() {
+
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            return isRetainable((Class<? extends Annotation>) type, new HashSet<>());
+        }
+    };
+
+    private ReflectionAnnotations() {
+    }
+
+    /**
+     * Whether the annotations composing an annotation type retain it: {@link Retainable} is anywhere in its own
+     * meta-annotations, so that a framework annotation marks its whole family at once.
+     */
+    private static boolean isRetainable(Class<? extends Annotation> type, Set<Class<?>> chain) {
+        if (!chain.add(type)) {
+            return false;
+        }
+        if (isMarkedRetainable(type)) {
+            return true;
+        }
+        for (Annotation meta : type.getAnnotations()) {
+            if (isRetainable(meta.annotationType(), chain)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether an annotation type is the marker of a retainable family: it carries {@link Retainable}, or a
+     * customizer says it does for a contract it cannot annotate.
+     */
+    private static boolean isMarkedRetainable(Class<? extends Annotation> type) {
+        if (type.isAnnotationPresent(Retainable.class)) {
+            return true;
+        }
+        for (ReflectionAnnotationCustomizer customizer : CUSTOMIZERS) {
+            if (customizer.isRetainable(type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The retainable annotations an annotation composes, each with the member overrides the composing annotation
+     * declares applied and with its own retained stereotypes in turn, as the processors record them in the
+     * reserved {@link AnnotationUtil#STEREOTYPES_MEMBER} member.
+     *
+     * <p>This is the runtime counterpart of what the annotation metadata builder does at compilation time: the
+     * marker itself and the annotations that are not retainable are left out, and an annotation type already in
+     * the chain is a cycle, which is not followed.</p>
+     *
+     * @return The retained occurrences, or {@code null} when the annotation composes none
+     */
+    private static AnnotationValue<?> @Nullable [] retainedStereotypes(Annotation annotation,
+                                                                      Set<Class<?>> chain,
+                                                                      @Nullable Map<CharSequence, Object> applied) {
+        Class<? extends Annotation> type = annotation.annotationType();
+        if (!chain.add(type)) {
+            return null;
+        }
+        try {
+            Map<String, Map<Integer, Map<CharSequence, Object>>> overrides = aliasedMembers(annotation, applied);
+            List<AnnotationValue<?>> retained = new ArrayList<>();
+            Set<String> composedNames = new HashSet<>(4);
+            // an annotation written more than once on the type is the container the compiler generates, which is
+            // not retainable itself: the occurrences it holds are the ones retained, as the processors retain them
+            Map<String, Integer> occurrences = new HashMap<>(2);
+            for (Annotation meta : type.getAnnotations()) {
+                Annotation[] contained = containedAnnotations(meta);
+                for (Annotation composed : contained == null ? new Annotation[]{meta} : contained) {
+                    Class<? extends Annotation> metaType = composed.annotationType();
+                    if (isIgnored(metaType) || RETAINABLE.equals(metaType.getName()) || !RETAINABLE_TYPES.get(metaType)) {
+                        continue;
+                    }
+                    String name = metaType.getName();
+                    composedNames.add(name);
+                    int index = occurrences.merge(name, 0, (previous, ignored) -> previous + 1);
+                    retained.add(retainedStereotype(composed, overriddenMembers(overrides.get(name), index), chain));
+                }
+            }
+            // an alias naming an annotation the type does not compose introduces it, and the introduced ones come
+            // first, as the processors reconcile them: @A aliasing a member of @C reached through @B carries @C
+            // itself, not only the override of the occurrence @B composes
+            List<AnnotationValue<?>> introduced = introducedStereotypes(overrides, composedNames, chain, loaderOf(type));
+            if (!introduced.isEmpty()) {
+                introduced.addAll(retained);
+                retained = introduced;
+            }
+            return retained.isEmpty() ? null : retained.toArray(AnnotationValue[]::new);
+        } finally {
+            chain.remove(type);
+        }
+    }
+
+    /**
+     * The annotations an alias names that the annotation does not compose itself, each with the members the
+     * alias sets and with its own retained stereotypes in turn.
+     *
+     * <p>An alias is a chain: {@code @DeepA(shortest = 7)} sets {@code DeepB.min}, which sets {@code DeepC.min},
+     * which sets {@code DeepLimit.min}. The processors walk that chain when they read the aliases of an
+     * annotation and file every annotation it reaches; the ones the annotation composes override the occurrence
+     * it composes, and the ones it does not compose become stereotypes of their own, before the composed ones.</p>
+     *
+     * @param overrides     The aliases of the annotation, by the name of the annotation they name
+     * @param composedNames The names of the annotations the annotation composes, which an alias overrides rather
+     *                      than introduces
+     * @param chain         The annotation types being described, to not follow a cycle
+     */
+    private static List<AnnotationValue<?>> introducedStereotypes(Map<String, Map<Integer, Map<CharSequence, Object>>> overrides,
+                                                                  Set<String> composedNames,
+                                                                  Set<Class<?>> chain,
+                                                                  ClassLoader loader) {
+        if (overrides.isEmpty()) {
+            return new ArrayList<>(0);
+        }
+        Map<String, Map<CharSequence, Object>> introduced = new LinkedHashMap<>(2);
+        for (Map.Entry<String, Map<Integer, Map<CharSequence, Object>>> entry : overrides.entrySet()) {
+            Map<CharSequence, Object> members = new LinkedHashMap<>(2);
+            entry.getValue().values().forEach(members::putAll);
+            collectIntroduced(entry.getKey(), members, introduced, loader);
+        }
+        List<AnnotationValue<?>> stereotypes = new ArrayList<>(introduced.size());
+        for (Map.Entry<String, Map<CharSequence, Object>> entry : introduced.entrySet()) {
+            String name = entry.getKey();
+            if (composedNames.contains(name)) {
+                continue;
+            }
+            Class<? extends Annotation> introducedType = annotationTypeOf(name, loader);
+            if (introducedType == null || isIgnored(introducedType)
+                || RETAINABLE.equals(name) || !RETAINABLE_TYPES.get(introducedType)) {
+                continue;
+            }
+            if (!chain.add(introducedType)) {
+                continue;
+            }
+            try {
+                Map<CharSequence, Object> values = new LinkedHashMap<>(entry.getValue());
+                AnnotationValue<?>[] retained = retainedStereotypesOf(introducedType, entry.getValue(), chain);
+                if (retained != null) {
+                    values.put(AnnotationUtil.STEREOTYPES_MEMBER, retained);
+                }
+                stereotypes.add(new AnnotationValue<>(name, values, defaultValues(introducedType)));
+            } finally {
+                chain.remove(introducedType);
+            }
+        }
+        return stereotypes;
+    }
+
+    /**
+     * Walks the alias chain, recording every annotation it names once, the first occurrence first: the
+     * annotation an alias names is recorded, and then the annotations the aliases of <em>its</em> members name
+     * with the values the alias gave them.
+     */
+    private static void collectIntroduced(String name,
+                                          Map<CharSequence, Object> members,
+                                          Map<String, Map<CharSequence, Object>> introduced,
+                                          ClassLoader loader) {
+        if (name.isEmpty() || introduced.containsKey(name)) {
+            return;
+        }
+        introduced.put(name, members);
+        Class<? extends Annotation> type = annotationTypeOf(name, loader);
+        if (type == null) {
+            return;
+        }
+        for (Map.Entry<String, Map<CharSequence, Object>> aliased : aliasedMembersOf(type, members).entrySet()) {
+            collectIntroduced(aliased.getKey(), aliased.getValue(), introduced, loader);
+        }
+    }
+
+    /**
+     * The retained stereotypes of an annotation type described by the members an alias sets rather than by an
+     * instance: the meta-annotations it declares, each with the members the aliases of those values override.
+     */
+    private static AnnotationValue<?> @Nullable [] retainedStereotypesOf(Class<? extends Annotation> type,
+                                                                        Map<CharSequence, Object> members,
+                                                                        Set<Class<?>> chain) {
+        Map<String, Map<CharSequence, Object>> aliases = aliasedMembersOf(type, members);
+        List<AnnotationValue<?>> retained = new ArrayList<>(2);
+        for (Annotation meta : type.getAnnotations()) {
+            Annotation[] contained = containedAnnotations(meta);
+            for (Annotation composed : contained == null ? new Annotation[]{meta} : contained) {
+                Class<? extends Annotation> metaType = composed.annotationType();
+                if (isIgnored(metaType) || RETAINABLE.equals(metaType.getName()) || !RETAINABLE_TYPES.get(metaType)) {
+                    continue;
+                }
+                retained.add(retainedStereotype(composed, aliases.get(metaType.getName()), chain));
+            }
+        }
+        return retained.isEmpty() ? null : retained.toArray(AnnotationValue[]::new);
+    }
+
+    /**
+     * The annotations the aliases of an annotation type name, with the members they set, read off the values
+     * given rather than off an instance: a member the values hold aliases with that value, and a member they do
+     * not hold aliases with its default where {@link AliasFor#applyDefault()} asks for it.
+     */
+    private static Map<String, Map<CharSequence, Object>> aliasedMembersOf(Class<? extends Annotation> type,
+                                                                          Map<CharSequence, Object> members) {
+        Map<String, Map<CharSequence, Object>> aliases = null;
+        Map<CharSequence, Object> defaults = defaultValues(type);
+        for (Method member : MEMBERS.get(type)) {
+            Object written = members.get(member.getName());
+            Object value = written == null ? defaults.get(member.getName()) : written;
+            if (value == null) {
+                continue;
+            }
+            for (AliasFor aliasFor : member.getAnnotationsByType(AliasFor.class)) {
+                if (written == null && !aliasFor.applyDefault()) {
+                    continue;
+                }
+                String target = aliasFor.annotation() == Annotation.class
+                    ? aliasFor.annotationName()
+                    : aliasFor.annotation().getName();
+                if (target.isEmpty() || aliasFor.member().isEmpty()) {
+                    continue;
+                }
+                if (aliases == null) {
+                    aliases = new LinkedHashMap<>(2);
+                }
+                aliases.computeIfAbsent(target, ignored -> new LinkedHashMap<>(2)).put(aliasFor.member(), value);
+            }
+        }
+        return aliases == null ? Map.of() : aliases;
+    }
+
+    /**
+     * The annotation type of a name, or {@code null} when the loader cannot see it: an alias can name an
+     * annotation of a module the application does not have.
+     */
+    @Nullable
+    @SuppressWarnings("unchecked")
+    private static Class<? extends Annotation> annotationTypeOf(String name, ClassLoader loader) {
+        return (Class<? extends Annotation>) ClassUtils.forName(name, loader)
+            .filter(Class::isAnnotation)
+            .orElse(null);
+    }
+
+    /**
+     * The loader to resolve the annotations an annotation names by: the one that loaded the annotation itself,
+     * which is the only one that certainly sees the family it is composed of - a type compiled and loaded apart
+     * from this module, as one built by a test compiler is - and this module's own for a type of the platform.
+     */
+    private static ClassLoader loaderOf(Class<?> type) {
+        ClassLoader loader = type.getClassLoader();
+        return loader == null ? ReflectionAnnotations.class.getClassLoader() : loader;
+    }
+
+    /**
+     * The members overriding one occurrence of a composed annotation: the ones an alias names for that
+     * occurrence, over the ones an alias names for every occurrence.
+     */
+    @Nullable
+    private static Map<CharSequence, Object> overriddenMembers(@Nullable Map<Integer, Map<CharSequence, Object>> byIndex,
+                                                               int index) {
+        if (byIndex == null) {
+            return null;
+        }
+        Map<CharSequence, Object> everyOccurrence = byIndex.get(-1);
+        Map<CharSequence, Object> thisOccurrence = byIndex.get(index);
+        if (thisOccurrence == null) {
+            return everyOccurrence;
+        }
+        if (everyOccurrence == null) {
+            return thisOccurrence;
+        }
+        Map<CharSequence, Object> merged = new LinkedHashMap<>(everyOccurrence);
+        merged.putAll(thisOccurrence);
+        return merged;
+    }
+
+    private static AnnotationValue<?> retainedStereotype(Annotation meta,
+                                                         @Nullable Map<CharSequence, Object> overrides,
+                                                         Set<Class<?>> chain) {
+        Class<? extends Annotation> metaType = meta.annotationType();
+        Map<CharSequence, Object> values = new LinkedHashMap<>(values(meta, chain, overrides));
+        return new AnnotationValue<>(metaType.getName(), values, defaultValues(metaType));
+    }
+
+    /**
+     * The members an annotation overrides on the annotations it composes, read off {@link AliasFor}: the member
+     * of the composed annotation carries the value of the overriding member, and does so even when the
+     * overriding member is left at its default where {@link AliasFor#applyDefault()} asks for it.
+     *
+     * <p>An alias naming no annotation aliases a member of the annotation itself, and is filed under the empty
+     * name: writing one member of such a pair sets the other, as it does at compilation time.</p>
+     *
+     * @return The overrides by the name of the annotation they apply to, the annotation itself under {@code ""}
+     */
+    private static Map<String, Map<Integer, Map<CharSequence, Object>>> aliasedMembers(Annotation annotation) {
+        return aliasedMembers(annotation, null);
+    }
+
+    /**
+     * The members an annotation overrides on the annotations it composes, read off the values the annotation
+     * carries once the annotation composing <em>it</em> has had its own aliases applied.
+     *
+     * <p>An alias is a chain: {@code @DeepA(shortest = 7)} sets {@code DeepB.min}, and it is that value, not the
+     * {@code min = 1} the declaration of {@code @DeepB} writes, which {@code DeepB} then aliases onto
+     * {@code DeepC}. Reading the members off the instance alone stops the override after one level, so the
+     * members already overridden are passed in and win over what the instance answers.</p>
+     *
+     * @param annotation The annotation
+     * @param applied    The members of this annotation the composing annotation overrides, or {@code null}
+     */
+    private static Map<String, Map<Integer, Map<CharSequence, Object>>> aliasedMembers(
+        Annotation annotation,
+        @Nullable Map<CharSequence, Object> applied) {
+        Class<? extends Annotation> type = annotation.annotationType();
+        Map<String, Map<Integer, Map<CharSequence, Object>>> overrides = null;
+        Map<CharSequence, Object> defaults = defaultValues(type);
+        for (Method member : MEMBERS.get(type)) {
+            for (AliasFor aliasFor : member.getAnnotationsByType(AliasFor.class)) {
+                String target = aliasFor.annotation() == Annotation.class
+                    ? aliasFor.annotationName()
+                    : aliasFor.annotation().getName();
+                overrides = alias(overrides, annotation, member, defaults, target, aliasFor.member(),
+                    aliasFor.applyDefault(), aliasFor.index(), applied);
+            }
+            // an override declared in the terms of a specification, which a transformer maps onto @AliasFor at
+            // compilation time and a customizer states here
+            for (ReflectionAnnotationCustomizer customizer : CUSTOMIZERS) {
+                for (AnnotationValue<AliasFor> aliasFor : customizer.aliasesOf(member)) {
+                    String target = aliasFor.stringValue("annotationName")
+                        .or(() -> aliasFor.stringValue("annotation"))
+                        .orElse("");
+                    overrides = alias(overrides, annotation, member, defaults, target,
+                        aliasFor.stringValue("member").orElse(""),
+                        aliasFor.booleanValue("applyDefault").orElse(false),
+                        aliasFor.intValue("index").orElse(-1), applied);
+                }
+            }
+        }
+        return overrides == null ? Map.of() : overrides;
+    }
+
+    /**
+     * Records one override of a member of another annotation, unless the member is left at its default and the
+     * alias does not ask for the default to be applied.
+     */
+    @Nullable
+    private static Map<String, Map<Integer, Map<CharSequence, Object>>> alias(
+        @Nullable Map<String, Map<Integer, Map<CharSequence, Object>>> overrides,
+        Annotation annotation,
+        Method member,
+        Map<CharSequence, Object> defaults,
+        String target,
+        String aliasedMember,
+        boolean applyDefault,
+        int index,
+        @Nullable Map<CharSequence, Object> applied) {
+        if (aliasedMember.isEmpty()) {
+            return overrides;
+        }
+        Object value = applied == null ? null : applied.get(member.getName());
+        if (value == null) {
+            value = memberOf(annotation, member);
+        }
+        if (value == null) {
+            return overrides;
+        }
+        boolean isDefault = Objects.deepEquals(value, defaults.get(member.getName()));
+        if (isDefault && !applyDefault) {
+            return overrides;
+        }
+        Map<String, Map<Integer, Map<CharSequence, Object>>> resolved = overrides == null ? new LinkedHashMap<>(2) : overrides;
+        resolved.computeIfAbsent(target, ignored -> new LinkedHashMap<>(2))
+            .computeIfAbsent(index, ignored -> new LinkedHashMap<>(2))
+            .put(aliasedMember, value);
+        return resolved;
+    }
+
+    @Nullable
+    private static Object memberOf(Annotation annotation, Method member) {
+        Object value = AnnotationValue.of(annotation).getValues().get(member.getName());
+        return value == null ? null : memberValue(annotation, member, value);
+    }
+
+    /**
+     * Builds the metadata of an element.
+     *
+     * @param element The element
+     * @return The metadata, {@link AnnotationMetadata#EMPTY_METADATA} when the element has no annotation
+     */
+    public static AnnotationMetadata metadataOf(AnnotatedElement element) {
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
+        add(metadata, element);
+        return metadata.isEmpty() ? AnnotationMetadata.EMPTY_METADATA : metadata;
+    }
+
+    /**
+     * Builds the metadata of several elements merged, the first element first: the field, the getter and the
+     * setter of a property, or a parameter and its type.
+     *
+     * @param elements The elements, a {@code null} element skipped
+     * @return The metadata, {@link AnnotationMetadata#EMPTY_METADATA} when none of the elements has an annotation
+     */
+    public static AnnotationMetadata metadataOf(@Nullable AnnotatedElement... elements) {
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
+        for (AnnotatedElement element : elements) {
+            if (element != null) {
+                add(metadata, element);
+            }
+        }
+        return metadata.isEmpty() ? AnnotationMetadata.EMPTY_METADATA : metadata;
+    }
+
+    /**
+     * Builds the metadata of annotation instances, each declared: the annotations a specification API hands
+     * over as an array, such as the ones of a JAX-RS entity or the qualifiers of a CDI lookup.
+     *
+     * @param annotations The annotations
+     * @return The metadata, {@link AnnotationMetadata#EMPTY_METADATA} when there is no annotation
+     */
+    public static AnnotationMetadata metadataOf(Annotation... annotations) {
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
+        for (Annotation annotation : annotations) {
+            addAnnotation(metadata, annotation, true);
+        }
+        return metadata.isEmpty() ? AnnotationMetadata.EMPTY_METADATA : metadata;
+    }
+
+    /**
+     * The metadata of an element that declares an annotation type, without an instance of it: the annotation
+     * with the values given, its defaults and its stereotypes, as the processors record it.
+     *
+     * <p>Code that adapts another container - a Guice binding annotation, a Spring bean marked primary - knows
+     * the annotation type and the members it means, and has no instance to read. Declaring the annotation by
+     * name alone loses its defaults and its stereotypes, and a qualifier built from such metadata then fails to
+     * match one built from the generated metadata of a bean.</p>
+     *
+     * @param annotationType The annotation type, filed under its container when it is repeatable
+     * @param values         The values of the members, empty when the annotation is written bare
+     * @return The metadata
+     */
+    public static AnnotationMetadata declaring(Class<? extends Annotation> annotationType, Map<CharSequence, Object> values) {
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
+        declare(metadata, annotationType, values);
+        return metadata;
+    }
+
+    /**
+     * The metadata of an element that declares an annotation type with the defaults of its members.
+     *
+     * @param annotationType The annotation type
+     * @return The metadata
+     * @see #declaring(Class, Map)
+     */
+    public static AnnotationMetadata declaring(Class<? extends Annotation> annotationType) {
+        return declaring(annotationType, Map.of());
+    }
+
+    /**
+     * Adds an annotation type, the values given, its defaults and its stereotypes to a metadata under
+     * construction.
+     *
+     * @param metadata       The metadata
+     * @param annotationType The annotation type
+     * @param values         The values of the members, empty when the annotation is written bare
+     * @see #declaring(Class, Map)
+     */
+    public static void declare(MutableAnnotationMetadata metadata,
+                               Class<? extends Annotation> annotationType,
+                               Map<CharSequence, Object> values) {
+        register(metadata, annotationType);
+        String name = annotationType.getName();
+        Repeatable repeatable = annotationType.getAnnotation(Repeatable.class);
+        if (repeatable == null) {
+            metadata.addDeclaredAnnotation(name, new LinkedHashMap<>(values));
+        } else {
+            // a repeatable annotation is filed under its container, whether it is written once or several times
+            Class<? extends Annotation> container = repeatable.value();
+            register(metadata, container);
+            DefaultAnnotationMetadata.registerRepeatableAnnotations(Map.of(name, container.getName()));
+            metadata.addDeclaredRepeatable(container.getName(),
+                new AnnotationValue<>(name, new LinkedHashMap<>(values), defaultValues(annotationType)));
+        }
+        addStereotypes(metadata, annotationType, List.of(name), true, Map.of());
+    }
+
+    /**
+     * The annotations of two metadata in one, both declared: the metadata of a class together with the
+     * annotations another container means it to carry.
+     *
+     * <p>A container adapting another one - a Spring bean it marks primary, a Guice binding it qualifies -
+     * has annotations of its own to add to the ones a class declares. Replacing the metadata of the class
+     * loses what the class says; a {@link AnnotationMetadataHierarchy hierarchy} keeps both but only the last
+     * level counts as declared, and the framework reads a scope, a qualifier and a primary marker from the
+     * declared level. This merges them, so both are declared.</p>
+     *
+     * @param first  The metadata whose values win where both declare the same annotation
+     * @param second The metadata to add
+     * @return The merged metadata
+     */
+    public static AnnotationMetadata merge(AnnotationMetadata first, AnnotationMetadata second) {
+        if (second.isEmpty()) {
+            return first;
+        }
+        if (first.isEmpty()) {
+            return second;
+        }
+        // adding fills in the members the target does not carry and leaves the ones it does alone, so the
+        // metadata whose values are to win is the one to start from
+        MutableAnnotationMetadata merged = MutableAnnotationMetadata.of(first);
+        merged.addAnnotationMetadata(MutableAnnotationMetadata.of(second));
+        return merged;
+    }
+
+    /**
+     * Adds the annotations of an element to a metadata under construction. An annotation whose values cannot be
+     * read is left out, with a message logged at debug level: the generated metadata of an element records it,
+     * and the element must not lose the annotations that can be read because of it.
+     *
+     * @param metadata The metadata
+     * @param element  The element
+     */
+    public static void add(MutableAnnotationMetadata metadata, AnnotatedElement element) {
+        Annotation[] declared = element.getDeclaredAnnotations();
+        for (Annotation annotation : declared) {
+            addAnnotationOf(metadata, element, annotation, true);
+        }
+        if (!(element instanceof Class<?> type)) {
+            return;
+        }
+        // the names the annotations are filed under, so that one inherited neither displaces nor duplicates one
+        // declared: a declared annotation wins over the same annotation inherited
+        Set<String> present = new HashSet<>();
+        for (Annotation annotation : declared) {
+            present.add(filedUnder(annotation.annotationType()));
+        }
+        for (Annotation annotation : type.getAnnotations()) {
+            if (present.add(filedUnder(annotation.annotationType()))) {
+                addAnnotationOf(metadata, type, annotation, false);
+            }
+        }
+        // getAnnotations() is built from the super class chain alone, so an @Inherited annotation an implemented
+        // interface declares is missing from it, while the hierarchy the processors walk includes the interfaces
+        for (Class<?> interfaceType : interfaceHierarchy(type)) {
+            for (Annotation annotation : interfaceType.getDeclaredAnnotations()) {
+                Class<? extends Annotation> annotationType = annotation.annotationType();
+                if (isInheritable(annotationType) && present.add(filedUnder(annotationType))) {
+                    addAnnotationOf(metadata, type, annotation, false);
+                }
+            }
+        }
+    }
+
+    /**
+     * Adds one annotation instance to a metadata under construction, as
+     * {@link #add(MutableAnnotationMetadata, AnnotatedElement)} adds every annotation of an element: a caller
+     * keeping only some annotations of an element - the constraints, the qualifiers - filters the instances and
+     * adds the ones it keeps.
+     *
+     * @param metadata   The metadata
+     * @param annotation The annotation
+     * @param declared   Whether the annotation is declared on the element rather than inherited
+     */
+    public static void add(MutableAnnotationMetadata metadata, Annotation annotation, boolean declared) {
+        addAnnotation(metadata, annotation, declared);
+    }
+
+    /**
+     * The annotations a repeatable container holds.
+     *
+     * @param annotation The annotation
+     * @return The contained annotations, empty when the annotation is not the container of a repeatable
+     * annotation
+     */
+    public static List<Annotation> contained(Annotation annotation) {
+        Annotation[] contained = containedAnnotations(annotation);
+        return contained == null ? List.of() : List.of(contained);
+    }
+
+    /**
+     * The values of the members of an annotation, as the metadata stores them: the members whose value is the
+     * default of the member are left out, a class is an {@link AnnotationClassValue}, an enum constant is its
+     * name, a nested annotation is an {@link AnnotationValue} and the members annotated {@link NonBinding} are
+     * listed under {@link AnnotationUtil#NON_BINDING_ATTRIBUTE}.
+     *
+     * <p>A nested annotation is given the same treatment as the annotation holding it, recursively, and an
+     * array value is a copy the caller owns.</p>
+     *
+     * @param annotation The annotation
+     * @return The values, mutable
+     * @throws IllegalStateException When a member of the annotation cannot be read
+     */
+    public static Map<CharSequence, Object> values(Annotation annotation) {
+        return values(annotation, new HashSet<>());
+    }
+
+    /**
+     * The values of an annotation, with the chain of the annotation types being converted, so that an annotation
+     * composing itself through its stereotypes is not followed round.
+     */
+    private static Map<CharSequence, Object> values(Annotation annotation, Set<Class<?>> chain) {
+        return values(annotation, chain, null);
+    }
+
+    /**
+     * The values of an annotation with the members the annotation composing it overrides already applied, so
+     * that what it derives from itself - a member aliasing another member of the same annotation, and the
+     * retained tree below it - is derived from the overridden values rather than the declared ones.
+     */
+    private static Map<CharSequence, Object> values(Annotation annotation,
+                                                    Set<Class<?>> chain,
+                                                    @Nullable Map<CharSequence, Object> applied) {
+        return values(annotation, chain, applied, null);
+    }
+
+    /**
+     * The values of an annotation, keeping a member the source wrote even where it is equal to the default of
+     * its type.
+     *
+     * @param written The members the source wrote, or {@code null} when the class file cannot say
+     */
+    private static Map<CharSequence, Object> values(Annotation annotation,
+                                                    Set<Class<?>> chain,
+                                                    @Nullable Map<CharSequence, Object> applied,
+                                                    @Nullable Set<String> written) {
+        Class<? extends Annotation> type = annotation.annotationType();
+        // reading the instance and converting its members is the shared conversion of the core API, a nested
+        // annotation and the members of it included; what this module adds on top of it is the policies below
+        Map<CharSequence, Object> read = AnnotationValue.of(annotation).getValues();
+        // a member equal to its default is left out of the values, as it is at compilation time: an instance
+        // answers every one of its members while the processors record only what the source writes, and
+        // registering the defaults is what lets the accessors serve the members left out
+        Map<CharSequence, Object> defaults = defaultValues(type);
+        Map<CharSequence, Object> values = new LinkedHashMap<>();
+        List<String> nonBinding = null;
+        for (Method member : MEMBERS.get(type)) {
+            String name = member.getName();
+            if (member.isAnnotationPresent(NonBinding.class)) {
+                if (nonBinding == null) {
+                    nonBinding = new ArrayList<>(2);
+                }
+                nonBinding.add(name);
+            }
+            Object value = read.get(name);
+            // the converted forms are compared, and by content: a member holding an array answers a fresh one.
+            // both sides are the form the shared conversion gives, the defaults included, so the comparison is
+            // made before the policies below reshape a nested annotation
+            if (value == null) {
+                continue;
+            }
+            // a member equal to its default is left out, as it is at compilation time - unless the class file
+            // says the source wrote it, which is the one thing an instance cannot tell and the processors record
+            if (Objects.deepEquals(value, defaults.get(name)) && (written == null || !written.contains(name))) {
+                continue;
+            }
+            values.put(name, memberValue(annotation, member, value));
+        }
+        if (nonBinding != null) {
+            // the attribute lists itself, as the processors record it
+            nonBinding.add(AnnotationUtil.NON_BINDING_ATTRIBUTE);
+            values.put(AnnotationUtil.NON_BINDING_ATTRIBUTE, nonBinding.toArray(String[]::new));
+        }
+        for (ReflectionAnnotationCustomizer customizer : CUSTOMIZERS) {
+            if (customizer.supports(type)) {
+                customizer.customize(annotation, values);
+            }
+        }
+        if (applied != null) {
+            values.putAll(applied);
+        }
+        // a member aliasing another member of the same annotation sets it, unless the source wrote it itself
+        Map<Integer, Map<CharSequence, Object>> selfAliases = aliasedMembers(annotation, applied).get("");
+        if (selfAliases != null) {
+            selfAliases.values().forEach(aliased -> aliased.forEach(values::putIfAbsent));
+        }
+        // the retained tree is added after the customizers, so that a customizer deriving a member of an
+        // annotation - the validators a constraint is validated by - has it on every retained occurrence too
+        AnnotationValue<?>[] retained = retainedStereotypes(annotation, chain, applied);
+        if (retained != null) {
+            values.put(AnnotationUtil.STEREOTYPES_MEMBER, retained);
+        }
+        return values;
+    }
+
+    /**
+     * The defaults of the members of an annotation type, in the shapes {@link #values(Annotation)} gives the
+     * values.
+     *
+     * @param annotationType The annotation type
+     * @return The defaults, unmodifiable
+     */
+    public static Map<CharSequence, Object> defaultValues(Class<? extends Annotation> annotationType) {
+        return DEFAULTS.get(annotationType);
+    }
+
+    /**
+     * The annotation value of an annotation instance, carrying its defaults. An instance that is an
+     * {@link AnnotationValueProvider} - a synthetic annotation built from a value - returns that value.
+     *
+     * @param annotation The annotation
+     * @param <A>        The annotation type
+     * @return The annotation value
+     */
+    public static <A extends Annotation> AnnotationValue<A> valueOf(A annotation) {
+        return valueOf(annotation, null);
+    }
+
+    /**
+     * The annotation value of an annotation instance, carrying its defaults, with its values customized.
+     *
+     * @param annotation The annotation
+     * @param customizer The customizer of the values, receiving a mutable copy, can be {@code null}
+     * @param <A>        The annotation type
+     * @return The annotation value
+     */
+    @SuppressWarnings("unchecked")
+    public static <A extends Annotation> AnnotationValue<A> valueOf(A annotation,
+                                                                  @Nullable Consumer<Map<CharSequence, Object>> customizer) {
+        if (customizer == null && annotation instanceof AnnotationValueProvider<?> provider) {
+            return (AnnotationValue<A>) provider.annotationValue();
+        }
+        Class<A> type = (Class<A>) annotation.annotationType();
+        Map<CharSequence, Object> values = values(annotation);
+        if (customizer != null) {
+            customizer.accept(values);
+        }
+        return new AnnotationValue<>(type.getName(), values, defaultValues(type));
+    }
+
+    /**
+     * Builds an annotation instance from an annotation value: the reverse of {@link #valueOf(Annotation)}. The
+     * instance implements {@link AnnotationValueProvider}, so that converting it back yields the value it was
+     * built from, and its members are the values of the annotation value completed by the defaults of the type.
+     *
+     * @param annotationType  The annotation type
+     * @param annotationValue The annotation value
+     * @param <A>             The annotation type
+     * @return The annotation
+     */
+    @SuppressWarnings("unchecked")
+    public static <A extends Annotation> A synthesize(Class<A> annotationType, AnnotationValue<A> annotationValue) {
+        // register the defaults of the type, so that the members the value does not carry are served
+        defaultValues(annotationType);
+        try {
+            return AnnotationMetadataSupport.buildAnnotation(annotationType, annotationValue);
+        } catch (AnnotationMetadataException | IllegalArgumentException e) {
+            // the shared path needs a proxy carrying AnnotationValueProvider, which cannot be built for every
+            // annotation type - one that is not public, or whose loader cannot see that interface - and a
+            // specification hands those over like any other
+            return (A) Proxy.newProxyInstance(
+                annotationType.getClassLoader(),
+                new Class<?>[]{annotationType},
+                new SynthesizedAnnotation<>(annotationType, annotationValue));
+        }
+    }
+
+    /**
+     * Builds an annotation instance from an annotation value, the type resolved by name through a class loader.
+     *
+     * @param annotationValue The annotation value
+     * @param classLoader     The class loader defining the annotation type
+     * @param <A>             The annotation type
+     * @return The annotation
+     * @throws IllegalArgumentException When the class loader does not define the annotation type
+     */
+    @SuppressWarnings("unchecked")
+    public static <A extends Annotation> A synthesize(AnnotationValue<A> annotationValue, ClassLoader classLoader) {
+        Class<?> type = ClassUtils.forName(annotationValue.getAnnotationName(), classLoader)
+            .orElseThrow(() -> new IllegalArgumentException("The annotation type " + annotationValue.getAnnotationName()
+                + " is not defined by the class loader " + classLoader));
+        if (!type.isAnnotation()) {
+            throw new IllegalArgumentException("The type " + type.getName() + " is not an annotation");
+        }
+        return synthesize((Class<A>) type, annotationValue);
+    }
+
+    /**
+     * Adds one annotation of an element, an annotation whose values cannot be read left out rather than failing
+     * the element. An annotation naming a class that is absent from the class path is read by the processor and
+     * recorded, while reading it reflectively throws; the entry points a caller asks a named annotation of still
+     * propagate, since the caller has nothing else to be given.
+     */
+    private static void addAnnotationOf(MutableAnnotationMetadata metadata,
+                                        AnnotatedElement element,
+                                        Annotation annotation,
+                                        boolean declared) {
+        try {
+            addAnnotation(metadata, annotation, declared, WrittenMembers.of(element, annotation.annotationType()));
+        } catch (RuntimeException e) {
+            ClassUtils.REFLECTION_LOGGER.debug("Skipping the annotation [{}] of [{}], its values cannot be read",
+                annotation.annotationType().getName(), element, e);
+        }
+    }
+
+    /**
+     * @return The name the metadata files an annotation type under: the container of a repeatable annotation, or
+     * the type itself
+     */
+    private static String filedUnder(Class<? extends Annotation> type) {
+        Repeatable repeatable = type.getAnnotation(Repeatable.class);
+        return repeatable == null ? type.getName() : repeatable.value().getName();
+    }
+
+    /**
+     * @return Whether an annotation type is meta-annotated {@link Inherited}, which is what makes the processors
+     * keep it on a type that does not declare it
+     */
+    private static boolean isInheritable(Class<? extends Annotation> type) {
+        if (type.isAnnotationPresent(Inherited.class)) {
+            return true;
+        }
+        // a repeatable annotation written more than once is the container the compiler generates, which carries
+        // no meta-annotation of its own: the annotation it holds is what says whether it is inherited
+        for (Method member : MEMBERS.get(type)) {
+            if (AnnotationMetadata.VALUE_MEMBER.equals(member.getName())) {
+                Class<?> returnType = member.getReturnType();
+                return returnType.isArray()
+                    && returnType.getComponentType().isAnnotation()
+                    && returnType.getComponentType().isAnnotationPresent(Inherited.class);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The interfaces of the hierarchy of a type, breadth first from the type down its super class chain and then
+     * up the super interfaces, each interface once: the order a nearer declaration is seen before a farther one.
+     */
+    private static List<Class<?>> interfaceHierarchy(Class<?> type) {
+        List<Class<?>> hierarchy = new ArrayList<>();
+        Set<Class<?>> visited = new HashSet<>();
+        Deque<Class<?>> queue = new ArrayDeque<>();
+        for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
+            for (Class<?> interfaceType : current.getInterfaces()) {
+                if (visited.add(interfaceType)) {
+                    queue.add(interfaceType);
+                }
+            }
+        }
+        while (!queue.isEmpty()) {
+            Class<?> interfaceType = queue.poll();
+            hierarchy.add(interfaceType);
+            for (Class<?> superInterface : interfaceType.getInterfaces()) {
+                if (visited.add(superInterface)) {
+                    queue.add(superInterface);
+                }
+            }
+        }
+        return hierarchy;
+    }
+
+    private static void addAnnotation(MutableAnnotationMetadata metadata, Annotation annotation, boolean declared) {
+        addAnnotation(metadata, annotation, declared, null);
+    }
+
+    private static void addAnnotation(MutableAnnotationMetadata metadata,
+                                      Annotation annotation,
+                                      boolean declared,
+                                      @Nullable Set<String> written) {
+        Class<? extends Annotation> type = annotation.annotationType();
+        if (isIgnored(type)) {
+            return;
+        }
+        Annotation[] contained = containedAnnotations(annotation);
+        if (contained != null) {
+            for (Annotation repeated : contained) {
+                addRepeated(metadata, repeated, type, declared);
+            }
+            addContainerItself(metadata, annotation, contained, declared);
+            return;
+        }
+        Repeatable repeatable = type.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            addRepeated(metadata, annotation, repeatable.value(), declared);
+            return;
+        }
+        register(metadata, type);
+        String name = type.getName();
+        Map<CharSequence, Object> values = values(annotation, new HashSet<>(), null, written);
+        if (declared) {
+            metadata.addDeclaredAnnotation(name, values);
+        } else {
+            metadata.addAnnotation(name, values);
+        }
+        addStereotypes(metadata, type, List.of(name), declared, aliasedMembers(annotation));
+    }
+
+    private static void addRepeated(MutableAnnotationMetadata metadata,
+                                    Annotation annotation,
+                                    Class<? extends Annotation> container,
+                                    boolean declared) {
+        Class<? extends Annotation> type = annotation.annotationType();
+        register(metadata, type);
+        register(metadata, container);
+        DefaultAnnotationMetadata.registerRepeatableAnnotations(Map.of(type.getName(), container.getName()));
+        AnnotationValue<?> value = valueOf(annotation);
+        if (declared) {
+            metadata.addDeclaredRepeatable(container.getName(), value);
+        } else {
+            metadata.addRepeatable(container.getName(), value);
+        }
+        addStereotypes(metadata, type, List.of(type.getName()), declared, aliasedMembers(annotation));
+    }
+
+    /**
+     * Records a repeatable container that the source wrote itself, rather than one the compiler synthesized for
+     * an annotation repeated on the element.
+     *
+     * <p>A container may declare members of its own besides the occurrences it holds, provided they have
+     * defaults, and the processors record those members on the container. The two cases are told apart the only
+     * way an instance allows: a synthesized container carries nothing but its occurrences, so it has no member
+     * left once the ones equal to their defaults are dropped, while a written one does. A container written with
+     * no occurrence at all is recorded whole, since the flattening above had nothing to file and the annotation
+     * would otherwise disappear from the element.</p>
+     */
+    private static void addContainerItself(MutableAnnotationMetadata metadata,
+                                           Annotation annotation,
+                                           Annotation[] contained,
+                                           boolean declared) {
+        Class<? extends Annotation> type = annotation.annotationType();
+        Map<CharSequence, Object> values = values(annotation);
+        if (contained.length > 0) {
+            // the occurrences are filed under the container by addRepeated, which appends to this same member
+            values.remove(AnnotationMetadata.VALUE_MEMBER);
+            if (values.isEmpty()) {
+                return;
+            }
+        }
+        register(metadata, type);
+        String name = type.getName();
+        if (declared) {
+            metadata.addDeclaredAnnotation(name, values);
+        } else {
+            metadata.addAnnotation(name, values);
+        }
+        addStereotypes(metadata, type, List.of(name), declared, aliasedMembers(annotation));
+    }
+
+    /**
+     * Adds the meta-annotations of an annotation type as stereotypes of the given parents, recursively. The
+     * parents are the chain from the annotation on the element down to the current type, and a type already
+     * in the chain is a cycle, which is skipped.
+     */
+    private static void addStereotypes(MutableAnnotationMetadata metadata,
+                                       Class<? extends Annotation> type,
+                                       List<String> parents,
+                                       boolean declared,
+                                       Map<String, Map<Integer, Map<CharSequence, Object>>> overrides) {
+        // the occurrence of each stereotype, so that an alias naming one of several occurrences overrides that
+        // one, as it does in the retained tree
+        Map<String, Integer> occurrences = new HashMap<>(2);
+        for (Annotation meta : type.getDeclaredAnnotations()) {
+            Class<? extends Annotation> metaType = meta.annotationType();
+            if (isIgnored(metaType) || parents.contains(metaType.getName())) {
+                continue;
+            }
+            Annotation[] contained = containedAnnotations(meta);
+            if (contained != null) {
+                for (Annotation repeated : contained) {
+                    addRepeatedStereotype(metadata, repeated, metaType, parents, declared,
+                        overridesFor(overrides, repeated.annotationType().getName(), occurrences));
+                }
+                continue;
+            }
+            Repeatable repeatable = metaType.getAnnotation(Repeatable.class);
+            if (repeatable != null) {
+                addRepeatedStereotype(metadata, meta, repeatable.value(), parents, declared,
+                    overridesFor(overrides, metaType.getName(), occurrences));
+                continue;
+            }
+            register(metadata, metaType);
+            // resolved once: reading it counts the occurrence, and the members it overrides are what the next
+            // level down aliases from
+            Map<CharSequence, Object> applied = overridesFor(overrides, metaType.getName(), occurrences);
+            // the overrides are applied while the values are read, not after: what the stereotype derives from
+            // itself - the retained tree below it, and a member aliasing another member of the same annotation -
+            // is derived from the overridden values, as the processors cascade an override down to the leaves
+            Map<CharSequence, Object> values = overridden(values(meta, new HashSet<>(), applied), applied);
+            if (declared) {
+                metadata.addDeclaredStereotype(parents, metaType.getName(), values);
+            } else {
+                metadata.addStereotype(parents, metaType.getName(), values);
+            }
+            addStereotypes(metadata, metaType, chain(parents, metaType), declared, aliasedMembers(meta, applied));
+        }
+    }
+
+    /**
+     * The overrides that apply to the next occurrence of a stereotype, counting the occurrences as they are seen.
+     */
+    @Nullable
+    private static Map<CharSequence, Object> overridesFor(Map<String, Map<Integer, Map<CharSequence, Object>>> overrides,
+                                                          String name,
+                                                          Map<String, Integer> occurrences) {
+        int index = occurrences.merge(name, 0, (previous, ignored) -> previous + 1);
+        return overriddenMembers(overrides.get(name), index);
+    }
+
+    /**
+     * The values of a stereotype with the members the annotation composing it overrides.
+     */
+    private static Map<CharSequence, Object> overridden(Map<CharSequence, Object> values,
+                                                        @Nullable Map<CharSequence, Object> overrides) {
+        if (overrides == null || overrides.isEmpty()) {
+            return values;
+        }
+        Map<CharSequence, Object> overriding = new LinkedHashMap<>(values);
+        overriding.putAll(overrides);
+        return overriding;
+    }
+
+    private static void addRepeatedStereotype(MutableAnnotationMetadata metadata,
+                                              Annotation meta,
+                                              Class<? extends Annotation> container,
+                                              List<String> parents,
+                                              boolean declared,
+                                              @Nullable Map<CharSequence, Object> overrides) {
+        Class<? extends Annotation> metaType = meta.annotationType();
+        if (parents.contains(metaType.getName())) {
+            return;
+        }
+        register(metadata, metaType);
+        register(metadata, container);
+        DefaultAnnotationMetadata.registerRepeatableAnnotations(Map.of(metaType.getName(), container.getName()));
+        AnnotationValue<?> value = valueOf(meta, values -> {
+            if (overrides != null) {
+                values.putAll(overrides);
+            }
+        });
+        if (declared) {
+            metadata.addDeclaredRepeatableStereotype(parents, container.getName(), value);
+        } else {
+            metadata.addRepeatableStereotype(parents, container.getName(), value);
+        }
+        addStereotypes(metadata, metaType, chain(parents, metaType), declared, aliasedMembers(meta, overrides));
+    }
+
+    private static List<String> chain(List<String> parents, Class<? extends Annotation> type) {
+        List<String> chain = new ArrayList<>(parents.size() + 1);
+        chain.addAll(parents);
+        chain.add(type.getName());
+        return chain;
+    }
+
+    /**
+     * Registers the defaults of an annotation type in the metadata under construction; the shared registry the
+     * value accessors consult is filled when the defaults are first computed.
+     */
+    private static void register(MutableAnnotationMetadata metadata, Class<? extends Annotation> type) {
+        Map<CharSequence, Object> defaults = defaultValues(type);
+        if (!defaults.isEmpty()) {
+            metadata.addDefaultAnnotationValues(type.getName(), defaults);
+        }
+    }
+
+    /**
+     * @return The annotations a repeatable container holds, or {@code null} when the annotation is not a container;
+     * a container is the {@link Repeatable} one or a nested {@code List} of its enclosing annotation
+     */
+    private static Annotation @Nullable [] containedAnnotations(Annotation annotation) {
+        Class<? extends Annotation> type = annotation.annotationType();
+        Method value;
+        try {
+            value = type.getDeclaredMethod(AnnotationMetadata.VALUE_MEMBER);
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
+        Class<?> returnType = value.getReturnType();
+        if (!returnType.isArray() || !returnType.getComponentType().isAnnotation()) {
+            return null;
+        }
+        Class<?> contained = returnType.getComponentType();
+        Repeatable repeatable = contained.getAnnotation(Repeatable.class);
+        if (repeatable == null || repeatable.value() != type) {
+            // a nested `List` of its enclosing annotation is a container by convention even without @Repeatable:
+            // Bean Validation declared its constraint containers that way before Java had repeatable annotations
+            if (!("List".equals(type.getSimpleName()) && type.getEnclosingClass() == contained)) { // NOSONAR - the convention is the simple name, there is no type to compare against
+                return null;
+            }
+        }
+        value.trySetAccessible();
+        return (Annotation[]) ReflectionUtils.invokeMethod(annotation, value);
+    }
+
+    /**
+     * A member value as this module records it, on top of the form the shared conversion gives it.
+     *
+     * <p>{@link AnnotationValue#of(Annotation)} converts the whole tree, so a member holding an annotation comes
+     * out as an {@link AnnotationValue} the shared rules built: it carries the members left at their default, its
+     * defaults are not registered, its non binding members are not recorded and no customizer has seen it. Those
+     * are the policies of this module and they hold at every level, so the nested annotation is read off the
+     * instance and converted by {@link #valueOf(Annotation)}, which recurses; only the shape of the conversion
+     * stays the concern of the core API.</p>
+     *
+     * @param annotation The annotation the member is read from
+     * @param member     The member
+     * @param value      The value of the member, as the shared conversion gives it
+     * @return The value to record
+     * @throws IllegalStateException When the member cannot be read
+     */
+    private static Object memberValue(Annotation annotation, Method member, Object value) {
+        if (value instanceof AnnotationValue<?>) {
+            if (readMember(annotation, member) instanceof Annotation nested) {
+                return valueOf(nested);
+            }
+        } else if (value instanceof AnnotationValue<?>[]) {
+            // an array of annotations is walked element by element: each element is an annotation of its own
+            if (readMember(annotation, member) instanceof Annotation[] nested) {
+                AnnotationValue<?>[] converted = new AnnotationValue[nested.length];
+                for (int i = 0; i < nested.length; i++) {
+                    converted[i] = valueOf(nested[i]);
+                }
+                return converted;
+            }
+        }
+        // a value that is not an annotation is left as the conversion gave it, copied when it is an array
+        return copied(value);
+    }
+
+    /**
+     * A member read off an annotation instance again, to convert the annotation it holds rather than the
+     * converted form of it. A failure is reported the way {@link AnnotationValue#of(Annotation)} reports one, so
+     * that a member read here fails no differently from the same member read there.
+     */
+    @Nullable
+    private static Object readMember(Annotation annotation, Method member) {
+        try {
+            return ReflectionUtils.invokeInaccessibleMethod(annotation, member);
+        } catch (RuntimeException e) {
+            // the reflective wrappers say nothing an invocation target's own exception does not say better
+            Throwable cause = e;
+            while (cause.getCause() != null) {
+                cause = cause.getCause();
+            }
+            throw new IllegalStateException("Cannot read member [" + member.getName() + "] of annotation ["
+                + annotation.annotationType().getName() + "]: " + cause, e);
+        }
+    }
+
+    /**
+     * A value copied when it is an array, so that a caller mutating what it is handed cannot reach the array of
+     * the annotation.
+     *
+     * <p>The copy is made here rather than in the core API because the shared conversion keeps an array it has
+     * no shape to change - one of primitives or of strings - as the instance answered it, which is safe for the
+     * proxy the compiler builds, since that one clones an array member on every call, and is not safe for an
+     * annotation written by hand nor for the one {@link #synthesize(Class, AnnotationValue)} builds, both of
+     * which answer the same array every time. The values this class builds are handed to a customizer and stored
+     * in a metadata, so the array they hold is to be theirs.</p>
+     */
+    private static Object copied(Object value) {
+        if (!value.getClass().isArray()) {
+            return value;
+        }
+        int length = Array.getLength(value);
+        Object copy = Array.newInstance(value.getClass().getComponentType(), length);
+        System.arraycopy(value, 0, copy, 0, length);
+        return copy;
+    }
+
+    /**
+     * The default of a member, in the form the metadata records a value.
+     *
+     * <p>{@link AnnotationValue#of(Annotation)} converts what it reads off an annotation instance, and a default
+     * has no instance behind it: {@link Method#getDefaultValue()} is the only source of it, so the module
+     * converts a default itself. The shapes are the ones that method produces, so that a value read off an
+     * instance and the default of its member compare equal and the member is left out of the values.</p>
+     */
+    private static Object convert(Object value) {
+        if (value instanceof Class<?> type) {
+            return new AnnotationClassValue<>(type);
+        }
+        if (value instanceof Enum<?> constant) {
+            return constant.name();
+        }
+        if (value instanceof Annotation annotation) {
+            return AnnotationValue.of(annotation);
+        }
+        if (value instanceof Class<?>[] types) {
+            AnnotationClassValue<?>[] converted = new AnnotationClassValue[types.length];
+            for (int i = 0; i < types.length; i++) {
+                converted[i] = new AnnotationClassValue<>(types[i]);
+            }
+            return converted;
+        }
+        if (value instanceof Enum<?>[] constants) {
+            String[] converted = new String[constants.length];
+            for (int i = 0; i < constants.length; i++) {
+                converted[i] = constants[i].name();
+            }
+            return converted;
+        }
+        if (value instanceof Annotation[] annotations) {
+            AnnotationValue<?>[] converted = new AnnotationValue[annotations.length];
+            for (int i = 0; i < annotations.length; i++) {
+                converted[i] = AnnotationValue.of(annotations[i]);
+            }
+            return converted;
+        }
+        return value;
+    }
+
+    private static boolean isIgnored(Class<? extends Annotation> type) {
+        String name = type.getName();
+        return name.startsWith(JAVA_LANG_ANNOTATION)
+            || name.startsWith(KOTLIN)
+            || AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(name);
+    }
+
+    /**
+     * An annotation instance over an {@link AnnotationValue}, for a type the shared proxy cannot be built for.
+     * A member is the value the annotation value carries, converted to the type the member declares, or the
+     * default of the member; {@code equals}, {@code hashCode} and {@code toString} follow
+     * {@link Annotation}, so that an instance compares equal to the annotation the compiler makes.
+     *
+     * @param <A> The annotation type
+     */
+    @Internal
+    private static final class SynthesizedAnnotation<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
+
+        private final Class<A> annotationType;
+        private final AnnotationValue<A> annotationValue;
+
+        SynthesizedAnnotation(Class<A> annotationType, AnnotationValue<A> annotationValue) {
+            this.annotationType = annotationType;
+            this.annotationValue = annotationValue;
+        }
+
+        @Override
+        public AnnotationValue<A> annotationValue() {
+            return annotationValue;
+        }
+
+        @Override
+        @Nullable
+        public Object invoke(Object proxy, Method method, Object @Nullable [] args) {
+            String name = method.getName();
+            if (args != null && args.length == 1 && "equals".equals(name)) {
+                return equalsAnnotation(args[0]);
+            }
+            if (args == null || args.length == 0) {
+                switch (name) {
+                    case "hashCode" -> {
+                        return annotationHashCode();
+                    }
+                    case "toString" -> {
+                        return annotationValue.toString();
+                    }
+                    case "annotationType" -> {
+                        return annotationType;
+                    }
+                    default -> {
+                        if (method.getReturnType() == AnnotationValue.class) {
+                            return annotationValue;
+                        }
+                        return member(method);
+                    }
+                }
+            }
+            return member(method);
+        }
+
+        @Nullable
+        private Object member(Method member) {
+            Object value = annotationValue.getValues().get(member.getName());
+            if (value == null) {
+                return member.getDefaultValue();
+            }
+            Object converted = ConversionService.SHARED
+                .convert(value, Argument.of(member.getReturnType()))
+                .orElse(null);
+            return converted == null ? member.getDefaultValue() : converted;
+        }
+
+        private boolean equalsAnnotation(@Nullable Object other) {
+            if (other == null || !annotationType.isInstance(other)) {
+                return false;
+            }
+            if (other instanceof AnnotationValueProvider<?> provider) {
+                return annotationValue.equals(provider.annotationValue());
+            }
+            for (Method declared : MEMBERS.get(annotationType)) {
+                Object mine = member(declared);
+                Object theirs = ReflectionUtils.invokeMethod(other, declared);
+                if (!Objects.deepEquals(mine, theirs)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /**
+         * The hash code {@link Annotation#hashCode()} defines: the sum over the members of the hash of the
+         * member name times 127, exclusive-ored with the hash of its value.
+         */
+        private int annotationHashCode() {
+            int hashCode = 0;
+            for (Method declared : MEMBERS.get(annotationType)) {
+                Object value = member(declared);
+                int valueHash = value == null ? 0 : (value.getClass().isArray() ? arrayHashCode(value) : value.hashCode());
+                hashCode += (127 * declared.getName().hashCode()) ^ valueHash;
+            }
+            return hashCode;
+        }
+
+        private static int arrayHashCode(Object array) {
+            int length = Array.getLength(array);
+            int hashCode = 1;
+            for (int i = 0; i < length; i++) {
+                Object element = Array.get(array, i);
+                hashCode = 31 * hashCode + (element == null ? 0 : element.hashCode());
+            }
+            return hashCode;
+        }
+    }
+}

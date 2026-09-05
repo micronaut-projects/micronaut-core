@@ -355,7 +355,17 @@ public final class AnnotationMetadataSupport {
     static Optional<Class<? extends Annotation>> getAnnotationType(String name, ClassLoader classLoader) {
         final Class<? extends Annotation> type = ANNOTATION_TYPES.get(name);
         if (type != null) {
-            return Optional.of(type);
+            // a type the bootstrap loader defines cannot be shadowed, and a caller that asks with no loader of
+            // its own has none to define a copy in either: resolving again would answer from whatever loader
+            // ClassUtils falls back to, which is not the caller's
+            if (classLoader == null || type.getClassLoader() == null || type.getClassLoader() == classLoader) {
+                return Optional.of(type);
+            }
+            // the registered type was loaded by another class loader: the caller's loader may define its own
+            // copy - a child-first deployment loader does - and that copy is the one the caller compares with
+            @SuppressWarnings("unchecked") final Class<? extends Annotation> own =
+                (Class<? extends Annotation>) ClassUtils.forName(name, classLoader).orElse(null);
+            return Optional.of(own != null && Annotation.class.isAssignableFrom(own) ? own : type);
         } else {
             // last resort, try dynamic load, shouldn't normally happen.
             @SuppressWarnings("unchecked") final Class<? extends Annotation> aClass =
@@ -503,7 +513,10 @@ public final class AnnotationMetadataSupport {
     public static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
         Optional<Constructor<InvocationHandler>> proxyClass = getProxyClass(annotationClass);
         if (proxyClass.isPresent()) {
-            Map<CharSequence, Object> values = new HashMap<>(getDefaultValues(annotationClass));
+            // the defaults of the annotation type itself, the ones equals completes the members with: a hash
+            // computed from the registry keyed by annotation name could differ from them when another class
+            // loader registered the same name, and two equal annotations would then hash apart
+            Map<CharSequence, Object> values = new HashMap<>(AnnotationDefaults.of(annotationClass));
             AnnotationValue<T> proxyAnnotationValue = removeInternalAnnotationValues(annotationValue);
             if (proxyAnnotationValue != null) {
                 proxyAnnotationValue.getValues().forEach((key, o) -> values.put(key.toString(), o));
@@ -539,6 +552,23 @@ public final class AnnotationMetadataSupport {
      *
      * @param <A> The annotation type
      */
+
+    /**
+     * An array member of an annotation, comparing by content rather than by identity, so that the maps holding
+     * two annotations' members can be compared with {@link Map#equals}.
+     */
+    private record ArrayMembers(Object array) {
+
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof ArrayMembers other && Objects.deepEquals(array, other.array);
+        }
+
+        @Override
+        public int hashCode() {
+            return array instanceof Object[] members ? Arrays.deepHashCode(members) : 0;
+        }
+    }
 
     private static class AnnotationProxyHandler<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
         private final int hashCode;
@@ -578,8 +608,31 @@ public final class AnnotationMetadataSupport {
             } else if (this.annotationValue == null || otherValues == null) {
                 return false;
             } else {
-                return annotationValue.equals(otherValues);
+                // the contract of Annotation#equals compares the members two annotations answer, not the way
+                // either of them stores them: a value that omits a member equal to its default and one that
+                // writes it out answer the same member, so both are completed by the defaults of the type
+                // before they are compared. Comparing the stored values instead makes equality depend on the
+                // representation, breaks symmetry against an annotation the JVM created, and leaves equivalent
+                // annotations as separate entries of a set, while hashCode - computed over the completed
+                // members - says they are the same
+                return effectiveValues(this.annotationValue).equals(effectiveValues(otherValues));
             }
+        }
+
+        /**
+         * The members an annotation answers: the values it stores over the defaults of its type, with an array
+         * wrapped so that it compares by content the way {@link java.util.Arrays#deepEquals} does.
+         */
+        private Map<CharSequence, Object> effectiveValues(AnnotationValue<?> value) {
+            // read from the annotation type rather than from the registry keyed by annotation name: that
+            // registry is filled in as classes load, so consulting it would make equality depend on what the
+            // process has loaded so far, and on which of two class loaders defining the name registered last
+            Map<CharSequence, Object> effective = new HashMap<>(AnnotationDefaults.of(annotationClass));
+            value.getValues().forEach((key, member) -> effective.put(key.toString(), member));
+            effective.replaceAll((key, member) -> member != null && member.getClass().isArray()
+                ? new ArrayMembers(member)
+                : member);
+            return effective;
         }
 
         @Nullable
@@ -590,14 +643,10 @@ public final class AnnotationMetadataSupport {
             if (!annotationClass.equals(other.annotationType())) {
                 return null;
             }
-            Map<CharSequence, Object> values = new HashMap<>();
-            for (Method method : annotationClass.getDeclaredMethods()) {
-                Object value = ReflectionUtils.invokeMethod(other, method);
-                if (value != null) {
-                    values.put(method.getName(), value);
-                }
-            }
-            return new AnnotationValue<>(annotationClass.getName(), values);
+            // the shared conversion, so that a class member is an AnnotationClassValue and an enum member its
+            // constant name on this side too: comparing the raw forms an instance answers against the recorded
+            // ones never matches
+            return AnnotationValue.of(other);
         }
 
         @Override

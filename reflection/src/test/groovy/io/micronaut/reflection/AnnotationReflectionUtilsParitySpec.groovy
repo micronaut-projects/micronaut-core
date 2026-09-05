@@ -1,0 +1,227 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.reflection
+
+import org.jspecify.annotations.Nullable
+import spock.lang.PendingFeature
+import spock.lang.Specification
+
+import java.lang.annotation.ElementType
+import java.lang.annotation.Retention
+import java.lang.annotation.RetentionPolicy
+import java.lang.annotation.Target
+import java.util.function.BiFunction
+import java.util.function.Consumer
+
+/**
+ * The suite of {@code io.micronaut.context.AnnotationReflectionUtils}, asked of
+ * {@link ReflectionArguments#resolveGenericToArgument} instead: the module carries the same resolution, so it
+ * answers the same, and this says so.
+ */
+class AnnotationReflectionUtilsParitySpec extends Specification {
+
+    void "test generic"() {
+        given:
+            Consumer<String> consumer = new Consumer<String>() {
+                @Override
+                void accept(String s) {
+                }
+            }
+
+        when:
+            def argument = ReflectionArguments.resolveGenericToArgument(consumer.getClass(), Consumer)
+
+        then:
+            argument.type == Consumer
+            argument.getTypeVariable("T").get().type == String
+    }
+
+    void "test generic 1 "() {
+        given:
+            Consumer<String> consumer = new @MyTypeUseAnnotation Consumer<@Nullable String>() {
+                @Override
+                void accept(String s) {
+                }
+            }
+
+        when:
+            def argument = ReflectionArguments.resolveGenericToArgument(consumer.getClass(), Consumer)
+
+        then:
+            argument.type == Consumer
+            argument.annotationMetadata.annotationNames.size() == 1
+            argument.annotationMetadata.annotationNames[0] == "io.micronaut.reflection.MyTypeUseAnnotation"
+            argument.getTypeVariable("T").get().type == String
+            argument.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
+    }
+
+    void "test generic 2"() {
+        given:
+            Consumer<String> consumer = new AbstractConsumer<@Nullable String>() {
+            }
+
+        when:
+            def argumentAbstractConsumer = ReflectionArguments.resolveGenericToArgument(consumer.getClass(), AbstractConsumer)
+
+        then:
+            argumentAbstractConsumer.type == AbstractConsumer
+            argumentAbstractConsumer.annotationMetadata.annotationNames.isEmpty()
+            argumentAbstractConsumer.getTypeVariable("T").get().type == String
+            argumentAbstractConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
+
+        when:
+            def argumentConsumer = ReflectionArguments.resolveGenericToArgument(consumer.getClass(), Consumer)
+
+        then:
+            argumentConsumer.type == Consumer
+            argumentConsumer.annotationMetadata.annotationNames.isEmpty()
+            argumentConsumer.getTypeVariable("T").get().type == String
+            argumentConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
+    }
+
+    void "test generic 3"() {
+        given:
+            Consumer<String> consumer = new AbstractConsumer2<@Nullable String>() {
+            }
+
+        when:
+            def argumentConsumer = ReflectionArguments.resolveGenericToArgument(consumer.getClass(), Consumer)
+        then:
+            argumentConsumer.type == Consumer
+            argumentConsumer.annotationMetadata.annotationNames.toList() == ["io.micronaut.reflection.MyTypeUseAnnotation"]
+            argumentConsumer.getTypeVariable("T").get().type == String
+            argumentConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
+
+        when:
+            def argumentAbstractConsumer = ReflectionArguments.resolveGenericToArgument(consumer.getClass(), AbstractConsumer)
+        then:
+            argumentAbstractConsumer.type == AbstractConsumer
+            argumentAbstractConsumer.annotationMetadata.annotationNames.isEmpty()
+            argumentAbstractConsumer.getTypeVariable("T").get().type == String
+            argumentAbstractConsumer.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
+
+        when:
+            def argumentAbstractConsumer2 = ReflectionArguments.resolveGenericToArgument(consumer.getClass(), AbstractConsumer2)
+        then:
+            argumentAbstractConsumer2.type == AbstractConsumer2
+            argumentAbstractConsumer2.annotationMetadata.annotationNames.isEmpty()
+            argumentAbstractConsumer2.getTypeVariable("T").get().type == String
+            argumentAbstractConsumer2.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
+    }
+
+    void "test generic 4"() {
+        given:
+            BiFunction<String, Integer, Long> consumer = new BiFunction<@Nullable String, @MyTypeUseAnnotation Integer, Long>() {
+                @Override
+                Long apply(String s, Integer integer) {
+                    return null
+                }
+            }
+
+        when:
+            def argument = ReflectionArguments.resolveGenericToArgument(consumer.getClass(), BiFunction)
+
+        then:
+            argument.type == BiFunction
+            argument.annotationMetadata.annotationNames.isEmpty()
+            argument.getTypeVariable("T").get().type == String
+            argument.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["org.jspecify.annotations.Nullable"]
+            argument.getTypeVariable("U").get().type == Integer
+            argument.getTypeVariable("U").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.reflection.MyTypeUseAnnotation"]
+            argument.getTypeVariable("R").get().type == Long
+            argument.getTypeVariable("R").get().annotationMetadata.annotationNames.isEmpty()
+    }
+
+    @PendingFeature // doesn't work with groovy for some reason
+    void "test array annotations"() {
+        given:
+        Consumer<String[]> consumer = new Consumer<@T1 String @T2 []>() {
+            @Override
+            void accept(String[] s) {
+            }
+        }
+
+        when:
+        def argument = ReflectionArguments.resolveGenericToArgument(consumer.getClass(), Consumer)
+
+        then:
+        argument.type == Consumer
+        argument.annotationMetadata.annotationNames.isEmpty()
+        argument.getTypeVariable("T").get().type == String[]
+        argument.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.reflection.T1", "io.micronaut.reflection.T2"]
+    }
+
+    void "test indirect"() {
+        given:
+        Consumer<String> consumer = new AbstractConsumer3<@T3 String>() {
+            @Override
+            void accept(String s) {
+            }
+        }
+
+        when:
+        def argument = ReflectionArguments.resolveGenericToArgument(consumer.getClass(), Consumer)
+
+        then:
+        argument.type == Consumer
+        argument.annotationMetadata.annotationNames.isEmpty()
+        argument.getTypeVariable("T").get().type == String
+        argument.getTypeVariable("T").get().annotationMetadata.annotationNames.toList() == ["io.micronaut.reflection.T3"]
+    }
+
+    void "test a type that does not implement the super type"() {
+        expect:
+        ReflectionArguments.resolveGenericToArgument(String, Consumer) == null
+    }
+}
+
+abstract class AbstractConsumer<T> implements Consumer<T> {
+    @Override
+    void accept(T s) {
+    }
+}
+
+abstract class AbstractConsumer2<T> extends AbstractConsumer<T> implements @MyTypeUseAnnotation Consumer<T> {
+    @Override
+    void accept(T s) {
+    }
+}
+
+abstract class AbstractConsumer3<T> extends AbstractConsumer<T> {
+    @Override
+    void accept(T s) {
+    }
+}
+
+@Target(ElementType.TYPE_USE)
+@Retention(RetentionPolicy.RUNTIME)
+@interface MyTypeUseAnnotation {
+}
+
+@Target(ElementType.TYPE_USE)
+@Retention(RetentionPolicy.RUNTIME)
+@interface T1 {
+}
+
+@Target(ElementType.TYPE_USE)
+@Retention(RetentionPolicy.RUNTIME)
+@interface T2 {
+}
+
+@Target(ElementType.TYPE_USE)
+@Retention(RetentionPolicy.RUNTIME)
+@interface T3 {
+}
