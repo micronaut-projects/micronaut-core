@@ -443,7 +443,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
                     if (!isJunit5Test && !extendsHostClass) {
                         if (isIntrospectedBean) {
-                        builder.addMethod(
+                            builder.addMethod(
                                 MethodDef.constructor()
                                     .addModifiers(Modifier.PUBLIC)
                                     .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
@@ -463,7 +463,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                         })
                                     ));
                         } else {
-                        builder.addMethod(
+                            builder.addMethod(
                                 MethodDef.constructor()
                                     .addModifiers(Modifier.PUBLIC)
                                     .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
@@ -799,7 +799,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         final int requiredConstructorParameterCount = requiredConstructorParameterCount(parameters);
                         final boolean hasDefaultedConstructorParameters = requiredConstructorParameterCount < parameters.length;
                         final boolean constructorParametersBackedByFields = constructorParametersBackedByFields(parameters, propertyFields);
-                            builder.addMethod(
+                        builder.addMethod(
                             constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                                 if (isIntrospectedBean && (constructorParametersBackedByFields || hasDynamicBeanProperties)) {
                                     if (hasConfigurationBuilderProperty || hasDynamicBeanProperties) {
