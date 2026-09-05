@@ -1039,11 +1039,16 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
                     }
                 }
             }
-            // the methods nearest to the type first, so that an overriding declaration hides the overridden one
+            // the methods nearest to the type first, so that an overriding declaration hides the overridden one;
+            // a private method neither overrides nor is overridden, so one of the same signature at another
+            // level is a declaration of its own, as it is to the processors
             for (int i = hierarchy.size() - 1; i >= 0; i--) {
                 Method[] declared = hierarchy.get(i).getDeclaredMethods();
                 for (Method method : declared) {
-                    if (method.isSynthetic() || method.isBridge() || !seen.add(signature(method))) {
+                    if (method.isSynthetic() || method.isBridge()) {
+                        continue;
+                    }
+                    if (!Modifier.isPrivate(method.getModifiers()) && !seen.add(signature(method))) {
                         continue;
                     }
                     candidates.add(method);
@@ -1057,6 +1062,17 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
                     }
                 }
             }
+            // then the default methods of the interfaces the type does not override: the processors read the
+            // methods of the whole hierarchy, the interfaces included
+            List<Method> defaults = new ArrayList<>();
+            for (Class<?> anInterface : allInterfaces(type)) {
+                for (Method method : anInterface.getDeclaredMethods()) {
+                    if (method.isDefault() && !method.isSynthetic() && seen.add(signature(method))) {
+                        defaults.add(method);
+                    }
+                }
+            }
+            candidates.addAll(defaults);
             // then in the order the processors visit them: the super classes first
             Collections.reverse(candidates);
             boolean typeExecutable = typeMetadata.hasStereotype(Executable.class);
@@ -1098,6 +1114,23 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
             }
             methods.add(method);
             methodReferences.add(new MethodReference(method.getDeclaringClass(), method.getName(), arguments, methodMetadata, postConstruct, preDestroy));
+        }
+
+        private static List<Class<?>> allInterfaces(Class<?> type) {
+            List<Class<?>> interfaces = new ArrayList<>();
+            for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
+                collectInterfaces(current, interfaces);
+            }
+            return interfaces;
+        }
+
+        private static void collectInterfaces(Class<?> type, List<Class<?>> interfaces) {
+            for (Class<?> anInterface : type.getInterfaces()) {
+                if (!interfaces.contains(anInterface)) {
+                    interfaces.add(anInterface);
+                    collectInterfaces(anInterface, interfaces);
+                }
+            }
         }
 
         private static boolean isSetter(Method method) {

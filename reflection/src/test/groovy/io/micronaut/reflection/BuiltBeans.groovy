@@ -1,5 +1,6 @@
 package io.micronaut.reflection
 
+import groovy.transform.PackageScope
 import io.micronaut.core.annotation.AccessorsStyle
 import io.micronaut.core.annotation.Introspected
 
@@ -35,6 +36,7 @@ class Built {
             return this
         }
 
+        @PackageScope
         Builder count(int count) {
             this.count = count
             return this

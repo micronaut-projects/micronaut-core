@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.beans.AbstractBeanMethod;
 import io.micronaut.core.beans.AbstractBeanProperty;
 import io.micronaut.core.beans.BeanConstructor;
@@ -31,7 +32,6 @@ import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.beans.BeanPropertyMember;
 import io.micronaut.core.beans.BeanReadProperty;
 import io.micronaut.core.beans.BeanWriteProperty;
-import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -53,7 +53,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.Parameter;
 import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -67,6 +66,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * A {@link BeanIntrospection} over a {@link Class}, with the properties, the constructor and the methods a
@@ -77,11 +77,13 @@ import java.util.Set;
  * default - merged by name, with the field of that name as a member of it: it is read through the getter when
  * there is one and through the field otherwise, written through the setter when there is one and through a
  * non-final field otherwise, and its metadata holds the annotations of all three together with the type-use
- * annotations of the property type. Only an accessor the visibility of the type admits - a non-private one by
- * default - makes a property, and a field alone makes one only when field access is asked for -
- * {@link Introspected#accessKind()} on the type, or the access kinds given to {@link #of(Class, Set)} - which
- * is what the processors admit; with field access alone the value goes through the field even where an
- * accessor exists. The accessor of a record component always makes a property, and so does a member
+ * annotations of the property type. Only an accessor the visibility of the type admits makes a property - by
+ * default one the type reaches without reflection: a public one, or a non-private one declared in its own
+ * package - and a field alone makes one only when field access is asked for - {@link Introspected#accessKind()}
+ * on the type, or the access kinds given to {@link #of(Class, Set)} - which is what the processors admit. The
+ * value goes through the members the access kinds admit: an accessor under method access, the field under
+ * field access, and a getter beside a private setter or a field no access kind admits makes a read-only
+ * property. The accessor of a record component always makes a property, and so does a member
  * annotated {@link Introspected.Property}, under the name of the method when the method carries no prefix,
  * read and written as its access kinds allow. A bean method is a public instance method of the type, of its
  * super classes or of its interfaces, {@link Object} excluded. The constructor is the static factory
@@ -656,7 +658,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         for (Class<?> type = beanType; type != null && type != Object.class; type = type.getSuperclass()) {
             for (Method method : type.getDeclaredMethods()) {
                 // an accessor of any visibility is a member of the property: what it declares holds
-                if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || method.isBridge()) {
+                if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || method.isBridge() || isGroovyObjectMethod(method)) {
                     continue;
                 }
                 String name = method.getName();
@@ -690,16 +692,23 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                 candidate(candidates, component.getName()).addComponent(component);
             }
         }
-        // the getters of the interfaces, which declare the type-use annotations of the implementations' properties
+        // the accessors of the interfaces, which declare the type-use annotations of the implementations'
+        // properties, and whose default methods a type inherits as accessors of its own
         for (Class<?> anInterface : allInterfaces(beanType)) {
             for (Method method : anInterface.getDeclaredMethods()) {
-                if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || method.getParameterCount() != 0
-                    || method.getReturnType() == void.class) {
+                if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || isGroovyObjectMethod(method)) {
                     continue;
                 }
-                String property = accessorProperty(method.getName(), method.getReturnType());
-                if (property != null) {
-                    candidate(candidates, property).addGetter(method);
+                if (method.getParameterCount() == 0 && method.getReturnType() != void.class) {
+                    String property = accessorProperty(method.getName(), method.getReturnType());
+                    if (property != null) {
+                        candidate(candidates, property).addGetter(method);
+                    }
+                } else if (method.getParameterCount() == 1) {
+                    String property = writerProperty(method.getName());
+                    if (property != null) {
+                        candidate(candidates, property).addSetter(method, method.getAnnotation(Introspected.Property.class));
+                    }
                 }
             }
         }
@@ -722,11 +731,11 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         List<BeanProperty<T, Object>> discovered = new ArrayList<>(candidates.size());
         for (Map.Entry<String, PropertyMembers> entry : candidates.entrySet()) {
             PropertyMembers property = entry.getValue();
-            property.resolve();
+            property.resolve(accessKinds.contains(Introspected.AccessKind.METHOD), fieldAccess, this::isVisible);
             if (!isProperty(property) || !isIncluded(property)) {
                 continue;
             }
-            discovered.add(new ReflectionProperty<>(this, property, describeAnnotations, property.methodAccess(accessKinds.contains(Introspected.AccessKind.METHOD))));
+            discovered.add(new ReflectionProperty<>(this, property, describeAnnotations));
         }
         return discovered;
     }
@@ -790,16 +799,21 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
 
     /**
      * Whether a member is visible enough to make a property, the way {@link Introspected#visibility()} is
-     * applied by the processor: everything but a private declaration by default.
+     * applied by the processor: by default a member the type can reach without reflection - a public one, or
+     * a protected or package-private one declared in the package of the type; a private one never, nor one a
+     * super class in another package keeps to its package.
      */
     private boolean isVisible(Member member) {
         if (visibility.contains(Introspected.Visibility.ANY)) {
             return true;
         }
+        int modifiers = member.getModifiers();
         if (visibility.contains(Introspected.Visibility.DEFAULT)) {
-            return !Modifier.isPrivate(member.getModifiers());
+            return Modifier.isPublic(modifiers)
+                || (!Modifier.isPrivate(modifiers) && member.getDeclaringClass().getPackageName().equals(beanType.getPackageName()))
+                || (member instanceof AnnotatedElement element && element.isAnnotationPresent(ReflectiveAccess.class));
         }
-        return Modifier.isPublic(member.getModifiers());
+        return Modifier.isPublic(modifiers);
     }
 
     /**
@@ -939,7 +953,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         // methods a super interface declares: the processor reads the methods of the whole hierarchy
         for (Class<?> anInterface : allInterfaces(beanType)) {
             for (Method method : anInterface.getDeclaredMethods()) {
-                if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || method.isBridge()) {
+                if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || method.isBridge() || isGroovyObjectMethod(method)) {
                     continue;
                 }
                 bySignature.putIfAbsent(signature(method), method);
@@ -1002,9 +1016,11 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         // what @Introspected.Property declares on a member: that the property exists whatever the access kinds
         // and the visibility, the ways it is accessed, and the one member ignoring the other accessors
         private boolean declared;
-        private boolean declaredAccessor;
+        private final Set<Member> declaring = new HashSet<>(1);
         private @Nullable Set<Introspected.Property.Access> access;
         private @Nullable Member exclusive;
+        private @Nullable Member reader;
+        private @Nullable Member writer;
 
         PropertyMembers(String name, Class<?> beanType) {
             this.name = name;
@@ -1040,9 +1056,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                 return;
             }
             declared = true;
-            if (member instanceof Method) {
-                declaredAccessor = true;
-            }
+            declaring.add(member);
             if (access == null) {
                 // the first declaration says how the property is accessed; the processor rejects a second one
                 // that disagrees
@@ -1065,18 +1079,6 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             return declared;
         }
 
-        /**
-         * Whether the property is read and written through its accessors: when method access is asked for,
-         * or when an accessor is declared {@link Introspected.Property} - unless a field declared so ignores
-         * the other accessors, in which case the value goes through the field.
-         */
-        boolean methodAccess(boolean methodAccessKind) {
-            if (exclusive instanceof Field) {
-                return false;
-            }
-            return methodAccessKind || declaredAccessor;
-        }
-
         boolean readable() {
             return access == null || access.contains(Introspected.Property.Access.READ);
         }
@@ -1086,11 +1088,21 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         }
 
         /**
-         * Selects the members the property is read and written through, and drops the setters the value of the
-         * property cannot be given to. Reflection reports the declarations of a class in no order, so the
-         * choice is made on the declarations themselves and is the same on every JVM.
+         * Selects the members of the property and the ones its value goes through, and drops the setters the
+         * value of the property cannot be given to. Reflection reports the declarations of a class in no order,
+         * so the choice is made on the declarations themselves and is the same on every JVM.
+         *
+         * <p>The value goes through an accessor when method access is asked for and the accessor is visible,
+         * or when the accessor declares the property; through the field when field access is asked for and the
+         * field is visible, or when the field declares the property; and through neither otherwise - a getter
+         * beside a private setter makes a read-only property, and a field no access kind admits is a member
+         * the property is not written through, as the processors resolve them.</p>
+         *
+         * @param methodAccess Whether {@link Introspected.AccessKind#METHOD} is asked for
+         * @param fieldAccess  Whether {@link Introspected.AccessKind#FIELD} is asked for
+         * @param visible      Whether a member is visible to the type
          */
-        void resolve() {
+        void resolve(boolean methodAccess, boolean fieldAccess, Predicate<Member> visible) {
             if (resolved) {
                 return;
             }
@@ -1114,6 +1126,32 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                 setters.removeIf(candidate -> isIncompatibleSetter(readType, candidate));
             }
             setter = selectSetter();
+            boolean fieldFirst = exclusive instanceof Field;
+            Field field = this.field;
+            boolean fieldReadable = field != null && (declares(field) || (fieldAccess && visible.test(field)));
+            boolean fieldWritable = fieldReadable && field != null && !Modifier.isFinal(field.getModifiers());
+            boolean getterReadable = getter != null && (component != null || declares(getter) || (methodAccess && visible.test(getter)));
+            boolean setterWritable = setter != null && (declares(setter) || (methodAccess && visible.test(setter)));
+            reader = getterReadable && !fieldFirst ? getter : fieldReadable ? field : getterReadable ? getter : null;
+            writer = setterWritable && !fieldFirst ? setter : fieldWritable ? field : setterWritable ? setter : null;
+        }
+
+        private boolean declares(Member member) {
+            return declaring.contains(member);
+        }
+
+        /**
+         * The member the value is read through, {@code null} when the property is write-only.
+         */
+        @Nullable Member reader() {
+            return readable() ? reader : null;
+        }
+
+        /**
+         * The member the value is written through, {@code null} when the property is read-only.
+         */
+        @Nullable Member writer() {
+            return writable() ? writer : null;
         }
 
         @Nullable Field field() {
@@ -1414,37 +1452,30 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         private final PropertyMembers members;
         // the argument the property was typed from, a placeholder when the property is of a variable type
         private final Argument<?> typed;
-        // whether the accessors are the way to the value: when method access is not asked for, an accessor
-        // still describes the property, but the value is read and written through the field, as a generated
-        // introspection with field access alone does
-        private final boolean methodAccess;
-        // what @Introspected.Property allows: a property declared readable alone is write-only to the caller
-        // whatever members it has, and one declared writable alone read-only
-        private final boolean readable;
-        private final boolean writable;
+        // the members the value goes through, as the processor selects them: an accessor, a field, or none
+        private final @Nullable Member reader;
+        private final @Nullable Member writer;
         // the members are described on the first call and shared from then on, so a description that never
         // asks for them costs nothing; describing the same list twice under a race is harmless
         @SuppressWarnings("java:S3077") // members() returns an immutable List.copyOf
         private volatile @Nullable List<BeanPropertyMember<B, ?>> propertyMembers;
 
-        ReflectionProperty(BeanIntrospection<B> introspection, PropertyMembers members, boolean describeAnnotations, boolean methodAccess) {
-            this(introspection, members, members.argument(), describeAnnotations, methodAccess);
+        ReflectionProperty(BeanIntrospection<B> introspection, PropertyMembers members, boolean describeAnnotations) {
+            this(introspection, members, members.argument(), describeAnnotations);
         }
 
         @SuppressWarnings("unchecked")
         private ReflectionProperty(BeanIntrospection<B> introspection,
                                    PropertyMembers members,
                                    Argument<?> typed,
-                                   boolean describeAnnotations,
-                                   boolean methodAccess) {
+                                   boolean describeAnnotations) {
             super(introspection, (Class<P>) typed.getType(), members.name,
                 describeAnnotations ? members.annotationMetadata(typed) : AnnotationMetadata.EMPTY_METADATA,
                 typed.getTypeParameters());
             this.members = members;
             this.typed = typed;
-            this.methodAccess = methodAccess;
-            this.readable = members.readable();
-            this.writable = members.writable();
+            this.reader = members.reader();
+            this.writer = members.writer();
             this.field = members.field();
             this.getter = members.getter();
             this.setter = members.setter();
@@ -1497,25 +1528,25 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
 
         @Override
         public boolean isReadOnly() {
-            return !writable || (setter == null && (field == null || Modifier.isFinal(field.getModifiers())));
+            return writer == null;
         }
 
         @Override
         public boolean isWriteOnly() {
-            return !readable || (getter == null && field == null);
+            return reader == null;
         }
 
         @Override
         @SuppressWarnings({"unchecked", "NullAway"}) // a property value can be null, the declaration of readInternal predates the nullness annotations
         protected P readInternal(B bean) {
-            if (readable && getter != null && (methodAccess || field == null)) {
-                return ReflectionUtils.invokeMethod(bean, getter);
+            if (reader instanceof Method method) {
+                return ReflectionUtils.invokeMethod(bean, method);
             }
-            if (field == null || !readable) {
+            if (!(reader instanceof Field readField)) {
                 throw new UnsupportedOperationException("The property '" + getName() + "' of " + getDeclaringType().getName() + " is write only");
             }
             try {
-                return (P) field.get(bean);
+                return (P) readField.get(bean);
             } catch (IllegalAccessException e) {
                 throw new IllegalStateException("Cannot read the field '" + getName() + "' of " + getDeclaringType().getName(), e);
             }
@@ -1523,18 +1554,15 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
 
         @Override
         protected void writeInternal(B bean, @Nullable P value) {
-            if (!writable) {
-                throw new UnsupportedOperationException("The property '" + getName() + "' of " + getDeclaringType().getName() + " is read only");
-            }
-            if (setter != null && (methodAccess || field == null || Modifier.isFinal(field.getModifiers()))) {
-                ReflectionUtils.invokeMethod(bean, setter, value);
+            if (writer instanceof Method method) {
+                ReflectionUtils.invokeMethod(bean, method, value);
                 return;
             }
-            if (field == null || Modifier.isFinal(field.getModifiers())) {
+            if (!(writer instanceof Field writeField)) {
                 throw new UnsupportedOperationException("The property '" + getName() + "' of " + getDeclaringType().getName() + " is read only");
             }
             try {
-                field.set(bean, value);
+                writeField.set(bean, value);
             } catch (IllegalAccessException e) {
                 throw new IllegalStateException("Cannot write the field '" + getName() + "' of " + getDeclaringType().getName(), e);
             }

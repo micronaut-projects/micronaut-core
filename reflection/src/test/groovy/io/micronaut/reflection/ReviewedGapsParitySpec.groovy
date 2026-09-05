@@ -65,8 +65,8 @@ class Made {
         expect: "what a generated description answers today"
         generated.hasBuilder()
         generated.isBuildable()
-        generated.builder().builderArguments*.name.toSorted() == ["count", "name"]
-        generated.builder().builderArguments*.type.toSorted { it.name } == [Integer, String]
+        generated.builder().builderArguments*.name == ["name", "count"]
+        generated.builder().builderArguments*.type == [String, Integer]
         generated.builder().buildMethodArguments.length == 0
         with(generated.builder().with("name", "a").with("count", 3).build()) {
             name == "a"
@@ -76,8 +76,8 @@ class Made {
         and: "and a reflective description answers the same"
         reflective.hasBuilder() == generated.hasBuilder()
         reflective.isBuildable() == generated.isBuildable()
-        reflective.builder().builderArguments*.name.toSorted() == generated.builder().builderArguments*.name.toSorted()
-        reflective.builder().builderArguments*.type.toSorted { it.name } == generated.builder().builderArguments*.type.toSorted { it.name }
+        reflective.builder().builderArguments*.name == generated.builder().builderArguments*.name
+        reflective.builder().builderArguments*.type == generated.builder().builderArguments*.type
         reflective.builder().buildMethodArguments.length == generated.builder().buildMethodArguments.length
         with(reflective.builder().with("name", "a").with("count", 3).build()) {
             name == "a"
@@ -338,6 +338,158 @@ class Identity implements Ids {
         def hierarchy = MethodHierarchy.resolve(introspector, LinearOverride.Leaf, "act", String)
         hierarchy.inherited()*.declaringType() == [LinearOverride.Parent, LinearOverride.Grand]
         !hierarchy.parallel()
+    }
+
+    // --- the second review
+
+    void "the return argument of an executable carries the type-use annotations of the return type, described either way"() {
+        given:
+        BeanIntrospection<?> generated = buildBeanIntrospection("test.Typed", HEADER + '''
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Introspected
+class Typed {
+    @Executable
+    public @TypeUseOnly("t") String typeOnly() { return ""; }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE_USE)
+@interface TypeUseOnly {
+    String value();
+}
+''')
+        def method = generated.beanType.getMethod("typeOnly")
+
+        expect: "what a generated description answers today: the return argument as written"
+        generated.beanMethods.find { it.name == "typeOnly" }.returnType.asArgument().annotationMetadata.stringValue("test.TypeUseOnly").get() == "t"
+
+        and: "and an executable method over the method answers the same"
+        new ReflectionExecutableMethod(generated.beanType, method).returnType.asArgument().annotationMetadata.stringValue("test.TypeUseOnly") ==
+            generated.beanMethods.find { it.name == "typeOnly" }.returnType.asArgument().annotationMetadata.stringValue("test.TypeUseOnly")
+    }
+
+    void "a generic array keeps the type arguments of its component, described either way"() {
+        given:
+        BeanIntrospection<?> generated = buildBeanIntrospection("test.Arrays", HEADER + '''
+@Introspected
+class Arrays {
+    @Executable
+    public List<@io.micronaut.reflection.Mark("nested") String>[] lists() { return null; }
+}
+''')
+        BeanIntrospection<?> reflective = reflectiveOf(generated)
+        def tags = { io.micronaut.core.annotation.AnnotationMetadata m -> m.stringValue(Mark).map { [it] }.orElse([]) }
+
+        expect: "what a generated description answers today"
+        generated.beanMethods.find { it.name == "lists" }.returnType.type == List[]
+        generated.beanMethods.find { it.name == "lists" }.returnType.asArgument().typeParameters*.type == [String]
+        tags(generated.beanMethods.find { it.name == "lists" }.returnType.asArgument().typeParameters[0].annotationMetadata) == ["nested"]
+
+        and: "and a reflective description answers the same"
+        reflective.beanMethods.find { it.name == "lists" }.returnType.type == generated.beanMethods.find { it.name == "lists" }.returnType.type
+        reflective.beanMethods.find { it.name == "lists" }.returnType.asArgument().typeParameters*.type == generated.beanMethods.find { it.name == "lists" }.returnType.asArgument().typeParameters*.type
+        tags(reflective.beanMethods.find { it.name == "lists" }.returnType.asArgument().typeParameters[0].annotationMetadata) == tags(generated.beanMethods.find { it.name == "lists" }.returnType.asArgument().typeParameters[0].annotationMetadata)
+    }
+
+    void "an accessor or a field no access kind admits is a member the value does not go through, described either way"() {
+        given:
+        BeanIntrospection<?> generated = buildBeanIntrospection("test.Guarded", HEADER + '''
+@Introspected
+class Guarded {
+    private String name = "name";
+    private String note = "note";
+    public String name = null;
+    public String getName() { return "getter"; }
+    private void setName(String name) { this.name = name; }
+    public String getNote() { return note; }
+}
+'''.replace("    public String name = null;\n", ""))
+        BeanIntrospection<?> reflective = reflectiveOf(generated)
+
+        expect: "what a generated description answers today: a private setter and a private field write nothing"
+        generated.getRequiredProperty("name", String).isReadOnly()
+        generated.getRequiredProperty("note", String).isReadOnly()
+
+        and: "and a reflective description answers the same"
+        reflective.getRequiredProperty("name", String).isReadOnly() == generated.getRequiredProperty("name", String).isReadOnly()
+        reflective.getRequiredProperty("note", String).isReadOnly() == generated.getRequiredProperty("note", String).isReadOnly()
+    }
+
+    void "a setter a type inherits as an interface default writes its property, described either way"() {
+        given:
+        BeanIntrospection<?> generated = buildBeanIntrospection("test.Named", HEADER + '''
+interface Nameable {
+    String getName();
+    default void setName(String name) { }
+}
+
+@Introspected
+class Named implements Nameable {
+    public String getName() { return "named"; }
+}
+''')
+        BeanIntrospection<?> reflective = reflectiveOf(generated)
+
+        expect: "what a generated description answers today"
+        !generated.getRequiredProperty("name", String).isReadOnly()
+
+        and: "and a reflective description answers the same"
+        reflective.getRequiredProperty("name", String).isReadOnly() == generated.getRequiredProperty("name", String).isReadOnly()
+    }
+
+    void "what a super class of another package keeps to its package is not a property, described either way"() {
+        given:
+        BeanIntrospection<PackageSub> generated = BeanIntrospector.SHARED.getIntrospection(PackageSub)
+        BeanIntrospection<PackageSub> reflective = ReflectionBeanIntrospection.of(PackageSub)
+
+        expect: "what a generated description answers today: the public accessor alone"
+        generated.propertyNames == ["open"]
+
+        and: "and a reflective description answers the same"
+        reflective.propertyNames == generated.propertyNames
+    }
+
+    void "the methods groovyc adds for GroovyObject are not bean methods"() {
+        expect:
+        ReflectionBeanIntrospection.of(Built).beanMethods*.name.intersect(["getMetaClass", "setMetaClass", "getProperty", "setProperty", "invokeMethod"]).isEmpty()
+    }
+
+    void "an executable default method of an interface is an executable of the definition, described either way"() {
+        given:
+        def context = io.micronaut.context.ApplicationContext.run()
+        def generated = context.getBeanDefinition(GreeterBean)
+        def reflective = ReflectionBeanDefinition.builder(GreeterBean).build()
+
+        expect: "what a generated definition answers today"
+        generated.executableMethods*.methodName == ["greet"]
+
+        and: "and a reflective definition answers the same"
+        reflective.executableMethods*.methodName == generated.executableMethods*.methodName
+
+        cleanup:
+        context.close()
+    }
+
+    void "a private injected method at two levels is two injection points, described either way"() {
+        given:
+        def context = io.micronaut.context.ApplicationContext.run()
+        def generated = context.getBeanDefinition(InjectSub)
+        def reflective = ReflectionBeanDefinition.builder(InjectSub).build()
+
+        expect: "what a generated definition answers today"
+        generated.injectedMethods*.name == ["wire", "wire"]
+        generated.injectedMethods*.declaringType == [InjectBase, InjectSub]
+
+        and: "and a reflective definition answers the same"
+        reflective.injectedMethods*.name == generated.injectedMethods*.name
+        reflective.injectedMethods*.declaringType == generated.injectedMethods*.declaringType
+
+        cleanup:
+        context.close()
     }
 
     // --- definitions

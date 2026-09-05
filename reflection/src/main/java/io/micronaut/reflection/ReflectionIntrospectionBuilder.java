@@ -38,7 +38,6 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -54,176 +53,6 @@ import java.util.function.Predicate;
  */
 @Internal
 final class ReflectionIntrospectionBuilder<T> implements BeanIntrospection.Builder<T> {
-
-    /**
-     * The builder {@link Introspected#builder()} configures, resolved the way the processor resolves it: the
-     * builder type - the one {@code builderClass} names, or the return type of the static {@code builderMethod}
-     * of the type - the way to an instance of it, its write methods and the method building the bean.
-     *
-     * @param <T> The bean type
-     */
-    static final class Support<T> {
-
-        private final Class<T> beanType;
-        private final Class<?> builderType;
-        private final @Nullable Method builderFactory;
-        private final @Nullable Constructor<?> builderConstructor;
-        private final Method creator;
-        private final Method[] writers;
-        private final Argument<?>[] arguments;
-        private final Argument<?>[] creatorArguments;
-
-        private Support(Class<T> beanType,
-                               Class<?> builderType,
-                               @Nullable Method builderFactory,
-                               @Nullable Constructor<?> builderConstructor,
-                               Method creator,
-                               Method[] writers,
-                               Argument<?>[] arguments) {
-            this.beanType = beanType;
-            this.builderType = builderType;
-            this.builderFactory = builderFactory;
-            this.builderConstructor = builderConstructor;
-            this.creator = creator;
-            this.writers = writers;
-            this.arguments = arguments;
-            this.creatorArguments = ReflectionArguments.argumentsOf(creator, builderType);
-        }
-
-        /**
-         * The builder the type configures, {@code null} when {@link Introspected#builder()} names neither a
-         * builder class nor a builder method.
-         */
-        static <T> @Nullable Support<T> of(Class<T> beanType, AnnotationMetadata metadata) {
-            AnnotationValue<Introspected.IntrospectionBuilder> builder = metadata.findAnnotation(Introspected.class)
-                .flatMap(introspected -> introspected.getAnnotation("builder", Introspected.IntrospectionBuilder.class))
-                .orElse(null);
-            if (builder == null) {
-                return null;
-            }
-            String builderMethod = builder.stringValue("builderMethod").filter(name -> !name.isEmpty()).orElse(null);
-            Class<?> builderClass = builder.classValue("builderClass").filter(type -> type != void.class).orElse(null);
-            if (builderMethod == null && builderClass == null) {
-                return null;
-            }
-            String creatorMethod = builder.stringValue("creatorMethod").filter(name -> !name.isEmpty()).orElse("build");
-            String[] writePrefixes = builder.getAnnotation("accessorStyle", AccessorsStyle.class)
-                .map(style -> style.stringValues("writePrefixes"))
-                .filter(prefixes -> prefixes.length > 0)
-                .orElse(new String[] {""});
-
-            Method builderFactory = null;
-            Constructor<?> builderConstructor = null;
-            Class<?> builderType;
-            if (builderMethod != null) {
-                builderFactory = staticMethod(beanType, candidate -> candidate.getName().equals(builderMethod)
-                    && candidate.getParameterCount() == 0 && candidate.getReturnType() != void.class);
-                if (builderFactory == null) {
-                    throw new IntrospectionException("Method " + builderMethod + "() specified by builderMethod not found on " + beanType.getName() + ". The method must be static and accessible.");
-                }
-                builderType = builderFactory.getReturnType();
-            } else {
-                builderType = Objects.requireNonNull(builderClass);
-                for (Constructor<?> candidate : builderType.getDeclaredConstructors()) {
-                    if (candidate.getParameterCount() == 0 && !Modifier.isPrivate(candidate.getModifiers())) {
-                        builderConstructor = candidate;
-                        break;
-                    }
-                }
-                if (builderConstructor == null) {
-                    // no constructor to call: a static method of the type returning the builder
-                    builderFactory = staticMethod(beanType, candidate -> candidate.getParameterCount() == 0
-                        && builderType.isAssignableFrom(candidate.getReturnType()));
-                    if (builderFactory == null) {
-                        throw new IntrospectionException("No accessible constructor or builder() method found for builder: " + builderType.getName());
-                    }
-                }
-            }
-            Method creator = null;
-            List<Method> writers = new ArrayList<>();
-            for (Method candidate : builderType.getMethods()) {
-                if (Modifier.isStatic(candidate.getModifiers()) || candidate.isSynthetic() || candidate.isBridge()
-                    || candidate.getDeclaringClass() == Object.class || ReflectionBeanIntrospection.isGroovyObjectMethod(candidate)) {
-                    continue;
-                }
-                if (creator == null && candidate.getName().equals(creatorMethod) && beanType.isAssignableFrom(candidate.getReturnType())) {
-                    creator = candidate;
-                } else if (candidate.getParameterCount() <= 1
-                    && candidate.getReturnType().isAssignableFrom(builderType)
-                    && Arrays.stream(writePrefixes).anyMatch(candidate.getName()::startsWith)) {
-                    writers.add(candidate);
-                }
-            }
-            if (creator == null) {
-                throw new IntrospectionException("No build method found in builder: " + builderType.getName());
-            }
-            // reflection reports the methods in no order: by name, then by parameter type, the same on every JVM
-            writers.sort(Comparator.comparing(Method::getName).thenComparing(candidate -> Arrays.toString(candidate.getParameterTypes())));
-            List<Method> selected = new ArrayList<>(writers.size());
-            List<Argument<?>> arguments = new ArrayList<>(writers.size());
-            Set<String> names = new HashSet<>();
-            for (Method writer : writers) {
-                Argument<?> argument = writer.getParameterCount() == 0
-                    ? Argument.of(Boolean.class, writer.getName())
-                    : argumentOf(writer.getParameters()[0], writer, builderType, writePrefixes);
-                // the first method of a name is the one written through, as a generated builder keeps it
-                if (names.add(argument.getName())) {
-                    selected.add(writer);
-                    arguments.add(argument);
-                }
-            }
-            for (Method writer : selected) {
-                writer.trySetAccessible();
-            }
-            creator.trySetAccessible();
-            if (builderConstructor != null) {
-                builderConstructor.trySetAccessible();
-            }
-            if (builderFactory != null) {
-                builderFactory.trySetAccessible();
-            }
-            return new Support<>(beanType, builderType, builderFactory, builderConstructor, creator,
-                selected.toArray(Method[]::new), arguments.toArray(Argument[]::new));
-        }
-
-        /**
-         * The argument a write method takes, boxed as a generated builder boxes it, named after the parameter
-         * when the class file carries its name and after the property the method writes otherwise.
-         */
-        private static Argument<?> argumentOf(Parameter parameter, Method writer, Class<?> builderType, String[] writePrefixes) {
-            Argument<?> argument = ReflectionArguments.of(parameter, builderType);
-            String name = parameter.isNamePresent() ? parameter.getName() : propertyOf(writer.getName(), writePrefixes);
-            Class<?> type = argument.getType().isPrimitive() ? ReflectionUtils.getWrapperType(argument.getType()) : argument.getType();
-            return Argument.of(type, name, argument.getAnnotationMetadata(), argument.getTypeParameters());
-        }
-
-        private static String propertyOf(String method, String[] writePrefixes) {
-            for (String prefix : writePrefixes) {
-                if (!prefix.isEmpty() && method.startsWith(prefix) && method.length() > prefix.length()) {
-                    return NameUtils.decapitalize(method.substring(prefix.length()));
-                }
-            }
-            return method;
-        }
-
-        private static @Nullable Method staticMethod(Class<?> type, Predicate<Method> filter) {
-            for (Method candidate : type.getDeclaredMethods()) {
-                if (Modifier.isStatic(candidate.getModifiers()) && !Modifier.isPrivate(candidate.getModifiers())
-                    && !candidate.isSynthetic() && filter.test(candidate)) {
-                    return candidate;
-                }
-            }
-            return null;
-        }
-
-        Object newBuilder() throws ReflectiveOperationException {
-            if (builderFactory != null) {
-                return builderFactory.invoke(null);
-            }
-            return Objects.requireNonNull(builderConstructor).newInstance();
-        }
-    }
-
 
     private final ReflectionBeanIntrospection<T> introspection;
     private final Support<T> support;
@@ -354,6 +183,182 @@ final class ReflectionIntrospectionBuilder<T> implements BeanIntrospection.Build
             throw new InstantiationException("Cannot build " + beanType.getName() + ": " + e.getTargetException().getMessage(), e.getTargetException());
         } catch (ReflectiveOperationException | IllegalArgumentException e) {
             throw new InstantiationException("Cannot build " + beanType.getName() + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * The builder {@link Introspected#builder()} configures, resolved the way the processor resolves it: the
+     * builder type - the one {@code builderClass} names, or the return type of the static {@code builderMethod}
+     * of the type - the way to an instance of it, its write methods and the method building the bean.
+     *
+     * @param <T> The bean type
+     */
+    static final class Support<T> {
+
+        private final Class<T> beanType;
+        private final Class<?> builderType;
+        private final @Nullable Method builderFactory;
+        private final @Nullable Constructor<?> builderConstructor;
+        private final Method creator;
+        private final Method[] writers;
+        private final Argument<?>[] arguments;
+        private final Argument<?>[] creatorArguments;
+
+        private Support(Class<T> beanType,
+                               Class<?> builderType,
+                               @Nullable Method builderFactory,
+                               @Nullable Constructor<?> builderConstructor,
+                               Method creator,
+                               Method[] writers,
+                               Argument<?>[] arguments) {
+            this.beanType = beanType;
+            this.builderType = builderType;
+            this.builderFactory = builderFactory;
+            this.builderConstructor = builderConstructor;
+            this.creator = creator;
+            this.writers = writers;
+            this.arguments = arguments;
+            this.creatorArguments = ReflectionArguments.argumentsOf(creator, builderType);
+        }
+
+        /**
+         * The builder the type configures, {@code null} when {@link Introspected#builder()} names neither a
+         * builder class nor a builder method.
+         */
+        static <T> @Nullable Support<T> of(Class<T> beanType, AnnotationMetadata metadata) {
+            AnnotationValue<Introspected.IntrospectionBuilder> builder = metadata.findAnnotation(Introspected.class)
+                .flatMap(introspected -> introspected.getAnnotation("builder", Introspected.IntrospectionBuilder.class))
+                .orElse(null);
+            if (builder == null) {
+                return null;
+            }
+            String builderMethod = builder.stringValue("builderMethod").filter(name -> !name.isEmpty()).orElse(null);
+            Class<?> builderClass = builder.classValue("builderClass").filter(type -> type != void.class).orElse(null);
+            if (builderMethod == null && builderClass == null) {
+                return null;
+            }
+            String creatorMethod = builder.stringValue("creatorMethod").filter(name -> !name.isEmpty()).orElse("build");
+            String[] writePrefixes = builder.getAnnotation("accessorStyle", AccessorsStyle.class)
+                .map(style -> style.stringValues("writePrefixes"))
+                .filter(prefixes -> prefixes.length > 0)
+                .orElse(new String[] {""});
+
+            Method builderFactory = null;
+            Constructor<?> builderConstructor = null;
+            Class<?> builderType;
+            if (builderMethod != null) {
+                builderFactory = staticMethod(beanType, candidate -> candidate.getName().equals(builderMethod)
+                    && candidate.getParameterCount() == 0 && candidate.getReturnType() != void.class);
+                if (builderFactory == null) {
+                    throw new IntrospectionException("Method " + builderMethod + "() specified by builderMethod not found on " + beanType.getName() + ". The method must be static and accessible.");
+                }
+                builderType = builderFactory.getReturnType();
+            } else {
+                builderType = Objects.requireNonNull(builderClass);
+                for (Constructor<?> candidate : builderType.getDeclaredConstructors()) {
+                    if (candidate.getParameterCount() == 0 && !Modifier.isPrivate(candidate.getModifiers())) {
+                        builderConstructor = candidate;
+                        break;
+                    }
+                }
+                if (builderConstructor == null) {
+                    // no constructor to call: a static method of the type returning the builder
+                    builderFactory = staticMethod(beanType, candidate -> candidate.getParameterCount() == 0
+                        && builderType.isAssignableFrom(candidate.getReturnType()));
+                    if (builderFactory == null) {
+                        throw new IntrospectionException("No accessible constructor or builder() method found for builder: " + builderType.getName());
+                    }
+                }
+            }
+            Method creator = null;
+            List<Method> writers = new ArrayList<>();
+            // the methods the type to build can call, as the processor queries them: public, or not private and
+            // in its own package; the declared methods of each level in the order the class file lists them,
+            // which is the order a generated builder numbers its arguments in
+            Set<String> signatures = new HashSet<>();
+            for (Class<?> level = builderType; level != null && level != Object.class; level = level.getSuperclass()) {
+                for (Method candidate : level.getDeclaredMethods()) {
+                    int modifiers = candidate.getModifiers();
+                    if (Modifier.isStatic(modifiers) || Modifier.isPrivate(modifiers) || candidate.isSynthetic() || candidate.isBridge()
+                        || ReflectionBeanIntrospection.isGroovyObjectMethod(candidate)
+                        || (!Modifier.isPublic(modifiers) && !level.getPackageName().equals(beanType.getPackageName()))
+                        || !signatures.add(candidate.getName() + Arrays.toString(candidate.getParameterTypes()))) {
+                        continue;
+                    }
+                    if (creator == null && candidate.getName().equals(creatorMethod) && beanType.isAssignableFrom(candidate.getReturnType())) {
+                        creator = candidate;
+                    } else if (candidate.getParameterCount() <= 1
+                        && candidate.getReturnType().isAssignableFrom(builderType)
+                        && Arrays.stream(writePrefixes).anyMatch(candidate.getName()::startsWith)) {
+                        writers.add(candidate);
+                    }
+                }
+            }
+            if (creator == null) {
+                throw new IntrospectionException("No build method found in builder: " + builderType.getName());
+            }
+            List<Method> selected = new ArrayList<>(writers.size());
+            List<Argument<?>> arguments = new ArrayList<>(writers.size());
+            Set<String> names = new HashSet<>();
+            for (Method writer : writers) {
+                Argument<?> argument = writer.getParameterCount() == 0
+                    ? Argument.of(Boolean.class, writer.getName())
+                    : argumentOf(writer.getParameters()[0], writer, builderType, writePrefixes);
+                // the first method of a name is the one written through, as a generated builder keeps it
+                if (names.add(argument.getName())) {
+                    selected.add(writer);
+                    arguments.add(argument);
+                }
+            }
+            for (Method writer : selected) {
+                writer.trySetAccessible();
+            }
+            creator.trySetAccessible();
+            if (builderConstructor != null) {
+                builderConstructor.trySetAccessible();
+            }
+            if (builderFactory != null) {
+                builderFactory.trySetAccessible();
+            }
+            return new Support<>(beanType, builderType, builderFactory, builderConstructor, creator,
+                selected.toArray(Method[]::new), arguments.toArray(Argument[]::new));
+        }
+
+        /**
+         * The argument a write method takes, boxed as a generated builder boxes it, named after the parameter
+         * when the class file carries its name and after the property the method writes otherwise.
+         */
+        private static Argument<?> argumentOf(Parameter parameter, Method writer, Class<?> builderType, String[] writePrefixes) {
+            Argument<?> argument = ReflectionArguments.of(parameter, builderType);
+            String name = parameter.isNamePresent() ? parameter.getName() : propertyOf(writer.getName(), writePrefixes);
+            Class<?> type = argument.getType().isPrimitive() ? ReflectionUtils.getWrapperType(argument.getType()) : argument.getType();
+            return Argument.of(type, name, argument.getAnnotationMetadata(), argument.getTypeParameters());
+        }
+
+        private static String propertyOf(String method, String[] writePrefixes) {
+            for (String prefix : writePrefixes) {
+                if (!prefix.isEmpty() && method.startsWith(prefix) && method.length() > prefix.length()) {
+                    return NameUtils.decapitalize(method.substring(prefix.length()));
+                }
+            }
+            return method;
+        }
+
+        private static @Nullable Method staticMethod(Class<?> type, Predicate<Method> filter) {
+            for (Method candidate : type.getDeclaredMethods()) {
+                if (Modifier.isStatic(candidate.getModifiers()) && !Modifier.isPrivate(candidate.getModifiers())
+                    && !candidate.isSynthetic() && filter.test(candidate)) {
+                    return candidate;
+                }
+            }
+            return null;
+        }
+
+        Object newBuilder() throws ReflectiveOperationException {
+            if (builderFactory != null) {
+                return builderFactory.invoke(null);
+            }
+            return Objects.requireNonNull(builderConstructor).newInstance();
         }
     }
 }
