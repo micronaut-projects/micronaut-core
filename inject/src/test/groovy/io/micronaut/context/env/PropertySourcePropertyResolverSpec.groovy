@@ -725,6 +725,175 @@ class PropertySourcePropertyResolverSpec extends Specification {
         micronaut['security']['intercept-url-map'][0]['access'][1] == '/some-path-x'
     }
 
+    void "test indexed properties expand into the RAW catalog with the map key and base name as written"() {
+        given:
+        def values = new HashMap()
+        values.put('foo.items[0].SOME_KEY', 'x')
+        values.put('foo.myItems[0].K', 'v')
+
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperties("foo", StringConvention.RAW) == [
+                'items[0].SOME_KEY': 'x',
+                'items'             : [['SOME_KEY': 'x']],
+                'myItems[0].K'      : 'v',
+                'myItems'           : [['K': 'v']],
+        ]
+    }
+
+    void "test indexed properties still hyphenate into the GENERATED catalog"() {
+        given:
+        def values = new HashMap()
+        values.put('foo.items[0].SOME_KEY', 'x')
+        values.put('foo.myItems[0].K', 'v')
+
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperties("foo") == [
+                'items[0].some-key': 'x',
+                'items'            : [['some-key': 'x']],
+                'my-items[0].k'    : 'v',
+                'my-items'         : [['k': 'v']],
+        ]
+    }
+
+    void "test indexed property expansion is skipped for the ENVIRONMENT_VARIABLE convention"() {
+        given: "the source key as EnvironmentPropertySource.getEnv would rewrite A_0__B into"
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", ['A[0]_B': 'x'], PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE)
+        )
+
+        expect: "the dotted property still resolves"
+        resolver.getRequiredProperty('a[0].b', String) == 'x'
+
+        and: "no aggregate entry is created in RAW for the rewritten key; checked directly because a top-level key has no dotted prefix for getProperties"
+        resolver.resolveEntriesForKey('A', false, PropertyCatalog.RAW)?.get('A') == null
+    }
+
+    void "test nested and bracketed indexed properties expand into the RAW catalog with map keys as written"() {
+        given: "top-level indexed keys, whose RAW aggregate is fetched from the catalog directly since getProperties only returns entries under a dotted prefix"
+        def values = new HashMap()
+        values.put('custom[0][0][KEY][4]', 'ohh')
+        values.put('custom[0][0][KEY][5]', 'ehh')
+        values.put('foo[1].bar[abx]', 'foo1Bar0')
+        values.put('a[0].b[1].C', 'deep')
+
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        when:
+        def rawCustom = resolver.resolveEntriesForKey('custom', false, PropertyCatalog.RAW).get('custom').value()
+        def rawFoo = resolver.resolveEntriesForKey('foo', false, PropertyCatalog.RAW).get('foo').value()
+        def rawA = resolver.resolveEntriesForKey('a', false, PropertyCatalog.RAW).get('a').value()
+
+        then: "RAW preserves the spelling as written at every map-key position"
+        rawCustom[0][0]['KEY'][4] == 'ohh'
+        rawCustom[0][0]['KEY'][5] == 'ehh'
+        rawFoo[1]['bar']['abx'] == 'foo1Bar0'
+        rawA[0]['b'][1]['C'] == 'deep'
+
+        and: "GENERATED still holds the hyphenated map keys NameUtils.hyphenate produces"
+        resolver.getProperty("custom", List).get()[0][0]['-key'][4] == 'ohh'
+        resolver.getProperty("foo", List).get()[1]['bar']['abx'] == 'foo1Bar0'
+        resolver.getProperty("a", List).get()[0]['b'][1]['c'] == 'deep'
+    }
+
+    void "test indexed property expansion leaves the NORMALIZED catalog unchanged"() {
+        given:
+        def values = new HashMap()
+        values.put('foo.items[0].SOME_KEY', 'x')
+
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect: "NORMALIZED still holds only the scalar under the base name, with no aggregate added"
+        resolver.getPropertyEntries("foo", PropertyCatalog.NORMALIZED) == ['items'] as Set
+
+        and:
+        def normalized = resolver.resolveEntriesForKey('foo', false, PropertyCatalog.NORMALIZED)
+        normalized.size() == 1
+        normalized['foo.items'].value() == 'x'
+    }
+
+    void "test a structured base value plus an indexed key targeting the same base does not corrupt GENERATED"() {
+        given: "a structured value as a YAML source supplies it, plus an indexed key targeting a new index of the same base; LinkedHashMap keeps the structured value first"
+        def values = new LinkedHashMap()
+        values.put('t.env', [[A: 1]])
+        values.put('t.env[1].B', 2)
+
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect: "GENERATED is unchanged: the RAW expansion must not mutate the list or map instance GENERATED serves"
+        resolver.getProperties("t")['env'] == [[A: 1], [b: 2]]
+
+        and: "RAW carries the spelling as written for the indexed key"
+        resolver.resolveEntriesForKey('t.env', false, PropertyCatalog.RAW).get('t.env').value()[1]['B'] == 2
+    }
+
+    void "test a structured base value plus an indexed key leaves no hyphenated key in RAW"() {
+        given: "a structured value, then an indexed key adding a new index to it; GENERATED expands into the structured value in place, writing the hyphenated key b"
+        def values = new LinkedHashMap()
+        values.put('t.env', [[A: 1]])
+        values.put('t.env[1].B', 2)
+
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect: "RAW shows only what was written; it must not also carry GENERATED's b, which it would if RAW shared the structured value GENERATED expands into"
+        resolver.getProperties("t", StringConvention.RAW)['env'] == [[A: 1], [B: 2]]
+
+        and: "GENERATED still hyphenates"
+        resolver.getProperties("t")['env'] == [[A: 1], [b: 2]]
+    }
+
+    void "test an indexed key, then a bare structured key re-aliasing the base, then another indexed key does not corrupt GENERATED"() {
+        given: "two indexed keys privatize RAW's base value, then the bare structured key re-aliases RAW's base value to the same instance GENERATED serves, then a third indexed key must re-privatize before mutating"
+        def values = new LinkedHashMap()
+        values.put('t.env[0].A', 1)
+        values.put('t.env[1].B', 2)
+        values.put('t.env', [[A: 1], [B: 2]])
+        values.put('t.env[2].C', 3)
+
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect: "GENERATED is unchanged: the RAW expansion must not mutate the list or map instance GENERATED serves"
+        resolver.getProperties("t")['env'] == [[A: 1], [B: 2], [c: 3]]
+
+        and: "RAW carries the spelling as written for the third indexed key"
+        resolver.resolveEntriesForKey('t.env', false, PropertyCatalog.RAW).get('t.env').value()[2]['C'] == 3
+    }
+
+    void "test an indexed key, then a bare map re-aliasing an index, then a nested indexed key does not leak into GENERATED"() {
+        given: "an indexed key establishes index 0, a bare map re-aliases index 1 to the source's own instance, then a nested indexed key targets that same index 1"
+        def values = new LinkedHashMap()
+        values.put('t.env[0].A', 1)
+        values.put('t.env[1]', [B: 2])
+        values.put('t.env[1].C', 3)
+
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect: "GENERATED is unchanged: the RAW expansion of the nested indexed key must not mutate the map instance GENERATED serves"
+        resolver.getProperties("t")['env'] == [[a: 1], [B: 2, c: 3]]
+
+        and: "RAW carries the nested indexed key's value verbatim"
+        resolver.resolveEntriesForKey('t.env', false, PropertyCatalog.RAW).get('t.env').value()[1]['C'] == 3
+    }
+
     void "test map and list values are collapsed"() {
         given:
         def values = new HashMap()
