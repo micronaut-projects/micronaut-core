@@ -75,11 +75,16 @@ if (System.getenv("SONAR_TOKEN") != null) {
     def pythonCoverageExcludes = pythonProjects.collect {
         "${project(it).projectDir.name}/**/*"
     }
+    // GraalVM Feature code only ever executes during native image generation, so it can never be
+    // covered by the JVM test suite. It is still analysed for issues, just not for coverage.
+    def coverageExcludes = pythonCoverageExcludes + [
+        "**/ServiceLoaderFeature.java"
+    ]
     sonarqube {
         skipProject = project.name.contains("test")
         properties {
             property "sonar.exclusions", analysisExcludes.join(",")
-            property "sonar.coverage.exclusions", pythonCoverageExcludes.join(",")
+            property "sonar.coverage.exclusions", coverageExcludes.join(",")
         }
     }
 }
