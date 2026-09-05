@@ -24,6 +24,7 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.processing.definition.ElementBeanDefinitionBuilder;
 import io.micronaut.inject.processing.definition.ElementBeanDefinitionBuilderFactory;
@@ -195,6 +196,12 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
             }
         }
 
+        // The pre-destroy callback the producing element names is a lifecycle callback of the produced bean, not an
+        // executable method of it, so the AOP proxy below must not advise it. This is the same rule a bean that
+        // declares @PreDestroy on its own method gets from DeclaredBeanElementCreator, where the callback is claimed
+        // as a lifecycle method before any around advice is applied to it.
+        String preDestroyMethodName = resolvePreDestroyMethodName(producedType, producedAnnotationMetadata);
+
         if (InterceptedMethodUtil.hasAroundStereotype(producedAnnotationMetadata) && !producedType.isAssignable("io.micronaut.aop.Interceptor")) {
             if (producedType.isArray()) {
                 throw new ProcessingException(producingElement, "Cannot apply AOP advice to arrays");
@@ -234,13 +241,15 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
 
             List<MethodElement> methodElements = producedType.getEnclosedElements(ElementQuery.ALL_METHODS)
                 .stream()
-                .filter(m -> m.isPublic() && !m.isFinal() && !m.isStatic()).toList();
+                .filter(m -> m.isPublic() && !m.isFinal() && !m.isStatic())
+                .filter(m -> !isPreDestroyCallback(m, preDestroyMethodName))
+                .toList();
             methodElements
                 .forEach(methodElement -> visitAroundMethod(proxyBuilder, methodElement.getDeclaringType(), methodElement));
             List<PropertyElement> syntheticBeanProperties = producedType.getSyntheticBeanProperties();
             for (PropertyElement syntheticBeanProperty : syntheticBeanProperties) {
                 syntheticBeanProperty.getReadMethod().ifPresent(m -> {
-                        if (!m.isFinal()) {
+                        if (!m.isFinal() && !isPreDestroyCallback(m, preDestroyMethodName)) {
                             visitAroundMethod(proxyBuilder, m.getDeclaringType(), m);
                         }
                     }
@@ -290,6 +299,31 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
         }
 
         additionalBuilders.add(beanDefinitionBuilder);
+    }
+
+    /**
+     * The name of the pre-destroy callback the producing element declares with {@link Bean#preDestroy()}, when the
+     * produced type can have one.
+     *
+     * @param producedType               The produced type
+     * @param producedAnnotationMetadata The annotation metadata of the produced bean
+     * @return The method name, or {@code null} when none is declared
+     */
+    @Nullable
+    private String resolvePreDestroyMethodName(ClassElement producedType, AnnotationMetadata producedAnnotationMetadata) {
+        if (producedType.isArray() || producedType.isPrimitive() || !producedAnnotationMetadata.isPresent(Bean.class, "preDestroy")) {
+            // The validation of those cases belongs to the pre-destroy handling itself
+            return null;
+        }
+        return producedType.getValue(Bean.class, "preDestroy", String.class)
+            .filter(StringUtils::isNotEmpty)
+            .orElse(null);
+    }
+
+    private static boolean isPreDestroyCallback(MethodElement methodElement, @Nullable String preDestroyMethodName) {
+        return preDestroyMethodName != null
+            && !methodElement.hasParameters()
+            && methodElement.getName().equals(preDestroyMethodName);
     }
 
     private void allowProxyConstruction(MethodElement constructor) {

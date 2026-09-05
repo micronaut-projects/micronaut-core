@@ -747,6 +747,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     interceptedTargetMethod = getSimpleInterceptedTargetMethod(targetField);
                 }
 
+                // The target of a non-lazy proxy is resolved by the constructor and held by the proxy, so it is
+                // always cached. Saying so is what lets the context destroy the target when the proxy is destroyed.
+                proxyBuilder.addMethod(getHasCachedInterceptedTargetMethod(targetField));
+
                 // Non-lazy target
                 bodyBuilders.add((aThis, methodParameters) -> aThis.field(targetField).assign(
                         methodParameters.get(beanResolutionContextArgumentIndex)
