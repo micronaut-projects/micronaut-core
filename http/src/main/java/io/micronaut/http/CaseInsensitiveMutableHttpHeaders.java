@@ -175,8 +175,9 @@ public final class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeade
 
     private static int validateCharSequenceToken(CharSequence token) {
         for (int i = 0, len = token.length(); i < len; i++) {
-            byte value = (byte) token.charAt(i);
-            if (!BitSet128.contains(value, TOKEN_CHARS_HIGH, TOKEN_CHARS_LOW)) {
+            char c = token.charAt(i);
+            // a token is US-ASCII, and narrowing a character beyond it to a byte would test a different one
+            if (c > 0x7F || !BitSet128.contains((byte) c, TOKEN_CHARS_HIGH, TOKEN_CHARS_LOW)) {
                 return i;
             }
         }

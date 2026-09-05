@@ -1,5 +1,6 @@
 package io.micronaut.http;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -12,6 +13,33 @@ import static io.micronaut.http.MediaType.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MediaTypeTest {
+
+    @Test
+    void constantsCarryTheMediaTypeTheyAreNamedFor() {
+        assertEquals(MICROSOFT_POWERPOINT_OPEN_XML, MICROSOFT_POWERPOINT_OPEN_XML_TYPE.getName());
+        assertEquals(EXTENSION_PPTX, MICROSOFT_POWERPOINT_OPEN_XML_TYPE.getExtension());
+        assertEquals(MICROSOFT_WORD_OPEN_XML, MICROSOFT_WORD_OPEN_XML_TYPE.getName());
+        assertEquals(EXTENSION_DOCX, MICROSOFT_WORD_OPEN_XML_TYPE.getExtension());
+    }
+
+    @ParameterizedTest
+    @MethodSource
+    void ofResolvesEveryConstantToItsOwnMediaType(String mediaType) {
+        assertEquals(mediaType, MediaType.of(mediaType).getName());
+    }
+
+    private static Stream<String> ofResolvesEveryConstantToItsOwnMediaType() throws IllegalAccessException {
+        List<String> mediaTypes = new java.util.ArrayList<>();
+        for (java.lang.reflect.Field field : MediaType.class.getFields()) {
+            if (field.getType() == String.class && java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+                String value = (String) field.get(null);
+                if (value != null && value.indexOf('/') > 0) {
+                    mediaTypes.add(value);
+                }
+            }
+        }
+        return mediaTypes.stream();
+    }
     @ParameterizedTest
     @MethodSource
     void noParameterFastPathMatchesSlowPathForValidMediaTypes(String contentType) {

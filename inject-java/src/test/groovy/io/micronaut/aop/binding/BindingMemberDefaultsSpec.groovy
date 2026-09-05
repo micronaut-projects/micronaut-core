@@ -35,8 +35,8 @@ import java.lang.annotation.*;
 import java.util.ArrayList;
 import java.util.List;
 
-// no @Around: an annotation carrying both @Around and @InterceptorBinding(bindMembers = true) records two
-// interceptor bindings, and the one @Around produces carries no members and so matches anything
+// no @Around here: an annotation carrying both records a second binding which binds no members, which
+// AroundBindingMembersSpec covers
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})
 @InterceptorBinding(kind = InterceptorKind.AROUND, bindMembers = true)

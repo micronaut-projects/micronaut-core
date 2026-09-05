@@ -113,7 +113,9 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
             if (occurrences != null) {
                 supportedAnnotationNames.computeIfAbsent(name, k -> new ArrayList<>(5)).addAll(occurrences);
             } else {
-                supportedAnnotationNames.put(name, null);
+                // an annotation carrying both @Around and @InterceptorBinding(bindMembers = true) records a
+                // second binding which binds no members, and it must not discard the occurrences of the first
+                supportedAnnotationNames.putIfAbsent(name, null);
             }
         }
         return supportedAnnotationNames;

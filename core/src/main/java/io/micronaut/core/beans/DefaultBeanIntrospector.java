@@ -44,7 +44,8 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     private static final String MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
 
     @Nullable
-    private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
+    @SuppressWarnings("java:S3077") // resolveIntrospections returns an immutable Map.copyOf, published once under double checked locking
+    private volatile Map<String, BeanIntrospectionReference<Object>> introspectionMap;
     private final ClassLoader classLoader;
     private final boolean useContextClassLoader;
 
@@ -189,6 +190,6 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         for (BeanIntrospectionReference<Object> reference : beanIntrospectionReferences) {
             resolvedIntrospectionMap.put(reference.getName(), reference);
         }
-        return resolvedIntrospectionMap;
+        return Map.copyOf(resolvedIntrospectionMap);
     }
 }

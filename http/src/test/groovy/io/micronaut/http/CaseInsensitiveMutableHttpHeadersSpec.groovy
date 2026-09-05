@@ -146,6 +146,13 @@ class CaseInsensitiveMutableHttpHeadersSpec extends Specification {
         IllegalArgumentException cex = thrown()
         cex.message == '''A header name can only contain "token" characters, but found invalid character 0xa at index 3 of header 'foo\nha'.'''
 
+        when: "a character outside US-ASCII whose low byte is a token character"
+        headers.add("foo\u0141", "bar")
+
+        then:
+        IllegalArgumentException wex = thrown()
+        wex.message == '''A header name can only contain "token" characters, but found invalid character 0x141 at index 3 of header 'foo\u0141'.'''
+
         when:
         headers.add(null, "null isn't allowed")
 
