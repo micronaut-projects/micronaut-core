@@ -31,7 +31,7 @@ import java.util.concurrent.CountDownLatch;
 @Requires(property = "parallel.failing.bean.enabled")
 public class FailingParallelBean {
 
-    public static final CountDownLatch CONSTRUCTING = new CountDownLatch(1);
+    public static volatile CountDownLatch CONSTRUCTING = new CountDownLatch(1);
 
     public FailingParallelBean(BeanContext beanContext) {
         // only fail once startup has completed: a shutdown triggered while the context is still
@@ -46,5 +46,13 @@ public class FailingParallelBean {
         }
         CONSTRUCTING.countDown();
         throw new IllegalStateException("Parallel bean construction failed on purpose");
+    }
+
+    /**
+     * Restores the latches, so that the spec is isolated even if it runs more than once in the
+     * same JVM and a latch has already been counted down.
+     */
+    public static void reset() {
+        CONSTRUCTING = new CountDownLatch(1);
     }
 }

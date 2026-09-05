@@ -2475,6 +2475,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             // iterated lazily, so a condition that throws fails in the loop header rather than in
             // the guarded body below, and would otherwise vanish with the thread
             LOG.error("Parallel bean discovery failed: {}", e.getMessage(), e);
+        } finally {
+            // there is nothing left to join: drop the reference rather than hold a terminated
+            // thread, and its thread locals, for as long as the context runs. only this thread's
+            // own registration is cleared, never one a later discovery has installed
+            parallelBeanDiscoveryThread.compareAndSet(Thread.currentThread(), null);
         }
     }
 
@@ -2543,8 +2548,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private void completeParallelInitialization(ParallelInitialization task) {
-        parallelInitializationTasks.remove(task);
+        // count down before removing, so that a task is only ever absent from the set once its
+        // latch has fired. the other order leaves a window where the set looks empty to a waiter
+        // that has not yet taken this task's latch
         task.completed.countDown();
+        parallelInitializationTasks.remove(task);
     }
 
     private void initializeParallelBean(BeanDefinition<Object> beanDefinition) {

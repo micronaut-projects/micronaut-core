@@ -32,9 +32,9 @@ import java.util.concurrent.TimeUnit;
 @Requires(property = "parallel.shutdown.bean.enabled")
 public class SlowShutdownParallelBean {
 
-    public static final CountDownLatch CONSTRUCTING = new CountDownLatch(1);
-    public static final CountDownLatch RELEASE = new CountDownLatch(1);
-    public static final CountDownLatch DESTROYED = new CountDownLatch(1);
+    public static volatile CountDownLatch CONSTRUCTING = new CountDownLatch(1);
+    public static volatile CountDownLatch RELEASE = new CountDownLatch(1);
+    public static volatile CountDownLatch DESTROYED = new CountDownLatch(1);
 
     public SlowShutdownParallelBean() {
         CONSTRUCTING.countDown();
@@ -50,5 +50,15 @@ public class SlowShutdownParallelBean {
     @PreDestroy
     void close() {
         DESTROYED.countDown();
+    }
+
+    /**
+     * Restores the latches, so that the spec is isolated even if it runs more than once in the
+     * same JVM and a latch has already been counted down.
+     */
+    public static void reset() {
+        CONSTRUCTING = new CountDownLatch(1);
+        RELEASE = new CountDownLatch(1);
+        DESTROYED = new CountDownLatch(1);
     }
 }

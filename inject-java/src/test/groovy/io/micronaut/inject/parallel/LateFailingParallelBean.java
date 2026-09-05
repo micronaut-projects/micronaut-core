@@ -32,9 +32,9 @@ import java.util.concurrent.TimeUnit;
 @Requires(property = "parallel.late.failure.enabled")
 public class LateFailingParallelBean {
 
-    public static final CountDownLatch CONSTRUCTING = new CountDownLatch(1);
-    public static final CountDownLatch RELEASE = new CountDownLatch(1);
-    public static final CountDownLatch FAILED = new CountDownLatch(1);
+    public static volatile CountDownLatch CONSTRUCTING = new CountDownLatch(1);
+    public static volatile CountDownLatch RELEASE = new CountDownLatch(1);
+    public static volatile CountDownLatch FAILED = new CountDownLatch(1);
 
     public LateFailingParallelBean() {
         CONSTRUCTING.countDown();
@@ -47,5 +47,15 @@ public class LateFailingParallelBean {
         }
         FAILED.countDown();
         throw new IllegalStateException("Parallel bean construction failed on purpose after shutdown began");
+    }
+
+    /**
+     * Restores the latches, so that the spec is isolated even if it runs more than once in the
+     * same JVM and a latch has already been counted down.
+     */
+    public static void reset() {
+        CONSTRUCTING = new CountDownLatch(1);
+        RELEASE = new CountDownLatch(1);
+        FAILED = new CountDownLatch(1);
     }
 }

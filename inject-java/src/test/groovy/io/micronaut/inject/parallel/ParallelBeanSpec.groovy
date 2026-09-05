@@ -23,6 +23,19 @@ import java.util.concurrent.TimeUnit
 
 class ParallelBeanSpec extends Specification {
 
+    def setup() {
+        // the fixtures coordinate through static latches, so restore them rather than rely on
+        // this spec running at most once per JVM
+        BlockingParallelCondition.reset()
+        EachParallelBean.reset()
+        FailingParallelBean.reset()
+        HangingParallelBean.reset()
+        LateFailingParallelBean.reset()
+        SlowShutdownParallelBean.reset()
+        ThrowingParallelCondition.reset()
+        TolerantFailingParallelBean.reset()
+    }
+
     void "test initialize bean in parallel"() {
         given:
         ApplicationContext ctx = ApplicationContext.run('parallel.bean.enabled':true)

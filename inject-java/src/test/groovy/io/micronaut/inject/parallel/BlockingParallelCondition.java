@@ -30,7 +30,7 @@ public class BlockingParallelCondition implements Condition {
 
     public static final String DISCOVERY_THREAD_NAME = "micronaut-parallel-bean-discovery";
 
-    public static final CountDownLatch EVALUATING = new CountDownLatch(1);
+    public static volatile CountDownLatch EVALUATING = new CountDownLatch(1);
 
     @Override
     public boolean matches(ConditionContext context) {
@@ -51,5 +51,13 @@ public class BlockingParallelCondition implements Condition {
             Thread.currentThread().interrupt();
         }
         return false;
+    }
+
+    /**
+     * Restores the latches, so that the spec is isolated even if it runs more than once in the
+     * same JVM and a latch has already been counted down.
+     */
+    public static void reset() {
+        EVALUATING = new CountDownLatch(1);
     }
 }

@@ -28,7 +28,7 @@ import java.util.concurrent.CountDownLatch;
  */
 public class ThrowingParallelCondition implements Condition {
 
-    public static final CountDownLatch EVALUATED = new CountDownLatch(1);
+    public static volatile CountDownLatch EVALUATED = new CountDownLatch(1);
 
     @Override
     public boolean matches(ConditionContext context) {
@@ -50,5 +50,13 @@ public class ThrowingParallelCondition implements Condition {
         }
         EVALUATED.countDown();
         throw new IllegalStateException("Parallel bean condition evaluation failed on purpose");
+    }
+
+    /**
+     * Restores the latches, so that the spec is isolated even if it runs more than once in the
+     * same JVM and a latch has already been counted down.
+     */
+    public static void reset() {
+        EVALUATED = new CountDownLatch(1);
     }
 }

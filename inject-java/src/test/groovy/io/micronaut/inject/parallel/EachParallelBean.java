@@ -42,4 +42,12 @@ public class EachParallelBean {
     public String getName() {
         return name;
     }
+
+    /**
+     * Restores the recorded names, so that the spec is isolated even if it runs more than once
+     * in the same JVM.
+     */
+    public static void reset() {
+        CONSTRUCTED.clear();
+    }
 }
