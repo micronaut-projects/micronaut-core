@@ -54,6 +54,8 @@ import java.util.Optional;
 @Internal
 final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
 
+    private static final String MEMBER_PRE_DESTROY = "preDestroy";
+
     FactoryBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy, ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilder) {
         super(classElement, visitorContext, isAopProxy, beanDefinitionBuilder);
     }
@@ -274,7 +276,7 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
                     methodElement, methodElement.isReflectionRequired(producingElement.getDeclaringType())));
         }
 
-        if (producedAnnotationMetadata.isPresent(Bean.class, "preDestroy")) {
+        if (producedAnnotationMetadata.isPresent(Bean.class, MEMBER_PRE_DESTROY)) {
             if (producedType.isArray()) {
                 throw new ProcessingException(producingElement, "Using 'preDestroy' is not allowed on array type beans");
             }
@@ -282,7 +284,7 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
                 throw new ProcessingException(producingElement, "Using 'preDestroy' is not allowed on primitive type beans");
             }
 
-            producedType.getValue(Bean.class, "preDestroy", String.class).ifPresent(destroyMethodName -> {
+            producedType.getValue(Bean.class, MEMBER_PRE_DESTROY, String.class).ifPresent(destroyMethodName -> {
                 if (StringUtils.isNotEmpty(destroyMethodName)) {
                     final Optional<MethodElement> destroyMethod = producedType.getEnclosedElement(ElementQuery.ALL_METHODS.onlyAccessible(classElement)
                         .onlyInstance()
@@ -311,11 +313,11 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
      */
     @Nullable
     private String resolvePreDestroyMethodName(ClassElement producedType, AnnotationMetadata producedAnnotationMetadata) {
-        if (producedType.isArray() || producedType.isPrimitive() || !producedAnnotationMetadata.isPresent(Bean.class, "preDestroy")) {
+        if (producedType.isArray() || producedType.isPrimitive() || !producedAnnotationMetadata.isPresent(Bean.class, MEMBER_PRE_DESTROY)) {
             // The validation of those cases belongs to the pre-destroy handling itself
             return null;
         }
-        return producedType.getValue(Bean.class, "preDestroy", String.class)
+        return producedType.getValue(Bean.class, MEMBER_PRE_DESTROY, String.class)
             .filter(StringUtils::isNotEmpty)
             .orElse(null);
     }
