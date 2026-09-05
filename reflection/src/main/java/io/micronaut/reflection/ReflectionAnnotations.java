@@ -212,6 +212,7 @@ public final class ReflectionAnnotations {
         try {
             Map<String, Map<Integer, Map<CharSequence, Object>>> overrides = aliasedMembers(annotation, applied);
             List<AnnotationValue<?>> retained = new ArrayList<>();
+            Set<String> composedNames = new HashSet<>(4);
             // an annotation written more than once on the type is the container the compiler generates, which is
             // not retainable itself: the occurrences it holds are the ones retained, as the processors retain them
             Map<String, Integer> occurrences = new HashMap<>(2);
@@ -223,14 +224,178 @@ public final class ReflectionAnnotations {
                         continue;
                     }
                     String name = metaType.getName();
+                    composedNames.add(name);
                     int index = occurrences.merge(name, 0, (previous, ignored) -> previous + 1);
                     retained.add(retainedStereotype(composed, overriddenMembers(overrides.get(name), index), chain));
                 }
+            }
+            // an alias naming an annotation the type does not compose introduces it, and the introduced ones come
+            // first, as the processors reconcile them: @A aliasing a member of @C reached through @B carries @C
+            // itself, not only the override of the occurrence @B composes
+            List<AnnotationValue<?>> introduced = introducedStereotypes(overrides, composedNames, chain, loaderOf(type));
+            if (!introduced.isEmpty()) {
+                introduced.addAll(retained);
+                retained = introduced;
             }
             return retained.isEmpty() ? null : retained.toArray(AnnotationValue[]::new);
         } finally {
             chain.remove(type);
         }
+    }
+
+    /**
+     * The annotations an alias names that the annotation does not compose itself, each with the members the
+     * alias sets and with its own retained stereotypes in turn.
+     *
+     * <p>An alias is a chain: {@code @DeepA(shortest = 7)} sets {@code DeepB.min}, which sets {@code DeepC.min},
+     * which sets {@code DeepLimit.min}. The processors walk that chain when they read the aliases of an
+     * annotation and file every annotation it reaches; the ones the annotation composes override the occurrence
+     * it composes, and the ones it does not compose become stereotypes of their own, before the composed ones.</p>
+     *
+     * @param overrides     The aliases of the annotation, by the name of the annotation they name
+     * @param composedNames The names of the annotations the annotation composes, which an alias overrides rather
+     *                      than introduces
+     * @param chain         The annotation types being described, to not follow a cycle
+     */
+    private static List<AnnotationValue<?>> introducedStereotypes(Map<String, Map<Integer, Map<CharSequence, Object>>> overrides,
+                                                                  Set<String> composedNames,
+                                                                  Set<Class<?>> chain,
+                                                                  ClassLoader loader) {
+        if (overrides.isEmpty()) {
+            return new ArrayList<>(0);
+        }
+        Map<String, Map<CharSequence, Object>> introduced = new LinkedHashMap<>(2);
+        for (Map.Entry<String, Map<Integer, Map<CharSequence, Object>>> entry : overrides.entrySet()) {
+            Map<CharSequence, Object> members = new LinkedHashMap<>(2);
+            entry.getValue().values().forEach(members::putAll);
+            collectIntroduced(entry.getKey(), members, introduced, loader);
+        }
+        List<AnnotationValue<?>> stereotypes = new ArrayList<>(introduced.size());
+        for (Map.Entry<String, Map<CharSequence, Object>> entry : introduced.entrySet()) {
+            String name = entry.getKey();
+            if (composedNames.contains(name)) {
+                continue;
+            }
+            Class<? extends Annotation> introducedType = annotationTypeOf(name, loader);
+            if (introducedType == null || isIgnored(introducedType)
+                || RETAINABLE.equals(name) || !RETAINABLE_TYPES.get(introducedType)) {
+                continue;
+            }
+            if (!chain.add(introducedType)) {
+                continue;
+            }
+            try {
+                Map<CharSequence, Object> values = new LinkedHashMap<>(entry.getValue());
+                AnnotationValue<?>[] retained = retainedStereotypesOf(introducedType, entry.getValue(), chain);
+                if (retained != null) {
+                    values.put(AnnotationUtil.STEREOTYPES_MEMBER, retained);
+                }
+                stereotypes.add(new AnnotationValue<>(name, values, defaultValues(introducedType)));
+            } finally {
+                chain.remove(introducedType);
+            }
+        }
+        return stereotypes;
+    }
+
+    /**
+     * Walks the alias chain, recording every annotation it names once, the first occurrence first: the
+     * annotation an alias names is recorded, and then the annotations the aliases of <em>its</em> members name
+     * with the values the alias gave them.
+     */
+    private static void collectIntroduced(String name,
+                                          Map<CharSequence, Object> members,
+                                          Map<String, Map<CharSequence, Object>> introduced,
+                                          ClassLoader loader) {
+        if (name.isEmpty() || introduced.containsKey(name)) {
+            return;
+        }
+        introduced.put(name, members);
+        Class<? extends Annotation> type = annotationTypeOf(name, loader);
+        if (type == null) {
+            return;
+        }
+        for (Map.Entry<String, Map<CharSequence, Object>> aliased : aliasedMembersOf(type, members).entrySet()) {
+            collectIntroduced(aliased.getKey(), aliased.getValue(), introduced, loader);
+        }
+    }
+
+    /**
+     * The retained stereotypes of an annotation type described by the members an alias sets rather than by an
+     * instance: the meta-annotations it declares, each with the members the aliases of those values override.
+     */
+    private static AnnotationValue<?> @Nullable [] retainedStereotypesOf(Class<? extends Annotation> type,
+                                                                        Map<CharSequence, Object> members,
+                                                                        Set<Class<?>> chain) {
+        Map<String, Map<CharSequence, Object>> aliases = aliasedMembersOf(type, members);
+        List<AnnotationValue<?>> retained = new ArrayList<>(2);
+        for (Annotation meta : type.getAnnotations()) {
+            Annotation[] contained = containedAnnotations(meta);
+            for (Annotation composed : contained == null ? new Annotation[]{meta} : contained) {
+                Class<? extends Annotation> metaType = composed.annotationType();
+                if (isIgnored(metaType) || RETAINABLE.equals(metaType.getName()) || !RETAINABLE_TYPES.get(metaType)) {
+                    continue;
+                }
+                retained.add(retainedStereotype(composed, aliases.get(metaType.getName()), chain));
+            }
+        }
+        return retained.isEmpty() ? null : retained.toArray(AnnotationValue[]::new);
+    }
+
+    /**
+     * The annotations the aliases of an annotation type name, with the members they set, read off the values
+     * given rather than off an instance: a member the values hold aliases with that value, and a member they do
+     * not hold aliases with its default where {@link AliasFor#applyDefault()} asks for it.
+     */
+    private static Map<String, Map<CharSequence, Object>> aliasedMembersOf(Class<? extends Annotation> type,
+                                                                          Map<CharSequence, Object> members) {
+        Map<String, Map<CharSequence, Object>> aliases = null;
+        Map<CharSequence, Object> defaults = defaultValues(type);
+        for (Method member : MEMBERS.get(type)) {
+            Object written = members.get(member.getName());
+            Object value = written == null ? defaults.get(member.getName()) : written;
+            if (value == null) {
+                continue;
+            }
+            for (AliasFor aliasFor : member.getAnnotationsByType(AliasFor.class)) {
+                if (written == null && !aliasFor.applyDefault()) {
+                    continue;
+                }
+                String target = aliasFor.annotation() == Annotation.class
+                    ? aliasFor.annotationName()
+                    : aliasFor.annotation().getName();
+                if (target.isEmpty() || aliasFor.member().isEmpty()) {
+                    continue;
+                }
+                if (aliases == null) {
+                    aliases = new LinkedHashMap<>(2);
+                }
+                aliases.computeIfAbsent(target, ignored -> new LinkedHashMap<>(2)).put(aliasFor.member(), value);
+            }
+        }
+        return aliases == null ? Map.of() : aliases;
+    }
+
+    /**
+     * The annotation type of a name, or {@code null} when the loader cannot see it: an alias can name an
+     * annotation of a module the application does not have.
+     */
+    @Nullable
+    @SuppressWarnings("unchecked")
+    private static Class<? extends Annotation> annotationTypeOf(String name, ClassLoader loader) {
+        return (Class<? extends Annotation>) ClassUtils.forName(name, loader)
+            .filter(Class::isAnnotation)
+            .orElse(null);
+    }
+
+    /**
+     * The loader to resolve the annotations an annotation names by: the one that loaded the annotation itself,
+     * which is the only one that certainly sees the family it is composed of - a type compiled and loaded apart
+     * from this module, as one built by a test compiler is - and this module's own for a type of the platform.
+     */
+    private static ClassLoader loaderOf(Class<?> type) {
+        ClassLoader loader = type.getClassLoader();
+        return loader == null ? ReflectionAnnotations.class.getClassLoader() : loader;
     }
 
     /**
@@ -953,7 +1118,10 @@ public final class ReflectionAnnotations {
             // resolved once: reading it counts the occurrence, and the members it overrides are what the next
             // level down aliases from
             Map<CharSequence, Object> applied = overridesFor(overrides, metaType.getName(), occurrences);
-            Map<CharSequence, Object> values = overridden(values(meta), applied);
+            // the overrides are applied while the values are read, not after: what the stereotype derives from
+            // itself - the retained tree below it, and a member aliasing another member of the same annotation -
+            // is derived from the overridden values, as the processors cascade an override down to the leaves
+            Map<CharSequence, Object> values = overridden(values(meta, new HashSet<>(), applied), applied);
             if (declared) {
                 metadata.addDeclaredStereotype(parents, metaType.getName(), values);
             } else {
