@@ -15,17 +15,13 @@
  */
 package io.micronaut.reflection;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanMethod;
-import io.micronaut.core.type.Argument;
-import org.jspecify.annotations.Nullable;
+import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.BeanPropertyMember;
 
-import java.lang.annotation.ElementType;
-import java.lang.reflect.Method;
-import java.lang.reflect.Field;
 import java.lang.reflect.AnnotatedElement;
 import java.util.List;
 import java.util.Optional;
@@ -53,15 +49,6 @@ public interface ReflectiveIntrospection<T> extends BeanIntrospection<T> {
     List<BeanConstructor<T>> getConstructors();
 
     /**
-     * The members a property is made of.
-     *
-     * @param propertyName The property name
-     * @return The members of the property, the most specific first: the fields declaring it in the type
-     * and its super classes, its getters and its setters, each with its own metadata
-     */
-    List<PropertyMember> getPropertyMembers(String propertyName);
-
-    /**
      * Finds the method the introspected type itself declares, with the annotations of that declaration only:
      * the generated metadata of a method merges the annotations of the methods it overrides.
      *
@@ -72,55 +59,19 @@ public interface ReflectiveIntrospection<T> extends BeanIntrospection<T> {
     Optional<BeanMethod<T, Object>> findDeclaredMethod(String name, Class<?>... parameterTypes);
 
     /**
-     * A member of a property.
+     * A member of a property, with the field or method reflection read it from.
      *
-     * @param elementType        {@link ElementType#FIELD} for a field, {@link ElementType#METHOD} for a getter or a setter
-     * @param declaringType      The class or interface declaring the member
-     * @param annotationMetadata The metadata of the member, the type-use annotations of its type included
-     * @param argument           The type of the member as it declares it — an interface getter can declare
-     *                           {@code Iterable<@NotNull String>} where the implementation returns a sub type —
-     *                           with the type-use annotations of its type arguments
-     * @param member             The field or method
+     * <p>{@link BeanProperty#getMembers()} reports these for every reflective property: a member is described
+     * only when it is asked for, so a description that never asks for one pays nothing for them.</p>
+     *
+     * @param <B> The bean type
      */
     @Experimental
-    record PropertyMember(ElementType elementType,
-                          Class<?> declaringType,
-                          AnnotationMetadata annotationMetadata,
-                          Argument<?> argument,
-                          AnnotatedElement member) {
+    interface ReflectivePropertyMember<B> extends BeanPropertyMember<B, Object> {
 
         /**
-         * Whether the member yields the property value.
-         *
-         * @return Whether the member yields the property value: a field or a getter, not a setter
+         * @return The field or method the member was read from
          */
-        public boolean isReadable() {
-            return member instanceof Field || (member instanceof Method method && method.getParameterCount() == 0);
-        }
-
-        /**
-         * Reads the value of the member on a bean: the field or the getter, the way the constraints declared
-         * on each are validated against what that member holds.
-         *
-         * @param bean The bean
-         * @return The value
-         * @throws IllegalStateException When the member is not readable or fails
-         */
-        @Nullable
-        public Object read(Object bean) {
-            try {
-                if (member instanceof Field field) {
-                    field.trySetAccessible();
-                    return field.get(bean);
-                }
-                if (member instanceof Method method && method.getParameterCount() == 0) {
-                    method.trySetAccessible();
-                    return method.invoke(bean);
-                }
-            } catch (ReflectiveOperationException e) {
-                throw new IllegalStateException("Cannot read " + member + " of " + bean.getClass().getName(), e);
-            }
-            throw new IllegalStateException("The member " + member + " does not yield the property value");
-        }
+        AnnotatedElement getMember();
     }
 }
