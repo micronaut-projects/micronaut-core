@@ -180,6 +180,115 @@ class CaseInsensitiveMutableHttpHeadersSpec extends Specification {
         cex.message == "The header value for 'foo' contains prohibited character 0xa at index 3."
     }
 
+    void "cannot add a header value with a character that is not an octet"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
+
+        when: "a character above 0xFF whose low byte is a line feed"
+        headers.add("foo", "bar" + ((char) 0x010A) + "Origin: localhost")
+
+        then:
+        IllegalArgumentException ex = thrown()
+        ex.message == "The header value for 'foo' contains prohibited character 0x10a at index 3."
+
+        when: "the value starts with one"
+        headers.add("foo", "" + ((char) 0x010A) + "bar")
+
+        then:
+        IllegalArgumentException fex = thrown()
+        fex.message == "The header value for 'foo' contains prohibited character 0x10a at index 0."
+
+        when: "it arrives through the defaults constructor"
+        new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED, "foo": ["bar" + ((char) 0x010A)])
+
+        then:
+        IllegalArgumentException cex = thrown()
+        cex.message == "The header value for 'foo' contains prohibited character 0x10a at index 3."
+    }
+
+    void "obs-text remains a valid header value"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
+        String disposition = 'attachment; filename="r' + ((char) 0xE9) + 'sum' + ((char) 0xE9) + '.pdf"'
+
+        when: "the value only uses characters that are representable as a single octet"
+        headers.add("Content-Disposition", disposition)
+
+        then: "it is accepted, as RFC 7230 obs-text (%x80-FF)"
+        noExceptionThrown()
+        headers.get("Content-Disposition") == disposition
+    }
+
+    void "the octet boundary is U+00FF"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
+        String highest = "" + ((char) 0x00FF)
+
+        when: "the highest character that is still a single octet is used"
+        headers.add("foo", highest + "bar" + highest)
+
+        then: "it is accepted, as the last obs-text character"
+        noExceptionThrown()
+        headers.get("foo") == highest + "bar" + highest
+
+        when: "the very next character is used at the start of the value"
+        headers.add("foo", "" + ((char) 0x0100) + "bar")
+
+        then:
+        IllegalArgumentException ex = thrown()
+        ex.message == "The header value for 'foo' contains prohibited character 0x100 at index 0."
+
+        when: "the very next character is used inside the value"
+        headers.add("foo", "bar" + ((char) 0x0100))
+
+        then:
+        IllegalArgumentException iex = thrown()
+        iex.message == "The header value for 'foo' contains prohibited character 0x100 at index 3."
+    }
+
+    void "cannot add a header value that starts with a character that is not field-vchar"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
+
+        when: "the value starts with a space"
+        headers.add("foo", " bar")
+
+        then:
+        IllegalArgumentException ex = thrown()
+        ex.message == "The header value for 'foo' contains prohibited character 0x20 at index 0."
+
+        when: "the value starts with a delete character"
+        headers.add("foo", "" + ((char) 0x7F) + "bar")
+
+        then:
+        IllegalArgumentException dex = thrown()
+        dex.message == "The header value for 'foo' contains prohibited character 0x7f at index 0."
+    }
+
+    void "cannot add a header value holding a delete character"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
+
+        when:
+        headers.add("foo", "bar" + ((char) 0x7F) + "baz")
+
+        then:
+        IllegalArgumentException ex = thrown()
+        ex.message == "The header value for 'foo' contains prohibited character 0x7f at index 3."
+    }
+
+    void "a horizontal tab is allowed inside a header value"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
+
+        when: "the only character below 0x20 that field-content allows is used"
+        headers.add("foo", "bar\tbaz")
+
+        then:
+        noExceptionThrown()
+        headers.get("foo") == "bar\tbaz"
+    }
+
     void "can switch off validation"() {
         given:
         CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(false, ConversionService.SHARED)
