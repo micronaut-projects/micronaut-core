@@ -746,16 +746,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                                 property,
                                 properties.getOrigin()
                             ));
-                            expandProperty(
+                            expandIndexedProperty(
+                                entries,
+                                propertyName,
                                 resolvedProperty.substring(i),
-                                val -> entries.put(propertyName, new DefaultPropertyEntry(
-                                    propertyName,
-                                    val,
-                                    property,
-                                    properties.getOrigin()
-                                )),
-                                () -> entries.getOrDefault(propertyName, NULL_ENTRY).value(),
-                                value
+                                value,
+                                property,
+                                properties.getOrigin()
                             );
                         }
                         if (first) {
@@ -800,18 +797,111 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
                 final Map<String, DefaultPropertyEntry> rawEntries = resolveEntriesForKey(property, true, PropertyCatalog.RAW);
                 if (rawEntries != null) {
+                    // Copied because the RAW catalog aggregates indexed keys into this structure
+                    // below, mutating it in place. The property source owns this value and the
+                    // GENERATED catalog stores it by reference, so RAW must not share it.
                     rawEntries.put(property, new DefaultPropertyEntry(
                         property,
-                        value,
+                        deepCopyForRawExpansion(value),
                         property,
                         properties.getOrigin()
                     ));
+                }
+
+                // Also expand indexed properties into the RAW catalog, using the verbatim
+                // (non-hyphenated) key, so the spelling of map keys nested under an indexed
+                // segment is preserved as written. Skipped for ENVIRONMENT_VARIABLE, which has no
+                // original spelling left to preserve: EnvironmentPropertySource.getEnv rewrites A_0__B
+                // into the verbatim key A[0]_B, and expanding that verbatim would misinterpret
+                // the trailing "_B" as part of the map key rather than a property delimiter.
+                if (convention != PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE) {
+                    int rawIndex = property.indexOf('[');
+                    if (rawIndex > -1) {
+                        String rawPropertyName = property.substring(0, rawIndex);
+                        Map<String, DefaultPropertyEntry> rawIndexedEntries = resolveEntriesForKey(rawPropertyName, true, PropertyCatalog.RAW);
+                        if (rawIndexedEntries != null) {
+                            // Copied for the same reason, and separately from the copy above:
+                            // expandProperty stores this value into the aggregate by reference, so
+                            // an uncopied container would be reachable from RAW and from GENERATED
+                            // at once, and a later key drilling into the same index would mutate
+                            // both. Copying on the way in keeps RAW's tree entirely its own, which
+                            // is what lets this expansion mutate the aggregate in place instead of
+                            // re-copying it for every indexed key.
+                            expandIndexedProperty(
+                                rawIndexedEntries,
+                                rawPropertyName,
+                                property.substring(rawIndex),
+                                deepCopyForRawExpansion(value),
+                                property,
+                                properties.getOrigin()
+                            );
+                        }
+                    }
                 }
             }
             // A lookup can cache a miss between reset() and catalog reinitialization.
             // Clear those entries after the rebuilt catalog becomes visible.
             resetCaches();
         }
+    }
+
+    /**
+     * Recursively duplicates a {@link List} or {@link Map} so that every value entering the RAW
+     * catalog is one the catalog alone owns, and RAW's aggregated structures can be mutated in
+     * place without corrupting the property source's value or what the GENERATED catalog serves.
+     * Non-container values are returned as-is.
+     *
+     * @param value The value to copy
+     * @return An equivalent, independently mutable copy
+     */
+    private static Object deepCopyForRawExpansion(Object value) {
+        if (value instanceof List<?> list) {
+            List<Object> copy = new ArrayList<>(list.size());
+            for (Object element : list) {
+                copy.add(deepCopyForRawExpansion(element));
+            }
+            return copy;
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<Object, Object> copy = new LinkedHashMap<>(map.size());
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                copy.put(entry.getKey(), deepCopyForRawExpansion(entry.getValue()));
+            }
+            return copy;
+        }
+        return value;
+    }
+
+    /**
+     * Expands an indexed property (e.g. {@code foo[0].bar}) into the given entries map under its
+     * base name, building the container value and writing it back to {@code entries} as it grows.
+     *
+     * @param entries The catalog entries map to read the existing container from and write the
+     *                expanded container to, keyed by {@code baseName}
+     * @param baseName The un-indexed base property name (e.g. {@code foo})
+     * @param indexSuffix The indexed remainder of the property, starting with {@code [} (e.g. {@code [0].bar})
+     * @param value The value to place at the indexed location
+     * @param originalProperty The original, unresolved property key, recorded on the entry
+     * @param origin The origin of the property source, recorded on the entry
+     */
+    private void expandIndexedProperty(
+        Map<String, DefaultPropertyEntry> entries,
+        String baseName,
+        String indexSuffix,
+        Object value,
+        String originalProperty,
+        PropertySource.Origin origin) {
+        expandProperty(
+            indexSuffix,
+            val -> entries.put(baseName, new DefaultPropertyEntry(
+                baseName,
+                val,
+                originalProperty,
+                origin
+            )),
+            () -> entries.getOrDefault(baseName, NULL_ENTRY).value(),
+            value
+        );
     }
 
     private void expandProperty(String property, Consumer<Object> containerSet, Supplier<Object> containerGet, Object actualValue) {
