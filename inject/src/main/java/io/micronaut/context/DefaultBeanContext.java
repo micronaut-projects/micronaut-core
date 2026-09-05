@@ -625,11 +625,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (beanType == null) {
             return Optional.empty();
         }
-        Collection<BeanDefinition<T>> definitions = getBeanDefinitions(beanType);
-        if (definitions.isEmpty()) {
+        Argument<T> beanArgument = Argument.of(beanType);
+        Collection<BeanDefinition<T>> definitions = getBeanDefinitions(beanArgument);
+        // a bean enumerable by this type only because it is @Indexed by it does not have the type's methods
+        BeanDefinition<T> beanDefinition = definitions.stream()
+            .filter(definition -> isInjectableCandidate(beanArgument, definition))
+            .findFirst()
+            .orElse(null);
+        if (beanDefinition == null) {
             return Optional.empty();
         }
-        BeanDefinition<T> beanDefinition = definitions.iterator().next();
         Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
         if (foundMethod.isPresent()) {
             return foundMethod;
@@ -1657,6 +1662,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         Collection<BeanDefinition<Object>> candidates;
         if (qualifier instanceof FilteringQualifier<Object> filteringQualifier) {
+            @SuppressWarnings("unchecked")
+            Argument<Object> indexedArgument = (Argument<Object>) filteringQualifier.getIndexedArgument();
+            if (indexedArgument != null) {
+                // the compile-time index holds every bean this qualifier selects, so there is nothing to filter
+                return getBeanDefinitions(indexedArgument);
+            }
             // Keep anonymous
             Predicate<BeanDefinitionReference<Object>> predicate = new Predicate<>() {
                 @Override
@@ -1706,20 +1717,42 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @Override
     public <B> BeanContext registerBeanDefinition(RuntimeBeanDefinition<B> definition) {
         beanDefinitionProvider.addBeanDefinition(definition);
-        Class<B> beanType = definition.getBeanType();
-        purgeCacheForBeanType(beanType);
-        if (CustomScope.class.isAssignableFrom(beanType)) {
+        purgeCacheForBeanDefinition(definition);
+        if (CustomScope.class.isAssignableFrom(definition.getBeanType())) {
             // a bean of this scope resolved earlier left the scope's absence recorded in the registry
             customScopeRegistry.invalidate();
         }
         return this;
     }
 
-    private <B> void purgeCacheForBeanType(Class<B> beanType) {
-        beanCandidateCache.entrySet().removeIf(entry -> entry.getKey().isAssignableFrom(beanType));
-        beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(beanType));
-        singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(beanType));
-        containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(beanType));
+    private void purgeCacheForBeanDefinition(RuntimeBeanDefinition<?> definition) {
+        if (beanCandidateCache.isEmpty() && beanConcreteCandidateCache.isEmpty() &&
+            singletonBeanRegistrations.isEmpty() && containsBeanCache.isEmpty()) {
+            return;
+        }
+        Class<?> beanType = definition.getBeanType();
+        Class<?>[] indexedTypes = definition.getIndexes();
+        Predicate<Argument<?>> isAffected = cachedType ->
+            isAffectedByRegistration(cachedType, beanType, indexedTypes);
+        beanCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey()));
+        beanConcreteCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
+        singletonBeanRegistrations.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
+        containsBeanCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
+    }
+
+    private static boolean isAffectedByRegistration(Argument<?> cachedType,
+                                                     Class<?> beanType,
+                                                     Class<?>[] indexedTypes) {
+        if (cachedType.isAssignableFrom(beanType)) {
+            return true;
+        }
+        Class<?> rawCachedType = cachedType.getType();
+        for (Class<?> indexedType : indexedTypes) {
+            if (indexedType == rawCachedType) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1872,7 +1905,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     public <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         for (BeanDefinition<T> beanDefinition : getBeanDefinitions(beanType, qualifier)) {
-            if (beanDefinition.isProxy()) {
+            // a bean enumerable by this type only because it is @Indexed by it is never a proxy of it
+            if (beanDefinition.isProxy() && isInjectableCandidate(beanType, beanDefinition)) {
                 return Optional.of(beanDefinition);
             }
         }
@@ -1930,12 +1964,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private <T extends EventListener> Map<Class<?>, List<BeanDefinition<T>>> getTypeToListenerMap(Class<T> listenerType) {
-        final Collection<BeanDefinition<T>> beanDefinitions = getBeanDefinitions(listenerType);
+        Argument<T> listenerArgument = Argument.of(listenerType);
+        final Collection<BeanDefinition<T>> beanDefinitions = getBeanDefinitions(listenerArgument);
         if (beanDefinitions.isEmpty()) {
             return Collections.emptyMap();
         }
         final HashMap<Class<?>, List<BeanDefinition<T>>> typeToListener = CollectionUtils.newHashMap(beanDefinitions.size());
         for (BeanDefinition<T> beanCreatedDefinition : beanDefinitions) {
+            // A bean only indexed by the listener type, without implementing it, is enumerable but is not a listener
+            if (!isInjectableCandidate(listenerArgument, beanCreatedDefinition)) {
+                continue;
+            }
             List<Argument<?>> typeArguments = beanCreatedDefinition.getTypeArguments(listenerType);
             Argument<?> argument = CollectionUtils.last(typeArguments);
             if (argument == null) {
@@ -2052,7 +2091,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     public final <T> Collection<BeanDefinition<T>> findBeanCandidates(@Nullable BeanResolutionContext resolutionContext,
                                                                       Argument<T> beanType,
                                                                       @Nullable BeanDefinition<?> filter) {
-        Predicate<BeanDefinition<T>> predicate = filter == null ? null : definition -> !definition.equals(filter);
+        Predicate<BeanDefinition<T>> predicate = candidate ->
+            isInjectableCandidate(beanType, candidate) && (filter == null || !candidate.equals(filter));
         return findBeanCandidates(resolutionContext, beanType, true, predicate);
     }
 
@@ -2105,7 +2145,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         Iterator<BeanDefinition<T>> iterator = beanDefinitions.iterator();
         Set<BeanDefinition<T>> candidates;
         if (iterator.hasNext()) {
-            candidates = new HashSet<>();
+            candidates = new LinkedHashSet<>();
             while (iterator.hasNext()) {
                 BeanDefinition<T> candidate = iterator.next();
                 if (collectIterables && candidate.isConfigurationProperties()) {
@@ -2911,7 +2951,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (scopeAnnotation == Prototype.class) {
                 // a prototype bean has no lifecycle of its own, so a scope declared on the
                 // injection point (such as @InjectScope) still applies to it
-                return findInjectionPointDeclaredScope(resolutionContext);
+                return findInjectionPointDeclaredScope(resolutionContext, definition);
             }
             CustomScope<?> customScope = customScopeRegistry.findScope(scopeAnnotation).orElse(null);
             if (customScope != null) {
@@ -2924,7 +2964,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (Prototype.class.getName().equals(scopeAnnotation)) {
                     // a prototype bean has no lifecycle of its own, so a scope declared on the
                     // injection point (such as @InjectScope) still applies to it
-                    return findInjectionPointDeclaredScope(resolutionContext);
+                    return findInjectionPointDeclaredScope(resolutionContext, definition);
                 }
                 CustomScope<?> customScope = customScopeRegistry.findScope(scopeAnnotation).orElse(null);
                 if (customScope != null) {
@@ -2933,7 +2973,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
 
-        CustomScope<?> injectionPointScope = findInjectionPointDeclaredScope(resolutionContext);
+        CustomScope<?> injectionPointScope = findInjectionPointDeclaredScope(resolutionContext, definition);
         if (injectionPointScope != null) {
             return injectionPointScope;
         }
@@ -2945,18 +2985,37 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Nullable
-    private CustomScope<?> findInjectionPointDeclaredScope(@Nullable BeanResolutionContext resolutionContext) {
+    private CustomScope<?> findInjectionPointDeclaredScope(@Nullable BeanResolutionContext resolutionContext,
+                                                           @Nullable BeanDefinition<?> definition) {
         if (resolutionContext != null) {
             BeanResolutionContext.Segment<?, ?> currentSegment = resolutionContext
                 .getPath()
                 .currentSegment()
                 .orElse(null);
             if (currentSegment != null) {
+                if (definition != null && isFactoryOf(definition, currentSegment.getDeclaringType())) {
+                    // the bean is the factory that produces the segment's bean rather than an injection point of
+                    // it, and a scope declared on the produced bean does not apply to its factory. Applying it
+                    // would resolve the factory through the very scope that is creating the produced bean,
+                    // re-entering that scope for a second bean while the first is still being created.
+                    return null;
+                }
                 Argument<?> argument = currentSegment.getArgument();
                 return customScopeRegistry.findDeclaredScope(argument).orElse(null);
             }
         }
         return null;
+    }
+
+    /**
+     * Whether the given definition is the factory the produced bean's definition declares its factory method on.
+     *
+     * @param definition   The definition being resolved
+     * @param producedBean The definition of the bean the current segment produces
+     * @return True if the definition is the factory of the produced bean
+     */
+    private static boolean isFactoryOf(BeanDefinition<?> definition, @Nullable BeanDefinition<?> producedBean) {
+        return producedBean != null && producedBean.getDeclaringType().orElse(null) == definition.getBeanType();
     }
 
     private <T> BeanRegistration<T> getOrCreateScopedRegistration(@Nullable BeanResolutionContext resolutionContext,
@@ -3092,7 +3151,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                          @Nullable Qualifier<T> qualifier,
                                                                          boolean throwNonUnique) {
 
-        Predicate<BeanDefinition<T>> predicate = candidate -> !candidate.isAbstract();
+        Predicate<BeanDefinition<T>> predicate = candidate -> !candidate.isAbstract() && isInjectableCandidate(beanType, candidate);
         Collection<BeanDefinition<T>> candidates = findBeanCandidates(resolutionContext, beanType, true, predicate);
         Optional<BeanDefinition<T>> beanDefinition = pickOneBean(beanType, qualifier, throwNonUnique, candidates);
         if (beanDefinition.isPresent()) {
@@ -3100,7 +3159,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
         if (!lookupBeanType.equals(beanType)) {
-            candidates = findBeanCandidates(resolutionContext, lookupBeanType, true, predicate);
+            Predicate<BeanDefinition<T>> lookupPredicate = candidate -> !candidate.isAbstract() && isInjectableCandidate(lookupBeanType, candidate);
+            candidates = findBeanCandidates(resolutionContext, lookupBeanType, true, lookupPredicate);
             return pickOneBean(lookupBeanType, qualifier, throwNonUnique, candidates);
         }
         return Optional.empty();
@@ -3332,7 +3392,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
         Collection<BeanDefinition<T>> beanDefinitions = findBeanCandidatesInternal(resolutionContext, beanType);
         if (!beanDefinitions.isEmpty()) {
-            beanDefinitions = applyBeanResolutionFilters(resolutionContext, beanDefinitions);
+            beanDefinitions = applyBeanResolutionFilters(resolutionContext, beanType, beanDefinitions);
             if (qualifier != null) {
                 beanDefinitions = qualifier.filterQualified(beanType.getType(), beanDefinitions);
             }
@@ -3397,7 +3457,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    private <T> Collection<BeanDefinition<T>> applyBeanResolutionFilters(@Nullable BeanResolutionContext resolutionContext, Collection<BeanDefinition<T>> candidates) {
+    private <T> Collection<BeanDefinition<T>> applyBeanResolutionFilters(@Nullable BeanResolutionContext resolutionContext,
+                                                                         Argument<T> beanType,
+                                                                         Collection<BeanDefinition<T>> candidates) {
+        Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
         BeanResolutionContext.Segment<?, ?> segment = resolutionContext != null ? resolutionContext.getPath().peek() : null;
         BeanDefinition<?> declaringBean = null;
         Class<?> proxyTargetDefinitionType = null;
@@ -3414,9 +3477,43 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             BeanDefinition<T> c = iterator.next();
             if (c.isAbstract() || declaringBean != null && c.equals(declaringBean) || proxyTargetDefinitionType != null && proxyTargetDefinitionType.equals(c.getClass())) {
                 iterator.remove();
+            } else if (!isInjectableCandidate(beanType, c) && (lookupBeanType.equals(beanType) || !isInjectableCandidate(lookupBeanType, c))) {
+                iterator.remove();
             }
         }
         return candidates;
+    }
+
+    /**
+     * Whether the candidate can be provided as the requested type. A bean that is only enumerable by the
+     * requested type because it is {@link io.micronaut.core.annotation.Indexed} by it, without implementing it,
+     * can be listed via {@link #getBeanDefinitions(Argument)} but cannot be instantiated or injected as that type.
+     *
+     * @param beanType  The requested bean type
+     * @param candidate The candidate
+     * @param <T>       The bean type
+     * @return True if the candidate is a candidate for the requested type
+     */
+    private <T> boolean isInjectableCandidate(Argument<T> beanType, BeanDefinition<T> candidate) {
+        return beanType.getType() == Object.class || beanResolutionCustomizer.isCandidateBean(beanType, candidate);
+    }
+
+    /**
+     * Whether exactly one injectable bean candidate exists for the requested type and qualifier.
+     *
+     * @param beanType  The requested bean type
+     * @param qualifier The requested qualifier
+     * @param <T>       The bean type
+     * @return True if exactly one injectable candidate exists
+     */
+    @Internal
+    public <T> boolean isUniqueBeanCandidate(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(null, beanType);
+        candidates = applyBeanResolutionFilters(null, beanType, candidates);
+        if (qualifier != null && !candidates.isEmpty()) {
+            candidates = qualifier.filterQualified(beanType.getType(), candidates);
+        }
+        return candidates.size() == 1;
     }
 
     private <T> void addCandidateToList(@Nullable BeanResolutionContext resolutionContext,
@@ -3482,7 +3579,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private <T> boolean isCandidatePresent(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        final Collection<BeanDefinition<T>> candidates = findBeanCandidates(null, beanType, true, null);
+        final Collection<BeanDefinition<T>> candidates = findBeanCandidates(null, beanType, true, candidate -> isInjectableCandidate(beanType, candidate));
         if (!candidates.isEmpty()) {
             filterReplacedBeans(candidates);
             if (qualifier != null) {
