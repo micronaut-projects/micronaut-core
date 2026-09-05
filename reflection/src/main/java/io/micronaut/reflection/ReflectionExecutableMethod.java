@@ -56,10 +56,12 @@ public final class ReflectionExecutableMethod<T, R> extends AbstractReflectionEx
      */
     @SuppressWarnings("unchecked")
     public ReflectionExecutableMethod(Class<T> declaringType, Method method) {
+        // as the type invoking the method sees them: a variable the type declaring the method leaves open is
+        // the type this one gives it, which is what a generated method of the inheriting type reports
         super(declaringType,
             method.getName(),
-            (Argument<R>) ReflectionArguments.returnOf(method),
-            ReflectionArguments.argumentsOf(method));
+            (Argument<R>) ReflectionArguments.returnOf(method, declaringType),
+            ReflectionArguments.argumentsOf(method, declaringType));
         this.method = method;
         method.trySetAccessible();
         AnnotationMetadata metadata = ReflectionAnnotations.metadataOf(method);

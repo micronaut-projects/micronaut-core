@@ -290,11 +290,14 @@ public final class ReflectionIntrospectionPolicy {
         @Override
         public void close() {
             if (closed.compareAndSet(false, true)) {
-                VERSION.incrementAndGet();
                 // by identity, and never by the patterns themselves: two configurations allowing the same
                 // patterns hold two contributions - and a pattern list of `*` compiles to the one predicate
                 // the JVM caches for that lambda - so closing one has to leave what the other contributed
                 CONFIGURED.removeIf(contribution -> contribution == this);
+                // the version moves after the change, as it does when a contribution is made: a caller that
+                // read the new version has read the new state, and one that computed over the old state under
+                // the old version is told to ask again
+                VERSION.incrementAndGet();
             }
         }
     }
