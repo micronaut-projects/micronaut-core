@@ -158,7 +158,9 @@ public final class ReflectionArguments {
 
     /**
      * Converts the return type of a method to an {@link Argument} carrying the type-use annotations of the
-     * return type. The annotations of the method itself belong to the method, not to its return type.
+     * return type. An annotation that targets the method alone belongs to the method, not to its return type;
+     * one written before the return type whose target includes {@code TYPE_USE} annotates both (JLS 9.7.4),
+     * and is on both, as the processors record it.
      *
      * @param method The method
      * @return The argument
