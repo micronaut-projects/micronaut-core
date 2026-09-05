@@ -105,6 +105,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     private final Collection<String> configurationIncludes = new HashSet<>(3);
     private final Collection<String> configurationExcludes = new HashSet<>(3);
     @Nullable
+    @SuppressWarnings("java:S3077") // evaluatePropertySourceLoaders returns an immutable List.copyOf, published once under double checked locking
     private volatile Collection<PropertySourceLoader> propertySourceLoaderList;
     private final Map<String, PropertySourceLoader> loaderByFormatMap = Collections.synchronizedMap(CollectionUtils.newLinkedHashMap(10));
     private final Map<String, Boolean> presenceCache = new ConcurrentHashMap<>();
@@ -556,7 +557,7 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
                 loaderByFormatMap.put(extension, propertySourceLoader);
             }
         }
-        return allLoaders;
+        return List.copyOf(allLoaders);
     }
 
     Optional<PropertySource> loadImportedPropertySource(ResourceLoader resourceLoader,

@@ -789,6 +789,7 @@ public class MediaType implements CharSequence {
 
     @SuppressWarnings("ConstantName")
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
+    @SuppressWarnings("java:S3077") // holds an immutable Map.copyOf or an empty map, published once under double checked locking
     private static volatile @Nullable Map<String, String> mediaTypeFileExtensions;
     @SuppressWarnings("ConstantName")
     private static final List<Pattern> textTypePatterns = new ArrayList<>(4);
@@ -1440,7 +1441,7 @@ public class MediaType implements CharSequence {
                     result.put(fileExtension, tokens[0]);
                 }
             }
-            return result;
+            return Map.copyOf(result);
         } catch (IOException ex) {
             Logger logger = LoggerFactory.getLogger(MediaType.class);
             if (logger.isWarnEnabled()) {

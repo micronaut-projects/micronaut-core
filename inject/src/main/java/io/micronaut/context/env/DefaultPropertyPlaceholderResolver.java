@@ -62,6 +62,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     @Nullable
     private final ClassLoader classLoader;
     @Nullable
+    @SuppressWarnings("java:S3077") // holds an immutable List.copyOf of the loaded resolvers, published once under double checked locking
     private volatile Collection<PropertyExpressionResolver> expressionResolvers;
 
     /**
@@ -90,10 +91,11 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             synchronized (this) { // double check
                 exResolvers = this.expressionResolvers;
                 if (exResolvers == null) {
-                    exResolvers = new ArrayList<>(DEFAULT_EXPRESSION_RESOLVERS);
+                    var loaded = new ArrayList<>(DEFAULT_EXPRESSION_RESOLVERS);
                     ClassLoader classLoader = this.classLoader != null ? this.classLoader :
                         (environment instanceof Environment e) ? e.getClassLoader() : environment.getClass().getClassLoader();
-                    SoftServiceLoader.load(PropertyExpressionResolver.class, classLoader).collectAll(exResolvers);
+                    SoftServiceLoader.load(PropertyExpressionResolver.class, classLoader).collectAll(loaded);
+                    exResolvers = List.copyOf(loaded);
                     this.expressionResolvers = exResolvers;
                 }
             }
