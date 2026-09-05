@@ -1045,24 +1045,39 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         <B> List<BeanPropertyMember<B, ?>> members() {
             List<BeanPropertyMember<B, ?>> members = new ArrayList<>(fields.size() + getters.size() + setters.size());
             for (Field field : fields) {
-                members.add(new ReflectionPropertyMember<>(ElementType.FIELD, field.getDeclaringClass(), field.getName(),
+                members.add(member(ElementType.FIELD, field.getDeclaringClass(), field.getName(),
                     withType(ReflectionAnnotations.metadataOf(field), field.getAnnotatedType()),
                     ReflectionArguments.of(name, field, beanType),
                     field));
             }
             for (Method getter : getters) {
-                members.add(new ReflectionPropertyMember<>(ElementType.METHOD, getter.getDeclaringClass(), getter.getName(),
+                members.add(member(ElementType.METHOD, getter.getDeclaringClass(), getter.getName(),
                     withType(ReflectionAnnotations.metadataOf(getter), getter.getAnnotatedReturnType()),
                     ReflectionArguments.returnOf(name, getter, beanType),
                     getter));
             }
             for (Method setter : setters) {
-                members.add(new ReflectionPropertyMember<>(ElementType.METHOD, setter.getDeclaringClass(), setter.getName(),
+                members.add(member(ElementType.METHOD, setter.getDeclaringClass(), setter.getName(),
                     ReflectionAnnotations.metadataOf(setter, setter.getParameters()[0]),
                     ReflectionArguments.of(name, setter.getParameters()[0], beanType),
                     setter));
             }
             return List.copyOf(members);
+        }
+
+        /**
+         * One member, its argument carrying the metadata of the member: the processor writes the argument of a
+         * member from the type of the member with the annotations of the member applied to it, so the argument
+         * answers what the member declares and not only what its type does.
+         */
+        private <B> BeanPropertyMember<B, ?> member(ElementType elementType,
+                                                    Class<?> declaringType,
+                                                    String memberName,
+                                                    AnnotationMetadata metadata,
+                                                    Argument<?> argument,
+                                                    AnnotatedElement member) {
+            return new ReflectionPropertyMember<>(elementType, declaringType, memberName, metadata,
+                Argument.of(argument.getType(), name, metadata, argument.getTypeParameters()), member);
         }
 
         private static AnnotationMetadata withType(AnnotationMetadata member, AnnotatedType type) {
@@ -1376,7 +1391,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                                  ReflectionExecutableMethod<B, R> executable,
                                  AnnotationMetadata metadata) {
             super(introspection,
-                (Argument<R>) resolvedReturn(executable, introspection.getBeanType(), metadata),
+                (Argument<R>) resolvedReturn(executable, introspection.getBeanType()),
                 executable.getMethodName(),
                 metadata,
                 ReflectionArguments.argumentsOf(executable.getMethod(), introspection.getBeanType()));
@@ -1403,17 +1418,12 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         /**
          * The return type as the bean type sees it: a variable the type declaring the method leaves open is
          * the type the bean type gives it rather than the bound of the variable, which is what a generated
-         * bean method reports. Its metadata is the metadata of the method, as for a generated one, completed
-         * by what the return type itself carries: the annotations of the type and the ones declaring the
-         * variable it stands for, which a generated argument carries as well.
+         * bean method reports. It carries what the return type itself carries - the annotations of the type
+         * and the ones declaring the variable it stands for - and not the metadata of the method, as a
+         * generated bean method reports the argument the processor writes for the return type alone.
          */
-        private static Argument<?> resolvedReturn(ReflectionExecutableMethod<?, ?> executable,
-                                                  Class<?> beanType,
-                                                  AnnotationMetadata metadata) {
-            Argument<?> resolved = ReflectionArguments.returnOf(executable.getMethod(), beanType);
-            return Argument.of(resolved.getType(),
-                ReflectionAnnotations.merge(metadata, resolved.getAnnotationMetadata()),
-                resolved.getTypeParameters());
+        private static Argument<?> resolvedReturn(ReflectionExecutableMethod<?, ?> executable, Class<?> beanType) {
+            return ReflectionArguments.returnOf(executable.getMethod(), beanType);
         }
 
         /**

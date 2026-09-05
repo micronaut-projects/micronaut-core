@@ -19,6 +19,10 @@ Argument<?>[] arguments = ReflectionArguments.argumentsOf(Order.class.getDeclare
 Argument<?> argument = ReflectionArguments.of(Order.class.getDeclaredField("lines"));
 ----
 
+An annotation composing others carries them as its retained stereotypes, the way the processors record them: the annotations it is meta-annotated with, and the ones an `@AliasFor` on one of its members reaches without composing them - `@A` setting a member of `@C` through `@B` carries `@C` itself, before the composed `@B` - each with the override applied down to the leaves.
+
+NOTE: One thing is described differently: a member of a *type-use* annotation written with the very value that is its default. An annotation instance answers every member, so a member equal to its default is dropped, as the processors record only what the source writes; which members the source wrote is read back from the class file for an annotation written on a class, a field, a method or a parameter, and the ones written on a type are held in an attribute that is not read. The member is then dropped where the processor keeps it.
+
 `ReflectionAnnotations.synthesize` goes the other way, building an annotation instance from an api:core.annotation.AnnotationValue[]. It uses the proxy the framework generates where there is one, and a JDK proxy otherwise, so an annotation type that is not public - a specification often nests one in a class of its own - is synthesized too.
 
 `ReflectionArguments.toType` renders an argument back as a `java.lang.reflect.Type`. An unresolved type variable becomes a `TypeVariable`, which is what an API describing a declaration needs; pass `false` to render it as the type it is bounded by, which is what an API comparing types by assignability needs.
