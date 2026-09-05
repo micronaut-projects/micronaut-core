@@ -22,6 +22,7 @@ import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.BeanPropertyMember;
 import io.micronaut.core.beans.BeanReadProperty;
 import io.micronaut.core.beans.BeanWriteProperty;
 import io.micronaut.core.reflect.exception.InstantiationException;
@@ -96,7 +97,7 @@ public final class SupplementedBeanIntrospection<T> implements ReflectiveIntrosp
             BeanProperty<T, Object> reflectedProperty = reflectedProperties.get(property.getName());
             BeanProperty<T, Object> describedProperty = reflectedProperty == null
                 ? property
-                : new DescribedBeanProperty<>(property, reflectedProperty.asArgument());
+                : new DescribedBeanProperty<>(property, reflectedProperty);
             mergedProperties.add(describedProperty);
             byName.putIfAbsent(describedProperty.getName(), describedProperty);
         }
@@ -232,11 +233,6 @@ public final class SupplementedBeanIntrospection<T> implements ReflectiveIntrosp
     }
 
     @Override
-    public List<PropertyMember> getPropertyMembers(String propertyName) {
-        return reflected.getPropertyMembers(propertyName);
-    }
-
-    @Override
     public T instantiate() throws InstantiationException {
         return generated.instantiate();
     }
@@ -323,12 +319,28 @@ public final class SupplementedBeanIntrospection<T> implements ReflectiveIntrosp
     private static final class DescribedBeanProperty<B, P> implements BeanProperty<B, P> {
 
         private final BeanProperty<B, P> generated;
+        private final BeanProperty<B, ?> reflected;
         private final Argument<P> argument;
 
         @SuppressWarnings("unchecked")
-        DescribedBeanProperty(BeanProperty<B, P> generated, Argument<?> reflectedArgument) {
+        DescribedBeanProperty(BeanProperty<B, P> generated, BeanProperty<B, ?> reflected) {
             this.generated = generated;
-            this.argument = (Argument<P>) ReflectionBeanIntrospection.mergeTypeArguments(generated.asArgument(), reflectedArgument);
+            this.reflected = reflected;
+            this.argument = (Argument<P>) ReflectionBeanIntrospection.mergeTypeArguments(generated.asArgument(), reflected.asArgument());
+        }
+
+        /**
+         * The members the generated introspection carries, and the ones reflection reads when it carries
+         * none: a generated introspection describes them only when {@link io.micronaut.core.annotation.Introspected#members()}
+         * asked for them, and the reflective description of the same property has them either way.
+         *
+         * @return The members of the property
+         */
+        @Override
+        @SuppressWarnings("unchecked")
+        public List<BeanPropertyMember<B, ?>> getMembers() {
+            List<BeanPropertyMember<B, ?>> members = generated.getMembers();
+            return members.isEmpty() ? (List<BeanPropertyMember<B, ?>>) (List<?>) reflected.getMembers() : members;
         }
 
         @Override

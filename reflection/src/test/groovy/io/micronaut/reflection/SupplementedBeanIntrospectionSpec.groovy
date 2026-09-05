@@ -242,20 +242,20 @@ class SupplementedBeanIntrospectionSpec extends Specification {
         introspection.beanWriteProperties[0].is(generated.beanWriteProperties[0])
     }
 
-    void "the members a property is made of come from reflection"() {
+    void "the members a property is made of come from reflection when the generated introspection carries none"() {
         given:
         def introspection = supplemented(Catalogue)
 
         when:
-        def members = introspection.getPropertyMembers("name")
+        def members = introspection.getRequiredProperty("name", String).members
 
         then: "the field and its accessors, each with the class declaring it"
         members*.declaringType.every { it == Catalogue }
         members.any { it.member instanceof java.lang.reflect.Field }
         members.find { it.member instanceof java.lang.reflect.Field }.read(new Catalogue("art", [])) == "art"
 
-        and:
-        introspection.getPropertyMembers("missing").isEmpty()
+        and: "a property the generated introspection does not describe is not one of the introspection at all"
+        introspection.getProperty("missing").empty
     }
 
     void "instantiation and building are delegated to the generated introspection"() {

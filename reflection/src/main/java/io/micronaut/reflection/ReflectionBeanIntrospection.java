@@ -27,6 +27,7 @@ import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.BeanPropertyMember;
 import io.micronaut.core.beans.BeanReadProperty;
 import io.micronaut.core.beans.BeanWriteProperty;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -34,12 +35,14 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Repeatable;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -95,7 +98,6 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     private final @Nullable Constructor<T> constructor;
     private final Argument<?>[] constructorArguments;
     private final BeanConstructor<T> beanConstructor;
-    private final Map<String, PropertyMembers> propertyMembers = new LinkedHashMap<>();
     private final List<BeanProperty<T, Object>> properties;
     private final Map<String, BeanProperty<T, Object>> propertiesByName;
     private final List<BeanMethod<T, Object>> methods;
@@ -552,12 +554,6 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         return (Constructor<T>) selected;
     }
 
-    @Override
-    public List<PropertyMember> getPropertyMembers(String propertyName) {
-        PropertyMembers members = propertyMembers.get(propertyName);
-        return members == null ? List.of() : members.members();
-    }
-
     private List<BeanProperty<T, Object>> discoverProperties() {
         Map<String, PropertyMembers> candidates = new LinkedHashMap<>();
         // the accessors first, as the processor resolves them: a field is a member of a property they
@@ -622,7 +618,6 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             if (!isProperty(property) || !isIncluded(property)) {
                 continue;
             }
-            propertyMembers.put(entry.getKey(), property);
             discovered.add(new ReflectionProperty<>(this, property, describeAnnotations));
         }
         return discovered;
@@ -1040,29 +1035,34 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         }
 
         /**
-         * The members with their own metadata, the most specific first.
+         * The members with their own metadata, in the order a generated introspection writes them - the
+         * fields, then the read methods, then the write methods - a shadowed or overridden declaration after
+         * the one that hides it. A generated introspection carries the selected member of each kind alone;
+         * reflection reads the whole hierarchy, and the constraints of every declaration apply.
+         *
+         * @param <B> The bean type
          */
-        List<PropertyMember> members() {
-            List<PropertyMember> members = new ArrayList<>(fields.size() + getters.size() + setters.size());
+        <B> List<BeanPropertyMember<B, ?>> members() {
+            List<BeanPropertyMember<B, ?>> members = new ArrayList<>(fields.size() + getters.size() + setters.size());
             for (Field field : fields) {
-                members.add(new PropertyMember(ElementType.FIELD, field.getDeclaringClass(),
+                members.add(new ReflectionPropertyMember<>(ElementType.FIELD, field.getDeclaringClass(), field.getName(),
                     withType(ReflectionAnnotations.metadataOf(field), field.getAnnotatedType()),
                     ReflectionArguments.of(name, field, beanType),
                     field));
             }
             for (Method getter : getters) {
-                members.add(new PropertyMember(ElementType.METHOD, getter.getDeclaringClass(),
+                members.add(new ReflectionPropertyMember<>(ElementType.METHOD, getter.getDeclaringClass(), getter.getName(),
                     withType(ReflectionAnnotations.metadataOf(getter), getter.getAnnotatedReturnType()),
                     ReflectionArguments.returnOf(name, getter, beanType),
                     getter));
             }
             for (Method setter : setters) {
-                members.add(new PropertyMember(ElementType.METHOD, setter.getDeclaringClass(),
+                members.add(new ReflectionPropertyMember<>(ElementType.METHOD, setter.getDeclaringClass(), setter.getName(),
                     ReflectionAnnotations.metadataOf(setter, setter.getParameters()[0]),
                     ReflectionArguments.of(name, setter.getParameters()[0], beanType),
                     setter));
             }
-            return members;
+            return List.copyOf(members);
         }
 
         private static AnnotationMetadata withType(AnnotationMetadata member, AnnotatedType type) {
@@ -1156,8 +1156,12 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         private final @Nullable Field field;
         private final @Nullable Method getter;
         private final @Nullable Method setter;
+        private final PropertyMembers members;
+        // the members are described on the first call and shared from then on, so a description that never
+        // asks for them costs nothing; describing the same list twice under a race is harmless
+        @SuppressWarnings("java:S3077") // members() returns an immutable List.copyOf
+        private volatile @Nullable List<BeanPropertyMember<B, ?>> propertyMembers;
 
-        @SuppressWarnings("unchecked")
         ReflectionProperty(BeanIntrospection<B> introspection, PropertyMembers members, boolean describeAnnotations) {
             this(introspection, members, members.argument(), describeAnnotations);
         }
@@ -1170,6 +1174,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             super(introspection, (Class<P>) typed.getType(), members.name,
                 describeAnnotations ? members.annotationMetadata(typed) : AnnotationMetadata.EMPTY_METADATA,
                 typed.getTypeParameters());
+            this.members = members;
             this.field = members.field();
             this.getter = members.getter();
             this.setter = members.setter();
@@ -1184,6 +1189,27 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             if (setter != null) {
                 setter.trySetAccessible();
             }
+        }
+
+        /**
+         * The members this property is made of, each with its own metadata, its own argument and the field or
+         * method reflection read it from.
+         *
+         * <p>A generated introspection carries them only when {@link Introspected#members()} asks for them,
+         * as they grow the class it writes. Reflection writes nothing and describes a member only when one is
+         * asked for, so they are always reported here - which is what a type the processors never saw needs,
+         * since it carries no annotation to ask with.</p>
+         *
+         * @return The members, the fields first, then the read methods, then the write methods
+         */
+        @Override
+        public List<BeanPropertyMember<B, ?>> getMembers() {
+            List<BeanPropertyMember<B, ?>> resolved = propertyMembers;
+            if (resolved == null) {
+                resolved = members.members();
+                propertyMembers = resolved;
+            }
+            return resolved;
         }
 
         @Override
@@ -1226,6 +1252,106 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             } catch (IllegalAccessException e) {
                 throw new IllegalStateException("Cannot write the field '" + getName() + "' of " + getDeclaringType().getName(), e);
             }
+        }
+    }
+
+    /**
+     * A member of a property read through reflection: the field itself for a field member rather than the
+     * getter of the property, the way a constraint declared on a field is validated against what that field
+     * holds.
+     *
+     * @param <B> The bean type
+     */
+    @Internal
+    private static final class ReflectionPropertyMember<B> implements ReflectivePropertyMember<B> {
+
+        private final ElementType elementType;
+        private final Class<?> declaringType;
+        private final String name;
+        private final AnnotationMetadata annotationMetadata;
+        private final Argument<Object> argument;
+        private final AnnotatedElement member;
+
+        @SuppressWarnings("unchecked")
+        ReflectionPropertyMember(ElementType elementType,
+                                 Class<?> declaringType,
+                                 String name,
+                                 AnnotationMetadata annotationMetadata,
+                                 Argument<?> argument,
+                                 AnnotatedElement member) {
+            this.elementType = elementType;
+            this.declaringType = declaringType;
+            this.name = name;
+            this.annotationMetadata = annotationMetadata;
+            this.argument = (Argument<Object>) argument;
+            this.member = member;
+            // a member of a type that is not public is reachable all the same, as it is for the property
+            if (member instanceof Field field) {
+                field.trySetAccessible();
+            } else if (member instanceof Method method) {
+                method.trySetAccessible();
+            }
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public ElementType getElementType() {
+            return elementType;
+        }
+
+        @Override
+        public Class<?> getDeclaringType() {
+            return declaringType;
+        }
+
+        @Override
+        public Argument<Object> asArgument() {
+            return argument;
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return annotationMetadata;
+        }
+
+        @Override
+        public AnnotatedElement getMember() {
+            return member;
+        }
+
+        @Override
+        public boolean isReadable() {
+            return member instanceof Field || (member instanceof Method method && method.getParameterCount() == 0);
+        }
+
+        @Override
+        public @Nullable Object read(B bean) {
+            ArgumentUtils.requireNonNull("bean", bean);
+            if (!declaringType.isInstance(bean)) {
+                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + declaringType);
+            }
+            if (member instanceof Field field) {
+                try {
+                    return field.get(bean);
+                } catch (IllegalAccessException e) {
+                    throw new IllegalStateException("Cannot read the field '" + name + "' of " + declaringType.getName(), e);
+                }
+            }
+            if (member instanceof Method method && method.getParameterCount() == 0) {
+                return ReflectionUtils.invokeMethod(bean, method);
+            }
+            throw new UnsupportedOperationException("Cannot read from the property member: " + name);
+        }
+
+        @Override
+        public String toString() {
+            return "BeanPropertyMember{elementType=" + elementType
+                + ", declaringType=" + declaringType
+                + ", name='" + name + "'}";
         }
     }
 

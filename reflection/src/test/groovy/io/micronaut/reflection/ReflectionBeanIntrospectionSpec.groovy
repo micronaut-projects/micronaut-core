@@ -55,9 +55,9 @@ class ReflectionBeanIntrospectionSpec extends Specification {
         introspection.getProperty("value").get().type == String
 
         and: "every member of the property is read through the bean type, so all of them agree"
-        def members = introspection.getPropertyMembers("value")
+        def members = introspection.getProperty("value").get().members
         members.size() == 3
-        members*.argument*.type.every { it == String }
+        members*.type.every { it == String }
 
         and: "and the property is read and written through the members the super class declares"
         def box = new IntroStringBox()
@@ -82,7 +82,6 @@ class ReflectionBeanIntrospectionSpec extends Specification {
 
         and: "a private field with no accessor is neither a property nor a member of one"
         introspection.getProperty("password").empty
-        introspection.getPropertyMembers("password").isEmpty()
 
         and: "a package private field with no accessor is not one either"
         introspection.getProperty("note").empty
@@ -125,7 +124,7 @@ class ReflectionBeanIntrospectionSpec extends Specification {
         }
 
         and: "the overload is a member all the same: the value of the property can be given to its parameter, which is what the processor keeps a setter for"
-        def setters = introspections.first().getPropertyMembers("value").findAll {
+        def setters = introspections.first().getProperty("value").get().members.findAll {
             it.member instanceof Method && ((Method) it.member).parameterCount == 1
         }
         setters.collect { ((Method) it.member).parameterTypes[0] } as Set == [String, Object] as Set
@@ -153,7 +152,7 @@ class ReflectionBeanIntrospectionSpec extends Specification {
         label.get(new Coordinate("origin", 1)) == "origin"
 
         and: "the accessor is a member of the property, with the type declaring it"
-        introspection.getPropertyMembers("label").any { it.member instanceof java.lang.reflect.Method && it.declaringType == Coordinate }
+        introspection.getRequiredProperty("label", String).members.any { it.member instanceof java.lang.reflect.Method && it.declaringType == Coordinate }
 
         and:
         introspection.instantiate("origin", 2) == new Coordinate("origin", 2)
@@ -234,7 +233,7 @@ class ReflectionBeanIntrospectionSpec extends Specification {
         def introspection = ReflectionBeanIntrospection.of(Shadowed)
 
         when:
-        def members = introspection.getPropertyMembers("value")
+        def members = introspection.getProperty("value").get().members
 
         then: "the shadowed field of the super class is a member too, after the one of the type"
         members.findAll { it.member instanceof Field }*.declaringType == [Shadowed, ShadowedBase]
@@ -254,15 +253,15 @@ class ReflectionBeanIntrospectionSpec extends Specification {
         !setter.readable
         members.findAll { it.member instanceof Field }.every { it.readable }
 
-        and: "an unknown property has no member"
-        introspection.getPropertyMembers("missing").isEmpty()
+        and: "an unknown property is not described at all"
+        introspection.getProperty("missing").empty
     }
 
     void "a member reads the value it holds, and says so when it cannot"() {
         given:
         def introspection = ReflectionBeanIntrospection.of(Shadowed)
         def bean = new Shadowed("own")
-        def members = introspection.getPropertyMembers("value")
+        def members = introspection.getProperty("value").get().members
 
         expect: "the field of the type and its getter read the value of the type"
         members.find { it.member instanceof Field && it.declaringType == Shadowed }.read(bean) == "own"
@@ -274,9 +273,9 @@ class ReflectionBeanIntrospectionSpec extends Specification {
         when: "a setter is asked for the value"
         members.find { it.member instanceof Method && ((Method) it.member).parameterCount == 1 }.read(bean)
 
-        then:
-        def e = thrown(IllegalStateException)
-        e.message.contains("does not yield the property value")
+        then: "the member says it cannot be read, the way a generated one does"
+        def e = thrown(UnsupportedOperationException)
+        e.message.contains("Cannot read from the property member")
     }
 
     void "the builder sets the constructor arguments by name, by index, from an existing bean and by conversion"() {
