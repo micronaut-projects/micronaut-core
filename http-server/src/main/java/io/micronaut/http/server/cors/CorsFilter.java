@@ -426,7 +426,11 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             return Optional.empty();
         }
         if (router != null) {
+            HttpMethod methodToMatch = methodToMatch(request);
             for (UriRouteMatch<Object, Object> routeMatch : router.findAny(request)) {
+                if (!routeMatch.getHttpMethod().equals(methodToMatch)) {
+                    continue;
+                }
                 Optional<CorsOriginConfiguration> corsOriginConfiguration = CrossOriginUtil.getCorsOriginConfiguration(routeMatch);
                 if (corsOriginConfiguration.isPresent() && matchesOrigin(corsOriginConfiguration.get(), requestOrigin)) {
                     return corsOriginConfiguration;
