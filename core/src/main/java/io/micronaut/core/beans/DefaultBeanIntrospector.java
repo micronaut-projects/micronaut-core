@@ -139,7 +139,8 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         }
         // a fallback describes a class it was never compiled against, so asking it can fail on a type it does
         // not serve - reading a member whose type is an absent optional dependency throws NoClassDefFoundError -
-        // and a failure of one fallback must stay a lookup miss, which is what the callers of a find expect
+        // and a failure of one fallback must stay a lookup miss, which is what the callers of a find expect.
+        // An error of the virtual machine is not such a failure and is left to propagate
         for (BeanIntrospectionFallback fallback : getFallbacks(effectiveClassLoader)) {
             try {
                 Optional<BeanIntrospection<T>> fallbackIntrospection = fallback.findIntrospection(beanType);
@@ -149,7 +150,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                     }
                     return fallbackIntrospection;
                 }
-            } catch (Throwable e) {
+            } catch (Exception | LinkageError e) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Fallback {} failed to supply a BeanIntrospection for type {}, continuing", fallback, beanType, e);
                 }

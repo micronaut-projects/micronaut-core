@@ -223,7 +223,7 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
             || (type.isMemberClass() && !Modifier.isStatic(type.getModifiers()))) {
             return false;
         }
-        return Builder.selectFactoryMethod(type) != null || Builder.selectConstructor(type) != null;
+        return ReflectionBeanIntrospection.selectFactoryMethod(type) != null || Builder.selectConstructor(type) != null;
     }
 
     /**
@@ -821,7 +821,7 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
             Constructor<T> selected = constructor;
             if (selected == null) {
                 // a static `@Creator` factory is the instantiation route the processors select first
-                factory = selectFactoryMethod(type);
+                factory = ReflectionBeanIntrospection.selectFactoryMethod(type);
                 if (factory == null) {
                     selected = selectConstructor(type);
                 }
@@ -861,7 +861,9 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
             Optional<String> scopeName = scope != null
                 ? Optional.of(scope.getName())
                 : metadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE);
-            boolean isSingleton = singleton != null ? singleton : isSingleton(metadata);
+            // a scope the builder sets replaces the one the class declares, for the singleton question too:
+            // a class declaring @Singleton registered under @Prototype is a prototype
+            boolean isSingleton = singleton != null ? singleton : scope != null ? isSingletonScope(scope) : isSingleton(metadata);
             if (isSingleton && scopeName.isEmpty()) {
                 scopeName = Optional.of(Singleton.class.getName());
             }
@@ -973,39 +975,6 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
         }
 
         /**
-         * The static factory method as the processors select it - the selection of
-         * {@code ClassElement#findStaticCreator()}: an accessible static method the type itself declares,
-         * annotated {@link Creator} through its metadata and returning the type or a sub type of it. When the
-         * type declares several, the only one taking parameters, else the first public one.
-         */
-        @Nullable
-        private static Method selectFactoryMethod(Class<?> type) {
-            List<Method> creators = new ArrayList<>();
-            for (Method candidate : type.getDeclaredMethods()) {
-                int modifiers = candidate.getModifiers();
-                if (!Modifier.isStatic(modifiers) || Modifier.isPrivate(modifiers) || candidate.isSynthetic()) {
-                    continue;
-                }
-                if (type.isAssignableFrom(candidate.getReturnType())
-                    && ReflectionAnnotations.metadataOf(candidate).hasStereotype(Creator.class)) {
-                    creators.add(candidate);
-                }
-            }
-            if (creators.size() < 2) {
-                return creators.isEmpty() ? null : creators.get(0);
-            }
-            // a no-argument factory loses to one taking parameters, as it does at compilation time
-            List<Method> withArguments = creators.stream().filter(candidate -> candidate.getParameterCount() > 0).toList();
-            if (withArguments.size() == 1) {
-                return withArguments.get(0);
-            }
-            return withArguments.stream()
-                .filter(candidate -> Modifier.isPublic(candidate.getModifiers()))
-                .findFirst()
-                .orElse(null);
-        }
-
-        /**
          * Opens a member for reflective access, failing at build time - rather than at injection time, with a
          * {@link DependencyInjectionException} the caller cannot act on - when the module declaring the type
          * does not open its package.
@@ -1017,6 +986,12 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
                     + member.getName() + "' cannot be made accessible, the " + declaringType.getModule()
                     + " does not open the package " + declaringType.getPackageName() + " for reflection");
             }
+        }
+
+        private static boolean isSingletonScope(Class<? extends Annotation> scope) {
+            return scope == Singleton.class
+                || AnnotationUtil.SINGLETON.equals(scope.getName())
+                || ReflectionAnnotations.metadataOf(scope).hasStereotype(AnnotationUtil.SINGLETON);
         }
 
         private static boolean isSingleton(AnnotationMetadata metadata) {

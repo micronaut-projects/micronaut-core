@@ -513,7 +513,10 @@ public final class AnnotationMetadataSupport {
     public static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
         Optional<Constructor<InvocationHandler>> proxyClass = getProxyClass(annotationClass);
         if (proxyClass.isPresent()) {
-            Map<CharSequence, Object> values = new HashMap<>(getDefaultValues(annotationClass));
+            // the defaults of the annotation type itself, the ones equals completes the members with: a hash
+            // computed from the registry keyed by annotation name could differ from them when another class
+            // loader registered the same name, and two equal annotations would then hash apart
+            Map<CharSequence, Object> values = new HashMap<>(AnnotationDefaults.of(annotationClass));
             AnnotationValue<T> proxyAnnotationValue = removeInternalAnnotationValues(annotationValue);
             if (proxyAnnotationValue != null) {
                 proxyAnnotationValue.getValues().forEach((key, o) -> values.put(key.toString(), o));

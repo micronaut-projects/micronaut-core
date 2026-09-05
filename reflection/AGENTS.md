@@ -77,6 +77,14 @@ the gap is in `inject-groovy`, not here: record it as a `@PendingFeature` whose 
 expectation set to what the Java processor and the class file say, so the pending case turns green when the
 Groovy side is fixed. Do not bend the reflective side towards one processor at the cost of the other.
 
+One trap the shared state sets: annotation defaults live in a registry keyed by annotation *name*, filled by
+whoever registers last - a generated class on loading, or `ReflectionAnnotations` the first time it describes an
+annotation type. The Groovy processor records only constant defaults (a nested annotation default is dropped),
+so a spec comparing `getDefaultValues` of a Groovy fixture depends on which side registered last, and on the
+order Gradle ran the specs in (micronaut-core#13017). A new spec should not build the metadata of a fixture
+annotation reflectively before the specs that compare that annotation's defaults have run; keep to fixtures of
+its own.
+
 Divergences known and recorded as pending or documented: see `OverriddenReturnParitySpec` (Groovy processor
 misses a method-position `TYPE_USE` annotation on the return type), `JavacBeanMetadataParitySpec` (a type-use
 member written with its default), and the four `*ParitySpec`s ported from core's own suites

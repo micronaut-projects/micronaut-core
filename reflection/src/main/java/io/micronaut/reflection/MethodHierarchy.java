@@ -198,10 +198,12 @@ public record MethodHierarchy(Declaration local,
                 .map(level -> level.getTypeParameters()[index])
                 .toList());
         }
-        return Argument.of((Class) local.getType(),
-            local.getName(),
-            mergeMetadata(levels.stream().map(Argument::getAnnotationMetadata).toList()),
-            typeParameters);
+        AnnotationMetadata metadata = mergeMetadata(levels.stream().map(Argument::getAnnotationMetadata).toList());
+        if (local instanceof GenericPlaceholder<?> placeholder) {
+            // a variable stays a variable: an overriding `<T> T id(T)` is a placeholder to a generated method
+            return Argument.ofTypeVariable((Class) local.getType(), local.getName(), placeholder.getVariableName(), metadata, typeParameters);
+        }
+        return Argument.of((Class) local.getType(), local.getName(), metadata, typeParameters);
     }
 
     /**
@@ -224,14 +226,25 @@ public record MethodHierarchy(Declaration local,
     }
 
     /**
-     * Whether the method is declared in parallel branches of the hierarchy. Each declaration is read from the
-     * introspection of the type declaring it, so a type that merely inherits the method does not count as a
-     * declaration of its own.
+     * Whether the method is declared in parallel branches of the hierarchy: by two types neither of which
+     * extends or implements the other, as a class implementing two interfaces that both declare it. A method
+     * a class declares, a super class overrides and the type overrides again is declared along one line, not
+     * in parallel. Each declaration is read from the introspection of the type declaring it, so a type that
+     * merely inherits the method does not count as a declaration of its own.
      *
-     * @return Whether more than one type of the hierarchy declares the method
+     * @return Whether two unrelated types of the hierarchy declare the method
      */
     public boolean parallel() {
-        return inherited.size() > 1;
+        for (int i = 0; i < inherited.size(); i++) {
+            Class<?> first = inherited.get(i).declaringType();
+            for (int j = i + 1; j < inherited.size(); j++) {
+                Class<?> second = inherited.get(j).declaringType();
+                if (!first.isAssignableFrom(second) && !second.isAssignableFrom(first)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -515,9 +528,13 @@ public record MethodHierarchy(Declaration local,
 
         @SuppressWarnings({"unchecked", "rawtypes"})
         private static Argument<?> returnArgumentOf(ReturnType<?> returnType) {
-            return Argument.of((Class) returnType.getType(),
-                declaredOf(returnType.asArgument().getAnnotationMetadata()),
-                returnType.getTypeParameters());
+            Argument<?> argument = returnType.asArgument();
+            AnnotationMetadata declared = declaredOf(argument.getAnnotationMetadata());
+            if (argument instanceof GenericPlaceholder<?> placeholder) {
+                // a variable stays a variable: `<T> T id(T)` returns a placeholder to a generated method
+                return Argument.ofTypeVariable((Class) returnType.getType(), null, placeholder.getVariableName(), declared, returnType.getTypeParameters());
+            }
+            return Argument.of((Class) returnType.getType(), declared, returnType.getTypeParameters());
         }
 
         @Override
