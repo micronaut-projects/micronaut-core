@@ -5,8 +5,9 @@ import io.micronaut.core.annotation.Introspected
 
 /**
  * A method declared by an interface and by a super class and overridden by the type, each level annotating the
- * return value. The processors merge what every level declares into the metadata of the overriding method, so a
- * reflective description has to merge it too.
+ * method with an annotation whose target includes {@code TYPE_USE}, next to a method whose return type is
+ * annotated in a nested position and a method whose parameter is annotated. What the processors record for each
+ * is what a reflective description has to answer.
  */
 interface ReturnDeclarer {
 
@@ -35,5 +36,14 @@ class OverriddenReturn extends AbstractReturnDeclarer implements ReturnDeclarer 
     @Tag("from-impl")
     String describe() {
         return ""
+    }
+
+    @Executable
+    List<@Tag("nested") String> nested() {
+        return []
+    }
+
+    @Executable
+    void take(@Tag("param") String value) {
     }
 }
