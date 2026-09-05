@@ -137,10 +137,14 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -176,6 +180,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private static final String MSG_COULD_NOT_BE_LOADED = "] could not be loaded: ";
     public static final String MSG_BEAN_DEFINITION = "Bean definition [";
+
+    private static final String PARALLEL_BEAN_DISCOVERY_THREAD = "micronaut-parallel-bean-discovery";
+
+    /**
+     * How long {@link #stop()} waits for the parallel bean discovery thread and any in-flight
+     * parallel bean initializations before it proceeds to destroy the singletons.
+     */
+    private static final long PARALLEL_SHUTDOWN_TIMEOUT_MS = 10_000L;
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean configured = new AtomicBoolean(false);
@@ -234,6 +246,26 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private final boolean eagerBeansEnabled;
 
     private @Nullable ForkJoinTask<?> checkEnabledBeans;
+
+    /**
+     * The thread that discovers {@link Parallel} beans, retained so that {@link #stop()} can
+     * interrupt and join it instead of letting it outlive the context. An {@link AtomicReference}
+     * so that the shutdown claims the thread and clears the field in one step, and a discovery
+     * started concurrently cannot have its thread dropped without being joined.
+     */
+    private final AtomicReference<Thread> parallelBeanDiscoveryThread = new AtomicReference<>();
+
+    /**
+     * The in-flight parallel bean initializations. Each entry is completed by its worker when the
+     * initialization finishes, successfully or not.
+     */
+    private final Set<ParallelInitialization> parallelInitializationTasks = ConcurrentHashMap.newKeySet();
+
+    /**
+     * The parallel initialization a worker thread is currently running, so that a shutdown
+     * triggered from that worker does not wait for the worker itself.
+     */
+    private final ThreadLocal<ParallelInitialization> currentParallelInitialization = new ThreadLocal<>();
 
     protected MutableConversionService conversionService;
 
@@ -414,6 +446,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
             publishEvent(new ShutdownEvent(this));
             attributes.clear();
+
+            // wait for parallel bean startup to finish so that the singletons it creates are
+            // included in the destruction pass below instead of being registered behind it
+            awaitParallelStartupTermination();
 
             // dedup by identity: identity hash codes are not unique across live objects
             Set<Object> processed = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -2424,37 +2460,223 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!eagerBeansEnabled) {
             return;
         }
-        new Thread(() -> {
-            Iterable<BeanDefinition<Object>> parallelBeans = beanDefinitionProvider.getParallelBeans(this);
-            Collection<BeanDefinition<Object>> parallelDefinitions = new ArrayList<>(20);
-            parallelBeans.forEach(beanDefinition -> {
+        Thread thread = new Thread(this::discoverParallelBeans, PARALLEL_BEAN_DISCOVERY_THREAD);
+        // a daemon thread cannot keep the JVM alive if condition evaluation below blocks
+        thread.setDaemon(true);
+        parallelBeanDiscoveryThread.set(thread);
+        thread.start();
+    }
+
+    private void discoverParallelBeans() {
+        try {
+            runParallelBeanDiscovery();
+        } catch (Exception e) {
+            // the discovery thread is the last handler for its own failures. the definitions are
+            // iterated lazily, so a condition that throws fails in the loop header rather than in
+            // the guarded body below, and would otherwise vanish with the thread
+            LOG.error("Parallel bean discovery failed: {}", e.getMessage(), e);
+        } finally {
+            // there is nothing left to join: drop the reference rather than hold a terminated
+            // thread, and its thread locals, for as long as the context runs. only this thread's
+            // own registration is cleared, never one a later discovery has installed
+            parallelBeanDiscoveryThread.compareAndSet(Thread.currentThread(), null);
+        }
+    }
+
+    private void runParallelBeanDiscovery() {
+        Iterable<BeanDefinition<Object>> parallelBeans = beanDefinitionProvider.getParallelBeans(this);
+        Collection<BeanDefinition<Object>> parallelDefinitions = new ArrayList<>(20);
+        for (BeanDefinition<Object> beanDefinition : parallelBeans) {
+            if (isParallelStartupAborted()) {
+                return;
+            }
+            try {
+                loadEagerBeans(beanDefinition, parallelDefinitions);
+            } catch (Throwable e) {
+                LOG.error("Parallel Bean definition [{}{}{}]", beanDefinition.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
+                if (isShutdownOnError(beanDefinition)) {
+                    stopFromParallelWorker();
+                    return;
+                }
+            }
+        }
+
+        filterReplacedBeans(parallelDefinitions);
+
+        for (BeanDefinition<Object> beanDefinition : parallelDefinitions) {
+            if (isParallelStartupAborted()) {
+                return;
+            }
+            submitParallelInitialization(beanDefinition);
+        }
+        parallelDefinitions.clear();
+    }
+
+    /**
+     * Submits a parallel bean initialization, tracking it so that {@link #stop()} can wait for it.
+     *
+     * @param beanDefinition The definition to initialize
+     */
+    @SuppressWarnings("java:S1181") // an Error from a bean constructor must still honour shutdownOnError; it is logged, not swallowed
+    private void submitParallelInitialization(BeanDefinition<Object> beanDefinition) {
+        ParallelInitialization task = new ParallelInitialization();
+        // register before submitting so that a task can never run unobserved by stop()
+        parallelInitializationTasks.add(task);
+        if (isParallelStartupAborted()) {
+            completeParallelInitialization(task);
+            return;
+        }
+        try {
+            ForkJoinPool.commonPool().execute(() -> {
+                currentParallelInitialization.set(task);
                 try {
-                    loadEagerBeans(beanDefinition, parallelDefinitions);
+                    initializeParallelBean(beanDefinition);
                 } catch (Throwable e) {
                     LOG.error("Parallel Bean definition [{}{}{}]", beanDefinition.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
-                    boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
-                    if (shutdownOnError) {
-                        stop();
+                    if (isShutdownOnError(beanDefinition)) {
+                        stopFromParallelWorker();
                     }
+                } finally {
+                    currentParallelInitialization.remove();
+                    completeParallelInitialization(task);
                 }
             });
+        } catch (Throwable e) {
+            completeParallelInitialization(task);
+            throw e;
+        }
+    }
 
-            filterReplacedBeans(parallelDefinitions);
+    private void completeParallelInitialization(ParallelInitialization task) {
+        // count down before removing, so that a task is only ever absent from the set once its
+        // latch has fired. the other order leaves a window where the set looks empty to a waiter
+        // that has not yet taken this task's latch
+        task.completed.countDown();
+        parallelInitializationTasks.remove(task);
+    }
 
-            parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
-                try {
-                    initializeEagerBean(beanDefinition);
-                } catch (Throwable e) {
-                    LOG.error("Parallel Bean definition [{}{}{}]", beanDefinition.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
-                    Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
-                    if (shutdownOnError) {
-                        stop();
-                    }
+    private void initializeParallelBean(BeanDefinition<Object> beanDefinition) {
+        if (isParallelStartupAborted()) {
+            // shutdown began before this bean was created: never register it in the first place
+            return;
+        }
+        List<BeanRegistration<Object>> registrations = new ArrayList<>(1);
+        initializeEagerBean(beanDefinition, registrations::add);
+        if (isShuttingDown()) {
+            // shutdown began while this bean was being constructed. stop() waits for in-flight
+            // initializations, so normally it will have seen these registrations; if it timed out
+            // waiting they landed too late for the destruction pass and are destroyed here instead
+            for (BeanRegistration<Object> registration : registrations) {
+                destroyLateParallelBean(registration);
+            }
+        }
+    }
+
+    private void destroyLateParallelBean(BeanRegistration<Object> registration) {
+        try {
+            // only destroy a registration that is still active, so a bean the destruction pass
+            // already picked up is not destroyed twice
+            BeanRegistration<Object> active = singletonScope.findBeanRegistration(registration.beanDefinition);
+            if (active != null) {
+                destroyBean(active);
+            }
+        } catch (Exception e) {
+            LOG.error("Error destroying parallel bean [{}] registered after the context was stopped: {}", registration.beanDefinition.getName(), e.getMessage(), e);
+        }
+    }
+
+    private static boolean isShutdownOnError(BeanDefinition<?> beanDefinition) {
+        return beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
+    }
+
+    /**
+     * @return Whether parallel startup work should stop because the context is shutting down or has
+     * already been shut down
+     */
+    private boolean isParallelStartupAborted() {
+        return Thread.currentThread().isInterrupted() || isShuttingDown();
+    }
+
+    /**
+     * @return Whether the context is shutting down or has already been shut down
+     */
+    private boolean isShuttingDown() {
+        return terminating.get() || (!running.get() && !initializing.get());
+    }
+
+    /**
+     * Stops the context from a parallel startup worker. The worker is one of the threads
+     * {@link #stop()} waits for, so it must not trigger a shutdown that is already under way.
+     */
+    private void stopFromParallelWorker() {
+        if (terminating.get()) {
+            return;
+        }
+        stop();
+    }
+
+    /**
+     * Waits for the parallel startup work to finish, so that {@link #stop()} does not race the
+     * registration of parallel singletons. Bounded: a blocked discovery or initialization delays
+     * shutdown by at most {@link #PARALLEL_SHUTDOWN_TIMEOUT_MS}.
+     */
+    private void awaitParallelStartupTermination() {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(PARALLEL_SHUTDOWN_TIMEOUT_MS);
+        Thread discoveryThread = parallelBeanDiscoveryThread.getAndSet(null);
+        if (discoveryThread != null && discoveryThread.isAlive() && discoveryThread != Thread.currentThread()) {
+            discoveryThread.interrupt();
+            try {
+                long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
+                discoveryThread.join(Math.max(1, remaining));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            if (discoveryThread.isAlive() && LOG.isWarnEnabled()) {
+                LOG.warn("Parallel bean discovery thread [{}] did not terminate within {}ms of the context being stopped", discoveryThread.getName(), PARALLEL_SHUTDOWN_TIMEOUT_MS);
+            }
+        }
+
+        ParallelInitialization ownTask = currentParallelInitialization.get();
+        if (ownTask != null) {
+            // this shutdown was triggered from within a parallel initialization; that task cannot
+            // complete until stop() returns, so waiting for it would deadlock
+            parallelInitializationTasks.remove(ownTask);
+        }
+        while (true) {
+            ParallelInitialization task = parallelInitializationTasks.stream().findFirst().orElse(null);
+            if (task == null) {
+                return;
+            }
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0 || !task.await(remaining)) {
+                if (LOG.isWarnEnabled()) {
+                    LOG.warn("{} parallel bean initialization(s) did not complete within {}ms of the context being stopped", parallelInitializationTasks.size(), PARALLEL_SHUTDOWN_TIMEOUT_MS);
                 }
-            }));
-            parallelDefinitions.clear();
+                return;
+            }
+            parallelInitializationTasks.remove(task);
+        }
+    }
 
-        }).start();
+    /**
+     * An in-flight parallel bean initialization, tracked so that {@link #stop()} can wait for it.
+     */
+    private static final class ParallelInitialization {
+
+        private final CountDownLatch completed = new CountDownLatch(1);
+
+        /**
+         * @param timeoutNanos How long to wait
+         * @return Whether the initialization finished within the given time
+         */
+        private boolean await(long timeoutNanos) {
+            try {
+                return completed.await(timeoutNanos, TimeUnit.NANOSECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
     }
 
     private <T> void filterReplacedBeans(Collection<BeanDefinition<T>> candidates) {
@@ -2525,6 +2747,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private void initializeEagerBean(BeanDefinition<Object> beanDefinition) {
+        initializeEagerBean(beanDefinition, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void initializeEagerBean(BeanDefinition<Object> beanDefinition, @Nullable Consumer<BeanRegistration<Object>> registrationConsumer) {
         if (beanDefinition.isIterable() || beanDefinition.hasStereotype(ConfigurationReader.class.getName())) {
             Set<BeanDefinition<Object>> beanCandidates = new HashSet<>(5);
 
@@ -2535,16 +2762,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 Argument.OBJECT_ARGUMENT
             );
             for (BeanDefinition beanCandidate : beanCandidates) {
-                intializeEagerBean(
+                BeanRegistration<Object> registration = intializeEagerBean(
                     null,
                     beanCandidate,
                     beanCandidate.asArgument(),
                     beanCandidate.hasAnnotation(Context.class) ? null : beanDefinition.getDeclaredQualifier()
                 );
+                if (registrationConsumer != null) {
+                    registrationConsumer.accept(registration);
+                }
             }
 
         } else {
-            intializeEagerBean(null, beanDefinition, beanDefinition.asArgument(), null);
+            BeanRegistration<Object> registration = intializeEagerBean(null, beanDefinition, beanDefinition.asArgument(), null);
+            if (registrationConsumer != null) {
+                registrationConsumer.accept(registration);
+            }
         }
     }
 
