@@ -334,7 +334,7 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
                 ClassUtils.REFLECTION_LOGGER.debug("Bean of type [{}] uses reflection to inject field: '{}'", getBeanType(), field.getName());
             }
             try {
-                field.set(bean, value);
+                field.set(bean, value); // NOSONAR - field injection through reflection is what this definition does in place of a generated one
             } catch (IllegalAccessException | IllegalArgumentException e) {
                 throw new DependencyInjectionException(resolutionContext, "Error setting field value: " + e.getMessage(), e);
             }

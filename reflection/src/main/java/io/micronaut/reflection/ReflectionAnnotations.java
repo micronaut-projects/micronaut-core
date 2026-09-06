@@ -1252,15 +1252,13 @@ public final class ReflectionAnnotations {
         if (value instanceof AnnotationValue<?> && readMember(annotation, member) instanceof Annotation nested) {
             return valueOf(nested);
         }
-        if (value instanceof AnnotationValue<?>[]) {
-            // an array of annotations is walked element by element: each element is an annotation of its own
-            if (readMember(annotation, member) instanceof Annotation[] nested) {
-                AnnotationValue<?>[] converted = new AnnotationValue[nested.length];
-                for (int i = 0; i < nested.length; i++) {
-                    converted[i] = valueOf(nested[i]);
-                }
-                return converted;
+        // an array of annotations is walked element by element: each element is an annotation of its own
+        if (value instanceof AnnotationValue<?>[] && readMember(annotation, member) instanceof Annotation[] nested) {
+            AnnotationValue<?>[] converted = new AnnotationValue[nested.length];
+            for (int i = 0; i < nested.length; i++) {
+                converted[i] = valueOf(nested[i]);
             }
+            return converted;
         }
         // a value that is not an annotation is left as the conversion gave it, copied when it is an array
         return copied(value);
@@ -1305,48 +1303,6 @@ public final class ReflectionAnnotations {
         Object copy = Array.newInstance(value.getClass().getComponentType(), length);
         System.arraycopy(value, 0, copy, 0, length);
         return copy;
-    }
-
-    /**
-     * The default of a member, in the form the metadata records a value.
-     *
-     * <p>{@link AnnotationValue#of(Annotation)} converts what it reads off an annotation instance, and a default
-     * has no instance behind it: {@link Method#getDefaultValue()} is the only source of it, so the module
-     * converts a default itself. The shapes are the ones that method produces, so that a value read off an
-     * instance and the default of its member compare equal and the member is left out of the values.</p>
-     */
-    private static Object convert(Object value) {
-        if (value instanceof Class<?> type) {
-            return new AnnotationClassValue<>(type);
-        }
-        if (value instanceof Enum<?> constant) {
-            return constant.name();
-        }
-        if (value instanceof Annotation annotation) {
-            return AnnotationValue.of(annotation);
-        }
-        if (value instanceof Class<?>[] types) {
-            AnnotationClassValue<?>[] converted = new AnnotationClassValue[types.length];
-            for (int i = 0; i < types.length; i++) {
-                converted[i] = new AnnotationClassValue<>(types[i]);
-            }
-            return converted;
-        }
-        if (value instanceof Enum<?>[] constants) {
-            String[] converted = new String[constants.length];
-            for (int i = 0; i < constants.length; i++) {
-                converted[i] = constants[i].name();
-            }
-            return converted;
-        }
-        if (value instanceof Annotation[] annotations) {
-            AnnotationValue<?>[] converted = new AnnotationValue[annotations.length];
-            for (int i = 0; i < annotations.length; i++) {
-                converted[i] = AnnotationValue.of(annotations[i]);
-            }
-            return converted;
-        }
-        return value;
     }
 
     private static boolean isIgnored(Class<? extends Annotation> type) {

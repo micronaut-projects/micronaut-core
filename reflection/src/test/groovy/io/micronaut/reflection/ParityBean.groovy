@@ -19,6 +19,8 @@ class ParityBean {
 
     final String constant = "fixed"
 
+    // a private field with no accessor: what an introspection must not expose
+    @SuppressWarnings('UnusedPrivateField')
     private String secret
 
     ParityBean() {

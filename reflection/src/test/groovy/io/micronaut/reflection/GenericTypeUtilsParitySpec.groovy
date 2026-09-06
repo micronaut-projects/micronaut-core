@@ -99,6 +99,8 @@ class GenericTypeUtilsParitySpec extends Specification {
     }
 
     static class Holder {
+        // read reflectively by the feature above, never by code
+        @SuppressWarnings('UnusedPrivateField')
         private Supplier<String> supplier
     }
 

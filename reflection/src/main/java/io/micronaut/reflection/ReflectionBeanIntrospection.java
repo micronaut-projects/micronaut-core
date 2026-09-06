@@ -1601,7 +1601,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                 throw new UnsupportedOperationException("The property '" + getName() + "' of " + getDeclaringType().getName() + " is read only");
             }
             try {
-                writeField.set(bean, value);
+                writeField.set(bean, value); // NOSONAR - writing through the field is what a reflective introspection of a field-accessed property is for
             } catch (IllegalAccessException e) {
                 throw new IllegalStateException("Cannot write the field '" + getName() + "' of " + getDeclaringType().getName(), e);
             }
