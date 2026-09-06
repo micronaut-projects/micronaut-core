@@ -530,6 +530,104 @@ class DirectFailure {
         context.close()
     }
 
+    void 'test an error thrown by a private callback reaches the interceptor unwrapped'() {
+        given: 'a private callback is dispatched reflectively, so what it throws arrives wrapped unless it is unwrapped'
+        ApplicationContext context = buildContext('''
+package states.error;
+
+import io.micronaut.aop.*;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+class CallbackError extends Error {
+    CallbackError(String message) { super(message); }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@interface Tracked {
+}
+
+@Singleton
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.POST_CONSTRUCT)
+class TrackingInterceptor implements MethodInterceptor<Object, Object> {
+    static final Map<String, Throwable> FAILURES = new LinkedHashMap<>();
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> ctx) {
+        try {
+            return ctx.proceed();
+        } catch (Throwable e) {
+            FAILURES.put(ctx.getTarget().getClass().getSimpleName(), e);
+            throw e;
+        }
+    }
+}
+
+@Singleton
+@Tracked
+class PrivateError {
+    static boolean afterErrorRan;
+
+    @PostConstruct
+    private void privateFailing() {
+        throw new CallbackError("private boom");
+    }
+
+    @PostConstruct
+    void afterError() {
+        afterErrorRan = true;
+    }
+}
+
+@Singleton
+@Tracked
+class DirectError {
+    static boolean afterErrorRan;
+
+    @PostConstruct
+    void directFailing() {
+        throw new CallbackError("direct boom");
+    }
+
+    @PostConstruct
+    void afterError() {
+        afterErrorRan = true;
+    }
+}
+''')
+        Class<?> interceptorType = context.classLoader.loadClass('states.error.TrackingInterceptor')
+        Class<?> errorType = context.classLoader.loadClass('states.error.CallbackError')
+        Class<?> privateType = context.classLoader.loadClass('states.error.PrivateError')
+        Class<?> directType = context.classLoader.loadClass('states.error.DirectError')
+
+        when:
+        context.getBean(privateType)
+
+        then: 'the interceptor sees the error itself, not the reflection wrapper, and the event stops'
+        BeanInstantiationException privateFailure = thrown()
+        errorType.isInstance(interceptorType.FAILURES.PrivateError)
+        interceptorType.FAILURES.PrivateError.message == 'private boom'
+        causes(privateFailure).any { errorType.isInstance(it) && it.message == 'private boom' }
+        !privateType.afterErrorRan
+
+        when:
+        context.getBean(directType)
+
+        then: 'a directly dispatched callback fails the same way, which is what the unwrapping is for'
+        BeanInstantiationException directFailure = thrown()
+        errorType.isInstance(interceptorType.FAILURES.DirectError)
+        interceptorType.FAILURES.DirectError.message == 'direct boom'
+        causes(directFailure).any { errorType.isInstance(it) && it.message == 'direct boom' }
+        !directType.afterErrorRan
+
+        cleanup:
+        context.close()
+    }
+
     void 'test a per target interceptor instance serves both lifecycle events of the bean'() {
         given:
         ApplicationContext context = buildContext('''
