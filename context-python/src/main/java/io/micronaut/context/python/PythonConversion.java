@@ -51,6 +51,8 @@ public final class PythonConversion {
 
     private static final String GETITEM = "__getitem__";
 
+    private static final String ISOFORMAT = "isoformat";
+
     private PythonConversion() {
     }
 
@@ -69,17 +71,17 @@ public final class PythonConversion {
     }
 
     static LocalDate convertLocalDate(Value value) {
-        return LocalDate.parse(value.invokeMember("isoformat").asString());
+        return LocalDate.parse(value.invokeMember(ISOFORMAT).asString());
     }
 
     static LocalTime convertLocalTime(Value value) {
         rejectAware(value, "time");
-        return LocalTime.parse(value.invokeMember("isoformat").asString());
+        return LocalTime.parse(value.invokeMember(ISOFORMAT).asString());
     }
 
     static LocalDateTime convertLocalDateTime(Value value) {
         rejectAware(value, "datetime");
-        return LocalDateTime.parse(value.invokeMember("isoformat").asString());
+        return LocalDateTime.parse(value.invokeMember(ISOFORMAT).asString());
     }
 
     static Duration convertDuration(Value value) {

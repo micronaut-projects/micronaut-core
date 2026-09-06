@@ -40,11 +40,11 @@ final class PythonClassCacheTest {
 
             Value secondClass = PythonContextRuntime.findClass(BOOK, second);
             assertNotSame(firstClass, secondClass, "contexts must not share class values");
-            assertTrue(secondClass.getContext().equals(second));
+            assertEquals(second, secondClass.getContext());
 
             Value instance = PythonContextRuntime.newUninitializedInstance(first, BOOK);
             assertEquals("unset", instance.getMember("title").asString());
-            assertTrue(instance.getMetaObject().equals(firstClass));
+            assertEquals(firstClass, instance.getMetaObject());
 
             PythonContextRegistry.unregisterContext(first);
             Value afterReset = PythonContextRuntime.findClass(BOOK, first);

@@ -20,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
@@ -88,7 +89,7 @@ final class NettyPythonEventLoopSemanticsTest {
             """, new Object[] {probe, results}, new NettyPythonEventLoopProvider(), () -> {
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
             while (results.size() < 2 && System.nanoTime() < deadline) {
-                Thread.sleep(20);
+                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(20));
             }
         });
         assertEquals(List.of(true, true), results);
@@ -218,7 +219,7 @@ final class NettyPythonEventLoopSemanticsTest {
             Value protocol = Value.asValue(holder.get("protocol"));
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
             while (protocol.getMember("lost").getArraySize() == 0 && System.nanoTime() < deadline) {
-                Thread.sleep(20);
+                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(20));
             }
             assertEquals(1, protocol.getMember("lost").getArraySize(), "connection_lost after the provider closed the channel");
             assertTrue(transport.invokeMember("is_closing").asBoolean(), "is_closing follows the channel");
@@ -575,7 +576,7 @@ final class NettyPythonEventLoopSemanticsTest {
             detached.complete("late");
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
             while (results.isEmpty() && System.nanoTime() < deadline) {
-                Thread.sleep(20);
+                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(20));
             }
             assertEquals(List.of(true), results, "the detached completion ran outside a frame");
         }));

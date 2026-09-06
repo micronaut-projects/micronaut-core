@@ -182,8 +182,10 @@ final class PythonContextRuntimeStateTest {
     @Test
     void aContextWhoseMainModuleFailsIsUnregisteredAndClosed() {
         try (Engine engine = GraalPyEngineFactory.buildPythonEngine()) {
+            ClassLoader classLoader = getClass().getClassLoader();
+            GraalPyContextConfiguration configuration = new GraalPyContextConfiguration();
             assertThrows(RuntimeException.class, () -> GraalPyContextFactory.buildContext(
-                HostAccess.ALL, engine, getClass().getClassLoader(), new GraalPyContextConfiguration(), "failing_main.py"));
+                HostAccess.ALL, engine, classLoader, configuration, "failing_main.py"));
             // nothing registered for the engine: the failed context is gone, so the engine can close
             AtomicBoolean noContexts = new AtomicBoolean();
             PythonContextRegistry.onNoContexts(engine, () -> noContexts.set(true));

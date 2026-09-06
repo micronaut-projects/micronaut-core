@@ -47,6 +47,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -55,6 +56,7 @@ import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -273,7 +275,7 @@ final class PythonAsyncioRuntimeTest {
                 // pooled context another thread may be using
                 Value script = PythonContextRuntime.findPooledScript(PYTHON, "Unnamed");
                 assertEquals(primary, script.getContext());
-                assertFalse(borrowed.equals(script.getContext()));
+                assertNotEquals(borrowed, script.getContext());
             } finally {
                 pool.release(borrowed);
             }
@@ -600,7 +602,7 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
-    void injectionsAreAppliedByEachContextsOwnerNotBroadcastToBorrowedContexts() throws Exception {
+    void injectionsAreAppliedByEachContextsOwnerNotBroadcastToBorrowedContexts() {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "micronaut.python.pool.enabled", true,
@@ -671,6 +673,7 @@ final class PythonAsyncioRuntimeTest {
             "micronaut.python.pool.enabled", true,
             "micronaut.python.pool.size", 1
         ))) {
+            assertTrue(applicationContext.containsBean(PythonPool.class));
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
             CountDownLatch started = new CountDownLatch(1);
             CountDownLatch gate = new CountDownLatch(1);
@@ -772,7 +775,7 @@ final class PythonAsyncioRuntimeTest {
         WeakReference<Object> heap = runACoroutineAndCloseTheContext();
         for (int attempt = 0; attempt < 100 && heap.get() != null; attempt++) {
             System.gc();
-            Thread.sleep(20);
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(20));
         }
         assertNull(heap.get(), "the closed context's heap stayed reachable from the thread that ran its coroutine");
     }
@@ -1625,7 +1628,8 @@ final class PythonAsyncioRuntimeTest {
 
             CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
 
-            CompletionException exception = assertThrows(CompletionException.class, () -> stage.toCompletableFuture().join());
+            CompletableFuture<?> joined = stage.toCompletableFuture();
+            CompletionException exception = assertThrows(CompletionException.class, joined::join);
             assertEquals("boom", assertInstanceOf(IllegalArgumentException.class, exception.getCause()).getMessage());
         }
     }
@@ -1649,7 +1653,8 @@ final class PythonAsyncioRuntimeTest {
             CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
             eventLoop.runUntilComplete(stage);
 
-            CompletionException exception = assertThrows(CompletionException.class, () -> stage.toCompletableFuture().join());
+            CompletableFuture<?> joined = stage.toCompletableFuture();
+            CompletionException exception = assertThrows(CompletionException.class, joined::join);
             assertEquals("boom", assertInstanceOf(IllegalArgumentException.class, exception.getCause()).getMessage());
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
@@ -1667,7 +1672,8 @@ final class PythonAsyncioRuntimeTest {
 
             CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
 
-            CompletionException exception = assertThrows(CompletionException.class, () -> stage.toCompletableFuture().join());
+            CompletableFuture<?> joined = stage.toCompletableFuture();
+            CompletionException exception = assertThrows(CompletionException.class, joined::join);
             PolyglotException cause = assertInstanceOf(PolyglotException.class, exception.getCause());
             assertTrue(cause.isGuestException());
             assertTrue(cause.getMessage().contains("bad value"), cause.getMessage());
@@ -1690,7 +1696,8 @@ final class PythonAsyncioRuntimeTest {
                 call
                 """).execute(target);
             CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(propagating);
-            CompletionException exception = assertThrows(CompletionException.class, () -> stage.toCompletableFuture().join());
+            CompletableFuture<?> joined = stage.toCompletableFuture();
+            CompletionException exception = assertThrows(CompletionException.class, joined::join);
             assertEquals("backend down", assertInstanceOf(IllegalStateException.class, exception.getCause()).getMessage());
 
             Value catching = context.eval(PYTHON, """

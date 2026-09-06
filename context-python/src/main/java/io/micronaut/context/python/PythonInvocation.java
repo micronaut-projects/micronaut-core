@@ -28,11 +28,11 @@ import org.jspecify.annotations.Nullable;
 @Internal
 public final class PythonInvocation {
 
+    private static final Object[] EMPTY_ARGUMENTS = new Object[0];
+
     private static final String INVOKE_METHOD = "__micronaut_invoke_method";
 
     private static final String RAW_CLASS_MEMBER = "__micronaut_get_raw_class_member";
-
-    private static final Object[] EMPTY_ARGUMENTS = new Object[0];
 
     private PythonInvocation() {
     }
@@ -53,10 +53,10 @@ public final class PythonInvocation {
      *
      * @param receiver The Python receiver
      * @param name The method name
-     * @param arguments The method arguments
+     * @param arguments The method arguments, or {@code null} for none
      * @return The invocation result
      */
-    public static Value invokePythonMethod(Value receiver, String name, Object[] arguments) {
+    public static Value invokePythonMethod(Value receiver, String name, Object @Nullable [] arguments) {
         Context context = receiver.getContext();
         Object[] args = arguments == null ? EMPTY_ARGUMENTS : arguments;
         return PythonContextRegistry.withExecutionFrame(context, () -> {
@@ -100,9 +100,12 @@ public final class PythonInvocation {
     public static Value bindPythonDescriptor(Value descriptor, Object receiver, Value owner) {
         Value getter = descriptor.getMember("__get__");
         if (getter != null && getter.canExecute()) {
-            Value receiverValue = receiver instanceof Value value
-                ? value
-                : receiver instanceof ValueCoercible valueCoercible ? valueCoercible.asPolyglotValue() : null;
+            Value receiverValue = null;
+            if (receiver instanceof Value value) {
+                receiverValue = value;
+            } else if (receiver instanceof ValueCoercible valueCoercible) {
+                receiverValue = valueCoercible.asPolyglotValue();
+            }
             if (receiverValue != null) {
                 return getter.execute(receiverValue, owner);
             }

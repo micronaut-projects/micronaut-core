@@ -26,7 +26,7 @@ import io.micronaut.python.processing.util.AnnotationScalars;
 import io.micronaut.python.processing.model.AnnotationMemberDef;
 import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.model.DecoratorDef;
-import io.micronaut.python.processing.element.PythonClassElement;
+import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
@@ -43,6 +43,8 @@ import org.jetbrains.annotations.Nullable;
  */
 @Internal
 final class PythonAnnotationValues {
+
+    private static final String PYTHON_FLOAT = "float";
 
     private final PythonVisitorContext visitorContext;
     private final AnnotationLookups lookups;
@@ -132,7 +134,7 @@ final class PythonAnnotationValues {
     private @Nullable String pythonClassName(String typeName) {
         Map<String, ClassDef> classes = visitorContext.getProcessingEnvironment().environment().classes();
         ClassDef classDef = classes.get(typeName);
-        String defaultPackage = PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
+        String defaultPackage = AbstractPythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
         if (classDef == null && typeName.startsWith(defaultPackage)) {
             classDef = classes.get(typeName.substring(defaultPackage.length()));
         }
@@ -163,7 +165,7 @@ final class PythonAnnotationValues {
         return switch (typeName) {
             case "object", "typing.Any", "Any" -> Object.class.getName();
             case "int" -> Integer.class.getName();
-            case "float" -> Double.class.getName();
+            case PYTHON_FLOAT -> Double.class.getName();
             case "bool" -> Boolean.class.getName();
             case "str" -> String.class.getName();
             default -> null;
@@ -173,7 +175,7 @@ final class PythonAnnotationValues {
     private @Nullable String decoratorAnnotationName(String typeName) {
         Map<String, DecoratorDef> decorators = visitorContext.getProcessingEnvironment().environment().decorators();
         DecoratorDef decoratorDef = decorators.get(typeName);
-        String defaultPackage = PythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
+        String defaultPackage = AbstractPythonClassElement.PYTHON_DEFAULT_PACKAGE + '.';
         if (decoratorDef == null && typeName.startsWith(defaultPackage)) {
             decoratorDef = decorators.get(typeName.substring(defaultPackage.length()));
         }
@@ -263,7 +265,6 @@ final class PythonAnnotationValues {
         }
         if (value instanceof DecoratorDef decoratorDef) {
             values.add(lookups.annotationValue(decoratorDef));
-            return;
         }
     }
 
@@ -317,10 +318,10 @@ final class PythonAnnotationValues {
                 }
                 yield array;
             }
-            case "float" -> {
+            case PYTHON_FLOAT -> {
                 float[] array = new float[values.size()];
                 for (int i = 0; i < values.size(); i++) {
-                    array[i] = AnnotationScalars.floating(AnnotationScalars.number(values.get(i), "float"));
+                    array[i] = AnnotationScalars.floating(AnnotationScalars.number(values.get(i), PYTHON_FLOAT));
                 }
                 yield array;
             }

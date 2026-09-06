@@ -52,8 +52,7 @@ final class NettyPythonEventLoopSupportTest {
         List<DynamicTest> tests = new ArrayList<>();
         for (TransportCase transportCase : availableTransports()) {
             tests.add(DynamicTest.dynamicTest(transportCase.transport().name(), () -> {
-                MultiThreadIoEventLoopGroup group = new MultiThreadIoEventLoopGroup(1, transportCase.ioHandlerFactory());
-                try {
+                try (MultiThreadIoEventLoopGroup group = new MultiThreadIoEventLoopGroup(1, transportCase.ioHandlerFactory())) {
                     EventLoop eventLoop = group.next();
                     NettyPythonEventLoopSupport support = new NettyPythonEventLoopSupport();
                     assertEquals(transportCase.transport(), support.transport(eventLoop));
@@ -70,8 +69,6 @@ final class NettyPythonEventLoopSupportTest {
                         assertTrue(eventLoop.register(support.newChannel(eventLoop, type)).syncUninterruptibly().isSuccess(), channelClass);
                     }
                     assertEquals(transportCase.transport().isNative(), support.reusePortOption(eventLoop) != null);
-                } finally {
-                    group.shutdownGracefully().syncUninterruptibly();
                 }
             }));
         }
@@ -122,11 +119,9 @@ final class NettyPythonEventLoopSupportTest {
         shutdown.get(5, TimeUnit.SECONDS);
 
         assertThrows(IllegalStateException.class, support::beginOperation, "an operation began after shutdown");
-        MultiThreadIoEventLoopGroup group = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
-        try {
-            assertThrows(IllegalStateException.class, () -> support.resolver(group.next()), "a resolver was created after shutdown");
-        } finally {
-            group.shutdownGracefully().syncUninterruptibly();
+        try (MultiThreadIoEventLoopGroup group = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory())) {
+            EventLoop lateLoop = group.next();
+            assertThrows(IllegalStateException.class, () -> support.resolver(lateLoop), "a resolver was created after shutdown");
         }
     }
 

@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 /**
@@ -101,7 +102,7 @@ final class PythonContextRegistry {
      * @param context The GraalPy context being tracked
      */
     static void registerContext(Context context) {
-        state(context).enterable = context;
+        state(context).enterable.set(context);
     }
 
     /**
@@ -294,14 +295,14 @@ final class PythonContextRegistry {
      */
     private static @Nullable Context enterIfPossible(Context ctx) {
         ContextState state = state(ctx);
-        Context enterable = state.enterable;
+        Context enterable = state.enterable.get();
         if (enterable == null) {
             if (state.enterUnsupported) {
                 return null;
             }
             try {
                 ctx.enter();
-                state.enterable = ctx;
+                state.enterable.set(ctx);
                 return ctx;
             } catch (IllegalStateException e) {
                 state.enterUnsupported = true;
@@ -426,19 +427,27 @@ final class PythonContextRegistry {
     }
 
     /**
-     * Rethrow the first failure of a cleanup loop with its own type: an error stays an error.
+     * Run every action even when one fails: the remaining actions run before the failure
+     * propagates with its own type, whatever it is, so one failing close never keeps the next
+     * gate waiting. When several fail, the last failure is the one seen.
      *
-     * @param failure The failure, or null
+     * @param actions The actions
      */
-    static void rethrow(@Nullable Throwable failure) {
-        if (failure instanceof RuntimeException runtimeException) {
-            throw runtimeException;
+    static void runEach(List<Runnable> actions) {
+        runFrom(actions, 0);
+    }
+
+    private static void runFrom(List<Runnable> actions, int index) {
+        if (index >= actions.size()) {
+            return;
         }
-        if (failure instanceof Error error) {
-            throw error;
-        }
-        if (failure != null) {
-            throw new IllegalStateException(failure);
+        try {
+            actions.get(index).run();
+        } catch (RuntimeException e) {
+            LOG.warn("Python cleanup action failed", e);
+            throw e;
+        } finally {
+            runFrom(actions, index + 1);
         }
     }
 
@@ -642,23 +651,8 @@ final class PythonContextRegistry {
         if (listeners.isEmpty()) {
             return;
         }
-        deferNoActiveExecutionListener(() -> {
-            // every listener runs: one failing close must not keep the next context or engine gate waiting
-            Throwable failure = null;
-            for (Runnable listener : listeners) {
-                try {
-                    listener.run();
-                } catch (Throwable e) {
-                    LOG.warn("Python no-active-executions listener failed", e);
-                    if (failure == null) {
-                        failure = e;
-                    } else {
-                        failure.addSuppressed(e);
-                    }
-                }
-            }
-            rethrow(failure);
-        });
+        // every listener runs: one failing close must not keep the next context or engine gate waiting
+        deferNoActiveExecutionListener(() -> runEach(listeners));
     }
 
     /**
@@ -711,7 +705,7 @@ final class PythonContextRegistry {
     static final class ContextState {
         final Object lock = new Object();
         /** The enterable creator instance of this context, when known. */
-        volatile @Nullable Context enterable;
+        final AtomicReference<@Nullable Context> enterable = new AtomicReference<>();
         /** Whether entering was probed on an instance that cannot be entered. */
         volatile boolean enterUnsupported;
         /** Host members assigned to startup-context objects, mirrored into event-loop contexts. */
@@ -719,7 +713,7 @@ final class PythonContextRegistry {
         /** Helper functions and cached pooled values, keyed by name or expression. */
         final Map<String, Value> helpers = new ConcurrentHashMap<>();
         /** The micronaut_runtime module imported into this context, once resolved. */
-        volatile @Nullable Value runtimeModule;
+        final AtomicReference<@Nullable Value> runtimeModule = new AtomicReference<>();
         /** Python classes resolved in this context, keyed by their qualified name. */
         final Map<String, Value> classes = new ConcurrentHashMap<>();
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
@@ -732,7 +726,7 @@ final class PythonContextRegistry {
             asyncMembers.clear();
             helpers.clear();
             classes.clear();
-            runtimeModule = null;
+            runtimeModule.set(null);
             noActiveExecutionsListeners.clear();
             noContextListeners.clear();
             activeExecutions = 0;

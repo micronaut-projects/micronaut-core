@@ -53,8 +53,8 @@ final class PythonApplicationRuntime {
 
     private final Context context;
     private final @Nullable ClassLoader classLoader;
-    private volatile @Nullable PythonPool pool;
-    private volatile @Nullable BeanProvider<ExecutorService> pooledExecutorServiceProvider;
+    private final AtomicReference<@Nullable PythonPool> pool = new AtomicReference<>();
+    private final AtomicReference<@Nullable BeanProvider<ExecutorService>> pooledExecutorServiceProvider = new AtomicReference<>();
 
     /**
      * @param context The primary context
@@ -151,7 +151,7 @@ final class PythonApplicationRuntime {
      * @return The pool, or {@code null} when pooling is disabled
      */
     @Nullable PythonPool pool() {
-        return pool;
+        return pool.get();
     }
 
     /**
@@ -162,7 +162,7 @@ final class PythonApplicationRuntime {
      * @param pool The pool, or {@code null}
      */
     void pool(@Nullable PythonPool pool) {
-        this.pool = pool;
+        this.pool.set(pool);
     }
 
     /**
@@ -171,7 +171,7 @@ final class PythonApplicationRuntime {
      * @return The executor provider, or {@code null} when unavailable
      */
     @Nullable BeanProvider<ExecutorService> pooledExecutorServiceProvider() {
-        return pooledExecutorServiceProvider;
+        return pooledExecutorServiceProvider.get();
     }
 
     /**
@@ -180,7 +180,7 @@ final class PythonApplicationRuntime {
      * @param provider The executor provider, or {@code null} when unavailable
      */
     void pooledExecutorServiceProvider(@Nullable BeanProvider<ExecutorService> provider) {
-        this.pooledExecutorServiceProvider = provider;
+        this.pooledExecutorServiceProvider.set(provider);
     }
 
     /**

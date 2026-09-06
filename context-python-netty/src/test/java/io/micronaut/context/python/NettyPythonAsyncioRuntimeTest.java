@@ -24,7 +24,8 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.DefaultEventLoop;
 import io.netty.channel.EventLoop;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -98,7 +99,7 @@ final class NettyPythonAsyncioRuntimeTest {
 
     @Test
     void nettyBackedRuntimeRunsCreateDatagramEndpoint() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
@@ -151,7 +152,7 @@ final class NettyPythonAsyncioRuntimeTest {
 
     @Test
     void nettyBackedRuntimeRunsCreateConnectionAndCreateServer() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
@@ -206,7 +207,7 @@ final class NettyPythonAsyncioRuntimeTest {
     @Test
     void nettyBackedRuntimeConnectsOverIpv6() throws Exception {
         assumeTrue(ipv6Loopback(), "IPv6 loopback is not available");
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
@@ -265,7 +266,7 @@ final class NettyPythonAsyncioRuntimeTest {
     @Test
     void nettyBackedRuntimeRunsDatagramsOverIpv6() throws Exception {
         assumeTrue(ipv6Loopback(), "IPv6 loopback is not available");
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
@@ -322,7 +323,7 @@ final class NettyPythonAsyncioRuntimeTest {
 
     @Test
     void pythonSocketsCannotBeAdoptedByTheNettyLoop() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
@@ -356,8 +357,8 @@ final class NettyPythonAsyncioRuntimeTest {
 
     @Test
     void aChannelAcceptedOnAnotherEventLoopCannotBeAdopted() throws Exception {
-        NioEventLoopGroup acceptingGroup = new NioEventLoopGroup(1);
-        NioEventLoopGroup otherGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup acceptingGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+        MultiThreadIoEventLoopGroup otherGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         CompletableFuture<Channel> acceptedChannel = new CompletableFuture<>();
         Channel[] channels = new Channel[2];
@@ -381,6 +382,7 @@ final class NettyPythonAsyncioRuntimeTest {
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel channel) {
+                        // no handlers: the channel only has to exist on the other event loop
                     }
                 })
                 .connect((InetSocketAddress) channels[0].localAddress())
@@ -429,7 +431,7 @@ final class NettyPythonAsyncioRuntimeTest {
 
     @Test
     void rejectsPythonSslContextObjectsBeforeConnecting() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
@@ -458,7 +460,7 @@ final class NettyPythonAsyncioRuntimeTest {
 
     @Test
     void gracefulShutdownClosesTrackedNettyServers() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         NettyPythonEventLoopProvider provider = new NettyPythonEventLoopProvider();
@@ -495,7 +497,7 @@ final class NettyPythonAsyncioRuntimeTest {
 
     @Test
     void nettyBackedRuntimeRunsConnectAcceptedSocket() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         CompletableFuture<Channel> acceptedChannel = new CompletableFuture<>();
@@ -523,6 +525,7 @@ final class NettyPythonAsyncioRuntimeTest {
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel channel) {
+                        // no handlers: the channel only has to exist on the other event loop
                     }
                 })
                 .connect((InetSocketAddress) serverChannel[0].localAddress())
@@ -573,7 +576,7 @@ final class NettyPythonAsyncioRuntimeTest {
 
     @Test
     void nettyBackedRuntimeRunsStreamServerAndClient() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
@@ -620,7 +623,7 @@ final class NettyPythonAsyncioRuntimeTest {
 
     @Test
     void nettyBackedRuntimeRunsTlsStreamServerAndClient() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
@@ -676,7 +679,7 @@ final class NettyPythonAsyncioRuntimeTest {
 
     @Test
     void nettyBackedRuntimeRunsUnixServerAndClient() throws Exception {
-        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        MultiThreadIoEventLoopGroup eventLoopGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         EventLoop eventLoop = eventLoopGroup.next();
         Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
         Path socketPath = Files.createTempDirectory("mn-python-netty").resolve("asyncio.sock");

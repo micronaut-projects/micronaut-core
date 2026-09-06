@@ -16,8 +16,6 @@
 package io.micronaut.python.processing.element;
 
 import io.micronaut.core.annotation.Experimental;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -30,7 +28,6 @@ import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.util.PythonDocstrings;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
-import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
@@ -168,39 +165,16 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
         if (declaredOnOwningType
             && getOwningType() instanceof PythonClassElement pythonClassElement
             && !pythonClassElement.hasExplicitTypeArguments()) {
-            return declaredGenericBindings(true);
+            return GenericBindings.declared(getDeclaringType(), true);
         }
         Map<String, Map<String, ClassElement>> allGenerics = getOwningType().getAllTypeArguments();
         Map<String, ClassElement> declaringGenerics = declaringClass != null
             ? allGenerics.getOrDefault(declaringClass.qualifiedName(), Map.of())
             : Map.of();
         if (declaringGenerics.isEmpty()) {
-            declaringGenerics = declaredGenericBindings(false);
+            declaringGenerics = GenericBindings.declared(getDeclaringType(), false);
         }
         return declaringGenerics;
-    }
-
-    private Map<String, ClassElement> declaredGenericBindings(boolean preservePlaceholders) {
-        List<? extends GenericPlaceholderElement> placeholders = getDeclaringType().getDeclaredGenericPlaceholders();
-        if (placeholders.isEmpty()) {
-            return Map.of();
-        }
-        Map<String, ClassElement> bindings = new LinkedHashMap<>(placeholders.size());
-        for (GenericPlaceholderElement placeholder : placeholders) {
-            bindings.put(
-                placeholder.getVariableName(),
-                preservePlaceholders ? placeholder : firstBound(placeholder)
-            );
-        }
-        return bindings;
-    }
-
-    private static ClassElement firstBound(GenericPlaceholderElement placeholder) {
-        List<? extends ClassElement> bounds = placeholder.getBounds();
-        if (bounds.isEmpty()) {
-            return ClassElement.of(Object.class);
-        }
-        return bounds.getFirst();
     }
 
     private ClassElement inferTypeFromValue(Object javaValue) {

@@ -71,7 +71,7 @@ public record TypeRef(
      * @param members The union members
      * @return A union type reference
      */
-    public static TypeRef union(List<TypeRef> members) {
+    public static TypeRef unionOf(List<TypeRef> members) {
         return new TypeRef(UNION, members, List.of());
     }
 

@@ -130,8 +130,10 @@ class PythonConversionTest {
             assertEquals(Duration.ofSeconds(-1, 999_999_000), mappedContext.eval("python", "__import__('datetime').timedelta(microseconds=-1)").as(Duration.class));
             assertEquals(ZoneOffset.ofHoursMinutes(5, 30), mappedContext.eval("python", "__import__('datetime').timezone(__import__('datetime').timedelta(hours=5, minutes=30))").as(ZoneOffset.class));
             assertEquals(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"), mappedContext.eval("python", "__import__('uuid').UUID('123e4567-e89b-12d3-a456-426614174000')").as(UUID.class));
-            assertThrows(RuntimeException.class, () -> mappedContext.eval("python", "__import__('datetime').time(12, tzinfo=__import__('datetime').timezone.utc)").as(LocalTime.class));
-            assertThrows(RuntimeException.class, () -> mappedContext.eval("python", "type('CustomZone', (__import__('datetime').tzinfo,), {'utcoffset': lambda self, value: __import__('datetime').timedelta(hours=1)})()").as(ZoneOffset.class));
+            Value awareTime = mappedContext.eval("python", "__import__('datetime').time(12, tzinfo=__import__('datetime').timezone.utc)");
+            assertThrows(RuntimeException.class, () -> awareTime.as(LocalTime.class));
+            Value customZone = mappedContext.eval("python", "type('CustomZone', (__import__('datetime').tzinfo,), {'utcoffset': lambda self, value: __import__('datetime').timedelta(hours=1)})()");
+            assertThrows(RuntimeException.class, () -> customZone.as(ZoneOffset.class));
         }
     }
 
@@ -517,6 +519,7 @@ class PythonConversionTest {
 
             @Override
             public void putMember(String key, Value value) {
+                // a read-only host object: writes are ignored
             }
         };
 
@@ -535,11 +538,11 @@ class PythonConversionTest {
                 value -> new TestBody(value.getMember("name").asString())
             )
             .build();
-        try (Context context = Context.newBuilder(PythonContextRuntime.PYTHON)
+        try (Context mappingContext = Context.newBuilder(PythonContextRuntime.PYTHON)
             .allowHostAccess(hostAccess)
             .allowHostClassLookup(className -> true)
             .build()) {
-            Value responseValue = context.eval(PythonContextRuntime.PYTHON, """
+            Value responseValue = mappingContext.eval(PythonContextRuntime.PYTHON, """
                 import java
 
                 HttpResponse = java.type("io.micronaut.http.HttpResponse")
@@ -666,12 +669,10 @@ class PythonConversionTest {
     @Test
     void testPrimitiveTypeConversion() {
         // Test individual primitive conversions by testing with collections
-        Value intValue = context.eval("python", "42");
         List<Integer> intList = PythonConversion.convertList(context.eval("python", "[42]"), Integer.class);
         assertEquals(1, intList.size());
         assertEquals(42, intList.get(0));
 
-        Value stringValue = context.eval("python", "'hello'");
         List<String> stringList = PythonConversion.convertList(context.eval("python", "['hello']"), String.class);
         assertEquals(1, stringList.size());
         assertEquals("hello", stringList.get(0));

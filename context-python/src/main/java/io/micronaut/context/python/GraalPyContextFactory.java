@@ -176,21 +176,34 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         GraalPyContextConfiguration contextConfiguration = new GraalPyContextConfiguration();
         contextConfiguration.getBuilder().options(options);
         Engine engine = GraalPyEngineFactory.buildPythonEngine();
-        Context context;
+        Context context = null;
         try {
             context = buildContext(bootstrapHostAccess(classLoader), engine, classLoader, contextConfiguration, applicationMain);
-        } catch (RuntimeException | IOException | Error e) {
-            // the engine was created for this context alone
-            try {
-                engine.close(true);
-            } catch (RuntimeException | Error closeFailure) {
-                e.addSuppressed(closeFailure);
+        } finally {
+            if (context == null) {
+                // the engine was created for this context alone; the bootstrap failure propagates
+                closeQuietly(engine);
             }
-            throw e;
         }
         PythonContextRuntime.setReuseContext(true);
         PythonContextRuntime.setContext(context, classLoader);
         return context;
+    }
+
+    private static void closeQuietly(Engine engine) {
+        try {
+            engine.close(true);
+        } catch (RuntimeException e) {
+            LOG.warn("Failed to close the engine of a context that did not bootstrap", e);
+        }
+    }
+
+    private static void closeQuietly(Context context) {
+        try {
+            context.close(true);
+        } catch (RuntimeException e) {
+            LOG.warn("Failed to close a context that did not bootstrap", e);
+        }
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -247,6 +260,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         var context = builder.build();
         PythonContextRegistry.registerContext(context);
         LOG.debug("GraalPy Context Built in {}ms", System.currentTimeMillis() - now);
+        boolean bootstrapped = false;
         try {
             // The per-context builtin is only needed by context-reuse tests. Avoid
             // evaluating another Python snippet during normal application startup.
@@ -261,16 +275,15 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             evaluateMain(classLoader, INTERNAL_MAIN, context);
             evaluateMain(classLoader, applicationMain, context);
             LOG.debug("GraalPy main.py evaluated in {}ms", System.currentTimeMillis() - now);
+            bootstrapped = true;
             return context;
-        } catch (RuntimeException | IOException | Error e) {
-            // a context that failed to bootstrap has no bean to destroy it: unregister and close it here
-            PythonContextRegistry.unregisterContext(context);
-            try {
-                context.close(true);
-            } catch (RuntimeException | Error closeFailure) {
-                e.addSuppressed(closeFailure);
+        } finally {
+            if (!bootstrapped) {
+                // a context that failed to bootstrap has no bean to destroy it: unregister and close it
+                // here; the bootstrap failure propagates whatever the close does
+                PythonContextRegistry.unregisterContext(context);
+                closeQuietly(context);
             }
-            throw e;
         }
     }
 

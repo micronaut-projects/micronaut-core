@@ -34,6 +34,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,6 +42,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.UnaryOperator;
 
 /**
  * Runtime helpers for Python coroutine bridge methods.
@@ -52,7 +54,7 @@ public final class PythonAsyncioRuntime {
     private static final String SCHEDULER_NAME = "__micronaut_asyncio_to_completion_stage";
     private static final String AWAITABLE_FACTORY_NAME = "__micronaut_completion_stage_awaitable";
     private static final String AWAITABLE_COMPLETER_NAME = "__micronaut_complete_completion_stage_awaitable";
-    private static volatile RuntimeState state = new RuntimeState(true, List.of(), null, null, 0, ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet());
+    private static final AtomicReference<RuntimeState> STATE = new AtomicReference<>(new RuntimeState(true, List.of(), null, null, 0, ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet()));
     private static final ExecutorAdapter EXECUTOR_ADAPTER = new ExecutorAdapter();
     private static final String ASYNCIO_MODULE_NAME = "micronaut_asyncio";
     private static final String ASYNCIO_MODULE_BINDING = "__micronaut_asyncio_module";
@@ -93,7 +95,7 @@ public final class PythonAsyncioRuntime {
     @SuppressWarnings({"rawtypes", "FutureReturnValueIgnored"})
     @UsedByGeneratedCode
     public static CompletionStage toCompletionStage(Value value) {
-        RuntimeState runtimeState = state;
+        RuntimeState runtimeState = state();
         if (!runtimeState.enabled()) {
             throw new IllegalStateException("Python asyncio support is disabled. Set micronaut.python.asyncio.enabled=true to enable async Python bridge methods.");
         }
@@ -132,7 +134,7 @@ public final class PythonAsyncioRuntime {
      * @return An asyncio future.
      */
     public static Value toAwaitable(Context context, CompletionStage<?> stage) {
-        RuntimeState runtimeState = state;
+        RuntimeState runtimeState = state();
         if (!runtimeState.enabled()) {
             throw new IllegalStateException("Python asyncio support is disabled. Set micronaut.python.asyncio.enabled=true to enable async Python bridge methods.");
         }
@@ -217,9 +219,13 @@ public final class PythonAsyncioRuntime {
             maxEventLoops, ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet()));
     }
 
-    private static synchronized void updateState(java.util.function.Function<RuntimeState, RuntimeState> updater) {
+    private static RuntimeState state() {
+        return Objects.requireNonNull(STATE.get(), "state");
+    }
+
+    private static synchronized void updateState(UnaryOperator<RuntimeState> updater) {
         // read-modify-write under the class monitor so concurrent configuration calls keep each other's fields
-        state = updater.apply(state);
+        STATE.set(updater.apply(state()));
     }
 
     private static @Nullable PythonEventLoop currentEventLoop(RuntimeState runtimeState) {
@@ -265,7 +271,7 @@ public final class PythonAsyncioRuntime {
      * @return The current event loop, or {@code null} when execution is not on a known loop.
      */
     static @Nullable PythonEventLoop currentEventLoopForContext() {
-        return currentEventLoop(state);
+        return currentEventLoop(state());
     }
 
     private static void schedule(Context context, Value value, PythonCompletableFuture future, @Nullable PythonEventLoop eventLoop) {
@@ -505,7 +511,7 @@ public final class PythonAsyncioRuntime {
         }
 
         private static @Nullable ExecutorService blockingExecutor() {
-            RuntimeState runtimeState = state;
+            RuntimeState runtimeState = state();
             ExecutorService executor = runtimeState.executorService();
             if (executor != null) {
                 return executor;

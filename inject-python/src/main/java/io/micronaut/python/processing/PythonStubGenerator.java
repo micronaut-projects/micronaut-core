@@ -106,6 +106,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String AS_POLYGLOT_VALUE = "asPolyglotValue";
     private static final String SYNC_SNAPSHOT_FIELD_PREFIX = "graalpyInternalSynced_";
     private static final String MEMBER_LOCAL_PREFIX = "pythonMember_";
+    private static final String BOOLEAN_TYPE = "boolean";
     private static final Set<String> IMMUTABLE_PROPERTY_TYPES = Set.of(
         String.class.getName(), Boolean.class.getName(), Byte.class.getName(), Short.class.getName(),
         Integer.class.getName(), Long.class.getName(), Float.class.getName(), Double.class.getName(),
@@ -409,7 +410,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             builder.addField(pythonValue);
         }
         FieldDef pythonValueSyncing = null;
-        if (isIntrospectedBean && pythonValue != null) {
+        if (isIntrospectedBean) {
             pythonValueSyncing = FieldDef.builder("graalpyInternalValueSyncing")
                 .ofType(TypeDef.Primitive.BOOLEAN)
                 .addModifiers(Modifier.PRIVATE)
@@ -423,6 +424,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * Bridges the methods of implemented Java interfaces, overridden host methods and abstract introduction methods; returns whether an interceptor binding was found on the way.
      */
+    @SuppressWarnings("java:S107") // the flags describe one bean kind; a record for them is a refactoring of its own
     private boolean addInterfaceAndHostBridges(AbstractPythonClassElement classElement, ClassElement element, ClassDef.ClassDefBuilder builder, VisitorContext context, Set<String> addedMethodNames, @Nullable ClassElement superType, boolean extendsHostClass, boolean isDeclaredBean, boolean isIntroductionBean, boolean isAopProxy) {
         Collection<ClassElement> interfaces = classElement.getInterfaces();
         for (ClassElement anInterface : interfaces) {
@@ -1470,7 +1472,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             AnnotationValue<?> annotationValue = annotationMetadata.getDeclaredAnnotation(annotationName);
             if (annotationValue != null) {
-                annotationDefs.add(PythonAnnotationStubGenerator.buildAnnotationDef(annotationValue.getAnnotationName(), (Map) annotationValue.getValues()));
+                annotationDefs.add(PythonAnnotationStubGenerator.buildAnnotationDef(annotationValue.getAnnotationName(), annotationValue.getValues()));
             }
         }
         if (annotationDefs.isEmpty()) {
@@ -3262,7 +3264,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         }
         String typeName = beanProperty.getType().getName();
-        return "boolean".equals(typeName) || Boolean.class.getName().equals(typeName);
+        return BOOLEAN_TYPE.equals(typeName) || Boolean.class.getName().equals(typeName);
     }
 
     private void addSetterPojo(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef field) {
@@ -3662,6 +3664,28 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         });
     }
 
+    private StatementDef polyglotValuePropertyAssignment(VariableDef.This aThis,
+                                                          ExpressionDef value,
+                                                          PropertyElement beanProperty,
+                                                          FieldDef field,
+                                                          @Nullable FieldDef snapshot) {
+        String propertyName = beanProperty.getName();
+        ExpressionDef.InvokeInstanceMethod member = value.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(propertyName));
+        if (isCollectionLike(beanProperty.getGenericType())) {
+            return aThis.field(field).assign(convertValueForType(beanProperty.getGenericType(), member));
+        }
+        ExpressionDef.InvokeInstanceMethod has = value.invoke("hasMember", TypeDef.Primitive.BOOLEAN, ExpressionDef.constant(propertyName));
+        // Read the member once into a local: the nullable conversions test and convert it separately.
+        return has.isTrue().doIf(member.newLocal(MEMBER_LOCAL_PREFIX + propertyName, local -> {
+            List<StatementDef> assignments = new ArrayList<>(2);
+            assignments.add(aThis.field(field).assign(convertValueForType(beanProperty.getGenericType(), local)));
+            if (snapshot != null) {
+                assignments.add(aThis.field(snapshot).assign(aThis.field(field)));
+            }
+            return StatementDef.multi(assignments);
+        }));
+    }
+
     private List<StatementDef> polyglotValuePropertyAssignments(
         VariableDef.This aThis,
         ExpressionDef value,
@@ -3672,26 +3696,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         List<StatementDef> statements = new ArrayList<>();
         for (PropertyElement beanProperty : beanProperties) {
             FieldDef field = propertyFields.get(beanProperty.getName());
-            if (field == null) {
-                continue;
+            if (field != null) {
+                statements.add(polyglotValuePropertyAssignment(aThis, value, beanProperty, field, syncSnapshotFields.get(beanProperty.getName())));
             }
-            String propertyName = beanProperty.getName();
-            ExpressionDef.InvokeInstanceMethod member = value.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(propertyName));
-            if (isCollectionLike(beanProperty.getGenericType())) {
-                statements.add(aThis.field(field).assign(convertValueForType(beanProperty.getGenericType(), member)));
-                continue;
-            }
-            ExpressionDef.InvokeInstanceMethod has = value.invoke("hasMember", TypeDef.Primitive.BOOLEAN, ExpressionDef.constant(propertyName));
-            FieldDef snapshot = syncSnapshotFields.get(propertyName);
-            // Read the member once into a local: the nullable conversions test and convert it separately.
-            statements.add(has.isTrue().doIf(member.newLocal(MEMBER_LOCAL_PREFIX + propertyName, local -> {
-                List<StatementDef> assignments = new ArrayList<>(2);
-                assignments.add(aThis.field(field).assign(convertValueForType(beanProperty.getGenericType(), local)));
-                if (snapshot != null) {
-                    assignments.add(aThis.field(snapshot).assign(aThis.field(field)));
-                }
-                return StatementDef.multi(assignments);
-            })));
         }
         return statements;
     }
@@ -3809,7 +3816,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return switch (primitiveTypeName) {
             case "int", "java.lang.Integer" ->
                 invokedValue.invoke("asInt", TypeDef.Primitive.INT);
-            case "boolean", "java.lang.Boolean" ->
+            case BOOLEAN_TYPE, "java.lang.Boolean" ->
                 invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
             case "double", "java.lang.Double" ->
                 invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE);
@@ -3860,7 +3867,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         } else if (type.isPrimitive()) {
             return switch (type.getName()) {
                 case "int" -> member.invoke("asInt", TypeDef.Primitive.INT);
-                case "boolean" -> member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
+                case BOOLEAN_TYPE -> member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
                 case "double" -> member.invoke("asDouble", TypeDef.Primitive.DOUBLE);
                 case "float" -> member.invoke("asFloat", TypeDef.Primitive.FLOAT);
                 case "long" -> member.invoke("asLong", TypeDef.Primitive.LONG);

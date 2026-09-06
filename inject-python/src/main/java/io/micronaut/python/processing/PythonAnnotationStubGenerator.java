@@ -186,9 +186,7 @@ final class PythonAnnotationStubGenerator {
             return null;
         }
         if (memberType instanceof TypeDef.Array arrayType) {
-            Object[] elements = defaultValue instanceof Collection<?> collection
-                ? collection.toArray()
-                : defaultValue.getClass().isArray() ? (Object[]) defaultValue : new Object[] {defaultValue};
+            Object[] elements = arrayElements(defaultValue);
             if (elements.length == 0) {
                 return new ExpressionDef.Constant(arrayType, new Object[0]);
             }
@@ -207,6 +205,16 @@ final class PythonAnnotationStubGenerator {
             return ExpressionDef.primitiveConstant(converted);
         }
         return ExpressionDef.constant(converted);
+    }
+
+    private static Object[] arrayElements(Object defaultValue) {
+        if (defaultValue instanceof Collection<?> collection) {
+            return collection.toArray();
+        }
+        if (defaultValue.getClass().isArray()) {
+            return (Object[]) defaultValue;
+        }
+        return new Object[] {defaultValue};
     }
 
     /**

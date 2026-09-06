@@ -1712,7 +1712,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         elif isinstance(type_node, ast.BinOp) and isinstance(type_node.op, ast.BitOr):
             # PEP 604 unions stay structured: TypeRef("|", [members...]), None included, so the Java
             # side can box primitives and mark the element nullable without parsing strings.
-            return TypeRef.union([self._parse_type(member) for member in self._union_members(type_node)])
+            return TypeRef.unionOf([self._parse_type(member) for member in self._union_members(type_node)])
         else:
             # Fallback for other expression types
             return TypeRef(ast.unparse(type_node))

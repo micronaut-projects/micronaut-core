@@ -83,8 +83,8 @@ public final class AnnotationScalars {
             if (Double.isInfinite(d) || Double.isNaN(d)) {
                 throw new IllegalArgumentException("Annotation member of type " + typeName + " cannot take the value " + number);
             }
-            // exact, so a huge double cannot saturate to the type's maximum before the range check
-            exact = new BigDecimal(d);
+            // the decimal value, so a huge double cannot saturate to the type's maximum before the range check
+            exact = BigDecimal.valueOf(d);
         } else if (number instanceof BigDecimal bigDecimal) {
             exact = bigDecimal;
         } else if (number instanceof BigInteger bigInteger) {

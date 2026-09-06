@@ -81,11 +81,11 @@ public final class PythonAnnotationTypes {
             return type.isAnnotation();
         }
         String packageName = classElement.getPackageName();
-        if (packageName != null && packageName.startsWith(JAVA_LANG_ANNOTATION)) {
+        if (packageName.startsWith(JAVA_LANG_ANNOTATION)) {
             return true;
         }
         AnnotationMetadata metadata = classElement.getAnnotationMetadata();
-        return metadata != null && metadata.hasAnnotation(Retention.class.getName());
+        return metadata.hasAnnotation(Retention.class.getName());
     }
 
     /**
@@ -112,8 +112,7 @@ public final class PythonAnnotationTypes {
             return target == null || contains(target.value());
         }
         AnnotationMetadata metadata = classElement.getAnnotationMetadata();
-        return metadata == null
-            || !metadata.hasAnnotation(Target.class.getName())
+        return !metadata.hasAnnotation(Target.class.getName())
             || contains(metadata.enumValues(Target.class.getName(), AnnotationMetadata.VALUE_MEMBER, ElementType.class));
     }
 
@@ -235,7 +234,7 @@ public final class PythonAnnotationTypes {
             return null;
         }
         AnnotationMetadata metadata = classElement.getAnnotationMetadata();
-        if (metadata != null && metadata.hasAnnotation(Repeatable.class.getName())) {
+        if (metadata.hasAnnotation(Repeatable.class.getName())) {
             AnnotationClassValue<?> container = metadata.getValue(Repeatable.class.getName(), AnnotationMetadata.VALUE_MEMBER, AnnotationClassValue.class).orElse(null);
             if (container != null) {
                 return container.getName();

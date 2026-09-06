@@ -40,7 +40,8 @@ public abstract class PythonCompileWorkAction implements WorkAction<PythonCompil
         String destinationDir = getParameters().getDestinationDir().get();
         List<File> classpath = new ArrayList<>(getParameters().getClasspath().getFiles());
         // one compiler run over every root: each run writes the launcher, the VFS file list and the
-        // package initialisers for the whole output, so a run per root would keep only the last root's
+        // package initialisers for the whole output, so a run per root would keep only the last
+        // root's files and drop the others
         compile(String.join(",", getParameters().getSourceDirs().get()), destinationDir, classpath);
     }
 

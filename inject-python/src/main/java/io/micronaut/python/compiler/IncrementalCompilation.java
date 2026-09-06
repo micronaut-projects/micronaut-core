@@ -69,7 +69,7 @@ final class IncrementalCompilation {
     private static final Pattern JAVA_TYPE = Pattern.compile("\\b(?:class|interface|record|enum|@interface)\\s+([A-Za-z_$][\\w$]*)");
     private static final Pattern PYTHON_TYPE = Pattern.compile("(?m)^\\s*class\\s+([A-Za-z_]\\w*)\\b");
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_$][\\w$]*");
-    private static final Pattern PYTHON_FROM_IMPORT = Pattern.compile("(?m)^\\s*from\\s+(\\S+)\\s+import\\s+");
+    private static final Pattern IMPORT_ALIAS = Pattern.compile("\\s+as\\s+");
     private static final Pattern PYTHON_STAR_IMPORT = Pattern.compile("(?m)^\\s*from\\s+\\S+\\s+import\\s+\\*");
     private static final Pattern PYTHON_DECLARATION = Pattern.compile("[A-Za-z_]\\w*\\s*(?::|=(?!=))");
     private static final Pattern DYNAMIC_PYTHON_REFERENCE = Pattern.compile(
@@ -471,7 +471,7 @@ final class IncrementalCompilation {
         while (fromImports.find()) {
             String imported = fromImports.group(1) != null ? fromImports.group(1) : fromImports.group(2);
             for (String name : imported.replaceAll("#[^\\n]*", "").split(",")) {
-                String[] parts = name.trim().split("\\s+as\\s+");
+                String[] parts = IMPORT_ALIAS.split(name.trim());
                 String bound = parts[parts.length - 1].trim();
                 if (!bound.isEmpty()) {
                     importedNames.add(bound);
@@ -494,58 +494,7 @@ final class IncrementalCompilation {
         // one scan over the whole source, so a string literal spanning lines is one literal: its
         // contents are blanked (an import-looking line inside it is not an import), comments are
         // dropped, and a top-level ';' ends a statement like a newline does
-        String joined = content.replace("\\\r\n", " ").replace("\\\n", " ");
-        StringBuilder statements = new StringBuilder(joined.length());
-        char quote = 0;
-        boolean triple = false;
-        boolean comment = false;
-        int depth = 0;
-        for (int i = 0; i < joined.length(); i++) {
-            char c = joined.charAt(i);
-            if (quote != 0) {
-                if (c == '\\' && i + 1 < joined.length()) {
-                    i++;
-                } else if (c == quote && (!triple || joined.startsWith(String.valueOf(quote).repeat(3), i))) {
-                    if (triple) {
-                        i += 2;
-                    }
-                    quote = 0;
-                    statements.append(c);
-                } else if (c == '\n') {
-                    statements.append(c);
-                }
-                continue;
-            }
-            if (comment) {
-                if (c == '\n') {
-                    comment = false;
-                    statements.append(c);
-                }
-                continue;
-            }
-            switch (c) {
-                case '#' -> comment = true;
-                case '"', '\'' -> {
-                    quote = c;
-                    triple = joined.startsWith(String.valueOf(c).repeat(3), i);
-                    if (triple) {
-                        i += 2;
-                    }
-                    statements.append(c);
-                }
-                case '(', '[', '{' -> {
-                    depth++;
-                    statements.append(c);
-                }
-                case ')', ']', '}' -> {
-                    depth = Math.max(0, depth - 1);
-                    statements.append(c);
-                }
-                case ';' -> statements.append(depth == 0 ? '\n' : c);
-                default -> statements.append(c);
-            }
-        }
-        return statements.toString();
+        return new StatementScanner(content.replace("\\\r\n", " ").replace("\\\n", " ")).scan();
     }
 
     private static Set<String> pythonImports(String content) {
@@ -559,7 +508,7 @@ final class IncrementalCompilation {
             // only when such a module exists, otherwise the name is an attribute of the package
             String imported = fromImports.group(2) != null ? fromImports.group(2) : fromImports.group(3);
             for (String name : imported.replaceAll("#[^\\n]*", "").split(",")) {
-                String bound = name.trim().split("\\s+as\\s+")[0].trim();
+                String bound = IMPORT_ALIAS.split(name.trim())[0].trim();
                 if (!bound.isEmpty() && bound.matches("\\w+")) {
                     modules.add(module.endsWith(".") ? module + bound : module + "." + bound);
                 }
@@ -582,7 +531,7 @@ final class IncrementalCompilation {
         while (imports.find()) {
             String statement = imports.group(1);
             for (String clause : statement.split(",")) {
-                String[] parts = clause.trim().split("\\s+as\\s+");
+                String[] parts = IMPORT_ALIAS.split(clause.trim());
                 String module = parts[0].trim();
                 if (module.isEmpty() || !module.matches("[\\w.]+")) {
                     continue;
@@ -1543,6 +1492,84 @@ final class IncrementalCompilation {
     private static final class SourceScanException extends RuntimeException {
         private SourceScanException(IOException cause) {
             super(cause);
+        }
+    }
+
+    /**
+     * The scanner behind {@link #logicalStatements}: it walks the source once, tracking whether it
+     * is inside a string literal, a comment or a bracket pair.
+     */
+    private static final class StatementScanner {
+        private final String source;
+        private final StringBuilder statements;
+        private int position;
+        private char quote;
+        private boolean triple;
+        private boolean comment;
+        private int depth;
+
+        StatementScanner(String source) {
+            this.source = source;
+            this.statements = new StringBuilder(source.length());
+        }
+
+        String scan() {
+            while (position < source.length()) {
+                char c = source.charAt(position++);
+                if (quote != 0) {
+                    insideString(c);
+                } else if (comment) {
+                    insideComment(c);
+                } else {
+                    code(c);
+                }
+            }
+            return statements.toString();
+        }
+
+        private void insideString(char c) {
+            if (c == '\\' && position < source.length()) {
+                position++;
+            } else if (c == quote && (!triple || source.startsWith(String.valueOf(quote).repeat(3), position - 1))) {
+                if (triple) {
+                    position += 2;
+                }
+                quote = 0;
+                statements.append(c);
+            } else if (c == '\n') {
+                statements.append(c);
+            }
+        }
+
+        private void insideComment(char c) {
+            if (c == '\n') {
+                comment = false;
+                statements.append(c);
+            }
+        }
+
+        private void code(char c) {
+            switch (c) {
+                case '#' -> comment = true;
+                case '"', '\'' -> {
+                    quote = c;
+                    triple = source.startsWith(String.valueOf(c).repeat(3), position - 1);
+                    if (triple) {
+                        position += 2;
+                    }
+                    statements.append(c);
+                }
+                case '(', '[', '{' -> {
+                    depth++;
+                    statements.append(c);
+                }
+                case ')', ']', '}' -> {
+                    depth = Math.max(0, depth - 1);
+                    statements.append(c);
+                }
+                case ';' -> statements.append(depth == 0 ? '\n' : c);
+                default -> statements.append(c);
+            }
         }
     }
 }

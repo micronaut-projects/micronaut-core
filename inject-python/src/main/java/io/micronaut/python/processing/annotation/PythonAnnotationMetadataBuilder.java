@@ -71,6 +71,8 @@ import java.util.Set;
  */
 @Experimental
 public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<ElementDef, DecoratorDef> implements AnnotationLookups {
+
+    private static final String ANNOTATION_NAME_MEMBER = "annotationName";
     private final Map<String, DecoratorDef> decorators;
     private final PythonVisitorContext visitorContext;
     private final Map<String, String> binaryClassNameCache = new HashMap<>();
@@ -430,11 +432,11 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
             }
             return resolvedAnnotations;
         }
-        if (annotationValue instanceof Object[] values) {
-            Object[] resolvedValues = new Object[values.length];
+        if (annotationValue instanceof Object[] elements) {
+            Object[] resolvedValues = new Object[elements.length];
             boolean changed = false;
-            for (int i = 0; i < values.length; i++) {
-                Object value = values[i];
+            for (int i = 0; i < elements.length; i++) {
+                Object value = elements[i];
                 Object resolvedValue = value instanceof AnnotationValue<?> nestedAnnotation
                     ? resolveNestedEvaluatedExpressionReferences(originatingElement, nestedAnnotation)
                     : value;
@@ -581,7 +583,7 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
         // @AliasFor names its target annotation as a class (annotation) or as a name (annotationName)
         Object annotation = aliasFor.members().get("annotation");
         if (annotation == null) {
-            annotation = aliasFor.members().get("annotationName");
+            annotation = aliasFor.members().get(ANNOTATION_NAME_MEMBER);
         }
         return annotation != null && annotationMemberStringValue(annotation) != null;
     }
@@ -643,12 +645,12 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
     }
 
     private <K extends Annotation> AnnotationValue<K> normalizeAliasForAnnotationValue(AnnotationValue<K> annotationValue, Class<K> annotationType) {
-        if (annotationType == AliasFor.class && annotationValue.stringValue("annotationName").isEmpty()) {
+        if (annotationType == AliasFor.class && annotationValue.stringValue(ANNOTATION_NAME_MEMBER).isEmpty()) {
             Optional<AnnotationClassValue<?>> annotationClassValue = annotationValue.annotationClassValue("annotation");
             if (annotationClassValue.isPresent()) {
                 return (AnnotationValue<K>) annotationValue
                     .mutate()
-                    .member("annotationName", annotationClassValue.get().getName())
+                    .member(ANNOTATION_NAME_MEMBER, annotationClassValue.get().getName())
                     .build();
             }
         }

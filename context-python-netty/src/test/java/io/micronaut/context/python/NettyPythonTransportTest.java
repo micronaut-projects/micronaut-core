@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The Python networking APIs must work on whatever transport the Netty event loop uses: NIO everywhere,

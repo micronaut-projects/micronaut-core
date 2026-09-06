@@ -297,12 +297,14 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
 
     private CompletionStage<?> leaseUntilComplete(Function<Context, CompletionStage<?>> fn) {
         Context c = borrow();
-        CompletionStage<?> stage;
+        CompletionStage<?> stage = null;
         try {
             stage = Objects.requireNonNull(PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(c)), "stage");
-        } catch (Throwable e) {
-            release(c);
-            throw e;
+        } finally {
+            if (stage == null) {
+                // the coroutine was never produced: the lease ends with the failure
+                release(c);
+            }
         }
         AtomicBoolean released = new AtomicBoolean();
         stage.whenComplete((ignored, ignoredFailure) -> {
@@ -792,19 +794,11 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         List<Context> contexts = new ArrayList<>(snapshot.size() + eventLoopSnapshot.size());
         contexts.addAll(snapshot);
         contexts.addAll(eventLoopSnapshot);
-        Throwable failure = null;
+        // every context is closed; the first failure is reported after the last close
+        List<Runnable> closes = new ArrayList<>(contexts.size());
         for (Context context : contexts) {
-            try {
-                GraalPyContextFactory.closeContext(context);
-            } catch (Throwable e) {
-                // every context is closed; the first failure is reported after the last close
-                if (failure == null) {
-                    failure = e;
-                } else {
-                    failure.addSuppressed(e);
-                }
-            }
+            closes.add(() -> GraalPyContextFactory.closeContext(context));
         }
-        PythonContextRegistry.rethrow(failure);
+        PythonContextRegistry.runEach(closes);
     }
 }

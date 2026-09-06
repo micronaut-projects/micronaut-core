@@ -16,15 +16,7 @@
 package io.micronaut.python.processing.element;
 
 import io.micronaut.core.annotation.Experimental;
-import java.util.Objects;
-import java.util.Optional;
-
-import javax.lang.model.element.Element;
-
-import io.micronaut.annotation.processing.visitor.ElementProvider;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -32,9 +24,7 @@ import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.MethodElementAnnotationMetadata;
-import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
-import org.jspecify.annotations.NonNull;
 
 /**
  * A synthetic getter method element for Python properties.
@@ -45,14 +35,9 @@ import org.jspecify.annotations.NonNull;
  * @since 5.2.0
  */
 @Experimental
-public final class PythonPropertyGetterMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider {
+public final class PythonPropertyGetterMethodElement extends AbstractPythonPropertyAccessorElement {
 
-    private final PythonProcessingEnvironment environment;
-    private final ClassElement declaringType;
-    private final ClassElement owningType;
     private final ClassElement returnType;
-    private final String methodName;
-    private final PythonPropertyElement propertyElement;
 
     public PythonPropertyGetterMethodElement(
             PythonPropertyElement propertyElement,
@@ -60,56 +45,13 @@ public final class PythonPropertyGetterMethodElement extends AbstractPythonEleme
             ClassElement declaringType,
             ClassElement owningType,
             ElementAnnotationMetadataFactory metadataFactory) {
-        super(propertyElement.getName(), null, metadataFactory);
-        this.methodName = propertyElement.getName();
+        super(propertyElement, environment, declaringType, owningType, metadataFactory);
         this.returnType = propertyElement.getType();
-        this.propertyElement = propertyElement;
-        this.environment = environment;
-        this.declaringType = declaringType;
-        this.owningType = owningType;
-    }
-
-    @Override
-    public @NonNull MutableAnnotationMetadataDelegate<AnnotationMetadata> getMethodAnnotationMetadata() {
-        return propertyElement.getElementAnnotationMetadata();
-    }
-
-    @Override
-    public AnnotationMetadata getAnnotationMetadata() {
-        AnnotationMetadata targetAnnotationMetadata = propertyElement.getTargetAnnotationMetadata();
-        if (!owningType.getAnnotationMetadata().isEmpty()) {
-            // Synthetic Python property accessors are generated from PropertyElement, not a
-            // Python function. Keep owning type metadata visible here so class-level AOP and
-            // executable metadata apply to generated accessors the same way they apply to
-            // regular Python methods.
-            targetAnnotationMetadata = new AnnotationMetadataHierarchy(owningType, targetAnnotationMetadata);
-        }
-        return targetAnnotationMetadata;
     }
 
     @Override
     protected ElementAnnotationMetadata getElementAnnotationMetadata() {
         return new MethodElementAnnotationMetadata(this);
-    }
-
-    @Override
-    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
-        return getElementAnnotationMetadata();
-    }
-
-    @Override
-    public boolean isReflectionRequired() {
-        return false;
-    }
-
-    @Override
-    public boolean isReflectionRequired(ClassElement callingType) {
-        return false;
-    }
-
-    @Override
-    public Object getNativeType() {
-        return null; // Synthetic element has no native type
     }
 
     @Override
@@ -144,58 +86,6 @@ public final class PythonPropertyGetterMethodElement extends AbstractPythonEleme
     }
 
     @Override
-    public boolean isPublic() {
-        return true;
-    }
-
-    @Override
-    public boolean isPrivate() {
-        return false;
-    }
-
-    @Override
-    public boolean isProtected() {
-        return false;
-    }
-
-    @Override
-    public boolean isSynthetic() {
-        return true;
-    }
-
-    @Override
-    public ClassElement getDeclaringType() {
-        return declaringType;
-    }
-
-    @Override
-    public ClassElement getOwningType() {
-        return owningType;
-    }
-
-    @Override
-    public Optional<String> getDocumentation(boolean parseContent) {
-        return Optional.empty();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        PythonPropertyGetterMethodElement that = (PythonPropertyGetterMethodElement) o;
-        return methodName.equals(that.methodName) && owningType.equals(that.owningType);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(methodName, owningType);
-    }
-
-    @Override
     protected AbstractPythonElement copyThis() {
         return new PythonPropertyGetterMethodElement(
             propertyElement,
@@ -204,15 +94,5 @@ public final class PythonPropertyGetterMethodElement extends AbstractPythonEleme
             owningType,
             getElementAnnotationMetadataFactory()
         );
-    }
-
-    @Override
-    public MethodElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return (MethodElement) super.withAnnotationMetadata(annotationMetadata);
-    }
-
-    @Override
-    public Element element() {
-        return environment.originatingElement();
     }
 }

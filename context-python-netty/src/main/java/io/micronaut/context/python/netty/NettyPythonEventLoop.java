@@ -67,6 +67,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -89,6 +90,9 @@ import java.util.function.Consumer;
 public final class NettyPythonEventLoop implements PythonEventLoop {
     /** Parsed once per context; {@code bytes} is looked up when a handler is created, not per packet. */
     private static final Logger LOG = LoggerFactory.getLogger(NettyPythonEventLoop.class);
+    private static final String INET = "inet";
+    private static final String INET6 = "inet6";
+    private static final String ERROR_RECEIVED = "error_received";
     private static final String TRANSPORT_WRAPPER = "__micronaut_netty_transport";
     private static final String DATAGRAM_TRANSPORT_WRAPPER = "__micronaut_netty_datagram_transport";
     private static final String JAVA_TRANSPORT_MEMBER = "_java";
@@ -186,6 +190,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * @param sslShutdownTimeout The TLS shutdown timeout in seconds.
      * @return A stage completing with transport and protocol.
      */
+    @SuppressWarnings("java:S107") // the parameters mirror asyncio's keyword arguments
     public CompletionStage<Object[]> createConnection(Value protocolFactory,
                                                       String host,
                                                       int port,
@@ -213,6 +218,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * @param family {@code inet}, {@code inet6} or empty for any address family
      * @return A stage completing with transport and protocol.
      */
+    @SuppressWarnings("java:S107") // the parameters mirror asyncio's keyword arguments
     public CompletionStage<Object[]> createConnection(Value protocolFactory,
                                                       String host,
                                                       int port,
@@ -224,15 +230,9 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
                                                       @Nullable Double sslShutdownTimeout,
                                                       String family) {
         CompletableFuture<Object[]> future = new CompletableFuture<>();
-        Runnable operationDone;
-        try {
-            // shutdown refuses new operations and waits for this one's channel, even if it is created later
-            operationDone = support.beginOperation();
-        } catch (IllegalStateException e) {
-            future.completeExceptionally(e);
+        if (!beginOperation(future)) {
             return future;
         }
-        future.whenComplete((ignored, ignoredFailure) -> operationDone.run());
         Runnable connect = () -> {
             try {
                 NettyPythonEventLoopSupport.TlsOptions tlsOptions = support.tlsOptions(
@@ -289,6 +289,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * @param sslShutdownTimeout The TLS shutdown timeout in seconds.
      * @return A stage completing with the server.
      */
+    @SuppressWarnings("java:S107") // the parameters mirror asyncio's keyword arguments
     public CompletionStage<NettyServer> createServer(Value protocolFactory,
                                                      @Nullable String host,
                                                      int port,
@@ -318,6 +319,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * @param family {@code inet}, {@code inet6} or empty for any address family
      * @return A stage completing with the server.
      */
+    @SuppressWarnings("java:S107") // the parameters mirror asyncio's keyword arguments
     public CompletionStage<NettyServer> createServer(Value protocolFactory,
                                                      @Nullable String host,
                                                      int port,
@@ -330,15 +332,9 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
                                                      @Nullable Double sslShutdownTimeout,
                                                      String family) {
         CompletableFuture<NettyServer> future = new CompletableFuture<>();
-        Runnable operationDone;
-        try {
-            // shutdown refuses new operations and waits for this one's channel, even if it is created later
-            operationDone = support.beginOperation();
-        } catch (IllegalStateException e) {
-            future.completeExceptionally(e);
+        if (!beginOperation(future)) {
             return future;
         }
-        future.whenComplete((ignored, ignoredFailure) -> operationDone.run());
         Runnable bind = () -> {
             try {
                 NettyPythonEventLoopSupport.TlsOptions tlsOptions = support.tlsOptions(ssl, true, null, port, sslHandshakeTimeout, sslShutdownTimeout);
@@ -374,7 +370,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
                     // create IPv6 sockets with IPV6_V6ONLY cleared, so the IPv6 wildcard listener is
                     // dual-stack and serves IPv4 too; a JVM without IPv6 sockets gets the IPv4 wildcard.
                     // Any bind failure, a port in use included, fails the call.
-                    String wildcardFamily = NettyPythonEventLoopSupport.ipv6Available() ? "inet6" : "inet";
+                    String wildcardFamily = NettyPythonEventLoopSupport.ipv6Available() ? INET6 : INET;
                     bootstrap.channelFactory(() -> (ServerChannel) support.newServerChannel(eventLoop, wildcardFamily));
                     bindAddress = wildcardAddress(port, wildcardFamily);
                 } else {
@@ -411,15 +407,9 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
                                                            @Nullable Double sslHandshakeTimeout,
                                                            @Nullable Double sslShutdownTimeout) {
         CompletableFuture<Object[]> future = new CompletableFuture<>();
-        Runnable operationDone;
-        try {
-            // shutdown refuses new operations and waits for this one's channel, even if it is created later
-            operationDone = support.beginOperation();
-        } catch (IllegalStateException e) {
-            future.completeExceptionally(e);
+        if (!beginOperation(future)) {
             return future;
         }
-        future.whenComplete((ignored, ignoredFailure) -> operationDone.run());
         Runnable connect = () -> {
             try {
                 Channel channel = toChannel(socket);
@@ -472,15 +462,9 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
                                                           @Nullable Double sslHandshakeTimeout,
                                                           @Nullable Double sslShutdownTimeout) {
         CompletableFuture<Object[]> future = new CompletableFuture<>();
-        Runnable operationDone;
-        try {
-            // shutdown refuses new operations and waits for this one's channel, even if it is created later
-            operationDone = support.beginOperation();
-        } catch (IllegalStateException e) {
-            future.completeExceptionally(e);
+        if (!beginOperation(future)) {
             return future;
         }
-        future.whenComplete((ignored, ignoredFailure) -> operationDone.run());
         Runnable connect = () -> {
             try {
                 NettyPythonEventLoopSupport.TlsOptions tlsOptions = support.tlsOptions(ssl, false, serverHostname, -1, sslHandshakeTimeout, sslShutdownTimeout);
@@ -531,15 +515,9 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
                                                          @Nullable Double sslHandshakeTimeout,
                                                          @Nullable Double sslShutdownTimeout) {
         CompletableFuture<NettyServer> future = new CompletableFuture<>();
-        Runnable operationDone;
-        try {
-            // shutdown refuses new operations and waits for this one's channel, even if it is created later
-            operationDone = support.beginOperation();
-        } catch (IllegalStateException e) {
-            future.completeExceptionally(e);
+        if (!beginOperation(future)) {
             return future;
         }
-        future.whenComplete((ignored, ignoredFailure) -> operationDone.run());
         Runnable bind = () -> {
             try {
                 NettyPythonEventLoopSupport.TlsOptions tlsOptions = support.tlsOptions(ssl, true, null, -1, sslHandshakeTimeout, sslShutdownTimeout);
@@ -593,6 +571,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * @param reusePort Whether port reuse is requested.
      * @return A stage completing with transport and protocol.
      */
+    @SuppressWarnings("java:S107") // the parameters mirror asyncio's keyword arguments
     public CompletionStage<Object[]> createDatagramEndpoint(Value protocolFactory,
                                                             @Nullable String localHost,
                                                             int localPort,
@@ -616,6 +595,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * @param family {@code inet}, {@code inet6} or empty for any address family
      * @return A stage completing with transport and protocol.
      */
+    @SuppressWarnings("java:S107") // the parameters mirror asyncio's keyword arguments
     public CompletionStage<Object[]> createDatagramEndpoint(Value protocolFactory,
                                                             @Nullable String localHost,
                                                             int localPort,
@@ -625,15 +605,9 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
                                                             boolean reusePort,
                                                             String family) {
         CompletableFuture<Object[]> future = new CompletableFuture<>();
-        Runnable operationDone;
-        try {
-            // shutdown refuses new operations and waits for this one's channel, even if it is created later
-            operationDone = support.beginOperation();
-        } catch (IllegalStateException e) {
-            future.completeExceptionally(e);
+        if (!beginOperation(future)) {
             return future;
         }
-        future.whenComplete((ignored, ignoredFailure) -> operationDone.run());
         Runnable bind = () -> {
             try {
                 InetSocketAddress local = toUnresolvedSocketAddress(localHost, localPort);
@@ -874,15 +848,22 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
         resolveAddresses(address, family, future, consumer);
     }
 
-    private void resolveAddress(@Nullable InetSocketAddress address,
-                                String family,
-                                CompletableFuture<?> future,
-                                Consumer<@Nullable InetSocketAddress> consumer) {
-        if (address == null) {
-            consumer.accept(null);
-            return;
+    /**
+     * Register an operation with the provider so shutdown refuses new ones and waits for this one's
+     * channel, even if it is created later; a refused operation fails the future.
+     *
+     * @return Whether the operation may proceed
+     */
+    private boolean beginOperation(CompletableFuture<?> future) {
+        Runnable operationDone;
+        try {
+            operationDone = support.beginOperation();
+        } catch (IllegalStateException e) {
+            future.completeExceptionally(e);
+            return false;
         }
-        resolveAddresses(address, family, future, resolved -> consumer.accept(resolved.getFirst()));
+        future.whenComplete((ignored, ignoredFailure) -> operationDone.run());
+        return true;
     }
 
     /**
@@ -991,7 +972,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
     private static boolean matchesFamily(InetSocketAddress address, String family) {
         return switch (family) {
             case "inet" -> address.getAddress() instanceof Inet4Address;
-            case "inet6" -> address.getAddress() instanceof Inet6Address;
+            case INET6 -> address.getAddress() instanceof Inet6Address;
             default -> true;
         };
     }
@@ -1000,7 +981,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
         try {
             return switch (family) {
                 case "inet" -> new InetSocketAddress(InetAddress.getByName("0.0.0.0"), port);
-                case "inet6" -> new InetSocketAddress(InetAddress.getByName("::"), port);
+                case INET6 -> new InetSocketAddress(InetAddress.getByName("::"), port);
                 default -> new InetSocketAddress(port);
             };
         } catch (UnknownHostException e) {
@@ -1245,20 +1226,20 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
 
         @Override
         public void channelInactive(ChannelHandlerContext ctx) {
-            fireConnectionLost(ctx.channel(), null);
+            fireConnectionLost(null);
         }
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             try {
-                fireConnectionLost(ctx.channel(), cause);
+                fireConnectionLost(cause);
             } finally {
                 // a connection_lost that throws must not keep the channel open
                 ctx.close().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
             }
         }
 
-        private void fireConnectionLost(Channel channel, @Nullable Throwable cause) {
+        private void fireConnectionLost(@Nullable Throwable cause) {
             Value current = protocol;
             if (connectionLost || current == null) {
                 // a connection that never activated made no protocol, so there is nothing to tell
@@ -1272,8 +1253,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
     private static final class NettyDatagramHandler extends SimpleChannelInboundHandler<DatagramPacket> {
         private final NettyPythonEventLoop loop;
         /** Created once the endpoint is bound and connected, as asyncio does; reads start then. */
-        private volatile @Nullable Value protocol;
-        private volatile @Nullable Value bytesType;
+        private final AtomicReference<@Nullable BoundProtocol> bound = new AtomicReference<>();
         private boolean connectionLost;
 
         private NettyDatagramHandler(NettyPythonEventLoop loop) {
@@ -1281,44 +1261,123 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
         }
 
         void protocol(Value protocol, Value bytesType) {
-            this.bytesType = bytesType;
-            this.protocol = protocol;
+            bound.set(new BoundProtocol(protocol, bytesType));
         }
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket packet) {
-            Value current = protocol;
-            Value bytesFactory = bytesType;
-            if (current == null || bytesFactory == null) {
+            BoundProtocol current = bound.get();
+            if (current == null) {
                 return;
             }
             ByteBuf content = packet.content();
             byte[] bytes = new byte[content.readableBytes()];
             content.getBytes(content.readerIndex(), bytes);
-            guestRun(loop, current, () -> current.invokeMember(
+            guestRun(loop, current.protocol(), () -> current.protocol().invokeMember(
                 "datagram_received",
-                bytesFactory.execute(ByteBuffer.wrap(bytes)),
+                current.bytesType().execute(ByteBuffer.wrap(bytes)),
                 toPythonAddress(packet.sender())
             ));
         }
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            Value current = protocol;
+            BoundProtocol current = bound.get();
             if (current != null) {
-                guestRun(loop, current, () -> current.invokeMember("error_received", cause));
+                guestRun(loop, current.protocol(), () -> current.protocol().invokeMember(ERROR_RECEIVED, cause));
             }
         }
 
         /** connection_lost once, whether the transport closed the channel or the provider did at shutdown. */
         @Override
         public void channelInactive(ChannelHandlerContext ctx) {
-            Value current = protocol;
+            BoundProtocol current = bound.get();
             if (connectionLost || current == null) {
                 return;
             }
             connectionLost = true;
-            guestRun(loop, current, () -> current.invokeMember("connection_lost", (Object) null));
+            guestRun(loop, current.protocol(), () -> current.protocol().invokeMember("connection_lost", (Object) null));
+        }
+
+        /**
+         * The protocol of a bound endpoint and the {@code bytes} type of its context.
+         *
+         * @param protocol The protocol
+         * @param bytesType The {@code bytes} type
+         */
+        private record BoundProtocol(Value protocol, Value bytesType) {
+        }
+    }
+
+    /**
+     * What the Netty-backed stream and datagram transports share: the channel, the protocol, the
+     * provider that owns the channel, and the asyncio members that only depend on them.
+     */
+    @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod", "checkstyle:MethodName", "java:S100"})
+    @Experimental
+    public abstract static class NettyTransport {
+        protected final Channel channel;
+        protected final Value protocol;
+        protected final NettyPythonEventLoopSupport support;
+        protected volatile boolean closing;
+
+        protected NettyTransport(Channel channel, Value protocol, NettyPythonEventLoopSupport support) {
+            this.channel = channel;
+            this.protocol = protocol;
+            this.support = support;
+        }
+
+        public final @Nullable Object getExtraInfo(String name) {
+            return getExtraInfo(name, null);
+        }
+
+        public abstract @Nullable Object getExtraInfo(String name, @Nullable Object defaultValue);
+
+        public final @Nullable Object get_extra_info(String name) {
+            return getExtraInfo(name);
+        }
+
+        public final @Nullable Object get_extra_info(String name, @Nullable Object defaultValue) {
+            return getExtraInfo(name, defaultValue);
+        }
+
+        public final boolean isClosing() {
+            // closed by the transport, by the peer, or by the provider whose shutdown has begun
+            return closing || !channel.isOpen() || support.isClosed();
+        }
+
+        public final boolean is_closing() {
+            return isClosing();
+        }
+
+        public final void close() {
+            if (closing) {
+                return;
+            }
+            closing = true;
+            // the channel handler reports connection_lost when the channel goes inactive
+            channel.close().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
+        }
+
+        public final void abort() {
+            close();
+        }
+
+        @SuppressWarnings("DoNotCallSuggester")
+        public final void setProtocol(Value protocol) {
+            throw new UnsupportedOperationException("Changing the protocol of a Netty-backed Python transport is not supported");
+        }
+
+        public final void set_protocol(Value protocol) {
+            setProtocol(protocol);
+        }
+
+        public final Value getProtocol() {
+            return protocol;
+        }
+
+        public final Value get_protocol() {
+            return getProtocol();
         }
     }
 
@@ -1331,18 +1390,12 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * {@code is_closing}. The Checkstyle suppression below protects that
      * Python-facing contract.</p>
      */
-    @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod", "checkstyle:MethodName"})
+    @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod", "checkstyle:MethodName", "java:S100"})
     @Experimental
-    public static final class NettySocketTransport {
-        private final Channel channel;
-        private final Value protocol;
-        private final NettyPythonEventLoopSupport support;
-        private volatile boolean closing;
+    public static final class NettySocketTransport extends NettyTransport {
 
         private NettySocketTransport(Channel channel, Value protocol, NettyPythonEventLoopSupport support) {
-            this.channel = channel;
-            this.protocol = protocol;
-            this.support = support;
+            super(channel, protocol, support);
         }
 
         public void write(byte[] bytes) {
@@ -1419,7 +1472,12 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
 
         public void set_write_buffer_limits(@Nullable Integer high, @Nullable Integer low) {
             // asyncio defaults: high 64 KiB (or four times low), low a quarter of high; both set at once
-            int highWaterMark = high != null ? high : low != null ? 4 * low : 64 * 1024;
+            int highWaterMark;
+            if (high != null) {
+                highWaterMark = high;
+            } else {
+                highWaterMark = low != null ? 4 * low : 64 * 1024;
+            }
             int lowWaterMark = low != null ? low : highWaterMark / 4;
             if (highWaterMark < 0 || lowWaterMark < 0 || lowWaterMark > highWaterMark) {
                 throw new IllegalArgumentException("high (" + highWaterMark + ") must be >= low (" + lowWaterMark + ") must be >= 0");
@@ -1452,10 +1510,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
             resumeReading();
         }
 
-        public @Nullable Object getExtraInfo(String name) {
-            return getExtraInfo(name, null);
-        }
-
+        @Override
         public @Nullable Object getExtraInfo(String name, @Nullable Object defaultValue) {
             /*
              * Keep this list intentionally small. Python code should get stable
@@ -1488,63 +1543,18 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
             };
         }
 
-        public @Nullable Object get_extra_info(String name) {
-            return getExtraInfo(name);
-        }
-
-        public @Nullable Object get_extra_info(String name, @Nullable Object defaultValue) {
-            return getExtraInfo(name, defaultValue);
-        }
-
-        public boolean isClosing() {
-            // closed by the transport, by the peer, or by the provider whose shutdown has begun
-            return closing || !channel.isOpen() || support.isClosed();
-        }
-
-        public boolean is_closing() {
-            return isClosing();
-        }
-
-        public void close() {
-            if (closing) {
-                return;
-            }
-            closing = true;
-            channel.close().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
-        }
-
-        public void abort() {
-            close();
-        }
-
-        @SuppressWarnings("DoNotCallSuggester")
-        public void setProtocol(Value protocol) {
-            throw new UnsupportedOperationException("Changing the protocol of a Netty-backed Python transport is not supported");
-        }
-
-        public void set_protocol(Value protocol) {
-            setProtocol(protocol);
-        }
-
-        public Value getProtocol() {
-            return protocol;
-        }
-
-        public Value get_protocol() {
-            return getProtocol();
-        }
     }
 
     /** The connections a server accepted, so {@code wait_closed()} can wait for them. */
     private static final class AcceptedClients {
         private final Set<Channel> channels = ConcurrentHashMap.newKeySet();
-        private volatile @Nullable Runnable onChange;
+        private final AtomicReference<@Nullable Runnable> onChange = new AtomicReference<>();
 
         void add(Channel channel) {
             channels.add(channel);
             channel.closeFuture().addListener(ignored -> {
                 channels.remove(channel);
-                Runnable listener = onChange;
+                Runnable listener = onChange.get();
                 if (listener != null) {
                     listener.run();
                 }
@@ -1559,7 +1569,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * asyncio server helpers call names such as {@code start_serving},
      * {@code serve_forever}, and {@code wait_closed} directly.</p>
      */
-    @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod", "checkstyle:MethodName"})
+    @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod", "checkstyle:MethodName", "java:S100"})
     @Experimental
     public static final class NettyServer {
         private final List<Channel> channels;
@@ -1581,7 +1591,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
             }).toArray(CompletableFuture[]::new);
             this.closed = CompletableFuture.allOf(closeFutures);
             this.closed.thenRun(this::checkDrained);
-            clients.onChange = this::checkDrained;
+            clients.onChange.set(this::checkDrained);
             checkDrained();
             if (!startServing) {
                 /*
@@ -1744,16 +1754,12 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
      * may resolve tuple-style target addresses asynchronously on the same Netty
      * event loop before flushing the packet.</p>
      */
-    @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod", "checkstyle:MethodName"})
+    @SuppressWarnings({"EffectivelyPrivate", "UnusedMethod", "checkstyle:MethodName", "java:S100"})
     @Experimental
-    public static final class NettyDatagramTransport {
+    public static final class NettyDatagramTransport extends NettyTransport {
         private final NettyPythonEventLoop loop;
-        private final Channel channel;
-        private final Value protocol;
         private final @Nullable InetSocketAddress remoteAddress;
         private final EventLoop eventLoop;
-        private final NettyPythonEventLoopSupport support;
-        private volatile boolean closing;
 
         private NettyDatagramTransport(NettyPythonEventLoop loop,
                                        Channel channel,
@@ -1761,12 +1767,10 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
                                        @Nullable InetSocketAddress remoteAddress,
                                        EventLoop eventLoop,
                                        NettyPythonEventLoopSupport support) {
+            super(channel, protocol, support);
             this.loop = loop;
-            this.channel = channel;
-            this.protocol = protocol;
             this.remoteAddress = remoteAddress;
             this.eventLoop = eventLoop;
-            this.support = support;
         }
 
         public void sendto(byte[] data) {
@@ -1789,7 +1793,7 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
                     if (resolveFuture.isSuccess()) {
                         writeDatagram(bytes, (InetSocketAddress) resolveFuture.getNow());
                     } else {
-                        guestRun(loop, protocol, () -> protocol.invokeMember("error_received", resolveFuture.cause()));
+                        guestRun(loop, protocol, () -> protocol.invokeMember(ERROR_RECEIVED, resolveFuture.cause()));
                     }
                 });
             }
@@ -1807,15 +1811,12 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
                 : new DatagramPacket(Unpooled.wrappedBuffer(bytes), targetAddress);
             channel.writeAndFlush(message).addListener((ChannelFutureListener) future -> {
                 if (!future.isSuccess() && !isClosing()) {
-                    guestRun(loop, protocol, () -> protocol.invokeMember("error_received", future.cause()));
+                    guestRun(loop, protocol, () -> protocol.invokeMember(ERROR_RECEIVED, future.cause()));
                 }
             });
         }
 
-        public @Nullable Object getExtraInfo(String name) {
-            return getExtraInfo(name, null);
-        }
-
+        @Override
         public @Nullable Object getExtraInfo(String name, @Nullable Object defaultValue) {
             return switch (name) {
                 case "socket" -> new NettySocketFacade(channel);
@@ -1826,51 +1827,5 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
             };
         }
 
-        public @Nullable Object get_extra_info(String name) {
-            return getExtraInfo(name);
-        }
-
-        public @Nullable Object get_extra_info(String name, @Nullable Object defaultValue) {
-            return getExtraInfo(name, defaultValue);
-        }
-
-        public boolean isClosing() {
-            // closed by the transport, by the peer, or by the provider whose shutdown has begun
-            return closing || !channel.isOpen() || support.isClosed();
-        }
-
-        public boolean is_closing() {
-            return isClosing();
-        }
-
-        public void close() {
-            if (closing) {
-                return;
-            }
-            closing = true;
-            // the datagram handler reports connection_lost when the channel goes inactive
-            channel.close().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE);
-        }
-
-        public void abort() {
-            close();
-        }
-
-        @SuppressWarnings("DoNotCallSuggester")
-        public void setProtocol(Value protocol) {
-            throw new UnsupportedOperationException("Changing the protocol of a Netty-backed Python transport is not supported");
-        }
-
-        public void set_protocol(Value protocol) {
-            setProtocol(protocol);
-        }
-
-        public Value getProtocol() {
-            return protocol;
-        }
-
-        public Value get_protocol() {
-            return getProtocol();
-        }
     }
 }

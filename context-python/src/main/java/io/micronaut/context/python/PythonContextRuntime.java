@@ -1295,7 +1295,7 @@ public final class PythonContextRuntime {
     }
 
     private static Value runtimeModule(Context context, PythonContextRegistry.ContextState state) {
-        Value module = state.runtimeModule;
+        Value module = state.runtimeModule.get();
         if (module != null) {
             return module;
         }
@@ -1318,7 +1318,7 @@ public final class PythonContextRuntime {
             }
             module = helper(context, "__micronaut_load_runtime_module", LOAD_RUNTIME_MODULE_SOURCE).execute(source);
         }
-        state.runtimeModule = module;
+        state.runtimeModule.set(module);
         return module;
     }
 

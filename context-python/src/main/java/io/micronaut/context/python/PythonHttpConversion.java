@@ -42,10 +42,10 @@ public final class PythonHttpConversion {
      * @param value The source polyglot response
      * @param bodyType The declared response body type
      * @param <T> The response body type
-     * @return The converted response
+     * @return The converted response, or {@code null} when the value is not an {@link HttpResponse}
      */
     @SuppressWarnings({"unchecked", "NullAway"})
-    public static <T> HttpResponse<T> convertHttpResponse(Value value, Class<T> bodyType) {
+    public static <T> @Nullable HttpResponse<T> convertHttpResponse(Value value, Class<T> bodyType) {
         HttpResponse<?> response = PythonConversion.convertValue(value, HttpResponse.class);
         if (response == null) {
             return null;
