@@ -24,6 +24,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
+import io.micronaut.python.processing.util.PythonKeywords;
 import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
 import org.graalvm.polyglot.Source;
@@ -74,13 +75,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_SRC_PATH + "__main__.py";
     static final String PYTHON_APPLICATION_ANNOTATION = "io.micronaut.context.python.annotation.PythonApplication";
     private static final String PYTHON_LANGUAGE = "python";
-    private static final Set<String> PYTHON_KEYWORDS = Set.of(
-        "False", "None", "True", "and", "as", "assert", "async", "await", "break",
-        "class", "continue", "def", "del", "elif", "else", "except", "finally",
-        "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal",
-        "not", "or", "pass", "raise", "return", "try", "while", "with", "yield"
-    );
-
     private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
@@ -1000,7 +994,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private static String toPythonImportName(String qualifiedName) {
         String name = qualifiedName.startsWith("io.") ? qualifiedName.substring(3) : qualifiedName;
         return Arrays.stream(name.split("\\."))
-            .map(part -> PYTHON_KEYWORDS.contains(part) ? part + "_" : part)
+            .map(PythonKeywords::toPythonName)
             .collect(Collectors.joining("."));
     }
 

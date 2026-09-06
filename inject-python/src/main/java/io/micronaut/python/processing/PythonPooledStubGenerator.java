@@ -27,8 +27,8 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
-import io.micronaut.python.processing.visitor.PythonScriptElement;
+import io.micronaut.python.processing.element.AbstractPythonClassElement;
+import io.micronaut.python.processing.element.PythonScriptElement;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -227,6 +227,10 @@ final class PythonPooledStubGenerator {
             args.add(pythonClassReference(element, element));
             args.add(ExpressionDef.constant(pythonFunctionName));
             args.addAll(parameterExpressions);
+            if (isAsyncPythonMethod(methodElement) && !methodElement.getReturnType().isVoid()) {
+                // the coroutine is driven while the pooled context is still leased to this call
+                return completionStage(methodElement, PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledAsync", TypeDef.of(CompletionStage.class), args));
+            }
             var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooled", POLYGLOT_VALUE, args);
             return bridgeReturnValue(allClasses, methodElement, invoked);
         })));
@@ -258,10 +262,17 @@ final class PythonPooledStubGenerator {
             args.add(ExpressionDef.constant(script));
             args.add(ExpressionDef.constant(pythonFunctionName));
             args.addAll(parameterExpressions);
+            if (isAsyncPythonMethod(methodElement) && !methodElement.getReturnType().isVoid()) {
+                return completionStage(methodElement, PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledScriptAsync", TypeDef.of(CompletionStage.class), args));
+            }
             var invoked = PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledScript", POLYGLOT_VALUE, args);
             return bridgeReturnValue(allClasses, methodElement, invoked);
         })));
 
+    }
+
+    private static StatementDef completionStage(MethodElement methodElement, ExpressionDef stage) {
+        return stage.cast(TypeDef.of(methodElement.getGenericReturnType())).returning();
     }
 
     private static StatementDef bridgeReturnValue(Map<String, ClassElement> allClasses,

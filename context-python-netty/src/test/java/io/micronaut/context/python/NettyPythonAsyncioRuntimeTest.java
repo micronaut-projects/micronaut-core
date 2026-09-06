@@ -45,8 +45,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
+import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -203,6 +204,230 @@ final class NettyPythonAsyncioRuntimeTest {
     }
 
     @Test
+    void nettyBackedRuntimeConnectsOverIpv6() throws Exception {
+        assumeTrue(ipv6Loopback(), "IPv6 loopback is not available");
+        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        EventLoop eventLoop = eventLoopGroup.next();
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                import socket
+                class Echo(asyncio.Protocol):
+                    def connection_made(self, transport):
+                        self.transport = transport
+                    def data_received(self, data):
+                        self.transport.write(b"echo:" + data)
+                        self.transport.close()
+                class Client(asyncio.Protocol):
+                    def __init__(self, done):
+                        self.done = done
+                    def connection_made(self, transport):
+                        self.peer = transport.get_extra_info("peername")
+                        transport.write(b"ok")
+                    def data_received(self, data):
+                        self.done.set_result(data.decode() + " via " + self.peer[0])
+                    def connection_lost(self, exc):
+                        pass
+                async def run():
+                    loop = asyncio.get_running_loop()
+                    # family=AF_INET6 and an IPv6 literal used to fall off the Netty path onto polled sockets
+                    server = await loop.create_server(Echo, "::1", 0, family=socket.AF_INET6)
+                    host, port, *_ = server.sockets[0].getsockname()
+                    done = loop.create_future()
+                    transport, _ = await loop.create_connection(lambda: Client(done), host, port, family=socket.AF_INET6)
+                    assert transport.get_extra_info("micronaut.netty") is True
+                    try:
+                        return await done
+                    finally:
+                        transport.close()
+                        server.close()
+                        await server.wait_closed()
+                run()
+                """);
+
+            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+
+            String result = (String) stage.toCompletableFuture().get(5, TimeUnit.SECONDS);
+            assertTrue(result.startsWith("echo:ok via "), result);
+            assertTrue(result.contains(":"), "expected an IPv6 peer address: " + result);
+            return null;
+            });
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            context.close(true);
+            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
+        }
+    }
+
+    @Test
+    void nettyBackedRuntimeRunsDatagramsOverIpv6() throws Exception {
+        assumeTrue(ipv6Loopback(), "IPv6 loopback is not available");
+        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        EventLoop eventLoop = eventLoopGroup.next();
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        PythonAsyncioRuntime.setExecutorService(executorService);
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                import socket
+                class Server(asyncio.DatagramProtocol):
+                    def connection_made(self, transport):
+                        self.transport = transport
+                    def datagram_received(self, data, addr):
+                        self.transport.sendto(b"echo:" + data, addr)
+                class Client(asyncio.DatagramProtocol):
+                    def __init__(self, done, peer):
+                        self.done = done
+                        self.peer = peer
+                    def connection_made(self, transport):
+                        # asyncio's four-element IPv6 tuple (host, port, flowinfo, scope_id) is accepted
+                        assert len(self.peer) == 4, self.peer
+                        transport.sendto(b"ok", tuple(self.peer))
+                    def datagram_received(self, data, addr):
+                        self.done.set_result(data.decode())
+                async def run():
+                    loop = asyncio.get_running_loop()
+                    server_transport, _ = await loop.create_datagram_endpoint(Server, local_addr=("::1", 0), family=socket.AF_INET6)
+                    sockname = server_transport.get_extra_info("sockname")
+                    host, port, *_ = sockname
+                    done = loop.create_future()
+                    client_transport, _ = await loop.create_datagram_endpoint(lambda: Client(done, sockname), remote_addr=(host, port), family=socket.AF_INET6)
+                    try:
+                        return await done
+                    finally:
+                        client_transport.close()
+                        server_transport.close()
+                run()
+                """);
+
+            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+
+            assertEquals("echo:ok", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
+            return null;
+            });
+        } finally {
+            PythonAsyncioRuntime.setExecutorService(null);
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            executorService.shutdownNow();
+            context.close(true);
+            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
+        }
+    }
+
+    @Test
+    void pythonSocketsCannotBeAdoptedByTheNettyLoop() throws Exception {
+        NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
+        EventLoop eventLoop = eventLoopGroup.next();
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        try {
+            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                import socket
+                async def run():
+                    loop = asyncio.get_running_loop()
+                    with socket.socket() as sock:
+                        try:
+                            await loop.connect_accepted_socket(asyncio.Protocol, sock)
+                        except NotImplementedError as exc:
+                            return str(exc)
+                run()
+                """);
+
+            CompletionStage stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+
+            String message = (String) stage.toCompletableFuture().get(5, TimeUnit.SECONDS);
+            assertTrue(message.contains("connect_accepted_socket with a Python socket"), message);
+            return null;
+            });
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            context.close(true);
+            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
+        }
+    }
+
+    @Test
+    void aChannelAcceptedOnAnotherEventLoopCannotBeAdopted() throws Exception {
+        NioEventLoopGroup acceptingGroup = new NioEventLoopGroup(1);
+        NioEventLoopGroup otherGroup = new NioEventLoopGroup(1);
+        Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        CompletableFuture<Channel> acceptedChannel = new CompletableFuture<>();
+        Channel[] channels = new Channel[2];
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(new NettyPythonEventLoopProvider()));
+        try {
+            channels[0] = new ServerBootstrap()
+                .group(acceptingGroup.next())
+                .channel(NioServerSocketChannel.class)
+                .childHandler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel channel) {
+                        acceptedChannel.complete(channel);
+                    }
+                })
+                .bind("127.0.0.1", 0)
+                .syncUninterruptibly()
+                .channel();
+            channels[1] = new Bootstrap()
+                .group(acceptingGroup.next())
+                .channel(NioSocketChannel.class)
+                .handler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel channel) {
+                    }
+                })
+                .connect((InetSocketAddress) channels[0].localAddress())
+                .syncUninterruptibly()
+                .channel();
+            Channel accepted = acceptedChannel.get(5, TimeUnit.SECONDS);
+            // adopted from a loop that did not accept it: refused, not re-piped from the wrong loop
+            String outcome = NettyPythonEventLoopProvider.bind(otherGroup.next(), () -> {
+                Value coroutine = context.eval(PYTHON, """
+                    import asyncio
+                    class Proto(asyncio.Protocol):
+                        pass
+                    async def run(channel):
+                        try:
+                            await asyncio.get_running_loop().connect_accepted_socket(Proto, channel)
+                            return "adopted"
+                        except Exception as e:
+                            return "refused" if "another event loop" in str(e) else repr(e)
+                    run
+                    """).execute(accepted);
+                return (String) PythonAsyncioRuntime.toCompletionStage(coroutine).toCompletableFuture().get(5, TimeUnit.SECONDS);
+            });
+            assertEquals("refused", outcome);
+            assertTrue(accepted.isOpen(), "the refused channel was closed by the wrong loop");
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            for (Channel channel : channels) {
+                if (channel != null) {
+                    channel.close();
+                }
+            }
+            context.close(true);
+            acceptingGroup.shutdownGracefully().syncUninterruptibly();
+            otherGroup.shutdownGracefully().syncUninterruptibly();
+        }
+    }
+
+    private static boolean ipv6Loopback() {
+        try (java.net.ServerSocket probe = new java.net.ServerSocket()) {
+            probe.bind(new InetSocketAddress(InetAddress.getByName("::1"), 0));
+            return true;
+        } catch (java.io.IOException e) {
+            return false;
+        }
+    }
+
+    @Test
     void rejectsPythonSslContextObjectsBeforeConnecting() throws Exception {
         NioEventLoopGroup eventLoopGroup = new NioEventLoopGroup(1);
         EventLoop eventLoop = eventLoopGroup.next();
@@ -239,7 +464,8 @@ final class NettyPythonAsyncioRuntimeTest {
         NettyPythonEventLoopProvider provider = new NettyPythonEventLoopProvider();
         PythonAsyncioRuntime.setEventLoopProviders(List.of(provider));
         try {
-            NettyPythonEventLoopProvider.bind(eventLoop, () -> {
+            // bound through the provider: its shutdown closes the channels opened under it
+            provider.call(eventLoop, () -> {
             Value coroutine = context.eval(PYTHON, """
                 import asyncio
                 class Hold(asyncio.Protocol):

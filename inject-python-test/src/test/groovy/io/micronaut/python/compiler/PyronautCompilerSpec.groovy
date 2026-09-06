@@ -23,7 +23,7 @@ import io.micronaut.data.model.Association
 import io.micronaut.data.model.runtime.RuntimePersistentEntity
 import io.micronaut.data.intercept.annotation.DataMethod
 import io.micronaut.python.processing.PythonAnnotationProcessor
-import io.micronaut.python.processing.visitor.ScriptDef
+import io.micronaut.python.processing.model.ScriptDef
 import org.graalvm.polyglot.PolyglotException
 import org.graalvm.polyglot.Value
 import spock.lang.Specification
@@ -413,7 +413,8 @@ class MyNamedService:
         // Verify the transformed content contains the original code and generated decorators
         def transformedContent = transformedFile.text
         // Check that decorators were generated for jakarta.inject annotations
-        transformedContent.contains("@micronaut_annotation(\"jakarta.inject.Singleton\")")
+        // no @Target on Singleton: Java lets it annotate annotation types, so the decorator says so
+        transformedContent.contains("@micronaut_annotation(\"jakarta.inject.Singleton\", annotationTypeTarget=True)")
         transformedContent.contains("def Singleton(")
 
         cleanup:
@@ -670,7 +671,7 @@ class MyRepeatableService:
         def transformedContent = transformedFile.text
 
         // Check that decorator was generated with repeatable info using the new codepath
-        transformedContent.contains("@micronaut_annotation(\"io.micronaut.python.compiler.RepeatableAnnotation\", repeated=\"io.micronaut.python.compiler.RepeatableAnnotations\")")
+        transformedContent.contains("@micronaut_annotation(\"io.micronaut.python.compiler.RepeatableAnnotation\", repeated=\"io.micronaut.python.compiler.RepeatableAnnotations\", annotationTypeTarget=True)")
         transformedContent.contains("def RepeatableAnnotation(")
 
         cleanup:
@@ -702,7 +703,7 @@ class MyNestedRepeatableService:
         def transformedFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler/NestedRepeatableAnnotation.py")
         transformedFile.exists()
         def transformedContent = transformedFile.text
-        transformedContent.contains('@micronaut_annotation("io.micronaut.python.compiler.NestedRepeatableAnnotation", repeated="io.micronaut.python.compiler.NestedRepeatableAnnotation.List")')
+        transformedContent.contains('@micronaut_annotation("io.micronaut.python.compiler.NestedRepeatableAnnotation", repeated="io.micronaut.python.compiler.NestedRepeatableAnnotation.List", annotationTypeTarget=True)')
         transformedContent.contains("def NestedRepeatableAnnotation(")
         !transformedContent.contains("@List()")
 
@@ -1699,7 +1700,7 @@ class RoomRepository(CrudRepository[Room, int]):
         def roomSource = new File(tempTargetDir, "example/micronaut/entities/Room.java").text
         roomSource.contains("public List<Message> messages;")
         roomSource.contains("public void setMessages(List<Message> arg1)")
-        roomSource.contains("GraalPyRuntimeUtil.convertList(arg1, (element) -> Message.fromPolyglotValue(element))")
+        roomSource.contains("PythonConversion.convertList(arg1, (element) -> Message.fromPolyglotValue(element))")
 
         cleanup:
         tempSrcDir.deleteDir()

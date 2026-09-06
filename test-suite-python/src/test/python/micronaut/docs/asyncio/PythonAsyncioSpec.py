@@ -4,12 +4,16 @@ import builtins
 import java
 from jakarta.inject import Inject
 from micronaut.context.annotation import Property
+from micronaut.http import HttpRequest
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from org.junit.jupiter.api import Test
 
 AsyncioConcurrentClientRunner = java.type("micronaut.docs.asyncio.AsyncioConcurrentClientRunner")
+NoteClass = java.type("micronaut.docs.asyncio.Note")
+
+from .Note import Note
 
 
 @Property(name="spec.name", value="PythonAsyncioSpec")
@@ -84,6 +88,15 @@ class PythonAsyncioSpec:
         assert "backend" == response, f"unexpected probe response: {probe}"
         assert before_thread == after_thread, f"event-loop thread changed: {probe}"
         assert int(heartbeat_elapsed) < 90, f"event-loop heartbeat was delayed: elapsed={heartbeat_elapsed}ms"
+
+    @Test
+    def dataclassBodyRoundTripsThroughThePooledEventLoopContext(self):
+        response = self.client.toBlocking().retrieve(
+            HttpRequest.POST("/async-demo/echo-note", Note(text="hello", priority=2)), NoteClass
+        )
+
+        assert "hello:True" == response.text
+        assert 3 == response.priority
 
     @Test
     def asyncControllerUsesEventLoopContext(self):

@@ -340,6 +340,7 @@ languageSupport:
   groovy: Micronaut for Groovy
   python:
     title: Micronaut for Python
+    pythonRuntime: Runtime Requirements
     pythonThreading: Python Threading
     typeOrdering: Type Ordering and Forward References
     standardTypes: Standard Library Type Conversions

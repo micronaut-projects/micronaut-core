@@ -93,7 +93,7 @@ class UntypedResponseController:
     def redirect(self):
         return HttpResponse.status(HttpStatus.SEE_OTHER)
 ''', '''
-return GraalPyRuntimeUtil.convertObject(pythonResult);
+return PythonConversion.convertObject(pythonResult);
 ''')
     }
 
@@ -248,10 +248,10 @@ public <S extends GenericRole> List<S> saveAll(Iterable<S> entities) {
 ''')
         assertGeneratedSourceContains(source, '''
 public <S extends GenericRole> S save(S entity) {
-    Value pythonResult = GraalPyRuntimeUtil.invokePythonMethod
+    Value pythonResult = PythonInvocation.invokePythonMethod
 ''')
         assertGeneratedSourceContains(source, '''
-return GraalPyRuntimeUtil.asObject((Object) GraalPyRuntimeUtil.convertValue(pythonResult, io.micronaut.python.compiler.GenericRole.class));
+return PythonConversion.asObject((Object) PythonConversion.convertValue(pythonResult, io.micronaut.python.compiler.GenericRole.class));
 ''')
         assertGeneratedSourceContains(source, '''
 public <S extends GenericRole> List<S> updateAll(Iterable<S> entities) {

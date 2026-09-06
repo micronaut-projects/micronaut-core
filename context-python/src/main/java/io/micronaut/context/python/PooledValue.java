@@ -49,7 +49,7 @@ public interface PooledValue {
      * @return The polyglot result
      */
     default Value execute(Object... args) {
-        return withValue(value -> value.execute(GraalPyRuntimeUtil.coerceArgumentsToContext(value.getContext(), args)));
+        return withValue(value -> value.execute(PythonCoercion.coerceArgumentsToContext(value.getContext(), args)));
     }
 
     /**
@@ -59,7 +59,7 @@ public interface PooledValue {
      * @return The string result
      */
     default String executeAsString(Object... args) {
-        return withValue(value -> value.execute(GraalPyRuntimeUtil.coerceArgumentsToContext(value.getContext(), args)).asString());
+        return withValue(value -> value.execute(PythonCoercion.coerceArgumentsToContext(value.getContext(), args)).asString());
     }
 
     /**
@@ -69,6 +69,6 @@ public interface PooledValue {
      * @return The boolean result
      */
     default boolean executeAsBoolean(Object... args) {
-        return withValue(value -> value.execute(GraalPyRuntimeUtil.coerceArgumentsToContext(value.getContext(), args)).asBoolean());
+        return withValue(value -> value.execute(PythonCoercion.coerceArgumentsToContext(value.getContext(), args)).asBoolean());
     }
 }

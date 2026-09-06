@@ -25,7 +25,9 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 /**
  * Configuration options for the GraalPy context.
@@ -35,6 +37,8 @@ import java.util.Map;
 @ConfigurationProperties(GraalPyContextConfiguration.PREFIX)
 public final class GraalPyContextConfiguration {
     public static final String PREFIX = "graalpy.context";
+    /** Package prefixes Python code can always look up: the JDK, Jakarta and the framework itself. */
+    private static final List<String> FRAMEWORK_PACKAGES = List.of("java.", "jakarta.", "io.micronaut.");
     private static final Logger LOG = LoggerFactory.getLogger(GraalPyContextFactory.class);
 
     @ConfigurationBuilder(prefixes = "", excludes = {
@@ -61,6 +65,7 @@ public final class GraalPyContextConfiguration {
         GraalPyContextCustomizers.languages(GraalPyContextCustomizers.currentClassLoader())
     );
     private Map<String, String> options = Map.of();
+    private List<String> hostClassLookup = List.of();
 
     GraalPyContextConfiguration() {
         // we use experimental features by default so don't warn about them
@@ -98,6 +103,44 @@ public final class GraalPyContextConfiguration {
                 this.options = options;
             }
         }
+    }
+
+    /**
+     * The package prefixes Python code may look up through {@code java.type} and {@code import}.
+     * Empty (the default) exposes every class the application class loader can load.
+     *
+     * @return The allowed package prefixes
+     */
+    public List<String> getHostClassLookup() {
+        return hostClassLookup;
+    }
+
+    /**
+     * Restrict the host classes Python code may look up to the given package prefixes. The JDK,
+     * Jakarta and the framework's own packages stay visible because generated Python code depends on
+     * them.
+     *
+     * @param hostClassLookup The allowed package prefixes, for example {@code com.example}
+     */
+    void setHostClassLookup(@Nullable List<String> hostClassLookup) {
+        this.hostClassLookup = hostClassLookup == null ? List.of() : List.copyOf(hostClassLookup);
+    }
+
+    /**
+     * The host class filter for {@link Context.Builder#allowHostClassLookup(Predicate)}.
+     *
+     * @return The filter
+     */
+    Predicate<String> hostClassFilter() {
+        if (hostClassLookup.isEmpty()) {
+            return className -> true;
+        }
+        // an entry names a package (its classes and subpackages) or one class (and its nested classes)
+        List<String> names = hostClassLookup.stream()
+            .map(name -> name.endsWith(".") ? name.substring(0, name.length() - 1) : name)
+            .toList();
+        return className -> FRAMEWORK_PACKAGES.stream().anyMatch(className::startsWith)
+            || names.stream().anyMatch(name -> className.equals(name) || className.startsWith(name + '.') || className.startsWith(name + '$'));
     }
 
     /**

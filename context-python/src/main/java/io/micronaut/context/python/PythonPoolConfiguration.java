@@ -28,12 +28,14 @@ import java.time.Duration;
  * @param enabled    Whether pooling is enabled.
  * @param size       The size of the pool. Defaults to the number of processors * 2.
  * @param warnWait   The amount of time to wait for a pooled context before a warning is printed.
+ * @param maxEventLoopContexts The most Netty event loops that get a dedicated asyncio context; {@code 0}, the default, gives every event loop one. Event loops beyond the cap run Python through the shared pool and block while a coroutine runs.
  */
 @ConfigurationProperties("micronaut.python.pool")
 @Experimental
 public record PythonPoolConfiguration(
     @Bindable(defaultValue = "true") boolean enabled,
     @Bindable(defaultValue = "0") int size,
-    @Bindable(defaultValue = "2s") @Nullable Duration warnWait
+    @Bindable(defaultValue = "2s") @Nullable Duration warnWait,
+    @Bindable(defaultValue = "0") int maxEventLoopContexts
 ) {
 }

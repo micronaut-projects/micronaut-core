@@ -17,7 +17,7 @@ package io.micronaut.python.compiler;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.version.VersionUtils;
-import io.micronaut.python.processing.visitor.ScriptDef;
+import io.micronaut.python.processing.model.ScriptDef;
 
 import java.io.File;
 import java.io.IOException;
@@ -70,12 +70,19 @@ final class IncrementalCompilation {
     private static final Pattern PYTHON_TYPE = Pattern.compile("(?m)^\\s*class\\s+([A-Za-z_]\\w*)\\b");
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_$][\\w$]*");
     private static final Pattern PYTHON_FROM_IMPORT = Pattern.compile("(?m)^\\s*from\\s+(\\S+)\\s+import\\s+");
-    private static final Pattern PYTHON_DIRECT_IMPORT = Pattern.compile("(?m)^\\s*import\\s+([\\w.]+)");
     private static final Pattern PYTHON_STAR_IMPORT = Pattern.compile("(?m)^\\s*from\\s+\\S+\\s+import\\s+\\*");
     private static final Pattern PYTHON_DECLARATION = Pattern.compile("[A-Za-z_]\\w*\\s*(?::|=(?!=))");
     private static final Pattern DYNAMIC_PYTHON_REFERENCE = Pattern.compile(
-        "\\b(?:__import__|import_module|getattr|globals|locals)\\s*\\(|@\\s*Mixin\\b"
+        "\\b(?:__import__|import_module|globals|locals)\\s*\\(|@\\s*Mixin\\b"
     );
+    // getattr only reaches another source when its target is an imported module; on any other
+    // object it is ordinary attribute access and must not force every Python source through the
+    // processor again.
+    private static final Pattern PYTHON_GETATTR = Pattern.compile("\\bgetattr\\s*\\(\\s*([A-Za-z_]\\w*)");
+    private static final Pattern PYTHON_IMPORT_STATEMENT = Pattern.compile("(?m)^\\s*import\\s+([^\\n#]+)");
+    // the imported names, on one line or spread over lines inside parentheses
+    private static final Pattern PYTHON_FROM_IMPORT_MODULE_AND_NAMES = Pattern.compile("(?m)^\\s*from\\s+(\\S+)\\s+import\\s+(?:\\(([^)]*)\\)|([^\\n]+))");
+    private static final Pattern PYTHON_FROM_IMPORT_NAMES = Pattern.compile("(?m)^\\s*from\\s+\\S+\\s+import\\s+(?:\\(([^)]*)\\)|([^\\n]+))");
 
     private final Path javaRoot;
     private final List<Path> pythonRoots;
@@ -420,7 +427,8 @@ final class IncrementalCompilation {
     private static boolean hasDynamicOrUnresolvedPythonRelationship(ScannedSource source,
                                                                     Set<String> pythonModules) {
         if (DYNAMIC_PYTHON_REFERENCE.matcher(source.content()).find()
-            || PYTHON_STAR_IMPORT.matcher(source.content()).find()) {
+            || PYTHON_STAR_IMPORT.matcher(source.content()).find()
+            || readsAttributesOfImportedModule(source.content())) {
             return true;
         }
         for (String module : pythonImports(source.content())) {
@@ -445,17 +453,146 @@ final class IncrementalCompilation {
         return false;
     }
 
+    /**
+     * Whether a {@code getattr} call targets a name bound by an import: the attribute it reads may
+     * then be a declaration of another source that the identifier scan cannot see.
+     */
+    private static boolean readsAttributesOfImportedModule(String content) {
+        Matcher getattr = PYTHON_GETATTR.matcher(content);
+        if (!getattr.find()) {
+            return false;
+        }
+        Set<String> importedNames = new LinkedHashSet<>();
+        // "import a.b, c as d" binds a and d
+        for (String[] clause : directImportClauses(content)) {
+            importedNames.add(clause[1]);
+        }
+        Matcher fromImports = PYTHON_FROM_IMPORT_NAMES.matcher(logicalStatements(content));
+        while (fromImports.find()) {
+            String imported = fromImports.group(1) != null ? fromImports.group(1) : fromImports.group(2);
+            for (String name : imported.replaceAll("#[^\\n]*", "").split(",")) {
+                String[] parts = name.trim().split("\\s+as\\s+");
+                String bound = parts[parts.length - 1].trim();
+                if (!bound.isEmpty()) {
+                    importedNames.add(bound);
+                }
+            }
+        }
+        do {
+            if (importedNames.contains(getattr.group(1))) {
+                return true;
+            }
+        } while (getattr.find());
+        return false;
+    }
+
+    /**
+     * The source with explicit line continuations folded and every {@code ;}-separated statement on
+     * a line of its own, so the line-anchored import patterns see each statement.
+     */
+    private static String logicalStatements(String content) {
+        // one scan over the whole source, so a string literal spanning lines is one literal: its
+        // contents are blanked (an import-looking line inside it is not an import), comments are
+        // dropped, and a top-level ';' ends a statement like a newline does
+        String joined = content.replace("\\\r\n", " ").replace("\\\n", " ");
+        StringBuilder statements = new StringBuilder(joined.length());
+        char quote = 0;
+        boolean triple = false;
+        boolean comment = false;
+        int depth = 0;
+        for (int i = 0; i < joined.length(); i++) {
+            char c = joined.charAt(i);
+            if (quote != 0) {
+                if (c == '\\' && i + 1 < joined.length()) {
+                    i++;
+                } else if (c == quote && (!triple || joined.startsWith(String.valueOf(quote).repeat(3), i))) {
+                    if (triple) {
+                        i += 2;
+                    }
+                    quote = 0;
+                    statements.append(c);
+                } else if (c == '\n') {
+                    statements.append(c);
+                }
+                continue;
+            }
+            if (comment) {
+                if (c == '\n') {
+                    comment = false;
+                    statements.append(c);
+                }
+                continue;
+            }
+            switch (c) {
+                case '#' -> comment = true;
+                case '"', '\'' -> {
+                    quote = c;
+                    triple = joined.startsWith(String.valueOf(c).repeat(3), i);
+                    if (triple) {
+                        i += 2;
+                    }
+                    statements.append(c);
+                }
+                case '(', '[', '{' -> {
+                    depth++;
+                    statements.append(c);
+                }
+                case ')', ']', '}' -> {
+                    depth = Math.max(0, depth - 1);
+                    statements.append(c);
+                }
+                case ';' -> statements.append(depth == 0 ? '\n' : c);
+                default -> statements.append(c);
+            }
+        }
+        return statements.toString();
+    }
+
     private static Set<String> pythonImports(String content) {
         Set<String> modules = new LinkedHashSet<>();
-        Matcher fromImports = PYTHON_FROM_IMPORT.matcher(content);
+        String statements = logicalStatements(content);
+        Matcher fromImports = PYTHON_FROM_IMPORT_MODULE_AND_NAMES.matcher(statements);
         while (fromImports.find()) {
-            modules.add(fromImports.group(1));
+            String module = fromImports.group(1);
+            modules.add(module);
+            // "from pkg import beta" may name the submodule pkg.beta: a candidate the resolver keeps
+            // only when such a module exists, otherwise the name is an attribute of the package
+            String imported = fromImports.group(2) != null ? fromImports.group(2) : fromImports.group(3);
+            for (String name : imported.replaceAll("#[^\\n]*", "").split(",")) {
+                String bound = name.trim().split("\\s+as\\s+")[0].trim();
+                if (!bound.isEmpty() && bound.matches("\\w+")) {
+                    modules.add(module.endsWith(".") ? module + bound : module + "." + bound);
+                }
+            }
         }
-        Matcher directImports = PYTHON_DIRECT_IMPORT.matcher(content);
-        while (directImports.find()) {
-            modules.add(directImports.group(1));
+        // every clause of "import a.b, c as d" is a dependency, not only the first
+        for (String[] clause : directImportClauses(content)) {
+            modules.add(clause[0]);
         }
         return modules;
+    }
+
+    /**
+     * The clauses of the direct import statements: {@code {module, boundName}} pairs, with explicit
+     * line continuations folded and a statement ending at a semicolon or a comment.
+     */
+    private static List<String[]> directImportClauses(String content) {
+        List<String[]> clauses = new ArrayList<>();
+        Matcher imports = PYTHON_IMPORT_STATEMENT.matcher(logicalStatements(content));
+        while (imports.find()) {
+            String statement = imports.group(1);
+            for (String clause : statement.split(",")) {
+                String[] parts = clause.trim().split("\\s+as\\s+");
+                String module = parts[0].trim();
+                if (module.isEmpty() || !module.matches("[\\w.]+")) {
+                    continue;
+                }
+                String bound = parts.length > 1 ? parts[1].trim() : module;
+                int separator = bound.indexOf('.');
+                clauses.add(new String[] {module, separator == -1 ? bound : bound.substring(0, separator)});
+            }
+        }
+        return clauses;
     }
 
     private static String resolveRelativePythonModule(String relativePath, String module) {

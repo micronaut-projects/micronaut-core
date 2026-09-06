@@ -17,92 +17,69 @@ package io.micronaut.context.python;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.scheduling.LoomSupport;
 import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
-import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.lang.ScopedValue.CallableOp;
-import java.util.ArrayList;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
-
-import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
 
 /**
  * Runtime coordination point for generated Python bridge classes.
  * <p>
- * This type owns access to the primary GraalPy context, resolves classes and scripts from the
- * primary context or a {@link PythonPool}, mirrors host members into event-loop contexts, executes
- * shared Python helper functions, and tracks active executions so contexts and engines can be
- * closed safely.
+ * This type is the static entry point of generated bridge classes: it resolves the application
+ * runtime installed by {@link GraalPyContextFactory} (see {@link PythonApplicationRuntime}), resolves
+ * classes and scripts from the primary context or a {@link PythonPool}, mirrors host members into
+ * event-loop contexts and executes the shared Python helper functions. Execution tracking and the
+ * per-context state live in {@link PythonContextRegistry}.
  *
  * @author Micronaut Team
  * @since 5.2.0
  */
 @Experimental
 public final class PythonContextRuntime {
-    private static final Logger LOG = LoggerFactory.getLogger(PythonContextRuntime.class);
+    /**
+     * The GraalPy language id.
+     */
+    public static final String PYTHON = "python";
 
     private static final String NEW_UNINITIALIZED_INSTANCE = "__micronaut_new_uninitialized_instance";
     private static final String SET_INSTANCE_PROPERTY = "__micronaut_set_instance_property";
-    private static final Source NEW_UNINITIALIZED_INSTANCE_SOURCE = Source.newBuilder(PYTHON, """
-        def __micronaut_new_uninitialized_instance(cls):
-            return object.__new__(cls)
-        """, "micronaut-new-uninitialized-instance.py").cached(true).buildLiteral();
-    private static final Source SET_INSTANCE_PROPERTY_SOURCE = Source.newBuilder(PYTHON, """
-        def __micronaut_set_instance_property(instance, name, value):
-            object.__setattr__(instance, name, value)
-            return instance
-        """, "micronaut-set-instance-property.py").cached(true).buildLiteral();
-    private static final Source FIND_CLASS_IN_PACKAGE_MODULES_SOURCE = Source.newBuilder(PYTHON, """
-        import importlib
-        import inspect
-        import pkgutil
+    private static final String SET_INSTANCE_PROPERTIES = "__micronaut_set_instance_properties";
+    private static final String PREPARE_INTRODUCTION = "__micronaut_prepare_introduction";
+    private static final String RUNTIME_MODULE_NAME = "micronaut_runtime";
+    private static final String RUNTIME_MODULE_RESOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_runtime.py";
+    private static final Source IMPORT_RUNTIME_MODULE_SOURCE = Source.newBuilder(PYTHON, "__import__('" + RUNTIME_MODULE_NAME + "')", "micronaut-import-runtime.py").cached(true).buildLiteral();
+    private static final Source LOAD_RUNTIME_MODULE_SOURCE = Source.newBuilder(PYTHON, """
+        import sys as __micronaut_sys
+        import types as __micronaut_types
 
-        def __micronaut_find_class_in_package_modules(package_name, class_name):
-            package = importlib.import_module(package_name)
-            package_path = getattr(package, "__path__", None)
-            if package_path is None:
-                return None
-            for module_info in pkgutil.iter_modules(package_path):
-                try:
-                    module = importlib.import_module(package_name + "." + module_info.name)
-                except Exception:
-                    continue
-                member = getattr(module, class_name, None)
-                if inspect.isclass(member):
-                    return member
-            return None
-        """, "micronaut-find-class-in-package-modules.py").cached(true).buildLiteral();
-    private static final Source INSPECT_IS_CLASS_SOURCE = Source.newBuilder(PYTHON, """
-        import inspect
-        __micronaut_inspect_isclass = inspect.isclass
-        """, "micronaut-inspect-is-class.py").cached(true).buildLiteral();
-    private static final Source IMPORT_MODULE_SOURCE = Source.newBuilder(PYTHON, """
-        import importlib
-        __micronaut_import_module = importlib.import_module
-        """, "micronaut-import-module.py").cached(true).buildLiteral();
+        def __micronaut_load_runtime_module(source):
+            module = __micronaut_types.ModuleType('micronaut_runtime')
+            __micronaut_sys.modules['micronaut_runtime'] = module
+            exec(source, module.__dict__)
+            return module
+        """, "micronaut-load-runtime-module.py").cached(true).buildLiteral();
+    private static final AtomicReference<@Nullable String> RUNTIME_MODULE_FALLBACK_SOURCE = new AtomicReference<>();
     private static final Source RELOAD_MODULES_SOURCE = Source.newBuilder(PYTHON, """
         import importlib
         import sys
@@ -113,60 +90,123 @@ public final class PythonContextRuntime {
                 pass
         """, "micronaut-reload-modules.py").cached(true).buildLiteral();
 
-    private static final AtomicBoolean REUSE_CONTEXT = new AtomicBoolean();
-    private static volatile @Nullable Context context;
-    private static volatile @Nullable ClassLoader contextClassLoader;
-    private static volatile @Nullable PythonPool pythonPool;
-    private static volatile @Nullable BeanProvider<ExecutorService> pooledExecutorServiceProvider;
-    private static final AtomicInteger ACTIVE_EXECUTIONS = new AtomicInteger();
-    private static final Object ACTIVE_EXECUTIONS_LOCK = new Object();
-    private static final IdentityHashMap<Context, ContextState> CONTEXT_STATES = new IdentityHashMap<>();
-    private static final ScopedValue<ExecutionFrame> CURRENT_EXECUTION = ScopedValue.newInstance();
-
     private PythonContextRuntime() {
     }
 
     /**
-     * Pre-split Python class identity for generated bridge code.
+     * The primary context of the installed application runtime.
      *
-     * @param packageName The Python package, or {@code null}/{@code python} for top-level classes
-     * @param rootName The top-level Python import/member name
-     * @param nestedMemberNames The nested member names below the root class
-     * @param displayName The class display name used in diagnostics
-     * @param cacheKey The stable class cache key used by pooled contexts
-     * @since 5.2.0
+     * @return The primary context
+     * @throws IllegalStateException When no application runtime is installed
      */
-    private static ContextState contextState(Context context) {
-        synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            return CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
-        }
-    }
-
-    private static @Nullable ContextState existingContextState(Context context) {
-        synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            return CONTEXT_STATES.get(context);
-        }
+    public static Context getContext() {
+        return PythonApplicationRuntime.require().context();
     }
 
     /**
-     * Register the active Python pool after the pool bean decides whether pooling is enabled.
+     * Install the runtime of an application: its primary context and the class loader that should be
+     * active when generated bridge classes enter Python from arbitrary runtime threads. This is
+     * called by {@link GraalPyContextFactory} during application startup.
+     *
+     * @param context The primary GraalPy context
+     * @param classLoader The application class loader used to build the context
+     * @return The installed runtime
+     */
+    static PythonApplicationRuntime setContext(Context context, @Nullable ClassLoader classLoader) {
+        PythonApplicationRuntime runtime = new PythonApplicationRuntime(context, classLoader);
+        PythonApplicationRuntime.install(runtime);
+        return runtime;
+    }
+
+    /**
+     * Check if an application runtime is installed.
+     *
+     * @return true if the primary context is available, false otherwise
+     */
+    public static boolean isInitialized() {
+        return PythonApplicationRuntime.current() != null;
+    }
+
+    /**
+     * Check whether the supplied context is the primary context of the installed runtime.
      * <p>
-     * A {@code null} pool intentionally routes generated bridge calls back to the primary context.
-     * This method stays package-private so only the pool lifecycle code can change global routing.
+     * {@link Context#equals(Object)} compares the underlying context, so the creator instance and the
+     * view returned by {@link Value#getContext()} both match the primary context.
      *
-     * @param pool The Python pool
+     * @param context The context to compare
+     * @return {@code true} when the context is the primary runtime context
      */
-    static void setPythonPool(@Nullable PythonPool pool) {
-        PythonContextRuntime.pythonPool = pool;
+    static boolean isCurrentContext(@Nullable Context context) {
+        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
+        return runtime == null ? context == null : runtime.owns(context);
     }
 
     /**
-     * Register the executor used when pooled Python execution is requested from a virtual thread.
-     *
-     * @param executorServiceProvider The executor provider, or {@code null} when unavailable
+     * Uninstall the application runtime. This method is called during application shutdown
+     * to ensure proper cleanup and prevent memory leaks; with context reuse enabled it only
+     * reloads the Python modules of the primary context.
      */
-    static void setPooledExecutorServiceProvider(@Nullable BeanProvider<ExecutorService> executorServiceProvider) {
-        PythonContextRuntime.pooledExecutorServiceProvider = executorServiceProvider;
+    public static void resetContext() {
+        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
+        if (runtime == null) {
+            return;
+        }
+        if (isReuseContext()) {
+            runtime.context().eval(RELOAD_MODULES_SOURCE);
+            return;
+        }
+        PythonApplicationRuntime.uninstall(runtime);
+        PythonContextRegistry.forgetContext(runtime.context());
+    }
+
+    /**
+     * If context reuse is set to true, then the context will never be cleared.
+     * @param reuse tells if the context should be reused
+     */
+    public static void setReuseContext(boolean reuse) {
+        PythonApplicationRuntime.setReuseContext(reuse);
+    }
+
+    /**
+     * Returns true if the context should be reused.
+     * @return the reuse flag
+     */
+    public static boolean isReuseContext() {
+        return PythonApplicationRuntime.isReuseContext();
+    }
+
+    /**
+     * Whether generated calls must use the primary context: no pool is registered or the context is reused.
+     */
+    private static boolean usePrimaryContext() {
+        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
+        return runtime == null || runtime.pool() == null || PythonApplicationRuntime.isReuseContext();
+    }
+
+    /**
+     * Return the configured Python pool for package-local runtime routing.
+     * <p>
+     * Callers should check {@link #usePrimaryContext()} before invoking this method; a missing
+     * pool means generated bridge calls must use the primary context instead.
+     *
+     * @return The configured PythonPool. Throws if not initialized.
+     */
+    static PythonPool getPythonPool() {
+        PythonPool pool = PythonApplicationRuntime.require().pool();
+        if (pool == null) {
+            throw new IllegalStateException("PythonPool has not been initialized.");
+        }
+        return pool;
+    }
+
+    private static @Nullable BeanProvider<ExecutorService> pooledExecutorServiceProvider() {
+        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
+        return runtime == null ? null : runtime.pooledExecutorServiceProvider();
+    }
+
+    private static <T> T withContextClassLoader(Supplier<T> action) {
+        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
+        return runtime == null ? action.get() : runtime.withContextClassLoader(action);
     }
 
     /**
@@ -179,7 +219,8 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value asyncInstance(Value fallback, PythonClassReference classReference) {
-        PythonPool pool = pythonPool;
+        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
+        PythonPool pool = runtime == null ? null : runtime.pool();
         if (pool == null || isReuseContext()) {
             return fallback;
         }
@@ -187,10 +228,15 @@ public final class PythonContextRuntime {
         if (eventLoop == null) {
             return fallback;
         }
-        Value target = pool.getEventLoopClass(eventLoop, classReference);
-        GraalPyRuntimeUtil.copyTransferableMembers(fallback, target);
-        copyRememberedAsyncMembers(fallback, target);
-        return target;
+        // the event-loop context's class load and the member copies are guest work: run them inside
+        // an execution frame of that context so a close waits for them
+        Context eventLoopContext = pool.getEventLoopContext(eventLoop);
+        return PythonContextRegistry.withTrackedExecutionFrame(eventLoopContext, () -> {
+            Value target = pool.getEventLoopClass(eventLoop, classReference);
+            PythonCoercion.copyTransferableMembers(fallback, target);
+            copyRememberedAsyncMembers(fallback, target);
+            return target;
+        });
     }
 
     /**
@@ -202,7 +248,7 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static void rememberAsyncMember(Value source, String name, @Nullable Object value) {
-        ContextState state = contextState(source.getContext());
+        PythonContextRegistry.ContextState state = PythonContextRegistry.state(source.getContext());
         synchronized (state) {
             state.asyncMembers.computeIfAbsent(source, ignored -> new HashMap<>()).put(name, value);
         }
@@ -210,7 +256,7 @@ public final class PythonContextRuntime {
 
     private static void copyRememberedAsyncMembers(Value source, Value target) {
         Map<String, Object> members;
-        ContextState state = existingContextState(source.getContext());
+        PythonContextRegistry.ContextState state = PythonContextRegistry.existingState(source.getContext());
         if (state == null) {
             return;
         }
@@ -219,363 +265,10 @@ public final class PythonContextRuntime {
             if (members == null || members.isEmpty()) {
                 return;
             }
-            members = Map.copyOf(members);
+            // not Map.copyOf: a member remembered as null is legitimate
+            members = new HashMap<>(members);
         }
-        members.forEach((name, value) -> GraalPyRuntimeUtil.putMember(target, name, GraalPyRuntimeUtil.asyncMemberValue(target, value)));
-    }
-
-    /**
-     * Return the configured Python pool for package-local runtime routing.
-     * <p>
-     * Callers should check the pooling configuration path before invoking this method; a missing
-     * pool means generated bridge calls must use the primary context instead.
-     *
-     * @return The configured PythonPool. Throws if not initialized.
-     */
-    static PythonPool getPythonPool() {
-        PythonPool pool = pythonPool;
-        if (pool == null) {
-            throw new IllegalStateException("PythonPool has not been initialized.");
-        }
-        return pool;
-    }
-
-    /**
-     * Register a context for execution and shared-engine shutdown tracking.
-     *
-     * @param context The GraalPy context being tracked
-     */
-    static void registerContext(Context context) {
-        contextState(context);
-    }
-
-    /**
-     * Remove a context from execution tracking and notify listeners waiting for its removal.
-     * <p>
-     * This is part of shutdown coordination; it clears cached helper/member state before the
-     * context can be closed and releases shared-engine shutdown gates that include this context.
-     *
-     * @param context The GraalPy context being removed
-     */
-    static void unregisterContext(Context context) {
-        List<Runnable> listeners;
-        synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            ContextState contextState = CONTEXT_STATES.remove(context);
-            if (contextState != null) {
-                listeners = List.copyOf(contextState.noContextListeners);
-                contextState.clear();
-            } else {
-                listeners = List.of();
-            }
-        }
-        runNoActiveExecutionsListeners(listeners);
-    }
-
-    /**
-     * Mark a context as actively executing host-initiated Python code.
-     * <p>
-     * Callers must pair this with {@link #exitExecution(Context)} unless they use
-     * {@link #withExecutionFrame(Context, CallableOp)}.
-     *
-     * @param context The context entering Python execution
-     */
-    static void enterExecution(Context context) {
-        synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            ContextState state = CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
-            state.activeExecutions++;
-            ACTIVE_EXECUTIONS.incrementAndGet();
-        }
-    }
-
-    /**
-     * Mark the primary context as actively executing host-initiated Python code.
-     * <p>
-     * This overload is for legacy generated paths that do not already hold a pooled or event-loop
-     * context. New context-specific code should prefer {@link #enterExecution(Context)}.
-     */
-    static void enterExecution() {
-        enterExecution(getContext());
-    }
-
-    /**
-     * Run an operation inside the current lexical execution frame, creating one when needed.
-     * <p>
-     * The frame lets nested generated bridge calls defer shutdown listeners until the outermost
-     * Python execution has unwound, while still decrementing per-context counters for each entry.
-     *
-     * @param ctx The context used by this execution
-     * @param operation The operation to run
-     * @param <T> The operation result type
-     * @param <X> The checked exception type the operation may throw
-     * @return The operation result
-     * @throws X When the operation throws
-     */
-    static <T, X extends Throwable> T withExecutionFrame(Context ctx, CallableOp<T, X> operation) throws X {
-        if (CURRENT_EXECUTION.isBound()) {
-            return runWithExecutionFrame(ctx, CURRENT_EXECUTION.get(), operation);
-        }
-        return ScopedValue.where(CURRENT_EXECUTION, new ExecutionFrame()).call(() -> runWithExecutionFrame(ctx, CURRENT_EXECUTION.get(), operation));
-    }
-
-    private static <T, X extends Throwable> T runWithExecutionFrame(Context ctx, ExecutionFrame frame, CallableOp<T, X> operation) throws X {
-        frame.contexts.add(ctx);
-        enterExecution(ctx);
-        boolean entered = false;
-        try {
-            try {
-                ctx.enter();
-                entered = true;
-            } catch (IllegalStateException ignored) {
-                // Context.get() exposes a non-enterable view while guest code is executing. In
-                // that case the operation is already running in the required context.
-            }
-            return operation.call();
-        } finally {
-            if (entered) {
-                ctx.leave();
-            }
-            exitExecutionFrame(ctx, frame);
-        }
-    }
-
-    /**
-     * Mark a context execution as complete and run any listeners whose context no longer has
-     * active executions.
-     *
-     * @param context The context leaving Python execution
-     */
-    static void exitExecution(Context context) {
-        List<Runnable> listeners = new ArrayList<>();
-        synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            ContextState state = CONTEXT_STATES.get(context);
-            if (state != null) {
-                state.activeExecutions = Math.max(0, state.activeExecutions - 1);
-                if (state.activeExecutions == 0 && !state.noActiveExecutionsListeners.isEmpty()) {
-                    listeners.addAll(state.noActiveExecutionsListeners);
-                    state.noActiveExecutionsListeners.clear();
-                }
-            }
-            ACTIVE_EXECUTIONS.updateAndGet(value -> Math.max(0, value - 1));
-        }
-        runNoActiveExecutionsListeners(listeners);
-    }
-
-    /**
-     * Mark an execution against the primary context as complete.
-     * <p>
-     * This must only be paired with {@link #enterExecution()} so the aggregate and primary-context
-     * execution counters remain balanced.
-     */
-    static void exitExecution() {
-        exitExecution(getContext());
-    }
-
-    @SuppressWarnings("ReferenceEquality")
-    private static void exitExecutionFrame(Context ctx, ExecutionFrame frame) {
-        List<Context> contexts = frame.contexts;
-        if (contexts.isEmpty()) {
-            exitExecution(ctx);
-            return;
-        }
-        Context removed = contexts.removeLast();
-        if (removed != ctx) {
-            contexts.remove(ctx);
-        }
-        exitExecution(ctx);
-        if (contexts.isEmpty()) {
-            runExecutionExitListeners(frame);
-        }
-    }
-
-    private static void runExecutionExitListeners(ExecutionFrame frame) {
-        List<Runnable> listeners = frame.exitListeners;
-        if (listeners.isEmpty()) {
-            return;
-        }
-        List<Runnable> snapshot = List.copyOf(listeners);
-        listeners.clear();
-        runNoActiveExecutionsListeners(snapshot);
-    }
-
-    /**
-     * Return the aggregate number of active Python executions across all registered contexts.
-     * <p>
-     * This counter is incremented by {@link #enterExecution(Context)} and decremented by
-     * {@link #exitExecution(Context)} for every generated bridge entry into Python. It is deliberately
-     * aggregate-only: context-local counts are stored in {@link ContextState} for shutdown gates.
-     * <p>
-     * Maintainers should treat this method as an observability hook for tests and diagnostics, not
-     * as a synchronization primitive. Use one of the {@code onNoActiveExecutions} registration methods
-     * when cleanup must wait for a safe idle point.
-     *
-     * @return The number of active Python executions known to the runtime
-     */
-    static int activeExecutions() {
-        return ACTIVE_EXECUTIONS.get();
-    }
-
-    /**
-     * Register a listener to run when the supplied context has no active Python executions.
-     * <p>
-     * The listener runs synchronously when the context is already idle. Otherwise it is stored on
-     * the context state and drained by the {@link #exitExecution(Context)} call that decrements the
-     * context-local execution count to zero. This is the context-scoped shutdown gate used before a
-     * GraalPy context can be closed.
-     * <p>
-     * Listener registration and counter checks are performed under {@link #ACTIVE_EXECUTIONS_LOCK}
-     * so a new listener cannot miss the transition from active to idle.
-     *
-     * @param context The context to observe
-     * @param listener The listener to run when the context is idle
-     */
-    static void onNoActiveExecutions(Context context, Runnable listener) {
-        boolean runNow;
-        synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            ContextState state = CONTEXT_STATES.computeIfAbsent(context, ignored -> new ContextState());
-            runNow = state.activeExecutions == 0;
-            if (!runNow) {
-                state.noActiveExecutionsListeners.add(listener);
-            }
-        }
-        if (runNow) {
-            listener.run();
-        }
-    }
-
-    /**
-     * Register a listener to run after the current execution frame exits and the context is idle.
-     * <p>
-     * This is used during bean/context destruction so cleanup cannot run in the middle of a nested
-     * generated bridge invocation that is still unwinding. When a scoped execution frame is active,
-     * the listener is first attached to that frame and only then registered with
-     * {@link #onNoActiveExecutions(Context, Runnable)}. Without that two-step handoff, a nested call
-     * could make the context appear idle before the outer bridge call has restored its Java-side state.
-     *
-     * @param context The context to observe
-     * @param listener The listener to run after the current frame and active executions complete
-     */
-    static void onNoActiveExecutionsAfterCurrentFrame(Context context, Runnable listener) {
-        if (CURRENT_EXECUTION.isBound() && !CURRENT_EXECUTION.get().contexts.isEmpty()) {
-            CURRENT_EXECUTION.get().exitListeners.add(() -> onNoActiveExecutions(context, listener));
-            return;
-        }
-        onNoActiveExecutions(context, listener);
-    }
-
-    /**
-     * Register a listener to run once every distinct context in the collection is idle.
-     * <p>
-     * Duplicate contexts are collapsed by identity so a pooled context cannot make the listener wait
-     * for the same active execution more than once. For active contexts, this method installs a small
-     * gate listener on each context; the original listener runs only after the final active context
-     * reaches zero executions. If no supplied context is active, the listener runs immediately.
-     * <p>
-     * This overload is used by pooled shutdown because the pool owns multiple contexts and all of
-     * them must be idle before cached values and GraalPy contexts are discarded.
-     *
-     * @param contexts The contexts to observe
-     * @param listener The listener to run when every observed context is idle
-     */
-    static void onNoActiveExecutions(Collection<Context> contexts, Runnable listener) {
-        List<Context> activeContexts;
-        synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            IdentityHashMap<Context, Boolean> seen = new IdentityHashMap<>();
-            activeContexts = contexts.stream()
-                .filter(ctx -> seen.put(ctx, Boolean.TRUE) == null)
-                .filter(ctx -> {
-                    ContextState state = CONTEXT_STATES.get(ctx);
-                    return state != null && state.activeExecutions > 0;
-                })
-                .toList();
-            if (activeContexts.isEmpty()) {
-                activeContexts = List.of();
-            } else {
-                AtomicInteger remaining = new AtomicInteger(activeContexts.size());
-                Runnable gate = () -> {
-                    if (remaining.decrementAndGet() == 0) {
-                        listener.run();
-                    }
-                };
-                for (Context activeContext : activeContexts) {
-                    CONTEXT_STATES.computeIfAbsent(activeContext, ignored -> new ContextState()).noActiveExecutionsListeners.add(gate);
-                }
-            }
-        }
-        if (activeContexts.isEmpty()) {
-            listener.run();
-        }
-    }
-
-    /**
-     * Register a listener to run when no registered contexts remain for the engine.
-     * <p>
-     * Context ownership is derived from {@link Context#getEngine()}; each currently matching context
-     * receives a shared removal gate. Context shutdown waits for active executions before unregistering,
-     * so this is also the safe hook for engine cleanup.
-     * <p>
-     * The listener runs immediately when no registered context uses the engine. Registration and gate
-     * installation happen under {@link #ACTIVE_EXECUTIONS_LOCK} so a concurrent unregister cannot
-     * miss the listener.
-     *
-     * @param engine The engine to observe
-     * @param listener The listener to run when the engine no longer owns contexts
-     */
-    static void onNoContexts(Engine engine, Runnable listener) {
-        boolean runNow;
-        synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            List<ContextState> states = CONTEXT_STATES.entrySet().stream()
-                .filter(entry -> entry.getKey().getEngine() == engine)
-                .map(Map.Entry::getValue)
-                .toList();
-            runNow = states.isEmpty();
-            if (!runNow) {
-                AtomicInteger remaining = new AtomicInteger(states.size());
-                Runnable gate = () -> {
-                    if (remaining.decrementAndGet() == 0) {
-                        listener.run();
-                    }
-                };
-                states.forEach(state -> state.noContextListeners.add(gate));
-            }
-        }
-        if (runNow) {
-            listener.run();
-        }
-    }
-
-    private static void runNoActiveExecutionsListeners(List<Runnable> listeners) {
-        if (listeners.isEmpty()) {
-            return;
-        }
-        deferNoActiveExecutionListener(() -> {
-            for (Runnable listener : listeners) {
-                try {
-                    listener.run();
-                } catch (Throwable e) {
-                    LOG.warn("Python no-active-executions listener failed", e);
-                    if (e instanceof RuntimeException runtimeException) {
-                        throw runtimeException;
-                    }
-                    if (e instanceof Error error) {
-                        throw error;
-                    }
-                    throw new IllegalStateException(e);
-                }
-            }
-        });
-    }
-
-    /**
-     * Dispatch a no-active-executions listener.
-     * <p>
-     * The default implementation runs inline to preserve ordering with context close operations.
-     * The package-private boundary keeps a single future extension point if listener dispatch needs
-     * to move to an executor.
-     *
-     * @param listener The listener to dispatch
-     */
-    static void deferNoActiveExecutionListener(Runnable listener) {
-        listener.run();
+        members.forEach((name, value) -> PythonCoercion.putMember(target, name, PythonCoercion.asyncMemberValue(target, value)));
     }
 
     /**
@@ -587,12 +280,16 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value findPooledClass(PythonClassReference classReference) {
-        if (isReuseContext() || pythonPool == null) {
-            return findClass(classReference);
+        if (usePrimaryContext()) {
+            // the primary context is shared: the load runs inside a frame of it
+            return withPrimaryContext(context -> findClass(classReference, context));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
-            return getPythonPool().getEventLoopClass(eventLoop, classReference);
+            // the load, and any injection the context is behind on, are guest work of the loop's context
+            PythonPool pool = getPythonPool();
+            Context context = pool.getEventLoopContext(eventLoop);
+            return PythonContextRegistry.withTrackedExecutionFrame(context, () -> pool.getEventLoopClass(eventLoop, classReference));
         }
         return getPythonPool().getAnyClass(classReference);
     }
@@ -607,10 +304,11 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value findPooledClass(PythonClassReference classReference, Context context) {
-        if (isReuseContext() || pythonPool == null) {
-            return findClass(classReference, context);
-        }
-        return getPythonPool().getClass(context, classReference);
+        // the caller owns the context (a borrowed pooled context, its loop's context); the load is
+        // still counted as an execution so a close waits for it
+        return PythonContextRegistry.withExecutionFrame(context, () -> usePrimaryContext()
+            ? findClass(classReference, context)
+            : getPythonPool().getClass(context, classReference));
     }
 
     /**
@@ -627,12 +325,16 @@ public final class PythonContextRuntime {
         if (shouldOffloadPooledExecution()) {
             return offloadPooledExecution(() -> withPooled(classReference, fn));
         }
-        if (isReuseContext() || pythonPool == null) {
+        if (usePrimaryContext()) {
             return withPrimaryContext(context -> fn.apply(findClass(classReference, context)));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
-            return fn.apply(getPythonPool().getEventLoopClass(eventLoop, classReference));
+            // the load and the callback run in a tracked frame of the event-loop context: a close
+            // waits for them and cannot be revived by them
+            PythonPool pool = getPythonPool();
+            Context context = pool.getEventLoopContext(eventLoop);
+            return PythonContextRegistry.withTrackedExecutionFrame(context, () -> fn.apply(pool.getEventLoopClass(eventLoop, classReference)));
         }
         return getPythonPool().withClass(classReference, fn);
     }
@@ -646,12 +348,14 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value findPooledScript(String packageName, String scriptName) {
-        if (isReuseContext() || pythonPool == null) {
-            return findScript(packageName, scriptName);
+        if (usePrimaryContext()) {
+            return withPrimaryContext(context -> findScript(packageName, scriptName, context));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
-            return getPythonPool().getEventLoopScript(eventLoop, packageName, scriptName);
+            PythonPool pool = getPythonPool();
+            Context context = pool.getEventLoopContext(eventLoop);
+            return PythonContextRegistry.withTrackedExecutionFrame(context, () -> pool.getEventLoopScript(eventLoop, packageName, scriptName));
         }
         return getPythonPool().getAnyScript(packageName, scriptName);
     }
@@ -666,10 +370,9 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value findPooledScript(String packageName, String scriptName, Context context) {
-        if (isReuseContext() || pythonPool == null) {
-            return findScript(packageName, scriptName, context);
-        }
-        return getPythonPool().getScript(context, packageName, scriptName);
+        return PythonContextRegistry.withExecutionFrame(context, () -> usePrimaryContext()
+            ? findScript(packageName, scriptName, context)
+            : getPythonPool().getScript(context, packageName, scriptName));
     }
 
     /**
@@ -686,12 +389,14 @@ public final class PythonContextRuntime {
         if (shouldOffloadPooledExecution()) {
             return offloadPooledExecution(() -> withPooledScript(packageName, scriptName, fn));
         }
-        if (isReuseContext() || pythonPool == null) {
+        if (usePrimaryContext()) {
             return withPrimaryContext(context -> fn.apply(findScript(packageName, scriptName, context)));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
-            return fn.apply(getPythonPool().getEventLoopScript(eventLoop, packageName, scriptName));
+            PythonPool pool = getPythonPool();
+            Context context = pool.getEventLoopContext(eventLoop);
+            return PythonContextRegistry.withTrackedExecutionFrame(context, () -> fn.apply(pool.getEventLoopScript(eventLoop, packageName, scriptName)));
         }
         return getPythonPool().withScript(packageName, scriptName, fn);
     }
@@ -725,35 +430,37 @@ public final class PythonContextRuntime {
         if (shouldOffloadPooledExecution()) {
             return offloadPooledExecution(() -> withPooledValue(expression, fn));
         }
-        if (isReuseContext() || pythonPool == null) {
+        if (usePrimaryContext()) {
             return withPrimaryContext(context -> fn.apply(getOrCreateValue(context, expression)));
         }
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
-            Context context = getPythonPool().getEventLoopContext(eventLoop);
-            return fn.apply(getPythonPool().getValue(context, expression));
+            PythonPool pool = getPythonPool();
+            Context context = pool.getEventLoopContext(eventLoop);
+            return PythonContextRegistry.withTrackedExecutionFrame(context, () -> fn.apply(pool.getValue(context, expression)));
         }
         return getPythonPool().withValue(expression, fn);
     }
 
     private static Value getOrCreateValue(Context context, String expression) {
-        return withContextLock(context, () -> {
-            ContextState state = contextState(context);
-            String key = "value:" + expression;
-            Value value = state.helpers.get(key);
-            if (value == null || GraalPyRuntimeUtil.isNone(value)) {
-                value = context.eval(PYTHON, expression);
-                Value existing = state.helpers.putIfAbsent(key, value);
-                if (existing != null && !GraalPyRuntimeUtil.isNone(existing)) {
-                    value = existing;
-                }
+        // no context monitor around the eval: GraalPy holds its GIL across host calls, so a thread
+        // waiting for the monitor while owning the GIL and one owning the monitor while waiting for
+        // the GIL would deadlock; the concurrent map settles a duplicate evaluation instead
+        PythonContextRegistry.ContextState state = PythonContextRegistry.state(context);
+        String key = "value:" + expression;
+        Value value = state.helpers.get(key);
+        if (value == null || PythonConversion.isNone(value)) {
+            value = context.eval(PYTHON, expression);
+            Value existing = state.helpers.putIfAbsent(key, value);
+            if (existing != null && !PythonConversion.isNone(existing)) {
+                value = existing;
             }
-            return value;
-        });
+        }
+        return value;
     }
 
     private static boolean shouldOffloadPooledExecution() {
-        BeanProvider<ExecutorService> provider = pooledExecutorServiceProvider;
+        BeanProvider<ExecutorService> provider = pooledExecutorServiceProvider();
         return provider != null
             && provider.isResolvable()
             && PythonAsyncioRuntime.currentEventLoopForContext() == null
@@ -761,7 +468,7 @@ public final class PythonContextRuntime {
     }
 
     private static <T> T offloadPooledExecution(Supplier<T> action) {
-        BeanProvider<ExecutorService> provider = pooledExecutorServiceProvider;
+        BeanProvider<ExecutorService> provider = pooledExecutorServiceProvider();
         if (provider == null || !provider.isResolvable()) {
             return action.get();
         }
@@ -792,9 +499,13 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static void injectPooledScript(String packageName, String scriptName, String attribute, Object value) {
-        if (isReuseContext() || pythonPool == null) {
-            Value script = findScript(packageName, scriptName);
-            script.putMember(attribute, GraalPyRuntimeUtil.coerceToContext(value, script.getContext()));
+        if (usePrimaryContext()) {
+            // guest work on the shared primary context: framed, so a close waits for it
+            withPrimaryContext(context -> {
+                Value script = findScript(packageName, scriptName, context);
+                script.putMember(attribute, PythonCoercion.coerceToContext(value, context));
+                return null;
+            });
             return;
         }
         getPythonPool().injectScript(packageName, scriptName, attribute, value);
@@ -810,9 +521,12 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static void injectPooledScriptAsync(String packageName, String scriptName, String attribute, Object value) {
-        if (isReuseContext() || pythonPool == null) {
-            Value script = findScript(packageName, scriptName);
-            script.putMember(attribute, GraalPyRuntimeUtil.asyncMemberValue(script, value));
+        if (usePrimaryContext()) {
+            withPrimaryContext(context -> {
+                Value script = findScript(packageName, scriptName, context);
+                script.putMember(attribute, PythonCoercion.asyncMemberValue(script, value));
+                return null;
+            });
             return;
         }
         getPythonPool().injectScriptAsync(packageName, scriptName, attribute, value);
@@ -829,11 +543,81 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value invokePooled(PythonClassReference classReference, String methodName, Object... args) {
-        return withPooled(classReference, v -> GraalPyRuntimeUtil.invokePythonMethod(
+        return withPooled(classReference, v -> PythonInvocation.invokePythonMethod(
             v,
             methodName,
-            GraalPyRuntimeUtil.coerceArgumentsToContext(v.getContext(), args)
+            PythonCoercion.coerceArgumentsToContext(v.getContext(), args)
         ));
+    }
+
+    /**
+     * Invoke an async method on a pooled class instance and drive the coroutine while the borrowed
+     * context is still leased to the call; the context is returned to the pool once the stage completes.
+     *
+     * @param classReference The Python class reference
+     * @param methodName The method name
+     * @param args Arguments
+     * @return The stage of the coroutine
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static CompletionStage<?> invokePooledAsync(PythonClassReference classReference, String methodName, Object... args) {
+        return withPooledStage(classReference, v -> PythonAsyncioRuntime.toCompletionStage(PythonInvocation.invokePythonMethod(
+            v,
+            methodName,
+            PythonCoercion.coerceArgumentsToContext(v.getContext(), args)
+        )));
+    }
+
+    /**
+     * Invoke an async method on a pooled script and drive the coroutine while the borrowed context
+     * is still leased to the call; the context is returned to the pool once the stage completes.
+     *
+     * @param packageName The package
+     * @param scriptName The script name
+     * @param methodName The method name
+     * @param args Arguments
+     * @return The stage of the coroutine
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static CompletionStage<?> invokePooledScriptAsync(String packageName, String scriptName, String methodName, Object... args) {
+        return withPooledScriptStage(packageName, scriptName, v -> PythonAsyncioRuntime.toCompletionStage(v.getMember(methodName).execute(
+            PythonCoercion.coerceArgumentsToContext(v.getContext(), args)
+        )));
+    }
+
+    private static CompletionStage<?> withPooledStage(PythonClassReference classReference, Function<Value, CompletionStage<?>> fn) {
+        if (shouldOffloadPooledExecution()) {
+            return offloadPooledExecution(() -> withPooledStage(classReference, fn));
+        }
+        if (usePrimaryContext()) {
+            return withPrimaryContext(context -> fn.apply(findClass(classReference, context)));
+        }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop != null) {
+            // the loop's own context: the coroutine continues on the loop, no lease to keep
+            PythonPool pool = getPythonPool();
+            Context context = pool.getEventLoopContext(eventLoop);
+            return PythonContextRegistry.withTrackedExecutionFrame(context, () -> fn.apply(pool.getEventLoopClass(eventLoop, classReference)));
+        }
+        return getPythonPool().withClassUntilComplete(classReference, fn);
+    }
+
+    private static CompletionStage<?> withPooledScriptStage(String packageName, String scriptName, Function<Value, CompletionStage<?>> fn) {
+        if (shouldOffloadPooledExecution()) {
+            return offloadPooledExecution(() -> withPooledScriptStage(packageName, scriptName, fn));
+        }
+        if (usePrimaryContext()) {
+            return withPrimaryContext(context -> fn.apply(findScript(packageName, scriptName, context)));
+        }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop != null) {
+            PythonPool pool = getPythonPool();
+            Context context = pool.getEventLoopContext(eventLoop);
+            return PythonContextRegistry.withTrackedExecutionFrame(context, () -> fn.apply(pool.getEventLoopScript(eventLoop, packageName, scriptName)));
+        }
+        return getPythonPool().withScriptUntilComplete(packageName, scriptName, fn);
     }
 
     /**
@@ -848,17 +632,8 @@ public final class PythonContextRuntime {
     @UsedByGeneratedCode
     public static Value invokePooledScript(String packageName, String scriptName, String methodName, Object... args) {
         return withPooledScript(packageName, scriptName, v -> v.getMember(methodName).execute(
-            GraalPyRuntimeUtil.coerceArgumentsToContext(v.getContext(), args)
+            PythonCoercion.coerceArgumentsToContext(v.getContext(), args)
         ));
-    }
-
-    public static Context getContext() {
-        Context ctx = context;
-        if (ctx == null) {
-            throw new IllegalStateException("GraalPy context has not been initialized. " +
-                "Make sure micronaut-context-python is on the classpath.");
-        }
-        return ctx;
     }
 
     /**
@@ -885,30 +660,13 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value newIntroduction(Context context, PythonClassReference classReference, Object... args) {
-        Value pythonClass = findClass(classReference, context);
-        if (!pythonClass.hasMember("__micronaut_introduction__")) {
-
-            Value abstractMethods = pythonClass.getMember("__abstractmethods__");
-            if (abstractMethods != null && abstractMethods.hasIterator()) {
-                Value iterator = abstractMethods.getIterator();
-                while (iterator.hasIteratorNextElement()) {
-                    String methodName = iterator.getIteratorNextElement().asString();
-                    ProxyExecutable stub = (_) -> null;
-                    pythonClass.putMember(methodName, stub);
-                }
-            }
-            if (!context.getBindings(PYTHON).hasMember("update_abstractmethods")) {
-                context.eval(PYTHON, "from abc import update_abstractmethods");
-            }
-
-            Value updateAbstractMethods = context.getBindings(PYTHON).getMember("update_abstractmethods");
-            updateAbstractMethods.execute(pythonClass);
-            Value isProtocol = pythonClass.getMember("_is_protocol");
-            if (isProtocol != null && isProtocol.isBoolean() && isProtocol.asBoolean()) {
-                pythonClass.putMember("_is_protocol", false);
-            }
-        }
-        return instantiate(classReference, args, pythonClass);
+        // generated code reaches this outside any bridge call: the work is an execution of the context
+        return PythonContextRegistry.withExecutionFrame(context, () -> {
+            Value pythonClass = findClass(classReference, context);
+            // stubs the abstract methods once per class and context; the marker it sets makes later calls a no-op
+            helper(context, PREPARE_INTRODUCTION).execute(pythonClass);
+            return instantiate(classReference, args, pythonClass);
+        });
     }
 
     /**
@@ -970,8 +728,10 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value newInstance(Context context, PythonClassReference classReference, Object... args) {
-        Value pythonClass = findClass(classReference, context);
-        return instantiate(classReference, args, pythonClass);
+        return PythonContextRegistry.withExecutionFrame(context, () -> {
+            Value pythonClass = findClass(classReference, context);
+            return instantiate(classReference, args, pythonClass);
+        });
     }
 
     /**
@@ -998,16 +758,20 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value enumValue(Context context, PythonClassReference classReference, String name) {
+        return PythonContextRegistry.withExecutionFrame(context, () -> enumValueInFrame(context, classReference, name));
+    }
+
+    private static Value enumValueInFrame(Context context, PythonClassReference classReference, String name) {
         Value pythonClass = findClass(classReference, context);
         return withContextClassLoader(() -> {
             Value enumValue = pythonClass.getMember(name);
-            if (enumValue != null && !GraalPyRuntimeUtil.isNone(enumValue)) {
+            if (enumValue != null && !PythonConversion.isNone(enumValue)) {
                 return enumValue;
             }
             Value members = pythonClass.getMember("__members__");
             if (members != null && members.hasHashEntries()) {
                 enumValue = members.getHashValue(name);
-                if (enumValue != null && !GraalPyRuntimeUtil.isNone(enumValue)) {
+                if (enumValue != null && !PythonConversion.isNone(enumValue)) {
                     return enumValue;
                 }
             }
@@ -1073,8 +837,10 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value newUninitializedInstance(Context context, PythonClassReference classReference) {
-        Value pythonClass = findClass(classReference, context);
-        return context.eval(PYTHON, "lambda cls: object.__new__(cls)").execute(pythonClass);
+        return PythonContextRegistry.withExecutionFrame(context, () -> {
+            Value pythonClass = findClass(classReference, context);
+            return uninitializedInstanceFactory(context).execute(pythonClass);
+        });
     }
 
     /**
@@ -1090,9 +856,12 @@ public final class PythonContextRuntime {
     public static Value newUninitializedInstance(Context context,
                                                  PythonClassReference classReference,
                                                  @Nullable Map<String, Object> props) {
-        Value instance = newUninitializedInstance(context, classReference);
-        populateProperties(instance, props);
-        return instance;
+        // one frame from the class lookup to the last member write
+        return PythonContextRegistry.withExecutionFrame(context, () -> {
+            Value instance = newUninitializedInstance(context, classReference);
+            populateProperties(instance, props);
+            return instance;
+        });
     }
 
     /**
@@ -1119,11 +888,13 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value newInstance(Context context, PythonClassReference classReference, @Nullable Map<String, Object> props) {
-        Value pythonClass = findClass(classReference, context);
-        return withContextClassLoader(() -> {
-            Value instance = instantiate(classReference, new Object[0], pythonClass);
-            populateProperties(instance, props);
-            return instance;
+        return PythonContextRegistry.withExecutionFrame(context, () -> {
+            Value pythonClass = findClass(classReference, context);
+            return withContextClassLoader(() -> {
+                Value instance = instantiate(classReference, new Object[0], pythonClass);
+                populateProperties(instance, props);
+                return instance;
+            });
         });
     }
 
@@ -1153,11 +924,13 @@ public final class PythonContextRuntime {
     public static Value newFrozenDataclassInstance(Context context,
                                                    PythonClassReference classReference,
                                                    @Nullable Map<String, Object> props) {
-        Value pythonClass = findClass(classReference, context);
-        return withContextClassLoader(() -> {
-            Value instance = uninitializedInstanceFactory(pythonClass.getContext()).execute(pythonClass);
-            populateProperties(instance, props);
-            return instance;
+        return PythonContextRegistry.withExecutionFrame(context, () -> {
+            Value pythonClass = findClass(classReference, context);
+            return withContextClassLoader(() -> {
+                Value instance = uninitializedInstanceFactory(pythonClass.getContext()).execute(pythonClass);
+                populateProperties(instance, props);
+                return instance;
+            });
         });
     }
 
@@ -1168,7 +941,7 @@ public final class PythonContextRuntime {
                 propertySetter.execute(
                     instance,
                     e.getKey(),
-                    GraalPyRuntimeUtil.coerceToContext(e.getValue(), instance.getContext())
+                    PythonCoercion.coerceToContext(e.getValue(), instance.getContext())
                 );
             }
         }
@@ -1187,22 +960,32 @@ public final class PythonContextRuntime {
         propertySetter(instance.getContext()).execute(
             instance,
             name,
-            GraalPyRuntimeUtil.coerceToContext(value, instance.getContext())
+            PythonCoercion.coerceToContext(value, instance.getContext())
         );
     }
 
     private static Value uninitializedInstanceFactory(Context context) {
-        return helper(context, NEW_UNINITIALIZED_INSTANCE, NEW_UNINITIALIZED_INSTANCE_SOURCE);
+        return helper(context, NEW_UNINITIALIZED_INSTANCE);
     }
 
     private static Value propertySetter(Context context) {
-        return helper(context, SET_INSTANCE_PROPERTY, SET_INSTANCE_PROPERTY_SOURCE);
+        return helper(context, SET_INSTANCE_PROPERTY);
+    }
+
+    /**
+     * The helper that assigns several instance attributes in one guest call.
+     *
+     * @param context The context
+     * @return The helper function
+     */
+    static Value propertiesSetter(Context context) {
+        return helper(context, SET_INSTANCE_PROPERTIES);
     }
 
     private static Value instantiate(PythonClassReference classReference, Object[] args, Value pythonClass) {
         return withContextClassLoader(() -> {
             if (pythonClass.canInstantiate()) {
-                return pythonClass.newInstance(GraalPyRuntimeUtil.coerceArgumentsToContext(pythonClass.getContext(), args));
+                return pythonClass.newInstance(PythonCoercion.coerceArgumentsToContext(pythonClass.getContext(), args));
             } else {
                 throw new InstantiationException("Cannot instantiate class: " + qualifiedName(classReference) + ". Ensure the class is a valid Python class and is non-abstract.");
             }
@@ -1226,10 +1009,34 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value findClass(PythonClassReference classReference) {
-        return findClass(classReference, getContext());
+        // the primary context is shared: the import runs inside a frame of it
+        return withPrimaryContext(context -> findClass(classReference, context));
     }
 
     static Value findClass(PythonClassReference classReference, Context ctx) {
+        // Resolving a class means importing its module and asking inspect.isclass, several guest
+        // calls that dominated the cost of rebuilding a dataclass in a pooled context. Classes are
+        // therefore cached per context; the cache lives and dies with the context state.
+        PythonContextRegistry.ContextState state = PythonContextRegistry.state(ctx);
+        String cacheKey = classCacheKey(classReference);
+        Value cached = state.classes.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+        Value resolved = resolveClass(classReference, ctx);
+        state.classes.put(cacheKey, resolved);
+        return resolved;
+    }
+
+    private static String classCacheKey(PythonClassReference classReference) {
+        String[] nested = classReference.nestedMemberNames();
+        if (nested.length == 0) {
+            return qualifiedName(classReference) + '#' + classReference.rootName();
+        }
+        return qualifiedName(classReference) + '#' + classReference.rootName() + '.' + String.join(".", nested);
+    }
+
+    private static Value resolveClass(PythonClassReference classReference, Context ctx) {
         if (classReference.packageName() == null || PYTHON.equals(classReference.packageName())) {
             Value value = ctx.getBindings(PYTHON).getMember(classReference.rootName());
             if (value == null) {
@@ -1274,8 +1081,8 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value findScript(String packageName, String scriptName) {
-        Context ctx = getContext();
-        return findScript(packageName, scriptName, ctx);
+        // the primary context is shared: the import runs inside a frame of it
+        return withPrimaryContext(context -> findScript(packageName, scriptName, context));
     }
 
     /**
@@ -1318,12 +1125,8 @@ public final class PythonContextRuntime {
     @UsedByGeneratedCode
     public static Value invokeStaticMethod(PythonClassReference classReference, String methodName, Object... args) {
         Context ctx = getContext();
-        enterExecution(ctx);
-        try {
-            return findClass(classReference, ctx).invokeMember(methodName, args);
-        } finally {
-            exitExecution(ctx);
-        }
+        return PythonContextRegistry.withExecutionFrame(ctx, () -> findClass(classReference, ctx)
+            .invokeMember(methodName, PythonCoercion.coerceArgumentsToContext(ctx, args)));
     }
 
     private static Value importPackageMember(Context ctx, String packageName, String importName) {
@@ -1366,32 +1169,109 @@ public final class PythonContextRuntime {
     }
 
     private static @Nullable Value findClassInPackageModules(Context ctx, String packageName, String importName) {
-        Value findClass = helper(ctx, "__micronaut_find_class_in_package_modules", FIND_CLASS_IN_PACKAGE_MODULES_SOURCE);
+        Value findClass = helper(ctx, "__micronaut_find_class_in_package_modules");
         return findClass.execute(packageName, importName);
     }
 
     private static boolean isPythonClass(Context ctx, @Nullable Value value) {
-        if (value == null || GraalPyRuntimeUtil.isNone(value)) {
+        if (value == null || PythonConversion.isNone(value)) {
             return false;
         }
-        Value isClass = helper(ctx, "__micronaut_inspect_isclass", INSPECT_IS_CLASS_SOURCE);
+        Value isClass = helper(ctx, "__micronaut_inspect_isclass");
         return isClass.execute(value).asBoolean();
     }
 
     private static Value importModule(Context ctx, String moduleName) {
         return withContextClassLoader(() -> {
-            Value importModule = helper(ctx, "__micronaut_import_module", IMPORT_MODULE_SOURCE);
+            Value importModule = helper(ctx, "__micronaut_import_module");
             return importModule.execute(moduleName);
         });
     }
 
     /**
-     * Resolve or initialize a cached helper function inside the given context.
+     * Resolve a cached helper function of the {@code micronaut_runtime} module inside the given context.
      * <p>
      * Helpers are stored per-context because Graal values cannot be shared across contexts. Helper
-     * initialization deliberately avoids {@link #withContextLock(Context, Supplier)} because GraalPy
+     * initialization deliberately avoids {@link PythonContextRegistry#withContextLock(Context, Supplier)} because GraalPy
      * operations acquire the Python GIL; taking the context monitor first can deadlock with another
      * thread that already owns the GIL and re-enters Micronaut runtime helper code.
+     *
+     * @param context The context that owns the helper function
+     * @param name The function name in the runtime module
+     * @return The helper function value for the context
+     */
+    /**
+     * Run host-initiated Python code inside an execution frame of the context, so shutdown waits for
+     * it and nested bridge calls share the frame.
+     *
+     * @param context The context the operation executes in
+     * @param operation The operation
+     * @param <T> The result type
+     * @param <X> The checked exception type the operation may throw
+     * @return The operation result
+     * @throws X When the operation throws
+     */
+    @Internal
+    public static <T, X extends Throwable> T withExecutionFrame(Context context, CallableOp<T, X> operation) throws X {
+        return PythonContextRegistry.withExecutionFrame(context, operation);
+    }
+
+    /**
+     * Run a callback inside an execution frame unless its context is closing or already closed, in
+     * which case the callback is skipped; the decision and the execution count are one step.
+     *
+     * @param context The context of the callback
+     * @param operation The callback
+     * @return {@code false} when the callback was skipped
+     */
+    @Internal
+    public static boolean tryWithExecutionFrame(Context context, Runnable operation) {
+        return PythonContextRegistry.tryWithExecutionFrame(context, operation);
+    }
+
+    /**
+     * Run an operation inside an execution frame of a context that must still be tracked and not
+     * closing: unlike {@link #withExecutionFrame} this never creates the state of an unknown (closed)
+     * context. Used for callbacks on channels that outlive a Python context.
+     *
+     * @param context The context
+     * @param operation The operation
+     * @param <T> The result type
+     * @param <X> The exception type
+     * @return The result
+     * @throws X When the operation throws
+     * @throws IllegalStateException When the context is closing or closed
+     */
+    @Internal
+    public static <T, X extends Throwable> T withTrackedExecutionFrame(Context context, CallableOp<T, X> operation) throws X {
+        return PythonContextRegistry.withTrackedExecutionFrame(context, operation);
+    }
+
+    /**
+     * A function of the {@code micronaut_runtime} module, resolved once per context.
+     *
+     * @param context The context
+     * @param name The function name
+     * @return The function
+     */
+    @Internal
+    public static Value helper(Context context, String name) {
+        PythonContextRegistry.ContextState state = PythonContextRegistry.state(context);
+        Value helper = state.helpers.get(name);
+        if (helper != null) {
+            return helper;
+        }
+        helper = runtimeModule(context, state).getMember(name);
+        if (helper == null) {
+            throw new IllegalStateException("The micronaut_runtime module does not define [" + name + "]");
+        }
+        Value existing = state.helpers.putIfAbsent(name, helper);
+        return existing == null ? helper : existing;
+    }
+
+    /**
+     * Resolve a helper installed by an explicit source, for bootstrap code that runs before the
+     * runtime module can be imported.
      *
      * @param context The context that owns the helper function
      * @param name The binding name exposed by the helper source
@@ -1399,14 +1279,14 @@ public final class PythonContextRuntime {
      * @return The helper function value for the context
      */
     static Value helper(Context context, String name, Source source) {
-        ContextState state = contextState(context);
+        PythonContextRegistry.ContextState state = PythonContextRegistry.state(context);
         Value helper = state.helpers.get(name);
         if (helper != null) {
             return helper;
         }
         Value bindings = context.getBindings(PYTHON);
         helper = bindings.getMember(name);
-        if (helper == null || GraalPyRuntimeUtil.isNone(helper)) {
+        if (helper == null || PythonConversion.isNone(helper)) {
             context.eval(source);
             helper = bindings.getMember(name);
         }
@@ -1414,154 +1294,37 @@ public final class PythonContextRuntime {
         return existing == null ? helper : existing;
     }
 
-    /**
-     * Run an action while holding the per-context monitor used for helper initialization and other
-     * context-local mutable runtime state.
-     *
-     * @param context The context whose state should be locked
-     * @param action The action to run while holding the lock
-     * @param <T> The action result type
-     * @return The action result
-     */
-    static <T> T withContextLock(Context context, Supplier<T> action) {
-        synchronized (contextState(context).lock) {
-            return action.get();
+    private static Value runtimeModule(Context context, PythonContextRegistry.ContextState state) {
+        Value module = state.runtimeModule;
+        if (module != null) {
+            return module;
         }
+        try {
+            module = context.eval(IMPORT_RUNTIME_MODULE_SOURCE);
+        } catch (PolyglotException e) {
+            // The virtual file system of this context does not carry the module (a bare context created
+            // outside the application): load it from the classpath resource instead.
+            String source = RUNTIME_MODULE_FALLBACK_SOURCE.get();
+            if (source == null) {
+                try (InputStream inputStream = PythonContextRuntime.class.getClassLoader().getResourceAsStream(RUNTIME_MODULE_RESOURCE)) {
+                    if (inputStream == null) {
+                        throw new IllegalStateException("Resource [" + RUNTIME_MODULE_RESOURCE + "] not found", e);
+                    }
+                    source = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+                } catch (IOException ioException) {
+                    throw new IllegalStateException("Unable to read [" + RUNTIME_MODULE_RESOURCE + "]", ioException);
+                }
+                RUNTIME_MODULE_FALLBACK_SOURCE.compareAndSet(null, source);
+            }
+            module = helper(context, "__micronaut_load_runtime_module", LOAD_RUNTIME_MODULE_SOURCE).execute(source);
+        }
+        state.runtimeModule = module;
+        return module;
     }
 
     static <T extends @Nullable Object> T withPrimaryContext(Function<Context, T> callback) {
         Context primary = getContext();
-        return withContextLock(primary,
-            () -> withExecutionFrame(primary, () -> callback.apply(primary)));
-    }
-
-    /**
-     * Run a void action while holding the per-context monitor.
-     * <p>
-     * This overload exists for call sites that need the same locking discipline as
-     * {@link #withContextLock(Context, Supplier)} but do not produce a value.
-     *
-     * @param context The context whose state should be locked
-     * @param action The action to run while holding the lock
-     */
-    static void withContextLock(Context context, Runnable action) {
-        withContextLock(context, () -> {
-            action.run();
-            return null;
-        });
-    }
-
-    /**
-     * Set the GraalPy context. This method is called by GraalPyContextFactory
-     * during application startup.
-     *
-     * @param context The GraalPy context to set
-     */
-    public static void setContext(Context context) {
-        PythonContextRuntime.context = context;
-        PythonContextRuntime.contextClassLoader = Thread.currentThread().getContextClassLoader();
-    }
-
-    /**
-     * Set the GraalPy context and the application class loader that should be active when
-     * generated bridge classes enter Python from arbitrary runtime threads.
-     *
-     * @param context The GraalPy context to set
-     * @param classLoader The application class loader used to build the context
-     */
-    public static void setContext(Context context, @Nullable ClassLoader classLoader) {
-        PythonContextRuntime.context = context;
-        PythonContextRuntime.contextClassLoader = classLoader;
-    }
-
-    /**
-     * Returns the application class loader associated with the current GraalPy context.
-     *
-     * @return The application class loader
-     */
-    public static @Nullable ClassLoader getContextClassLoader() {
-        return contextClassLoader;
-    }
-
-    /**
-     * Check if the context has been initialized.
-     *
-     * @return true if the context is available, false otherwise
-     */
-    public static boolean isInitialized() {
-        return context != null;
-    }
-
-    /**
-     * Check whether the supplied context is the primary runtime context by identity.
-     * <p>
-     * Identity comparison is intentional because multiple GraalPy contexts can share the same
-     * engine and equivalent configuration but still own incompatible {@link Value} instances.
-     *
-     * @param context The context to compare
-     * @return {@code true} when the context is the primary runtime context
-     */
-    @SuppressWarnings("ReferenceEquality")
-    static boolean isCurrentContext(Context context) {
-        return PythonContextRuntime.context == context;
-    }
-
-    /**
-     * Reset the context to null. This method is called during application shutdown
-     * to ensure proper cleanup and prevent memory leaks.
-     */
-    public static void resetContext() {
-        if (REUSE_CONTEXT.get()) {
-            Context ctx = context;
-            if (ctx == null) {
-                return;
-            }
-            ctx.eval(RELOAD_MODULES_SOURCE);
-            return;
-        }
-        context = null;
-        contextClassLoader = null;
-        pythonPool = null;
-        pooledExecutorServiceProvider = null;
-        synchronized (ACTIVE_EXECUTIONS_LOCK) {
-            CONTEXT_STATES.values().forEach(ContextState::clear);
-            CONTEXT_STATES.clear();
-            ACTIVE_EXECUTIONS.set(0);
-        }
-    }
-
-    private static <T> T withContextClassLoader(Supplier<T> action) {
-        ClassLoader classLoader = contextClassLoader;
-        if (classLoader == null) {
-            return action.get();
-        }
-        Thread thread = Thread.currentThread();
-        ClassLoader previous = thread.getContextClassLoader();
-        if (previous == classLoader) {
-            return action.get();
-        }
-        thread.setContextClassLoader(classLoader);
-        try {
-            return action.get();
-        } finally {
-            thread.setContextClassLoader(previous);
-        }
-    }
-
-    /**
-     * If context reuse is set to true, then the context will never be cleared.
-     * @param reuse tells if the context should be reused
-     */
-    public static void setReuseContext(boolean reuse) {
-        REUSE_CONTEXT.set(reuse);
-    }
-
-    /**
-     * Returns true if the context should be reused.
-     * @return the reuse flag
-     */
-    public static boolean isReuseContext() {
-        return REUSE_CONTEXT.get();
+        return PythonContextRegistry.withExecutionFrame(primary, () -> callback.apply(primary));
     }
 
     /**
@@ -1631,27 +1394,5 @@ public final class PythonContextRuntime {
                 + ", cacheKey=" + cacheKey
                 + ']';
         }
-    }
-
-    private static final class ContextState {
-        private final Object lock = new Object();
-        private final IdentityHashMap<Value, Map<String, Object>> asyncMembers = new IdentityHashMap<>();
-        private final Map<String, Value> helpers = new ConcurrentHashMap<>();
-        private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
-        private final List<Runnable> noContextListeners = new ArrayList<>();
-        private int activeExecutions;
-
-        private void clear() {
-            asyncMembers.clear();
-            helpers.clear();
-            noActiveExecutionsListeners.clear();
-            noContextListeners.clear();
-            activeExecutions = 0;
-        }
-    }
-
-    private static final class ExecutionFrame {
-        private final List<Context> contexts = new ArrayList<>();
-        private final List<Runnable> exitListeners = new ArrayList<>();
     }
 }

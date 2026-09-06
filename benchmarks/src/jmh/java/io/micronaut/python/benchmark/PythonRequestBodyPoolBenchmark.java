@@ -18,6 +18,7 @@ package io.micronaut.python.benchmark;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.python.PythonContextExecutor;
 import io.micronaut.runtime.server.EmbeddedServer;
+import org.openjdk.jmh.annotations.AuxCounters;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Level;
@@ -29,9 +30,11 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
+import org.openjdk.jmh.infra.BenchmarkParams;
 import org.openjdk.jmh.infra.Blackhole;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -124,57 +127,87 @@ public class PythonRequestBodyPoolBenchmark {
     /** Measures request-body conversion with one JMH worker. */
     @Benchmark
     @Threads(1)
-    public void bodyThreads1(Blackhole blackhole) throws IOException, InterruptedException {
+    public void bodyThreads1(Blackhole blackhole, ProcessCpu cpu) throws IOException, InterruptedException {
         blackhole.consume(exchange(bodyRequest));
     }
 
     /** Measures request-body conversion with two JMH workers. */
     @Benchmark
     @Threads(2)
-    public void bodyThreads2(Blackhole blackhole) throws IOException, InterruptedException {
+    public void bodyThreads2(Blackhole blackhole, ProcessCpu cpu) throws IOException, InterruptedException {
         blackhole.consume(exchange(bodyRequest));
     }
 
     /** Measures request-body conversion with four JMH workers. */
     @Benchmark
     @Threads(4)
-    public void bodyThreads4(Blackhole blackhole) throws IOException, InterruptedException {
+    public void bodyThreads4(Blackhole blackhole, ProcessCpu cpu) throws IOException, InterruptedException {
         blackhole.consume(exchange(bodyRequest));
     }
 
     /** Measures request-body conversion with eight JMH workers. */
     @Benchmark
     @Threads(8)
-    public void bodyThreads8(Blackhole blackhole) throws IOException, InterruptedException {
+    public void bodyThreads8(Blackhole blackhole, ProcessCpu cpu) throws IOException, InterruptedException {
         blackhole.consume(exchange(bodyRequest));
     }
 
     /** Measures the pooled control endpoint with one JMH worker. */
     @Benchmark
     @Threads(1)
-    public void controlThreads1(Blackhole blackhole) throws IOException, InterruptedException {
+    public void controlThreads1(Blackhole blackhole, ProcessCpu cpu) throws IOException, InterruptedException {
         blackhole.consume(exchange(controlRequest));
     }
 
     /** Measures the pooled control endpoint with two JMH workers. */
     @Benchmark
     @Threads(2)
-    public void controlThreads2(Blackhole blackhole) throws IOException, InterruptedException {
+    public void controlThreads2(Blackhole blackhole, ProcessCpu cpu) throws IOException, InterruptedException {
         blackhole.consume(exchange(controlRequest));
     }
 
     /** Measures the pooled control endpoint with four JMH workers. */
     @Benchmark
     @Threads(4)
-    public void controlThreads4(Blackhole blackhole) throws IOException, InterruptedException {
+    public void controlThreads4(Blackhole blackhole, ProcessCpu cpu) throws IOException, InterruptedException {
         blackhole.consume(exchange(controlRequest));
     }
 
     /** Measures the pooled control endpoint with eight JMH workers. */
     @Benchmark
     @Threads(8)
-    public void controlThreads8(Blackhole blackhole) throws IOException, InterruptedException {
+    public void controlThreads8(Blackhole blackhole, ProcessCpu cpu) throws IOException, InterruptedException {
         blackhole.consume(exchange(controlRequest));
+    }
+
+    /**
+     * Process CPU time consumed during an iteration, reported next to the throughput as
+     * {@code cpuMillis} per second. The benchmark is latency bound (a blocking client and a thread
+     * hop to the IO executor), so throughput hides runtime regressions; CPU per request does not:
+     * divide {@code cpuMillis/s} by {@code ops/s}. The process total is split evenly between the
+     * benchmark threads so JMH's per-thread sum equals the process figure.
+     */
+    @State(Scope.Thread)
+    @AuxCounters(AuxCounters.Type.EVENTS)
+    public static class ProcessCpu {
+        public long cpuMillis;
+        private long startNanos;
+        private int threads;
+
+        @Setup(Level.Iteration)
+        public void start(BenchmarkParams params) {
+            threads = params.getThreads();
+            startNanos = processCpuNanos();
+        }
+
+        @TearDown(Level.Iteration)
+        public void stop() {
+            cpuMillis = (processCpuNanos() - startNanos) / 1_000_000 / threads;
+        }
+
+        private static long processCpuNanos() {
+            return ((com.sun.management.OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean()).getProcessCpuTime();
+        }
     }
 
     private HttpResponse<String> exchange(HttpRequest request) throws IOException, InterruptedException {

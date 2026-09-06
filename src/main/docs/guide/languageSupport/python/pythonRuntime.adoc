@@ -1,0 +1,50 @@
+Python code runs on GraalPy, which is a Truffle language. Truffle compiles Python code to native code at run time only when the JVM provides a Graal compiler whose version matches the GraalPy artifacts on the classpath. On any other JVM GraalPy still works, but every Python function is interpreted.
+
+The difference is large: a bridge call from a generated Java stub into Python costs about 0.4 µs compiled and about 1 µs interpreted, and Python code itself runs 30 to 60 times slower in the interpreter.
+
+== Choosing a JDK
+
+The GraalPy version is `{graalpyVersion}`. Use a GraalVM JDK from the matching GraalVM release line, for example GraalVM 25.2.x for GraalPy 25.2.x. The JDK's build string then contains the same Truffle line, such as `25.0.4+7-jvmci-25.2-b20`.
+
+The following JVMs run Python interpreted, even though some of them are GraalVM builds:
+
+* A stock OpenJDK or Oracle JDK.
+* A GraalVM JDK from a different release line, for example GraalVM for JDK 25.0.x with GraalPy 25.2.x. The bundled compiler rejects the mismatched Truffle runtime and Truffle falls back to the interpreter.
+
+== Detecting the fallback runtime
+
+At startup the framework logs the active runtime:
+
+[source]
+----
+INFO  i.m.c.python.GraalPyEngineFactory - GraalPy engine created in 1843ms using the GraalVM CE runtime
+----
+
+`Interpreted` in that line means the fallback runtime. Truffle additionally logs `The polyglot engine uses a fallback runtime that does not support runtime compilation to native code` at `WARN` level through the `engine` logger.
+
+== Compiler threads
+
+By default the framework limits the Truffle compiler to one thread with `engine.CompilerThreads=1`. Applications that warm up many Python contexts concurrently can raise the limit; an explicitly configured value always wins over the default:
+
+[configuration]
+----
+graalpy:
+  engine:
+    options:
+      engine.CompilerThreads: 4
+----
+
+== Host class lookup
+
+Python code can look up any class the application class loader can load, through `java.type("...")` and `from ... import ...`. Restrict the lookup to the packages the application needs with `graalpy.context.host-class-lookup`; the JDK, Jakarta and `io.micronaut` packages stay visible because the generated Python code depends on them:
+
+[configuration]
+----
+graalpy:
+  context:
+    host-class-lookup:
+      - com.example
+      - org.reactivestreams
+----
+
+A lookup outside the configured packages raises a Python `KeyError` for `java.type` or an `ImportError` for an import.

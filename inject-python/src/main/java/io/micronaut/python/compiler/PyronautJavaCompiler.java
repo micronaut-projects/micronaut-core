@@ -61,7 +61,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.function.Consumer;
@@ -365,8 +364,10 @@ final class PyronautJavaCompiler {
                                                     JavaFileManager fileManager,
                                                     DiagnosticCollector<JavaFileObject> diagnosticCollector) {
         synchronized (COMPILATION_LOCK) {
-            Properties systemProperties = System.getProperties();
-            Properties originalSystemProperties = (Properties) systemProperties.clone();
+            // System properties changed by annotation processors are restored one by one. Replacing
+            // the whole property table would briefly expose an empty table to other threads of an
+            // embedding JVM such as a build daemon.
+            Map<String, String> originalSystemProperties = snapshotSystemProperties();
             try {
                 return compileJavaIsolated(
                     sources,
@@ -378,10 +379,7 @@ final class PyronautJavaCompiler {
                     diagnosticCollector
                 );
             } finally {
-                synchronized (systemProperties) {
-                    systemProperties.clear();
-                    systemProperties.putAll(originalSystemProperties);
-                }
+                restoreSystemProperties(originalSystemProperties);
             }
         }
     }
@@ -492,8 +490,6 @@ final class PyronautJavaCompiler {
             throw processingFailure(diagnosticCollector, e);
         } finally {
             Thread.currentThread().setContextClassLoader(previous);
-            System.clearProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER);
-            System.clearProperty(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER);
             shutdownProcessors(processors);
             if (pythonProcessingSession == null) {
                 closeClassLoader(classLoader);
@@ -503,6 +499,30 @@ final class PyronautJavaCompiler {
             throw processingFailure(diagnosticCollector, null);
         }
         return IncrementalCompilationTrace.empty();
+    }
+
+    private static Map<String, String> snapshotSystemProperties() {
+        Map<String, String> snapshot = new LinkedHashMap<>();
+        for (String name : System.getProperties().stringPropertyNames()) {
+            String value = System.getProperty(name);
+            if (value != null) {
+                snapshot.put(name, value);
+            }
+        }
+        return snapshot;
+    }
+
+    private static void restoreSystemProperties(Map<String, String> original) {
+        for (String name : System.getProperties().stringPropertyNames()) {
+            if (!original.containsKey(name)) {
+                System.clearProperty(name);
+            }
+        }
+        for (Map.Entry<String, String> entry : original.entrySet()) {
+            if (!entry.getValue().equals(System.getProperty(entry.getKey()))) {
+                System.setProperty(entry.getKey(), entry.getValue());
+            }
+        }
     }
 
     private static void mergeOutputs(Map<String, Set<String>> destination,
