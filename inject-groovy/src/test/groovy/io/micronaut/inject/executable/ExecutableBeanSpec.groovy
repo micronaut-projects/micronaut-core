@@ -18,6 +18,7 @@ package io.micronaut.inject.executable
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.BeanProperties
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.annotation.Wildcard
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.validation.RequiresValidation
@@ -560,6 +561,7 @@ class MyBean {
         assert am.hasAnnotation(TypeUseRuntimeAnn.class)
         assert !am.hasAnnotation(MyEntity.class)
         assert !am.hasAnnotation(Introspected.class)
-        assert am.getAnnotationNames().size() == 1
+        // a wildcard type argument is additionally marked as one
+        assert (am.getAnnotationNames() - Wildcard.name).size() == 1
     }
 }
