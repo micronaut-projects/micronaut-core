@@ -1020,6 +1020,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         applyConfigurationInjectionIfNecessary(methodDefinition.annotationMetadata(), methodDefinition.injectionPoints());
     }
 
+    private void applyConfigurationInjectionIfNecessary(FieldDefinition<ClassElement, FieldElement> fieldDefinition) {
+        applyConfigurationInjectionIfNecessary(fieldDefinition.annotationMetadata(), fieldDefinition.injectionPoints());
+    }
+
     private void applyConfigurationInjectionIfNecessary(AnnotationMetadata annotationMetadata, List<BeanDefinitionInjectionPoint<ClassElement>> injectionPoints) {
         if (annotationMetadata.hasDeclaredAnnotation(RequiresValidation.class)) {
             List<BeanDefinitionInjectionPoint<ClassElement>> validatedPoints = injectionPoints.stream()
@@ -1054,8 +1058,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     /**
      * Post-construct {@link ValidatedBeanDefinition#validate} is required when a validated
      * injection point is a (nullable) bean dependency — null can be injected and only full
-     * bean validation rejects it. Pure {@code @Value}/{@code @Property} constraints are
-     * covered by {@code validateBeanArgument} at inject time.
+     * bean validation rejects it. Pure {@code @Value}/{@code @Property} constraints on
+     * constructor parameters, fields and method parameters are covered by
+     * {@code validateBeanArgument} at inject time.
      */
     private boolean needsPostConstructBeanValidation(List<BeanDefinitionInjectionPoint<ClassElement>> validatedPoints) {
         return validatedPoints.stream().anyMatch(ip ->
@@ -1082,6 +1087,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     @Override
     public BeanDefinitionWriter addFieldInjection(FieldDefinition<ClassElement, FieldElement> fieldDefinition) {
+        applyConfigurationInjectionIfNecessary(fieldDefinition);
         injectCommands.add(new InjectField(fieldDefinition));
         if (shouldKeepInjectionPoint(fieldDefinition.annotationMetadata())) {
             allFields.add(fieldDefinition);
@@ -1389,9 +1395,10 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             ).build((aThis, methodParameters) -> aThis.type().instantiate().returning())
         );
 
-        // Injection-point constraints are validated via validateBeanArgument during construction.
-        // Skip post-construct bean validation so @Singleton beans with constrained @Value
-        // constructor parameters do not require @Introspected (see #12847).
+        // Injection-point constraints are validated via validateBeanArgument while the value is
+        // resolved, for constructor parameters as well as injected fields and method parameters
+        // (AbstractInitializableBeanDefinition). Skip post-construct bean validation so @Singleton
+        // beans with constrained @Value injection points do not require @Introspected (see #12847).
         if (validated && !requiresPostConstructBeanValidation) {
             classDefBuilder.addMethod(
                 MethodDef.override(VALIDATE_BEAN_METHOD)
