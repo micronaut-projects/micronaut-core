@@ -336,8 +336,10 @@ final class ReflectionIntrospectionBuilder<T> implements BeanIntrospection.Build
         private static String propertyOf(String method, String[] writePrefixes) {
             for (String prefix : writePrefixes) {
                 if (!prefix.isEmpty() && method.startsWith(prefix) && method.length() > prefix.length()) {
-                    // decapitalize answers null for null only, which the substring is never
-                    return Objects.requireNonNullElse(NameUtils.decapitalize(method.substring(prefix.length())), method);
+                    // decapitalize answers null for null only, which the substring is never: the check is
+                    // for the static analysis reading the nullable declaration
+                    String property = NameUtils.decapitalize(method.substring(prefix.length()));
+                    return property == null ? method : property;
                 }
             }
             return method;
