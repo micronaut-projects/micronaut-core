@@ -3,6 +3,8 @@ package io.micronaut.inject.injectionpoint.kind
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanResolutionContext
 import io.micronaut.context.BeanResolutionCustomizer
+import io.micronaut.context.DefaultBeanResolutionContext
+import io.micronaut.core.type.Argument
 import io.micronaut.inject.ArgumentInjectionPoint
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ConstructorInjectionPoint
@@ -116,6 +118,48 @@ class InjectionPointKindSpec extends Specification {
         outer.arguments*.name == ['fromMethod']
         !((MethodInjectionPoint) outer).postConstructMethod
         !((MethodInjectionPoint) outer).preDestroyMethod
+    }
+
+    void "a segment pushed with a method injection point answers that injection point as outer"() {
+        given:
+        BeanDefinition<KindConsumer> definition = applicationContext.getBeanDefinition(KindConsumer)
+        MethodInjectionPoint<KindConsumer, ?> setter = definition.injectedMethods.find { it.name == 'setFromMethod' }
+        def resolutionContext = new DefaultBeanResolutionContext(applicationContext, definition)
+
+        when:
+        def path = resolutionContext.path.pushMethodArgumentResolve(definition, setter, setter.arguments[0])
+        def outer = ((ArgumentInjectionPoint) path.currentSegment().get().injectionPoint).outerInjectionPoint
+
+        then:
+        outer.is(setter)
+
+        cleanup:
+        path?.close()
+    }
+
+    void "a method argument segment with no matching method answers itself as outer"() {
+        given:
+        BeanDefinition<KindConsumer> definition = applicationContext.getBeanDefinition(KindConsumer)
+        def resolutionContext = new DefaultBeanResolutionContext(applicationContext, definition)
+        Argument<?> argument = Argument.of(String, 'value')
+
+        when: 'the name matches no injected method'
+        def path = resolutionContext.path.pushMethodArgumentResolve(definition, 'setValue', argument, [argument] as Argument[])
+        def segment = path.currentSegment().get()
+
+        then:
+        ((ArgumentInjectionPoint) segment.injectionPoint).outerInjectionPoint.is(segment)
+
+        when: 'the name matches an injected method but the arguments do not'
+        path = resolutionContext.path.pushMethodArgumentResolve(definition, 'setFromMethod', argument, [argument] as Argument[])
+        segment = path.currentSegment().get()
+
+        then:
+        ((ArgumentInjectionPoint) segment.injectionPoint).outerInjectionPoint.is(segment)
+        segment.name == 'setFromMethod'
+
+        cleanup:
+        path?.close()
     }
 
     void "a factory method argument injection point has the factory method as outer injection point"() {
