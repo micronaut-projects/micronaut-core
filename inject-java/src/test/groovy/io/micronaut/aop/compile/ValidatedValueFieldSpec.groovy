@@ -90,6 +90,31 @@ class SetterBean {
 }
 '''
 
+    /**
+     * Configuration properties are validated post-construct as well, which needs an introspection the
+     * in-memory test class loader cannot provide, so only the invalid value is asserted for this bean.
+     */
+    private static final String CONFIGURATION_SETTER_BEAN = '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Value;
+import jakarta.validation.constraints.Max;
+
+@ConfigurationProperties("a")
+class ConfigurationSetterBean {
+    private Integer number;
+
+    void setNumber(@Max(20) @Value("${a.number}") Integer number) {
+        this.number = number;
+    }
+
+    Integer getNumber() {
+        return number;
+    }
+}
+'''
+
     private static final String CONSTRUCTOR_BEAN = '''
 package test;
 
@@ -120,21 +145,27 @@ class ConstructorBean {
         ClassUtils.forName('test.$FieldBean$Introspection', beanDefinition.beanType.classLoader).isEmpty()
     }
 
-    void "singleton with validated @Value field starts with a valid value"() {
+    void "bean with validated #description starts with a valid value"() {
         given:
-        ApplicationContext context = buildContext('test.FieldBean', FIELD_BEAN, true, ['a.number': 10])
+        ApplicationContext context = buildContext(className, source, true, ['a.number': 10])
 
         when:
-        def bean = getBean(context, 'test.FieldBean')
+        def bean = getBean(context, className)
 
         then:
         bean.getNumber() == 10
 
         cleanup:
         context.close()
+
+        where:
+        description       | className                | source
+        '@Value field'    | 'test.FieldBean'         | FIELD_BEAN
+        '@Property field' | 'test.PropertyFieldBean' | PROPERTY_FIELD_BEAN
+        '@Value setter'   | 'test.SetterBean'        | SETTER_BEAN
     }
 
-    void "singleton with validated #description rejects an invalid value"() {
+    void "bean with validated #description rejects an invalid value"() {
         given:
         ApplicationContext context = buildContext(className, source, true, ['a.number': 40])
 
@@ -150,10 +181,11 @@ class ConstructorBean {
         context.close()
 
         where:
-        description        | className                | source
-        '@Value field'     | 'test.FieldBean'         | FIELD_BEAN
-        '@Property field'  | 'test.PropertyFieldBean' | PROPERTY_FIELD_BEAN
-        '@Value setter'    | 'test.SetterBean'        | SETTER_BEAN
+        description                              | className                      | source
+        '@Value field'                           | 'test.FieldBean'               | FIELD_BEAN
+        '@Property field'                        | 'test.PropertyFieldBean'       | PROPERTY_FIELD_BEAN
+        '@Value setter'                          | 'test.SetterBean'              | SETTER_BEAN
+        '@Value configuration properties setter' | 'test.ConfigurationSetterBean' | CONFIGURATION_SETTER_BEAN
     }
 
     void "singleton with validated @Value constructor parameter rejects an invalid value"() {

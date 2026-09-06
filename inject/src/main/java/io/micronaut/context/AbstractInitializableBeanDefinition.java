@@ -1052,11 +1052,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     protected final Object getValueForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex, Qualifier qualifier) {
         MethodReference methodRef = Objects.requireNonNull(methodInjection)[methodIndex];
         Argument<?> argument = methodRef.arguments[argIndex];
-        try (BeanResolutionContext.Path path = resolutionContext.getPath()
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments)) {
-            Object val = resolveValue(resolutionContext, context, methodRef.annotationMetadata, argument, qualifier);
-            validateBeanArgument(resolutionContext, path, argument, argIndex, val);
-            return val;
+            return resolveValue(resolutionContext, context, methodRef.annotationMetadata, argument, qualifier);
         }
     }
 
