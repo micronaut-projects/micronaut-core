@@ -15,17 +15,14 @@
  */
 package io.micronaut.inject.injectionpoint.kind;
 
-import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.inject.InjectionPoint;
 
-@Factory
+/**
+ * Injected into the factory method that creates {@link KindBean}, so the resolution of a
+ * factory method argument is observable.
+ */
 @Requires(property = "spec.name", value = "InjectionPointKindSpec")
-public class KindFactory {
-
-    @Prototype
-    KindBean kindBean(InjectionPoint<KindBean> injectionPoint, KindDependency dependency) {
-        return new KindBean(injectionPoint);
-    }
+@Prototype
+public class KindDependency {
 }
