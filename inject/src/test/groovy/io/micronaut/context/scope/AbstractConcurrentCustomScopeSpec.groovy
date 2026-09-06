@@ -267,6 +267,52 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         latecomer.isEmpty()
     }
 
+    void "under a lock per bean a destruction that resolves another bean of the scope reaches the instance held"() {
+        given: "two beans, each of which resolves the other as it is destroyed"
+        def scope = new TestScope(true)
+        def firstContext = new TestCreationContext(BeanIdentifier.of("first"))
+        def secondContext = new TestCreationContext(BeanIdentifier.of("second"))
+        def first = scope.getOrCreate(firstContext)
+        def second = scope.getOrCreate(secondContext)
+        def resolvedByFirst = null
+        def resolvedBySecond = null
+        firstContext.created[0].onClose = { resolvedByFirst = scope.getOrCreate(secondContext) }
+        secondContext.created[0].onClose = { resolvedBySecond = scope.getOrCreate(firstContext) }
+
+        when:
+        scope.destroyScope(scope.scopeMap)
+
+        then: "whichever is destroyed first, the other reaches the instance the scope held, not a fresh one"
+        resolvedByFirst.is(second)
+        resolvedBySecond.is(first)
+        firstContext.created.size() == 1
+        secondContext.created.size() == 1
+        firstContext.created[0].closed
+        secondContext.created[0].closed
+        scope.scopeMap.isEmpty()
+    }
+
+    void "under a lock per bean two destructions of one map close each bean once"() {
+        given: "a bean whose destruction lets a second destruction of the map run to the end"
+        def scope = new TestScope(true)
+        def secondDestructionDone = new CountDownLatch(1)
+        def context = new TestCreationContext(BeanIdentifier.of("slow"))
+        scope.getOrCreate(context)
+        def closings = new java.util.concurrent.atomic.AtomicInteger()
+        context.created[0].onClose = {
+            closings.incrementAndGet()
+            Thread.start { scope.destroyScope(scope.scopeMap); secondDestructionDone.countDown() }
+            assert secondDestructionDone.await(5, TimeUnit.SECONDS): "the second destruction should not wait for the first"
+        }
+
+        when:
+        scope.destroyScope(scope.scopeMap)
+
+        then:
+        closings.get() == 1
+        scope.scopeMap.isEmpty()
+    }
+
     void "under a lock per bean the scope map must be a concurrent map"() {
         given:
         def scope = new TestScope(true, new HashMap<BeanIdentifier, CreatedBean<?>>())
@@ -495,11 +541,22 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         @Override
         CreatedBean<?> remove(Object key) {
             def removed = delegate.remove(key)
+            arrive()
+            return removed
+        }
+
+        @Override
+        boolean remove(Object key, Object value) {
+            def removed = delegate.remove(key, value)
+            arrive()
+            return removed
+        }
+
+        private void arrive() {
             if (!arrived) {
                 arrived = true
                 delegate.put(late.id(), late)
             }
-            return removed
         }
     }
 
@@ -600,6 +657,7 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         BeanDefinition<Object> definition
         boolean closed
         boolean failToClose
+        Runnable onClose = {}
 
         @Override
         BeanDefinition<Object> definition() {
@@ -619,6 +677,7 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         @Override
         void close() {
             closed = true
+            onClose.run()
             if (failToClose) {
                 throw new BeanDestructionException(definition, new IllegalStateException("destroy failed on purpose"))
             }

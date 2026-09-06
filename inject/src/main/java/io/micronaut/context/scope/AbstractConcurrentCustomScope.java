@@ -28,8 +28,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -67,6 +68,13 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      * see an empty map, finish, and leave the bean that the creation then publishes to be never destroyed.
      */
     private final ConcurrentMap<BeanIdentifier, Map<BeanIdentifier, CreatedBean<?>>> creationsInFlight = new ConcurrentHashMap<>();
+
+    /**
+     * The beans a destruction in the {@code lockPerBean} mode is closing, while they are still held: a bean is
+     * closed while the scope holds all of them and taken out afterwards, so a second destruction running at the
+     * same time must not close it again.
+     */
+    private final Set<CreatedBean<?>> closing = ConcurrentHashMap.newKeySet();
 
     /**
      * A custom scope annotation.
@@ -487,54 +495,57 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         return null;
     }
 
-    /**
-     * The identifier of any one entry of the map, or {@code null} where it holds none.
-     *
-     * @param scopeMap The scope map
-     * @return An identifier, or {@code null}
-     */
-    @Nullable
-    private static BeanIdentifier firstIdentifierOf(Map<BeanIdentifier, CreatedBean<?>> scopeMap) {
-        final Iterator<BeanIdentifier> identifiers = scopeMap.keySet().iterator();
-        return identifiers.hasNext() ? identifiers.next() : null;
-    }
-
-    /**
-     * The identifier of the next bean a destruction of the given scope map has to take out: one the map holds, or
-     * failing that one whose creation into the map is in flight, or {@code null} where there is neither.
-     *
-     * @param scopeMap The scope map
-     * @return An identifier, or {@code null}
-     */
-    @Nullable
-    private BeanIdentifier nextIdentifierToDestroy(Map<BeanIdentifier, CreatedBean<?>> scopeMap) {
-        final BeanIdentifier held = firstIdentifierOf(scopeMap);
-        return held != null ? held : identifierInFlightFor(scopeMap, Set.of());
-    }
-
     private void destroyScopeLockingPerBean(@Nullable Map<BeanIdentifier, CreatedBean<?>> scopeMap) {
         if (scopeMap == null) {
             return;
         }
-        // the map is drained rather than cleared: each entry is taken out before it is closed, so that two
-        // destructions of one map close each bean once, and a bean that another thread put there while the
-        // destruction runs is closed by the pass that finds it instead of being dropped by a clear(). Nothing
-        // holds creation off in this mode, so the drain repeats until the map stays empty and no creation into
-        // it is in flight; a creation that is in flight is waited for on its identifier's lock and the bean it
-        // publishes is then taken out, rather than being left behind by a drain that saw an empty map
-        for (BeanIdentifier id = nextIdentifierToDestroy(scopeMap); id != null; id = nextIdentifierToDestroy(scopeMap)) {
-            final CreatedBean<?> createdBean;
-            // under the identifier's lock, so that a creation of it in flight is waited for and then taken out
-            synchronized (creationLocks.computeIfAbsent(id, key -> new Object())) {
-                createdBean = scopeMap.remove(id);
-            }
-            if (createdBean != null) {
-                try {
-                    createdBean.close();
-                } catch (BeanDestructionException e) {
-                    handleDestructionException(e);
+        // every bean of a pass is closed while the map still holds all of them, and only then taken out: a
+        // destruction that resolves another bean of the scope - a @PreDestroy reaching a collaborator, a
+        // pre-destroy listener asking for one - then reaches the instance the scope holds, as it does under the
+        // scope-wide lock, rather than a fresh one created into a scope on its way out. Nothing holds creation
+        // off in this mode, so the pass repeats until the map stays empty and no creation into it is in
+        // flight: a bean another thread put there meanwhile is closed by the pass that finds it, and a creation
+        // in flight is waited for on its identifier's lock and the bean it publishes is closed then. Two
+        // destructions of one map running at once close each bean once: the one that marks it as closing
+        // closes it, the other leaves it alone and finds it gone
+        while (true) {
+            final List<CreatedBean<?>> closedInThisPass = new ArrayList<>();
+            for (CreatedBean<?> createdBean : new ArrayList<>(scopeMap.values())) {
+                if (closing.add(createdBean)) {
+                    closeQuietly(createdBean);
+                    closedInThisPass.add(createdBean);
                 }
             }
+            for (BeanIdentifier id = identifierInFlightFor(scopeMap, Set.of()); id != null; id = identifierInFlightFor(scopeMap, Set.of())) {
+                final CreatedBean<?> published;
+                // under the identifier's lock, so that the creation in flight is waited for and what it published is seen
+                synchronized (creationLocks.computeIfAbsent(id, key -> new Object())) {
+                    published = scopeMap.get(id);
+                }
+                if (published != null && closing.add(published)) {
+                    closeQuietly(published);
+                    closedInThisPass.add(published);
+                }
+            }
+            if (closedInThisPass.isEmpty()) {
+                // nothing held, nothing in flight, and nothing another destruction is not already closing
+                return;
+            }
+            for (CreatedBean<?> closedBean : closedInThisPass) {
+                // under the identifier's lock, so that a creation racing this take-out is not taken out unclosed
+                synchronized (creationLocks.computeIfAbsent(closedBean.id(), key -> new Object())) {
+                    scopeMap.remove(closedBean.id(), closedBean);
+                }
+                closing.remove(closedBean);
+            }
+        }
+    }
+
+    private void closeQuietly(CreatedBean<?> createdBean) {
+        try {
+            createdBean.close();
+        } catch (BeanDestructionException e) {
+            handleDestructionException(e);
         }
     }
 
