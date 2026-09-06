@@ -81,9 +81,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Set<String> uris = this.resolveUrisMapping(Get.class, method);
             for (String uri: uris) {
                 MediaType[] produces = resolveProduces(method);
-                UriRoute route = GET(resolveUri(bean, uri,
-                        method,
-                        uriNamingStrategy),
+                String resolvedUri = resolveUri(bean, uri, method, uriNamingStrategy);
+                UriRoute route = GET(resolvedUri,
                         bean,
                         method).produces(produces);
 
@@ -93,10 +92,15 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Created Route: {}", route);
                 }
-                if (method.booleanValue(Get.class, "headRoute").orElse(true)) {
-                    route = HEAD(resolveUri(bean, uri,
-                            method,
-                            uriNamingStrategy),
+                // Only auto-create an implicit HEAD route for this GET method if the
+                // controller does not already declare an explicit @Head method for the
+                // exact same URI. Otherwise, two HEAD routes would match the same request
+                // (this implicit one and the explicit one), and since neither is more specific
+                // than the other, the router cannot resolve the ambiguity and rejects the
+                // request as a duplicate route (see DuplicateRouteException / HTTP 400).
+                if (method.booleanValue(Get.class, "headRoute").orElse(true)
+                        && !hasExplicitHeadMapping(bean, resolvedUri)) {
+                    route = HEAD(resolvedUri,
                             bean,
                             method).produces(produces);
                     if (definition.port > -1) {
@@ -349,6 +353,31 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                 }
             }
         );
+    }
+
+    /**
+     * Determines whether the given bean declares an explicit {@link Head}-mapped method
+     * for the given, already-resolved URI. Used to prevent registering an implicit HEAD
+     * route (auto-derived from a {@code @Get} method) that would otherwise collide with a
+     * user-defined {@code @Head} route mapped to the exact same URI.
+     *
+     * @param bean The bean definition being processed
+     * @param resolvedUri The fully resolved URI of the candidate implicit HEAD route
+     * @return {@code true} if an explicit {@code @Head} route already exists for {@code resolvedUri}
+     */
+    private boolean hasExplicitHeadMapping(BeanDefinition<?> bean, String resolvedUri) {
+        for (ExecutableMethod<?, ?> candidate : bean.getExecutableMethods()) {
+            if (candidate.getAnnotationTypeByStereotype(HttpMethodMapping.class)
+                    .filter(Head.class::equals)
+                    .isPresent()) {
+                for (String headUri : resolveUrisMapping(Head.class, candidate)) {
+                    if (resolveUri(bean, headUri, candidate, uriNamingStrategy).equals(resolvedUri)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private Set<String> resolveUrisMapping(Class<? extends Annotation> httpMethod, ExecutableMethod method) {
