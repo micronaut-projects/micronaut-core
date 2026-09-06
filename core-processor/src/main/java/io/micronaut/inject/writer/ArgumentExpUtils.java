@@ -18,6 +18,7 @@ package io.micronaut.inject.writer;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Wildcard;
 import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -399,7 +400,9 @@ public final class ArgumentExpUtils {
             String argumentName = entry.getKey();
             ClassElement classElement = entry.getValue();
             Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
-            if (CollectionUtils.isNotEmpty(typeArguments) || !classElement.getAnnotationMetadata().isEmpty()) {
+            if (CollectionUtils.isNotEmpty(typeArguments)
+                || !classElement.getAnnotationMetadata().isEmpty()
+                || classElement instanceof WildcardElement) {
                 return buildArgumentWithGenerics(
                     annotationMetadataWithDefaults,
                     owningType,
@@ -444,7 +447,11 @@ public final class ArgumentExpUtils {
         }
 
         // Persist only type annotations added to the type argument
-        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(argumentType.getTypeAnnotationMetadata());
+        MutableAnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(argumentType.getTypeAnnotationMetadata());
+        if (argumentType instanceof WildcardElement wildcardElement) {
+            // The argument is the bound the wildcard resolves to; record that it was a wildcard
+            recordWildcard(annotationMetadata, wildcardElement);
+        }
         boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
 
         boolean isRecursiveType = false;
@@ -518,6 +525,20 @@ public final class ArgumentExpUtils {
      * @param argumentType The argument type
      * @return The expression
      */
+    private static void recordWildcard(MutableAnnotationMetadata annotationMetadata, WildcardElement wildcardElement) {
+        Wildcard.Bound bound;
+        if (wildcardElement.hasExplicitLowerBound()) {
+            bound = Wildcard.Bound.LOWER;
+        } else if (wildcardElement.hasExplicitUpperBound()) {
+            bound = Wildcard.Bound.UPPER;
+        } else {
+            bound = Wildcard.Bound.NONE;
+        }
+        Map<CharSequence, Object> values = Map.of("bound", bound.name());
+        annotationMetadata.addAnnotation(Wildcard.class.getName(), values);
+        annotationMetadata.addDeclaredAnnotation(Wildcard.class.getName(), values);
+    }
+
     private static ExpressionDef buildArgument(String argumentName, ClassElement argumentType) {
         ExpressionDef.Constant argumentTypeConstant = ExpressionDef.constant(TypeDef.erasure(resolveArgument(argumentType)));
         ExpressionDef.Constant argumentNameConstant = ExpressionDef.constant(argumentName);
