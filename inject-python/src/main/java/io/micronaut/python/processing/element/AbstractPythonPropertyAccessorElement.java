@@ -134,8 +134,9 @@ abstract sealed class AbstractPythonPropertyAccessorElement extends AbstractPyth
         return Optional.empty();
     }
 
+    /** Accessors are the same when they accessorise the same property of the same owning type. */
     @Override
-    public boolean equals(Object o) {
+    public final boolean equals(Object o) {
         if (this == o) {
             return true;
         }
@@ -147,7 +148,7 @@ abstract sealed class AbstractPythonPropertyAccessorElement extends AbstractPyth
     }
 
     @Override
-    public int hashCode() {
+    public final int hashCode() {
         return Objects.hash(methodName, owningType);
     }
 

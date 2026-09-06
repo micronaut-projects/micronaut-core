@@ -443,10 +443,8 @@ final class PythonContextRegistry {
         }
         try {
             actions.get(index).run();
-        } catch (RuntimeException e) {
-            LOG.warn("Python cleanup action failed", e);
-            throw e;
         } finally {
+            // the failure, whatever its type, propagates once the rest have run
             runFrom(actions, index + 1);
         }
     }
