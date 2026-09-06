@@ -393,7 +393,7 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
     }
 
     @Nullable
-    @SuppressWarnings({"deprecation", "unchecked", "rawtypes", "NullAway"}) // the base class accepts a null qualifier and resolves it from the argument
+    @SuppressWarnings({"deprecation", "unchecked", "rawtypes", "NullAway", "java:S4449"}) // the base class accepts a null qualifier and resolves it from the argument
     private Object resolveConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int index) {
         Argument<?> argument = constructorArguments[index];
         return switch (Injection.of(argument)) {
@@ -410,7 +410,7 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
     }
 
     @Nullable
-    @SuppressWarnings({"deprecation", "unchecked", "rawtypes", "NullAway"}) // the base class accepts a null qualifier and resolves it from the argument
+    @SuppressWarnings({"deprecation", "unchecked", "rawtypes", "NullAway", "java:S4449"}) // the base class accepts a null qualifier and resolves it from the argument
     private Object resolveFieldValue(BeanResolutionContext resolutionContext, BeanContext context, int index) {
         Argument<?> argument = fieldArguments[index];
         return switch (Injection.of(argument)) {
@@ -427,7 +427,7 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
     }
 
     @Nullable
-    @SuppressWarnings({"deprecation", "unchecked", "rawtypes", "NullAway"}) // the base class accepts a null qualifier and resolves it from the argument
+    @SuppressWarnings({"deprecation", "unchecked", "rawtypes", "NullAway", "java:S4449"}) // the base class accepts a null qualifier and resolves it from the argument
     private Object resolveMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int index) {
         Argument<?> argument = methodArguments[methodIndex][index];
         return switch (Injection.of(argument)) {
@@ -863,7 +863,12 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
                 : metadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE);
             // a scope the builder sets replaces the one the class declares, for the singleton question too:
             // a class declaring @Singleton registered under @Prototype is a prototype
-            boolean isSingleton = singleton != null ? singleton : scope != null ? isSingletonScope(scope) : isSingleton(metadata);
+            boolean isSingleton;
+            if (singleton != null) {
+                isSingleton = singleton;
+            } else {
+                isSingleton = scope != null ? isSingletonScope(scope) : isSingleton(metadata);
+            }
             if (isSingleton && scopeName.isEmpty()) {
                 scopeName = Optional.of(Singleton.class.getName());
             }
@@ -1045,13 +1050,10 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
             for (int i = hierarchy.size() - 1; i >= 0; i--) {
                 Method[] declared = hierarchy.get(i).getDeclaredMethods();
                 for (Method method : declared) {
-                    if (method.isSynthetic() || method.isBridge()) {
-                        continue;
+                    boolean copy = method.isSynthetic() || method.isBridge();
+                    if (!copy && (Modifier.isPrivate(method.getModifiers()) || seen.add(signature(method)))) {
+                        candidates.add(method);
                     }
-                    if (!Modifier.isPrivate(method.getModifiers()) && !seen.add(signature(method))) {
-                        continue;
-                    }
-                    candidates.add(method);
                 }
                 // then the bridges the class declares: a bridge carries the erased signature of the generic
                 // declaration its target overrides, so recording it hides that declaration, which the

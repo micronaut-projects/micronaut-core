@@ -142,6 +142,18 @@ public final class ReflectionExecutableMethod<T, R> extends AbstractReflectionEx
         return (R) invokeTarget(method, instance, arguments);
     }
 
+    @Override
+    public boolean equals(Object o) {
+        // the identity of an executable method is the one of the base class: the declaring type, the name and
+        // the argument types
+        return super.equals(o);
+    }
+
+    @Override
+    public int hashCode() {
+        return super.hashCode();
+    }
+
     /**
      * The metadata of the method resolving its property expressions against the configured environment.
      */

@@ -37,6 +37,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.type.GenericPlaceholder;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -151,9 +152,13 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         // a static @Creator factory is the instantiation route the processors select first, before any constructor
         this.factory = selectFactoryMethod(beanType);
         this.constructor = factory == null ? selectConstructor(beanType) : null;
-        this.constructorArguments = factory != null
-            ? ReflectionArguments.argumentsOf(factory)
-            : constructor == null ? Argument.ZERO_ARGUMENTS : ReflectionArguments.argumentsOf(constructor);
+        if (factory != null) {
+            this.constructorArguments = ReflectionArguments.argumentsOf(factory);
+        } else if (constructor != null) {
+            this.constructorArguments = ReflectionArguments.argumentsOf(constructor);
+        } else {
+            this.constructorArguments = Argument.ZERO_ARGUMENTS;
+        }
         this.beanConstructor = new SelectedBeanConstructor();
         this.properties = Collections.unmodifiableList(discoverProperties());
         Map<String, BeanProperty<T, Object>> byName = new LinkedHashMap<>(properties.size());
@@ -339,12 +344,11 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
      * @return The read properties
      */
     @Override
-    @SuppressWarnings("unchecked")
     public List<BeanReadProperty<T, Object>> getBeanReadProperties() {
         List<BeanReadProperty<T, Object>> readProperties = new ArrayList<>(properties.size());
         for (BeanProperty<T, Object> property : properties) {
             if (!property.isWriteOnly()) {
-                readProperties.add((BeanReadProperty<T, Object>) property);
+                readProperties.add(property);
             }
         }
         return Collections.unmodifiableList(readProperties);
@@ -356,12 +360,11 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
      * @return The write properties
      */
     @Override
-    @SuppressWarnings("unchecked")
     public List<BeanWriteProperty<T, Object>> getBeanWriteProperties() {
         List<BeanWriteProperty<T, Object>> writeProperties = new ArrayList<>(properties.size());
         for (BeanProperty<T, Object> property : properties) {
             if (!property.isReadOnly()) {
-                writeProperties.add((BeanWriteProperty<T, Object>) property);
+                writeProperties.add(property);
             }
         }
         return Collections.unmodifiableList(writeProperties);
@@ -497,14 +500,14 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
 
     @Override
     public T instantiate() throws InstantiationException {
-        return instantiate(true, new Object[0]);
+        return instantiate(true, ArrayUtils.EMPTY_OBJECT_ARRAY);
     }
 
     @Override
     public T instantiate(boolean strictNullable, @Nullable Object... arguments) throws InstantiationException {
-        Method factory = this.factory;
-        Constructor<T> constructor = this.constructor;
-        if (constructor == null && factory == null) {
+        Method selectedFactory = this.factory;
+        Constructor<T> selectedConstructor = this.constructor;
+        if (selectedConstructor == null && selectedFactory == null) {
             throw new InstantiationException("The type " + beanType.getName() + " declares no constructor a reflective introspection can invoke");
         }
         Object[] values = arguments == null ? new Object[0] : arguments; // NOSONAR - the annotation marks the elements nullable, a caller can still pass a null array
@@ -521,10 +524,10 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             }
         }
         try {
-            if (factory != null) {
-                return beanType.cast(factory.invoke(null, values));
+            if (selectedFactory != null) {
+                return beanType.cast(selectedFactory.invoke(null, values));
             }
-            return Objects.requireNonNull(constructor).newInstance(values);
+            return Objects.requireNonNull(selectedConstructor).newInstance(values);
         } catch (InvocationTargetException e) {
             throw new InstantiationException("Cannot instantiate " + beanType.getName() + ": " + e.getTargetException().getMessage(), e.getTargetException());
         } catch (ReflectiveOperationException | IllegalArgumentException e) {
@@ -972,12 +975,14 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
      * run before the compiler adds them and never see them, so a description of a Groovy class does not carry them.
      */
     static boolean isGroovyObjectMethod(Method method) {
-        if ("groovy.lang.GroovyObject".equals(method.getDeclaringClass().getName())) {
+        // the interface is compared by name: Groovy is not on the class path of this module, and the check
+        // must not load it when it is
+        if ("groovy.lang.GroovyObject".equals(method.getDeclaringClass().getName())) { // NOSONAR - the type is not on the class path
             // a default method of the interface itself, inherited by the class
             return true;
         }
         for (Class<?> anInterface : method.getDeclaringClass().getInterfaces()) {
-            if ("groovy.lang.GroovyObject".equals(anInterface.getName())) {
+            if ("groovy.lang.GroovyObject".equals(anInterface.getName())) { // NOSONAR - the type is not on the class path
                 for (Method declared : anInterface.getMethods()) {
                     if (declared.getName().equals(method.getName()) && Arrays.equals(declared.getParameterTypes(), method.getParameterTypes())) {
                         return true;
@@ -1127,13 +1132,25 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             }
             setter = selectSetter();
             boolean fieldFirst = exclusive instanceof Field;
-            Field field = this.field;
-            boolean fieldReadable = field != null && (declares(field) || (fieldAccess && visible.test(field)));
-            boolean fieldWritable = fieldReadable && field != null && !Modifier.isFinal(field.getModifiers());
+            Field selectedField = this.field;
+            boolean fieldReadable = selectedField != null && (declares(selectedField) || (fieldAccess && visible.test(selectedField)));
+            boolean fieldWritable = fieldReadable && selectedField != null && !Modifier.isFinal(selectedField.getModifiers());
             boolean getterReadable = getter != null && (component != null || declares(getter) || (methodAccess && visible.test(getter)));
             boolean setterWritable = setter != null && (declares(setter) || (methodAccess && visible.test(setter)));
-            reader = getterReadable && !fieldFirst ? getter : fieldReadable ? field : getterReadable ? getter : null;
-            writer = setterWritable && !fieldFirst ? setter : fieldWritable ? field : setterWritable ? setter : null;
+            reader = select(fieldFirst, getterReadable ? getter : null, fieldReadable ? selectedField : null);
+            writer = select(fieldFirst, setterWritable ? setter : null, fieldWritable ? selectedField : null);
+        }
+
+        /**
+         * The member a value goes through: the accessor unless the field is declared to come first, then the
+         * field, then whichever of the two there is.
+         */
+        @Nullable
+        private static Member select(boolean fieldFirst, @Nullable Member accessor, @Nullable Member field) {
+            if (accessor != null && !fieldFirst) {
+                return accessor;
+            }
+            return field != null ? field : accessor;
         }
 
         private boolean declares(Member member) {
@@ -1247,11 +1264,17 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
          */
         private int rankOf(Class<?> declaringType) {
             int rank = 0;
-            for (Class<?> type = beanType; type != null && type != Object.class; type = type.getSuperclass()) {
+            Class<?> type = beanType;
+            while (type != Object.class) {
                 if (type == declaringType) {
                     return rank;
                 }
                 rank++;
+                Class<?> superclass = type.getSuperclass();
+                if (superclass == null) {
+                    break;
+                }
+                type = superclass;
             }
             int index = allInterfaces(beanType).indexOf(declaringType);
             return index == -1 ? Integer.MAX_VALUE : rank + index;
@@ -1322,23 +1345,23 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
          */
         <B> List<BeanPropertyMember<B, ?>> members() {
             List<BeanPropertyMember<B, ?>> members = new ArrayList<>(fields.size() + getters.size() + setters.size());
-            for (Field field : fields) {
-                members.add(member(ElementType.FIELD, field.getDeclaringClass(), field.getName(),
-                    withType(ReflectionAnnotations.metadataOf(field), field.getAnnotatedType()),
-                    ReflectionArguments.of(name, field, beanType),
-                    field));
+            for (Field declaredField : fields) {
+                members.add(member(ElementType.FIELD, declaredField.getDeclaringClass(), declaredField.getName(),
+                    withType(ReflectionAnnotations.metadataOf(declaredField), declaredField.getAnnotatedType()),
+                    ReflectionArguments.of(name, declaredField, beanType),
+                    declaredField));
             }
-            for (Method getter : getters) {
-                members.add(member(ElementType.METHOD, getter.getDeclaringClass(), getter.getName(),
-                    withType(ReflectionAnnotations.metadataOf(getter), getter.getAnnotatedReturnType()),
-                    ReflectionArguments.returnOf(name, getter, beanType),
-                    getter));
+            for (Method declaredGetter : getters) {
+                members.add(member(ElementType.METHOD, declaredGetter.getDeclaringClass(), declaredGetter.getName(),
+                    withType(ReflectionAnnotations.metadataOf(declaredGetter), declaredGetter.getAnnotatedReturnType()),
+                    ReflectionArguments.returnOf(name, declaredGetter, beanType),
+                    declaredGetter));
             }
-            for (Method setter : setters) {
-                members.add(member(ElementType.METHOD, setter.getDeclaringClass(), setter.getName(),
-                    ReflectionAnnotations.metadataOf(setter, setter.getParameters()[0]),
-                    ReflectionArguments.of(name, setter.getParameters()[0], beanType),
-                    setter));
+            for (Method declaredSetter : setters) {
+                members.add(member(ElementType.METHOD, declaredSetter.getDeclaringClass(), declaredSetter.getName(),
+                    ReflectionAnnotations.metadataOf(declaredSetter, declaredSetter.getParameters()[0]),
+                    ReflectionArguments.of(name, declaredSetter.getParameters()[0], beanType),
+                    declaredSetter));
             }
             return List.copyOf(members);
         }
@@ -1412,9 +1435,14 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     @Internal
     private final class SelectedBeanConstructor implements BeanConstructor<T> {
 
-        private final AnnotationMetadata metadata = factory != null
-            ? ReflectionAnnotations.metadataOf(factory)
-            : constructor == null ? AnnotationMetadata.EMPTY_METADATA : ReflectionAnnotations.metadataOf(constructor);
+        private final AnnotationMetadata metadata = selectedMetadata();
+
+        private AnnotationMetadata selectedMetadata() {
+            if (factory != null) {
+                return ReflectionAnnotations.metadataOf(factory);
+            }
+            return constructor == null ? AnnotationMetadata.EMPTY_METADATA : ReflectionAnnotations.metadataOf(constructor);
+        }
 
         @Override
         public Class<T> getDeclaringBeanType() {
@@ -1521,9 +1549,20 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         @SuppressWarnings({"unchecked", "rawtypes"})
         public Argument<P> asArgument() {
             if (typed instanceof GenericPlaceholder<?> placeholder) {
-                return Argument.ofTypeVariable((Class) getType(), getName(), placeholder.getVariableName(), getAnnotationMetadata(), typed.getTypeParameters());
+                return Argument.ofTypeVariable((Class) getType(), getName(), placeholder.getVariableName(), this.getAnnotationMetadata(), typed.getTypeParameters());
             }
             return super.asArgument();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            // the identity of a property is the one of the base class: its declaring type and its name
+            return super.equals(o);
+        }
+
+        @Override
+        public int hashCode() {
+            return super.hashCode();
         }
 
         @Override

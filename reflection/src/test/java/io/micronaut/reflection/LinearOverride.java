@@ -7,18 +7,21 @@ public class LinearOverride {
 
     public static class Grand {
         public void act(String value) {
+            // the declaration is what the hierarchy is read from, the method has nothing to do
         }
     }
 
     public static class Parent extends Grand {
         @Override
         public void act(String value) {
+            // the declaration is what the hierarchy is read from, the method has nothing to do
         }
     }
 
     public static class Leaf extends Parent {
         @Override
         public void act(String value) {
+            // the declaration is what the hierarchy is read from, the method has nothing to do
         }
     }
 }

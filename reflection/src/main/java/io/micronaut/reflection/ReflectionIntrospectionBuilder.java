@@ -29,6 +29,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Constructor;
@@ -148,7 +149,7 @@ final class ReflectionIntrospectionBuilder<T> implements BeanIntrospection.Build
 
     @Override
     public T build() {
-        return build(new Object[0]);
+        return build(ArrayUtils.EMPTY_OBJECT_ARRAY);
     }
 
     @Override
@@ -162,16 +163,13 @@ final class ReflectionIntrospectionBuilder<T> implements BeanIntrospection.Build
                 Object result;
                 if (writer.getParameterCount() == 0) {
                     // a flag: the method is called when the flag is set
-                    if (!Boolean.TRUE.equals(value)) {
-                        continue;
-                    }
-                    result = writer.invoke(builder);
+                    result = Boolean.TRUE.equals(value) ? writer.invoke(builder) : null;
                 } else if (value != null) {
                     result = writer.invoke(builder, value);
                 } else if (support.arguments[i].isDeclaredNullable()) {
-                    result = writer.invoke(builder, new Object[] {null});
+                    result = writer.invoke(builder, (Object) null);
                 } else {
-                    continue;
+                    result = null;
                 }
                 // a fluent builder answers itself, or another builder to go on with
                 if (result != null && support.builderType.isInstance(result)) {

@@ -157,6 +157,20 @@ public final class ReflectionAnnotations {
     }
 
     /**
+     * The name of the annotation an alias targets, the one it names by type or the one it names by name.
+     */
+    private static String aliasTarget(AliasFor aliasFor) {
+        return aliasFor.annotation() == Annotation.class ? aliasFor.annotationName() : aliasFor.annotation().getName();
+    }
+
+    /**
+     * Whether an annotation type is retained by the annotations composing it, answered once per type.
+     */
+    private static boolean isRetainable(Class<? extends Annotation> type) {
+        return Boolean.TRUE.equals(RETAINABLE_TYPES.get(type));
+    }
+
+    /**
      * Whether the annotations composing an annotation type retain it: {@link Retainable} is anywhere in its own
      * meta-annotations, so that a framework annotation marks its whole family at once.
      */
@@ -220,7 +234,7 @@ public final class ReflectionAnnotations {
                 Annotation[] contained = containedAnnotations(meta);
                 for (Annotation composed : contained == null ? new Annotation[]{meta} : contained) {
                     Class<? extends Annotation> metaType = composed.annotationType();
-                    if (isIgnored(metaType) || RETAINABLE.equals(metaType.getName()) || !RETAINABLE_TYPES.get(metaType)) {
+                    if (isIgnored(metaType) || RETAINABLE.equals(metaType.getName()) || !isRetainable(metaType)) {
                         continue;
                     }
                     String name = metaType.getName();
@@ -273,15 +287,10 @@ public final class ReflectionAnnotations {
         List<AnnotationValue<?>> stereotypes = new ArrayList<>(introduced.size());
         for (Map.Entry<String, Map<CharSequence, Object>> entry : introduced.entrySet()) {
             String name = entry.getKey();
-            if (composedNames.contains(name)) {
-                continue;
-            }
-            Class<? extends Annotation> introducedType = annotationTypeOf(name, loader);
+            Class<? extends Annotation> introducedType = composedNames.contains(name) ? null : annotationTypeOf(name, loader);
             if (introducedType == null || isIgnored(introducedType)
-                || RETAINABLE.equals(name) || !RETAINABLE_TYPES.get(introducedType)) {
-                continue;
-            }
-            if (!chain.add(introducedType)) {
+                || RETAINABLE.equals(name) || !isRetainable(introducedType)
+                || !chain.add(introducedType)) {
                 continue;
             }
             try {
@@ -333,7 +342,7 @@ public final class ReflectionAnnotations {
             Annotation[] contained = containedAnnotations(meta);
             for (Annotation composed : contained == null ? new Annotation[]{meta} : contained) {
                 Class<? extends Annotation> metaType = composed.annotationType();
-                if (isIgnored(metaType) || RETAINABLE.equals(metaType.getName()) || !RETAINABLE_TYPES.get(metaType)) {
+                if (isIgnored(metaType) || RETAINABLE.equals(metaType.getName()) || !isRetainable(metaType)) {
                     continue;
                 }
                 retained.add(retainedStereotype(composed, aliases.get(metaType.getName()), chain));
@@ -358,12 +367,10 @@ public final class ReflectionAnnotations {
                 continue;
             }
             for (AliasFor aliasFor : member.getAnnotationsByType(AliasFor.class)) {
-                if (written == null && !aliasFor.applyDefault()) {
-                    continue;
-                }
-                String target = aliasFor.annotation() == Annotation.class
-                    ? aliasFor.annotationName()
-                    : aliasFor.annotation().getName();
+                // an alias left at its default and not applying it is skipped before its target is read: the
+                // class-valued member throws when the annotation type it names is not on the class path
+                boolean applies = written != null || aliasFor.applyDefault();
+                String target = applies ? aliasTarget(aliasFor) : "";
                 if (target.isEmpty() || aliasFor.member().isEmpty()) {
                     continue;
                 }
@@ -491,6 +498,7 @@ public final class ReflectionAnnotations {
      * alias does not ask for the default to be applied.
      */
     @Nullable
+    @SuppressWarnings("java:S107") // the alias is recorded from the pieces the caller already resolved
     private static Map<String, Map<Integer, Map<CharSequence, Object>>> alias(
         @Nullable Map<String, Map<Integer, Map<CharSequence, Object>>> overrides,
         Annotation annotation,
@@ -790,13 +798,11 @@ public final class ReflectionAnnotations {
             Object value = read.get(name);
             // the converted forms are compared, and by content: a member holding an array answers a fresh one.
             // both sides are the form the shared conversion gives, the defaults included, so the comparison is
-            // made before the policies below reshape a nested annotation
-            if (value == null) {
-                continue;
-            }
-            // a member equal to its default is left out, as it is at compilation time - unless the class file
-            // says the source wrote it, which is the one thing an instance cannot tell and the processors record
-            if (Objects.deepEquals(value, defaults.get(name)) && (written == null || !written.contains(name))) {
+            // made before the policies below reshape a nested annotation. A member equal to its default is left
+            // out, as it is at compilation time - unless the class file says the source wrote it, which is the
+            // one thing an instance cannot tell and the processors record
+            if (value == null
+                || (Objects.deepEquals(value, defaults.get(name)) && (written == null || !written.contains(name)))) {
                 continue;
             }
             values.put(name, memberValue(annotation, member, value));
@@ -1101,33 +1107,31 @@ public final class ReflectionAnnotations {
                 continue;
             }
             Annotation[] contained = containedAnnotations(meta);
+            Repeatable repeatable = contained == null ? metaType.getAnnotation(Repeatable.class) : null;
             if (contained != null) {
                 for (Annotation repeated : contained) {
                     addRepeatedStereotype(metadata, repeated, metaType, parents, declared,
                         overridesFor(overrides, repeated.annotationType().getName(), occurrences));
                 }
-                continue;
-            }
-            Repeatable repeatable = metaType.getAnnotation(Repeatable.class);
-            if (repeatable != null) {
+            } else if (repeatable != null) {
                 addRepeatedStereotype(metadata, meta, repeatable.value(), parents, declared,
                     overridesFor(overrides, metaType.getName(), occurrences));
-                continue;
-            }
-            register(metadata, metaType);
-            // resolved once: reading it counts the occurrence, and the members it overrides are what the next
-            // level down aliases from
-            Map<CharSequence, Object> applied = overridesFor(overrides, metaType.getName(), occurrences);
-            // the overrides are applied while the values are read, not after: what the stereotype derives from
-            // itself - the retained tree below it, and a member aliasing another member of the same annotation -
-            // is derived from the overridden values, as the processors cascade an override down to the leaves
-            Map<CharSequence, Object> values = overridden(values(meta, new HashSet<>(), applied), applied);
-            if (declared) {
-                metadata.addDeclaredStereotype(parents, metaType.getName(), values);
             } else {
-                metadata.addStereotype(parents, metaType.getName(), values);
+                register(metadata, metaType);
+                // resolved once: reading it counts the occurrence, and the members it overrides are what the next
+                // level down aliases from
+                Map<CharSequence, Object> applied = overridesFor(overrides, metaType.getName(), occurrences);
+                // the overrides are applied while the values are read, not after: what the stereotype derives from
+                // itself - the retained tree below it, and a member aliasing another member of the same annotation -
+                // is derived from the overridden values, as the processors cascade an override down to the leaves
+                Map<CharSequence, Object> values = overridden(values(meta, new HashSet<>(), applied), applied);
+                if (declared) {
+                    metadata.addDeclaredStereotype(parents, metaType.getName(), values);
+                } else {
+                    metadata.addStereotype(parents, metaType.getName(), values);
+                }
+                addStereotypes(metadata, metaType, chain(parents, metaType), declared, aliasedMembers(meta, applied));
             }
-            addStereotypes(metadata, metaType, chain(parents, metaType), declared, aliasedMembers(meta, applied));
         }
     }
 
@@ -1245,11 +1249,10 @@ public final class ReflectionAnnotations {
      * @throws IllegalStateException When the member cannot be read
      */
     private static Object memberValue(Annotation annotation, Method member, Object value) {
-        if (value instanceof AnnotationValue<?>) {
-            if (readMember(annotation, member) instanceof Annotation nested) {
-                return valueOf(nested);
-            }
-        } else if (value instanceof AnnotationValue<?>[]) {
+        if (value instanceof AnnotationValue<?> && readMember(annotation, member) instanceof Annotation nested) {
+            return valueOf(nested);
+        }
+        if (value instanceof AnnotationValue<?>[]) {
             // an array of annotations is walked element by element: each element is an annotation of its own
             if (readMember(annotation, member) instanceof Annotation[] nested) {
                 AnnotationValue<?>[] converted = new AnnotationValue[nested.length];
@@ -1443,7 +1446,12 @@ public final class ReflectionAnnotations {
             int hashCode = 0;
             for (Method declared : MEMBERS.get(annotationType)) {
                 Object value = member(declared);
-                int valueHash = value == null ? 0 : (value.getClass().isArray() ? arrayHashCode(value) : value.hashCode());
+                int valueHash;
+                if (value == null) {
+                    valueHash = 0;
+                } else {
+                    valueHash = value.getClass().isArray() ? arrayHashCode(value) : value.hashCode();
+                }
                 hashCode += (127 * declared.getName().hashCode()) ^ valueHash;
             }
             return hashCode;

@@ -2,7 +2,6 @@ package io.micronaut.core.annotation
 
 import spock.lang.Specification
 
-import java.lang.annotation.Annotation
 import java.lang.annotation.Retention
 import java.lang.annotation.RetentionPolicy
 import java.lang.reflect.InvocationHandler

@@ -2,12 +2,11 @@ package io.micronaut.reflection
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospector
 import spock.lang.Specification
 
 /**
- * The {@link Introspected} members an application configuration supplies for the types it allows to be
+ * The {@link io.micronaut.core.annotation.Introspected} members an application configuration supplies for the types it allows to be
  * described reflectively: a type of a library, or one compiled without the processor, carries no annotation of
  * its own and has no other way to say how it is to be described.
  */

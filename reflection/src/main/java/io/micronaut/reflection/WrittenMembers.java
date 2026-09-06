@@ -231,19 +231,22 @@ final class WrittenMembers {
         private void constantPool() throws IOException {
             int count = in.readUnsignedShort();
             strings = new String[count];
-            for (int i = 1; i < count; i++) {
+            int i = 1;
+            while (i < count) {
                 int tag = in.readUnsignedByte();
+                // a long or a double takes two entries
+                int entries = 1;
                 switch (tag) {
                     case 1 -> strings[i] = in.readUTF();
                     case 7, 8, 16, 19, 20 -> skip(2);
                     case 15 -> skip(3);
                     case 5, 6 -> {
                         skip(8);
-                        // a long or a double takes two entries
-                        i++;
+                        entries = 2;
                     }
                     default -> skip(4);
                 }
+                i += entries;
             }
         }
 

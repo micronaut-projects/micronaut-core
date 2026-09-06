@@ -352,7 +352,7 @@ public final class AnnotationMetadataSupport {
      * @param classLoader The classloader to retrieve the type
      * @return The annotation
      */
-    static Optional<Class<? extends Annotation>> getAnnotationType(String name, ClassLoader classLoader) {
+    static Optional<Class<? extends Annotation>> getAnnotationType(String name, @Nullable ClassLoader classLoader) {
         final Class<? extends Annotation> type = ANNOTATION_TYPES.get(name);
         if (type != null) {
             // a type the bootstrap loader defines cannot be shadowed, and a caller that asks with no loader of
@@ -548,12 +548,6 @@ public final class AnnotationMetadataSupport {
     }
 
     /**
-     * Annotation proxy handler.
-     *
-     * @param <A> The annotation type
-     */
-
-    /**
      * An array member of an annotation, comparing by content rather than by identity, so that the maps holding
      * two annotations' members can be compared with {@link Map#equals}.
      */
@@ -566,10 +560,28 @@ public final class AnnotationMetadataSupport {
 
         @Override
         public int hashCode() {
-            return array instanceof Object[] members ? Arrays.deepHashCode(members) : 0;
+            // the hash of the content, for a primitive array as for an object one, so that equal members hash
+            // alike and the members of a type do not all fall into one bucket
+            return switch (array) {
+                case Object[] members -> Arrays.deepHashCode(members);
+                case int[] members -> Arrays.hashCode(members);
+                case long[] members -> Arrays.hashCode(members);
+                case boolean[] members -> Arrays.hashCode(members);
+                case byte[] members -> Arrays.hashCode(members);
+                case char[] members -> Arrays.hashCode(members);
+                case short[] members -> Arrays.hashCode(members);
+                case float[] members -> Arrays.hashCode(members);
+                case double[] members -> Arrays.hashCode(members);
+                default -> Objects.hashCode(array);
+            };
         }
     }
 
+    /**
+     * Annotation proxy handler.
+     *
+     * @param <A> The annotation type
+     */
     private static class AnnotationProxyHandler<A extends Annotation> implements InvocationHandler, AnnotationValueProvider<A> {
         private final int hashCode;
         private final Class<A> annotationClass;

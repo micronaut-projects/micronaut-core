@@ -349,15 +349,12 @@ public record MethodHierarchy(Declaration local,
         Parameter[] parameters = candidate.getParameters();
         for (int i = 0; i < parameters.length; i++) {
             Argument<?> resolved = ReflectionArguments.of(parameters[i], context);
-            if (resolved.getType() == parameterTypes[i]) {
-                continue;
-            }
             // a variable the reading type leaves open stands for the erasure of its bound, which is what a
             // read method of a type that is generic itself erases to
-            if (resolved instanceof GenericPlaceholder<?> && resolved.getType().isAssignableFrom(parameterTypes[i])) {
-                continue;
+            boolean open = resolved instanceof GenericPlaceholder<?> && resolved.getType().isAssignableFrom(parameterTypes[i]);
+            if (resolved.getType() != parameterTypes[i] && !open) {
+                return false;
             }
-            return false;
         }
         return true;
     }

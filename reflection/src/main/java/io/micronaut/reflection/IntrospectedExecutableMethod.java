@@ -76,4 +76,16 @@ public final class IntrospectedExecutableMethod<T, R> extends AbstractReflection
     public R invokeUnsafe(T instance, @Nullable Object... arguments) {
         return beanMethod.invoke(instance, arguments);
     }
+
+    @Override
+    public boolean equals(Object o) {
+        // the identity of an executable method is the one of the base class: the declaring type, the name and
+        // the argument types
+        return super.equals(o);
+    }
+
+    @Override
+    public int hashCode() {
+        return super.hashCode();
+    }
 }
