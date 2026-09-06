@@ -1,5 +1,6 @@
 package io.micronaut.reflection
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Requires
@@ -11,9 +12,8 @@ import io.micronaut.inject.MethodReference
 import jakarta.inject.Singleton
 import spock.lang.AutoCleanup
 import spock.lang.Shared
-import spock.lang.Specification
 
-class ReflectionExecutablesSpec extends Specification {
+class ReflectionExecutablesSpec extends AbstractTypeElementSpec {
 
     @Shared
     @AutoCleanup
@@ -212,6 +212,55 @@ methods of the type are reported in"
         ReflectionExecutables.constructorArguments(introspection, Pair.getConstructor(String, String))
                 .is(introspection.constructorArguments)
         ReflectionExecutables.constructorArguments(introspection, other)*.type == [String]
+    }
+
+    void "a constructor a generated introspection describes is the bean constructor generated for it"() {
+        given: "an introspection compiled to describe every constructor of the type"
+        BeanIntrospection introspection = buildBeanIntrospection("test.Both", '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(constructors = true)
+public class Both {
+    private final String first;
+    private final String second;
+
+    public Both(String first, String second) {
+        this.first = first;
+        this.second = second;
+    }
+
+    public Both(String first) {
+        this(first, null);
+    }
+
+    public String getFirst() {
+        return first;
+    }
+
+    public String getSecond() {
+        return second;
+    }
+}
+''')
+        def other = introspection.beanType.getConstructor(String)
+
+        expect: "the introspection selects the two argument constructor, and describes the other one"
+        introspection.constructorArguments.length == 2
+        introspection.constructors*.arguments*.length == [2, 1]
+
+        when:
+        def constructor = ReflectionExecutables.beanConstructor(introspection, other)
+
+        then: "the generated bean constructor, not one built over the raw metadata"
+        constructor.is(introspection.constructors[1])
+        !(constructor instanceof ReflectionBeanConstructor)
+        constructor.arguments*.type == [String]
+        constructor.instantiate("only").first == "only"
+
+        and: "its arguments are the ones the introspection describes"
+        ReflectionExecutables.constructorArguments(introspection, other).is(constructor.arguments)
     }
 
     void "a constructor a reflective introspection knows is one of its own bean constructors"() {

@@ -162,25 +162,29 @@ public final class ReflectionExecutables {
     }
 
     /**
-     * The arguments of the constructor named by the caller. An introspection describes one constructor;
-     * when the caller names another one of the type, its arguments are read from the constructor itself.
+     * The arguments of the constructor named by the caller: the ones the introspection describes when it
+     * describes that constructor, else the ones read from the constructor itself.
      *
      * @param introspection The introspection of the declaring type
      * @param constructor   The constructor
      * @return The arguments
      */
     public static Argument<?>[] constructorArguments(BeanIntrospection<?> introspection, Constructor<?> constructor) {
-        Argument<?>[] arguments = introspection.getConstructorArguments();
-        if (Arrays.equals(Argument.toClassArray(arguments), constructor.getParameterTypes())) {
-            return arguments;
+        Class<?>[] parameterTypes = constructor.getParameterTypes();
+        for (BeanConstructor<?> candidate : introspection.getConstructors()) {
+            Argument<?>[] arguments = candidate.getArguments();
+            if (Arrays.equals(Argument.toClassArray(arguments), parameterTypes)) {
+                return arguments;
+            }
         }
         return ReflectionArguments.argumentsOf(constructor);
     }
 
     /**
      * The constructor named by the caller, with its arguments and its annotation metadata: the one the
-     * introspection describes when it is that constructor, another one a {@link ReflectiveIntrospection}
-     * knows, else one read from the constructor itself.
+     * introspection describes when it describes that constructor, else one read from the constructor itself.
+     * A generated introspection describes every constructor when compiled with
+     * {@code @Introspected(constructors = true)}, a {@link ReflectiveIntrospection} always does.
      *
      * @param introspection The introspection of the declaring type, can be {@code null}
      * @param constructor   The constructor
@@ -190,10 +194,7 @@ public final class ReflectionExecutables {
     public static <T> BeanConstructor<T> beanConstructor(@Nullable BeanIntrospection<T> introspection, Constructor<T> constructor) {
         Class<?>[] parameterTypes = constructor.getParameterTypes();
         if (introspection != null) {
-            List<BeanConstructor<T>> known = introspection instanceof ReflectiveIntrospection<T> reflective
-                ? reflective.getConstructors()
-                : List.of(introspection.getConstructor());
-            for (BeanConstructor<T> candidate : known) {
+            for (BeanConstructor<T> candidate : introspection.getConstructors()) {
                 if (Arrays.equals(Argument.toClassArray(candidate.getArguments()), parameterTypes)) {
                     return candidate;
                 }
