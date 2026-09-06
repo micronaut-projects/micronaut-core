@@ -64,9 +64,7 @@ class ProxiedFactoryPreDestroySpec extends AbstractTypeElementSpec {
         context.destroyBean(disposable)
 
         then: 'the callback is dispatched by the target definition, so the pre-destroy advice sees it'
-        // One chain runs for the event, so the intercepted method is the phase method dispose(), not the
-        // callback; proceed() in the last interceptor is what reaches close().
-        callsType.RECORDED == ['AROUND:use', 'use', 'PRE_DESTROY:dispose', 'close']
+        callsType.RECORDED == ['AROUND:use', 'use', 'PRE_DESTROY:close', 'close']
 
         cleanup:
         context.close()

@@ -156,4 +156,72 @@ class Rocket extends Weapon {
         cleanup:
         context.close()
     }
+
+    void 'test the chain of an event describes the callback the bean declares'() {
+        given:
+        ApplicationContext context = buildContext('''
+package chain.described;
+
+import io.micronaut.aop.*;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
+@interface Watched {
+}
+
+@Singleton
+@InterceptorBinding(value = Watched.class, kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(value = Watched.class, kind = InterceptorKind.PRE_DESTROY)
+class WatchingInterceptor implements MethodInterceptor<Object, Object> {
+    static final List<String> SEEN = new ArrayList<>();
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> ctx) {
+        SEEN.add(ctx.getExecutableMethod().getDeclaringType().getSimpleName()
+            + "." + ctx.getExecutableMethod().getMethodName()
+            + " target=" + ctx.getExecutableMethod().getTargetMethod().getName());
+        return ctx.proceed();
+    }
+}
+
+class Base {
+    @PostConstruct void initBase() {}
+    @PreDestroy void closeBase() {}
+}
+
+@Singleton
+@Watched
+class Described extends Base {
+    @PostConstruct void initOwn() {}
+    @PreDestroy void closeOwn() {}
+}
+''')
+        def seen = context.classLoader.loadClass('chain.described.WatchingInterceptor').SEEN
+
+        when:
+        def bean = context.getBean(context.classLoader.loadClass('chain.described.Described'))
+
+        then: 'the most derived callback, not a synthetic initialize on the definition'
+        seen == ['Described.initOwn target=initOwn']
+
+        and: 'and getTargetMethod() resolves rather than throwing'
+        noExceptionThrown()
+
+        when:
+        seen.clear()
+        context.destroyBean(bean)
+
+        then:
+        seen == ['Described.closeOwn target=closeOwn']
+
+        cleanup:
+        context.close()
+    }
 }

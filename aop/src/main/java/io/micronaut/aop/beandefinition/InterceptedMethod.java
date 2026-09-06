@@ -231,7 +231,7 @@ abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>,
      * @throws NoSuchMethodError if the method doesn't exist
      */
     @Override
-    public final Method getTargetMethod() {
+    public Method getTargetMethod() {
         if (method == null) {
             Method resolvedMethod = ReflectionUtils.getRequiredMethod(declaringType, methodName, argTypes);
             resolvedMethod.setAccessible(true);

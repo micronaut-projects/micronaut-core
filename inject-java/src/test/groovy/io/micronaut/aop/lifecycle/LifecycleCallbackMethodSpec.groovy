@@ -82,7 +82,7 @@ class MyBean {
 
         then: 'the event is the intercepted method, and it ran once'
         interceptorType.intercepted == 1
-        interceptorType.seen.methodName == 'initialize'
+        interceptorType.seen.methodName == 'init'
         interceptorType.seen.declaringType == beanType
         interceptorType.seen.arguments.length == 0
 
@@ -181,7 +181,7 @@ class MyBean {
         then:
         interceptorType.intercepted == 1
         interceptorType.kind == io.micronaut.aop.InterceptorKind.PRE_DESTROY
-        interceptorType.seen.methodName == 'dispose'
+        interceptorType.seen.methodName == 'close'
         interceptorType.seen.declaringType == beanType
         bean.destroys == 1
         definition.preDestroyExecutableMethods[0].declaringType == beanType
@@ -260,8 +260,8 @@ class Sub extends Base {
         BeanDefinition<?> definition = getBeanDefinition(context, subType.name)
 
         then: 'one interception precedes both callbacks, the superclass one first'
-        events.LOG == ['intercept initialize', 'baseInit', 'subInit']
-        interceptorType.names == ['initialize']
+        events.LOG == ['intercept subInit', 'baseInit', 'subInit']
+        interceptorType.names == ['subInit']
         interceptorType.declaringTypes == [subType]
 
         and: 'the definition exposes the callbacks in that order'
@@ -506,7 +506,7 @@ class MyBean {
         BeanDefinition<?> definition = getBeanDefinition(context, beanType.name)
 
         then: 'one interception ran both callbacks once'
-        interceptorType.names == ['initialize']
+        interceptorType.names == ['privateInit']
         bean.invoked.toSet() == ['packagePrivateInit', 'privateInit'].toSet()
         bean.invoked.size() == 2
         definition.postConstructExecutableMethods*.methodName.toSet() == ['packagePrivateInit', 'privateInit'].toSet()
@@ -732,7 +732,7 @@ class MyBean {
         then:
         bean instanceof io.micronaut.aop.Intercepted
         bean.inits == 1
-        interceptorType.METHODS == [POST_CONSTRUCT: ['initialize'], AROUND: ['work']]
+        interceptorType.METHODS == [POST_CONSTRUCT: ['init'], AROUND: ['work']]
         definition.executableMethods*.methodName == ['work']
         definition.postConstructExecutableMethods*.methodName == ['init']
 

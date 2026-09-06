@@ -70,7 +70,7 @@ class MyBean {
         BeanDefinition<?> definition = getBeanDefinition(context, beanType.name)
 
         then:
-        interceptorType.EVENTS == ['POST_CONSTRUCT:initialize']
+        interceptorType.EVENTS == ['POST_CONSTRUCT:init']
         beanType.EVENTS == ['init']
         definition.postConstructExecutableMethods*.methodName == ['init']
         definition.preDestroyExecutableMethods*.methodName == ['close']
@@ -80,7 +80,7 @@ class MyBean {
         context.stop()
 
         then:
-        interceptorType.EVENTS == ['POST_CONSTRUCT:initialize', 'PRE_DESTROY:dispose']
+        interceptorType.EVENTS == ['POST_CONSTRUCT:init', 'PRE_DESTROY:close']
         beanType.EVENTS == ['init', 'close']
 
         cleanup:
@@ -153,7 +153,7 @@ class MyBean {
 
         then:
         bean.closes == 1
-        interceptorType.EVENTS == ['PRE_DESTROY:dispose']
+        interceptorType.EVENTS == ['PRE_DESTROY:close']
 
         cleanup:
         context.close()
@@ -231,7 +231,7 @@ class Sub extends Base {
 
         and: 'the hierarchy is intercepted once, then every callback runs in the order the definition invokes them'
         invocationOrder == ['baseClose', 'subClose']
-        interceptorType.EVENTS.findAll { it != 'intercept NoCallback.dispose' } == ['intercept Sub.dispose'] + invocationOrder
+        interceptorType.EVENTS.findAll { it != 'intercept NoCallback.dispose' } == ['intercept Sub.subClose'] + invocationOrder
 
         cleanup:
         context.close()
@@ -294,7 +294,7 @@ class MyBean {
         then:
         result == 'done'
         bean instanceof io.micronaut.aop.Intercepted
-        interceptorType.EVENTS == ['POST_CONSTRUCT:initialize', 'AROUND:work']
+        interceptorType.EVENTS == ['POST_CONSTRUCT:init', 'AROUND:work']
 
         and: 'no definition of the type, proxy or target, lists the callback as an executable method'
         !definitions.empty
@@ -524,7 +524,7 @@ class DirectFailure {
         !directType.afterFailureRan
 
         and: 'each event was intercepted once'
-        interceptorType.intercepted == ['PrivateFailure.initialize', 'DirectFailure.initialize']
+        interceptorType.intercepted == ['PrivateFailure.afterFailure', 'DirectFailure.afterFailure']
 
         cleanup:
         context.close()
@@ -709,9 +709,9 @@ class MyBean extends Base {
         interceptorType.instances == 1
         interceptorType.EVENTS == [
                 '1:AROUND_CONSTRUCT',
-                '1:POST_CONSTRUCT:initialize',
+                '1:POST_CONSTRUCT:init',
                 '1:AROUND:work',
-                '1:PRE_DESTROY:dispose'
+                '1:PRE_DESTROY:close'
         ]
 
         cleanup:
@@ -787,7 +787,7 @@ class ResourceFactory {
 
         then:
         resource.closed
-        interceptorType.methodName == 'dispose'
+        interceptorType.methodName == 'close'
         interceptorType.declaringType == resourceType
         interceptorType.target.is(resource)
         definition.preDestroyExecutableMethods[0].declaringType == resourceType
