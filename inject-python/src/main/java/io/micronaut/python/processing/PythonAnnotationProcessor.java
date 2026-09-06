@@ -292,9 +292,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                         .flatMap(tr -> tr.exportedTypes().stream())
                         .collect(Collectors.toSet());
                     for (PythonAstParser.TransformResult transformResult : transformedList) {
-                        for (String srcDir : srcDirs) {
+                        for (String configuredSrcDir : srcDirs) {
                             Source source = transformResult.originalSource();
-                            String path = source.getPath();
+                            String srcDir = normalizeResourcePath(configuredSrcDir);
+                            String path = normalizeResourcePath(source.getPath());
                             int i = path.indexOf(srcDir);
                             if (i == -1) {
                                 continue;
@@ -789,6 +790,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private static String runtimeFilename(String filePath) {
         String relativePath = filePath.substring(APPLICATION_PATH.length());
         return "/graalpy_vfs/" + relativePath;
+    }
+
+    static String normalizeResourcePath(String path) {
+        return path.replace('\\', '/');
     }
 
     private static String cacheFilePath(String sourcePath, String cachePath) {
