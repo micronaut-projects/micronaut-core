@@ -157,16 +157,18 @@ public final class ReflectionArguments {
     }
 
     /**
-     * Converts the return type of a method to an {@link Argument} carrying the type-use annotations of the
-     * return type. An annotation that targets the method alone belongs to the method, not to its return type;
-     * one written before the return type whose target includes {@code TYPE_USE} annotates both (JLS 9.7.4),
-     * and is on both, as the processors record it.
+     * Converts the return type of a method to an {@link Argument} whose metadata holds the annotations of the
+     * method and the type-use annotations of its return type, as {@link #of(Parameter)} builds the argument of
+     * a parameter from the parameter and its type: a generated executable method of a bean definition reports
+     * the return value with the annotations of the method on it, and a constraint declared on a method
+     * constrains the value it returns. An annotation written before the return type whose target includes
+     * {@code TYPE_USE} is on both the method and the type (JLS 9.7.4) and is read once.
      *
      * @param method The method
      * @return The argument
      */
     public static Argument<?> returnOf(Method method) {
-        return toArgument(null, method.getAnnotatedReturnType(), Map.of());
+        return withElementAnnotations(toArgument(null, method.getAnnotatedReturnType(), Map.of()), method);
     }
 
     /**
@@ -218,15 +220,17 @@ public final class ReflectionArguments {
     }
 
     /**
-     * Converts the return type of a method to an {@link Argument} as the type reading it sees it.
+     * Converts the return type of a method to an {@link Argument} as the type invoking it sees it, with the
+     * annotations of the method and the type-use annotations of its return type.
      *
      * @param method  The method
-     * @param context The type the method is read through, an implementation of its declaring type
+     * @param context The type the method is invoked on, an implementation of its declaring type
      * @return The argument
+     * @see #returnOf(Method)
      * @see #of(Field, Class)
      */
     public static Argument<?> returnOf(Method method, Class<?> context) {
-        return returnOf(null, method, context);
+        return withElementAnnotations(returnOf(null, method, context), method);
     }
 
     /**
@@ -264,7 +268,9 @@ public final class ReflectionArguments {
 
     /**
      * Converts the return type of a method to an {@link Argument} under a name of the caller's choosing, as the
-     * reading type sees it.
+     * reading type sees it, carrying the annotations of the return type but not the ones the method declares:
+     * what the processor writes for the return type of a bean method of an introspection, and for the type of
+     * a property read through a getter.
      */
     static Argument<?> returnOf(@Nullable String name, Method method, Class<?> context) {
         return toArgument(name, method.getAnnotatedReturnType(), bindings(context, method.getDeclaringClass()), Set.of());

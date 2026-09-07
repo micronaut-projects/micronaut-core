@@ -56,7 +56,7 @@ class ReflectionArgumentFactoriesSpec extends Specification {
         ReflectionArguments.argumentsOf(Factories.getConstructor()).is(io.micronaut.core.type.Argument.ZERO_ARGUMENTS)
     }
 
-    void "the return argument of a method is the annotated return type, not the method"() {
+    void "the return argument of a method carries the annotations of the method and of its return type"() {
         when:
         def argument = ReflectionArguments.returnOf(Factories.getMethod("produce", Map))
 
@@ -64,11 +64,22 @@ class ReflectionArgumentFactoriesSpec extends Specification {
         argument.type == List
         tags(argument.typeParameters[0]) == ["returned"]
 
-        and: "an annotation written before the return type whose target includes TYPE_USE is one of that type too, the way the compiler records it"
+        and: "an annotation written before the return type whose target includes TYPE_USE is on the method and on the type, and is read once"
         tags(argument) == ["method"]
 
         and: "a void method returns a void argument"
         ReflectionArguments.returnOf(Factories.getMethod("consume", String)).type == void
+
+        when: "an annotation targeting the method alone"
+        def labelled = ReflectionArguments.returnOf(Factories.getMethod("label"))
+
+        then: "it is on the return argument, as a generated executable method of a bean definition reports it"
+        labelled.annotationMetadata.stringValue(MethodTag).get() == "method-only"
+        tags(labelled) == ["both"]
+        tags(labelled.typeParameters[0]) == ["element"]
+
+        and: "read through a type the same way"
+        ReflectionArguments.returnOf(Factories.getMethod("label"), Factories).annotationMetadata.stringValue(MethodTag).get() == "method-only"
     }
 
     void "an argument can be named by the caller rather than by the member"() {

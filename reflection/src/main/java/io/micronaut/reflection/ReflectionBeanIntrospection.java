@@ -1758,10 +1758,12 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
          * the type the bean type gives it rather than the bound of the variable, which is what a generated
          * bean method reports. It carries what the return type itself carries - the annotations of the type
          * and the ones declaring the variable it stands for - and not the metadata of the method, as a
-         * generated bean method reports the argument the processor writes for the return type alone.
+         * generated bean method reports the argument the processor writes for the return type alone, where
+         * {@link ReflectionArguments#returnOf(Method, Class)} folds the annotations of the method in, as a
+         * generated executable method of a bean definition does.
          */
         private static Argument<?> resolvedReturn(ReflectionExecutableMethod<?, ?> executable, Class<?> beanType) {
-            return ReflectionArguments.returnOf(executable.getMethod(), beanType);
+            return ReflectionArguments.returnOf(null, executable.getMethod(), beanType);
         }
 
         /**
