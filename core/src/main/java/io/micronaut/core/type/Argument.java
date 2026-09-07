@@ -376,6 +376,30 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
+     * Creates an argument that stands for a wildcard type argument, compiled to the type it is bounded by.
+     * See {@link WildcardArgument}.
+     *
+     * @param type               The type the wildcard is bounded by
+     * @param name               The name of the type parameter the wildcard stands for
+     * @param annotationMetadata The annotation metadata
+     * @param typeParameters     The type parameters of the type
+     * @param upperBounds        The explicit upper bounds, {@code null} for {@code Object}
+     * @param lowerBounds        The explicit lower bounds, {@code null} for none
+     * @param <T>                The generic type
+     * @return The argument
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    static <T> Argument<T> ofWildcard(Class<T> type,
+                                      @Nullable String name,
+                                      @Nullable AnnotationMetadata annotationMetadata,
+                                      Argument<?> @Nullable [] typeParameters,
+                                      Argument<?> @Nullable [] upperBounds,
+                                      Argument<?> @Nullable [] lowerBounds) {
+        return new DefaultWildcardArgument<>(type, name, annotationMetadata, typeParameters, upperBounds, lowerBounds);
+    }
+
+    /**
      * Creates a new argument for the given type and name.
      *
      * @param type               The type

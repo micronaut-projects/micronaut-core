@@ -114,6 +114,23 @@ public final class ArgumentExpUtils {
         Argument[].class
     );
 
+    private static final Method METHOD_CREATE_ARGUMENT_CLASS = ReflectionUtils.getRequiredInternalMethod(
+        Argument.class,
+        "of",
+        Class.class
+    );
+
+    private static final Method METHOD_CREATE_WILDCARD = ReflectionUtils.getRequiredInternalMethod(
+        Argument.class,
+        "ofWildcard",
+        Class.class,
+        String.class,
+        AnnotationMetadata.class,
+        Argument[].class,
+        Argument[].class,
+        Argument[].class
+    );
+
     private static final Method METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_CLASS_GENERICS = ReflectionUtils.getRequiredInternalMethod(
         Argument.class,
         "of",
@@ -399,7 +416,9 @@ public final class ArgumentExpUtils {
             String argumentName = entry.getKey();
             ClassElement classElement = entry.getValue();
             Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
-            if (CollectionUtils.isNotEmpty(typeArguments) || !classElement.getAnnotationMetadata().isEmpty()) {
+            if (CollectionUtils.isNotEmpty(typeArguments)
+                || !classElement.getAnnotationMetadata().isEmpty()
+                || classElement instanceof WildcardElement) {
                 return buildArgumentWithGenerics(
                     annotationMetadataWithDefaults,
                     owningType,
@@ -444,8 +463,9 @@ public final class ArgumentExpUtils {
         }
 
         // Persist only type annotations added to the type argument
-        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(argumentType.getTypeAnnotationMetadata());
+        MutableAnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(argumentType.getTypeAnnotationMetadata());
         boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
+        boolean isWildcard = argumentType instanceof WildcardElement;
 
         boolean isRecursiveType = false;
         if (argumentType instanceof GenericPlaceholderElement placeholderElement) {
@@ -466,7 +486,7 @@ public final class ArgumentExpUtils {
         values.add(ExpressionDef.constant(argumentName));
 
 
-        if (isRecursiveType || !typeVariable && !hasAnnotationMetadata && typeArguments.isEmpty()) {
+        if (isRecursiveType || !isWildcard && !typeVariable && !hasAnnotationMetadata && typeArguments.isEmpty()) {
             // Argument.create( .. )
             return TYPE_ARGUMENT.invokeStatic(
                 METHOD_CREATE_ARGUMENT_SIMPLE,
@@ -483,7 +503,7 @@ public final class ArgumentExpUtils {
 
             values.add(
                 AnnotationMetadataGenUtils.instantiateNewMetadata(
-                    (MutableAnnotationMetadata) annotationMetadata,
+                    annotationMetadata,
                     loadClassValueExpressionFn
                 )
             );
@@ -504,11 +524,71 @@ public final class ArgumentExpUtils {
             )
         );
 
+        if (argumentType instanceof WildcardElement wildcardElement) {
+            // The argument is the bound the wildcard resolves to; the bounds are kept the way
+            // java.lang.reflect.WildcardType reports them: Object above unless declared otherwise
+            List<? extends ClassElement> upperBounds = List.of();
+            List<? extends ClassElement> lowerBounds = List.of();
+            if (wildcardElement.hasExplicitLowerBound()) {
+                lowerBounds = wildcardElement.getLowerBounds();
+            } else if (wildcardElement.hasExplicitUpperBound()) {
+                upperBounds = wildcardElement.getUpperBounds();
+            }
+            // 5th and 6th arguments: the bounds
+            values.add(pushWildcardBounds(annotationMetadataWithDefaults, owningType, upperBounds, visitedTypes, loadClassValueExpressionFn));
+            values.add(pushWildcardBounds(annotationMetadataWithDefaults, owningType, lowerBounds, visitedTypes, loadClassValueExpressionFn));
+            // Argument.ofWildcard( .. )
+            return TYPE_ARGUMENT.invokeStatic(METHOD_CREATE_WILDCARD, values);
+        }
+
         // Argument.create( .. )
         return TYPE_ARGUMENT.invokeStatic(
             typeVariable ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
             values
         );
+    }
+
+    private static ExpressionDef pushWildcardBounds(AnnotationMetadata annotationMetadataWithDefaults,
+                                                    ClassTypeDef owningType,
+                                                    List<? extends ClassElement> bounds,
+                                                    Set<Object> visitedTypes,
+                                                    Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        if (bounds.isEmpty()) {
+            return ExpressionDef.nullValue();
+        }
+        return TYPE_ARGUMENT_ARRAY.instantiate(bounds.stream().map(bound -> {
+            ExpressionDef.Constant boundTypeConstant = ExpressionDef.constant(TypeDef.erasure(resolveArgument(bound)));
+            Map<String, ClassElement> boundTypeArguments = bound.getTypeArguments();
+            // Persist only type annotations added to the bound
+            MutableAnnotationMetadata boundAnnotationMetadata = MutableAnnotationMetadata.of(bound.getTypeAnnotationMetadata());
+            if (boundTypeArguments.isEmpty() && boundAnnotationMetadata.isEmpty()) {
+                // Argument.of(Class)
+                return TYPE_ARGUMENT.invokeStatic(METHOD_CREATE_ARGUMENT_CLASS, boundTypeConstant);
+            }
+            ExpressionDef annotationMetadataExp;
+            if (boundAnnotationMetadata.isEmpty()) {
+                annotationMetadataExp = ExpressionDef.nullValue();
+            } else {
+                MutableAnnotationMetadata.contributeDefaults(annotationMetadataWithDefaults, boundAnnotationMetadata);
+                annotationMetadataExp = AnnotationMetadataGenUtils.instantiateNewMetadata(boundAnnotationMetadata, loadClassValueExpressionFn);
+            }
+            // Argument.of(Class, null, AnnotationMetadata, Argument[])
+            return TYPE_ARGUMENT.invokeStatic(
+                METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
+                boundTypeConstant,
+                ExpressionDef.nullValue(),
+                annotationMetadataExp,
+                boundTypeArguments.isEmpty() ? ExpressionDef.nullValue() : pushTypeArgumentElements(
+                    annotationMetadataWithDefaults,
+                    owningType,
+                    bound,
+                    bound,
+                    boundTypeArguments,
+                    visitedTypes,
+                    loadClassValueExpressionFn
+                )
+            );
+        }).toList());
     }
 
     /**
