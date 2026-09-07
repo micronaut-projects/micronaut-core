@@ -80,6 +80,7 @@ aop:
   introductionAdvice: Introduction Advice
   adapterAdvice: Method Adapter Advice
   lifecycleAdvice: Bean Life Cycle Advice
+  interceptorLifecycle: Interceptor Life Cycle
   validation:
     title: Validation Advice
   caching:
@@ -109,6 +110,7 @@ httpServer:
   jsonBinding:
     title: JSON Binding
     serializeUsingMicronautSerialization: Serialize using Micronaut Serialization
+    serializationUsingJacksonDatabind: Serialization using Jackson Databind
     jsonMapper: JsonMapper
     bindingUsingReactiveFrameworks: Binding using Reactive Frameworks
     bindingUsingCompletableFuture: Binding Using CompletableFuture
@@ -300,6 +302,9 @@ languageSupport:
       asyncioRuntime: Netty-Backed Asyncio Runtime
       asyncioNetworking: Asyncio Networking and TLS
       asyncioUnsupported: Unsupported Asyncio APIs
+  graal:
+    title: Micronaut for GraalVM
+    graalServices: Microservices as GraalVM native images
 management:
   title: Management & Monitoring
   buildingEndpoints:
@@ -344,6 +349,7 @@ cli:
     comparingVersions: Comparing Versions
   features: Features
   commands: Commands
+  proxy: Proxy Configuration
 i18n:
   title: Internationalization
   bundle: Resource Bundles

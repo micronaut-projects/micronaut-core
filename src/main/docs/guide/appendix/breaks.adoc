@@ -49,7 +49,7 @@ Check https://groovy-lang.org/releasenotes/groovy-5.0.html#Groovy5.0-breaking[Gr
 
 ==== JSpecify Nullability Annotations
 
-The Micronaut APIs use <<jspecify, JSpecify Annotations>>, and we recommend users to embrace JSpecify nullability annotations.
+The Micronaut APIs use https://jspecify.dev[JSpecify] annotations, and we recommend users to embrace JSpecify nullability annotations.
 
 ==== Bean context changes
 
