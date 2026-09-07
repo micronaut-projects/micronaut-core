@@ -72,6 +72,11 @@ import java.util.stream.Collectors;
 public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor implements AutoCloseable {
     public static final String APPLICATION_PATH = "GRAALPY-VFS/micronaut-application/";
     public static final String APPLICATION_SRC_PATH = "GRAALPY-VFS/micronaut-application/src/";
+    /**
+     * The compiler option naming the directory that relative {@code @PythonApplication(src = ...)}
+     * directories are resolved against. Without it they resolve against the working directory.
+     */
+    public static final String SOURCE_ROOT_OPTION = "micronaut.python.source.root";
     public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_SRC_PATH + "__main__.py";
     static final String PYTHON_APPLICATION_ANNOTATION = "io.micronaut.context.python.annotation.PythonApplication";
     private static final String PYTHON_LANGUAGE = "python";
@@ -628,8 +633,33 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
 
         String code = getString(values.get("code"));
-        String[] src = getStringArray(values.get("src"));
+        String[] src = resolveSourceDirectories(getStringArray(values.get("src")));
         return Optional.of(new PythonApplicationValues(code, src));
+    }
+
+    /**
+     * Resolves the configured source directories against the {@link #SOURCE_ROOT_OPTION} directory, or the
+     * working directory when the option is absent. A build tool can then compile a relative directory into
+     * the {@code @PythonApplication} annotation, which keeps the compiled output free of absolute paths,
+     * while the processor keeps matching the absolute paths of the parsed sources against absolute roots.
+     *
+     * @param src The configured source directories
+     * @return The absolute source directories
+     */
+    private String[] resolveSourceDirectories(String[] src) {
+        if (src == null) {
+            return null;
+        }
+        String root = processingEnv.getOptions().get(SOURCE_ROOT_OPTION);
+        Path base = root == null || root.isBlank() ? Paths.get("") : Paths.get(root);
+        String[] resolved = new String[src.length];
+        for (int i = 0; i < src.length; i++) {
+            String directory = src[i];
+            resolved[i] = directory == null || directory.isBlank()
+                ? directory
+                : base.resolve(directory).toAbsolutePath().normalize().toString();
+        }
+        return resolved;
     }
 
     private static AnnotationMirror getAnnotationMirror(Element element, String annotationFqcn) {

@@ -34,6 +34,11 @@ import java.util.List;
 public abstract class PythonCompileWorkAction implements WorkAction<PythonCompileParameters> {
 
     private static final String PYRONAUT_COMPILER_MAIN_CLASS = "io.micronaut.python.compiler.PyronautCompiler";
+    /**
+     * The processor option naming the directory relative source directories are resolved against.
+     * Mirrors {@code PythonAnnotationProcessor.SOURCE_ROOT_OPTION}, which buildSrc cannot reference.
+     */
+    private static final String SOURCE_ROOT_OPTION = "micronaut.python.source.root";
 
     @Override
     public void execute() {
@@ -42,10 +47,10 @@ public abstract class PythonCompileWorkAction implements WorkAction<PythonCompil
         // one compiler run over every root: each run writes the launcher, the VFS file list and the
         // package initialisers for the whole output, so a run per root would keep only the last
         // root's files and drop the others
-        compile(String.join(",", getParameters().getSourceDirs().get()), destinationDir, classpath);
+        compile(String.join(",", getParameters().getSourceDirs().get()), getParameters().getSourceRoot().get(), destinationDir, classpath);
     }
 
-    private void compile(String sourceDirs, String destinationDir, List<File> classpath) {
+    private void compile(String sourceDirs, String sourceRoot, String destinationDir, List<File> classpath) {
         try {
             Class<?> compiler = Class.forName(PYRONAUT_COMPILER_MAIN_CLASS, true, getClass().getClassLoader());
             Object builder = compiler.getMethod("builder").invoke(null);
@@ -54,6 +59,7 @@ public abstract class PythonCompileWorkAction implements WorkAction<PythonCompil
             builderType.getMethod("targetDir", File.class).invoke(builder, new File(destinationDir));
             builderType.getMethod("classpath", List.class).invoke(builder, classpath);
             builderType.getMethod("annotationProcessorPath", List.class).invoke(builder, classpath);
+            builderType.getMethod("options", List.class).invoke(builder, List.of("-A" + SOURCE_ROOT_OPTION + "=" + sourceRoot));
             Object instance = builderType.getMethod("build").invoke(builder);
             instance.getClass().getMethod("compile").invoke(instance);
         } catch (InvocationTargetException e) {
