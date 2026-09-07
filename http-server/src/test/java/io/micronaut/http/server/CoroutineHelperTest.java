@@ -16,8 +16,12 @@
 package io.micronaut.http.server;
 
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import kotlin.coroutines.Continuation;
+import kotlin.coroutines.CoroutineContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import reactor.util.context.Context;
@@ -27,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
@@ -66,6 +71,38 @@ class CoroutineHelperTest {
     void anInstrumentedExecutorResolvesToItsTargetsDispatcher() {
         ExecutorService instrumented = new ContextPropagatingExecutorService(executor);
         assertSame(helper.dispatcherFor(executor), helper.dispatcherFor(instrumented));
+    }
+
+    /**
+     * The point of the change: the executor a route was assigned to becomes the dispatcher its coroutine runs and
+     * resumes on, rather than {@code Dispatchers.Default}.
+     */
+    @Test
+    void theExecutorBecomesTheCoroutinesDispatcher() {
+        HttpRequest<?> request = HttpRequest.GET("/");
+        Continuation<?> continuation = bindContinuation(request);
+
+        helper.setupCoroutineContext(request, Context.empty(), PropagatedContext.empty(), executor);
+
+        CoroutineContext.Element dispatcher = (CoroutineContext.Element) helper.dispatcherFor(executor);
+        assertSame(dispatcher, continuation.getContext().get(dispatcher.getKey()));
+    }
+
+    @Test
+    void withNoExecutorTheCoroutineKeepsTheDefaultDispatcher() {
+        HttpRequest<?> request = HttpRequest.GET("/");
+        Continuation<?> continuation = bindContinuation(request);
+
+        helper.setupCoroutineContext(request, Context.empty(), PropagatedContext.empty());
+
+        CoroutineContext.Element dispatcher = (CoroutineContext.Element) helper.dispatcherFor(executor);
+        assertNotNull(continuation.getContext().get(dispatcher.getKey()));
+        assertNotSame(dispatcher, continuation.getContext().get(dispatcher.getKey()));
+    }
+
+    private static Continuation<?> bindContinuation(HttpRequest<?> request) {
+        ContinuationArgumentBinder binder = new ContinuationArgumentBinder();
+        return binder.bind(ConversionContext.of(binder.argumentType()), request).getValue().orElseThrow();
     }
 
     @Test

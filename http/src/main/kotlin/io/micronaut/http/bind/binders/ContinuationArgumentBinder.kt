@@ -72,14 +72,6 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
         fun setupCoroutineContext(source: HttpRequest<*>,
                                   contextView: ContextView,
                                   propagatedContext: PropagatedContext,
-                                  continuationArgumentBinderCoroutineContextFactories: Collection<HttpCoroutineContextFactory<*>>) {
-            setupCoroutineContext(source, contextView, propagatedContext, continuationArgumentBinderCoroutineContextFactories, null)
-        }
-
-        @JvmStatic
-        fun setupCoroutineContext(source: HttpRequest<*>,
-                                  contextView: ContextView,
-                                  propagatedContext: PropagatedContext,
                                   continuationArgumentBinderCoroutineContextFactories: Collection<HttpCoroutineContextFactory<*>>,
                                   dispatcher: CoroutineContext?) {
             val customContinuation = source.getAttribute(CONTINUATION_ARGUMENT_ATTRIBUTE_KEY, CustomContinuation::class.java).orElse(null)
