@@ -16,20 +16,37 @@
 package io.micronaut.context
 
 import io.micronaut.inject.QualifiedBeanType
+import jakarta.inject.Named
+import jakarta.inject.Singleton
 import spock.lang.Specification
 
 import java.util.function.Predicate
 
 class BeansPredicateSpec extends Specification {
 
+    private static final String NARROWED = "beansPredicateSpecNarrowed"
+
+    private static final Predicate<QualifiedBeanType<?>> ACCEPT_ALL =
+            { QualifiedBeanType<?> type -> true } as Predicate<QualifiedBeanType<?>>
+
+    private static final Predicate<QualifiedBeanType<?>> REJECT_ALL =
+            { QualifiedBeanType<?> type -> false } as Predicate<QualifiedBeanType<?>>
+
+    /**
+     * Matched on the annotation metadata the reference carries rather than on {@code getBeanType()}, so the
+     * predicate never loads a bean class: the test classpath carries references whose bean type is not
+     * resolvable, and narrowing has to be decided without touching them.
+     */
+    private static final Predicate<QualifiedBeanType<?>> ONLY_NARROWED_BEAN =
+            { QualifiedBeanType<?> type -> type.stringValue(Named).orElse(null) == NARROWED } as Predicate<QualifiedBeanType<?>>
+
     void "test the beans predicate a context was built with is readable"() {
         given:
-        Predicate<QualifiedBeanType<?>> predicate = (Predicate) { QualifiedBeanType<?> type -> true }
-        ApplicationContext context = ApplicationContext.builder().beansPredicate(predicate).build()
+        ApplicationContext context = ApplicationContext.builder().beansPredicate(ACCEPT_ALL).build()
 
         expect:
-        context.getBeansPredicate().is(predicate)
-        context.getContextConfiguration().beansPredicate().is(predicate)
+        context.getBeansPredicate().is(ACCEPT_ALL)
+        context.getContextConfiguration().beansPredicate().is(ACCEPT_ALL)
 
         cleanup:
         context.close()
@@ -48,14 +65,27 @@ class BeansPredicateSpec extends Specification {
 
     void "test the raw references view is narrowed by the same predicate"() {
         given:
+        ApplicationContext narrowed = ApplicationContext.builder().beansPredicate(ONLY_NARROWED_BEAN).build()
+
+        expect: "only the one definition the predicate accepts is reported"
+        narrowed.getBeanDefinitionReferences().size() == 1
+
+        and: "the resolving views agree with the raw one"
+        narrowed.getBeanDefinition(NarrowedBean) != null
+        !narrowed.findBeanDefinition(OtherBean).isPresent()
+
+        cleanup:
+        narrowed.close()
+    }
+
+    void "test an accept-all predicate narrows nothing and a reject-all predicate narrows everything"() {
+        given:
         ApplicationContext unfiltered = ApplicationContext.builder().build()
-        Predicate<QualifiedBeanType<?>> acceptAll = (Predicate) { QualifiedBeanType<?> type -> true }
-        ApplicationContext accepting = ApplicationContext.builder().beansPredicate(acceptAll).build()
-        Predicate<QualifiedBeanType<?>> rejectAll = (Predicate) { QualifiedBeanType<?> type -> false }
-        ApplicationContext rejecting = ApplicationContext.builder().beansPredicate(rejectAll).build()
+        ApplicationContext accepting = ApplicationContext.builder().beansPredicate(ACCEPT_ALL).build()
+        ApplicationContext rejecting = ApplicationContext.builder().beansPredicate(REJECT_ALL).build()
 
         expect:
-        !unfiltered.getBeanDefinitionReferences().isEmpty()
+        unfiltered.findBeanDefinition(NarrowedBean).isPresent()
         accepting.getBeanDefinitionReferences().size() == unfiltered.getBeanDefinitionReferences().size()
         rejecting.getBeanDefinitionReferences().isEmpty()
 
@@ -63,5 +93,14 @@ class BeansPredicateSpec extends Specification {
         unfiltered.close()
         accepting.close()
         rejecting.close()
+    }
+
+    @Singleton
+    @Named(NARROWED)
+    static class NarrowedBean {
+    }
+
+    @Singleton
+    static class OtherBean {
     }
 }

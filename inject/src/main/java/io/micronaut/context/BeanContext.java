@@ -68,7 +68,7 @@ public interface BeanContext extends
      * carrying a second copy of the predicate alongside the one handed to the builder.</p>
      *
      * @return The beans predicate, or {@code null} if the context was not narrowed by one
-     * @since 5.0
+     * @since 5.2.0
      */
     @Nullable
     default Predicate<QualifiedBeanType<?>> getBeansPredicate() {
