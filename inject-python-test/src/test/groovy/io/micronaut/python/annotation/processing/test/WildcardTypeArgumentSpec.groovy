@@ -15,8 +15,8 @@
  */
 package io.micronaut.python.annotation.processing.test
 
-import io.micronaut.core.annotation.Wildcard
 import io.micronaut.core.type.Argument
+import io.micronaut.core.type.WildcardArgument
 import io.micronaut.inject.BeanDefinition
 
 import java.util.function.Consumer
@@ -24,8 +24,16 @@ import java.util.function.Supplier
 
 class WildcardTypeArgumentSpec extends AbstractPythonTypeElementSpec {
 
-    private static Wildcard.Bound wildcardOf(Argument<?> argument) {
-        argument.annotationMetadata.enumValue(Wildcard, "bound", Wildcard.Bound).orElse(null)
+    private static WildcardArgument<?> wildcard(Argument<?> argument) {
+        argument instanceof WildcardArgument ? (WildcardArgument<?>) argument : null
+    }
+
+    private static List<String> upper(Argument<?> argument) {
+        wildcard(argument)?.upperBounds*.type*.name
+    }
+
+    private static List<String> lower(Argument<?> argument) {
+        wildcard(argument)?.lowerBounds*.type*.name
     }
 
     void "a wildcard in a Java signature implemented by a Python bean is recorded on the argument it compiles to"() {
@@ -54,16 +62,16 @@ class PythonContract(WildcardContract[Book]):
 
         then: 'method parameters'
         accept.arguments[0].typeParameters[0].type == Number
-        wildcardOf(accept.arguments[0].typeParameters[0]) == Wildcard.Bound.UPPER
+        upper(accept.arguments[0].typeParameters[0]) == [accept.arguments[0].typeParameters[0].type.name] && lower(accept.arguments[0].typeParameters[0]) == []
 
         consume.arguments[0].typeParameters[0].type.name == 'io.micronaut.python.annotation.processing.test.generics.Book'
-        wildcardOf(consume.arguments[0].typeParameters[0]) == Wildcard.Bound.LOWER
+        lower(consume.arguments[0].typeParameters[0]) == [consume.arguments[0].typeParameters[0].type.name] && upper(consume.arguments[0].typeParameters[0]) == ['java.lang.Object']
 
         any.arguments[0].typeParameters[0].type == Object
-        wildcardOf(any.arguments[0].typeParameters[0]) == Wildcard.Bound.NONE
+        upper(any.arguments[0].typeParameters[0]) == ['java.lang.Object'] && lower(any.arguments[0].typeParameters[0]) == []
 
         and: 'the enclosing argument is not marked'
-        !accept.arguments[0].annotationMetadata.hasAnnotation(Wildcard)
+        !(accept.arguments[0] instanceof WildcardArgument)
 
         cleanup:
         context.close()
@@ -87,9 +95,9 @@ class PythonSupplier(WildcardSupplier):
 
         then:
         supplied.type == List
-        !supplied.annotationMetadata.hasAnnotation(Wildcard)
+        !(supplied instanceof WildcardArgument)
         supplied.typeParameters[0].type == Number
-        wildcardOf(supplied.typeParameters[0]) == Wildcard.Bound.UPPER
+        upper(supplied.typeParameters[0]) == [supplied.typeParameters[0].type.name] && lower(supplied.typeParameters[0]) == []
 
         cleanup:
         context.close()

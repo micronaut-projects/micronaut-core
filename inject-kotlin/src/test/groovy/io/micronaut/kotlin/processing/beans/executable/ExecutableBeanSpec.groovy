@@ -19,7 +19,6 @@ import io.micronaut.context.annotation.BeanProperties
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
-import io.micronaut.core.annotation.Wildcard
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.validation.RequiresValidation
@@ -675,13 +674,11 @@ class MyBean {
         assert am.hasAnnotation(TypeUseRuntimeAnn.class)
         assert !am.hasAnnotation(MyEntity.class)
         assert !am.hasAnnotation(Introspected.class)
-        // a wildcard type argument is additionally marked as one
-        def names = am.getAnnotationNames() - Wildcard.name
         if (shouldBeNonnull) {
             assert am.hasAnnotation(Nonnull.class)
-            assert names == [Nonnull.class.name, TypeUseRuntimeAnn.class.name] as Set<String>
+            assert am.getAnnotationNames() == [Nonnull.class.name, TypeUseRuntimeAnn.class.name] as Set<String>
         } else {
-            assert names == [TypeUseRuntimeAnn.class.name] as Set<String>
+            assert am.getAnnotationNames() == [TypeUseRuntimeAnn.class.name] as Set<String>
         }
     }
 }

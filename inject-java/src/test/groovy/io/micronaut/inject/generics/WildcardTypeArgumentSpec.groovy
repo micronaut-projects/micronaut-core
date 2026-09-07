@@ -16,9 +16,9 @@
 package io.micronaut.inject.generics
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.core.annotation.Wildcard
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.type.Argument
+import io.micronaut.core.type.WildcardArgument
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import spock.lang.PendingFeature
@@ -95,8 +95,16 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
         definition = buildBeanDefinition('test.Bean', SOURCE)
     }
 
-    private static Wildcard.Bound wildcardOf(Argument<?> argument) {
-        argument.annotationMetadata.enumValue(Wildcard, "bound", Wildcard.Bound).orElse(null)
+    private static WildcardArgument<?> wildcard(Argument<?> argument) {
+        argument instanceof WildcardArgument ? (WildcardArgument<?>) argument : null
+    }
+
+    private static List<String> upper(Argument<?> argument) {
+        wildcard(argument)?.upperBounds*.type*.name
+    }
+
+    private static List<String> lower(Argument<?> argument) {
+        wildcard(argument)?.lowerBounds*.type*.name
     }
 
     private Map<String, Argument<?>> constructorArguments() {
@@ -108,24 +116,25 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
     }
 
     @Unroll
-    void "constructor parameter #name compiles the wildcard to #type marked #bound"() {
+    void "constructor parameter #name compiles the wildcard to #type bounded by #upperBounds above and #lowerBounds below"() {
         given:
         Argument<?> typeArgument = constructorArguments()[name].typeParameters[0]
 
         expect:
         typeArgument.type.name == type
-        wildcardOf(typeArgument) == bound
+        upper(typeArgument) == upperBounds
+        lower(typeArgument) == lowerBounds
 
         where:
-        name                 | type                 | bound
-        'unbounded'          | 'java.lang.Object'   | Wildcard.Bound.NONE
-        'upper'              | 'java.lang.Number'   | Wildcard.Bound.UPPER
-        'lower'              | 'test.Book'          | Wildcard.Bound.LOWER
-        'implicitBound'      | 'java.lang.Number'   | Wildcard.Bound.NONE
-        'classVariableBound' | 'test.Book'          | Wildcard.Bound.UPPER
-        'parameterizedBound' | 'java.lang.Comparable' | Wildcard.Bound.UPPER
-        'object'             | 'java.lang.Object'   | null
-        'variable'           | 'test.Book'          | null
+        name                 | type                   | upperBounds              | lowerBounds
+        'unbounded'          | 'java.lang.Object'     | ['java.lang.Object']     | []
+        'upper'              | 'java.lang.Number'     | ['java.lang.Number']     | []
+        'lower'              | 'test.Book'            | ['java.lang.Object']     | ['test.Book']
+        'implicitBound'      | 'java.lang.Number'     | ['java.lang.Object']     | []
+        'classVariableBound' | 'test.Book'            | ['test.Book']            | []
+        'parameterizedBound' | 'java.lang.Comparable' | ['java.lang.Comparable'] | []
+        'object'             | 'java.lang.Object'     | null                     | null
+        'variable'           | 'test.Book'            | null                     | null
     }
 
     void "a type argument that is not a wildcard is not marked"() {
@@ -133,16 +142,16 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
         Map<String, Argument<?>> arguments = constructorArguments()
 
         expect:
-        !arguments.object.typeParameters[0].annotationMetadata.hasAnnotation(Wildcard)
+        !(arguments.object.typeParameters[0] instanceof WildcardArgument)
         !arguments.object.typeParameters[0].isTypeVariable()
 
         and: 'a class type variable stays a type variable'
         arguments.variable.typeParameters[0].isTypeVariable()
-        !arguments.variable.typeParameters[0].annotationMetadata.hasAnnotation(Wildcard)
+        !(arguments.variable.typeParameters[0] instanceof WildcardArgument)
 
         and: 'the enclosing argument is never marked'
-        !arguments.upper.annotationMetadata.hasAnnotation(Wildcard)
-        !arguments.nested.annotationMetadata.hasAnnotation(Wildcard)
+        !(arguments.upper instanceof WildcardArgument)
+        !(arguments.nested instanceof WildcardArgument)
     }
 
     void "a wildcard keeps the type arguments of its bound"() {
@@ -151,9 +160,10 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
 
         expect:
         comparable.type == Comparable
-        wildcardOf(comparable) == Wildcard.Bound.UPPER
+        upper(comparable) == [comparable.type.name] && lower(comparable) == []
         comparable.typeParameters[0].type == String
-        !comparable.typeParameters[0].annotationMetadata.hasAnnotation(Wildcard)
+        !(comparable.typeParameters[0] instanceof WildcardArgument)
+        wildcard(comparable).upperBounds[0].typeParameters[0].type == String
     }
 
     void "a nested wildcard is recorded at its own level only"() {
@@ -161,17 +171,17 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
         Map<String, Argument<?>> arguments = constructorArguments()
 
         expect:
-        !arguments.nested.typeParameters[0].annotationMetadata.hasAnnotation(Wildcard)
+        !(arguments.nested.typeParameters[0] instanceof WildcardArgument)
         arguments.nested.typeParameters[0].type == List
         arguments.nested.typeParameters[0].typeParameters[0].type == Number
-        wildcardOf(arguments.nested.typeParameters[0].typeParameters[0]) == Wildcard.Bound.UPPER
+        upper(arguments.nested.typeParameters[0].typeParameters[0]) == [arguments.nested.typeParameters[0].typeParameters[0].type.name] && lower(arguments.nested.typeParameters[0].typeParameters[0]) == []
 
         and: 'a wildcard bounded by a type with a wildcard records both'
         Argument<?> foo = arguments.optionalNested.typeParameters[0]
         foo.type.name == 'test.Foo'
-        wildcardOf(foo) == Wildcard.Bound.UPPER
+        upper(foo) == [foo.type.name] && lower(foo) == []
         foo.typeParameters[0].type == Object
-        wildcardOf(foo.typeParameters[0]) == Wildcard.Bound.NONE
+        upper(foo.typeParameters[0]) == ['java.lang.Object'] && lower(foo.typeParameters[0]) == []
     }
 
     void "each type argument is recorded independently"() {
@@ -181,13 +191,13 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
         expect:
         two.typeParameters.length == 2
         two.typeParameters[0].type == CharSequence
-        wildcardOf(two.typeParameters[0]) == Wildcard.Bound.UPPER
+        upper(two.typeParameters[0]) == [two.typeParameters[0].type.name] && lower(two.typeParameters[0]) == []
         two.typeParameters[1].type.name == 'test.Book'
-        wildcardOf(two.typeParameters[1]) == Wildcard.Bound.LOWER
+        lower(two.typeParameters[1]) == [two.typeParameters[1].type.name] && upper(two.typeParameters[1]) == ['java.lang.Object']
 
         and: 'by name'
-        wildcardOf(two.typeVariables.K) == Wildcard.Bound.UPPER
-        wildcardOf(two.typeVariables.V) == Wildcard.Bound.LOWER
+        upper(two.typeVariables.K) == [two.typeVariables.K.type.name] && lower(two.typeVariables.K) == []
+        lower(two.typeVariables.V) == [two.typeVariables.V.type.name] && upper(two.typeVariables.V) == ['java.lang.Object']
     }
 
     void "a wildcard inside an array argument is recorded"() {
@@ -197,7 +207,7 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
         expect:
         array.type == List[]
         array.typeParameters[0].type == Number
-        wildcardOf(array.typeParameters[0]) == Wildcard.Bound.UPPER
+        upper(array.typeParameters[0]) == [array.typeParameters[0].type.name] && lower(array.typeParameters[0]) == []
     }
 
     void "a type-use annotation on the bound is kept next to the wildcard"() {
@@ -205,9 +215,9 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
         Argument<?> annotated = constructorArguments().annotated.typeParameters[0]
 
         expect:
-        wildcardOf(annotated) == Wildcard.Bound.UPPER
+        upper(annotated) == [annotated.type.name] && lower(annotated) == []
         annotated.annotationMetadata.hasAnnotation('test.Mark')
-        annotated.annotationMetadata.annotationNames.sort() == ['io.micronaut.core.annotation.Wildcard', 'test.Mark']
+        annotated.annotationMetadata.annotationNames == ['test.Mark'] as Set
     }
 
     void "a wildcard is recorded for an injected field"() {
@@ -216,9 +226,9 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
         def mapField = definition.injectedFields.find { it.name == 'mapField' }
 
         expect:
-        wildcardOf(field.asArgument().typeParameters[0]) == Wildcard.Bound.NONE
-        wildcardOf(mapField.asArgument().typeParameters[0]) == Wildcard.Bound.UPPER
-        wildcardOf(mapField.asArgument().typeParameters[1]) == Wildcard.Bound.LOWER
+        upper(field.asArgument().typeParameters[0]) == ['java.lang.Object'] && lower(field.asArgument().typeParameters[0]) == []
+        upper(mapField.asArgument().typeParameters[0]) == [mapField.asArgument().typeParameters[0].type.name] && lower(mapField.asArgument().typeParameters[0]) == []
+        lower(mapField.asArgument().typeParameters[1]) == [mapField.asArgument().typeParameters[1].type.name] && upper(mapField.asArgument().typeParameters[1]) == ['java.lang.Object']
     }
 
     void "a wildcard is recorded for an injected method parameter"() {
@@ -227,9 +237,9 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
         Map<String, Argument<?>> arguments = inject.arguments.collectEntries { [it.name, it] }
 
         expect:
-        wildcardOf(arguments.injected.typeParameters[0]) == Wildcard.Bound.NONE
+        upper(arguments.injected.typeParameters[0]) == ['java.lang.Object'] && lower(arguments.injected.typeParameters[0]) == []
         arguments.lowerInjected.typeParameters[0].type.name == 'test.Book'
-        wildcardOf(arguments.lowerInjected.typeParameters[0]) == Wildcard.Bound.LOWER
+        lower(arguments.lowerInjected.typeParameters[0]) == [arguments.lowerInjected.typeParameters[0].type.name] && upper(arguments.lowerInjected.typeParameters[0]) == ['java.lang.Object']
     }
 
     void "a wildcard is recorded for an executable method parameter"() {
@@ -237,11 +247,11 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
         Map<String, Argument<?>> arguments = method('on').arguments.collectEntries { [it.name, it] }
 
         expect:
-        wildcardOf(arguments.unbounded.typeParameters[0]) == Wildcard.Bound.NONE
+        upper(arguments.unbounded.typeParameters[0]) == ['java.lang.Object'] && lower(arguments.unbounded.typeParameters[0]) == []
         arguments.upper.typeParameters[0].type == Number
-        wildcardOf(arguments.upper.typeParameters[0]) == Wildcard.Bound.UPPER
+        upper(arguments.upper.typeParameters[0]) == [arguments.upper.typeParameters[0].type.name] && lower(arguments.upper.typeParameters[0]) == []
         arguments.lower.typeParameters[0].type.name == 'test.Book'
-        wildcardOf(arguments.lower.typeParameters[0]) == Wildcard.Bound.LOWER
+        lower(arguments.lower.typeParameters[0]) == [arguments.lower.typeParameters[0].type.name] && upper(arguments.lower.typeParameters[0]) == ['java.lang.Object']
     }
 
     void "a wildcard bounded by a method type variable is recorded with the variable's bound"() {
@@ -250,26 +260,26 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
 
         expect:
         arguments.methodVariableBound.typeParameters[0].type == Number
-        wildcardOf(arguments.methodVariableBound.typeParameters[0]) == Wildcard.Bound.UPPER
+        upper(arguments.methodVariableBound.typeParameters[0]) == [arguments.methodVariableBound.typeParameters[0].type.name] && lower(arguments.methodVariableBound.typeParameters[0]) == []
 
         and: 'the method type variable itself is not'
         arguments.variable.typeParameters[0].type == Number
         arguments.variable.typeParameters[0].isTypeVariable()
-        !arguments.variable.typeParameters[0].annotationMetadata.hasAnnotation(Wildcard)
+        !(arguments.variable.typeParameters[0] instanceof WildcardArgument)
     }
 
     void "a wildcard is recorded for an executable method return type"() {
         given:
-        Argument<?> upper = method('returnsUpper').returnType.asArgument()
+        Argument<?> returnedUpper = method('returnsUpper').returnType.asArgument()
         Argument<?> two = method('returnsTwo').returnType.asArgument()
         Argument<?> object = method('returnsObject').returnType.asArgument()
 
         expect:
-        upper.typeParameters[0].type == Number
-        wildcardOf(upper.typeParameters[0]) == Wildcard.Bound.UPPER
-        wildcardOf(two.typeParameters[0]) == Wildcard.Bound.UPPER
-        wildcardOf(two.typeParameters[1]) == Wildcard.Bound.LOWER
-        !object.typeParameters[0].annotationMetadata.hasAnnotation(Wildcard)
+        returnedUpper.typeParameters[0].type == Number
+        upper(returnedUpper.typeParameters[0]) == [returnedUpper.typeParameters[0].type.name] && lower(returnedUpper.typeParameters[0]) == []
+        upper(two.typeParameters[0]) == [two.typeParameters[0].type.name] && lower(two.typeParameters[0]) == []
+        lower(two.typeParameters[1]) == [two.typeParameters[1].type.name] && upper(two.typeParameters[1]) == ['java.lang.Object']
+        !(object.typeParameters[0] instanceof WildcardArgument)
     }
 
     void "a wildcard is recorded in the type arguments of the bean's interface and superclass"() {
@@ -279,16 +289,16 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
 
         expect: 'implements Foo<List<? extends Number>>'
         fooArgument.type == List
-        !fooArgument.annotationMetadata.hasAnnotation(Wildcard)
+        !(fooArgument instanceof WildcardArgument)
         fooArgument.typeParameters[0].type == Number
-        wildcardOf(fooArgument.typeParameters[0]) == Wildcard.Bound.UPPER
+        upper(fooArgument.typeParameters[0]) == [fooArgument.typeParameters[0].type.name] && lower(fooArgument.typeParameters[0]) == []
 
         and: 'extends Base<Foo<?>, List<? super Book>>'
         baseArguments[0].type.name == 'test.Foo'
-        wildcardOf(baseArguments[0].typeParameters[0]) == Wildcard.Bound.NONE
+        upper(baseArguments[0].typeParameters[0]) == ['java.lang.Object'] && lower(baseArguments[0].typeParameters[0]) == []
         baseArguments[1].type == List
         baseArguments[1].typeParameters[0].type.name == 'test.Book'
-        wildcardOf(baseArguments[1].typeParameters[0]) == Wildcard.Bound.LOWER
+        lower(baseArguments[1].typeParameters[0]) == [baseArguments[1].typeParameters[0].type.name] && upper(baseArguments[1].typeParameters[0]) == ['java.lang.Object']
     }
 
     void "a wildcard is recorded in the type arguments of a factory bean"() {
@@ -324,11 +334,11 @@ class FooFactory {
         def consumerDefinition = context.getBeanDefinition(Consumer)
 
         expect:
-        wildcardOf(fooDefinition.getTypeArguments('test.Foo')[0].typeParameters[0]) == Wildcard.Bound.UPPER
+        upper(fooDefinition.getTypeArguments('test.Foo')[0].typeParameters[0]) == [fooDefinition.getTypeArguments('test.Foo')[0].typeParameters[0].type.name] && lower(fooDefinition.getTypeArguments('test.Foo')[0].typeParameters[0]) == []
 
         and:
         consumerDefinition.getTypeArguments(Consumer)[0].type.name == 'test.Book'
-        wildcardOf(consumerDefinition.getTypeArguments(Consumer)[0]) == Wildcard.Bound.LOWER
+        lower(consumerDefinition.getTypeArguments(Consumer)[0]) == [consumerDefinition.getTypeArguments(Consumer)[0].type.name] && upper(consumerDefinition.getTypeArguments(Consumer)[0]) == ['java.lang.Object']
 
         cleanup:
         context.close()
@@ -354,7 +364,7 @@ class Collision<T extends Book> {
 
         expect:
         typeArgument.type == Object
-        wildcardOf(typeArgument) == Wildcard.Bound.NONE
+        upper(typeArgument) == ['java.lang.Object'] && lower(typeArgument) == []
     }
 
     void "a wildcard is recorded for introspected properties, record components and fields"() {
@@ -402,17 +412,17 @@ class Fields {
 ''')
 
         expect: 'bean properties'
-        wildcardOf(bean.getRequiredProperty('numbers', List).asArgument().typeParameters[0]) == Wildcard.Bound.UPPER
-        wildcardOf(bean.getRequiredProperty('map', Map).asArgument().typeParameters[0]) == Wildcard.Bound.UPPER
-        wildcardOf(bean.getRequiredProperty('map', Map).asArgument().typeParameters[1]) == Wildcard.Bound.LOWER
+        upper(bean.getRequiredProperty('numbers', List).asArgument().typeParameters[0]) == [bean.getRequiredProperty('numbers', List).asArgument().typeParameters[0].type.name] && lower(bean.getRequiredProperty('numbers', List).asArgument().typeParameters[0]) == []
+        upper(bean.getRequiredProperty('map', Map).asArgument().typeParameters[0]) == [bean.getRequiredProperty('map', Map).asArgument().typeParameters[0].type.name] && lower(bean.getRequiredProperty('map', Map).asArgument().typeParameters[0]) == []
+        lower(bean.getRequiredProperty('map', Map).asArgument().typeParameters[1]) == [bean.getRequiredProperty('map', Map).asArgument().typeParameters[1].type.name] && upper(bean.getRequiredProperty('map', Map).asArgument().typeParameters[1]) == ['java.lang.Object']
 
         and: 'record components, as properties and as constructor arguments'
-        wildcardOf(record.getRequiredProperty('numbers', List).asArgument().typeParameters[0]) == Wildcard.Bound.UPPER
-        wildcardOf(record.getProperty('foo').get().asArgument().typeParameters[0]) == Wildcard.Bound.NONE
-        wildcardOf(record.constructorArguments[0].typeParameters[0]) == Wildcard.Bound.UPPER
-        wildcardOf(record.constructorArguments[1].typeParameters[0]) == Wildcard.Bound.NONE
+        upper(record.getRequiredProperty('numbers', List).asArgument().typeParameters[0]) == [record.getRequiredProperty('numbers', List).asArgument().typeParameters[0].type.name] && lower(record.getRequiredProperty('numbers', List).asArgument().typeParameters[0]) == []
+        upper(record.getProperty('foo').get().asArgument().typeParameters[0]) == ['java.lang.Object'] && lower(record.getProperty('foo').get().asArgument().typeParameters[0]) == []
+        upper(record.constructorArguments[0].typeParameters[0]) == [record.constructorArguments[0].typeParameters[0].type.name] && lower(record.constructorArguments[0].typeParameters[0]) == []
+        upper(record.constructorArguments[1].typeParameters[0]) == ['java.lang.Object'] && lower(record.constructorArguments[1].typeParameters[0]) == []
 
         and: 'field access'
-        wildcardOf(fields.getRequiredProperty('numbers', List).asArgument().typeParameters[0]) == Wildcard.Bound.UPPER
+        upper(fields.getRequiredProperty('numbers', List).asArgument().typeParameters[0]) == [fields.getRequiredProperty('numbers', List).asArgument().typeParameters[0].type.name] && lower(fields.getRequiredProperty('numbers', List).asArgument().typeParameters[0]) == []
     }
 }

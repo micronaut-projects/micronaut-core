@@ -18,7 +18,6 @@ package io.micronaut.inject.writer;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Wildcard;
 import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -112,6 +111,23 @@ public final class ArgumentExpUtils {
         String.class,
         String.class,
         AnnotationMetadata.class,
+        Argument[].class
+    );
+
+    private static final Method METHOD_CREATE_ARGUMENT_CLASS = ReflectionUtils.getRequiredInternalMethod(
+        Argument.class,
+        "of",
+        Class.class
+    );
+
+    private static final Method METHOD_CREATE_WILDCARD = ReflectionUtils.getRequiredInternalMethod(
+        Argument.class,
+        "ofWildcard",
+        Class.class,
+        String.class,
+        AnnotationMetadata.class,
+        Argument[].class,
+        Argument[].class,
         Argument[].class
     );
 
@@ -448,11 +464,8 @@ public final class ArgumentExpUtils {
 
         // Persist only type annotations added to the type argument
         MutableAnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(argumentType.getTypeAnnotationMetadata());
-        if (argumentType instanceof WildcardElement wildcardElement) {
-            // The argument is the bound the wildcard resolves to; record that it was a wildcard
-            recordWildcard(annotationMetadata, wildcardElement);
-        }
         boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
+        boolean isWildcard = argumentType instanceof WildcardElement;
 
         boolean isRecursiveType = false;
         if (argumentType instanceof GenericPlaceholderElement placeholderElement) {
@@ -473,7 +486,7 @@ public final class ArgumentExpUtils {
         values.add(ExpressionDef.constant(argumentName));
 
 
-        if (isRecursiveType || !typeVariable && !hasAnnotationMetadata && typeArguments.isEmpty()) {
+        if (isRecursiveType || !isWildcard && !typeVariable && !hasAnnotationMetadata && typeArguments.isEmpty()) {
             // Argument.create( .. )
             return TYPE_ARGUMENT.invokeStatic(
                 METHOD_CREATE_ARGUMENT_SIMPLE,
@@ -511,11 +524,62 @@ public final class ArgumentExpUtils {
             )
         );
 
+        if (argumentType instanceof WildcardElement wildcardElement) {
+            // The argument is the bound the wildcard resolves to; the bounds are kept the way
+            // java.lang.reflect.WildcardType reports them: Object above unless declared otherwise
+            List<? extends ClassElement> upperBounds = List.of();
+            List<? extends ClassElement> lowerBounds = List.of();
+            if (wildcardElement.hasExplicitLowerBound()) {
+                lowerBounds = wildcardElement.getLowerBounds();
+            } else if (wildcardElement.hasExplicitUpperBound()) {
+                upperBounds = wildcardElement.getUpperBounds();
+            }
+            // 5th and 6th arguments: the bounds
+            values.add(pushWildcardBounds(annotationMetadataWithDefaults, owningType, upperBounds, visitedTypes, loadClassValueExpressionFn));
+            values.add(pushWildcardBounds(annotationMetadataWithDefaults, owningType, lowerBounds, visitedTypes, loadClassValueExpressionFn));
+            // Argument.ofWildcard( .. )
+            return TYPE_ARGUMENT.invokeStatic(METHOD_CREATE_WILDCARD, values);
+        }
+
         // Argument.create( .. )
         return TYPE_ARGUMENT.invokeStatic(
             typeVariable ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
             values
         );
+    }
+
+    private static ExpressionDef pushWildcardBounds(AnnotationMetadata annotationMetadataWithDefaults,
+                                                    ClassTypeDef owningType,
+                                                    List<? extends ClassElement> bounds,
+                                                    Set<Object> visitedTypes,
+                                                    Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        if (bounds.isEmpty()) {
+            return ExpressionDef.nullValue();
+        }
+        return TYPE_ARGUMENT_ARRAY.instantiate(bounds.stream().map(bound -> {
+            ExpressionDef.Constant boundTypeConstant = ExpressionDef.constant(TypeDef.erasure(resolveArgument(bound)));
+            Map<String, ClassElement> boundTypeArguments = bound.getTypeArguments();
+            if (boundTypeArguments.isEmpty()) {
+                // Argument.of(Class)
+                return TYPE_ARGUMENT.invokeStatic(METHOD_CREATE_ARGUMENT_CLASS, boundTypeConstant);
+            }
+            // Argument.of(Class, null, null, Argument[])
+            return TYPE_ARGUMENT.invokeStatic(
+                METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
+                boundTypeConstant,
+                ExpressionDef.nullValue(),
+                ExpressionDef.nullValue(),
+                pushTypeArgumentElements(
+                    annotationMetadataWithDefaults,
+                    owningType,
+                    bound,
+                    bound,
+                    boundTypeArguments,
+                    visitedTypes,
+                    loadClassValueExpressionFn
+                )
+            );
+        }).toList());
     }
 
     /**
@@ -525,20 +589,6 @@ public final class ArgumentExpUtils {
      * @param argumentType The argument type
      * @return The expression
      */
-    private static void recordWildcard(MutableAnnotationMetadata annotationMetadata, WildcardElement wildcardElement) {
-        Wildcard.Bound bound;
-        if (wildcardElement.hasExplicitLowerBound()) {
-            bound = Wildcard.Bound.LOWER;
-        } else if (wildcardElement.hasExplicitUpperBound()) {
-            bound = Wildcard.Bound.UPPER;
-        } else {
-            bound = Wildcard.Bound.NONE;
-        }
-        Map<CharSequence, Object> values = Map.of("bound", bound.name());
-        annotationMetadata.addAnnotation(Wildcard.class.getName(), values);
-        annotationMetadata.addDeclaredAnnotation(Wildcard.class.getName(), values);
-    }
-
     private static ExpressionDef buildArgument(String argumentName, ClassElement argumentType) {
         ExpressionDef.Constant argumentTypeConstant = ExpressionDef.constant(TypeDef.erasure(resolveArgument(argumentType)));
         ExpressionDef.Constant argumentNameConstant = ExpressionDef.constant(argumentName);
