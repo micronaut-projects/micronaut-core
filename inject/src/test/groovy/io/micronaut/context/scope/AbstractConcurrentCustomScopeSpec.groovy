@@ -313,6 +313,31 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         scope.scopeMap.isEmpty()
     }
 
+    void "under a lock per bean two maps destroyed at once each close their own bean"() {
+        given: "two maps of one scope, each holding a bean that equals the other, as two BeanRegistration of one identifier and definition do"
+        def scope = new TestScope(true)
+        def other = new ConcurrentHashMap<BeanIdentifier, CreatedBean<?>>()
+        def id = BeanIdentifier.of("shared")
+        def first = new EqualByIdentifierCreatedBean(id: id, bean: new Object())
+        def second = new EqualByIdentifierCreatedBean(id: id, bean: new Object())
+        scope.scopeMap.put(id, first)
+        other.put(id, second)
+        def otherDestroyed = new CountDownLatch(1)
+        first.onClose = {
+            Thread.start { scope.destroyScope(other); otherDestroyed.countDown() }
+            assert otherDestroyed.await(5, TimeUnit.SECONDS): "the destruction of the other map should not wait for this one"
+        }
+
+        when: "the other map is destroyed while this one is closing its own bean"
+        scope.destroyScope(scope.scopeMap)
+
+        then: "the bean of the other map is closed and taken out, not taken for the one already being closed"
+        first.closed
+        second.closed
+        scope.scopeMap.isEmpty()
+        other.isEmpty()
+    }
+
     void "under a lock per bean the scope map must be a concurrent map"() {
         given:
         def scope = new TestScope(true, new HashMap<BeanIdentifier, CreatedBean<?>>())
@@ -647,6 +672,23 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
             def createdBean = new TestCreatedBean(id: id, bean: new Object(), definition: definition, failToClose: failToClose)
             created << createdBean
             return createdBean
+        }
+    }
+
+    /**
+     * A created bean that equals another of the same identifier, as {@link io.micronaut.context.BeanRegistration}
+     * equals another of the same identifier and definition, however distinct the instances they hold are.
+     */
+    static class EqualByIdentifierCreatedBean extends TestCreatedBean {
+
+        @Override
+        boolean equals(Object o) {
+            return o instanceof EqualByIdentifierCreatedBean && ((EqualByIdentifierCreatedBean) o).id == id
+        }
+
+        @Override
+        int hashCode() {
+            return id.hashCode()
         }
     }
 

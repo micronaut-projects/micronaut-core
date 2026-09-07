@@ -72,9 +72,11 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     /**
      * The beans a destruction in the {@code lockPerBean} mode is closing, while they are still held: a bean is
      * closed while the scope holds all of them and taken out afterwards, so a second destruction running at the
-     * same time must not close it again.
+     * same time must not close it again. Held by identity, since one scope has a map per context - a request
+     * scope has one per request - and {@link BeanRegistration} equals another of the same identifier and
+     * definition, so beans of two maps destroyed at once would otherwise be taken for one.
      */
-    private final Set<CreatedBean<?>> closing = ConcurrentHashMap.newKeySet();
+    private final Set<IdentityKey> closing = ConcurrentHashMap.newKeySet();
 
     /**
      * A custom scope annotation.
@@ -511,7 +513,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
         while (true) {
             final List<CreatedBean<?>> closedInThisPass = new ArrayList<>();
             for (CreatedBean<?> createdBean : new ArrayList<>(scopeMap.values())) {
-                if (closing.add(createdBean)) {
+                if (closing.add(new IdentityKey(createdBean))) {
                     closeQuietly(createdBean);
                     closedInThisPass.add(createdBean);
                 }
@@ -522,7 +524,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
                 synchronized (creationLocks.computeIfAbsent(id, key -> new Object())) {
                     published = scopeMap.get(id);
                 }
-                if (published != null && closing.add(published)) {
+                if (published != null && closing.add(new IdentityKey(published))) {
                     closeQuietly(published);
                     closedInThisPass.add(published);
                 }
@@ -532,11 +534,14 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
                 return;
             }
             for (CreatedBean<?> closedBean : closedInThisPass) {
-                // under the identifier's lock, so that a creation racing this take-out is not taken out unclosed
+                // under the identifier's lock, so that a creation racing this take-out is not taken out unclosed,
+                // and by identity, so that a bean the racing creation published is not taken for the closed one
                 synchronized (creationLocks.computeIfAbsent(closedBean.id(), key -> new Object())) {
-                    scopeMap.remove(closedBean.id(), closedBean);
+                    if (scopeMap.get(closedBean.id()) == closedBean) {
+                        scopeMap.remove(closedBean.id());
+                    }
                 }
-                closing.remove(closedBean);
+                closing.remove(new IdentityKey(closedBean));
             }
         }
     }
@@ -610,6 +615,26 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
             return unwrap(delegatingBeanDefinition.getTarget());
         }
         return beanDefinition;
+    }
+
+    /**
+     * A key that holds a bean by identity, so that two distinct beans that are equal - two
+     * {@link BeanRegistration} of one identifier and definition, held by the maps of two contexts of one scope -
+     * are two keys.
+     *
+     * @param createdBean The bean
+     */
+    private record IdentityKey(CreatedBean<?> createdBean) {
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof IdentityKey other && other.createdBean == createdBean;
+        }
+
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(createdBean);
+        }
     }
 
     @SuppressWarnings("unchecked")
