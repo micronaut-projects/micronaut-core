@@ -6,11 +6,12 @@ import java
 from jakarta.inject import Inject
 from micronaut.context.annotation import Requires
 from micronaut.http import HttpRequest
-from micronaut.http.annotation import Controller, Get
+from micronaut.http.annotation import Body, Controller, Get, Post
 from micronaut.http.client import HttpClient
 from micronaut.http.client.annotation import Client
 
 from .BackendClient import BackendClient
+from .Note import Note
 
 String = java.type("java.lang.String")
 System = java.type("java.lang.System")
@@ -110,3 +111,10 @@ class AsyncDemoController:
     @Get("/context-id")
     async def context_id(self) -> str:
         return builtins.__MN_CTX_ID__
+
+    # A dataclass body arrives as the generated Java class and is rebuilt in the event-loop context;
+    # the response leaves that context again. With the pool enabled this is the pooled value path.
+    @Post("/echo-note")
+    async def echo_note(self, note: Annotated[Note, Body]) -> Note:
+        await asyncio.sleep(0)
+        return Note(text=f"{note.text}:{builtins.__MN_CTX_ID__ != ''}", priority=note.priority + 1)

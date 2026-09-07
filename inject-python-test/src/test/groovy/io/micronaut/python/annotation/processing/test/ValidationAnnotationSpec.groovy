@@ -72,6 +72,55 @@ class ProductService:
         context?.close()
     }
 
+    def "test qualified and aliased Annotated spellings keep their constraints"() {
+        given:
+        @Language("python") def pythonCode = '''
+import typing
+import typing as t
+from typing import Annotated as Meta
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from jakarta.validation.constraints import NotBlank, Min
+
+@Singleton
+class SpellingService:
+    @Executable
+    def qualified(self, name: typing.Annotated[str, NotBlank]) -> typing.Annotated[str, NotBlank]:
+        return name
+
+    @Executable
+    def aliased(self, age: Meta[int, Min(1)]) -> str:
+        return str(age)
+
+    @Executable
+    def module_alias(self, name: t.Annotated[str, NotBlank]) -> str:
+        return name
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.SpellingService")
+        def qualified = definition.getExecutableMethods().find { it.methodName == "qualified" }
+        def aliased = definition.getExecutableMethods().find { it.methodName == "aliased" }
+        def moduleAlias = definition.getExecutableMethods().find { it.methodName == "module_alias" }
+
+        then:
+        definition instanceof ProxyBeanDefinition
+        qualified.hasStereotype(Validated)
+        qualified.arguments[0].type == String
+        qualified.arguments[0].annotationMetadata.hasAnnotation(NotBlank)
+        qualified.returnType.type == String
+        aliased.hasStereotype(Validated)
+        aliased.arguments[0].type == int
+        aliased.arguments[0].annotationMetadata.hasAnnotation(Min)
+        aliased.arguments[0].annotationMetadata.intValue(Min).asInt == 1
+        moduleAlias.arguments[0].type == String
+        moduleAlias.arguments[0].annotationMetadata.hasAnnotation(NotBlank)
+
+        cleanup:
+        context?.close()
+    }
+
     def "test inherited method validation metadata can be mutated by validation visitor"() {
         given:
         @Language("python") def pythonCode = '''

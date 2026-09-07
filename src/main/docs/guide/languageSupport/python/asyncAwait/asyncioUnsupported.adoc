@@ -7,5 +7,10 @@ The following APIs are not implemented by the current Micronaut asyncio bridge a
 * `sendfile` and `start_tls`
 * Selector registration APIs: `add_reader`, `remove_reader`, `add_writer`, and `remove_writer`
 * Subprocess APIs: `subprocess_exec` and `subprocess_shell`
+* Caller-supplied Python sockets: `sock=...` on `create_connection`, `create_server` and `create_datagram_endpoint`, and a Python socket passed to `connect_accepted_socket`
+* `keep_alive` on `create_server`
+* `happy_eyeballs_delay` and `interleave` on `create_connection`
+* `set_protocol` on a transport
+* `shutdown_asyncgens()` and `shutdown_default_executor()` return without doing anything: the blocking executor belongs to Micronaut and async generators are finalised by the garbage collector
 
-When an unsupported socket option, address family, or supplied socket prevents the Netty path, Micronaut uses the generic socket coroutine implementation from `micronaut-context-python`. That fallback exists for compatibility; HTTP request coroutine execution remains bound to the current Netty event loop while `micronaut-context-python-netty` is active.
+Every address family is served by Netty; there is no socket-polling fallback, so an unsupported argument fails at the call instead of silently taking a slower path. HTTP request coroutine execution remains bound to the current Netty event loop while `micronaut-context-python-netty` is active.

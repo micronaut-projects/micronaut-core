@@ -22,16 +22,29 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
+import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 final class GraalPyEngineFactoryTest {
+
+    @Test
+    void configuredEngineOptionsWinOverBuiltInDefaults() {
+        GraalPyEngineFactory.GraalPyEngineConfiguration configuration = new GraalPyEngineFactory.GraalPyEngineConfiguration();
+        assertEquals("1", configuration.optionalOptions.get("engine.CompilerThreads"));
+
+        configuration.setOptions(Map.of("engine.CompilerThreads", "4"));
+
+        assertFalse(GraalPyEngineFactory.optionalOptionsToApply(configuration).containsKey("engine.CompilerThreads"),
+            "the built-in CompilerThreads default must not override the configured value");
+    }
 
     @Test
     void engineOptionsCanBeConfiguredFromMicronautProperties() {
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "graalpy.engine.allow-experimental-options", true,
-            "graalpy.engine.options", Map.of("engine.Compilation", "false")
+            // an option both the optimizing and the fallback runtime know
+            "graalpy.engine.options", Map.of("engine.WarnInterpreterOnly", "false")
         ))) {
             Context context = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
 

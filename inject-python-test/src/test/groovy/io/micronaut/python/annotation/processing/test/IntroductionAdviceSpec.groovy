@@ -795,8 +795,8 @@ class AbstractBean(ABC):
         Value bean = getBean(context, "python.AbstractBean").asPolyglotValue()
         def interceptor = getBean(context, "python.StubIntroduction")
 
-        then:
-        bean.invokeMember("is_abstract").isNull()
+        then: "the introduction returns the decorator's declared default, an empty string"
+        bean.invokeMember("is_abstract").asString() == ""
         bean.invokeMember("non_abstract").asString() == "good"
         interceptor.invoked == 1
 

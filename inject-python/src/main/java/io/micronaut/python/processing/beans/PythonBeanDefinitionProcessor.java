@@ -113,10 +113,9 @@ public final class PythonBeanDefinitionProcessor {
                 outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, outputVisitor));
             }
         } catch (IOException e) {
-            // Raise a compile error
             String message = e.getMessage();
-            error("Unexpected error " + e.getClass().getSimpleName() + ":" +
-                  (message != null ? message : e.getClass().getSimpleName()));
+            outputVisitor.fail("Failed to write bean definition [" + outputObjectDef.objectDef().getName() + "]: "
+                + (message != null ? message : e.getClass().getSimpleName()), null);
         }
     }
 
@@ -132,11 +131,5 @@ public final class PythonBeanDefinitionProcessor {
         } else {
             visitorContext.fail("Unknown error processing element", null);
         }
-    }
-
-    private void error(String message) {
-        // This would normally log an error, but in annotation processing
-        // we need to use the visitor context to report errors
-        System.err.println("PythonBeanDefinitionProcessor error: " + message);
     }
 }

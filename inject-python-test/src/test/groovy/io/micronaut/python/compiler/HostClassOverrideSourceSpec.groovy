@@ -17,7 +17,7 @@ class MyMap(HashMap):
         expect:
         assertGeneratedSourceContains(pythonCode, '''
 public int size() {
-    Value pythonResult = GraalPyRuntimeUtil.invokePythonMethod(this.asPolyglotValue(), "size", new Object[]{});
+    Value pythonResult = PythonInvocation.invokePythonMethod(this.asPolyglotValue(), "size", new Object[]{});
     return pythonResult.asInt();
   }
 ''')
