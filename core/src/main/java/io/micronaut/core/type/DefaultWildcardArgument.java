@@ -17,11 +17,10 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.util.ArrayUtils;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Default implementation of {@link WildcardArgument}. It is also a {@link GenericPlaceholder} named after the
@@ -35,10 +34,12 @@ import java.util.List;
 @Internal
 final class DefaultWildcardArgument<T> extends DefaultArgument<T> implements WildcardArgument<T>, GenericPlaceholder<T> {
 
-    private static final Argument<?>[] OBJECT_BOUND = {Argument.OBJECT_ARGUMENT};
+    private static final List<Argument<?>> OBJECT_BOUND = List.of(Argument.OBJECT_ARGUMENT);
 
-    private final Argument<?>[] upperBounds;
-    private final Argument<?>[] lowerBounds;
+    @Nullable
+    private final String name;
+    private final List<Argument<?>> upperBounds;
+    private final List<Argument<?>> lowerBounds;
 
     /**
      * @param type               The type the wildcard is bounded by
@@ -54,19 +55,34 @@ final class DefaultWildcardArgument<T> extends DefaultArgument<T> implements Wil
                             Argument<?> @Nullable [] typeParameters,
                             Argument<?> @Nullable [] upperBounds,
                             Argument<?> @Nullable [] lowerBounds) {
+        this(type,
+            name,
+            annotationMetadata,
+            typeParameters,
+            upperBounds == null || upperBounds.length == 0 ? OBJECT_BOUND : List.of(upperBounds),
+            lowerBounds == null || lowerBounds.length == 0 ? List.of() : List.of(lowerBounds));
+    }
+
+    private DefaultWildcardArgument(Class<T> type,
+                                    @Nullable String name,
+                                    @Nullable AnnotationMetadata annotationMetadata,
+                                    Argument<?> @Nullable [] typeParameters,
+                                    List<Argument<?>> upperBounds,
+                                    List<Argument<?>> lowerBounds) {
         super(type, name, annotationMetadata, true, typeParameters);
-        this.upperBounds = ArrayUtils.isEmpty(upperBounds) ? OBJECT_BOUND : upperBounds;
-        this.lowerBounds = ArrayUtils.isEmpty(lowerBounds) ? Argument.ZERO_ARGUMENTS : lowerBounds;
+        this.name = name;
+        this.upperBounds = upperBounds;
+        this.lowerBounds = lowerBounds;
     }
 
     @Override
     public List<Argument<?>> getUpperBounds() {
-        return Arrays.asList(upperBounds);
+        return upperBounds;
     }
 
     @Override
     public List<Argument<?>> getLowerBounds() {
-        return Arrays.asList(lowerBounds);
+        return lowerBounds;
     }
 
     @Override
@@ -81,17 +97,33 @@ final class DefaultWildcardArgument<T> extends DefaultArgument<T> implements Wil
 
     @Override
     public Argument<T> withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return new DefaultWildcardArgument<>(getType(), getName(), annotationMetadata, getTypeParameters(), upperBounds, lowerBounds);
+        return new DefaultWildcardArgument<>(getType(), name, annotationMetadata, getTypeParameters(), upperBounds, lowerBounds);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        return super.equals(o)
+            && o instanceof DefaultWildcardArgument<?> that
+            && upperBounds.equals(that.upperBounds)
+            && lowerBounds.equals(that.lowerBounds);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), upperBounds, lowerBounds);
     }
 
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder("?");
-        if (lowerBounds.length > 0) {
-            builder.append(" super ").append(lowerBounds[0]);
+        if (!lowerBounds.isEmpty()) {
+            builder.append(" super ").append(lowerBounds.get(0));
         } else if (upperBounds != OBJECT_BOUND) {
-            builder.append(" extends ").append(upperBounds[0]);
+            builder.append(" extends ").append(upperBounds.get(0));
         }
-        return builder.append(' ').append(getName()).toString();
+        if (name != null) {
+            builder.append(' ').append(name);
+        }
+        return builder.toString();
     }
 }

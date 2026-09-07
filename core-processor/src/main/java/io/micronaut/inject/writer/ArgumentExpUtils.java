@@ -503,7 +503,7 @@ public final class ArgumentExpUtils {
 
             values.add(
                 AnnotationMetadataGenUtils.instantiateNewMetadata(
-                    (MutableAnnotationMetadata) annotationMetadata,
+                    annotationMetadata,
                     loadClassValueExpressionFn
                 )
             );
@@ -559,17 +559,26 @@ public final class ArgumentExpUtils {
         return TYPE_ARGUMENT_ARRAY.instantiate(bounds.stream().map(bound -> {
             ExpressionDef.Constant boundTypeConstant = ExpressionDef.constant(TypeDef.erasure(resolveArgument(bound)));
             Map<String, ClassElement> boundTypeArguments = bound.getTypeArguments();
-            if (boundTypeArguments.isEmpty()) {
+            // Persist only type annotations added to the bound
+            MutableAnnotationMetadata boundAnnotationMetadata = MutableAnnotationMetadata.of(bound.getTypeAnnotationMetadata());
+            if (boundTypeArguments.isEmpty() && boundAnnotationMetadata.isEmpty()) {
                 // Argument.of(Class)
                 return TYPE_ARGUMENT.invokeStatic(METHOD_CREATE_ARGUMENT_CLASS, boundTypeConstant);
             }
-            // Argument.of(Class, null, null, Argument[])
+            ExpressionDef annotationMetadataExp;
+            if (boundAnnotationMetadata.isEmpty()) {
+                annotationMetadataExp = ExpressionDef.nullValue();
+            } else {
+                MutableAnnotationMetadata.contributeDefaults(annotationMetadataWithDefaults, boundAnnotationMetadata);
+                annotationMetadataExp = AnnotationMetadataGenUtils.instantiateNewMetadata(boundAnnotationMetadata, loadClassValueExpressionFn);
+            }
+            // Argument.of(Class, null, AnnotationMetadata, Argument[])
             return TYPE_ARGUMENT.invokeStatic(
                 METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
                 boundTypeConstant,
                 ExpressionDef.nullValue(),
-                ExpressionDef.nullValue(),
-                pushTypeArgumentElements(
+                annotationMetadataExp,
+                boundTypeArguments.isEmpty() ? ExpressionDef.nullValue() : pushTypeArgumentElements(
                     annotationMetadataWithDefaults,
                     owningType,
                     bound,

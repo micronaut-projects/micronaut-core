@@ -218,6 +218,23 @@ class Bean<B extends Book> extends Base<Foo<?>, List<? super Book>> implements F
         upper(annotated) == [annotated.type.name] && lower(annotated) == []
         annotated.annotationMetadata.hasAnnotation('test.Mark')
         annotated.annotationMetadata.annotationNames == ['test.Mark'] as Set
+
+        and: 'the bound carries it as well'
+        wildcard(annotated).upperBounds[0].annotationMetadata.hasAnnotation('test.Mark')
+    }
+
+    void "a renamed wildcard keeps its bounds and equals itself"() {
+        given:
+        Argument<?> lowerBounded = constructorArguments().lower.typeParameters[0]
+        Argument<?> renamed = lowerBounded.withName('other')
+
+        expect:
+        renamed instanceof WildcardArgument
+        renamed.name == 'other'
+        lower(renamed) == ['test.Book']
+        renamed.toString() == '? super Book other'
+        lowerBounded == lowerBounded.withAnnotationMetadata(lowerBounded.annotationMetadata)
+        lowerBounded != renamed
     }
 
     void "a wildcard is recorded for an injected field"() {
