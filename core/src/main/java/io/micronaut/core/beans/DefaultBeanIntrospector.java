@@ -16,6 +16,8 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.beans.exceptions.IntrospectionException;
+import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import org.jspecify.annotations.Nullable;
@@ -46,6 +48,9 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     @Nullable
     @SuppressWarnings("java:S3077") // resolveIntrospections returns an immutable Map.copyOf, published once under double checked locking
     private volatile Map<String, BeanIntrospectionReference<Object>> introspectionMap;
+    @Nullable
+    @SuppressWarnings("java:S3077") // resolveFallbacks returns an immutable List.copyOf, published once under double checked locking
+    private volatile List<BeanIntrospectionFallback> fallbacks;
     private final ClassLoader classLoader;
     private final boolean useContextClassLoader;
 
@@ -129,13 +134,32 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                     }
                 }
             }
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("No BeanIntrospection found for bean type: {}", beanType);
-            }
-            return Optional.empty();
         } catch (Throwable e) {
             throw new IntrospectionException("Error loading BeanIntrospection for type [" + beanType + "]: " + e.getMessage(), e);
         }
+        // a fallback describes a class it was never compiled against, so asking it can fail on a type it does
+        // not serve - reading a member whose type is an absent optional dependency throws NoClassDefFoundError -
+        // and a failure of one fallback must stay a lookup miss, which is what the callers of a find expect.
+        // An error of the virtual machine is not such a failure and is left to propagate
+        for (BeanIntrospectionFallback fallback : getFallbacks(effectiveClassLoader)) {
+            try {
+                Optional<BeanIntrospection<T>> fallbackIntrospection = fallback.findIntrospection(beanType);
+                if (fallbackIntrospection.isPresent()) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Found BeanIntrospection for type {} from fallback {}", beanType, fallback);
+                    }
+                    return fallbackIntrospection;
+                }
+            } catch (Exception | LinkageError e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Fallback {} failed to supply a BeanIntrospection for type {}, continuing", fallback, beanType, e);
+                }
+            }
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("No BeanIntrospection found for bean type: {}", beanType);
+        }
+        return Optional.empty();
     }
 
     @Nullable
@@ -172,6 +196,35 @@ class DefaultBeanIntrospector implements BeanIntrospector {
             }
         }
         return resolvedIntrospectionMap;
+    }
+
+    /**
+     * The fallbacks registered as services, in order, resolved with the same class loader the introspections
+     * are resolved with so that a fallback and a generated introspection are never looked for in two places.
+     * Only the fallbacks of the class loader of this introspector are cached, as {@link #getIntrospections()}
+     * caches only that class loader's introspections.
+     */
+    private List<BeanIntrospectionFallback> getFallbacks(ClassLoader effectiveClassLoader) {
+        if (effectiveClassLoader != classLoader) {
+            return resolveFallbacks(effectiveClassLoader);
+        }
+        List<BeanIntrospectionFallback> resolvedFallbacks = this.fallbacks;
+        if (resolvedFallbacks == null) {
+            synchronized (this) { // double check
+                resolvedFallbacks = this.fallbacks;
+                if (resolvedFallbacks == null) {
+                    resolvedFallbacks = resolveFallbacks(classLoader);
+                    this.fallbacks = resolvedFallbacks;
+                }
+            }
+        }
+        return resolvedFallbacks;
+    }
+
+    private List<BeanIntrospectionFallback> resolveFallbacks(ClassLoader classLoader) {
+        List<BeanIntrospectionFallback> resolvedFallbacks = SoftServiceLoader.load(BeanIntrospectionFallback.class, classLoader).collectAll();
+        OrderUtil.sort(resolvedFallbacks);
+        return List.copyOf(resolvedFallbacks);
     }
 
     private ClassLoader resolveClassLoader() {
