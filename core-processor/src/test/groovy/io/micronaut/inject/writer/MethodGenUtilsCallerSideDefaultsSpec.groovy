@@ -2,7 +2,6 @@ package io.micronaut.inject.writer
 
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.ast.DefaultValueProvidingParameterElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.sourcegen.model.ClassTypeDef
@@ -16,6 +15,9 @@ import spock.lang.Specification
  * Tests the language-neutral, caller-side default value path of {@link MethodGenUtils}, which
  * supports languages such as Scala that compile a default argument to an accessor the caller
  * invokes, rather than to Kotlin's bitmask plus {@code $default} overload.
+ *
+ * <p>The default values are contributed by {@link TestScalaLikeDefaultValueProvider}, registered
+ * as a service in the test resources.</p>
  */
 class MethodGenUtilsCallerSideDefaultsSpec extends Specification {
 
@@ -39,12 +41,17 @@ class MethodGenUtilsCallerSideDefaultsSpec extends Specification {
         )
     }
 
+    private static ParameterElement plain(String name) {
+        ParameterElement.of(ClassElement.of(String), name)
+    }
+
+    private static ParameterElement defaulted(String name) {
+        new DefaultedParameter(plain(name), defaultGetterCall())
+    }
+
     void "a parameter supplying a caller-side default is selected when no value is present"() {
         given:
-        def constructor = constructorOf(
-                ParameterElement.of(ClassElement.of(String), 'name'),
-                new DefaultedParameter(ParameterElement.of(ClassElement.of(String), 'greeting'))
-        )
+        def constructor = constructorOf(plain('name'), defaulted('greeting'))
         def values = [ExpressionDef.nullValue(), ExpressionDef.nullValue()]
         def hasValues = [ExpressionDef.trueValue(), ExpressionDef.falseValue()]
 
@@ -69,9 +76,7 @@ class MethodGenUtilsCallerSideDefaultsSpec extends Specification {
 
     void "the default is used directly when no values are supplied at all"() {
         given:
-        def constructor = constructorOf(
-                new DefaultedParameter(ParameterElement.of(ClassElement.of(String), 'greeting'))
-        )
+        def constructor = constructorOf(defaulted('greeting'))
 
         when:
         def expression = MethodGenUtils.invokeBeanConstructor(
@@ -82,11 +87,23 @@ class MethodGenUtilsCallerSideDefaultsSpec extends Specification {
         (expression as ExpressionDef.NewInstance).values() == [defaultGetterCall()]
     }
 
+    void "the value is passed through unchanged when presence is unknown"() {
+        given: 'values but no presence expressions, so an explicit null cannot be told from absence'
+        def constructor = constructorOf(defaulted('greeting'))
+        def values = [ExpressionDef.nullValue()]
+
+        when:
+        def expression = MethodGenUtils.invokeBeanConstructor(
+                constructor, false, true, values, null, [] as List<StatementDef>)
+
+        then: 'no default is substituted - an explicit null must not silently become the default'
+        expression instanceof ExpressionDef.NewInstance
+        (expression as ExpressionDef.NewInstance).values() == values
+    }
+
     void "a parameter that reports a default but supplies no expression falls back to the value"() {
         given: 'a language that evaluates defaults in the callee, e.g. Python via its generated stub'
-        def constructor = constructorOf(
-                new OptionalParameter(ParameterElement.of(ClassElement.of(String), 'greeting'))
-        )
+        def constructor = constructorOf(new DefaultedParameter(plain('greeting'), null))
         def values = [ExpressionDef.nullValue()]
 
         when:
@@ -98,15 +115,29 @@ class MethodGenUtilsCallerSideDefaultsSpec extends Specification {
         (expression as ExpressionDef.NewInstance).values() == values
     }
 
+    void "an unsupported parameter is never consulted for a caller-side default"() {
+        given: 'a parameter reporting a default that no registered provider supports'
+        def constructor = constructorOf(new OptionalParameter(plain('greeting')))
+        def values = [ExpressionDef.nullValue()]
+
+        when:
+        def expression = MethodGenUtils.invokeBeanConstructor(
+                constructor, false, true, values, [ExpressionDef.falseValue()], [] as List<StatementDef>)
+
+        then:
+        expression instanceof ExpressionDef.NewInstance
+        (expression as ExpressionDef.NewInstance).values() == values
+    }
+
     void "hasDefaultsParameters reports caller-side defaults as well as Kotlin defaults"() {
         given:
-        def plain = ParameterElement.of(ClassElement.of(String), 'name')
-        def callerSide = new DefaultedParameter(ParameterElement.of(ClassElement.of(String), 'greeting'))
-        def optionalOnly = new OptionalParameter(ParameterElement.of(ClassElement.of(String), 'greeting'))
+        def required = plain('name')
+        def callerSide = defaulted('greeting')
+        def optionalOnly = new OptionalParameter(plain('greeting'))
 
         expect:
-        !MethodGenUtils.hasDefaultsParameters([plain])
-        MethodGenUtils.hasDefaultsParameters([plain, callerSide])
+        !MethodGenUtils.hasDefaultsParameters([required])
+        MethodGenUtils.hasDefaultsParameters([required, callerSide])
         MethodGenUtils.hasCallerSideDefaultsParameters([callerSide])
 
         and: 'a parameter that is merely optional supplies no caller-side default'
@@ -118,12 +149,14 @@ class MethodGenUtilsCallerSideDefaultsSpec extends Specification {
     }
 
     /** A parameter whose default value can be materialised at the call site, as in Scala. */
-    private static class DefaultedParameter implements DefaultValueProvidingParameterElement {
+    private static class DefaultedParameter implements ParameterElement, TestScalaLikeDefaultValueProvider.ScalaLikeParameter {
         @Delegate
         final ParameterElement delegate
+        final ExpressionDef accessorCall
 
-        DefaultedParameter(ParameterElement delegate) {
+        DefaultedParameter(ParameterElement delegate, ExpressionDef accessorCall) {
             this.delegate = delegate
+            this.accessorCall = accessorCall
         }
 
         @Override
@@ -132,8 +165,8 @@ class MethodGenUtilsCallerSideDefaultsSpec extends Specification {
         }
 
         @Override
-        Optional<ExpressionDef> defaultValueExpression(ExpressionDef target) {
-            Optional.of(defaultGetterCall())
+        ExpressionDef defaultAccessorCall() {
+            accessorCall
         }
     }
 

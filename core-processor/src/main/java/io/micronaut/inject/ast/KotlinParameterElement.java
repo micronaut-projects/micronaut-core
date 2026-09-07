@@ -24,8 +24,8 @@ import io.micronaut.core.annotation.Experimental;
  * <i>Kotlin's</i> calling convention: a defaults bitmask plus the synthetic {@code $default}
  * overload. It is therefore not a general marker for optional parameters — use
  * {@link ParameterElement#hasDefault()} for that, and
- * {@link DefaultValueProvidingParameterElement} for languages that evaluate the default in the
- * caller.</p>
+ * {@code io.micronaut.inject.writer.ParameterDefaultValueProvider} for languages that evaluate the
+ * default in the caller.</p>
  *
  * @author Denis Stepanov
  * @since 4.1.0

@@ -22,7 +22,6 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.DefaultValueProvidingParameterElement;
 import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -48,6 +47,13 @@ import java.util.Objects;
 public final class MethodGenUtils {
 
     private static final TypeDef KOTLIN_CONSTRUCTOR_MARKER = TypeDef.of("kotlin.jvm.internal.DefaultConstructorMarker");
+
+    private static final java.lang.reflect.Method REQUIRE_NON_NULL_ELSE_METHOD = ReflectionUtils.getRequiredMethod(
+            Objects.class,
+            "requireNonNullElse",
+            Object.class,
+            Object.class
+    );
 
     private static final java.lang.reflect.Method INSTANTIATE_METHOD = ReflectionUtils.getRequiredInternalMethod(
             InstantiationUtils.class,
@@ -87,7 +93,7 @@ public final class MethodGenUtils {
      * through Kotlin's calling convention or through a caller-side default value.
      *
      * @param arguments The arguments
-     * @return true if include
+     * @return true if any argument has a default this class can generate code for
      * @since 5.2.0
      */
     public static boolean hasDefaultsParameters(List<ParameterElement> arguments) {
@@ -98,7 +104,7 @@ public final class MethodGenUtils {
      * Checks if any parameter has a default value that can be materialised at the call site.
      *
      * @param arguments The arguments
-     * @return true if include
+     * @return true if any argument has a caller-side default value expression
      * @since 5.2.0
      */
     public static boolean hasCallerSideDefaultsParameters(List<ParameterElement> arguments) {
@@ -116,8 +122,13 @@ public final class MethodGenUtils {
         if (parameter instanceof KotlinParameterElement || !parameter.hasDefault()) {
             return null;
         }
-        if (parameter instanceof DefaultValueProvidingParameterElement provider) {
-            return provider.defaultValueExpression(null).orElse(null);
+        for (ParameterDefaultValueProvider provider : ParameterDefaultValueProviderLoader.load()) {
+            if (provider.supports(parameter)) {
+                ExpressionDef expression = provider.defaultValueExpression(parameter, null).orElse(null);
+                if (expression != null) {
+                    return expression;
+                }
+            }
         }
         return null;
     }
@@ -298,7 +309,7 @@ public final class MethodGenUtils {
                     expressions.add(
                             ClassTypeDef.of(Objects.class)
                                     .invokeStatic(
-                                            ReflectionUtils.getRequiredMethod(Objects.class, "requireNonNullElse", Object.class, Object.class),
+                                            REQUIRE_NON_NULL_ELSE_METHOD,
 
                                             value.cast(TypeDef.OBJECT), // Remove any previous casts
                                         defaultValue
@@ -316,6 +327,11 @@ public final class MethodGenUtils {
      * Selects between the supplied value and the parameter's declared default, for a language
      * that evaluates defaults in the caller.
      *
+     * <p>Substitution requires a presence expression. Without one the supplied value is passed
+     * through unchanged, rather than treating a {@code null} value as absent — a language may
+     * allow an explicit {@code null} to be passed to a nullable parameter that also has a
+     * default, and that {@code null} must not silently become the default.</p>
+     *
      * @param value             The supplied value, or {@code null} if no value is supplied at all
      * @param hasValueExpression An expression that is true when the value is present, if known
      * @param defaultValue      The declared default value expression
@@ -332,16 +348,11 @@ public final class MethodGenUtils {
             // A known non-null constant is always present
             return value;
         }
-        if (hasValueExpression != null) {
-            return hasValueExpression.isTrue().doIfElse(value, defaultValue);
+        if (hasValueExpression == null) {
+            // Presence is unknown, so the value cannot be distinguished from an explicit null
+            return value;
         }
-        return ClassTypeDef.of(Objects.class)
-            .invokeStatic(
-                ReflectionUtils.getRequiredMethod(Objects.class, "requireNonNullElse", Object.class, Object.class),
-
-                value.cast(TypeDef.OBJECT), // Remove any previous casts
-                defaultValue
-            ).cast(value.type());
+        return hasValueExpression.isTrue().doIfElse(value, defaultValue);
     }
 
     private static ExpressionDef getDefaultValue(ParameterElement constructorArgument) {

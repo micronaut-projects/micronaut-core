@@ -75,8 +75,9 @@ public interface ParameterElement extends TypedElement {
      * specific and is deliberately not part of this contract:</p>
      *
      * <ul>
-     *     <li>some languages evaluate the default in the <i>caller</i>, in which case the element
-     *     may also implement {@link DefaultValueProvidingParameterElement} to supply it;</li>
+     *     <li>some languages evaluate the default in the <i>caller</i>, in which case the language
+     *     module may contribute an {@code io.micronaut.inject.writer.ParameterDefaultValueProvider}
+     *     to supply it;</li>
      *     <li>others evaluate it in the <i>callee</i> and require a dedicated calling convention,
      *     as {@link KotlinParameterElement} does.</li>
      * </ul>
