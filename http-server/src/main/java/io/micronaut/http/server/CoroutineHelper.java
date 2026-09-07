@@ -76,7 +76,14 @@ public final class CoroutineHelper {
         ContinuationArgumentBinder.setupCoroutineContext(httpRequest, contextView, propagatedContext, coroutineContextFactories, dispatcher);
     }
 
-    private CoroutineContext dispatcherFor(ExecutorService executorService) {
+    /**
+     * Resolves, and caches, the dispatcher for an executor. Package private so that the caching and unwrapping
+     * can be asserted directly.
+     *
+     * @param executorService The executor the route runs on
+     * @return The dispatcher for that executor
+     */
+    CoroutineContext dispatcherFor(ExecutorService executorService) {
         // the coroutine's own propagation is handled by KotlinCoroutinePropagation, so dispatch on the raw
         // executor rather than the instrumented wrapper, which would otherwise capture the propagated context
         // of whichever thread happened to resume the continuation
