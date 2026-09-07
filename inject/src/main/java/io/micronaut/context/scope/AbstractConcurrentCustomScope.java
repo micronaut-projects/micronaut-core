@@ -534,16 +534,42 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
                 return;
             }
             for (CreatedBean<?> closedBean : closedInThisPass) {
-                // under the identifier's lock, so that a creation racing this take-out is not taken out unclosed,
-                // and by identity, so that a bean the racing creation published is not taken for the closed one
+                final boolean stillHeld;
+                // under the identifier's lock, so that a creation racing this take-out is not taken out unclosed
                 synchronized (creationLocks.computeIfAbsent(closedBean.id(), key -> new Object())) {
-                    if (scopeMap.get(closedBean.id()) == closedBean) {
-                        scopeMap.remove(closedBean.id());
+                    // taken out by identity rather than by identifier, so that a scope keying its map by
+                    // something of its own - anything other than the identifier the bean carries - has its entry
+                    // taken out all the same, and so that a bean a racing creation published is left alone
+                    for (Map.Entry<BeanIdentifier, CreatedBean<?>> entry : scopeMap.entrySet()) {
+                        if (entry.getValue() == closedBean) {
+                            scopeMap.remove(entry.getKey(), closedBean);
+                        }
                     }
+                    stillHeld = holds(scopeMap, closedBean);
                 }
-                closing.remove(new IdentityKey(closedBean));
+                if (!stillHeld) {
+                    closing.remove(new IdentityKey(closedBean));
+                }
+                // the mark of an instance the map holds even after the take-out - one a creation racing this
+                // destruction has just put back - is kept, so that no later pass closes that instance a second time
             }
         }
+    }
+
+    /**
+     * Whether the given map holds the given instance, by identity, under any key.
+     *
+     * @param scopeMap    The scope map
+     * @param createdBean The created bean
+     * @return Whether it is held
+     */
+    private static boolean holds(Map<BeanIdentifier, CreatedBean<?>> scopeMap, CreatedBean<?> createdBean) {
+        for (CreatedBean<?> held : scopeMap.values()) {
+            if (held == createdBean) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void closeQuietly(CreatedBean<?> createdBean) {
