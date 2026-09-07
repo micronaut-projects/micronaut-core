@@ -3774,13 +3774,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
             .returns(thisType);
 
-        // Add parameters
-        for (int i = 0; i < creatorMethod.getParameters().length; i++) {
-            @NonNull ParameterElement parameter = creatorMethod.getParameters()[i];
-            // first parameter in Python is the class, skip it
-            if (i == 0) {
-                continue;
-            }
+        // Add parameters. The implicit Python receiver (`cls`/`self`) is already
+        // excluded from the resolved parameters, so every remaining one is a real argument.
+        for (@NonNull ParameterElement parameter : creatorMethod.getParameters()) {
             var parameterType = TypeDef.of(parameter.getType());
             ParameterDef parameterDef = ParameterDef
                 .builder(parameter.getName(), parameterType).build();
