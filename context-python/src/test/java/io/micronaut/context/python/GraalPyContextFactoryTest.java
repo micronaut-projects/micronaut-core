@@ -97,6 +97,17 @@ final class GraalPyContextFactoryTest {
     }
 
     @Test
+    void hostClassLookupIsUnrestrictedByDefault() {
+        try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            Context context = applicationContext.getBean(Context.class);
+            assertTrue(applicationContext.getBean(GraalPyContextConfiguration.class).getHostClassLookup().isEmpty());
+            // a class outside the JDK, Jakarta and framework packages: visible without configuration
+            assertTrue(context.eval(PYTHON, "import java\njava.type('org.slf4j.LoggerFactory')").isMetaObject());
+            assertTrue(context.eval(PYTHON, "java.type('org.graalvm.polyglot.Value')").isMetaObject());
+        }
+    }
+
+    @Test
     void hostClassLookupCanBeRestrictedToPackages() {
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "graalpy.context.host-class-lookup", List.of("com.example", "org.slf4j.Logger")

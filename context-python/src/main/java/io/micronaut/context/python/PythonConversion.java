@@ -39,6 +39,16 @@ import org.jspecify.annotations.Nullable;
 /**
  * Conversion of Python values to Java: none checks, scalars, collections, optionals, enums and the
  * generated wrapper types.
+ * <p>
+ * Maintainer notes. The public methods are called by generated bridge code (see
+ * {@code PythonStubGenerator}) on every value that crosses from Python to Java, so they sit on the
+ * hot path: keep them free of meta-object lookups and string formatting. The package-private methods
+ * are the per-type converters {@link PythonCoercion} and {@link #convertValue} dispatch to. Every
+ * converter follows the same rules: {@code None} converts to {@code null} (or an empty
+ * {@link Optional}), a value that is already a host object of the target type is returned as is,
+ * a generated wrapper ({@link ValueCoercible}) is unwrapped rather than copied, and a conversion
+ * that cannot be done is an exception, never an empty result, so a bad element does not silently
+ * shrink a collection.
  *
  * @since 5.2.0
  */
@@ -70,20 +80,49 @@ public final class PythonConversion {
         return value == null || value.isNull();
     }
 
+    /**
+     * Convert a Python {@code datetime.date} through its ISO 8601 form, the one representation both
+     * sides parse identically.
+     *
+     * @param value The Python date
+     * @return The local date
+     */
     static LocalDate convertLocalDate(Value value) {
         return LocalDate.parse(value.invokeMember(ISOFORMAT).asString());
     }
 
+    /**
+     * Convert a naive Python {@code datetime.time}. An aware time (one with {@code tzinfo}) is
+     * refused: {@link LocalTime} has no zone and dropping it would change the instant.
+     *
+     * @param value The Python time
+     * @return The local time
+     */
     static LocalTime convertLocalTime(Value value) {
         rejectAware(value, "time");
         return LocalTime.parse(value.invokeMember(ISOFORMAT).asString());
     }
 
+    /**
+     * Convert a naive Python {@code datetime.datetime}; aware values are refused for the reason given
+     * on {@link #convertLocalTime}.
+     *
+     * @param value The Python datetime
+     * @return The local date-time
+     */
     static LocalDateTime convertLocalDateTime(Value value) {
         rejectAware(value, "datetime");
         return LocalDateTime.parse(value.invokeMember(ISOFORMAT).asString());
     }
 
+    /**
+     * Convert a Python {@code datetime.timedelta} from its normalised {@code days}, {@code seconds}
+     * and {@code microseconds} members (Python keeps seconds and microseconds non-negative and
+     * pushes the sign into days, so the three add up).
+     *
+     * @param value The Python timedelta
+     * @return The duration
+     */
     static Duration convertDuration(Value value) {
         long days = value.getMember("days").asLong();
         long seconds = value.getMember("seconds").asLong();
@@ -91,6 +130,16 @@ public final class PythonConversion {
         return Duration.ofDays(days).plusSeconds(seconds).plusNanos(Math.multiplyExact(microseconds, 1_000));
     }
 
+    /**
+     * Convert a fixed-offset {@code datetime.timezone} to a {@link ZoneOffset}. Other {@code tzinfo}
+     * implementations (zoneinfo regions, whose offset depends on the instant) are refused, and so is
+     * an offset with sub-second precision, which {@link ZoneOffset} cannot express. The offset is
+     * read by a helper of the runtime module so this class does not depend on {@code tzinfo}
+     * internals.
+     *
+     * @param value The Python timezone
+     * @return The zone offset
+     */
     static ZoneOffset convertZoneOffset(Value value) {
         if (!PythonCoercion.isPythonType(value, "datetime", "timezone")) {
             throw new IllegalArgumentException("Only fixed-offset datetime.timezone values can be converted to ZoneOffset");
@@ -103,10 +152,22 @@ public final class PythonConversion {
         return ZoneOffset.ofTotalSeconds(Math.toIntExact(offset.getSeconds()));
     }
 
+    /**
+     * Convert a Python {@code uuid.UUID} through its canonical string form.
+     *
+     * @param value The Python UUID
+     * @return The UUID
+     */
     static UUID convertUuid(Value value) {
         return UUID.fromString(value.invokeMember("__str__").asString());
     }
 
+    /**
+     * Refuse an aware {@code datetime} value where a naive Java type is expected.
+     *
+     * @param value The Python time or datetime
+     * @param typeName The Python type name for the message
+     */
     private static void rejectAware(Value value, String typeName) {
         Value tzinfo = value.getMember("tzinfo");
         if (tzinfo != null && !isNone(tzinfo)) {
@@ -114,6 +175,13 @@ public final class PythonConversion {
         }
     }
 
+    /**
+     * Read a string member, treating a missing member and {@code None} alike.
+     *
+     * @param value The Python object
+     * @param name The member name
+     * @return The member as a string, or {@code null}
+     */
     static @Nullable String stringMember(Value value, String name) {
         Value member = value.getMember(name);
         return member == null || member.isNull() ? null : member.asString();
@@ -380,6 +448,14 @@ public final class PythonConversion {
 
     /**
      * Generic value conversion method that handles primitives and recursively converts collections.
+     * <p>
+     * The attempts run in this order, and the order matters: a host object that is a
+     * {@link ValueCoercible} proxy is unwrapped first (a generated wrapper that went through Python
+     * must come back as the same Java object, not a copy); a host object of the target type is
+     * returned as is; a Java enum target is resolved from the Python enum's name or value; a mapped
+     * wrapper type ({@link TargetTypeMapping}) is resolved through the wrapper registry; and only
+     * then does {@link Value#as(Class)} run, which handles primitives, strings and the collection
+     * types by GraalPy's own rules.
      *
      * @param value The source polyglot value
      * @param targetType The target Java type
@@ -415,6 +491,15 @@ public final class PythonConversion {
         return value.as(targetType);
     }
 
+    /**
+     * Convert a value returned to the HTTP layer (a response body, a publisher element) to a Java
+     * object while keeping generated wrappers intact: a wrapper's host object is returned rather than
+     * a Python view of it, so the response is serialised by its Java type. A plain Python value is
+     * converted with {@link Value#as(Class) Value.as(Object.class)}, whatever GraalPy maps it to.
+     *
+     * @param rawBody The raw body: a polyglot value, a proxy, or already a Java object
+     * @return The Java object, or {@code null} for a null body
+     */
     static @Nullable Object convertObjectResponseBody(@Nullable Object rawBody) {
         if (rawBody == null) {
             return null;
@@ -438,6 +523,18 @@ public final class PythonConversion {
         return rawBody;
     }
 
+    /**
+     * Resolve a value to a generated wrapper of the target type when the value is, or carries, one:
+     * the host object behind a proxy, a host object that is a wrapper proxy, or the object GraalPy
+     * maps the value to. Returns {@code null} when none applies so {@link #convertValue} can fall
+     * back to {@link Value#as(Class)}; the interop exceptions caught are the ones GraalPy raises
+     * when the value is not mappable to a Java object at all.
+     *
+     * @param value The value
+     * @param targetType The wrapper type
+     * @param <T> The wrapper type
+     * @return The wrapper, or {@code null}
+     */
     private static <T> @Nullable T convertMappedWrapper(Value value, Class<T> targetType) {
         try {
             ValueCoercible host = ValueCoercibles.hostObject(value);
@@ -463,6 +560,16 @@ public final class PythonConversion {
         return null;
     }
 
+    /**
+     * Resolve a proxy that fronts a generated wrapper: the wrapper itself when it is of the target
+     * type, otherwise a conversion of the wrapper's Python value (a wrapper of a subtype, say, being
+     * converted to a supertype's wrapper).
+     *
+     * @param proxyObject The proxy
+     * @param targetType The target type
+     * @param <T> The target type
+     * @return The converted value, or {@code null} when the proxy fronts no wrapper
+     */
     static <T> @Nullable T convertValueCoercibleProxy(ProxyObject proxyObject, Class<T> targetType) {
         ValueCoercible host = ValueCoercibles.hostObject(proxyObject);
         if (host == null) {
@@ -499,6 +606,16 @@ public final class PythonConversion {
         return target.toString();
     }
 
+    /**
+     * Resolve a Java enum constant from a Python enum member, a string, or anything whose string
+     * form ends in the member name. The constant name is tried first; a constant whose
+     * {@code toString()} matches is the fallback for enums that override it.
+     *
+     * @param value The Python value
+     * @param targetType The target type
+     * @param <T> The target type
+     * @return The constant, or {@code null} when the target is not an enum or nothing matches
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <T> @Nullable T convertEnumValue(Value value, Class<T> targetType) {
         if (!targetType.isEnum()) {
@@ -520,6 +637,14 @@ public final class PythonConversion {
         }
     }
 
+    /**
+     * The name to look a Java enum constant up by: the string itself, a Python enum member's
+     * {@code name}, then its {@code value}, then the last segment of {@code str(value)}
+     * ({@code Color.RED} gives {@code RED}).
+     *
+     * @param value The Python value
+     * @return The candidate name, or {@code null}
+     */
     private static @Nullable String enumName(Value value) {
         if (value.isString()) {
             return value.asString();
@@ -540,6 +665,13 @@ public final class PythonConversion {
         return null;
     }
 
+    /**
+     * A member of a Python enum member as a string, or {@code null} when absent or {@code None}.
+     *
+     * @param value The Python enum member
+     * @param memberName {@code name} or {@code value}
+     * @return The member as a string, or {@code null}
+     */
     private static @Nullable String enumMemberString(Value value, String memberName) {
         if (!value.hasMembers() || !value.hasMember(memberName)) {
             return null;

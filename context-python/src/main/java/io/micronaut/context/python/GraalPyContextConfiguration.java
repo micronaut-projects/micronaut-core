@@ -107,9 +107,14 @@ public final class GraalPyContextConfiguration {
 
     /**
      * The package prefixes Python code may look up through {@code java.type} and {@code import}.
-     * Empty (the default) exposes every class the application class loader can load.
+     * <p>
+     * Empty, the default, means no restriction: every class the application class loader can load is
+     * visible, whatever its package. The list is an opt-in hardening knob for applications that run
+     * Python code they trust less than their Java code; an application that sets it must list its own
+     * packages (the generated Python code looks up the application's Java classes by name) and every
+     * library package its Python code touches.
      *
-     * @return The allowed package prefixes
+     * @return The allowed package prefixes, empty for no restriction
      */
     public List<String> getHostClassLookup() {
         return hostClassLookup;
@@ -118,7 +123,7 @@ public final class GraalPyContextConfiguration {
     /**
      * Restrict the host classes Python code may look up to the given package prefixes. The JDK,
      * Jakarta and the framework's own packages stay visible because generated Python code depends on
-     * them.
+     * them. Not setting the property, or setting it empty, keeps every class visible.
      *
      * @param hostClassLookup The allowed package prefixes, for example {@code com.example}
      */
@@ -133,6 +138,7 @@ public final class GraalPyContextConfiguration {
      */
     Predicate<String> hostClassFilter() {
         if (hostClassLookup.isEmpty()) {
+            // the default: no restriction, user packages included
             return className -> true;
         }
         // an entry names a package (its classes and subpackages) or one class (and its nested classes)

@@ -36,7 +36,9 @@ graalpy:
 
 == Host class lookup
 
-Python code can look up any class the application class loader can load, through `java.type("...")` and `from ... import ...`. Restrict the lookup to the packages the application needs with `graalpy.context.host-class-lookup`; the JDK, Jakarta and `io.micronaut` packages stay visible because the generated Python code depends on them:
+Python code can look up any class the application class loader can load, through `java.type("...")` and `from ... import ...`. That is the default and needs no configuration: the application's own packages, the JDK, Micronaut and every library on the classpath are visible.
+
+Applications that run Python code they trust less than their Java code can narrow that surface with `graalpy.context.host-class-lookup`. The setting is opt-in; when it is set, only the listed packages (and their subpackages) are visible, plus the JDK, Jakarta and `io.micronaut` packages the generated Python code depends on. List the application's own packages, since the generated Python code looks up the application's Java classes by name, and every library package the Python code uses:
 
 [configuration]
 ----
@@ -47,4 +49,4 @@ graalpy:
       - org.reactivestreams
 ----
 
-A lookup outside the configured packages raises a Python `KeyError` for `java.type` or an `ImportError` for an import.
+A lookup outside the configured packages raises a Python `KeyError` for `java.type` or an `ImportError` for an import. Leave the setting unset to keep the default, unrestricted lookup.

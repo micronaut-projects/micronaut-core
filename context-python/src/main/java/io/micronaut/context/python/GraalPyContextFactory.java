@@ -248,6 +248,13 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             .hostClassLoader(classLoader)
             .engine(engine)
             .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+            // Python reaches Java through java.type(...) and "from a.b import C". By default the
+            // filter accepts every class the application class loader can load, the application's
+            // own packages included, which is what generated and user Python code needs. That also
+            // exposes java.lang.Runtime, ProcessBuilder and the like, so an application that runs
+            // Python it trusts less than its Java can narrow the surface with
+            // graalpy.context.host-class-lookup; the filter then keeps the JDK, Jakarta and framework
+            // packages the generated code depends on and adds only the configured packages.
             .allowHostClassLookup(contextConfiguration.hostClassFilter());
         resolveVirtualEnvExecutable(System.getenv())
             .ifPresent(executable -> builder.option("python.Executable", executable.toString()));
