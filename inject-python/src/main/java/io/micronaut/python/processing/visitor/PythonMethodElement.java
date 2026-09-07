@@ -975,19 +975,26 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     private ParameterElement[] createParameters(FunctionDef functionDef) {
         List<ArgumentDef> arguments = functionDef.arguments().arguments();
-        boolean isStatic = functionDef.isStatic();
         int size = arguments.size();
         if (size == 0) {
             return ParameterElement.ZERO_PARAMETER_ELEMENTS;
         }
-        List<ParameterElement> parameters = new ArrayList<>(isStatic ? size - 1 : size);
+        // A `@classmethod` receives the class as its first argument, a `@staticmethod` doesn't,
+        // and `self` is already stripped when the function is parsed.
+        int offset = functionDef.isStatic() && isReceiverArgument(arguments.get(0)) ? 1 : 0;
+        List<ParameterElement> parameters = new ArrayList<>(size - offset);
 
-        for (int i = isStatic ? 1 : 0; i < size; i++) {
+        for (int i = offset; i < size; i++) {
             ArgumentDef argDef = arguments.get(i);
             parameters.add(new PythonParameterElement(argDef, environment, this, getElementAnnotationMetadataFactory()));
         }
 
         return parameters.toArray(ParameterElement.ZERO_PARAMETER_ELEMENTS);
+    }
+
+    private static boolean isReceiverArgument(ArgumentDef argument) {
+        String name = argument.name();
+        return "cls".equals(name) || "self".equals(name);
     }
 
     @Override
