@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.BeanProperties
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.util.CollectionUtils
 import spock.lang.Specification
+import spock.lang.Unroll
 
 class ConfigurationPropertiesSpec extends Specification {
 
@@ -106,6 +107,31 @@ class ConfigurationPropertiesSpec extends Specification {
         config.defaultPort == 9999
         config.defaultValue == 9999
         config.primitiveDefaultValue == 9999
+    }
+
+    @Unroll
+    void "test configuration properties list binding accepts every spelling of an indexed key inner segment #key"() {
+        given: "the same indexed key written with a differently cased or separated inner segment"
+        ApplicationContext applicationContext = ApplicationContext.builder("test").build()
+        applicationContext.environment.addPropertySource(PropertySource.of(
+            'test',
+            [(key): 123]
+        ))
+        applicationContext.start()
+
+        expect: "every spelling binds to the same property of the object in the List"
+        applicationContext.getBean(MyConfig).innerVals[0].expireUnsignedSeconds == 123
+
+        cleanup:
+        applicationContext.close()
+
+        where:
+        key << [
+            'foo.bar.innerVals[0].expireUnsignedSeconds',
+            'foo.bar.innerVals[0].expire-unsigned-seconds',
+            'foo.bar.innerVals[0].expire_unsigned_seconds',
+            'foo.bar.innerVals[0].EXPIRE_UNSIGNED_SECONDS',
+        ]
     }
 
     void "test configuration inner class properties binding"() {

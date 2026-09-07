@@ -43,6 +43,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -85,6 +86,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private final @Nullable Map<String, DefaultPropertyEntry>[] catalog = new Map[58];
     private final @Nullable Map<String, DefaultPropertyEntry>[] rawCatalog = new Map[58];
     private final @Nullable Map<String, DefaultPropertyEntry>[] nonGenerated = new Map[58];
+    // Base names whose RAW aggregate the RAW catalog owns outright and may therefore expand in
+    // place. A bare key stores its value by reference and clears the name; the next indexed key
+    // targeting that base copies the value once and records it here. Guarded by `catalog`.
+    private final Set<String> rawOwnedBases = new HashSet<>();
 
     private final Logger log;
 
@@ -158,6 +163,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             Arrays.fill(nonGenerated, null);
             Arrays.fill(rawCatalog, null);
             Arrays.fill(catalog, null);
+            rawOwnedBases.clear();
             resetCaches();
         }
     }
@@ -732,6 +738,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
                 Object value = properties.get(property);
 
+                populateRawCatalog(property, value, convention, properties.getOrigin());
+
                 List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
                 boolean first = true;
                 for (String resolvedProperty : resolvedProperties) {
@@ -746,16 +754,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                                 property,
                                 properties.getOrigin()
                             ));
-                            expandProperty(
+                            expandIndexedProperty(
+                                entries,
+                                propertyName,
                                 resolvedProperty.substring(i),
-                                val -> entries.put(propertyName, new DefaultPropertyEntry(
-                                    propertyName,
-                                    val,
-                                    property,
-                                    properties.getOrigin()
-                                )),
-                                () -> entries.getOrDefault(propertyName, NULL_ENTRY).value(),
-                                value
+                                value,
+                                property,
+                                properties.getOrigin()
                             );
                         }
                         if (first) {
@@ -798,20 +803,155 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                     }
                 }
 
-                final Map<String, DefaultPropertyEntry> rawEntries = resolveEntriesForKey(property, true, PropertyCatalog.RAW);
-                if (rawEntries != null) {
-                    rawEntries.put(property, new DefaultPropertyEntry(
-                        property,
-                        value,
-                        property,
-                        properties.getOrigin()
-                    ));
-                }
             }
             // A lookup can cache a miss between reset() and catalog reinitialization.
             // Clear those entries after the rebuilt catalog becomes visible.
             resetCaches();
         }
+    }
+
+    /**
+     * Populates the RAW catalog for a single property: the verbatim entry under its own key, plus,
+     * for an indexed key, the expanded aggregate under the verbatim base name. Aggregating in RAW
+     * as well as in GENERATED is what preserves the spelling of a map key nested under an indexed
+     * segment, since GENERATED sees only the hyphenated key.
+     *
+     * <p>Skipped for {@link PropertySource.PropertyConvention#ENVIRONMENT_VARIABLE}, which has no
+     * original spelling left to preserve: {@code EnvironmentPropertySource.getEnv} rewrites
+     * {@code A_0__B} into the verbatim key {@code A[0]_B}, and expanding that verbatim would
+     * misread the trailing {@code _B} as part of the map key rather than as a property
+     * delimiter.</p>
+     *
+     * @param property The verbatim property key
+     * @param value The property value
+     * @param convention The property convention
+     * @param origin The origin of the property source
+     */
+    private void populateRawCatalog(
+        String property,
+        Object value,
+        PropertySource.PropertyConvention convention,
+        PropertySource.Origin origin) {
+
+        int bracket = property.indexOf('[');
+
+        Map<String, DefaultPropertyEntry> rawEntries = resolveEntriesForKey(property, true, PropertyCatalog.RAW);
+        if (rawEntries != null) {
+            if (bracket < 0) {
+                // Only a key without an index can be an aggregate base. The value goes in by
+                // reference, so RAW no longer owns whatever it held under this name; the next
+                // indexed key targeting it takes its own copy below.
+                rawOwnedBases.remove(property);
+            }
+            rawEntries.put(property, new DefaultPropertyEntry(
+                property,
+                value,
+                property,
+                origin
+            ));
+        }
+
+        if (bracket <= 0 || convention == PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE) {
+            return;
+        }
+        String baseName = property.substring(0, bracket);
+        Map<String, DefaultPropertyEntry> baseEntries = resolveEntriesForKey(baseName, true, PropertyCatalog.RAW);
+        if (baseEntries == null) {
+            return;
+        }
+
+        // The expansion below mutates the aggregate in place, so RAW has to own it. It does not
+        // yet if a bare key last stored it by reference, so take a copy on the first indexed key
+        // to target this base since then. This must happen before the GENERATED expansion for the
+        // same key, which mutates its own aggregate in place and may share that very instance:
+        // copied afterwards, RAW would inherit GENERATED's hyphenated spelling.
+        if (rawOwnedBases.add(baseName)) {
+            DefaultPropertyEntry existing = baseEntries.get(baseName);
+            if (existing != null) {
+                baseEntries.put(baseName, new DefaultPropertyEntry(
+                    baseName,
+                    deepCopyForRawExpansion(existing.value()),
+                    existing.raw(),
+                    existing.origin()
+                ));
+            }
+        }
+
+        // expandProperty stores this value into the aggregate by reference, so a container that
+        // GENERATED can reach too would be mutated by a later key drilling into the same index.
+        // Scalars, which are the overwhelming majority, pass through untouched.
+        expandIndexedProperty(
+            baseEntries,
+            baseName,
+            property.substring(bracket),
+            deepCopyForRawExpansion(value),
+            property,
+            origin
+        );
+    }
+
+    /**
+     * Recursively duplicates the {@link List} and {@link Map} spine of a value, so that RAW can
+     * expand into its own copy without mutating the property source's value or the instance the
+     * GENERATED catalog serves.
+     *
+     * <p>Every other value is shared rather than copied, which is safe because expansion only ever
+     * mutates a {@code List} by index or a {@code Map} by key: an array, a {@code Set} or a leaf
+     * is never written through. Note that a copied {@code Map} becomes a {@link LinkedHashMap}, so
+     * a source supplying a sorted or case-insensitive map keeps its iteration order at the point
+     * of copying but not its behaviour for keys added afterwards.</p>
+     *
+     * @param value The value to copy
+     * @return An equivalent value whose containers are independently mutable
+     */
+    private static Object deepCopyForRawExpansion(Object value) {
+        if (value instanceof List<?> list) {
+            List<Object> copy = new ArrayList<>(list.size());
+            for (Object element : list) {
+                copy.add(deepCopyForRawExpansion(element));
+            }
+            return copy;
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<Object, Object> copy = new LinkedHashMap<>(map.size());
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                copy.put(entry.getKey(), deepCopyForRawExpansion(entry.getValue()));
+            }
+            return copy;
+        }
+        return value;
+    }
+
+    /**
+     * Expands an indexed property (e.g. {@code foo[0].bar}) into the given entries map under its
+     * base name, building the container value and writing it back to {@code entries} as it grows.
+     *
+     * @param entries The catalog entries map to read the existing container from and write the
+     *                expanded container to, keyed by {@code baseName}
+     * @param baseName The un-indexed base property name (e.g. {@code foo})
+     * @param indexSuffix The indexed remainder of the property, starting with {@code [} (e.g. {@code [0].bar})
+     * @param value The value to place at the indexed location
+     * @param originalProperty The original, unresolved property key, recorded on the entry
+     * @param origin The origin of the property source, recorded on the entry
+     */
+    private void expandIndexedProperty(
+        Map<String, DefaultPropertyEntry> entries,
+        String baseName,
+        String indexSuffix,
+        Object value,
+        String originalProperty,
+        PropertySource.Origin origin) {
+        expandProperty(
+            indexSuffix,
+            val -> entries.put(baseName, new DefaultPropertyEntry(
+                baseName,
+                val,
+                originalProperty,
+                origin
+            )),
+            () -> entries.getOrDefault(baseName, NULL_ENTRY).value(),
+            value
+        );
     }
 
     private void expandProperty(String property, Consumer<Object> containerSet, Supplier<Object> containerGet, Object actualValue) {
