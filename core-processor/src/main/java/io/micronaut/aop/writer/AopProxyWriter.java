@@ -505,26 +505,28 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         proxyBuilder.addField(interceptorsField);
 
-        FieldDef interceptorRegistrationsField;
-        if (proxyBeanDefinitionWriter.hasInterceptedLifecycle()) {
-            interceptorRegistrationsField = FieldDef.builder(FIELD_INTERCEPTOR_REGISTRATIONS, List.class)
-                .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
-                .build();
-            proxyBuilder.addField(interceptorRegistrationsField);
-            proxyBuilder.addMethod(MethodDef.override(GET_INTERCEPTOR_REGISTRATIONS_METHOD)
-                .build((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).returning()));
+        // Every proxy retains the registrations its constructor was given, so a proxy can always report the
+        // interceptors bound to it. For an around-only proxy that is exactly the around/introduction set it already
+        // receives; only a proxy with intercepted lifecycle widens the constructor qualifier below.
+        FieldDef interceptorRegistrationsField = FieldDef.builder(FIELD_INTERCEPTOR_REGISTRATIONS, List.class)
+            .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+            .build();
+        proxyBuilder.addField(interceptorRegistrationsField);
+        proxyBuilder.addMethod(MethodDef.override(GET_INTERCEPTOR_REGISTRATIONS_METHOD)
+            .build((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).returning()));
 
+        if (proxyBeanDefinitionWriter.hasInterceptedLifecycle()) {
             // The constructor argument is qualified by the accumulated around/introduction bindings only. Widen it
             // with the lifecycle bindings so the retained list is a superset of what lifecycle interception needs,
             // otherwise a lifecycle interceptor bound by a different annotation would be dropped.
             // This is the compile-time half of the same rule InterceptedBeanDefinition#resolveInterceptors applies at
             // runtime for beans that get no proxy: whatever a bean binds for construction, post-construct and
             // pre-destroy is resolved as one set. Keep the two in step.
+            // Only widen here: doing it for every proxy would change which interceptors are injected into every
+            // proxied bean in every application.
             AnnotationMetadata targetAnnotationMetadata = targetType.getAnnotationMetadata();
             visitInterceptorBinding(InterceptedMethodUtil.resolveInterceptorBinding(targetAnnotationMetadata, InterceptorKind.POST_CONSTRUCT));
             visitInterceptorBinding(InterceptedMethodUtil.resolveInterceptorBinding(targetAnnotationMetadata, InterceptorKind.PRE_DESTROY));
-        } else {
-            interceptorRegistrationsField = null;
         }
 
         FieldDef proxyMethodsField = FieldDef.builder(FIELD_PROXY_METHODS, ExecutableMethod[].class)
@@ -626,16 +628,14 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                                 ClassTypeDef targetType,
                                 @Nullable FieldDef targetField,
                                 FieldDef interceptorsField,
-                                @Nullable FieldDef interceptorRegistrationsField,
+                                FieldDef interceptorRegistrationsField,
                                 FieldDef proxyMethodsField,
                                 List<MethodElement> interceptedMethods) {
 
         List<MethodDef.MethodBodyBuilder> bodyBuilders = new ArrayList<>();
-        if (interceptorRegistrationsField != null) {
-            bodyBuilders.add((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).assign(
-                methodParameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
-            ));
-        }
+        bodyBuilders.add((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).assign(
+            methodParameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
+        ));
 
         if (isProxyTarget) {
 
