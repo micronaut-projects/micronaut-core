@@ -1790,7 +1790,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         return Stream.concat(
                 modifiedStereotypes.getStereotypeAnnotationNames().stream().flatMap(stereotypeName -> {
-                    final AnnotationValue<Annotation> a = modifiedStereotypes.getAnnotation(stereotypeName);
+                    final AnnotationValue<Annotation> a = withoutRetainedStereotypes(modifiedStereotypes.getAnnotation(stereotypeName));
                     if (a == null) {
                         return Stream.of();
                     }
@@ -1818,7 +1818,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
                 }),
                 modifiedStereotypes.getAnnotationNames().stream().flatMap(annotationName -> {
-                    AnnotationValue<Annotation> a = modifiedStereotypes.getAnnotation(annotationName);
+                    AnnotationValue<Annotation> a = withoutRetainedStereotypes(modifiedStereotypes.getAnnotation(annotationName));
                     if (a == null) {
                         return Stream.empty();
                     }
@@ -1828,6 +1828,31 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     );
                 })
         ).toList();
+    }
+
+    /**
+     * The annotation without the occurrences retained in the reserved {@link AnnotationUtil#STEREOTYPES_MEMBER}
+     * member. An annotation read back out of stored metadata to be processed again carries the retained tree,
+     * which is only the {@link Retainable} part of the closure; leaving it in place would present that part as
+     * the whole set of stereotypes the annotation was written with, and everything else it composes would be
+     * dropped from the metadata it is being added to. The closure is computed again, and retained again, from
+     * the annotation type.
+     *
+     * @param annotationValue The annotation value, or {@code null}
+     * @return The annotation value with no stereotypes, or {@code null} when none was given
+     */
+    @Nullable
+    private AnnotationValue<Annotation> withoutRetainedStereotypes(@Nullable AnnotationValue<Annotation> annotationValue) {
+        if (annotationValue == null || annotationValue.getStereotypes() == null) {
+            return annotationValue;
+        }
+        return new AnnotationValue<>(
+            annotationValue.getAnnotationName(),
+            annotationValue.getValues(),
+            annotationValue.getDefaultValues(),
+            annotationValue.getRetentionPolicy(),
+            null
+        );
     }
 
     private <K> List<K> eliminateProcessed(ProcessingContext context, @Nullable List<K> visitors) {
