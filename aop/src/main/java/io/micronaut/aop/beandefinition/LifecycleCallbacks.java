@@ -44,7 +44,11 @@ final class LifecycleCallbacks {
      *
      * @param callback  The callback
      * @param bean      The bean
-     * @param arguments The resolved arguments of the callback
+     * @param arguments The resolved arguments of the callback, empty for a callback that takes none. Never
+     *                  {@code null}: the generated code that calls this always supplies an array, and
+     *                  {@link ExecutableMethod#invoke} would reject one that was not there. An individual
+     *                  resolved argument may be {@code null}, which is what the type-use {@code @Nullable}
+     *                  states, matching the signature of {@link ExecutableMethod#invoke} itself.
      * @param <T>       The bean type
      */
     static <T> void invoke(ExecutableMethod<T, ?> callback, T bean, @Nullable Object[] arguments) {

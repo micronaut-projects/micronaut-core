@@ -51,9 +51,13 @@ of that kind declared by the bean, superclass callbacks first, in the same order
 does not call `proceed()` keeps all of them from running, and the bean it returns replaces the instance.
 
 The api:aop.MethodInvocationContext[] passed to the interceptor stands for the event: `getKind()` is
-`POST_CONSTRUCT` or `PRE_DESTROY`, `getTarget()` is the bean, and `getExecutableMethod()` describes the event
-rather than a method of the bean, so it carries the annotation metadata of the bean class and no parameters.
-`proceed()` returns the bean.
+`POST_CONSTRUCT` or `PRE_DESTROY`, `getTarget()` is the bean, and `proceed()` returns the bean.
+`getExecutableMethod()` stands for the whole event, and names it after the last callback the event will run: the
+most derived one, which is the one the bean itself declares where it declares any. Its `getDeclaringType()` and
+`getMethodName()` are that callback's, and `getTargetMethod()` resolves to that callback's `Method`; only when the
+bean declares no callback of that kind does the name fall back to `initialize` or `dispose`. It still describes the
+event rather than that one callback, so it carries the annotation metadata of the bean class and declares no
+parameters, a callback's own arguments being resolved only once the event proceeds.
 
 The callbacks the event is about to run are available from the bean definition of the intercepted bean:
 api:inject.InitializingBeanDefinition[] exposes `getPostConstructExecutableMethods()` and
