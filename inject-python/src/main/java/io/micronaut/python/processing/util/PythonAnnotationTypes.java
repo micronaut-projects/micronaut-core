@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.python.processing.annotation.AnnotationMemberReflection;
 
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
@@ -34,7 +35,6 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -162,9 +162,8 @@ public final class PythonAnnotationTypes {
                 }
             }
         } else if (classElement.getNativeType() instanceof Class<?> type) {
-            for (Method method : type.getDeclaredMethods()) {
-                names.add(method.getReturnType().getName());
-            }
+            // the bare parser sees a Java annotation as a loaded class, not as a javac element
+            names.addAll(AnnotationMemberReflection.memberReturnTypeNames(type));
         }
         return names;
     }

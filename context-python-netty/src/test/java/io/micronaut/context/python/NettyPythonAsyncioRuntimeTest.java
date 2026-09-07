@@ -92,8 +92,10 @@ final class NettyPythonAsyncioRuntimeTest {
             });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoop.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoop.shutdownGracefully().syncUninterruptibly();
         }
     }
 
@@ -145,8 +147,10 @@ final class NettyPythonAsyncioRuntimeTest {
             PythonAsyncioRuntime.setExecutorService(null);
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
             executorService.shutdownNow();
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
@@ -199,8 +203,10 @@ final class NettyPythonAsyncioRuntimeTest {
             });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
@@ -258,8 +264,10 @@ final class NettyPythonAsyncioRuntimeTest {
             });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
@@ -316,8 +324,10 @@ final class NettyPythonAsyncioRuntimeTest {
             PythonAsyncioRuntime.setExecutorService(null);
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
             executorService.shutdownNow();
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
@@ -350,8 +360,10 @@ final class NettyPythonAsyncioRuntimeTest {
             });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
@@ -414,9 +426,9 @@ final class NettyPythonAsyncioRuntimeTest {
                     channel.close();
                 }
             }
+            acceptingGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
+            otherGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            acceptingGroup.shutdownGracefully().syncUninterruptibly();
-            otherGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
@@ -453,8 +465,10 @@ final class NettyPythonAsyncioRuntimeTest {
             });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
@@ -490,8 +504,10 @@ final class NettyPythonAsyncioRuntimeTest {
             });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
@@ -569,8 +585,10 @@ final class NettyPythonAsyncioRuntimeTest {
             close(clientChannel[0]);
             close(accepted[0]);
             close(serverChannel[0]);
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
@@ -616,8 +634,10 @@ final class NettyPythonAsyncioRuntimeTest {
             PythonAsyncioRuntime.setExecutorService(null);
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
             executorService.shutdownNow();
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
@@ -672,8 +692,10 @@ final class NettyPythonAsyncioRuntimeTest {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
             executorService.shutdownNow();
             certificate.delete();
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
         }
     }
 
@@ -726,8 +748,10 @@ final class NettyPythonAsyncioRuntimeTest {
             });
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
+            // the loop first: a callback still finishing on it (the one that completed the stage)
+            // must not be cancelled by the close
+            eventLoopGroup.shutdownGracefully(0, 15, TimeUnit.SECONDS).syncUninterruptibly();
             context.close(true);
-            eventLoopGroup.shutdownGracefully().syncUninterruptibly();
             Files.deleteIfExists(socketPath);
             Files.deleteIfExists(socketPath.getParent());
         }

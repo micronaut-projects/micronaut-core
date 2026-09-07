@@ -680,7 +680,7 @@ final class PythonAsyncioRuntimeTest {
             ProxyExecutable block = arguments -> {
                 started.countDown();
                 try {
-                    assertTrue(gate.await(10, TimeUnit.SECONDS));
+                    assertTrue(gate.await(2, TimeUnit.MINUTES));
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
@@ -691,17 +691,18 @@ final class PythonAsyncioRuntimeTest {
                 // no event loop: the coroutine is driven on the calling thread, blocked inside the gate
                 Future<Object> coroutine = threads.submit(() -> PythonContextRuntime.invokePooledScriptAsync(PYTHON, "leased", "hold", block)
                     .toCompletableFuture().get(10, TimeUnit.SECONDS));
-                if (!started.await(10, TimeUnit.SECONDS)) {
+                // creating the pooled context and importing asyncio take several seconds on a cold CI runner
+                if (!started.await(2, TimeUnit.MINUTES)) {
                     // surface the coroutine's failure rather than a bare timeout
-                    coroutine.get(1, TimeUnit.SECONDS);
+                    coroutine.get(30, TimeUnit.SECONDS);
                     throw new AssertionError("the coroutine did not reach the gate");
                 }
                 // the only pooled context is running the coroutine: a second bridge call must wait for it
                 Future<String> second = threads.submit(() -> PythonContextRuntime.withPooledScript(PYTHON, "leased", value -> "borrowed"));
                 assertThrows(TimeoutException.class, () -> second.get(500, TimeUnit.MILLISECONDS), "the context was lent out while its coroutine ran");
                 gate.countDown();
-                assertEquals("done", coroutine.get(10, TimeUnit.SECONDS));
-                assertEquals("borrowed", second.get(10, TimeUnit.SECONDS));
+                assertEquals("done", coroutine.get(1, TimeUnit.MINUTES));
+                assertEquals("borrowed", second.get(1, TimeUnit.MINUTES));
             } finally {
                 gate.countDown();
                 threads.shutdownNow();

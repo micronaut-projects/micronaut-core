@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 
-import java.lang.reflect.Modifier;
 import java.util.Set;
 
 /**
@@ -66,10 +65,6 @@ public final class PythonJavaTypes {
      * @return Whether it is a concrete class
      */
     public static boolean isConcreteClass(@Nullable ClassElement classElement) {
-        if (classElement == null || classElement.isInterface() || classElement.isAbstract()) {
-            return false;
-        }
-        // reflection-backed elements do not report abstract classes
-        return !(classElement.getNativeType() instanceof Class<?> type && Modifier.isAbstract(type.getModifiers()));
+        return classElement != null && !classElement.isInterface() && !classElement.isAbstract();
     }
 }
