@@ -152,4 +152,20 @@ class PerBeanLockingScopeSpec extends Specification {
         context.getBean(PerBeanScopeImpl).findBeanRegistration(bean).get().bean.is(bean)
         context.findBeanRegistration(bean).present
     }
+
+    void "under a lock per bean a destruction that resolves another bean of the scope reaches the instance held"() {
+        given: "two beans of the scope, each resolving the other as it is destroyed"
+        def referrer = context.getBean(PerBeanReferrer)
+        def referent = context.getBean(PerBeanReferent)
+        def constructions = PerBeanReferent.CONSTRUCTIONS.get()
+
+        when: "the scope is destroyed"
+        context.getBean(PerBeanScopeImpl).close()
+
+        then: "whichever was destroyed first, the other reached the instance the scope held, not a fresh one"
+        referrer.resolvedOnDestroy.is(referent)
+        referent.resolvedOnDestroy.is(referrer)
+        PerBeanReferent.CONSTRUCTIONS.get() == constructions
+        context.getBean(PerBeanScopeImpl).beans.isEmpty()
+    }
 }
