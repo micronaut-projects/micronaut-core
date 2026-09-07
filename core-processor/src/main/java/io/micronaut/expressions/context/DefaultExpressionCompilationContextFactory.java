@@ -21,14 +21,18 @@ import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 /**
  * Factory for producing expression evaluation context.
@@ -106,18 +110,25 @@ public final class DefaultExpressionCompilationContextFactory implements Express
         ClassElement annotation,
         String annotationMember) {
 
-        ElementQuery<MethodElement> memberQuery =
-            ElementQuery.ALL_METHODS
-                .onlyDeclared()
-                .annotated(am -> am.hasAnnotation(AnnotationExpressionContext.class))
-                .named(annotationMember);
-
-        return annotation.getEnclosedElements(memberQuery).stream()
+        return findAnnotationMembers(annotation, annotationMember)
                    .flatMap(element -> Optional.ofNullable(element.getDeclaredAnnotation(AnnotationExpressionContext.class)).stream())
                    .flatMap(av -> av.annotationClassValue(AnnotationMetadata.VALUE_MEMBER).stream())
                    .map(AnnotationClassValue::getName)
                    .flatMap(className -> visitorContext.getClassElement(className).stream())
                    .reduce(currentEvaluationContext, ExtensibleExpressionEvaluationContext::extendWith, (a, b) -> a);
+    }
+
+    private Stream<? extends Element> findAnnotationMembers(ClassElement annotation, String annotationMember) {
+        List<MethodElement> methods = annotation.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared());
+        if (!methods.isEmpty()) {
+            return methods.stream().filter(method -> method.getName().equals(annotationMember));
+        }
+        // Kotlin models the members of an annotation class as properties instead of methods
+        ElementQuery<PropertyElement> propertyQuery =
+            ElementQuery.of(PropertyElement.class)
+                .onlyDeclared()
+                .named(annotationMember);
+        return annotation.getEnclosedElements(propertyQuery).stream();
     }
 
     /**
