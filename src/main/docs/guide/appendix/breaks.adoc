@@ -471,3 +471,9 @@ If the previous behavior is desired, configure the retryable annotation explicit
 ----
 @Retryable(includes = RuntimeException.class)
 ----
+
+==== Kotlin `suspend` routes honour the selected executor
+
+In Micronaut Framework 4, a Kotlin `suspend` route ignored ann:scheduling.annotation.ExecuteOn[] and the `micronaut.server.thread-selection` setting: the route ran on the event loop and resumed on `Dispatchers.Default`. In Micronaut 5 the selected executor is applied, and it is also the dispatcher the coroutine resumes on.
+
+This changes which thread a `suspend` route runs on for applications that annotate one with ann:scheduling.annotation.ExecuteOn[], or that set `micronaut.server.thread-selection` to `AUTO`, `IO` or `BLOCKING` (the default is `MANUAL`, which selects no executor and is unaffected). To keep a `suspend` route on the event loop under `AUTO`, annotate it with ann:core.annotation.NonBlocking[].
