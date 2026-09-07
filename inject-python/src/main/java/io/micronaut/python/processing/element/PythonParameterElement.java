@@ -73,6 +73,11 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
     }
 
     @Override
+    public boolean hasDefault() {
+        return getNativeType().hasDefaultValue();
+    }
+
+    @Override
     public ClassElement getType() {
         if (methodElement.requiresResolvedParameterType()) {
             ClassElement classElement = resolveType(argumentDef, methodElement.getBoundGenericTypes());

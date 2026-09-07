@@ -2140,7 +2140,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                          List<? extends ExpressionDef> values,
                                          List<StatementDef> additionalStatements) {
         MethodElement constructor = constructorDefinition.constructorElement();
-        if (interceptedType == null && MethodGenUtils.hasKotlinDefaultsParameters(List.of(constructor.getParameters()))) {
+        if (interceptedType == null && MethodGenUtils.hasDefaultsParameters(List.of(constructor.getParameters()))) {
             // NOTE: Proxies will handle the default constructor call
             List<ExpressionDef> variables = new ArrayList<>(values.size());
             List<TypeDef> types = new ArrayList<>(values.size());
