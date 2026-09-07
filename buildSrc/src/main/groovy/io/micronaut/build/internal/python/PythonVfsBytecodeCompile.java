@@ -20,10 +20,13 @@ import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.file.FileSystemOperations;
 import org.gradle.api.provider.Property;
+import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.Classpath;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputDirectory;
 import org.gradle.api.tasks.OutputDirectory;
+import org.gradle.api.tasks.PathSensitive;
+import org.gradle.api.tasks.PathSensitivity;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.process.ExecOperations;
 
@@ -32,11 +35,13 @@ import javax.inject.Inject;
 /**
  * Copies a GraalPy VFS resource tree and adds checked-hash Python bytecode caches to its file list.
  */
+@CacheableTask
 public abstract class PythonVfsBytecodeCompile extends DefaultTask {
     private static final String PYTHON_BYTECODE_COMPILER_MAIN_CLASS =
         "io.micronaut.python.compiler.PythonBytecodeCompiler";
 
     @InputDirectory
+    @PathSensitive(PathSensitivity.RELATIVE)
     public abstract DirectoryProperty getSourceDirectory();
 
     @OutputDirectory

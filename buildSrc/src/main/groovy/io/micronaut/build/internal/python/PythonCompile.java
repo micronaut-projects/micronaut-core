@@ -19,9 +19,11 @@ import org.gradle.api.DefaultTask;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.file.FileSystemOperations;
+import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.provider.ListProperty;
 import org.gradle.api.provider.MapProperty;
 import org.gradle.api.provider.Property;
+import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.Classpath;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
@@ -37,15 +39,23 @@ import org.gradle.workers.WorkerExecutor;
 import javax.inject.Inject;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-//@CacheableTask
-// Currently NOT cacheable because generated Python code
-// contains absolute paths
+/**
+ * Compiles Python sources with the Pyronaut compiler.
+ * <p>
+ * The compiler is given each source directory relative to the project directory, so that the
+ * {@code @PythonApplication(src = ...)} value it compiles into the output carries no absolute path.
+ * The project directory itself reaches the annotation processor as a compiler option, because a
+ * worker daemon does not run in the project directory. That keeps the outputs relocatable and
+ * therefore cacheable.
+ */
+@CacheableTask
 public abstract class PythonCompile extends DefaultTask {
 
     private static final String PYRONAUT_COMPILER_MAIN_CLASS =
@@ -93,6 +103,9 @@ public abstract class PythonCompile extends DefaultTask {
     @Inject
     protected abstract FileSystemOperations getFileSystemOperations();
 
+    @Inject
+    protected abstract ProjectLayout getLayout();
+
     private Map<String, String> getMergedSystemProperties() {
         var systemProperties = new LinkedHashMap<>(getSystemProperties().getOrElse(Map.of()));
         systemProperties.putAll(Map.of(
@@ -113,6 +126,7 @@ public abstract class PythonCompile extends DefaultTask {
     @TaskAction
     void compile() throws IOException {
         var outputDir = getDestinationDir().getAsFile().get().toPath();
+        var projectDir = getLayout().getProjectDirectory().getAsFile().toPath().toAbsolutePath().normalize();
         getFileSystemOperations().delete(spec -> spec.delete(outputDir));
         Files.createDirectories(outputDir);
         // A process-isolated worker is reused for matching fork options within one build, so several
@@ -132,7 +146,7 @@ public abstract class PythonCompile extends DefaultTask {
             // Compiler currently accepts a single directory, but maybe it should
             // accept a list of .py files instead
             if (location.getAsFile().isDirectory()) {
-                sourceDirs.add(location.getAsFile().getAbsolutePath());
+                sourceDirs.add(relocatableSourcePath(projectDir, location.getAsFile().toPath()));
             }
         }
         if (sourceDirs.isEmpty()) {
@@ -141,11 +155,22 @@ public abstract class PythonCompile extends DefaultTask {
         // one work item: the roots share the destination, so they must not compile concurrently
         queue.submit(PythonCompileWorkAction.class, parameters -> {
             parameters.getSourceDirs().set(sourceDirs);
+            parameters.getSourceRoot().set(projectDir.toString());
             parameters.getDestinationDir().set(destDir);
             parameters.getClasspath().from(getCompilerClasspath(), getClasspath());
         });
         queue.await();
     }
 
-
+    /**
+     * Returns the source directory relative to the project directory when it is located inside it,
+     * otherwise its absolute path. The annotation processor resolves relative paths against the project directory.
+     */
+    private static String relocatableSourcePath(Path projectDir, Path sourceDir) {
+        var absoluteSource = sourceDir.toAbsolutePath().normalize();
+        if (absoluteSource.startsWith(projectDir)) {
+            return projectDir.relativize(absoluteSource).toString();
+        }
+        return absoluteSource.toString();
+    }
 }

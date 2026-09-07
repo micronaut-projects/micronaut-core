@@ -28,6 +28,13 @@ public interface PythonCompileParameters extends WorkParameters {
 
     ListProperty<String> getSourceDirs();
 
+    /**
+     * The absolute directory against which relative source directories are resolved. It is handed to the
+     * annotation processor as a compiler option rather than compiled into the output, so the output
+     * stays free of absolute paths.
+     */
+    Property<String> getSourceRoot();
+
     Property<String> getDestinationDir();
 
     /**
