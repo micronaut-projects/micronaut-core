@@ -20,11 +20,11 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
-import java.util.List;
 import io.micronaut.inject.ExecutableMethod;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
-import org.jspecify.annotations.Nullable;
+import java.util.List;
 
 /**
  * Executable method that delegates {@link DisposableIntercepted} disposal to the interceptor chain.
