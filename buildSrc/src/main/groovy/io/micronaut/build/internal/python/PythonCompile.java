@@ -16,7 +16,6 @@
 package io.micronaut.build.internal.python;
 
 import org.gradle.api.DefaultTask;
-import org.gradle.api.GradleException;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.file.FileSystemOperations;
@@ -33,12 +32,10 @@ import org.gradle.api.tasks.PathSensitive;
 import org.gradle.api.tasks.PathSensitivity;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.api.tasks.options.Option;
-import org.gradle.process.ExecOperations;
+import org.gradle.workers.WorkerExecutor;
 
 import javax.inject.Inject;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -62,6 +59,13 @@ public abstract class PythonCompile extends DefaultTask {
     @Optional
     public abstract ListProperty<String> getJvmArgs();
 
+    /**
+     * The worker heap; Gradle's worker default of 512m is too small for the GraalPy processor.
+     */
+    @Input
+    @Optional
+    public abstract Property<String> getMaxHeapSize();
+
     @Input
     @Optional
     public abstract MapProperty<String, String> getSystemProperties();
@@ -84,7 +88,7 @@ public abstract class PythonCompile extends DefaultTask {
     public abstract DirectoryProperty getDestinationDir();
 
     @Inject
-    protected abstract ExecOperations getExecOperations();
+    protected abstract WorkerExecutor getWorkerExecutor();
 
     @Inject
     protected abstract FileSystemOperations getFileSystemOperations();
@@ -111,43 +115,37 @@ public abstract class PythonCompile extends DefaultTask {
         var outputDir = getDestinationDir().getAsFile().get().toPath();
         getFileSystemOperations().delete(spec -> spec.delete(outputDir));
         Files.createDirectories(outputDir);
+        // A process-isolated worker is reused for matching fork options within one build, so several
+        // Python compile tasks share one JVM start; the compiler itself is rebuilt per submission.
+        var queue = getWorkerExecutor().processIsolation(spec -> {
+            spec.getClasspath().from(getCompilerClasspath(), getClasspath());
+            spec.forkOptions(fork -> {
+                fork.setMaxHeapSize(getMaxHeapSize().getOrElse("2g"));
+                fork.systemProperties(getMergedSystemProperties());
+                fork.environment(getEnvironmentVariables().getOrElse(Map.of()));
+                fork.jvmArgs(getMergedJvmArgs());
+            });
+        });
+        var destDir = getDestinationDir().getAsFile().get().getAbsolutePath();
+        var sourceDirs = new ArrayList<String>();
         for (var location : getSource().getElements().get()) {
             // Compiler currently accepts a single directory, but maybe it should
             // accept a list of .py files instead
             if (location.getAsFile().isDirectory()) {
-                var compilerOutput = new ByteArrayOutputStream();
-                var sourceDir = location.getAsFile().getAbsolutePath();
-                var destDir = getDestinationDir().getAsFile().get().getAbsolutePath();
-                var result = getExecOperations().javaexec(spec -> {
-                    spec.classpath(getCompilerClasspath(), getClasspath());
-                    spec.systemProperties(getMergedSystemProperties());
-                    spec.environment(getEnvironmentVariables().getOrElse(Map.of()));
-                    spec.jvmArgs(getMergedJvmArgs());
-                    spec.getMainClass().set(PYRONAUT_COMPILER_MAIN_CLASS);
-                    spec.setStandardOutput(compilerOutput);
-                    spec.setErrorOutput(compilerOutput);
-                    spec.setIgnoreExitValue(true);
-                    spec.args(sourceDir, destDir);
-                });
-                var output = compilerOutput.toString(StandardCharsets.UTF_8);
-                if (result.getExitValue() != 0) {
-                    throw new GradleException("Python compilation failed for source directory [" +
-                        sourceDir + "] with exit code " + result.getExitValue() + "." +
-                        formatCompilerOutput(output));
-                }
-                if (!output.isBlank()) {
-                    getLogger().lifecycle(output.stripTrailing());
-                }
+                sourceDirs.add(location.getAsFile().getAbsolutePath());
             }
         }
-
-    }
-
-    private static String formatCompilerOutput(String output) {
-        if (output.isBlank()) {
-            return "";
+        if (sourceDirs.isEmpty()) {
+            return;
         }
-        return System.lineSeparator() + "Compiler output:" +
-            System.lineSeparator() + output.stripTrailing();
+        // one work item: the roots share the destination, so they must not compile concurrently
+        queue.submit(PythonCompileWorkAction.class, parameters -> {
+            parameters.getSourceDirs().set(sourceDirs);
+            parameters.getDestinationDir().set(destDir);
+            parameters.getClasspath().from(getCompilerClasspath(), getClasspath());
+        });
+        queue.await();
     }
+
+
 }

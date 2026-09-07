@@ -29,9 +29,9 @@ class StreamLikeService:
         def generated = new File(tempDir, "python/StreamLikeService.java")
         generated.exists()
         def javaCode = generated.text
-        javaCode.count("GraalPyRuntimeUtil.invokePythonMethod") == 1
-        javaCode.contains("Value pythonResult = GraalPyRuntimeUtil.invokePythonMethod")
-        javaCode.contains("return GraalPyRuntimeUtil.isNone(pythonResult) ? null : pythonResult.asString();")
+        javaCode.count("PythonInvocation.invokePythonMethod") == 1
+        javaCode.contains("Value pythonResult = PythonInvocation.invokePythonMethod")
+        javaCode.contains("return PythonConversion.isNone(pythonResult) ? null : pythonResult.asString();")
 
         cleanup:
         tempDir.deleteDir()

@@ -40,6 +40,10 @@ micronaut:
 
 `enabled` defaults to `true`. `size` is the target number of additional GraalPy contexts; a value of `0` selects the default of twice the number of available processors. Contexts are created lazily and each one consumes memory and requires initialization work. Compiled Python code is shared across contexts where possible. For CPU-bound Python code, start with a pool size near the number of available processors and increase it only when measurements show useful parallelism. For I/O-heavy Python code, a larger pool may improve throughput, but it should remain bounded by the concurrency the application can sustain. Set `warn-wait` to a useful threshold, such as `2s`, to log when requests wait for an available context and use that signal when tuning `size`.
 
+When the asyncio bridge is enabled, each Netty event loop that executes Python coroutines additionally owns a dedicated context. Those contexts are created lazily, one per event loop, and are not counted against `size`. The number of contexts an application can create is therefore the pool `size` plus the number of Netty event loops that run Python, plus the primary context. Reduce `micronaut.netty.event-loops.default.num-threads` or disable `micronaut.python.asyncio.enabled` when that footprint is too large. Alternatively cap the dedicated contexts with `micronaut.python.pool.max-event-loop-contexts`: the first event loops to run Python get a context each, and the others run Python through the shared pool, which keeps memory bounded at the cost of blocking those event loops while a coroutine runs; the pooled context a coroutine runs on stays leased to it until the coroutine completes, so it is never shared with another caller. Such a coroutine, like one started from a thread with no event loop at all, is driven to completion on the calling thread by a private loop that needs no sockets: its timers, `call_soon_threadsafe` and executors work, while networking must go through a Netty event loop. A warning names each event loop that is refused a context.
+
+During graceful shutdown the pool keeps serving requests that are still in flight and reports completion once every context is idle. The contexts are closed when the application context is destroyed, after any Python execution still running in them has finished.
+
 Disabling the pool is useful for applications that use one context deliberately or do not need concurrent Python execution:
 
 [configuration]
@@ -57,3 +61,15 @@ include::{includedir}configurationProperties/io.micronaut.context.python.PythonP
 WARNING: Python context pooling, including the `@ContextPooled` scope, is experimental. Test pooled applications carefully, especially when Python code relies on mutable module or global state, because each pooled context has its own Python state.
 
 The current GIL and virtual-thread limitations are temporary. A future GraalPy release will provide GIL-free Python execution and virtual-thread support; revisit the executor and pool recommendations when using that runtime.
+
+
+== Pool statistics
+
+The `PythonContextExecutor` bean reports a snapshot of the pool through `statistics()`: the target size, the number of pooled, idle and event-loop contexts, how many borrows there were, how many of them had to wait, and the total and longest wait. With `micronaut-management` on the classpath the same snapshot is served by the `pythonpool` endpoint, which is sensitive by default:
+
+[source,json]
+----
+{"enabled":true,"targetSize":8,"pooledContexts":3,"idleContexts":2,"eventLoopContexts":1,"borrows":1204,"waits":3,"totalWaitMillis":41,"maxWaitMillis":22,"closed":false}
+----
+
+A growing `waits` count with `maxWaitMillis` near `warn-wait` means the pool is too small for the load; `idleContexts` staying close to `pooledContexts` means it is larger than needed. Applications that use Micrometer can bind the snapshot to gauges with a `MeterBinder`.

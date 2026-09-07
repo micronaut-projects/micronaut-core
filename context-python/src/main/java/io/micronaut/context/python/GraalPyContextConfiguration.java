@@ -25,7 +25,9 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 /**
  * Configuration options for the GraalPy context.
@@ -35,6 +37,8 @@ import java.util.Map;
 @ConfigurationProperties(GraalPyContextConfiguration.PREFIX)
 public final class GraalPyContextConfiguration {
     public static final String PREFIX = "graalpy.context";
+    /** Package prefixes Python code can always look up: the JDK, Jakarta and the framework itself. */
+    private static final List<String> FRAMEWORK_PACKAGES = List.of("java.", "jakarta.", "io.micronaut.");
     private static final Logger LOG = LoggerFactory.getLogger(GraalPyContextFactory.class);
 
     @ConfigurationBuilder(prefixes = "", excludes = {
@@ -61,6 +65,7 @@ public final class GraalPyContextConfiguration {
         GraalPyContextCustomizers.languages(GraalPyContextCustomizers.currentClassLoader())
     );
     private Map<String, String> options = Map.of();
+    private List<String> hostClassLookup = List.of();
 
     GraalPyContextConfiguration() {
         // we use experimental features by default so don't warn about them
@@ -98,6 +103,50 @@ public final class GraalPyContextConfiguration {
                 this.options = options;
             }
         }
+    }
+
+    /**
+     * The package prefixes Python code may look up through {@code java.type} and {@code import}.
+     * <p>
+     * Empty, the default, means no restriction: every class the application class loader can load is
+     * visible, whatever its package. The list is an opt-in hardening knob for applications that run
+     * Python code they trust less than their Java code; an application that sets it must list its own
+     * packages (the generated Python code looks up the application's Java classes by name) and every
+     * library package its Python code touches.
+     *
+     * @return The allowed package prefixes, empty for no restriction
+     */
+    public List<String> getHostClassLookup() {
+        return hostClassLookup;
+    }
+
+    /**
+     * Restrict the host classes Python code may look up to the given package prefixes. The JDK,
+     * Jakarta and the framework's own packages stay visible because generated Python code depends on
+     * them. Not setting the property, or setting it empty, keeps every class visible.
+     *
+     * @param hostClassLookup The allowed package prefixes, for example {@code com.example}
+     */
+    void setHostClassLookup(@Nullable List<String> hostClassLookup) {
+        this.hostClassLookup = hostClassLookup == null ? List.of() : List.copyOf(hostClassLookup);
+    }
+
+    /**
+     * The host class filter for {@link Context.Builder#allowHostClassLookup(Predicate)}.
+     *
+     * @return The filter
+     */
+    Predicate<String> hostClassFilter() {
+        if (hostClassLookup.isEmpty()) {
+            // the default: no restriction, user packages included
+            return className -> true;
+        }
+        // an entry names a package (its classes and subpackages) or one class (and its nested classes)
+        List<String> names = hostClassLookup.stream()
+            .map(name -> name.endsWith(".") ? name.substring(0, name.length() - 1) : name)
+            .toList();
+        return className -> FRAMEWORK_PACKAGES.stream().anyMatch(className::startsWith)
+            || names.stream().anyMatch(name -> className.equals(name) || className.startsWith(name + '.') || className.startsWith(name + '$'));
     }
 
     /**

@@ -137,7 +137,7 @@ final class PyronautCompilerTest {
         assertTrue(generated.contains("asPolyglotValue(Context "));
         assertTrue(generated.contains("reconstructPolyglotValue(Context "));
         assertTrue(generated.contains("newUninitializedInstance(arg1,"));
-        assertTrue(generated.contains("GraalPyRuntimeUtil.coerceToContext"));
+        assertTrue(generated.contains("PythonCoercion.coerceToContext"));
 
         String frozen = Files.readString(findGeneratedSource(outputDirectory, "TeamId.java"));
         assertTrue(frozen.contains("PooledValueCoercible"));

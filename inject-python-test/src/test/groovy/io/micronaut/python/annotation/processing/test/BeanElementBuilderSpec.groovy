@@ -22,7 +22,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.python.annotation.processing.test.beanbuilder.ApplyAopToMe
 import io.micronaut.python.annotation.processing.test.beanbuilder.Mutating
-import io.micronaut.python.processing.visitor.PythonClassElement
+import io.micronaut.python.processing.element.PythonClassElement
 
 class BeanElementBuilderSpec extends AbstractPythonTypeElementSpec {
 

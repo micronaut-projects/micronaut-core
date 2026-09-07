@@ -55,6 +55,8 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     systemProperty("micronaut.python.pool.enabled", "false")
+    // Module tests use the default client; JIT warm-up under the parallel full-suite run exceeded the 10s default once.
+    systemProperty("micronaut.http.client.read-timeout", "30s")
     // The asyncio context-isolation test compares IDs across pooled contexts.
     systemProperty("micronaut.python.context-id.enabled", "true")
 }

@@ -16,9 +16,9 @@
 package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.python.processing.visitor.ClassDef;
-import io.micronaut.python.processing.visitor.DecoratorDef;
-import io.micronaut.python.processing.visitor.ScriptDef;
+import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.model.DecoratorDef;
+import io.micronaut.python.processing.model.ScriptDef;
 import org.graalvm.polyglot.Context;
 
 import java.util.Collections;

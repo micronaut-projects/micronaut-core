@@ -52,6 +52,7 @@ import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.sourcegen.model.ObjectDef;
 
 import java.io.IOException;

@@ -17,13 +17,15 @@ package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
-import io.micronaut.python.processing.visitor.ClassDef;
-import io.micronaut.python.processing.visitor.DecoratorDef;
-import io.micronaut.python.processing.visitor.ScriptDef;
+import io.micronaut.python.processing.util.PythonKeywords;
+import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.model.DecoratorDef;
+import io.micronaut.python.processing.model.ScriptDef;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Source;
@@ -43,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Parses Python source files into the internal Python processing model.
@@ -52,12 +55,6 @@ public final class PythonAstParser {
 
     public static final String PYTHON = "python";
     public static final String INJECT_RESOURCES = "GRAALPY-VFS/io.micronaut/micronaut-inject-python";
-    private static final Set<String> PYTHON_KEYWORDS = Set.of(
-        "False", "None", "True", "and", "as", "assert", "async", "await", "break",
-        "class", "continue", "def", "del", "elif", "else", "except", "finally",
-        "for", "from", "global", "if", "import", "in", "is", "lambda", "nonlocal",
-        "not", "or", "pass", "raise", "return", "try", "while", "with", "yield"
-    );
     private static final Source COMPILE_RUNTIME_AST_SOURCE = Source.newBuilder(PYTHON, """
         import importlib.util as _mn_runtime_importlib_util
         import marshal as _mn_runtime_marshal
@@ -75,6 +72,11 @@ public final class PythonAstParser {
                 header + _mn_runtime_marshal.dumps(code)
             )
         """, "micronaut-runtime-ast-compiler.py").cached(true).buildLiteral();
+    // The driver snippets read their inputs from the context bindings, so one cached Source serves
+    // every file: GraalPy parses a cached Source once per context instead of once per evaluation.
+    private static final Source PROCESSOR_SOURCE = Source.newBuilder(PYTHON, getSource(), "micronaut-processor-driver.py").cached(true).buildLiteral();
+    private static final Source CALL_EXTRACTION_SOURCE = Source.newBuilder(PYTHON, getCallExtractionSource(), "micronaut-call-extraction.py").cached(true).buildLiteral();
+    private static final Source TRANSFORM_SOURCE = Source.newBuilder(PYTHON, getTransformSource(), "micronaut-transform-driver.py").cached(true).buildLiteral();
     private final Context context;
     private final Value runtimeAstCompiler;
     private final IdentityHashMap<TransformResult, RuntimeArtifact> runtimeArtifacts = new IdentityHashMap<>();
@@ -88,22 +90,23 @@ public final class PythonAstParser {
     }
 
     PythonAstParser(ClassLoader classLoader, boolean incremental) {
-        var contextBuilder = newContextBuilder(classLoader);
-        if (incremental) {
-            // Incremental processing is a short-lived workload. Tune GraalPy for startup latency
-            // and avoid paying for a core-count-based compiler thread pool.
-            contextBuilder.allowExperimentalOptions(true)
-                .option("engine.Mode", "latency")
-                .option("engine.CompilerThreads", "1");
-        }
-        // Both of those options exist only on the optimizing Truffle runtime. On the fallback
-        // runtime - any JVM without JVMCI, which includes stock OpenJDK and a GraalVM CE not started
-        // with -XX:+EnableJVMCI - build() throws IllegalArgumentException and Pyronaut cannot compile
-        // Python at all. Tuning is not worth failing the build over, so fall back without them.
-        this.context = buildTolerantly(contextBuilder, incremental, classLoader);
+        // Each parser owns its engine. A JVM-wide shared engine was tried to keep compiled code warm
+        // across compilations, but an engine pins every context created on it until that context is
+        // closed, and the optimizing runtime keeps compiled code per engine: the compile-time test
+        // suite, which creates hundreds of parsers in one JVM, ran out of heap on GraalVM CE.
+        this.context = buildTolerantly(classLoader, incremental);
         context.initialize(PYTHON);
         context.eval(COMPILE_RUNTIME_AST_SOURCE);
         runtimeAstCompiler = context.getBindings(PYTHON).getMember("_mn_compile_runtime_ast");
+    }
+
+    /**
+     * The GraalPy context the processor sources run in; used by tests that execute Python-level unit tests.
+     *
+     * @return The context
+     */
+    Context context() {
+        return context;
     }
 
     private static Context.Builder newContextBuilder(ClassLoader classLoader) {
@@ -126,7 +129,19 @@ public final class PythonAstParser {
      * @param classLoader    The host class loader, needed to rebuild from scratch
      * @return The context
      */
-    private static Context buildTolerantly(Context.Builder contextBuilder, boolean incremental, ClassLoader classLoader) {
+    private static Context buildTolerantly(ClassLoader classLoader, boolean incremental) {
+        Context.Builder contextBuilder = newContextBuilder(classLoader);
+        if (incremental) {
+            // Incremental processing is a short-lived workload. Tune GraalPy for startup latency
+            // and avoid paying for a core-count-based compiler thread pool.
+            contextBuilder.allowExperimentalOptions(true)
+                .option("engine.Mode", "latency")
+                .option("engine.CompilerThreads", "1");
+        }
+        // Both of those options exist only on the optimizing Truffle runtime. On the fallback
+        // runtime - any JVM without JVMCI, which includes stock OpenJDK and a GraalVM CE not started
+        // with -XX:+EnableJVMCI - build() throws IllegalArgumentException and Pyronaut cannot compile
+        // Python at all. Tuning is not worth failing the build over, so fall back without them.
         try {
             return contextBuilder.build();
         } catch (IllegalArgumentException e) {
@@ -172,10 +187,7 @@ public final class PythonAstParser {
         bindings.putMember("visitor_context", visitorContext);
         bindings.putMember("file_name", "Unknown");
         bindings.putMember("src_root", "");
-        context.eval(Source.create(
-            PYTHON,
-            getSource()
-        ));
+        context.eval(PROCESSOR_SOURCE);
         return new PythonEnvironment(
             classes,
             scripts,
@@ -249,10 +261,7 @@ public final class PythonAstParser {
                     bindings.putMember("file_name", fileName == null || fileName.isBlank() ? "Unnamed" : fileName);
                     bindings.putMember("visitor_context", visitorContext);
                     bindings.putMember("src_root", srcDir);
-                    context.eval(Source.create(
-                        PYTHON,
-                        getSource()
-                    ));
+                    context.eval(PROCESSOR_SOURCE);
                 } else if (isWithinSourceDir(srcDir, path)) {
                     String packageName = getPackageNameOfSource(srcDir, source);
                     bindings.putMember("src", source.getCharacters());
@@ -260,10 +269,7 @@ public final class PythonAstParser {
                     bindings.putMember("file_name", source.getName());
                     bindings.putMember("visitor_context", visitorContext);
                     bindings.putMember("src_root", srcDir);
-                    context.eval(Source.create(
-                        PYTHON,
-                        getSource()
-                    ));
+                    context.eval(PROCESSOR_SOURCE);
                 }
             }
         }
@@ -327,7 +333,7 @@ public final class PythonAstParser {
             return value;
         });
         bindings.putMember("src", source.getCharacters());
-        context.eval(Source.create(PYTHON, getCallExtractionSource()));
+        context.eval(CALL_EXTRACTION_SOURCE);
         return calls;
     }
 
@@ -371,10 +377,7 @@ public final class PythonAstParser {
 
             Value result;
             try {
-                result = context.eval(Source.create(
-                    PYTHON,
-                    getTransformSource()
-                ));
+                result = context.eval(TRANSFORM_SOURCE);
             } catch (Exception e) {
                 StringWriter stack = new StringWriter();
                 e.printStackTrace(new PrintWriter(stack));
@@ -382,7 +385,10 @@ public final class PythonAstParser {
             }
             Map map = result.as(Map.class);
             String code = map.containsKey("code") ? map.get("code").toString() : null;
-            String runtimeCode = map.containsKey("runtimeCode") ? map.get("runtimeCode").toString() : code;
+            Value runtimeCodeFactory = result.getHashValue("runtimeCode");
+            Supplier<String> runtimeCode = runtimeCodeFactory != null && runtimeCodeFactory.canExecute()
+                ? SupplierUtil.memoized(() -> runtimeCodeFactory.execute().asString())
+                : () -> code;
             Map<String, String> decorators = map.containsKey("decorators") ? (Map<String, String>) map.get("decorators") : null;
             Map<String, java.util.List<Map<String, String>>> javaClassImports =
                 map.containsKey("javaClassImports") ? (Map<String, java.util.List<Map<String, String>>>) map.get("javaClassImports") : null;
@@ -434,17 +440,7 @@ public final class PythonAstParser {
     }
 
     private static String normalizeKeywordSafePackageName(String name) {
-        String[] parts = name.split("\\.");
-        for (int i = 0; i < parts.length; i++) {
-            String part = parts[i];
-            if (part.endsWith("_")) {
-                String withoutTrailingUnderscore = part.substring(0, part.length() - 1);
-                if (PYTHON_KEYWORDS.contains(withoutTrailingUnderscore)) {
-                    parts[i] = withoutTrailingUnderscore;
-                }
-            }
-        }
-        return String.join(".", parts);
+        return PythonKeywords.toJavaDottedName(name);
     }
 
     public PythonEnvironment process(@Language("python") String sources, VisitorContext visitorContext) {
@@ -473,16 +469,20 @@ public final class PythonAstParser {
     private static @Language("python") String getTransformSource() {
         return """
             import ast
-            from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, unparse
+            from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, ast_equal, unparse
 
             tree = ast.parse(src)
             transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements)
             transformed_tree = transformer.visit(tree)
-            diagnostic_runtime_tree = ast.parse(src)
-            diagnostic_runtime_transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, True)
-            transformed_diagnostic_runtime_tree = diagnostic_runtime_transformer.visit(diagnostic_runtime_tree)
+            # The diagnostic runtime source is only read by tests and error reports, so it is
+            # produced on demand instead of costing a parse, a transformer pass and an unparse per file.
+            def diagnostic_runtime_code(source=src):
+                diagnostic_runtime_transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, True)
+                return unparse(diagnostic_runtime_transformer.visit(ast.parse(source)))
             executable_runtime_tree = ast.parse(src)
-            original_runtime_tree = ast.dump(executable_runtime_tree, include_attributes=False)
+            # Transformers mutate in place, so a pristine parse (cheaper than a deep copy) is kept for
+            # the change check; ast_equal stops at the first difference instead of serialising both trees.
+            pristine_runtime_tree = ast.parse(src)
             missing_decorator_code = transformer.get_missing_runtime_decorator_code(executable_runtime_tree)
             runtime_transformer = MicronautRuntimeTransformer(
                 callback_get_class_element,
@@ -493,9 +493,9 @@ public final class PythonAstParser {
             ast.fix_missing_locations(transformed_runtime_tree)
             {
                 "code": unparse(transformed_tree),
-                "runtimeCode": unparse(transformed_diagnostic_runtime_tree),
+                "runtimeCode": diagnostic_runtime_code,
                 "runtimeTree": transformed_runtime_tree,
-                "runtimeRequired": ast.dump(transformed_runtime_tree, include_attributes=False) != original_runtime_tree,
+                "runtimeRequired": not ast_equal(pristine_runtime_tree, transformed_runtime_tree),
                 "decorators": transformer.get_generated_decorator_code(),
                 "javaClassImports": transformer.get_java_class_imports(),
                 "exportedTypes": transformer.get_exported_types(),
@@ -542,7 +542,7 @@ public final class PythonAstParser {
      *
      * @param originalSource   The original source
      * @param code             The transformed code
-     * @param runtimeCode      The runtime code
+     * @param runtimeCodeSupplier Produces the runtime code for diagnostics on demand
      * @param decorators       The decorators
      * @param javaClassImports The Java class imports
      * @param exportedTypes    The types that have Micronaut decorators
@@ -553,7 +553,7 @@ public final class PythonAstParser {
     public record TransformResult(
         Source originalSource,
         String code,
-        String runtimeCode,
+        Supplier<String> runtimeCodeSupplier,
         Map<String, String> decorators,
         Map<String, java.util.List<Map<String, String>>> javaClassImports,
         java.util.List<String> exportedTypes,
@@ -564,8 +564,17 @@ public final class PythonAstParser {
             return sourceWithContent(code);
         }
 
+        /**
+         * The runtime source rendered for diagnostics. It is computed on first access.
+         *
+         * @return The runtime code
+         */
+        public String runtimeCode() {
+            return runtimeCodeSupplier.get();
+        }
+
         public Source runtimeSource() {
-            return sourceWithContent(runtimeCode);
+            return sourceWithContent(runtimeCode());
         }
 
         private Source sourceWithContent(String content) {

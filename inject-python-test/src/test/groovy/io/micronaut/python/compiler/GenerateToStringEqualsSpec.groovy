@@ -38,18 +38,18 @@ class Person:
         return this.graalpyInternalValue;
       } else {
         this.graalpyInternalValueSyncing = true;
-        GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "name", (Object) this.name);
-        GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "age", (Object) this.age);
-        GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", GraalPyRuntimeUtil.coerceValue(this.address));
+        PythonCoercion.putMember(this.graalpyInternalValue, "name", (Object) this.name);
+        PythonCoercion.putMember(this.graalpyInternalValue, "age", (Object) this.age);
+        PythonCoercion.putMember(this.graalpyInternalValue, "address", PythonCoercion.coerceValue(this.address));
         this.graalpyInternalValueSyncing = false;
         return this.graalpyInternalValue;
       }
     } else {
       this.graalpyInternalValue = PythonContextRuntime.newUninitializedInstance(Person.__PYTHON_CLASS_REFERENCE);
       this.graalpyInternalValueSyncing = true;
-      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "name", (Object) this.name);
-      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "age", (Object) this.age);
-      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", GraalPyRuntimeUtil.coerceValue(this.address));
+      PythonCoercion.putMember(this.graalpyInternalValue, "name", (Object) this.name);
+      PythonCoercion.putMember(this.graalpyInternalValue, "age", (Object) this.age);
+      PythonCoercion.putMember(this.graalpyInternalValue, "address", PythonCoercion.coerceValue(this.address));
       this.graalpyInternalValueSyncing = false;
       return this.graalpyInternalValue;
     }
@@ -57,29 +57,25 @@ class Person:
 
   @Override
   public Value asPolyglotValue(Context arg1) {
-    return GraalPyRuntimeUtil.coercePooledValue(this, arg1);
+    return PythonCoercion.coercePooledValue(this, arg1);
   }
 
   @Override
   public Value reconstructPolyglotValue(Context arg1) {
-    if (GraalPyRuntimeUtil.isValueInContext(this.graalpyInternalValue, arg1)) {
-      GraalPyRuntimeUtil.rememberPooledValue(this, arg1, this.graalpyInternalValue);
-      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "name", GraalPyRuntimeUtil.coerceToContext(this.name, arg1, java.lang.String.class));
-      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "age", GraalPyRuntimeUtil.coerceToContext(this.age, arg1, int.class));
-      GraalPyRuntimeUtil.putMember(this.graalpyInternalValue, "address", GraalPyRuntimeUtil.coerceToContext(this.address, arg1, python.Address.class));
+    if (PythonCoercion.isValueInContext(this.graalpyInternalValue, arg1)) {
+      PythonCoercion.rememberPooledValue(this, arg1, this.graalpyInternalValue);
+      PythonCoercion.putMembers(this.graalpyInternalValue, new String[]{"name","age","address"}, new Object[]{PythonCoercion.coerceToContext(this.name, arg1, java.lang.String.class),PythonCoercion.coerceToContext(this.age, arg1, int.class),PythonCoercion.coerceToContext(this.address, arg1, python.Address.class)});
       return this.graalpyInternalValue;
     } else {
       Value targetValue = PythonContextRuntime.newUninitializedInstance(arg1, Person.__PYTHON_CLASS_REFERENCE);
-      GraalPyRuntimeUtil.rememberPooledValue(this, arg1, targetValue);
-      GraalPyRuntimeUtil.putMember(targetValue, "name", GraalPyRuntimeUtil.coerceToContext(this.name, arg1, java.lang.String.class));
-      GraalPyRuntimeUtil.putMember(targetValue, "age", GraalPyRuntimeUtil.coerceToContext(this.age, arg1, int.class));
-      GraalPyRuntimeUtil.putMember(targetValue, "address", GraalPyRuntimeUtil.coerceToContext(this.address, arg1, python.Address.class));
+      PythonCoercion.rememberPooledValue(this, arg1, targetValue);
+      PythonCoercion.putMembers(targetValue, new String[]{"name","age","address"}, new Object[]{PythonCoercion.coerceToContext(this.name, arg1, java.lang.String.class),PythonCoercion.coerceToContext(this.age, arg1, int.class),PythonCoercion.coerceToContext(this.address, arg1, python.Address.class)});
       return targetValue;
     }
   }
 
   public static Person fromPolyglotValue(Value arg1) {
-    if (GraalPyRuntimeUtil.isNone(arg1)) {
+    if (PythonConversion.isNone(arg1)) {
       return null;
     }
     return new python.Person(arg1);
