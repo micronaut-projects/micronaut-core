@@ -167,6 +167,7 @@ httpServer:
   formData: Handling Form Data
   form:
     title: Forms
+    formBinding: Form Data Binding
     formCapable: Detailed Form API
   serverIO: Writing Response Data
   uploads: File Uploads
@@ -393,6 +394,7 @@ management:
         title: Provided Indicators
         diskSpaceHealthIndicator: Disk Space Health Indicator
         jdbcHealthIndicator: JDBC Health Indicator
+        discoveryClientHealthIndicator: Discovery Client Health Indicator
         deadlockedThreads: Deadlocked Threads
     metricsEndpoint: The Metrics Endpoint
     refreshEndpoint: The Refresh Endpoint

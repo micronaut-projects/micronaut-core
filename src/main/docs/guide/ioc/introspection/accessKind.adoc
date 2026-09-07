@@ -7,4 +7,4 @@ snippet::io.micronaut.docs.ioc.beans.User[tags="class", indent=0]
 
 NOTE: The `accessKind` accepts an array, so it is possible to allow for both types of accessors but prefer one or the other depending on the order they appear in the annotation. The first one in the list has priority.
 
-IMPORTANT: Introspections on fields are not possible in Kotlin because it is not possible to declare fields directly.
+IMPORTANT: Introspections on fields are not possible in Kotlin or Python because neither language lets you declare fields directly.

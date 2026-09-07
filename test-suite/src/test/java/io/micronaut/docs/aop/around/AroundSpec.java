@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class AroundSpec {
 
+    // tag::test[]
     @Test
     void testNotNull() {
         try (ApplicationContext applicationContext = ApplicationContext.run()) {
@@ -33,4 +34,5 @@ class AroundSpec {
             assertEquals(ex.getMessage(), "Null parameter [taskName] not allowed");
         }
     }
+    // end::test[]
 }

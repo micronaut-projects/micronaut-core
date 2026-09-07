@@ -43,3 +43,4 @@ open class DefaultsInterceptedController(private val timeProvider: (ZoneId) -> O
 
 // tag::endclass[]
 }
+// end::endclass[]

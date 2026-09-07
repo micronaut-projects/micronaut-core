@@ -15,6 +15,8 @@
  */
 package io.micronaut.docs.server.filters
 
+import io.micronaut.context.annotation.Requires
+
 // tag::imports[]
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MutableHttpResponse
@@ -24,23 +26,20 @@ import io.micronaut.http.filter.ServerFilterChain
 import org.reactivestreams.Publisher
 // end::imports[]
 
-// tag::class[]
+@Requires(property = "spec.filter", value = "TraceFilter")
+// tag::clazz[]
 @Filter("/hello/**") // <1>
-class TraceFilter(// <2>
-    private val traceService: TraceService)// <3>
-    : HttpServerFilter {
-    // end::class[]
+class TraceFilter( // <2>
+    private val traceService: TraceService // <3>
+) : HttpServerFilter {
 
-    // tag::doFilter[]
     override fun doFilter(request: HttpRequest<*>,
                           chain: ServerFilterChain): Publisher<MutableHttpResponse<*>> {
-        return traceService.trace(request) // <1>
-            .switchMap { aBoolean -> chain.proceed(request) } // <2>
+        return traceService.trace(request) // <4>
+            .switchMap { aBoolean -> chain.proceed(request) } // <5>
             .doOnNext { res ->
-                res.headers.add("X-Trace-Enabled", "true") // <3>
+                res.headers.add("X-Trace-Enabled", "true") // <6>
             }
     }
-    // end::doFilter[]
-// tag::endclass[]
 }
-// end::endclass[]
+// end::clazz[]

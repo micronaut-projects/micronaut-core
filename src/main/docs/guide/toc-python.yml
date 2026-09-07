@@ -217,7 +217,6 @@ httpClient:
     clientJackson: Customizing Jackson Settings
     clientRetry: Retry and Circuit Breaker
     clientFallback: Client Fallbacks
-    netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
   clientHttp2: HTTP/2 Support
   clientHttp3: HTTP/3 Support
@@ -249,7 +248,6 @@ cloud:
     serviceDiscoveryManual: Manual Service Discovery Configuration
   clientSideLoadBalancing:
     title: Client Side Load Balancing
-    netflixRibbon: Netflix Ribbon Support
   distributedTracing: Distributed Tracing
 serverlessFunctions:
   title: Serverless Functions
@@ -290,7 +288,12 @@ languageSupport:
     title: Micronaut for Python
     pythonThreading: Python Threading
     typeOrdering: Type Ordering and Forward References
+    standardTypes: Standard Library Type Conversions
     keywords: Python Keywords in Java APIs
+    moduleScripts:
+      title: Module Scripts
+      testing: JUnit 5 Module Tests
+    graalTools: GraalPy Tools
     asyncAwait:
       title: Async/Await
       asyncioRuntime: Netty-Backed Asyncio Runtime
@@ -319,6 +322,7 @@ management:
         title: Provided Indicators
         diskSpaceHealthIndicator: Disk Space Health Indicator
         jdbcHealthIndicator: JDBC Health Indicator
+        discoveryClientHealthIndicator: Discovery Client Health Indicator
         deadlockedThreads: Deadlocked Threads
     metricsEndpoint: The Metrics Endpoint
     refreshEndpoint: The Refresh Endpoint

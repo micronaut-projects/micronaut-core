@@ -448,7 +448,7 @@ Micronaut Framework 4 changes `@CrossOrigin` behavior to match configuration-bas
 
 Micronaut Framework 5 changes the default value of `@CrossOrigin.allowCredentials` from `true` to `false`. If your application relies on credentialed cross-origin requests, set `allowCredentials = true` explicitly.
 
-==== `@EachBean` requires a `@Named qualifier
+==== `@EachBean` requires a `@Named` qualifier
 
 `@EachBean` throws a "multiple possible bean candidates found" exception if any parent bean lacks a name qualifier.
 

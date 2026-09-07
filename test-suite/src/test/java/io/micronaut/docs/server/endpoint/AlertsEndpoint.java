@@ -16,6 +16,8 @@
 package io.micronaut.docs.server.endpoint;
 
 import io.micronaut.context.annotation.Requires;
+
+//tag::imports[]
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.management.endpoint.annotation.Delete;

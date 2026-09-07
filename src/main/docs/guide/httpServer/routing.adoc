@@ -43,14 +43,14 @@ snippet::io.micronaut.docs.server.routes.IssuesControllerTest[tags="imports,star
 
 Note that the URI template in the previous example requires that the `number` variable is specified. You can specify optional URI templates with the syntax: `/issues{/number}` and by annotating the `number` parameter with `@Nullable`. Alternatively, you can use the `defaultValue` element of the link:{api}/io/micronaut/http/annotation/PathVariable.html[PathVariable] annotation to specify a default value when the URI variable is missing. For example:
 
-snippet::io.micronaut.docs.server.routes.IssuesController[tags="defaultvalue", indent=0 title="Default Value Example"]
+snippet::io.micronaut.docs.server.routes.IssuesController[tags="defaultvalue", indent=0, title="Default Value Example"]
 
 <1> The forward slash inside the braces designates `number` as an optional URI variable
 <2> The `defaultValue` attribute specifies the default value for `number` when the URI variable is missing
 
-snippet::io.micronaut.docs.server.routes.IssuesControllerTest[tags="defaultvalue", indent=0 title="Testing Default Value"]
+snippet::io.micronaut.docs.server.routes.IssuesControllerTest[tags="defaultvalue", indent=0, title="Testing Default Value"]
 
-<1> This test illustrates the substitution of a default `PathVariable' value when the URI variable is missing
+<1> This test illustrates the substitution of a default `PathVariable` value when the URI variable is missing
 <2> And another test to illustrate when the optional URI variable is provided
 
 The following table provides examples of URI templates and what they match:
@@ -171,17 +171,28 @@ NOTE: Route validation is more complicated with multiple templates. If a variabl
 
 == Building Routes Programmatically
 
+[.lang-java.lang-groovy.lang-kotlin]
+--
 If you prefer to not use annotations and instead declare all routes in code then never fear, the Micronaut framework has a flexible link:{api}/io/micronaut/web/router/RouteBuilder.html[RouteBuilder] API that makes it a breeze to define routes programmatically.
 
 To start, subclass link:{api}/io/micronaut/web/router/DefaultRouteBuilder.html[DefaultRouteBuilder] and inject the controller to route to into the method, and define your routes:
+--
 
 snippet::io.micronaut.docs.server.routes.MyRoutes[tags="imports,class", indent=0, title="URI Variables Example"]
 
+[.lang-java.lang-groovy.lang-kotlin]
+--
 <1> Route definitions should subclass link:{api}/io/micronaut/web/router/DefaultRouteBuilder.html[DefaultRouteBuilder]
 <2> Use `@Inject` to inject a method with the controller to route to
 <3> Use methods such as link:{api}/io/micronaut/web/router/RouteBuilder.html[`RouteBuilder::GET(String,Class,String,Class...)`] to route to controller methods. Note that even though the issues controller is used, the route has no knowledge of its `@Controller` annotation and thus the full path must be specified.
 
 TIP: Unfortunately due to type erasure, a Java method lambda reference cannot be used with the API. For Groovy there is a `GroovyRouteBuilder` class which can be subclassed that allows passing Groovy method references.
+--
+
+[.lang-python]
+--
+Python applications declare routes as module-level functions instead of subclassing a route builder. See <<moduleScripts, Module Scripts>> for how a module of route functions is turned into a controller.
+--
 
 == Route Compile-Time Validation
 

@@ -4,7 +4,7 @@ import io.micronaut.core.beans.BeanIntrospection;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class PersonTest {
+class PersonSpec {
 
     @Test
     void testPersonIntrospection() {
