@@ -398,6 +398,9 @@ public interface ApplicationContextBuilder {
     /**
      * Set a predicate to filter beans considered by the context.
      *
+     * <p>The predicate can be read back from the built context with
+     * {@link BeanContext#getBeansPredicate()}.</p>
+     *
      * @param predicate The predicate to apply, or null to clear it
      * @return This builder
      * @since 5.0
