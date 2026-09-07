@@ -4,7 +4,7 @@ import jakarta.inject.Inject
 import jakarta.inject.Singleton
 
 @Singleton
-internal class Vehicle {
+class Vehicle {
     @Inject lateinit var engine: Engine // <1>
 
     fun start() {
@@ -13,7 +13,7 @@ internal class Vehicle {
 }
 
 @Singleton
-internal class Engine {
+class Engine {
     fun start() {
         println("Vrooom!")
     }

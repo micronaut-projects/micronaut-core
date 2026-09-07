@@ -5,7 +5,7 @@ import jakarta.inject.Inject
 import jakarta.inject.Singleton
 
 @Singleton
-internal class Vehicle {
+class Vehicle {
     private val engine: Engine
 
     @Inject // <1>
@@ -23,7 +23,7 @@ internal class Vehicle {
 }
 
 @Singleton
-internal class Engine(val cylinders: Int) {
+class Engine(val cylinders: Int) {
 
     companion object {
         @Creator // <2>

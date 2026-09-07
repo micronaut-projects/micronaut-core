@@ -3,7 +3,7 @@ package io.micronaut.docs.ioc.injection.nullable
 import jakarta.inject.Singleton
 
 @Singleton
-internal class Vehicle(engine: Engine?) { // <1>
+class Vehicle(engine: Engine?) { // <1>
     val engine: Engine = engine ?: Engine.create(6) // <2>
 
     fun start() {
@@ -11,7 +11,7 @@ internal class Vehicle(engine: Engine?) { // <1>
     }
 }
 
-internal class Engine(val cylinders: Int) {
+class Engine(val cylinders: Int) {
 
     companion object {
         fun create(cylinders: Int): Engine {

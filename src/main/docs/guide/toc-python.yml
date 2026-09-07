@@ -46,6 +46,7 @@ ioc:
     title: Bean Introspection
     atIntrospected: Use the @Introspected Annotation
     staticAtCreator: Static Creator Methods
+    introspectedAnnotationOnAConfigurationClass: Use the @Introspected Annotation on a Configuration Class
     beanWrapperApi: The BeanWrapper API
   beanMappers:
     title: Bean Mappers
