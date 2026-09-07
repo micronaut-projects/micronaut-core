@@ -27,11 +27,14 @@ import java.lang.annotation.ElementType;
 /**
  * A single member (a field, a getter or a setter) that contributed to a {@link BeanProperty}.
  *
- * <p>A {@link BeanProperty} merges the field, the read method and the write method of a property into a single
- * element with a single merged {@link io.micronaut.core.annotation.AnnotationMetadata}. Some specifications, most
- * notably Jakarta Bean Validation, treat those members as distinct elements: a constraint declared on the field is
- * validated against the value the field holds, while a constraint declared on the getter is validated against the
- * value the getter returns, and the two can differ.</p>
+ * <p>A {@link BeanProperty} merges the field, the read method and the write method of a property, and what the
+ * super types declare on them, into a single element with a single merged
+ * {@link io.micronaut.core.annotation.AnnotationMetadata}. Some specifications, most notably Jakarta Bean
+ * Validation, treat those members as distinct elements: a constraint declared on the field is validated against
+ * the value the field holds, while a constraint declared on the getter is validated against the value the getter
+ * returns, and the two can differ; a constraint an interface declares on its getter belongs to the implicit group
+ * of that interface. A member is one declaration: the field, or the read or write method of one type of the
+ * hierarchy, carrying the annotations that declaration carries and not the ones of the methods it overrides.</p>
  *
  * <p>The members of a property are only available if the introspection was generated with
  * {@link io.micronaut.core.annotation.Introspected#members()} set to {@code true}, otherwise

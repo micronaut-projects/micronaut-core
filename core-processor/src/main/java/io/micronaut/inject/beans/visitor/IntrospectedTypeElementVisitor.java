@@ -30,6 +30,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.ImportedClass;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -51,8 +52,11 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -532,6 +536,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         List<PropertyElement> beanProperties = ce.getBeanProperties(propertyElementQuery).stream()
             .filter(p -> !p.isExcluded())
             .toList();
+        if (members) {
+            writer.describeMembers();
+        }
         Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
         constructorElement.ifPresent(constructorEl -> {
             if (ArrayUtils.isNotEmpty(constructorEl.getParameters())) {
@@ -568,7 +575,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 beanProperty.getReadType().map(t -> t.withAnnotationMetadata(annotationMetadata)).orElse(null),
                 beanProperty.getWriteType().map(t -> t.withAnnotationMetadata(annotationMetadata)).orElse(null),
                 beanProperty.isReadOnly(),
-                members ? resolvePropertyMembers(beanProperty) : List.of()
+                members ? resolvePropertyMembers(ce, beanProperty) : List.of()
             );
 
             for (AnnotationValue<?> indexedAnnotation : indexedAnnotations) {
@@ -602,42 +609,173 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     }
 
     /**
-     * Resolves the individual members (the field, the read method and the write method) a property is composed of,
-     * each with its own type and its own annotation metadata.
+     * Resolves the individual members (the field, the read methods and the write methods) a property is composed
+     * of, each with its own type and its own annotation metadata: the field, and the read and write method of
+     * every type of the hierarchy declaring one, each carrying the annotations of its own declaration and not the
+     * ones of the methods it overrides, so that a member is attributed to the type declaring it.
      *
+     * @param beanType     The introspected type
      * @param beanProperty The property
-     * @return The members, in field, read method, write method order
+     * @return The members, in field, read methods, write methods order, the declaration of the most specific
+     * type first in each group
      */
-    private List<BeanIntrospectionWriter.PropertyMemberDef> resolvePropertyMembers(PropertyElement beanProperty) {
+    private List<BeanIntrospectionWriter.PropertyMemberDef> resolvePropertyMembers(ClassElement beanType, PropertyElement beanProperty) {
         List<BeanIntrospectionWriter.PropertyMemberDef> members = new ArrayList<>(3);
-        beanProperty.getField().ifPresent(field ->
-            members.add(new BeanIntrospectionWriter.PropertyMemberDef(
-                field,
-                field.getGenericType().withAnnotationMetadata(memberAnnotationMetadata(field, field.getType()))
-            ))
-        );
+        beanProperty.getField().ifPresent(field -> {
+            for (FieldElement declaration : fieldDeclarations(beanType, field)) {
+                members.add(new BeanIntrospectionWriter.PropertyMemberDef(
+                    declaration,
+                    // the field of the property is read as the property reads it, a field it hides through
+                    // the class declaring it
+                    declaration == field ? field : null,
+                    declaration.getGenericType().withAnnotationMetadata(memberAnnotationMetadata(declaration, declaration.getType()))
+                ));
+            }
+        });
         beanProperty.getReadMethod()
             .filter(method -> !method.isSynthetic())
-            .ifPresent(method ->
-                members.add(new BeanIntrospectionWriter.PropertyMemberDef(
-                    method,
-                    method.getGenericReturnType().withAnnotationMetadata(
-                        memberAnnotationMetadata(method.getMethodAnnotationMetadata(), method.getReturnType())
-                    )
-                ))
-            );
+            .ifPresent(method -> {
+                for (MethodElement declaration : declarations(beanType, method)) {
+                    members.add(new BeanIntrospectionWriter.PropertyMemberDef(
+                        declaration,
+                        method,
+                        declaration.getGenericReturnType().withAnnotationMetadata(
+                            memberAnnotationMetadata(declaration.getDeclaredMethodAnnotationMetadata(), declaration.getReturnType())
+                        )
+                    ));
+                }
+            });
         beanProperty.getWriteMethod()
             .filter(method -> !method.isSynthetic() && method.getParameters().length == 1)
             .ifPresent(method -> {
-                ParameterElement parameter = method.getParameters()[0];
-                members.add(new BeanIntrospectionWriter.PropertyMemberDef(
-                    method,
-                    parameter.getGenericType().withAnnotationMetadata(
-                        memberAnnotationMetadata(method.getMethodAnnotationMetadata(), parameter.getType())
-                    )
-                ));
+                for (MethodElement declaration : declarations(beanType, method)) {
+                    ParameterElement[] parameters = declaration.getParameters();
+                    if (parameters.length != 1) {
+                        continue;
+                    }
+                    ParameterElement parameter = parameters[0];
+                    members.add(new BeanIntrospectionWriter.PropertyMemberDef(
+                        declaration,
+                        method,
+                        parameter.getGenericType().withAnnotationMetadata(
+                            memberAnnotationMetadata(declaration.getDeclaredMethodAnnotationMetadata(), parameter.getType())
+                        )
+                    ));
+                }
             });
         return members;
+    }
+
+    /**
+     * The declarations of a field: the field itself and the fields of the same name it hides in the super
+     * classes, each a member of the property with the annotations of its own declaration, the bean type first.
+     *
+     * @param beanType The introspected type
+     * @param field    The field of the property
+     * @return The declarations, the most specific first
+     */
+    private static List<FieldElement> fieldDeclarations(ClassElement beanType, FieldElement field) {
+        List<FieldElement> hidden = beanType.getEnclosedElements(
+            ElementQuery.ALL_FIELDS.onlyInstance().includeHiddenElements().named(field.getName())
+        );
+        if (hidden.size() < 2) {
+            return List.of(field);
+        }
+        Set<String> declaringTypes = new HashSet<>();
+        declaringTypes.add(field.getDeclaringType().getName());
+        List<FieldElement> declarations = new ArrayList<>(hidden.size());
+        declarations.add(field);
+        for (FieldElement declaration : hidden) {
+            if (!declaration.isSynthetic() && declaringTypes.add(declaration.getDeclaringType().getName())) {
+                declarations.add(declaration);
+            }
+        }
+        if (declarations.size() > 1) {
+            List<String> hierarchy = hierarchyOf(beanType);
+            declarations.sort(Comparator.comparingInt(declaration -> rankOf(hierarchy, declaration.getDeclaringType().getName())));
+        }
+        return declarations;
+    }
+
+    /**
+     * The declarations of an accessor: the method itself, every method it overrides, and every method of the
+     * same signature the hierarchy declares beside it - an interface inheriting an accessor from two parent
+     * interfaces without redeclaring it overrides neither - one per type declaring it, the bean type first,
+     * then its super classes, then its interfaces.
+     *
+     * @param beanType The introspected type
+     * @param method   The accessor the bean type declares or inherits
+     * @return The declarations, the most specific first
+     */
+    private static List<MethodElement> declarations(ClassElement beanType, MethodElement method) {
+        Set<String> declaringTypes = new HashSet<>();
+        declaringTypes.add(method.getDeclaringType().getName());
+        List<MethodElement> declarations = new ArrayList<>(3);
+        declarations.add(method);
+        List<MethodElement> candidates = new ArrayList<>(method.getOverriddenMethods());
+        candidates.addAll(beanType.getEnclosedElements(
+            ElementQuery.ALL_METHODS.onlyInstance().includeOverriddenMethods().named(method.getName())
+                .filter(candidate -> hasSameParameterTypes(candidate, method))
+        ));
+        for (MethodElement declaration : candidates) {
+            // a type declares an accessor once; an accessor found through more than one path of the hierarchy
+            // is one declaration
+            if (!declaration.isSynthetic() && declaringTypes.add(declaration.getDeclaringType().getName())) {
+                declarations.add(declaration);
+            }
+        }
+        if (declarations.size() > 1) {
+            List<String> hierarchy = hierarchyOf(beanType);
+            declarations.sort(Comparator.comparingInt(declaration -> rankOf(hierarchy, declaration.getDeclaringType().getName())));
+        }
+        return declarations;
+    }
+
+    private static boolean hasSameParameterTypes(MethodElement candidate, MethodElement method) {
+        ParameterElement[] candidateParameters = candidate.getParameters();
+        ParameterElement[] parameters = method.getParameters();
+        if (candidateParameters.length != parameters.length) {
+            return false;
+        }
+        for (int i = 0; i < parameters.length; i++) {
+            if (!candidateParameters[i].getType().getName().equals(parameters[i].getType().getName())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The names of the types of a hierarchy, the type first, then its super classes, then the interfaces of
+     * each of them, an interface before the ones it extends: the order the declarations of a member are
+     * reported in.
+     */
+    private static List<String> hierarchyOf(ClassElement type) {
+        List<ClassElement> classes = new ArrayList<>();
+        for (ClassElement current = type; current != null && !current.getName().equals(Object.class.getName()); current = current.getSuperType().orElse(null)) {
+            classes.add(current);
+        }
+        Set<String> hierarchy = new LinkedHashSet<>();
+        for (ClassElement aClass : classes) {
+            hierarchy.add(aClass.getName());
+        }
+        for (ClassElement aClass : classes) {
+            collectInterfaces(aClass, hierarchy);
+        }
+        return new ArrayList<>(hierarchy);
+    }
+
+    private static void collectInterfaces(ClassElement type, Set<String> hierarchy) {
+        for (ClassElement anInterface : type.getInterfaces()) {
+            if (hierarchy.add(anInterface.getName())) {
+                collectInterfaces(anInterface, hierarchy);
+            }
+        }
+    }
+
+    private static int rankOf(List<String> hierarchy, String typeName) {
+        int rank = hierarchy.indexOf(typeName);
+        return rank == -1 ? Integer.MAX_VALUE : rank;
     }
 
     /**

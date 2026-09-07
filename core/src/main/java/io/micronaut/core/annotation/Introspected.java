@@ -154,12 +154,14 @@ public @interface Introspected {
      * Whether the individual members (the field, the read method and the write method) that each property is composed
      * of should be included in the introspection.
      *
-     * <p>A {@link io.micronaut.core.beans.BeanProperty} normally merges its members into a single element with a
-     * single merged {@link AnnotationMetadata}. When this is set to {@code true}
-     * {@link io.micronaut.core.beans.BeanProperty#getMembers()} additionally exposes each member separately, with its
-     * own annotation metadata, its own {@link io.micronaut.core.type.Argument} and its own accessor. This is required
-     * by specifications such as Jakarta Bean Validation that treat a field and a getter as two distinct constrained
-     * elements.</p>
+     * <p>A {@link io.micronaut.core.beans.BeanProperty} normally merges its members, and what the super types
+     * declare on them, into a single element with a single merged {@link AnnotationMetadata}. When this is set to
+     * {@code true} {@link io.micronaut.core.beans.BeanProperty#getMembers()} additionally exposes each member
+     * separately - the field, and the read and write method of every type of the hierarchy declaring one - with
+     * its own annotation metadata, its own {@link io.micronaut.core.type.Argument} and its own accessor, and
+     * {@link io.micronaut.core.beans.BeanIntrospection#separatesDeclarations()} reports it. This is required by
+     * specifications such as Jakarta Bean Validation that treat a field and a getter as two distinct constrained
+     * elements, and attribute a constraint to the type declaring it.</p>
      *
      * <p>Defaults to {@code false} since the additional metadata increases the size of the generated
      * introspection. Has no effect when {@link #annotationMetadata()} is {@code false}, since the members carry

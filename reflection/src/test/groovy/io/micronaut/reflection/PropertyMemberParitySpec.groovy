@@ -35,7 +35,7 @@ class PropertyMemberParitySpec extends Specification {
         expect:
         generated.beanProperties.every { property ->
             property.members.every { member ->
-                def other = reflectiveMember(property.name, member.name, member.elementType)
+                def other = reflectiveMember(property.name, member)
                 other != null && tags(other) == tags(member)
             }
         }
@@ -60,17 +60,60 @@ class PropertyMemberParitySpec extends Specification {
                 reflective.getRequiredProperty("value", String).getAnnotationValuesByType(Tag)*.stringValue()*.get().toSet()
     }
 
-    void "a member declared by a super class reports that class in both descriptions"() {
-        expect:
-        generated.getRequiredProperty("note", String).members*.declaringType.every { it == MemberParityBase }
-        members("note")*.declaringType.every { it == MemberParityBase }
+    void "a member is reported by the type declaring it in both descriptions"() {
+        expect: "the field and the field it hides by the class declaring each, the getter by every type of the hierarchy declaring one, the bean type first"
+        describe(generated.getRequiredProperty("note", String).members) == [
+                "FIELD MemberParityBean note",
+                "FIELD MemberParityBase note",
+                "METHOD MemberParityBean getNote",
+                "METHOD MemberParityBase getNote",
+                "METHOD MemberParityContract getNote",
+                "METHOD MemberParityBase setNote",
+                "METHOD MemberParityContract setNote"
+        ]
+
+        and:
+        describe(members("note")) == describe(generated.getRequiredProperty("note", String).members)
+    }
+
+    void "a getter overridden along the hierarchy carries the annotations of its own declaration in both descriptions"() {
+        given:
+        def tagsOf = { List<BeanPropertyMember> members -> members.collect { m -> tags(m) } }
+
+        expect: "the hiding field, the hidden one, the override, the overridden getter and the one of the interface each answer its own tag alone"
+        tagsOf(generated.getRequiredProperty("note", String).members) ==
+                [["hiding-field"], ["inherited-field"], ["overriding-getter"], ["inherited-getter"], ["contract-getter"], [], ["contract-setter"]]
+        tagsOf(members("note")) == tagsOf(generated.getRequiredProperty("note", String).members)
+
+        and: "while the property carries the occurrence of the member it is read through, in both descriptions"
+        generated.getRequiredProperty("note", String).getAnnotationValuesByType(Tag)*.stringValue()*.get() == ["overriding-getter"]
+        reflective.getRequiredProperty("note", String).getAnnotationValuesByType(Tag)*.stringValue()*.get() ==
+                generated.getRequiredProperty("note", String).getAnnotationValuesByType(Tag)*.stringValue()*.get()
+
+        and: "every getter reads the value the override returns, and each field the value it holds"
+        def bean = new MemberParityBean(note: "inherited")
+        generated.getRequiredProperty("note", String).members.findAll { it.readable && it.elementType == ElementType.METHOD }*.read(bean).every { it == "inherited" }
+        generated.getRequiredProperty("note", String).members.findAll { it.elementType == ElementType.FIELD }*.read(bean) == ["hidden", "inherited"]
+        members("note").findAll { it.readable }*.read(bean) == generated.getRequiredProperty("note", String).members.findAll { it.readable }*.read(bean)
+    }
+
+    void "an introspection says whether it separates the declarations"() {
+        expect: "a generated introspection compiled with the members does"
+        generated.separatesDeclarations()
+
+        and: "a reflective one always does"
+        reflective.separatesDeclarations()
+
+        and: "a generated introspection without the members does not, and lists no member"
+        !BeanIntrospection.getIntrospection(ParityBean).separatesDeclarations()
+        BeanIntrospection.getIntrospection(ParityBean).beanProperties.every { it.members.isEmpty() }
     }
 
     void "a member is the type it declares in both descriptions"() {
         expect:
         generated.beanProperties.every { property ->
             property.members.every { member ->
-                def other = reflectiveMember(property.name, member.name, member.elementType)
+                def other = reflectiveMember(property.name, member)
                 other.type == member.type &&
                         other.asArgument().typeParameters*.type == member.asArgument().typeParameters*.type
             }
@@ -84,7 +127,7 @@ class PropertyMemberParitySpec extends Specification {
         expect:
         generated.beanProperties.every { property ->
             property.members.every { member ->
-                def other = reflectiveMember(property.name, member.name, member.elementType)
+                def other = reflectiveMember(property.name, member)
                 other.readable == member.readable &&
                         (!member.readable || other.read(bean) == member.read(bean))
             }
@@ -136,8 +179,10 @@ class PropertyMemberParitySpec extends Specification {
         return reflective.getProperty(property).map { it.members }.orElse([])
     }
 
-    private BeanPropertyMember reflectiveMember(String property, String name, ElementType elementType) {
-        return members(property).find { it.name == name && it.elementType == elementType }
+    private BeanPropertyMember reflectiveMember(String property, BeanPropertyMember member) {
+        return members(property).find {
+            it.name == member.name && it.elementType == member.elementType && it.declaringType == member.declaringType
+        }
     }
 
     private static List<String> describe(List<BeanPropertyMember> members) {

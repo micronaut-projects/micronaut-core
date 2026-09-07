@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.beans;
 
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -1667,7 +1668,17 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         @Override
         public Class<?> getDeclaringType() {
-            return ref.declaringType();
+            // the generated code cannot name a package-private super class of another package as a class
+            // constant, so the class value of the declaring type carries its name when the constant fails,
+            // and the class is loaded by that name through the loader of the bean type
+            AnnotationClassValue<?> declaringType = ref.declaringType();
+            Class<?> type = declaringType.getType().orElse(null);
+            if (type != null) {
+                return type;
+            }
+            return ClassUtils.forName(declaringType.getName(), getBeanType().getClassLoader())
+                .orElseThrow(() -> new IllegalStateException("The type declaring the member " + ref.name()
+                    + " of " + getBeanType().getName() + " cannot be loaded: " + declaringType.getName()));
         }
 
         @SuppressWarnings("unchecked")
@@ -2159,7 +2170,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      * Bean property member compile-time data container.
      *
      * @param elementType    The kind of the member, either {@link ElementType#FIELD} or {@link ElementType#METHOD}
-     * @param declaringType  The type declaring the member
+     * @param declaringType  The type declaring the member, by name when the generated code cannot name it
      * @param name           The name of the member
      * @param argument       The type of the member including its own annotation metadata
      * @param readMethodIndex The dispatch index used to read the member, or {@code -1} if it cannot be read
@@ -2168,10 +2179,29 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @Internal
     @UsedByGeneratedCode
     public record BeanPropertyMemberRef(ElementType elementType,
-                                        Class<?> declaringType,
+                                        AnnotationClassValue<?> declaringType,
                                         String name,
                                         Argument<?> argument,
                                         int readMethodIndex) {
+
+        /**
+         * The shape the generated code named the declaring type by before it was carried as a class value;
+         * kept for the introspections compiled against it.
+         *
+         * @param elementType     The kind of the member
+         * @param declaringType   The type declaring the member
+         * @param name            The name of the member
+         * @param argument        The type of the member including its own annotation metadata
+         * @param readMethodIndex The dispatch index used to read the member, or {@code -1} if it cannot be read
+         */
+        @UsedByGeneratedCode
+        public BeanPropertyMemberRef(ElementType elementType,
+                                     Class<?> declaringType,
+                                     String name,
+                                     Argument<?> argument,
+                                     int readMethodIndex) {
+            this(elementType, new AnnotationClassValue<>(declaringType), name, argument, readMethodIndex);
+        }
     }
 
     /**
