@@ -794,6 +794,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
         private @Nullable Integer port;
+        private boolean implicitHead;
         private final RouteExecutorSelector executorSelector = new RouteExecutorSelector();
 
         /**
@@ -901,8 +902,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 port,
                 conversionService,
                 executorSelector,
-                messageBodyHandlerRegistry
+                messageBodyHandlerRegistry,
+                implicitHead
             );
+        }
+
+        /**
+         * Marks this route as an implicit {@code HEAD} route derived from a {@code @Get} mapping.
+         *
+         * @see UriRouteInfo#isImplicitHead()
+         */
+        void markImplicitHead() {
+            this.implicitHead = true;
         }
 
         @Override
