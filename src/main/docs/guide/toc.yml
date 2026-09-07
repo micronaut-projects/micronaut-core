@@ -57,6 +57,7 @@ ioc:
     introspectionConstructors: Describing Constructors
     introspectionBuilders: Builders
     introspectionEnums: Introspect Enums
+    introspectionTypeArguments: Type Arguments
     introspectedAnnotationOnAConfigurationClass: Use the @Introspected Annotation on a Configuration Class
     introspectExistingAnnotations: Write an AnnotationMapper to Introspect Existing Annotations
     beanWrapperApi: The BeanWrapper API

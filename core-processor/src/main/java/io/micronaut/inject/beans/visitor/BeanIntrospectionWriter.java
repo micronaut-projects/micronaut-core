@@ -109,6 +109,7 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
     private static final String FIELD_BEAN_METHODS_REFERENCES = "$METHODS_REFERENCES";
     private static final String FIELD_BEAN_CONSTRUCTORS_REFERENCES = "$CONSTRUCTORS_REFERENCES";
     private static final String FIELD_ENUM_CONSTANTS_REFERENCES = "$ENUM_CONSTANTS_REFERENCES";
+    private static final String FIELD_TYPE_ARGUMENTS = "$TYPE_ARGUMENTS";
     private static final String METADATA_METHOD_SUFFIX = "$metadata";
     /**
      * The name the JDK gives the synthetic enclosing instance parameter of an inner class constructor.
@@ -122,6 +123,9 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
 
     private static final java.lang.reflect.Method GET_INDEXED_PROPERTIES =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getIndexedProperties", Class.class);
+
+    private static final java.lang.reflect.Method GET_TYPE_ARGUMENTS_MAP_METHOD =
+        ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getTypeArgumentsMap");
 
     private static final java.lang.reflect.Method GET_BP_INDEXED_SUBSET_METHOD =
         ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getBeanPropertiesIndexedSubset", int[].class);
@@ -922,6 +926,11 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             enumsField = null;
         }
 
+        FieldDef typeArgumentsField = buildTypeArgumentsField(thisType, loadClassValueExpressionFn);
+        if (typeArgumentsField != null) {
+            classDefBuilder.addField(typeArgumentsField);
+        }
+
         int indexesIndex = 0;
         for (String annotationName : indexByAnnotations.keySet()) {
             int[] indexes = indexByAnnotations.get(annotationName)
@@ -1078,9 +1087,53 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
             getBooleanMethod(HAS_BUILDER_METHOD, hasBuilder)
         );
 
+        if (typeArgumentsField != null) {
+            classDefBuilder.addMethod(
+                MethodDef.override(GET_TYPE_ARGUMENTS_MAP_METHOD)
+                    .build((aThis, methodParameters) -> thisType.getStaticField(typeArgumentsField).returning())
+            );
+        }
+
         loadTypeMethods.values().forEach(classDefBuilder::addMethod);
 
         return classDefBuilder.build();
+    }
+
+    /**
+     * Builds the field holding the type arguments the bean binds in each of its super types, mirroring what
+     * {@code BeanDefinitionWriter} writes for a bean definition. Super types that bind nothing are left out; the
+     * accessor answers an empty list for a name it does not hold, so the result is the same and the metadata smaller.
+     *
+     * @param thisType                   The introspection type
+     * @param loadClassValueExpressionFn The load type expression fn
+     * @return The field, or {@code null} if the bean binds no type argument anywhere in its hierarchy
+     */
+    @Nullable
+    private FieldDef buildTypeArgumentsField(ClassTypeDef thisType, Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        Map<String, Map<String, ClassElement>> allTypeArguments = beanClassElement.getAllTypeArguments();
+        Map<String, Map<String, ClassElement>> typeArguments = new LinkedHashMap<>(allTypeArguments.size());
+        for (Map.Entry<String, Map<String, ClassElement>> entry : allTypeArguments.entrySet()) {
+            if (!entry.getValue().isEmpty()) {
+                typeArguments.put(entry.getKey(), entry.getValue());
+            }
+        }
+        if (typeArguments.isEmpty()) {
+            return null;
+        }
+        return FieldDef.builder(FIELD_TYPE_ARGUMENTS, Map.class)
+            .addModifiers(Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC)
+            .initializer(
+                GenUtils.stringMapOf(
+                    typeArguments, true, null, types -> ArgumentExpUtils.pushTypeArgumentElements(
+                        annotationMetadata,
+                        thisType,
+                        ClassElement.of(introspectionName),
+                        types,
+                        loadClassValueExpressionFn
+                    )
+                )
+            )
+            .build();
     }
 
     private void addPrimitiveDispatchMethods(ClassDef.ClassDefBuilder classDefBuilder) {
