@@ -4531,6 +4531,52 @@ enum Test {
         thrown(InstantiationException)
     }
 
+    void "test instantiating an enum through a @Creator factory"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+enum Test {
+    A, B, C;
+
+    @Creator
+    static Test fromCode(String code) {
+        return valueOf(code.toUpperCase());
+    }
+}
+''')
+
+        expect: "the parameter names of a @Creator come from the source, unlike the synthesized valueOf"
+        introspection.constructorArguments.length == 1
+        introspection.constructorArguments[0].name == "code"
+
+        when:
+        def instance = introspection.instantiate("a")
+
+        then:
+        instance.name() == "A"
+    }
+
+    void "test the constructor argument of an enum is named consistently"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+enum Test {
+    A, B, C
+}
+''')
+
+        expect: "valueOf is synthesized by the compiler, so its parameter name must not leak through"
+        introspection.constructorArguments.length == 1
+        introspection.constructorArguments[0].name == "name"
+    }
+
     void "test constructor argument nested generics"() {
         BeanIntrospection introspection = buildBeanIntrospection('test.Test', '''
 package test;

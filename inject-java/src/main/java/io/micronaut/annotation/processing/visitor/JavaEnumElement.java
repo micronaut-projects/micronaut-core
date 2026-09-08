@@ -129,17 +129,19 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
     /**
      * {@code valueOf(String)} is synthesized by the compiler, so the name of its parameter is
      * compiler specific: javac reports {@code name} while the Eclipse JDT compiler reports
-     * {@code arg0}. Normalise it so that the generated introspection is the same either way.
+     * {@code arg0}. Its name is always rewritten, rather than only when it differs, so that the
+     * generated introspection does not depend on which compiler produced it.
+     *
+     * <p>A creator that is not the synthesized {@code valueOf}, such as a method annotated with
+     * {@link io.micronaut.core.annotation.Creator}, is returned untouched: its parameter names come
+     * from the source.</p>
      *
      * @param creator The static creator
      * @return The creator with a stable parameter name
      */
     private static MethodElement normalizeValueOf(MethodElement creator) {
-        if (!creator.getName().equals("valueOf")) {
-            return creator;
-        }
         ParameterElement[] parameters = creator.getParameters();
-        if (parameters.length != 1 || VALUE_OF_PARAMETER.equals(parameters[0].getName())) {
+        if (parameters.length != 1 || !creator.getName().equals("valueOf")) {
             return creator;
         }
         return creator.withParameters(

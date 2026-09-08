@@ -540,16 +540,13 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         // whereas getRecordComponents() is specified to be in declaration order.
         var methodElements = new ArrayList<MethodElement>();
         for (RecordComponentElement recordComponent : classElement.getRecordComponents()) {
-            ExecutableElement accessor = recordComponent.getAccessor();
-            if (accessor != null) {
-                methodElements.add(
-                    new JavaMethodElement(
-                        JavaClassElement.this,
-                        new JavaNativeElement.Method(accessor),
-                        elementAnnotationMetadataFactory,
-                        visitorContext)
-                );
-            }
+            methodElements.add(
+                new JavaMethodElement(
+                    JavaClassElement.this,
+                    new JavaNativeElement.Method(recordComponent.getAccessor()),
+                    elementAnnotationMetadataFactory,
+                    visitorContext)
+            );
         }
         return methodElements;
     }
