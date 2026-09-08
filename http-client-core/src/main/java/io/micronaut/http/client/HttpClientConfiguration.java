@@ -310,8 +310,14 @@ public abstract class HttpClientConfiguration {
             this.sslConfiguration = copy.sslConfiguration;
             this.threadFactory = copy.threadFactory;
             this.httpVersion = copy.httpVersion;
-            this.plaintextMode = copy.plaintextMode;
-            this.alpnModes = new ArrayList<>(copy.alpnModes);
+            // these two have non-null defaults, so only overwrite them when the source
+            // actually carries a value
+            if (copy.plaintextMode != null) {
+                this.plaintextMode = copy.plaintextMode;
+            }
+            if (copy.alpnModes != null) {
+                this.alpnModes = new ArrayList<>(copy.alpnModes);
+            }
             this.allowBlockEventLoop = copy.allowBlockEventLoop;
             this.dnsResolutionMode = copy.dnsResolutionMode;
             this.addressResolverGroupName = copy.addressResolverGroupName;
