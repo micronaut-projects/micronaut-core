@@ -118,7 +118,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         }
     }
 
-    public boolean isPythonSource() {
+    public final boolean isPythonSource() {
         return environment.classes().containsKey(getName());
     }
 
@@ -511,7 +511,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         return new PythonClassElement(getNativeType(), environment, arrayDimensions, typeArguments);
     }
 
-    boolean hasExplicitTypeArguments() {
+    final boolean hasExplicitTypeArguments() {
         return resolvedTypeArguments != null;
     }
 
