@@ -26,13 +26,13 @@ class MyBean
 
         expect:
         InheritedVisitor.RESULTS['test.MyInheritedAnn']
-        !InheritedVisitor.RESULTS['test.MyPlainAnn']
+        InheritedVisitor.RESULTS['test.MyPlainAnn'] == false
         InheritedVisitor.RESULTS[Introspected.name]
-        !InheritedVisitor.RESULTS[Singleton.name]
+        InheritedVisitor.RESULTS[Singleton.name] == false
 
         and: "a copy of the element is still an annotation element and keeps the answer"
         InheritedVisitor.RESULTS['test.MyInheritedAnn:copy']
-        !InheritedVisitor.RESULTS['test.MyPlainAnn:copy']
+        InheritedVisitor.RESULTS['test.MyPlainAnn:copy'] == false
     }
 
     static class InheritedVisitor implements TypeElementVisitor<Object, Object> {

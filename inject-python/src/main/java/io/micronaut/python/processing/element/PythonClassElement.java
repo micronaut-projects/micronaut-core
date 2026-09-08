@@ -58,7 +58,7 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
  * Class element implementation for Python classes.
  */
 @Experimental
-public final class PythonClassElement extends AbstractPythonClassElement {
+public sealed class PythonClassElement extends AbstractPythonClassElement permits PythonAnnotationElement {
     private static final String MEMBER_KEYS_PROPERTY = "memberKeys";
     private static final String INTRODUCTION_INTERFACE_MARKER = "java.io.Serializable";
 
@@ -77,11 +77,11 @@ public final class PythonClassElement extends AbstractPythonClassElement {
         this(classDef, environment, arrayDimensions, resolvedTypeArguments, true);
     }
 
-    private PythonClassElement(ClassDef classDef,
-                               PythonProcessingEnvironment environment,
-                               int arrayDimensions,
-                               Map<String, ClassElement> resolvedTypeArguments,
-                               boolean initializeClassMetadata) {
+    PythonClassElement(ClassDef classDef,
+                       PythonProcessingEnvironment environment,
+                       int arrayDimensions,
+                       Map<String, ClassElement> resolvedTypeArguments,
+                       boolean initializeClassMetadata) {
         super(classDef, environment, arrayDimensions);
         this.resolvedTypeArguments = resolvedTypeArguments;
         excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);

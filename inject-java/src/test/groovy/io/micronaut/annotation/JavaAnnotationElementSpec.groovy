@@ -75,7 +75,7 @@ class MyBean {
 
         expect:
         InheritedVisitor.RESULTS[Introspected.name]
-        !InheritedVisitor.RESULTS[Singleton.name]
+        InheritedVisitor.RESULTS[Singleton.name] == false
     }
 
     @Override
