@@ -40,6 +40,11 @@ final class DefaultGenericPlaceholder<T>
      */
     @Nullable
     private final List<Argument<?>> bounds;
+    /**
+     * The type the variable erases to, answered when no bounds were recorded, computed once.
+     */
+    @Nullable
+    private List<Argument<?>> erasedBounds;
 
     /**
      * Constructor for where@author variable name and argument name are@author same.
@@ -112,7 +117,15 @@ final class DefaultGenericPlaceholder<T>
 
     @Override
     public List<Argument<?>> getBounds() {
-        return bounds != null ? bounds : GenericPlaceholder.super.getBounds();
+        if (bounds != null) {
+            return bounds;
+        }
+        List<Argument<?>> erased = erasedBounds;
+        if (erased == null) {
+            erased = GenericPlaceholder.super.getBounds();
+            erasedBounds = erased;
+        }
+        return erased;
     }
 
     @Override
@@ -127,7 +140,9 @@ final class DefaultGenericPlaceholder<T>
 
     @Override
     public Argument<T> withName(@Nullable String name) {
-        return new DefaultGenericPlaceholder<>(getType(), name, variableName, getAnnotationMetadata(), getTypeParameters(), bounds);
+        // Renaming the argument does not rename the variable it stands for, so an implicit variable name,
+        // the name this argument was given, is resolved before the new one replaces it
+        return new DefaultGenericPlaceholder<>(getType(), name, getVariableName(), getAnnotationMetadata(), getTypeParameters(), bounds);
     }
 
     @Override

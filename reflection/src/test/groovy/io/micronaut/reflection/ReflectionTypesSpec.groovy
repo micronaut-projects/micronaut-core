@@ -73,8 +73,17 @@ class ReflectionTypesSpec extends Specification {
     }
 
     void "a placeholder with no recorded bounds answers the type it erases to"() {
+        given:
+        def placeholder = (GenericPlaceholder) Argument.ofTypeVariable(Number, "value")
+
         expect:
-        ((GenericPlaceholder) Argument.ofTypeVariable(Number, "value")).bounds*.type == [Number]
+        placeholder.bounds*.type == [Number]
+
+        and: "the answer is the same list every time"
+        placeholder.bounds.is(placeholder.bounds)
+
+        and: "and renaming keeps the variable it stands for"
+        ((GenericPlaceholder) placeholder.withName("other")).variableName == "value"
     }
 
     void "a placeholder renders as the type it is bounded by when the caller compares types"() {

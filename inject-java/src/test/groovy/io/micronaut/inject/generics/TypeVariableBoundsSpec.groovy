@@ -156,6 +156,10 @@ class Bean<T extends Payment & Refundable, S extends Payment, U, P extends List<
         renamed instanceof GenericPlaceholder
         renamed.name == 'other'
         bounds(renamed) == ['test.Payment', 'test.Refundable']
+
+        and: 'renaming the argument does not rename the variable it stands for'
+        ((GenericPlaceholder<?>) renamed).variableName == ((GenericPlaceholder<?>) variable).variableName
+        ((GenericPlaceholder<?>) variable).variableName != null
         bounds(variable.withAnnotationMetadata(variable.annotationMetadata)) == ['test.Payment', 'test.Refundable']
 
         and: 'the bounds do not take part in equality'
