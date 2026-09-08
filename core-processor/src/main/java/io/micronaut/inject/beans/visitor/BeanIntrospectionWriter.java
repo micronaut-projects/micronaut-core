@@ -1053,8 +1053,9 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                         getInstantiateMethod(constructor, INSTANTIATE_METHOD)
                     );
                 } else {
-                    boolean allParametersHaveDefaults = Arrays.stream(constructor.getParameters())
-                        .allMatch(ParameterElement::hasDefault);
+                    boolean allParametersHaveDefaults = MethodGenUtils.hasAllDefaultsParameters(
+                        Arrays.asList(constructor.getParameters())
+                    );
                     if (allParametersHaveDefaults) {
                         classDefBuilder.addMethod(
                             getInstantiateMethod(constructor, INSTANTIATE_METHOD)

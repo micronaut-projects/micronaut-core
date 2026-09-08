@@ -24,6 +24,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Loads the {@link ParameterDefaultValueProvider} instances.
@@ -44,18 +46,21 @@ final class ParameterDefaultValueProviderLoader {
     }
 
     private static List<ParameterDefaultValueProvider> loadServices(ClassLoader classLoader) {
-        List<ParameterDefaultValueProvider> found = SoftServiceLoader.load(ParameterDefaultValueProvider.class, classLoader)
-            .disableFork()
-            .collectAll();
-        if (!found.isEmpty()) {
-            return found;
-        }
-        found = new ArrayList<>();
+        // Both registration formats are read, as a language module may use either
+        List<ParameterDefaultValueProvider> found = new ArrayList<>(
+            SoftServiceLoader.load(ParameterDefaultValueProvider.class, classLoader)
+                .disableFork()
+                .collectAll()
+        );
+        Set<Class<?>> seen = found.stream().map(Object::getClass).collect(Collectors.toSet());
         Iterator<ServiceLoader.Provider<ParameterDefaultValueProvider>> iterator =
             ServiceLoader.load(ParameterDefaultValueProvider.class, classLoader).stream().iterator();
         while (iterator.hasNext()) {
             try {
-                found.add(iterator.next().get());
+                ParameterDefaultValueProvider provider = iterator.next().get();
+                if (seen.add(provider.getClass())) {
+                    found.add(provider);
+                }
             } catch (Exception | ServiceConfigurationError e) {
                 // A broken provider on the classpath must not fail the compilation
             }

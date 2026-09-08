@@ -101,6 +101,26 @@ public final class MethodGenUtils {
     }
 
     /**
+     * Checks whether <i>every</i> parameter has a default that this class can supply, so that a
+     * call may omit all of the arguments.
+     *
+     * <p>This is stricter than every parameter merely reporting
+     * {@link ParameterElement#hasDefault()}: a language whose defaults are applied by the callee,
+     * without a calling convention this class implements, cannot have its arguments omitted here.
+     * Passing the default value of each parameter's type instead would silently construct an
+     * object with nulls and zeroes in place of the declared defaults.</p>
+     *
+     * @param arguments The arguments
+     * @return true if all arguments can be defaulted by generated code
+     * @since 5.2.0
+     */
+    public static boolean hasAllDefaultsParameters(List<ParameterElement> arguments) {
+        return !arguments.isEmpty() && arguments.stream().allMatch(
+            p -> p instanceof KotlinParameterElement kp && kp.hasDefault() || callerSideDefault(p) != null
+        );
+    }
+
+    /**
      * Checks if any parameter has a default value that can be materialised at the call site.
      *
      * @param arguments The arguments
