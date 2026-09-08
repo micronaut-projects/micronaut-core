@@ -129,7 +129,7 @@ public abstract class HttpClientConfiguration {
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
 
     /**
-     * The default value.
+     * The default buffer error body for streaming value.
      */
     public static final boolean DEFAULT_BUFFER_ERROR_BODY_FOR_STREAMING = false;
 
@@ -414,17 +414,20 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * @return Whether the error response body should be buffered and parsed for streaming clients.
+     * @return Whether the error response body should be buffered for streaming clients when no error type is set
+     * @since 5.2.0
      */
     public boolean isBufferErrorBodyForStreaming() {
         return bufferErrorBodyForStreaming;
     }
 
     /**
-     * Sets whether the error response body should be buffered and parsed for streaming clients, so that
-     * {@code getResponse().getBody(..)} is populated on error. Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_BUFFER_ERROR_BODY_FOR_STREAMING})
+     * Sets whether the error response body should be buffered for streaming clients when no error type is set, so
+     * that {@code getResponse().getBody(..)} is populated on error. Default value
+     * ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_BUFFER_ERROR_BODY_FOR_STREAMING}).
      *
-     * @param bufferErrorBodyForStreaming Whether
+     * @param bufferErrorBodyForStreaming Whether the error response body should be buffered for streaming clients
+     * @since 5.2.0
      */
     public void setBufferErrorBodyForStreaming(boolean bufferErrorBodyForStreaming) {
         this.bufferErrorBodyForStreaming = bufferErrorBodyForStreaming;

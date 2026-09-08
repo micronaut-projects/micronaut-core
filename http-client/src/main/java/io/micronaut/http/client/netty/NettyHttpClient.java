@@ -1281,17 +1281,18 @@ final class NettyHttpClient implements
                             public void onComplete() {
                                 try {
                                     FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
-                                    final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, (Argument<Object>) errorType, true, conversionService);
+                                    boolean hasErrorType = errorType != HttpClient.DEFAULT_ERROR_TYPE;
+                                    final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, hasErrorType ? (Argument<Object>) errorType : null, hasErrorType, conversionService);
                                     completeExceptionallySafe(delayed, decorate(new HttpClientResponseException(
                                         fullHttpResponse.status().reasonPhrase(),
                                         null,
                                         fullNettyClientHttpResponse,
-                                        new HttpClientErrorDecoder() {
+                                        hasErrorType ? new HttpClientErrorDecoder() {
                                             @Override
                                             public Argument<?> getErrorType(MediaType mediaType) {
                                                 return errorType;
                                             }
-                                        }
+                                        } : HttpClientErrorDecoder.DEFAULT
                                     )));
                                 } finally {
                                     buffer.release();
