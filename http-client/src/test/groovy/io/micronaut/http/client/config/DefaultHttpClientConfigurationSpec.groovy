@@ -214,6 +214,19 @@ class DefaultHttpClientConfigurationSpec extends Specification {
         copy.alpnModes == [HttpVersionSelection.ALPN_HTTP_1]
     }
 
+    void "copy constructor keeps non-null defaults when the source has none"() {
+        given: "a source whose fields are all null, as a mock or partially built config is"
+        def source = Mock(HttpClientConfiguration)
+
+        when:
+        def copy = new TestHttpClientConfiguration(source)
+
+        then: "the defaults survive rather than being overwritten with null"
+        copy.plaintextMode == HttpVersionSelection.PlaintextMode.HTTP_1
+        copy.alpnModes == [HttpVersionSelection.ALPN_HTTP_2, HttpVersionSelection.ALPN_HTTP_1]
+        copy.dnsResolutionMode == HttpClientConfiguration.DEFAULT_DNS_RESOLUTION_MODE
+    }
+
     static final class TestHttpClientConfiguration extends HttpClientConfiguration {
         private final ConnectionPoolConfiguration connectionPoolConfiguration = new ConnectionPoolConfiguration()
 
