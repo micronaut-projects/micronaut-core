@@ -11,6 +11,8 @@ import io.micronaut.inject.beans.injectionpoints.Colour
 import io.micronaut.inject.beans.injectionpoints.DisposableDependency
 import io.micronaut.inject.beans.injectionpoints.DisposableSingletonDependency
 import io.micronaut.inject.beans.lookups.CircularDependency
+import io.micronaut.inject.beans.lookups.CompiledHolder
+import io.micronaut.inject.beans.lookups.LifeCycleDependency
 import io.micronaut.inject.beans.lookups.LookupHolder
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
@@ -256,6 +258,43 @@ class RuntimeBeanDefinitionLookupSpec extends Specification {
 
         and: 'what it resolved before failing is destroyed all the same'
         (resolvedByDisposer[0] as DisposableDependency).destroyed
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test a life cycle dependent is destroyed the same way whichever context resolved it'() {
+        given: 'the same dependent reached three ways: a compiled constructor, a creator lookup and a disposer lookup'
+        def resolvedByDisposer = []
+        def context = ApplicationContext.builder()
+                .beanDefinitions(
+                        holderBuilder(ctx -> new LookupHolder(ctx.getBean(Argument.of(LifeCycleDependency))))
+                                .singleton(true)
+                                .injectedDisposer((BiConsumer<RuntimeBeanDefinition.DisposalContext, LookupHolder>) { ctx, bean ->
+                                    resolvedByDisposer << ctx.getBean(Argument.of(LifeCycleDependency))
+                                })
+                                .build()
+                )
+                .build()
+                .start()
+        LookupHolder holder = context.getBean(LookupHolder)
+        LifeCycleDependency createdWith = holder.created as LifeCycleDependency
+        CompiledHolder compiledHolder = context.getBean(CompiledHolder)
+        LifeCycleDependency injectedInto = compiledHolder.dependency
+
+        when:
+        context.destroyBean(holder)
+        context.destroyBean(compiledHolder)
+        LifeCycleDependency disposedWith = resolvedByDisposer[0] as LifeCycleDependency
+
+        then: 'all three are destroyed'
+        injectedInto.destroyed
+        createdWith.destroyed
+        disposedWith.destroyed
+
+        and: 'and reach the same life cycle state, so a lookup is destroyed no differently from an injection'
+        disposedWith.stopped == injectedInto.stopped
+        createdWith.stopped == injectedInto.stopped
 
         cleanup:
         context.close()

@@ -314,8 +314,10 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
     }
 
     /**
-     * Destroys the dependent objects a disposal resolved, in the reverse of the order they were resolved in,
-     * the way the bean context destroys the dependents of a bean.
+     * Destroys the dependent objects a disposal resolved, in the reverse of the order they were resolved in
+     * and as dependents, the way the bean context destroys the dependents of a bean: what the disposer
+     * resolved is owned by the disposal, so a {@link LifeCycle} among them is no more stopped than one
+     * resolved for an injection point is.
      *
      * @param context    The bean context
      * @param dependents The dependent registrations
@@ -323,7 +325,12 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
     private static void destroyDependents(BeanContext context, List<BeanRegistration<?>> dependents) {
         ListIterator<BeanRegistration<?>> i = dependents.listIterator(dependents.size());
         while (i.hasPrevious()) {
-            context.destroyBean(i.previous());
+            BeanRegistration<?> dependent = i.previous();
+            if (context instanceof DefaultBeanContext defaultBeanContext) {
+                defaultBeanContext.destroyDependentBean(dependent);
+            } else {
+                context.destroyBean(dependent);
+            }
         }
     }
 
