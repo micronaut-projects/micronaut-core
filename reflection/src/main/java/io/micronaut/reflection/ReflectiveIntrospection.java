@@ -33,7 +33,9 @@ import java.util.Optional;
  * <p>A specification that describes a type — the constraint metadata of Jakarta Validation, for instance —
  * names constructors by their parameter types and distinguishes the constraints declared on a field from the
  * ones declared on a getter, or in the type from the ones inherited from a super type. A generated
- * introspection merges the members of a property into one metadata; this contract keeps them apart.</p>
+ * introspection merges the members of a property into one metadata unless it is compiled with
+ * {@code @Introspected(members = true)}; this contract always keeps them apart, and
+ * {@link BeanIntrospection#separatesDeclarations()} says so for either.</p>
  *
  * @param <T> The bean type
  * @author Denis Stepanov
@@ -47,6 +49,18 @@ public interface ReflectiveIntrospection<T> extends BeanIntrospection<T> {
      */
     @Override
     List<BeanConstructor<T>> getConstructors();
+
+    /**
+     * A reflective introspection always does: the members of a property are read from the field and the
+     * accessors of every type declaring one, and the annotations of a method from the method itself, which
+     * Java reflection does not inherit.
+     *
+     * @return {@code true}
+     */
+    @Override
+    default boolean separatesDeclarations() {
+        return true;
+    }
 
     /**
      * Finds the method the introspected type itself declares, with the annotations of that declaration only:

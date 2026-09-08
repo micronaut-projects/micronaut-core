@@ -31,4 +31,10 @@ public class Factories {
     public void consume(String value) { // NOSONAR - the parameter is unused on purpose, the signature is what is described
         // empty on purpose - only the declaration is read
     }
+
+    @MethodTag("method-only")
+    @Tag("both")
+    public List<@Tag("element") String> label() {
+        return List.of();
+    }
 }

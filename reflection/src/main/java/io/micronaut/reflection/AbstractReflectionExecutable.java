@@ -177,9 +177,9 @@ abstract class AbstractReflectionExecutable<T, R> implements ExecutableMethod<T,
 
         @Override
         public Argument<R> asArgument() {
-            // the return argument as written - its own type-use annotations, a variable kept a variable - which
-            // is what the return type of a generated executable answers; the metadata of the method is what
-            // getAnnotationMetadata() answers, on both sides
+            // the return argument as built - the annotations of the method with the type-use annotations of the
+            // return type, a variable kept a variable - which is what the return type of a generated executable
+            // method answers; the metadata of the method is what getAnnotationMetadata() answers, on both sides
             return returnArgument;
         }
     }

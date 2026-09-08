@@ -54,4 +54,13 @@ class MemberParityBean extends MemberParityBase {
     String writeOnlyValue() {
         return writeOnly
     }
+
+    @Tag("hiding-field")
+    private String note = "hidden"
+
+    @Tag("overriding-getter")
+    @Override
+    String getNote() {
+        return super.getNote()
+    }
 }

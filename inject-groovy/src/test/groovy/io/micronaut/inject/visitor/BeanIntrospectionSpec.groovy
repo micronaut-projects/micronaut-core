@@ -5,8 +5,10 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.Executable
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.inject.test.IntrospectionMetadataShape
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanMethod
@@ -2675,6 +2677,66 @@ class Person {
         members[0].read(introspection.instantiate()) == null
     }
 
+    void "the members do not change the metadata the previous API answers"() {
+        given: "the same hierarchy, introspected with and without the members"
+        def source = { boolean members -> """
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.context.annotation.Executable
+import jakarta.validation.constraints.*
+import java.lang.annotation.*
+
+@Introspected(accessKind = [Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD], visibility = Introspected.Visibility.ANY${members ? ", members = true" : ""})
+@Marker("type")
+class Child extends Parent implements Holder<String> {
+    @Marker("child-field") @Size(max = 3)
+    private String name = "shadow"
+    @Override @Marker("child-getter") @Positive String getName() { "child" }
+    @Override String getValue() { "value" }
+    @Override @Executable @Marker("child-describe") @Negative String describe(@Min(2L) int level) { "c" }
+    @Executable @NotNull String other() { "o" }
+}
+
+interface Named {
+    @Marker("interface-getter") @NotNull @Size(min = 1) String getName()
+    @Marker("interface-setter") void setName(@Email String name)
+    @Executable @NotNull String describe(@Min(1L) int level)
+}
+
+interface Holder<T> {
+    @NotNull T getValue()
+}
+
+class Parent implements Named {
+    @Marker("field") @NotBlank
+    protected String name = "parent"
+    @Override @Marker("parent-getter") @Size(max = 10) String getName() { name }
+    @Override @Marker("parent-setter") void setName(@Digits(integer = 1, fraction = 1) String name) { this.name = name }
+    @Override @Executable @Size(max = 5) String describe(@Max(9L) int level) { "p" }
+}
+
+@Retention(RetentionPolicy.RUNTIME) @Inherited
+@Target([ElementType.TYPE, ElementType.FIELD, ElementType.METHOD])
+@interface Marker {
+    String value()
+}
+""" }
+        def plain = buildBeanIntrospection('test.Child', source(false))
+        def withMembers = buildBeanIntrospection('test.Child', source(true))
+
+        expect: "the members are there in the one and not in the other"
+        withMembers.separatesDeclarations()
+        !plain.separatesDeclarations()
+        withMembers.getProperty("name").get().members*.declaringType*.simpleName == ["Child", "Parent", "Child", "Parent", "Named", "Parent", "Named"]
+        plain.getProperty("name").get().members.isEmpty()
+
+        and: "the metadata the previous API answers is the same in both"
+        withMembers.propertyNames == plain.propertyNames
+        withMembers.beanMethods*.name.toSorted() == plain.beanMethods*.name.toSorted()
+        IntrospectionMetadataShape.of(withMembers) == IntrospectionMetadataShape.of(plain)
+    }
+
     void "every declared constructor is described"() {
         when:
         def introspection = buildBeanIntrospection('test.Order', '''
@@ -2763,4 +2825,5 @@ class CustomerService {
             introspection.beanType.getDeclaredConstructors()[0].parameterTypes
         introspection.getConstructors()[0].arguments.length == 1
     }
+
 }

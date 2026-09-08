@@ -16,6 +16,7 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -451,6 +452,32 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      */
     default List<BeanConstructor<T>> getConstructors() {
         return List.of(getConstructor());
+    }
+
+    /**
+     * Whether this introspection tells the declarations of the bean type apart from the ones it inherits.
+     *
+     * <p>A property merges what its field, its accessors and every super type declaring one of them carry
+     * into one annotation metadata, and a method merges the annotations of the methods it overrides. A
+     * specification attributing an annotation to the element declaring it - Jakarta Validation puts a
+     * constraint an interface declares in the implicit group of that interface, validates a constraint of a
+     * field against the field rather than the getter, and reports the constraints of an element apart from the
+     * inherited ones - needs them apart. An introspection separating them lists in
+     * {@link BeanProperty#getMembers()} the field of a property and the accessor of every type of the
+     * hierarchy declaring one, each carrying the annotations of its own declaration only, and answers what a
+     * method declares itself through {@link BeanMethod#getDeclaredMethodAnnotationMetadata()}.</p>
+     *
+     * <p>A generated introspection separates the declarations when it is compiled with
+     * {@link io.micronaut.core.annotation.Introspected#members()}; by default it does not, and the members of
+     * its properties are empty.</p>
+     *
+     * @return True if the members of a property and the annotations of a method are reported by the type
+     * declaring them
+     * @since 5.2.0
+     */
+    @Experimental
+    default boolean separatesDeclarations() {
+        return false;
     }
 
     /**

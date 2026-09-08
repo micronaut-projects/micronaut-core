@@ -10,15 +10,18 @@ import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.visitor.ConfigurationReaderVisitor
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.NextMajorVersion
 import org.jspecify.annotations.NonNull
 import org.jspecify.annotations.Nullable
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.inject.test.IntrospectionMetadataShape
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
+import io.micronaut.core.beans.BeanPropertyMember
 import io.micronaut.core.beans.EnumBeanIntrospection
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.TypeConverter
@@ -31,6 +34,8 @@ import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.inject.visitor.beans.hidden.HiddenBase
+import io.micronaut.inject.visitor.beans.hidden.HiddenChild
 import io.micronaut.inject.visitor.beans.outer.MuxedEvent2
 import io.micronaut.validation.visitor.ValidationVisitor
 import jakarta.validation.Constraint
@@ -6191,6 +6196,359 @@ class Child extends Parent {
         members*.declaringType.every { it.name == "test.Parent" }
         members*.declaringType != [introspection.beanType] * 3
     }
+
+    void "test property members separate the declarations of the hierarchy"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Child', """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.lang.annotation.*;
+
+@Introspected(members = true)
+class Child extends Parent implements Holder<String> {
+    @Marker("child-field")
+    private String name = "shadow";
+    @Override @Marker("child-getter") public String getName() { return "child"; }
+    @Override public String getValue() { return "value"; }
+}
+
+interface Named {
+    @Marker("interface-getter") String getName();
+    @Marker("interface-setter") void setName(String name);
+}
+
+interface Holder<T> {
+    @Marker("holder-getter") T getValue();
+}
+
+class Parent implements Named {
+    @Marker("field")
+    String name = "parent";
+    @Override @Marker("parent-getter") public String getName() { return name; }
+    @Override @Marker("parent-setter") public void setName(String name) { this.name = name; }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.FIELD, ElementType.METHOD})
+@interface Marker {
+    String value();
+}
+""")
+        def bean = introspection.instantiate()
+        def name = introspection.getProperty("name").get()
+        def value = introspection.getProperty("value").get()
+
+        expect: "the introspection separates the declarations"
+        introspection.separatesDeclarations()
+
+        and: "the field and the fields it hides, then the getter of every type declaring one, the most specific first, then the setters"
+        describe(name.members) == [
+                "FIELD test.Child name",
+                "FIELD test.Parent name",
+                "METHOD test.Child getName",
+                "METHOD test.Parent getName",
+                "METHOD test.Named getName",
+                "METHOD test.Parent setName",
+                "METHOD test.Named setName"
+        ]
+
+        and: "each carries the annotations of its own declaration only"
+        name.members.collect { it.annotationMetadata.stringValue("test.Marker").orElse(null) } ==
+                ["child-field", "field", "child-getter", "parent-getter", "interface-getter", "parent-setter", "interface-setter"]
+        name.members.collect { it.asArgument().annotationMetadata.stringValue("test.Marker").orElse(null) } ==
+                ["child-field", "field", "child-getter", "parent-getter", "interface-getter", "parent-setter", "interface-setter"]
+
+        and: "while the property merges them into one declaration"
+        name.annotationMetadata.stringValue("test.Marker").isPresent()
+
+        and: "a getter of a super type is read as the getter overriding it"
+        name.members.findAll { it.elementType == ElementType.METHOD && it.name == "getName" }.every { it.readable && it.read(bean) == "child" }
+        and: "each field is read as the field it is, the hidden one included"
+        name.members.findAll { it.elementType == ElementType.FIELD }*.read(bean) == ["shadow", "parent"]
+        name.members.findAll { it.name == "setName" }.every { !it.readable }
+
+        and: "the getter a generic interface declares is the type the bean gives it"
+        describe(value.members) == ["METHOD test.Child getValue", "METHOD test.Holder getValue"]
+        value.members*.type == [String, String]
+        value.members.collect { it.annotationMetadata.stringValue("test.Marker").orElse(null) } == [null, "holder-getter"]
+        value.members.every { it.read(bean) == "value" }
+    }
+
+    void "test a generic accessor of an interface is a declaration of the property that implements it"() {
+        given: "an interface declaring the accessors generically, implemented with a concrete type"
+        def introspection = buildBeanIntrospection('test.Impl', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+interface Holder<T> {
+    @NotNull
+    T getValue();
+
+    @Size(min = 2)
+    void setValue(T value);
+}
+
+interface AlsoHolder<T> {
+    @Size(max = 9)
+    T getValue();
+}
+
+@Introspected(members = true)
+class Impl implements Holder<String>, AlsoHolder<String> {
+    private String value;
+    @Override
+    public String getValue() { return value; }
+    @Override
+    public void setValue(String value) { this.value = value; }
+}
+''')
+        def members = introspection.getRequiredProperty("value", String).members
+
+        expect: "the erasure of the interface accessors does not hide them: every declaration is a member"
+        members*.declaringType*.simpleName == ["Impl", "Impl", "Holder", "AlsoHolder", "Impl", "Holder"]
+        members*.elementType == [ElementType.FIELD, ElementType.METHOD, ElementType.METHOD, ElementType.METHOD, ElementType.METHOD, ElementType.METHOD]
+
+        and: "each carries the annotations of its own declaration, the erased ones included"
+        members.find { it.declaringType.simpleName == "Holder" && it.elementType == ElementType.METHOD && it.readable }.annotationMetadata.hasAnnotation(NotNull)
+        members.find { it.declaringType.simpleName == "AlsoHolder" }.annotationMetadata.hasAnnotation(Size)
+        members.find { it.declaringType.simpleName == "Holder" && !it.readable }.annotationMetadata.hasAnnotation(Size)
+    }
+
+    void "test a field of a super class the introspection cannot name is read through the owning type"() {
+        given: "an introspection generated in another package than the package-private super class"
+        def introspection = BeanIntrospector.SHARED.getIntrospection(HiddenChild)
+        def bean = new HiddenChild()
+
+        expect: "an inherited field is read and written through the accessible owning type"
+        introspection.getRequiredProperty("other", String).get(bean) == "base-other"
+        introspection.getRequiredProperty("other", String).members*.declaringType == [HiddenBase]
+        introspection.getRequiredProperty("other", String).members[0].read(bean) == "base-other"
+        introspection.getRequiredProperty("other", String).set(bean, "written")
+        bean.other == "written"
+
+        and: "the hiding field is read, the hidden one is listed but cannot be read"
+        introspection.getRequiredProperty("name", String).get(bean) == "child"
+        introspection.getRequiredProperty("name", String).members*.declaringType == [HiddenChild, HiddenBase]
+        introspection.getRequiredProperty("name", String).members*.readable == [true, false]
+        introspection.getRequiredProperty("name", String).members[0].read(bean) == "child"
+
+        when:
+        introspection.getRequiredProperty("name", String).members[1].read(bean)
+
+        then:
+        thrown(UnsupportedOperationException)
+    }
+
+    void "test property members list the declarations of parallel parent interfaces"() {
+        given: "an interface inheriting the same accessor from two parents without redeclaring it"
+        def introspection = buildBeanIntrospection('test.Both', """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import java.lang.annotation.*;
+
+@Introspected(members = true)
+interface Both extends Left, Right {
+}
+
+interface Left {
+    @Marker("left") String getName();
+}
+
+interface Right {
+    @Marker("right") String getName();
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.FIELD, ElementType.METHOD})
+@interface Marker {
+    String value();
+}
+""")
+        def members = introspection.getProperty("name").get().members
+
+        expect: "one member per parent interface, in the order the interfaces are declared"
+        describe(members) == ["METHOD test.Left getName", "METHOD test.Right getName"]
+        members.collect { it.annotationMetadata.stringValue("test.Marker").orElse(null) } == ["left", "right"]
+        members.every { it.readable }
+    }
+
+    void "test a field hidden in a private nested super class of the same package is read"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Outer$Child', """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+class Outer {
+    private static class Base {
+        String name = "base";
+    }
+
+    @Introspected(accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY, members = true)
+    public static class Child extends Base {
+        String name = "child";
+    }
+}
+""")
+        def bean = introspection.instantiate()
+        def members = introspection.getProperty("name").get().members
+
+        expect: "a private nested class is package-private in the class file, so the introspection of its package names it"
+        members*.declaringType*.simpleName == ["Child", "Base"]
+        members*.readable == [true, true]
+        members*.read(bean) == ["child", "base"]
+    }
+
+    void "test an introspection without members does not separate the declarations"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Plain', """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Plain {
+    private String name;
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+}
+""")
+
+        expect:
+        !introspection.separatesDeclarations()
+        introspection.getProperty("name").get().members.isEmpty()
+    }
+
+    void "test a bean method answers its own declaration apart from the ones it overrides"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Child', """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import java.lang.annotation.*;
+
+@Introspected
+@OnType
+class Child extends Parent {
+    @Override @Executable @OnChild public String describe(int level) { return "child"; }
+    @Executable public String other() { return "other"; }
+}
+
+interface Named {
+    @OnInterface String describe(int level);
+}
+
+class Parent implements Named {
+    @Override @OnParent public String describe(int level) { return "parent"; }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@interface OnType {}
+
+@Retention(RetentionPolicy.RUNTIME) @Inherited
+@interface OnInterface {}
+
+@Retention(RetentionPolicy.RUNTIME) @Inherited
+@interface OnParent {}
+
+@Retention(RetentionPolicy.RUNTIME) @Inherited
+@interface OnChild {}
+""")
+        def describe = introspection.beanMethods.find { it.name == "describe" }
+        def other = introspection.beanMethods.find { it.name == "other" }
+        def names = { AnnotationMetadata metadata -> metadata.annotationNames.findAll { it.startsWith("test.On") }.sort() }
+
+        expect: "the metadata of the method combines the type, the overridden methods and the declaration"
+        names(describe.annotationMetadata) == ["test.OnChild", "test.OnInterface", "test.OnParent", "test.OnType"]
+
+        and: "the declared metadata narrows it to the method, the overridden ones included"
+        names(describe.declaredMetadata) == ["test.OnChild", "test.OnInterface", "test.OnParent"]
+
+        and: "the declaration is the annotations of the method itself"
+        names(describe.declaredMethodAnnotationMetadata) == ["test.OnChild"]
+        describe.declaredMethodAnnotationMetadata.hasAnnotation(Executable)
+
+        and: "a method overriding nothing declares everything it carries but the type"
+        names(other.annotationMetadata) == ["test.OnType"]
+        names(other.declaredMethodAnnotationMetadata) == []
+        other.declaredMethodAnnotationMetadata.hasAnnotation(Executable)
+    }
+
+    void "test the members do not change the metadata the previous API answers"() {
+        given: "the same hierarchy, introspected with and without the members"
+        def source = { boolean members -> """
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import jakarta.validation.constraints.*;
+import java.lang.annotation.*;
+import java.util.List;
+
+@Introspected(accessKind = {Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD}, visibility = Introspected.Visibility.ANY${members ? ", members = true" : ""})
+@Marker("type")
+class Child extends Parent implements Holder<String> {
+    @Marker("child-field") @Size(max = 3)
+    private String name = "shadow";
+    @Override @Marker("child-getter") @Positive public String getName() { return "child"; }
+    @Override public String getValue() { return "value"; }
+    @Override @Executable @Marker("child-describe") @Negative public String describe(@Min(2) int level) { return "c"; }
+    @Executable @NotNull public @Email String other() { return "o"; }
+    public Child() {}
+    public Child(@NotBlank String name) {}
+}
+
+interface Named {
+    @Marker("interface-getter") @NotNull @Size(min = 1) String getName();
+    @Marker("interface-setter") void setName(@Email String name);
+    @Executable @NotNull String describe(@Min(1) int level);
+}
+
+interface Holder<T> {
+    @NotNull T getValue();
+    List<@NotBlank String> getTags();
+}
+
+class Parent implements Named {
+    @Marker("field") @NotBlank
+    String name = "parent";
+    @Override @Marker("parent-getter") @Size(max = 10) public String getName() { return name; }
+    @Override @Marker("parent-setter") public void setName(@Digits(integer = 1, fraction = 1) String name) { this.name = name; }
+    @Override @Executable @Size(max = 5) public String describe(@Max(9) int level) { return "p"; }
+    public List<@Size(max = 2) String> getTags() { return null; }
+}
+
+@Retention(RetentionPolicy.RUNTIME) @Inherited
+@Target({ElementType.TYPE, ElementType.FIELD, ElementType.METHOD})
+@interface Marker {
+    String value();
+}
+""" }
+        def plain = buildBeanIntrospection('test.Child', source(false))
+        def withMembers = buildBeanIntrospection('test.Child', source(true))
+
+        expect: "the members are there in the one and not in the other"
+        withMembers.separatesDeclarations()
+        !plain.separatesDeclarations()
+        withMembers.getProperty("name").get().members.size() == 7
+        plain.getProperty("name").get().members.isEmpty()
+
+        and: "the metadata the previous API answers is the same in both"
+        withMembers.propertyNames == plain.propertyNames
+        withMembers.beanMethods*.name.toSorted() == plain.beanMethods*.name.toSorted()
+        IntrospectionMetadataShape.of(withMembers) == IntrospectionMetadataShape.of(plain)
+    }
+
+    private static List<String> describe(List<BeanPropertyMember> members) {
+        return members.collect { "$it.elementType $it.declaringType.name $it.name" as String }
+    }
+
 
     void "test a nested type named on classNames is introspected once"() {
         given:
