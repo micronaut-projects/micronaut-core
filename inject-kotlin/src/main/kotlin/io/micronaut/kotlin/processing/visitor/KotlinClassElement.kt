@@ -650,6 +650,8 @@ internal open class KotlinClassElement(
 
     override fun isSealed() = declaration.modifiers.contains(Modifier.SEALED)
 
+    // KSP resolves the sealed subclasses through the current round's resolver, so this has to be read while
+    // that session is live rather than from an element retained past it
     override fun getPermittedSubclasses(): Collection<ClassElement> =
         declaration.getSealedSubclasses()
             .mapNotNull { it.qualifiedName?.asString() }
