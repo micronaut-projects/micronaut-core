@@ -49,7 +49,7 @@ Check https://groovy-lang.org/releasenotes/groovy-5.0.html#Groovy5.0-breaking[Gr
 
 ==== JSpecify Nullability Annotations
 
-The Micronaut APIs use <<jspecify, JSpecify Annotations>>, and we recommend users to embrace JSpecify nullability annotations.
+The Micronaut APIs use https://jspecify.dev[JSpecify] annotations, and we recommend users to embrace JSpecify nullability annotations.
 
 ==== Bean context changes
 
@@ -448,7 +448,7 @@ Micronaut Framework 4 changes `@CrossOrigin` behavior to match configuration-bas
 
 Micronaut Framework 5 changes the default value of `@CrossOrigin.allowCredentials` from `true` to `false`. If your application relies on credentialed cross-origin requests, set `allowCredentials = true` explicitly.
 
-==== `@EachBean` requires a `@Named qualifier
+==== `@EachBean` requires a `@Named` qualifier
 
 `@EachBean` throws a "multiple possible bean candidates found" exception if any parent bean lacks a name qualifier.
 

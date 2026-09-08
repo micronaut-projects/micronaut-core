@@ -26,7 +26,6 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-//end::rxImport[]
 
 class LocalFunctionInvokeSpec {
 

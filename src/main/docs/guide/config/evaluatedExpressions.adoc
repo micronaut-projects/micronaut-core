@@ -320,7 +320,7 @@ snippet::io.micronaut.docs.expressions.AnnotationContextExample[title="Usage of 
 <2> The `firstValue()` method is defined in a bean called `AnnotationContext`
 <3> The `secondValue()` method is defined in a bean called `AnnotationMemberContext`
 <4> On the `@CustomAnnotation` annotation the methods of the `AnnotationContext` type are exposed to all members of the annotation (type level context).
-<5> On the `value()` member of the `@CustomAnnotation` annotation the methods of the `AnnotationContextExample` are made available but scoped only to the `value()` member.
+<5> On the `value()` member of the `@CustomAnnotation` annotation the methods of the `AnnotationMemberContext` type are made available but scoped only to the `value()` member.
 
 Again context classes need to be explicitly defined as beans to make them available for retrieval from
 application context at runtime.

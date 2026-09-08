@@ -40,7 +40,6 @@ class PaginationCommand {
     @Nullable
     @Pattern(regexp = "asc|desc|ASC|DESC")
     private String order;
-    // end::props[]
 
     @Nullable
     public Integer getOffset() {

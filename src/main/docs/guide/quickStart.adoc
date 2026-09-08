@@ -1,3 +1,13 @@
 The following sections walk you through a Quick Start on how to use the Micronaut framework to set up a basic "Hello World" application.
 
-Before getting started ensure you have a Java 8 or higher JDK installed, and it is recommended that you use a <<ideSetup,suitable IDE>> such as IntelliJ IDEA.
+Before getting started ensure you have a Java 8 or higher JDK installed.
+
+[.lang-java.lang-groovy.lang-kotlin]
+--
+It is recommended that you use a <<ideSetup,suitable IDE>> such as IntelliJ IDEA.
+--
+
+[.lang-python]
+--
+It is recommended that you use an IDE with Python support, such as IntelliJ IDEA or Visual Studio Code.
+--

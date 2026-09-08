@@ -23,7 +23,7 @@ import io.micronaut.core.io.ResourceLoader
 import io.micronaut.core.util.ConnectionString
 import spock.lang.Specification
 
-class DemoPropertySourceImporterSpec extends Specification {
+class DemoPropertySourceImporterTest extends Specification {
 
     // tag::test[]
     void "imports demo defaults"() {

@@ -2,7 +2,7 @@ Since 1.3, Micronaut framework supports the definition of immutable configuratio
 
 dependency::micronaut-context[]
 
-`micronaut-context` is a transitive dependency of `micronaut-http`. If you use a Micronaut HTTP runtime, your project already includes the `Micronaut-context` dependency. 
+`micronaut-context` is a transitive dependency of `micronaut-http`. If you use a Micronaut HTTP runtime, your project already includes the `micronaut-context` dependency.
 
 There are two ways to define immutable configuration. The preferred way is to define an interface annotated with ann:context.annotation.ConfigurationProperties[]. For example:
 
@@ -57,17 +57,17 @@ Configuration values can then be supplied when running the application. For exam
 
 snippet::io.micronaut.docs.config.immutable.VehicleSpec[tags="start",indent=0,title="Supply Configuration"]
 
-The above example prints: `"Ford Engine Starting V8 [rodLength=7B.0]"`
+The above example prints: `"Ford Engine Starting V8 [rodLength=7.0]"`
 
-==== Using Java Record Classes to define immutable configuration
+==== Using Record Classes to define immutable configuration
 
-For Java language applications, it's also possible to use https://docs.oracle.com/en/java/javase/17/language/records.html[Java Record Classes] for immutable configuration with ann:context.annotation.ConfigurationProperties[]. For example:
+It is also possible to use a record class -- a https://docs.oracle.com/en/java/javase/17/language/records.html[Java record], a Kotlin data class or a frozen Python dataclass -- for immutable configuration with ann:context.annotation.ConfigurationProperties[]. For example:
 
-snippet::io.micronaut.docs.config.immutable.ValueAddedTaxConfiguration[tags="imports,class",title="Java Record Example"]
+snippet::io.micronaut.docs.config.immutable.ValueAddedTaxConfiguration[tags="imports,class",title="Record Example"]
 
 <1> The `percentage` field defines a configuration property for "vat"
 
-NOTE: From a performance perspective Java records are better than interfaces.
+NOTE: From a performance perspective records are better than interfaces.
 
 == Customizing accessors
 

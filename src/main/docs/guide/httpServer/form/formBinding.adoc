@@ -41,7 +41,7 @@ snippet::io.micronaut.docs.server.form.FormController[tags="imports,class,Comple
 
 A api:io.micronaut.http.multipart.StreamingFileUpload[] _lazily_ streams a form field. Your controller can be called before the full content is received. Similar to `RawFormField`, you must consume the input data so that the upload does not stall.
 
-The advantage of `StreamingFileUpload` over `CompletedFileUpload` is that you do not need any disk space, and that you can start streaming the data immediately to e.g. e.g. forward it to a backend service. If the backend is slow to receive the uploaded data, this backpressure will also apply to the browser upload, and that upload will slow down – there is no (significant) buffering in the Micronaut service, unlike with `CompletedFileUpload`.
+The advantage of `StreamingFileUpload` over `CompletedFileUpload` is that you do not need any disk space, and that you can start streaming the data immediately to e.g. forward it to a backend service. If the backend is slow to receive the uploaded data, this backpressure will also apply to the browser upload, and that upload will slow down – there is no (significant) buffering in the Micronaut service, unlike with `CompletedFileUpload`.
 
 snippet::io.micronaut.docs.server.form.FormController[tags="imports,class,StreamingFileUpload,endclass", title="StreamingFileUpload controller example"]
 

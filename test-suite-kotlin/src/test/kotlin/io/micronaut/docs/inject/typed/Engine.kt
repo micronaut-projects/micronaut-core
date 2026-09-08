@@ -5,4 +5,4 @@ interface Engine {
     val cylinders: Int
     fun start(): String
 }
-// tag::class[]
+// end::class[]
