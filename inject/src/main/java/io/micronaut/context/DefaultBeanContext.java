@@ -3481,8 +3481,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (candidates.size() == 1) {
             return candidates.iterator().next();
         }
-        if (candidates.isEmpty()) {
-            throw new NonUniqueBeanException(beanType.getType(), originalCandidates.iterator());
+        // When every candidate is @Secondary none of them is preferable to another, but lowering the
+        // precedence of all of them shouldn't remove the ability to decide between them: carry on with
+        // the original candidates so that the order and @DefaultImplementation still get a say.
+        boolean allSecondary = candidates.isEmpty();
+        if (allSecondary) {
+            candidates = originalCandidates;
         }
         // pick the bean with the highest priority
         ArrayList<BeanDefinition<T>> listCandidates = new ArrayList<>(candidates);
@@ -3510,6 +3514,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType.getType(), candidates);
         if (exactMatches.size() == 1) {
             return exactMatches.iterator().next();
+        }
+        if (allSecondary) {
+            throw new NonUniqueBeanException(beanType.getType(), originalCandidates.iterator());
         }
         if (throwNonUnique) {
             return findConcreteCandidate(beanType.getType(), qualifier, candidates);
