@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -236,6 +237,101 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
     }
 
     /**
+     * A new builder for constructing and configuring runtime created beans where the bean factory
+     * receives the beans resolved for the injection points declared with
+     * {@link Builder#injectionPoint(Argument)}.
+     *
+     * @param beanType The bean type
+     * @param beanFactory The bean factory that receives the current {@link BeanResolutionContext} and the
+     *                    resolved injections
+     * @return The builder
+     * @param <B> The bean type
+     * @since 5.2.0
+     */
+    static <B> Builder<B> builder(Class<B> beanType, BiFunction<BeanResolutionContext, Injections, B> beanFactory) {
+        return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
+            Argument.of(beanType),
+            beanFactory
+        );
+    }
+
+    /**
+     * A new builder for constructing and configuring runtime created beans where the bean factory
+     * receives the beans resolved for the injection points declared with
+     * {@link Builder#injectionPoint(Argument)}.
+     *
+     * @param beanType The bean type
+     * @param beanFactory The bean factory that receives the current {@link BeanResolutionContext} and the
+     *                    resolved injections
+     * @return The builder
+     * @param <B> The bean type
+     * @since 5.2.0
+     */
+    static <B> Builder<B> builder(Argument<B> beanType, BiFunction<BeanResolutionContext, Injections, B> beanFactory) {
+        return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
+            beanType,
+            beanFactory
+        );
+    }
+
+    /**
+     * The beans resolved for the injection points a {@link RuntimeBeanDefinition} declared with
+     * {@link Builder#injectionPoint(Argument)} and {@link Builder#injectionPoint(Argument, Qualifier)}.
+     *
+     * <p>An instance is passed to the bean factory of a definition built with
+     * {@link #builder(Argument, BiFunction)} each time the bean is created. The beans it holds were resolved
+     * through the {@link BeanResolutionContext} of that creation, so any of them that is a dependent object
+     * (a {@code @Prototype} or {@code @Dependent} bean, for example) is a dependent of the created bean and is
+     * destroyed with it.</p>
+     *
+     * @since 5.2.0
+     */
+    interface Injections {
+
+        /**
+         * @return The number of declared injection points
+         */
+        int size();
+
+        /**
+         * The bean resolved for the injection point at the given index, in the order the injection points
+         * were declared on the builder.
+         *
+         * @param index The index
+         * @return The resolved bean, which is {@code null} only when the injection point was declared with a
+         *         nullable argument and no bean was found
+         * @param <V> The injected type
+         * @throws IndexOutOfBoundsException If the index is out of range
+         */
+        <V> @Nullable V get(int index);
+
+        /**
+         * The bean resolved for the injection point declared with the given type and no qualifier.
+         *
+         * @param type The type the injection point was declared with
+         * @return The resolved bean, which is {@code null} only when the injection point was declared with a
+         *         nullable argument and no bean was found
+         * @param <V> The injected type
+         * @throws IllegalArgumentException If no such injection point was declared
+         */
+        default <V> @Nullable V get(Argument<V> type) {
+            return get(type, null);
+        }
+
+        /**
+         * The bean resolved for the injection point declared with the given type and qualifier.
+         *
+         * @param type The type the injection point was declared with
+         * @param qualifier The qualifier the injection point was declared with
+         * @return The resolved bean, which is {@code null} only when the injection point was declared with a
+         *         nullable argument and no bean was found
+         * @param <V> The injected type
+         * @throws IllegalArgumentException If no such injection point was declared
+         */
+        <V> @Nullable V get(Argument<V> type, @Nullable Qualifier<V> qualifier);
+    }
+
+    /**
      * A builder for constructing {@link RuntimeBeanDefinition} instances.
      * @param <B> The bean type
      */
@@ -312,6 +408,43 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @return This builder
          */
         Builder<B> annotationMetadata(@Nullable AnnotationMetadata annotationMetadata);
+
+        /**
+         * Declares an injection point of this bean.
+         *
+         * <p>The declared injection points are resolved through the {@link BeanResolutionContext} of the bean
+         * creation, in the order they were declared, and are handed to the bean factory of a definition built
+         * with {@link RuntimeBeanDefinition#builder(Argument, BiFunction)} as {@link Injections}. Resolving them
+         * this way is what makes core's own dependency handling apply to a runtime built bean: a dependent object
+         * resolved for an injection point becomes a dependent of the created bean and is destroyed with it,
+         * a circular dependency is detected, and an unsatisfied injection point fails the creation with the usual
+         * {@link io.micronaut.context.exceptions.DependencyInjectionException}.</p>
+         *
+         * <p>An injection point declared with a {@link Argument#isDeclaredNullable() nullable} argument resolves
+         * to {@code null} instead of failing when no bean is found.</p>
+         *
+         * <p>The declared injection points are also the arguments of {@link BeanDefinition#getConstructor()} and
+         * the types of {@link BeanDefinition#getRequiredComponents()}, so that the bean's dependencies can be
+         * described the way a compiled bean's are.</p>
+         *
+         * @param type The type to inject
+         * @return This builder
+         * @since 5.2.0
+         */
+        default Builder<B> injectionPoint(Argument<?> type) {
+            return injectionPoint(type, null);
+        }
+
+        /**
+         * Declares a qualified injection point of this bean.
+         *
+         * @param type The type to inject
+         * @param qualifier The qualifier, or {@code null} for none
+         * @return This builder
+         * @see #injectionPoint(Argument)
+         * @since 5.2.0
+         */
+        Builder<B> injectionPoint(Argument<?> type, @Nullable Qualifier<?> qualifier);
 
         /**
          * The disposer to run when an instance created by this definition is destroyed.

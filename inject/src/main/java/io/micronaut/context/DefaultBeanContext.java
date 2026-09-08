@@ -2802,13 +2802,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             @SuppressWarnings("unchecked")
             BeanDefinition<T> def = (BeanDefinition<T>) new DefaultRuntimeBeanDefinition<>(
                 Argument.of(beanClass),
-                ctx -> (T) this,
+                (ctx, injections) -> (T) this,
                 null,
                 null,
                 true,
                 null,
                 ReflectionUtils.EMPTY_CLASS_ARRAY,
-                java.util.Collections.emptyMap()
+                java.util.Collections.emptyMap(),
+                new DefaultRuntimeBeanDefinition.InjectionPointSpec[0]
             );
             return BeanRegistration.of(this, BeanIdentifier.of(beanClass.getName()), def, (T) this);
         }
