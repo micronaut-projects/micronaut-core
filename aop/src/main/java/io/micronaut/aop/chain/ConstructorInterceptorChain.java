@@ -23,6 +23,7 @@ import io.micronaut.aop.InvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.exceptions.ConstructorAdviceException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -107,7 +108,13 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
             } else {
                 finalParameters = getParameterValues();
             }
-            return beanConstructor.instantiate(finalParameters);
+            try {
+                return beanConstructor.instantiate(finalParameters);
+            } catch (RuntimeException | Error e) {
+                // Marks the throwable as coming from the constructor body rather than from advice, so that it
+                // keeps the wrapping an unadvised constructor's throwable gets. Unwrapped again in instantiate.
+                throw new ConstructorBodyException(e);
+            }
         } else {
             interceptor = this.interceptors[index++];
             if (LOG.isTraceEnabled()) {
@@ -197,13 +204,47 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
         final Interceptor<T1, T1>[] resolvedInterceptors = interceptorRegistry
             .resolveConstructorInterceptors(constructor, interceptors);
-        return Objects.requireNonNull(new ConstructorInterceptorChain<>(
+        ConstructorInterceptorChain<T1> chain = new ConstructorInterceptorChain<>(
             definition,
             constructor,
             resolvedInterceptors,
             additionalProxyConstructorParametersCount,
             parameters
-        ).proceed(), "Constructor interceptor chain illegally returned null for constructor: " + constructor.getDescription());
+        );
+        T1 bean;
+        try {
+            bean = chain.proceed();
+        } catch (ConstructorBodyException e) {
+            throw e.rethrowCause();
+        } catch (ConstructorAdviceException e) {
+            throw e;
+        } catch (RuntimeException | Error e) {
+            // Anything else escaped the advice itself rather than the constructor it wraps. Advice around a
+            // method reaches its caller as it was thrown; carry this one so construction advice does too.
+            throw new ConstructorAdviceException(e);
+        }
+        return Objects.requireNonNull(bean, "Constructor interceptor chain illegally returned null for constructor: " + constructor.getDescription());
+    }
+
+    /**
+     * Carries a throwable out of the intercepted constructor's own body, so that
+     * {@link #instantiate} can tell it apart from one thrown by the advice around it.
+     */
+    private static final class ConstructorBodyException extends RuntimeException {
+
+        private final transient Throwable bodyCause;
+
+        private ConstructorBodyException(Throwable cause) {
+            super(cause.getMessage(), cause, false, false);
+            this.bodyCause = cause;
+        }
+
+        private RuntimeException rethrowCause() {
+            if (bodyCause instanceof Error error) {
+                throw error;
+            }
+            return (RuntimeException) bodyCause;
+        }
     }
 
     private static @Nullable Object[] resolveConcreteSubset(BeanDefinition<?> beanDefinition,
