@@ -211,9 +211,8 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
             if (producedType.isPrimitive()) {
                 throw new ProcessingException(producingElement, "Cannot apply AOP advice to primitive beans");
             }
-            if (originalProducedType.isFinal()) { // Test on the original type to avoid KSP annotations isFinal bypass, because of the new merged annotations
-                throw new ProcessingException(producingElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + producedType.getName());
-            }
+            // Validate the original type to avoid KSP annotations isFinal bypass, because of the new merged annotations
+            ProxyableTypeValidator.validateProxyable(originalProducedType, producingElement);
 
             MethodElement constructorElement = producedType.getPrimaryConstructor().orElse(null);
             MethodElement defaultConstructor = producedType.getDefaultConstructor().orElse(null);
