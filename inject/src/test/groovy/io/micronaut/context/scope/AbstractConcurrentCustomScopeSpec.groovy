@@ -338,6 +338,25 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         other.isEmpty()
     }
 
+    void "under a lock per bean a bean held under a key of the scope's own is closed once and taken out"() {
+        given: "a map keying a bean by something other than the identifier the bean carries"
+        def scope = new TestScope(true)
+        def closings = new java.util.concurrent.atomic.AtomicInteger()
+        def held = new TestCreatedBean(id: BeanIdentifier.of("its own name"), bean: new Object(), onClose: { closings.incrementAndGet() })
+        scope.scopeMap.put(BeanIdentifier.of("the scope's key"), held)
+
+        when: "on a daemon thread, since a destruction that spins closing it again could not be interrupted"
+        def destruction = new Thread({ scope.destroyScope(scope.scopeMap) } as Runnable, "destruction")
+        destruction.daemon = true
+        destruction.start()
+        destruction.join(TimeUnit.SECONDS.toMillis(10))
+
+        then: "the destruction ends, having closed the bean once and taken it out"
+        !destruction.alive
+        closings.get() == 1
+        scope.scopeMap.isEmpty()
+    }
+
     void "under a lock per bean the scope map must be a concurrent map"() {
         given:
         def scope = new TestScope(true, new HashMap<BeanIdentifier, CreatedBean<?>>())
