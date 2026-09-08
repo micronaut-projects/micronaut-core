@@ -43,6 +43,38 @@ snippet::io.micronaut.docs.aop.lifecycle.ProductInterceptors[tags="method-interc
 <2> `@PostConstruct` interception is handled
 <3> `@PreDestroy` interception is handled
 
+=== Exceptions Thrown by Construct Advice
+
+An exception thrown by a api:aop.ConstructorInterceptor[] reaches whoever asked for the bean as it was thrown,
+the same way an exception thrown by a api:aop.MethodInterceptor[] reaches the caller of the method it advises.
+It is not wrapped in a api:context.exceptions.BeanInstantiationException[]. This holds whether the interceptor
+throws before `proceed()`, rejecting the arguments the constructor was about to receive, or after it, rejecting
+the instance the constructor produced:
+
+[source,java]
+----
+@InterceptorBean(ProductBean.class)
+class ProductInterceptor implements ConstructorInterceptor<Product> {
+    @Override
+    public Product intercept(ConstructorInvocationContext<Product> context) {
+        if (context.getParameterValues()[0] == null) {
+            throw new IllegalArgumentException("A product needs a name"); // <1>
+        }
+        return context.proceed();
+    }
+}
+----
+
+<1> `context.getBean(Product.class)` throws this `IllegalArgumentException`, not a `BeanInstantiationException`
+
+This lets advice reject a construction in its own terms. It is what allows constraints declared on a
+constructor to be enforced when the container creates the bean, so that the caller catches the validation
+exception rather than a wrapper around it.
+
+An exception thrown by the constructor's own body is not advice throwing, and is wrapped in a
+api:context.exceptions.BeanInstantiationException[] as it is for a bean with no construct advice at all. So is
+any failure during eager initialization at startup, where the bean is not being created on anyone's behalf.
+
 === Intercepted Callbacks
 
 A `@PostConstruct` or `@PreDestroy` interception runs once per lifecycle event of the bean, not once per callback.

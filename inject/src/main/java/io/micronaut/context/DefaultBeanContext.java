@@ -44,6 +44,7 @@ import io.micronaut.context.exceptions.BeanCreationException;
 import io.micronaut.context.exceptions.BeanDestructionException;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.context.exceptions.ConstructorAdviceException;
 import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
@@ -2312,6 +2313,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 qualified.$withBeanQualifier(declaredQualifier);
             }
             return bean;
+        } catch (ConstructorAdviceException e) {
+            // Advice around the constructor rejected the construction. An exception thrown by advice reaches
+            // its caller as it was thrown when the advice is around a method, so it does here too.
+            throw e.getAdviceCause();
         } catch (DependencyInjectionException | DisabledBeanException |
                  BeanInstantiationException e) {
             throw e;
