@@ -287,6 +287,29 @@ class Event implements Titled {
         context.close()
     }
 
+    void "a violation while an eager bean is initialized at startup fails the startup"() {
+        when: 'a @Context bean the container initializes eagerly cannot satisfy its constraint'
+        buildContext(VALIDATION_STACK + '''
+@Factory
+class Titles {
+    @Singleton
+    String title() { return "Hi"; }
+}
+
+@Context
+class Event implements Titled {
+    private final String title;
+    Event(@Size(min = 5) String title) { this.title = title; }
+    @Override public String getTitle() { return title; }
+}
+''')
+
+        then: 'the startup fails, reporting the definition that could not be loaded'
+        def e = thrown(io.micronaut.context.exceptions.BeanInstantiationException)
+        e.message.contains('test.Event')
+        e.message.contains('title: size must be at least 5')
+    }
+
     void "an exception thrown by the constructor body of an advised bean is still wrapped"() {
         given:
         ApplicationContext context = buildContext(VALIDATION_STACK + '''

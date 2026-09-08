@@ -65,6 +65,12 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      */
     private final BeanConstructor<T> interceptedConstructor;
     private final @Nullable Object[] internalParameters;
+    /**
+     * The exception the intercepted constructor's own body threw, if it threw one. Kept so that
+     * {@link #instantiate} can tell it apart from an exception thrown by the advice around it: the two are
+     * propagated differently.
+     */
+    private @Nullable RuntimeException bodyFailure;
 
     /**
      * Default constructor.
@@ -110,10 +116,9 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
             }
             try {
                 return beanConstructor.instantiate(finalParameters);
-            } catch (RuntimeException | Error e) {
-                // Marks the throwable as coming from the constructor body rather than from advice, so that it
-                // keeps the wrapping an unadvised constructor's throwable gets. Unwrapped again in instantiate.
-                throw new ConstructorBodyException(e);
+            } catch (RuntimeException e) {
+                bodyFailure = e;
+                throw e;
             }
         } else {
             interceptor = this.interceptors[index++];
@@ -214,37 +219,19 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         T1 bean;
         try {
             bean = chain.proceed();
-        } catch (ConstructorBodyException e) {
-            throw e.rethrowCause();
         } catch (ConstructorAdviceException e) {
+            // Already carried, by the advice around a bean this one's construction depends on
             throw e;
-        } catch (RuntimeException | Error e) {
-            // Anything else escaped the advice itself rather than the constructor it wraps. Advice around a
-            // method reaches its caller as it was thrown; carry this one so construction advice does too.
+        } catch (RuntimeException e) {
+            if (e == chain.bodyFailure) {
+                // The constructor's own body threw. Keep the wrapping an unadvised constructor's throwable gets
+                throw e;
+            }
+            // The advice around the constructor threw. Advice around a method reaches its caller as it was
+            // thrown; carry this one so that construction advice does too
             throw new ConstructorAdviceException(e);
         }
         return Objects.requireNonNull(bean, "Constructor interceptor chain illegally returned null for constructor: " + constructor.getDescription());
-    }
-
-    /**
-     * Carries a throwable out of the intercepted constructor's own body, so that
-     * {@link #instantiate} can tell it apart from one thrown by the advice around it.
-     */
-    private static final class ConstructorBodyException extends RuntimeException {
-
-        private final transient Throwable bodyCause;
-
-        private ConstructorBodyException(Throwable cause) {
-            super(cause.getMessage(), cause, false, false);
-            this.bodyCause = cause;
-        }
-
-        private RuntimeException rethrowCause() {
-            if (bodyCause instanceof Error error) {
-                throw error;
-            }
-            return (RuntimeException) bodyCause;
-        }
     }
 
     private static @Nullable Object[] resolveConcreteSubset(BeanDefinition<?> beanDefinition,

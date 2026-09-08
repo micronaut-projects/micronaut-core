@@ -2316,7 +2316,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         } catch (ConstructorAdviceException e) {
             // Advice around the constructor rejected the construction. An exception thrown by advice reaches
             // its caller as it was thrown when the advice is around a method, so it does here too.
-            throw e.rethrowCause();
+            throw e.getAdviceCause();
         } catch (DependencyInjectionException | DisabledBeanException |
                  BeanInstantiationException e) {
             throw e;

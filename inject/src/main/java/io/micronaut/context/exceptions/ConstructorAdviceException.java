@@ -26,8 +26,10 @@ import io.micronaut.core.annotation.Internal;
  * lets the container tell the two apart, so that an exception thrown by construction advice is rethrown
  * unchanged while an exception thrown by the constructor body keeps being wrapped.</p>
  *
- * <p>Instances never reach user code: {@code DefaultBeanContext} unwraps them at the bean creation
- * boundary.</p>
+ * <p>Used for flow control only: it is thrown and caught between
+ * {@code ConstructorInterceptorChain#instantiate} and the bean creation boundary in
+ * {@code DefaultBeanContext}, and never reaches user code. It carries no stack trace of its own — the
+ * exception the advice threw keeps its own, and it is that one the caller sees.</p>
  *
  * @author Denis Stepanov
  * @since 5.2.0
@@ -35,29 +37,25 @@ import io.micronaut.core.annotation.Internal;
 @Internal
 public final class ConstructorAdviceException extends RuntimeException {
 
-    private final transient Throwable adviceCause;
+    private final transient RuntimeException adviceCause;
 
     /**
-     * @param cause The throwable the advice threw
+     * @param cause The exception the advice threw
      */
-    public ConstructorAdviceException(Throwable cause) {
-        super(cause.getMessage(), cause, false, false);
+    public ConstructorAdviceException(RuntimeException cause) {
+        super(cause.getMessage(), cause);
         this.adviceCause = cause;
     }
 
     /**
-     * Rethrows the exception the advice threw.
-     *
-     * <p>Advice cannot throw a checked exception, so the cause is always a {@link RuntimeException} or an
-     * {@link Error}. An {@link Error} is thrown directly; a {@link RuntimeException} is returned so that the
-     * call site can {@code throw} it and keep the compiler informed that the flow ends there.</p>
-     *
-     * @return The runtime exception the advice threw
+     * @return The exception the advice threw, to be rethrown in place of this carrier
      */
-    public RuntimeException rethrowCause() {
-        if (adviceCause instanceof Error error) {
-            throw error;
-        }
-        return (RuntimeException) adviceCause;
+    public RuntimeException getAdviceCause() {
+        return adviceCause;
+    }
+
+    @Override
+    public synchronized Throwable fillInStackTrace() {
+        return this;
     }
 }
