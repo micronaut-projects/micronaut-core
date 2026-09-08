@@ -95,6 +95,7 @@ include "test-utils"
 include "test-suite-annotation-remapper"
 include "test-suite-annotation-remapper-visitor"
 include "test-suite-property-source"
+include "test-suite-jdt"
 
 // benchmarks
 include "benchmarks"

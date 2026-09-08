@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.jspecify.annotations.Nullable;
 
@@ -39,6 +41,8 @@ import java.util.Objects;
  */
 @Internal
 class JavaEnumElement extends JavaClassElement implements EnumElement {
+
+    private static final String VALUE_OF_PARAMETER = "name";
 
     @Nullable
     protected List<EnumConstantElement> enumConstants;
@@ -114,6 +118,33 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
         }
         values = Collections.unmodifiableList(values);
         enumConstants = Collections.unmodifiableList(enumConstants);
+    }
+
+    @Override
+    public List<MethodElement> getAccessibleStaticCreators() {
+        List<MethodElement> creators = super.getAccessibleStaticCreators();
+        return creators.stream().map(JavaEnumElement::normalizeValueOf).toList();
+    }
+
+    /**
+     * {@code valueOf(String)} is synthesized by the compiler, so the name of its parameter is
+     * compiler specific: javac reports {@code name} while the Eclipse JDT compiler reports
+     * {@code arg0}. Normalise it so that the generated introspection is the same either way.
+     *
+     * @param creator The static creator
+     * @return The creator with a stable parameter name
+     */
+    private static MethodElement normalizeValueOf(MethodElement creator) {
+        if (!creator.getName().equals("valueOf")) {
+            return creator;
+        }
+        ParameterElement[] parameters = creator.getParameters();
+        if (parameters.length != 1 || VALUE_OF_PARAMETER.equals(parameters[0].getName())) {
+            return creator;
+        }
+        return creator.withParameters(
+            ParameterElement.of(parameters[0].getGenericType(), VALUE_OF_PARAMETER)
+        );
     }
 
     @Override

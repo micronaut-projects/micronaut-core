@@ -487,12 +487,10 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     private JavaPropertyElement mapToPropertyElement(AstBeanPropertiesUtils.BeanPropertyData value) {
         AnnotationMetadata propertyAnnotationMetadata = null;
         if (isRecord()) {
-            for (Element enclosedElement : classElement.getEnclosedElements()) {
-                if (JavaModelUtils.isRecordComponent(enclosedElement) && enclosedElement instanceof RecordComponentElement recordComponentElement) {
-                    if (recordComponentElement.getSimpleName().toString().equals(value.propertyName)) {
-                        propertyAnnotationMetadata = visitorContext.getAnnotationMetadataBuilder().build(recordComponentElement);
-                        break;
-                    }
+            for (RecordComponentElement recordComponentElement : classElement.getRecordComponents()) {
+                if (recordComponentElement.getSimpleName().toString().equals(value.propertyName)) {
+                    propertyAnnotationMetadata = visitorContext.getAnnotationMetadataBuilder().build(recordComponentElement);
+                    break;
                 }
             }
         }
@@ -535,27 +533,22 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     private List<MethodElement> getRecordMethods() {
-        var recordComponents = new HashSet<String>();
+        // NOTE: the accessors are resolved from the record components rather than by scanning
+        // getEnclosedElements(), because the order and the relative position of the record
+        // components and their accessors within the enclosed elements is compiler specific
+        // (javac reports declaration order, the Eclipse JDT compiler reports alphabetical order),
+        // whereas getRecordComponents() is specified to be in declaration order.
         var methodElements = new ArrayList<MethodElement>();
-        for (Element enclosedElement : classElement.getEnclosedElements()) {
-            if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
-                if (enclosedElement.getKind() == ElementKind.CONSTRUCTOR) {
-                    continue;
-                }
-                String name = enclosedElement.getSimpleName().toString();
-                if (enclosedElement instanceof ExecutableElement executableElement) {
-                    if (recordComponents.contains(name)) {
-                        methodElements.add(
-                            new JavaMethodElement(
-                                JavaClassElement.this,
-                                new JavaNativeElement.Method(executableElement),
-                                elementAnnotationMetadataFactory,
-                                visitorContext)
-                        );
-                    }
-                } else if (enclosedElement instanceof VariableElement) {
-                    recordComponents.add(name);
-                }
+        for (RecordComponentElement recordComponent : classElement.getRecordComponents()) {
+            ExecutableElement accessor = recordComponent.getAccessor();
+            if (accessor != null) {
+                methodElements.add(
+                    new JavaMethodElement(
+                        JavaClassElement.this,
+                        new JavaNativeElement.Method(accessor),
+                        elementAnnotationMetadataFactory,
+                        visitorContext)
+                );
             }
         }
         return methodElements;

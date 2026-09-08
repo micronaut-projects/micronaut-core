@@ -668,9 +668,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         @Override
         public Object visitAnnotation(AnnotationMirror a, Object o) {
-            if (a instanceof javax.lang.model.element.AnnotationValue) {
-                resolvedValue = readNestedAnnotationValue(originatingElement, a, resolvedDefaults);
-            }
+            // NOTE: don't be tempted to check that the mirror is also an AnnotationValue here.
+            // That holds for javac, where Attribute.Compound implements both interfaces, but not
+            // for other compilers such as the Eclipse JDT compiler, where it silently discards
+            // every nested annotation member.
+            resolvedValue = readNestedAnnotationValue(originatingElement, a, resolvedDefaults);
             return null;
         }
 
