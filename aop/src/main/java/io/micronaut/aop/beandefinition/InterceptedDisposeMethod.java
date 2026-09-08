@@ -63,11 +63,22 @@ final class InterceptedDisposeMethod<T> extends InterceptedMethod<T, T> {
      * The callback of the bean, resolved by the executable method that stands for it rather than by looking a
      * name up on the declaring type: the chain declares no arguments, since a callback's arguments are resolved
      * only once it proceeds, so a name and an empty signature would not find a callback that takes any.
+     *
+     * <p>A bean may bind the event without declaring a callback of that kind, which is deliberately supported: the
+     * binding promises an interception either way. Such an event has no target method, so this returns {@code null}
+     * rather than looking up the synthetic {@code dispose} the chain names itself by, which no bean declares.
+     * The package is {@code @NullMarked} and {@link io.micronaut.inject.MethodReference#getTargetMethod()} is
+     * therefore implicitly non-null, so the widening is declared here rather than left implicit, and NullAway is
+     * suppressed for it: widening the interface itself would change a contract every other implementation keeps.</p>
+     *
+     * @return The callback of the event, or {@code null} when the bean declares no callback of this kind
      */
     @Override
+    @Nullable
+    @SuppressWarnings("NullAway")
     public Method getTargetMethod() {
         ExecutableMethod<T, ?> callback = described(disposableIntercepted);
-        return callback == null ? super.getTargetMethod() : callback.getTargetMethod();
+        return callback == null ? null : callback.getTargetMethod();
     }
 
     @Override
