@@ -6275,6 +6275,49 @@ class Parent implements Named {
         value.members.every { it.read(bean) == "value" }
     }
 
+    void "test a generic accessor of an interface is a declaration of the property that implements it"() {
+        given: "an interface declaring the accessors generically, implemented with a concrete type"
+        def introspection = buildBeanIntrospection('test.Impl', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+interface Holder<T> {
+    @NotNull
+    T getValue();
+
+    @Size(min = 2)
+    void setValue(T value);
+}
+
+interface AlsoHolder<T> {
+    @Size(max = 9)
+    T getValue();
+}
+
+@Introspected(members = true)
+class Impl implements Holder<String>, AlsoHolder<String> {
+    private String value;
+    @Override
+    public String getValue() { return value; }
+    @Override
+    public void setValue(String value) { this.value = value; }
+}
+''')
+        def members = introspection.getRequiredProperty("value", String).members
+
+        expect: "the erasure of the interface accessors does not hide them: every declaration is a member"
+        members*.declaringType*.simpleName == ["Impl", "Impl", "Holder", "AlsoHolder", "Impl", "Holder"]
+        members*.elementType == [ElementType.FIELD, ElementType.METHOD, ElementType.METHOD, ElementType.METHOD, ElementType.METHOD, ElementType.METHOD]
+
+        and: "each carries the annotations of its own declaration, the erased ones included"
+        members.find { it.declaringType.simpleName == "Holder" && it.elementType == ElementType.METHOD && it.readable }.annotationMetadata.hasAnnotation(NotNull)
+        members.find { it.declaringType.simpleName == "AlsoHolder" }.annotationMetadata.hasAnnotation(Size)
+        members.find { it.declaringType.simpleName == "Holder" && !it.readable }.annotationMetadata.hasAnnotation(Size)
+    }
+
     void "test a field of a super class the introspection cannot name is read through the owning type"() {
         given: "an introspection generated in another package than the package-private super class"
         def introspection = BeanIntrospector.SHARED.getIntrospection(HiddenChild)

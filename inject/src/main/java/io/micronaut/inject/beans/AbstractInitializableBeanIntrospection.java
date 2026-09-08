@@ -1650,6 +1650,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         private final BeanPropertyMemberRef ref;
         private final AnnotationMetadata annotationMetadata;
+        // resolving the declaring type is idempotent and yields the same class, so the field is allowed to be
+        // initialized more than once when getDeclaringType() is called concurrently
+        @SuppressWarnings("java:S3077")
+        @Nullable
+        private volatile Class<?> declaringType;
 
         private BeanPropertyMemberImpl(BeanPropertyMemberRef ref) {
             this.ref = ref;
@@ -1668,17 +1673,29 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         @Override
         public Class<?> getDeclaringType() {
-            // the generated code cannot name a package-private super class of another package as a class
-            // constant, so the class value of the declaring type carries its name when the constant fails,
-            // and the class is loaded by that name through the loader of the bean type
-            AnnotationClassValue<?> declaringType = ref.declaringType();
-            Class<?> type = declaringType.getType().orElse(null);
+            Class<?> resolved = declaringType;
+            if (resolved == null) {
+                resolved = resolveDeclaringType();
+                declaringType = resolved;
+            }
+            return resolved;
+        }
+
+        /**
+         * The generated code cannot name a package-private super class of another package as a class constant,
+         * so the class value of the declaring type carries its name when the constant fails, and the class is
+         * loaded by that name through the loader of the bean type. The lookup runs once per member: it loads a
+         * class and builds a message on the failing path, where a member is described repeatedly.
+         */
+        private Class<?> resolveDeclaringType() {
+            AnnotationClassValue<?> value = ref.declaringType();
+            Class<?> type = value.getType().orElse(null);
             if (type != null) {
                 return type;
             }
-            return ClassUtils.forName(declaringType.getName(), getBeanType().getClassLoader())
+            return ClassUtils.forName(value.getName(), getBeanType().getClassLoader())
                 .orElseThrow(() -> new IllegalStateException("The type declaring the member " + ref.name()
-                    + " of " + getBeanType().getName() + " cannot be loaded: " + declaringType.getName()));
+                    + " of " + getBeanType().getName() + " cannot be loaded: " + value.getName()));
         }
 
         @SuppressWarnings("unchecked")
