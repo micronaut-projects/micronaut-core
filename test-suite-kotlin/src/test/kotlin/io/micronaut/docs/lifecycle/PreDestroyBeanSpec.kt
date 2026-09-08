@@ -12,11 +12,13 @@ class PreDestroyBeanSpec: StringSpec() {
             val ctx = ApplicationContext.run()
             val preDestroyBean = ctx.getBean(PreDestroyBean::class.java)
             val connection = ctx.getBean(Connection::class.java)
+            val cache = ctx.getBean(Cache::class.java)
             ctx.stop()
             // end::start[]
 
             preDestroyBean.stopped.get() shouldBe true
             connection.stopped.get() shouldBe true
+            cache.flushed.get() shouldBe true
         }
     }
 }

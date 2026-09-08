@@ -17,6 +17,7 @@ package io.micronaut.inject.processing;
 
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
+import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
@@ -75,11 +76,19 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     private static final String MSG_ADAPTER_METHOD_PREFIX = "Cannot adapt method [";
     private static final String MSG_TARGET_METHOD_PREFIX = "] to target method [";
 
+    private static final String MEMBER_PRE_DESTROY = "preDestroy";
+
     protected final boolean isAopProxy;
     protected final List<Buildable<List<R>>> additionalBuilders = new ArrayList<>();
     private final AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
     @Nullable
     private ElementProxyBuilder<R> aopProxyBuilder;
+    /**
+     * The method named by {@link Bean#preDestroy()} on the bean class, resolved before the members are visited so
+     * that it can be claimed as a lifecycle callback instead of being advised or made executable.
+     */
+    @Nullable
+    private MethodElement declaredPreDestroyMethod;
 
     protected DeclaredBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy, ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilderFactory) {
         super(classElement, visitorContext, beanDefinitionBuilderFactory);
@@ -158,6 +167,7 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     }
 
     protected void build(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder) {
+        declaredPreDestroyMethod = resolveDeclaredPreDestroyMethod();
         Set<FieldElement> processedFields = new HashSet<>();
         ElementQuery<MemberElement> memberQuery = ElementQuery.ALL_FIELD_AND_METHODS.includeHiddenElements();
         if (processAsProperties()) {
@@ -185,6 +195,56 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
                 throw new IllegalStateException("Unknown element");
             }
         }
+        if (declaredPreDestroyMethod != null) {
+            beanDefinitionBuilder.addPreDestroy(
+                declaredPreDestroyMethod,
+                declaredPreDestroyMethod.isReflectionRequired(classElement),
+                visitorContext
+            );
+        }
+    }
+
+    /**
+     * Resolves the pre-destroy callback the bean class names with {@link Bean#preDestroy()}. This mirrors what
+     * {@link FactoryBeanElementCreator} does for a produced bean: the member names a no-argument, accessible instance
+     * method of the bean type, and a name that resolves to nothing is a compilation error rather than silence.
+     *
+     * @return The method, {@code null} when the member is not declared or the method it names is already registered
+     * as a callback because it declares {@code @PreDestroy} itself
+     */
+    @Nullable
+    private MethodElement resolveDeclaredPreDestroyMethod() {
+        AnnotationMetadata annotationMetadata = classElement.getAnnotationMetadata();
+        if (!annotationMetadata.isPresent(Bean.class, MEMBER_PRE_DESTROY)) {
+            return null;
+        }
+        String destroyMethodName = annotationMetadata.stringValue(Bean.class, MEMBER_PRE_DESTROY).orElse(null);
+        if (StringUtils.isEmpty(destroyMethodName)) {
+            return null;
+        }
+        MethodElement destroyMethod = classElement.getEnclosedElement(
+            // Named filtering should avoid processing all methods and fail on possible missing classes and compilation errors
+            ElementQuery.ALL_METHODS.onlyAccessible(classElement)
+                .onlyInstance()
+                .named(destroyMethodName)
+                .filter(e -> !e.hasParameters())
+        ).orElseThrow(() -> new ProcessingException(classElement, "@Bean defines a preDestroy method that does not exist or is not public: " + destroyMethodName));
+        if (destroyMethod.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)) {
+            // Already registered as a callback by the member visitor
+            return null;
+        }
+        return destroyMethod;
+    }
+
+    /**
+     * @param methodElement The method
+     * @return true if the method is the pre-destroy callback named by {@link Bean#preDestroy()} on the bean class
+     */
+    private boolean isDeclaredPreDestroyCallback(MethodElement methodElement) {
+        return declaredPreDestroyMethod != null
+            && !methodElement.hasParameters()
+            && !methodElement.isStatic()
+            && methodElement.getName().equals(declaredPreDestroyMethod.getName());
     }
 
     private void visitFieldInternal(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, FieldElement fieldElement) {
@@ -380,6 +440,11 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     }
 
     private boolean visitAopAndExecutableMethod(ElementBeanDefinitionBuilder<R> beanDefinitionBuilder, MethodElement methodElement) {
+        if (isDeclaredPreDestroyCallback(methodElement)) {
+            // The callback is a lifecycle method of the bean, not an executable method of it, so it must not be
+            // advised. This is the same rule a method annotated with @PreDestroy gets from visitInjectAndLifecycleMethod.
+            return true;
+        }
         if (methodElement.isStatic() && !isStaticExecutableMethod(methodElement)) {
             // Only allow static executable methods when the method itself is annotated with @Executable
             // (directly or via an annotation meta-annotated with @Executable)
