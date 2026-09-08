@@ -280,47 +280,53 @@ public final class MethodGenUtils {
                                                          boolean addCallerSideDefaults) {
         List<ExpressionDef> expressions = new ArrayList<>(constructorArguments.length);
         for (int i = 0; i < constructorArguments.length; i++) {
-            ParameterElement constructorArgument = constructorArguments[i];
-            ExpressionDef value = values == null ? null : values.get(i);
-            ExpressionDef callerSideDefault = addCallerSideDefaults ? callerSideDefault(constructorArgument) : null;
-            if (callerSideDefault != null) {
-                expressions.add(
-                    callerSideDefaultValue(value, hasValuesExpressions == null ? null : hasValuesExpressions.get(i), callerSideDefault)
-                );
-                continue;
-            }
-            ExpressionDef defaultValue = getDefaultValue(constructorArgument);
-            ExpressionDef nullExpression = ExpressionDef.nullValue();
-            if (value != null) {
-                if (!addKotlinDefaults || value instanceof ExpressionDef.Constant constant && constant.value() != null) {
-                    expressions.add(value);
-                } else if (hasValuesExpressions != null) {
-                    ExpressionDef expressionDef = hasValuesExpressions.get(i);
-                    if (defaultValue.equals(nullExpression)) {
-                        expressions.add(value); // Null value anyway
-                    } else {
-                        expressions.add(
-                            expressionDef.isTrue().doIfElse(value, defaultValue)
-                        );
-                    }
-                } else if (!constructorArgument.isPrimitive()) {
-                    expressions.add(value);
-                } else {
-                    expressions.add(
-                            ClassTypeDef.of(Objects.class)
-                                    .invokeStatic(
-                                            REQUIRE_NON_NULL_ELSE_METHOD,
-
-                                            value.cast(TypeDef.OBJECT), // Remove any previous casts
-                                        defaultValue
-                                    ).cast(value.type())
-                    );
-                }
-                continue;
-            }
-            expressions.add(defaultValue);
+            expressions.add(
+                constructorValue(
+                    constructorArguments[i],
+                    values == null ? null : values.get(i),
+                    hasValuesExpressions == null ? null : hasValuesExpressions.get(i),
+                    addKotlinDefaults,
+                    addCallerSideDefaults
+                )
+            );
         }
         return expressions;
+    }
+
+    private static ExpressionDef constructorValue(ParameterElement constructorArgument,
+                                                  @Nullable
+                                                  ExpressionDef value,
+                                                  @Nullable
+                                                  ExpressionDef hasValueExpression,
+                                                  boolean addKotlinDefaults,
+                                                  boolean addCallerSideDefaults) {
+        ExpressionDef callerSideDefault = addCallerSideDefaults ? callerSideDefault(constructorArgument) : null;
+        if (callerSideDefault != null) {
+            return callerSideDefaultValue(value, hasValueExpression, callerSideDefault);
+        }
+        ExpressionDef defaultValue = getDefaultValue(constructorArgument);
+        if (value == null) {
+            return defaultValue;
+        }
+        if (!addKotlinDefaults || value instanceof ExpressionDef.Constant constant && constant.value() != null) {
+            return value;
+        }
+        if (hasValueExpression != null) {
+            if (defaultValue.equals(ExpressionDef.nullValue())) {
+                return value; // Null value anyway
+            }
+            return hasValueExpression.isTrue().doIfElse(value, defaultValue);
+        }
+        if (!constructorArgument.isPrimitive()) {
+            return value;
+        }
+        return ClassTypeDef.of(Objects.class)
+            .invokeStatic(
+                REQUIRE_NON_NULL_ELSE_METHOD,
+
+                value.cast(TypeDef.OBJECT), // Remove any previous casts
+                defaultValue
+            ).cast(value.type());
     }
 
     /**

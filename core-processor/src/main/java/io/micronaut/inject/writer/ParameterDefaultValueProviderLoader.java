@@ -17,12 +17,12 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
-import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 
 /**
@@ -33,8 +33,6 @@ import java.util.ServiceLoader;
  */
 final class ParameterDefaultValueProviderLoader {
 
-    private static volatile @Nullable List<ParameterDefaultValueProvider> providers;
-
     private ParameterDefaultValueProviderLoader() {
     }
 
@@ -42,23 +40,7 @@ final class ParameterDefaultValueProviderLoader {
      * @return The loaded providers, in {@link io.micronaut.core.order.Ordered} order
      */
     static List<ParameterDefaultValueProvider> load() {
-        List<ParameterDefaultValueProvider> loaded = providers;
-        if (loaded == null) {
-            synchronized (ParameterDefaultValueProviderLoader.class) {
-                loaded = providers;
-                if (loaded == null) {
-                    loaded = loadServices(ParameterDefaultValueProviderLoader.class.getClassLoader());
-                    if (loaded.isEmpty()) {
-                        loaded = Collections.emptyList();
-                    } else {
-                        OrderUtil.sort(loaded);
-                        loaded = Collections.unmodifiableList(loaded);
-                    }
-                    providers = loaded;
-                }
-            }
-        }
-        return loaded;
+        return Providers.INSTANCES;
     }
 
     private static List<ParameterDefaultValueProvider> loadServices(ClassLoader classLoader) {
@@ -74,12 +56,27 @@ final class ParameterDefaultValueProviderLoader {
         while (iterator.hasNext()) {
             try {
                 found.add(iterator.next().get());
-            } catch (Throwable e) {
-                if (e instanceof VirtualMachineError virtualMachineError) {
-                    throw virtualMachineError;
-                }
+            } catch (Exception | ServiceConfigurationError e) {
+                // A broken provider on the classpath must not fail the compilation
             }
         }
         return found;
+    }
+
+    /**
+     * Initialization-on-demand holder, so the providers are loaded once, lazily and safely.
+     */
+    private static final class Providers {
+
+        private static final List<ParameterDefaultValueProvider> INSTANCES = initialize();
+
+        private static List<ParameterDefaultValueProvider> initialize() {
+            List<ParameterDefaultValueProvider> found = loadServices(ParameterDefaultValueProviderLoader.class.getClassLoader());
+            if (found.isEmpty()) {
+                return Collections.emptyList();
+            }
+            OrderUtil.sort(found);
+            return Collections.unmodifiableList(found);
+        }
     }
 }
