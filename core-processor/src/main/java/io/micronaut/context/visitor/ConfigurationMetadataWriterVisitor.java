@@ -30,6 +30,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.type.DefaultArgument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
@@ -283,10 +284,15 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                 .getBeanProperties();
             final ParameterElement[] parameters = constructor.getParameters();
             if (beanProperties.size() == parameters.length) {
-                for (int i = 0; i < parameters.length; i++) {
-                    ParameterElement parameter = parameters[i];
-                    final PropertyElement bp = beanProperties.get(i);
-                    if (CONSTRUCTOR_PARAMETERS_INJECTION_ANN.stream().noneMatch(bp::hasStereotype)) {
+                // Record component names are unique and a record cannot inherit properties,
+                // so there is exactly one bean property per constructor parameter name.
+                final Map<String, PropertyElement> propertiesByName = CollectionUtils.newHashMap(beanProperties.size());
+                for (PropertyElement beanProperty : beanProperties) {
+                    propertiesByName.put(beanProperty.getName(), beanProperty);
+                }
+                for (ParameterElement parameter : parameters) {
+                    final PropertyElement bp = propertiesByName.get(parameter.getName());
+                    if (bp == null || CONSTRUCTOR_PARAMETERS_INJECTION_ANN.stream().noneMatch(bp::hasStereotype)) {
                         processConfigurationInjectParameter(constructor.getDeclaringType(), parameter, visitorContext);
                     }
                 }
