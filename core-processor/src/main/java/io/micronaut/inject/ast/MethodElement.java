@@ -25,7 +25,6 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.inject.ast.annotation.MethodElementAnnotationsGuard;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import org.jspecify.annotations.Nullable;
@@ -39,7 +38,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -60,60 +58,18 @@ public interface MethodElement extends MemberElement {
      * <p>Implementations that support adding or removing annotations at compilation time are expected to
      * override this method and return a delegate backed by the method's own mutable annotation metadata,
      * typically built with {@link io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper}.
-     * The default returned here cannot separate the method annotations from the class annotations, so it
-     * approximates the read side with {@link #getAnnotationMetadata()} and routes the write side to
-     * {@link Element#annotate(String, java.util.function.Consumer)} and friends on this element. For an
-     * element that does not support mutation either, the resulting exception names this element rather
-     * than the delegate, and an element whose own mutators route back through this delegate is rejected
-     * rather than left to recurse.</p>
+     * Overriding it is a separate obligation from implementing
+     * {@link Element#annotate(String, java.util.function.Consumer)}: an element that supports the latter
+     * and not this one still cannot be annotated through this surface. The default returned here cannot
+     * separate the method annotations from the class annotations, so it approximates the read side with
+     * {@link #getAnnotationMetadata()} and rejects the write side with an exception that names this
+     * element.</p>
      *
      * @return The method annotation metadata
      * @since 4.0.0
      */
     default MutableAnnotationMetadataDelegate<AnnotationMetadata> getMethodAnnotationMetadata() {
-        return new MutableAnnotationMetadataDelegate<>() {
-            @Override
-            public AnnotationMetadata getAnnotationMetadata() {
-                return MethodElement.this.getAnnotationMetadata();
-            }
-
-            @Override
-            public <T extends Annotation> AnnotationMetadata annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-                return write("adding", () -> MethodElement.this.annotate(annotationType, consumer));
-            }
-
-            @Override
-            public <T extends Annotation> AnnotationMetadata annotate(AnnotationValue<T> annotationValue) {
-                return write("adding", () -> MethodElement.this.annotate(annotationValue));
-            }
-
-            @Override
-            public AnnotationMetadata removeAnnotation(String annotationType) {
-                return write("removing", () -> MethodElement.this.removeAnnotation(annotationType));
-            }
-
-            @Override
-            public <T extends Annotation> AnnotationMetadata removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
-                return write("removing", () -> MethodElement.this.removeAnnotationIf(predicate));
-            }
-
-            @Override
-            public AnnotationMetadata removeStereotype(String annotationType) {
-                return write("removing", () -> MethodElement.this.removeStereotype(annotationType));
-            }
-
-            /**
-             * An element may answer a mutation with a new instance rather than itself, so read the
-             * metadata back off whatever the mutation returned.
-             */
-            private AnnotationMetadata write(String operation, Supplier<Element> mutation) {
-                return MethodElementAnnotationsGuard.write(
-                    MethodElement.this,
-                    operation,
-                    () -> mutation.get().getAnnotationMetadata()
-                );
-            }
-        };
+        return new DefaultMethodAnnotationMetadata(this);
     }
 
     /**

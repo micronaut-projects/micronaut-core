@@ -11,27 +11,12 @@ import java.util.function.Consumer
 
 /**
  * Covers the default {@link MethodElement#getMethodAnnotationMetadata()}, which every shipped language
- * module overrides but third party and synthetic elements inherit.
+ * module overrides but third party and synthetic elements inherit. The default does not support mutation;
+ * what matters is that saying so names the element at fault rather than the delegate.
  */
 class MethodElementAnnotationMetadataDefaultSpec extends Specification {
 
-    void "the default method annotation metadata writes through to an element that supports annotating"() {
-        given:
-        def element = new MutableTestMethodElement()
-
-        when:
-        element.getMethodAnnotationMetadata().annotate("example.ByName") { AnnotationValueBuilder builder ->
-            builder.member("name", "foo")
-        }
-        element.getMethodAnnotationMetadata().annotate(AnnotationValue.builder("example.ByValue").build())
-
-        then:
-        element.annotationMetadata.hasDeclaredAnnotation("example.ByName")
-        element.annotationMetadata.stringValue("example.ByName", "name").get() == "foo"
-        element.annotationMetadata.hasDeclaredAnnotation("example.ByValue")
-    }
-
-    void "an element that cannot be annotated reports itself rather than the delegate"() {
+    void "an element that cannot be annotated at all reports itself rather than the delegate"() {
         given:
         def element = MethodElement.of(
             ClassElement.of("example.Bean"),
@@ -50,29 +35,43 @@ class MethodElementAnnotationMetadataDefaultSpec extends Specification {
         e.message.contains(element.getClass().name)
     }
 
-    void "an element whose own mutators route back through the delegate is rejected rather than left to recurse"() {
-        given:
-        def element = new CircularTestMethodElement()
+    void "an element that supports Element.annotate but not the override still reports itself"() {
+        given: "the shape that sent the original investigation at Core rather than at the element"
+        def element = new MutableTestMethodElement()
 
         when:
         element.getMethodAnnotationMetadata().annotate("example.ByName")
 
-        then:
+        then: "the two surfaces are independent, and the message names the element that did not override"
         def e = thrown(UnsupportedOperationException)
-        e.message.contains("route back through getMethodAnnotationMetadata()")
-        e.message.contains(CircularTestMethodElement.name)
+        e.message.contains(MutableTestMethodElement.name)
+        !e.message.contains('$1')
+
+        and: "the surface it does implement is unaffected"
+        element.annotate("example.ByName")
+        element.annotationMetadata.hasDeclaredAnnotation("example.ByName")
     }
 
-    void "the delegate reads the annotation metadata back off whatever the mutation returned"() {
+    void "removing through the default also names the element"() {
         given:
-        def element = new CopyOnWriteTestMethodElement()
+        def element = new MutableTestMethodElement()
 
         when:
-        def metadata = element.getMethodAnnotationMetadata().annotate("example.ByName")
+        element.getMethodAnnotationMetadata().removeAnnotation("example.ByName")
 
-        then: "the original is untouched and the returned metadata is the copy's"
-        !element.annotationMetadata.hasDeclaredAnnotation("example.ByName")
-        metadata.hasDeclaredAnnotation("example.ByName")
+        then:
+        def e = thrown(UnsupportedOperationException)
+        e.message.contains("does not support removing annotations at compilation time")
+        e.message.contains(MutableTestMethodElement.name)
+    }
+
+    void "the read side is the element's annotation metadata"() {
+        given:
+        def element = new MutableTestMethodElement()
+        element.annotate("example.ByName")
+
+        expect:
+        element.getMethodAnnotationMetadata().hasDeclaredAnnotation("example.ByName")
     }
 
     /**
@@ -140,34 +139,6 @@ class MethodElementAnnotationMetadataDefaultSpec extends Specification {
         <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
             annotationMetadata.addDeclaredAnnotation(annotationValue.annotationName, annotationValue.values)
             this
-        }
-    }
-
-    /**
-     * A method element that implements {@link Element#annotate} in terms of the very delegate that routes
-     * back to it. Nonsensical, but it used to fail with an exception rather than a {@link StackOverflowError}.
-     */
-    private static class CircularTestMethodElement extends MutableTestMethodElement {
-
-        @Override
-        <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-            getMethodAnnotationMetadata().annotate(annotationType, consumer)
-            this
-        }
-    }
-
-    /**
-     * A method element that answers a mutation with a new instance rather than mutating itself.
-     */
-    private static class CopyOnWriteTestMethodElement extends MutableTestMethodElement {
-
-        @Override
-        <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-            def copy = new CopyOnWriteTestMethodElement()
-            AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType)
-            consumer.accept(builder)
-            copy.annotationMetadata.addDeclaredAnnotation(annotationType, builder.build().values)
-            copy
         }
     }
 }
