@@ -45,29 +45,6 @@ final class ParameterDefaultValueProviderLoader {
         return Providers.INSTANCES;
     }
 
-    private static List<ParameterDefaultValueProvider> loadServices(ClassLoader classLoader) {
-        // Both registration formats are read, as a language module may use either
-        List<ParameterDefaultValueProvider> found = new ArrayList<>(
-            SoftServiceLoader.load(ParameterDefaultValueProvider.class, classLoader)
-                .disableFork()
-                .collectAll()
-        );
-        Set<Class<?>> seen = found.stream().map(Object::getClass).collect(Collectors.toSet());
-        Iterator<ServiceLoader.Provider<ParameterDefaultValueProvider>> iterator =
-            ServiceLoader.load(ParameterDefaultValueProvider.class, classLoader).stream().iterator();
-        while (iterator.hasNext()) {
-            try {
-                ParameterDefaultValueProvider provider = iterator.next().get();
-                if (seen.add(provider.getClass())) {
-                    found.add(provider);
-                }
-            } catch (Exception | ServiceConfigurationError e) {
-                // A broken provider on the classpath must not fail the compilation
-            }
-        }
-        return found;
-    }
-
     /**
      * Initialization-on-demand holder, so the providers are loaded once, lazily and safely.
      */
@@ -82,6 +59,29 @@ final class ParameterDefaultValueProviderLoader {
             }
             OrderUtil.sort(found);
             return Collections.unmodifiableList(found);
+        }
+
+        private static List<ParameterDefaultValueProvider> loadServices(ClassLoader classLoader) {
+            // Both registration formats are read, as a language module may use either
+            List<ParameterDefaultValueProvider> found = new ArrayList<>(
+                SoftServiceLoader.load(ParameterDefaultValueProvider.class, classLoader)
+                    .disableFork()
+                    .collectAll()
+            );
+            Set<Class<?>> seen = found.stream().map(Object::getClass).collect(Collectors.toSet());
+            Iterator<ServiceLoader.Provider<ParameterDefaultValueProvider>> iterator =
+                ServiceLoader.load(ParameterDefaultValueProvider.class, classLoader).stream().iterator();
+            while (iterator.hasNext()) {
+                try {
+                    ParameterDefaultValueProvider provider = iterator.next().get();
+                    if (seen.add(provider.getClass())) {
+                        found.add(provider);
+                    }
+                } catch (Exception | ServiceConfigurationError e) {
+                    // A broken provider on the classpath must not fail the compilation
+                }
+            }
+            return found;
         }
     }
 }
