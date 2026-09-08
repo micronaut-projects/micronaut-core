@@ -30,6 +30,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.type.DefaultArgument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
@@ -52,7 +53,6 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -284,9 +284,11 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                 .getBeanProperties();
             final ParameterElement[] parameters = constructor.getParameters();
             if (beanProperties.size() == parameters.length) {
-                final Map<String, PropertyElement> propertiesByName = new HashMap<>(beanProperties.size());
+                // Record component names are unique and a record cannot inherit properties,
+                // so there is exactly one bean property per constructor parameter name.
+                final Map<String, PropertyElement> propertiesByName = CollectionUtils.newHashMap(beanProperties.size());
                 for (PropertyElement beanProperty : beanProperties) {
-                    propertiesByName.putIfAbsent(beanProperty.getName(), beanProperty);
+                    propertiesByName.put(beanProperty.getName(), beanProperty);
                 }
                 for (ParameterElement parameter : parameters) {
                     final PropertyElement bp = propertiesByName.get(parameter.getName());

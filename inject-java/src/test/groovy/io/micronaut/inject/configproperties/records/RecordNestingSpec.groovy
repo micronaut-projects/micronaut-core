@@ -53,6 +53,12 @@ record RecordOuterConfig(
         config.inners()[0].thirdLevel().num() == 40
     }
 
+    // General coverage for @EachProperty records whose @Parameter component is not
+    // alphabetically first. This is NOT a regression guard for #12658: that bug only
+    // manifests under Eclipse JDT, whose TypeElement.getEnclosedElements() is alphabetical,
+    // while this suite compiles with javac, which returns declaration order and so always
+    // lines the bean properties up with the constructor parameters. Reproducing the failure
+    // automatically would require an ECJ-backed compilation path.
     void "test EachProperty record where @Parameter field is not alphabetically first"() {
         given:
         def context = buildContext('test.UnorderedConfig', '''
