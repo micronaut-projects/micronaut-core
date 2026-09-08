@@ -24,6 +24,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanContextConditional;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
@@ -32,8 +33,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -196,19 +197,19 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
 
     /**
      * A new builder for constructing and configuring runtime created beans where the bean factory
-     * receives the current {@link BeanResolutionContext}.
+     * receives the {@link CreationContext} of each creation.
      *
-     * <p>The resolution context allows the factory to introspect where in a resolution the bean is being
-     * created, for example via {@link BeanResolutionContext#getPath()} to discover the injection point
-     * the bean is being created for.</p>
+     * <p>The creation context carries the beans resolved for the injection points declared with
+     * {@link Builder#injectionPoint(Argument)} and the injection point the bean is being created for.</p>
      *
      * @param beanType The bean type
-     * @param beanFactory The bean factory that receives the current {@link BeanResolutionContext}
+     * @param beanFactory The bean factory that receives the {@link CreationContext}
      * @return The builder
      * @param <B> The bean type
      * @since 5.2.0
      */
-    static <B> Builder<B> builder(Class<B> beanType, Function<BeanResolutionContext, B> beanFactory) {
+    @Experimental
+    static <B> Builder<B> builder(Class<B> beanType, Function<CreationContext, B> beanFactory) {
         return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
             Argument.of(beanType),
             beanFactory
@@ -217,19 +218,19 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
 
     /**
      * A new builder for constructing and configuring runtime created beans where the bean factory
-     * receives the current {@link BeanResolutionContext}.
+     * receives the {@link CreationContext} of each creation.
      *
-     * <p>The resolution context allows the factory to introspect where in a resolution the bean is being
-     * created, for example via {@link BeanResolutionContext#getPath()} to discover the injection point
-     * the bean is being created for.</p>
+     * <p>The creation context carries the beans resolved for the injection points declared with
+     * {@link Builder#injectionPoint(Argument)} and the injection point the bean is being created for.</p>
      *
      * @param beanType The bean type
-     * @param beanFactory The bean factory that receives the current {@link BeanResolutionContext}
+     * @param beanFactory The bean factory that receives the {@link CreationContext}
      * @return The builder
      * @param <B> The bean type
      * @since 5.2.0
      */
-    static <B> Builder<B> builder(Argument<B> beanType, Function<BeanResolutionContext, B> beanFactory) {
+    @Experimental
+    static <B> Builder<B> builder(Argument<B> beanType, Function<CreationContext, B> beanFactory) {
         return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
             beanType,
             beanFactory
@@ -237,65 +238,49 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
     }
 
     /**
-     * A new builder for constructing and configuring runtime created beans where the bean factory
-     * receives the beans resolved for the injection points declared with
-     * {@link Builder#injectionPoint(Argument)}.
+     * The context of a single creation of a bean built at runtime, passed to the bean factory of a definition
+     * built with {@link #builder(Argument, Function)}.
      *
-     * @param beanType The bean type
-     * @param beanFactory The bean factory that receives the current {@link BeanResolutionContext} and the
-     *                    resolved injections
-     * @return The builder
-     * @param <B> The bean type
-     * @since 5.2.0
-     */
-    static <B> Builder<B> builder(Class<B> beanType, BiFunction<BeanResolutionContext, Injections, B> beanFactory) {
-        return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
-            Argument.of(beanType),
-            beanFactory
-        );
-    }
-
-    /**
-     * A new builder for constructing and configuring runtime created beans where the bean factory
-     * receives the beans resolved for the injection points declared with
-     * {@link Builder#injectionPoint(Argument)}.
+     * <p>It carries the beans resolved for the injection points the definition declared with
+     * {@link Builder#injectionPoint(Argument)}, the injection point the bean is being created for, and the
+     * {@link BeanContext} to look anything else up in.</p>
      *
-     * @param beanType The bean type
-     * @param beanFactory The bean factory that receives the current {@link BeanResolutionContext} and the
-     *                    resolved injections
-     * @return The builder
-     * @param <B> The bean type
-     * @since 5.2.0
-     */
-    static <B> Builder<B> builder(Argument<B> beanType, BiFunction<BeanResolutionContext, Injections, B> beanFactory) {
-        return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
-            beanType,
-            beanFactory
-        );
-    }
-
-    /**
-     * The beans resolved for the injection points a {@link RuntimeBeanDefinition} declared with
-     * {@link Builder#injectionPoint(Argument)} and {@link Builder#injectionPoint(Argument, Qualifier)}.
-     *
-     * <p>An instance is passed to the bean factory of a definition built with
-     * {@link #builder(Argument, BiFunction)} each time the bean is created. The beans it holds were resolved
-     * through the {@link BeanResolutionContext} of that creation, so any of them that is a dependent object
-     * (a {@code @Prototype} or {@code @Dependent} bean, for example) is a dependent of the created bean and is
-     * destroyed with it.</p>
+     * <p>The injected beans were resolved through the resolution context of this creation, so any of them that
+     * is a dependent object (a {@code @Prototype} or {@code @Dependent} bean, for example) is a dependent of the
+     * created bean and is destroyed with it. The exception is a bean obtained from
+     * {@link BeanContext#createBean(Class)}, which records no dependents for any bean, runtime built or
+     * compiled.</p>
      *
      * @since 5.2.0
      */
-    interface Injections {
+    @Experimental
+    interface CreationContext {
 
         /**
-         * @return The number of declared injection points
+         * @return The bean context creating the bean
          */
-        int size();
+        BeanContext getBeanContext();
 
         /**
-         * The bean resolved for the injection point at the given index, in the order the injection points
-         * were declared on the builder.
+         * The injection point the bean is being created for.
+         *
+         * <p>For a constructor or method argument this is an
+         * {@link io.micronaut.inject.ArgumentInjectionPoint}, which exposes the argument and the bean that
+         * declares it. It is empty when the bean is not being created for an injection point, as it is for a
+         * direct {@link BeanContext#getBean(Class)} lookup.</p>
+         *
+         * @return The injection point, or empty if there is none
+         */
+        Optional<InjectionPoint<?>> getInjectionPoint();
+
+        /**
+         * @return The number of injection points the definition declared
+         */
+        int getInjectedBeanCount();
+
+        /**
+         * The bean resolved for the injection point at the given index, in the order the injection points were
+         * declared on the builder.
          *
          * @param index The index
          * @return The resolved bean, which is {@code null} only when the injection point was declared with a
@@ -303,7 +288,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @param <V> The injected type
          * @throws IndexOutOfBoundsException If the index is out of range
          */
-        <V> @Nullable V get(int index);
+        <V> @Nullable V getInjectedBean(int index);
 
         /**
          * The bean resolved for the injection point declared with the given type and no qualifier.
@@ -314,8 +299,8 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @param <V> The injected type
          * @throws IllegalArgumentException If no such injection point was declared
          */
-        default <V> @Nullable V get(Argument<V> type) {
-            return get(type, null);
+        default <V> @Nullable V getInjectedBean(Argument<V> type) {
+            return getInjectedBean(type, null);
         }
 
         /**
@@ -328,7 +313,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @param <V> The injected type
          * @throws IllegalArgumentException If no such injection point was declared
          */
-        <V> @Nullable V get(Argument<V> type, @Nullable Qualifier<V> qualifier);
+        <V> @Nullable V getInjectedBean(Argument<V> type, @Nullable Qualifier<V> qualifier);
     }
 
     /**
@@ -412,9 +397,9 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
         /**
          * Declares an injection point of this bean.
          *
-         * <p>The declared injection points are resolved through the {@link BeanResolutionContext} of the bean
-         * creation, in the order they were declared, and are handed to the bean factory of a definition built
-         * with {@link RuntimeBeanDefinition#builder(Argument, BiFunction)} as {@link Injections}. Resolving them
+         * <p>The declared injection points are resolved through the resolution context of the bean creation,
+         * in the order they were declared, and are handed to the bean factory of a definition built
+         * with {@link RuntimeBeanDefinition#builder(Argument, Function)} as its {@link CreationContext}. Resolving them
          * this way is what makes core's own dependency handling apply to a runtime built bean: a dependent object
          * resolved for an injection point becomes a dependent of the created bean and is destroyed with it,
          * a circular dependency is detected, and an unsatisfied injection point fails the creation with the usual
@@ -431,6 +416,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @return This builder
          * @since 5.2.0
          */
+        @Experimental
         default Builder<B> injectionPoint(Argument<?> type) {
             return injectionPoint(type, null);
         }
@@ -444,6 +430,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @see #injectionPoint(Argument)
          * @since 5.2.0
          */
+        @Experimental
         Builder<B> injectionPoint(Argument<?> type, @Nullable Qualifier<?> qualifier);
 
         /**

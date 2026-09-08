@@ -2,7 +2,6 @@ package io.micronaut.inject.beans
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanRegistration
-import io.micronaut.context.BeanResolutionContext
 import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.type.Argument
@@ -12,12 +11,12 @@ import io.micronaut.inject.beans.injectionpoints.DisposableSingletonDependency
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
-import java.util.function.BiFunction
+import java.util.function.Function
 
 class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
 
     private static RuntimeBeanDefinition.Builder<Holder> holderBuilder(
-            BiFunction<BeanResolutionContext, RuntimeBeanDefinition.Injections, Holder> factory) {
+            Function<RuntimeBeanDefinition.CreationContext, Holder> factory) {
         RuntimeBeanDefinition.builder(Holder, factory)
     }
 
@@ -25,7 +24,7 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
         given:
         def context = ApplicationContext.builder()
                 .beanDefinitions(
-                        holderBuilder((ctx, injections) -> new Holder(injections.get(0)))
+                        holderBuilder(ctx -> new Holder(ctx.getInjectedBean(0)))
                                 .injectionPoint(Argument.of(DisposableSingletonDependency))
                                 .singleton(true)
                                 .build()
@@ -44,7 +43,7 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
         given:
         def context = ApplicationContext.builder()
                 .beanDefinitions(
-                        holderBuilder((ctx, injections) -> new Holder(injections.get(0)))
+                        holderBuilder(ctx -> new Holder(ctx.getInjectedBean(0)))
                                 .injectionPoint(Argument.of(DisposableDependency))
                                 .scope(Prototype)
                                 .build()
@@ -74,7 +73,7 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
         given:
         def context = ApplicationContext.builder()
                 .beanDefinitions(
-                        holderBuilder((ctx, injections) -> new Holder(injections.get(0)))
+                        holderBuilder(ctx -> new Holder(ctx.getInjectedBean(0)))
                                 .injectionPoint(Argument.of(DisposableDependency))
                                 .singleton(true)
                                 .build()
@@ -98,7 +97,7 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
         given:
         def context = ApplicationContext.builder()
                 .beanDefinitions(
-                        holderBuilder((ctx, injections) -> new Holder(injections.get(0)))
+                        holderBuilder(ctx -> new Holder(ctx.getInjectedBean(0)))
                                 .injectionPoint(Argument.of(DisposableSingletonDependency))
                                 .scope(Prototype)
                                 .build()
@@ -125,8 +124,8 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
         given:
         def context = ApplicationContext.builder()
                 .beanDefinitions(
-                        holderBuilder((ctx, injections) ->
-                                new Holder(injections.get(Argument.of(Colour), Qualifiers.byName("green"))))
+                        holderBuilder(ctx ->
+                                new Holder(ctx.getInjectedBean(Argument.of(Colour), Qualifiers.byName("green"))))
                                 .injectionPoint(Argument.of(Colour), Qualifiers.byName("green"))
                                 .singleton(true)
                                 .build()

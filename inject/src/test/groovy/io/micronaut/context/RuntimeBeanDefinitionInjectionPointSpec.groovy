@@ -7,7 +7,7 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
-import java.util.function.BiFunction
+import java.util.function.Function
 
 class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
 
@@ -18,7 +18,7 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
     }
 
     private static RuntimeBeanDefinition.Builder<Bar> barBuilder(
-            BiFunction<BeanResolutionContext, RuntimeBeanDefinition.Injections, Bar> factory) {
+            Function<RuntimeBeanDefinition.CreationContext, Bar> factory) {
         RuntimeBeanDefinition.builder(Bar, factory)
     }
 
@@ -27,7 +27,7 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
         def context = ApplicationContext.builder()
                 .beanDefinitions(
                         RuntimeBeanDefinition.builder(Foo, () -> new Foo("one")).singleton(true).build(),
-                        barBuilder((ctx, injections) -> new Bar(injections.get(0) as Foo))
+                        barBuilder(ctx -> new Bar(ctx.getInjectedBean(0) as Foo))
                                 .injectionPoint(Argument.of(Foo))
                                 .singleton(true)
                                 .build()
@@ -51,7 +51,7 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
         def context = ApplicationContext.builder()
                 .beanDefinitions(
                         RuntimeBeanDefinition.builder(Foo, () -> new Foo("one")).singleton(true).build(),
-                        barBuilder((ctx, injections) -> new Bar(injections.get(Argument.of(Foo))))
+                        barBuilder(ctx -> new Bar(ctx.getInjectedBean(Argument.of(Foo))))
                                 .injectionPoint(Argument.of(Foo))
                                 .singleton(true)
                                 .build()
@@ -72,8 +72,8 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
                 .beanDefinitions(
                         RuntimeBeanDefinition.builder(Foo, () -> new Foo("one")).named("one").singleton(true).build(),
                         RuntimeBeanDefinition.builder(Foo, () -> new Foo("two")).named("two").singleton(true).build(),
-                        barBuilder((ctx, injections) ->
-                                new Bar(injections.get(Argument.of(Foo), Qualifiers.byName("two"))))
+                        barBuilder(ctx ->
+                                new Bar(ctx.getInjectedBean(Argument.of(Foo), Qualifiers.byName("two"))))
                                 .injectionPoint(Argument.of(Foo), Qualifiers.byName("two"))
                                 .singleton(true)
                                 .build()
@@ -94,10 +94,10 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
                 .beanDefinitions(
                         RuntimeBeanDefinition.builder(Foo, () -> new Foo("one")).named("one").singleton(true).build(),
                         RuntimeBeanDefinition.builder(Foo, () -> new Foo("two")).named("two").singleton(true).build(),
-                        barBuilder((ctx, injections) -> {
-                            def created = new Bar(injections.get(0) as Foo)
-                            created.second = injections.get(1) as Foo
-                            created.size = injections.size()
+                        barBuilder(ctx -> {
+                            def created = new Bar(ctx.getInjectedBean(0) as Foo)
+                            created.second = ctx.getInjectedBean(1) as Foo
+                            created.size = ctx.getInjectedBeanCount()
                             created
                         })
                                 .injectionPoint(Argument.of(Foo), Qualifiers.byName("two"))
@@ -124,7 +124,7 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
         given:
         def context = ApplicationContext.builder()
                 .beanDefinitions(
-                        barBuilder((ctx, injections) -> new Bar(injections.get(0) as Foo))
+                        barBuilder(ctx -> new Bar(ctx.getInjectedBean(0) as Foo))
                                 .injectionPoint(Argument.of(Foo, "foo"))
                                 .singleton(true)
                                 .build()
@@ -148,7 +148,7 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
         given:
         def context = ApplicationContext.builder()
                 .beanDefinitions(
-                        barBuilder((ctx, injections) -> new Bar(injections.get(0) as Foo))
+                        barBuilder(ctx -> new Bar(ctx.getInjectedBean(0) as Foo))
                                 .injectionPoint(Argument.of(Foo, "foo", nullableMetadata()))
                                 .singleton(true)
                                 .build()
@@ -165,7 +165,7 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
 
     void 'test the declared injection points describe the bean dependencies'() {
         given:
-        RuntimeBeanDefinition<Bar> definition = barBuilder((ctx, injections) -> new Bar(injections.get(0) as Foo))
+        RuntimeBeanDefinition<Bar> definition = barBuilder(ctx -> new Bar(ctx.getInjectedBean(0) as Foo))
                 .injectionPoint(Argument.of(Foo, "foo"), Qualifiers.byName("one"))
                 .build()
 
@@ -190,7 +190,7 @@ class RuntimeBeanDefinitionInjectionPointSpec extends Specification {
         def context = ApplicationContext.builder()
                 .beanDefinitions(
                         RuntimeBeanDefinition.builder(Foo, () -> new Foo("one")).singleton(true).build(),
-                        barBuilder((ctx, injections) -> new Bar(injections.get(Argument.of(Foo), Qualifiers.byName("nope"))))
+                        barBuilder(ctx -> new Bar(ctx.getInjectedBean(Argument.of(Foo), Qualifiers.byName("nope"))))
                                 .injectionPoint(Argument.of(Foo))
                                 .singleton(true)
                                 .build()

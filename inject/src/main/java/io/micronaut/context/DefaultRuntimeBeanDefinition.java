@@ -31,6 +31,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ConstructorInjectionPoint;
+import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.qualifiers.ClosestTypeArgumentQualifier;
@@ -51,7 +52,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -71,7 +71,7 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
     private static final String MSG_BEAN_TYPE_CANNOT_BE_NULL = "Bean type cannot be null";
     private static final InjectionPointSpec[] NO_INJECTION_POINTS = new InjectionPointSpec[0];
     private final Argument<T> beanType;
-    private final BiFunction<BeanResolutionContext, RuntimeBeanDefinition.Injections, T> beanFactory;
+    private final Function<RuntimeBeanDefinition.CreationContext, T> beanFactory;
     private final InjectionPointSpec[] injectionPoints;
     private final AnnotationMetadata annotationMetadata;
     private final String beanName;
@@ -86,7 +86,7 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
     private final int order;
 
     DefaultRuntimeBeanDefinition(Argument<T> beanType,
-                                 BiFunction<BeanResolutionContext, RuntimeBeanDefinition.Injections, T> beanFactory,
+                                 Function<RuntimeBeanDefinition.CreationContext, T> beanFactory,
                                  @Nullable Qualifier<T> qualifier,
                                  @Nullable AnnotationMetadata annotationMetadata,
                                  boolean isSingleton,
@@ -265,14 +265,16 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
 
     @Override
     public T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
+        Object[] resolved;
         if (injectionPoints.length == 0) {
-            return beanFactory.apply(resolutionContext, ResolvedInjections.EMPTY);
+            resolved = ArrayUtils.EMPTY_OBJECT_ARRAY;
+        } else {
+            resolved = new Object[injectionPoints.length];
+            for (int i = 0; i < injectionPoints.length; i++) {
+                resolved[i] = resolveInjectionPoint(resolutionContext, injectionPoints[i]);
+            }
         }
-        Object[] resolved = new Object[injectionPoints.length];
-        for (int i = 0; i < injectionPoints.length; i++) {
-            resolved[i] = resolveInjectionPoint(resolutionContext, injectionPoints[i]);
-        }
-        return beanFactory.apply(resolutionContext, new ResolvedInjections(injectionPoints, resolved));
+        return beanFactory.apply(new DefaultCreationContext(resolutionContext, resolved));
     }
 
     /**
@@ -343,26 +345,43 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
     }
 
     /**
-     * Implementation of {@link RuntimeBeanDefinition.Injections} over the declared injection points and the
-     * beans resolved for them.
+     * Implementation of {@link RuntimeBeanDefinition.CreationContext} over the resolution context of one
+     * creation and the beans resolved for the declared injection points.
      */
-    private record ResolvedInjections(InjectionPointSpec[] injectionPoints, Object[] resolved)
-        implements RuntimeBeanDefinition.Injections {
+    private final class DefaultCreationContext implements RuntimeBeanDefinition.CreationContext {
+        private final BeanResolutionContext resolutionContext;
+        private final Object[] resolved;
 
-        static final RuntimeBeanDefinition.Injections EMPTY = new ResolvedInjections(NO_INJECTION_POINTS, ArrayUtils.EMPTY_OBJECT_ARRAY);
+        DefaultCreationContext(BeanResolutionContext resolutionContext, Object[] resolved) {
+            this.resolutionContext = resolutionContext;
+            this.resolved = resolved;
+        }
 
         @Override
-        public int size() {
+        public BeanContext getBeanContext() {
+            return resolutionContext.getContext();
+        }
+
+        @Override
+        public Optional<InjectionPoint<?>> getInjectionPoint() {
+            return resolutionContext.getPath().currentSegment()
+                // the segment of a top level lookup is the creation of this bean itself, not an injection point
+                .filter(segment -> segment.getDeclaringType() != DefaultRuntimeBeanDefinition.this)
+                .map(BeanResolutionContext.Segment::getInjectionPoint);
+        }
+
+        @Override
+        public int getInjectedBeanCount() {
             return resolved.length;
         }
 
         @Override
-        public <V> V get(int index) {
+        public <V> V getInjectedBean(int index) {
             return (V) resolved[index];
         }
 
         @Override
-        public <V> V get(Argument<V> type, @Nullable Qualifier<V> qualifier) {
+        public <V> V getInjectedBean(Argument<V> type, @Nullable Qualifier<V> qualifier) {
             Objects.requireNonNull(type, "Injection point type cannot be null");
             for (int i = 0; i < injectionPoints.length; i++) {
                 if (injectionPoints[i].matches(type, qualifier)) {
@@ -390,7 +409,7 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
         private final BiConsumer<BeanContext, T> disposer;
 
         Disposable(Argument<T> beanType,
-                   BiFunction<BeanResolutionContext, RuntimeBeanDefinition.Injections, T> beanFactory,
+                   Function<RuntimeBeanDefinition.CreationContext, T> beanFactory,
                    @Nullable Qualifier<T> qualifier,
                    @Nullable AnnotationMetadata annotationMetadata,
                    boolean isSingleton,
@@ -421,7 +440,7 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
      */
     static final class RuntimeBeanBuilder<B> implements RuntimeBeanDefinition.Builder<B> {
         private Argument<B> beanType;
-        private final BiFunction<BeanResolutionContext, RuntimeBeanDefinition.Injections, B> beanFactory;
+        private final Function<RuntimeBeanDefinition.CreationContext, B> beanFactory;
         private final List<InjectionPointSpec> injectionPoints = new ArrayList<>(3);
         @Nullable
         private Qualifier<B> qualifier;
@@ -441,18 +460,11 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
         RuntimeBeanBuilder(Argument<B> beanType, Supplier<B> supplier) {
             this.beanType = Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
             Objects.requireNonNull(supplier, "Bean supplier cannot be null");
-            this.beanFactory = (resolutionContext, injections) -> supplier.get();
+            this.beanFactory = creationContext -> supplier.get();
             this.annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
         }
 
-        RuntimeBeanBuilder(Argument<B> beanType, Function<BeanResolutionContext, B> beanFactory) {
-            this.beanType = Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
-            Objects.requireNonNull(beanFactory, "Bean factory cannot be null");
-            this.beanFactory = (resolutionContext, injections) -> beanFactory.apply(resolutionContext);
-            this.annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
-        }
-
-        RuntimeBeanBuilder(Argument<B> beanType, BiFunction<BeanResolutionContext, RuntimeBeanDefinition.Injections, B> beanFactory) {
+        RuntimeBeanBuilder(Argument<B> beanType, Function<RuntimeBeanDefinition.CreationContext, B> beanFactory) {
             this.beanType = Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
             this.beanFactory = Objects.requireNonNull(beanFactory, "Bean factory cannot be null");
             this.annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
