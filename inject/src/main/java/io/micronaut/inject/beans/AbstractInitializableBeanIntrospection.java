@@ -981,6 +981,35 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         return beanType;
     }
 
+    /**
+     * The type arguments this bean binds in each of its super types, keyed by the super type name. The generated
+     * subclass overrides this when the bean binds at least one type argument somewhere in its hierarchy.
+     *
+     * @return The map of super type name to bound arguments, or {@code null} if the bean binds none
+     * @since 5.2.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected @Nullable Map<String, Argument<?>[]> getTypeArgumentsMap() {
+        return null;
+    }
+
+    @Override
+    public final List<Argument<?>> getTypeArguments(@Nullable String type) {
+        if (type == null) {
+            return Collections.emptyList();
+        }
+        Map<String, Argument<?>[]> typeArgumentsMap = getTypeArgumentsMap();
+        if (typeArgumentsMap == null) {
+            return Collections.emptyList();
+        }
+        Argument<?>[] arguments = typeArgumentsMap.get(type);
+        if (arguments == null) {
+            return Collections.emptyList();
+        }
+        return Arrays.asList(arguments);
+    }
+
     @Override
     public Collection<BeanMethod<B, Object>> getBeanMethods() {
         return beanMethodsList;

@@ -375,7 +375,7 @@ public final class ArgumentExpUtils {
      * @param loadClassValueExpressionFn     The load type expression fn
      * @return The expression
      */
-    static ExpressionDef pushTypeArgumentElements(
+    public static ExpressionDef pushTypeArgumentElements(
         AnnotationMetadata annotationMetadataWithDefaults,
         ClassTypeDef owningType,
         ClassElement declaringType,

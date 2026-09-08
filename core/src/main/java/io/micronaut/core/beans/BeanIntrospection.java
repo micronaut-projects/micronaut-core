@@ -192,6 +192,48 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
     }
 
     /**
+     * If the bean itself declares any type arguments this method will return the arguments that represent those
+     * types.
+     *
+     * <p>Note this returns the type arguments the bean type <em>declares</em>, not the arguments it binds in a
+     * super type. Use {@link #getTypeArguments(Class)} for the latter.</p>
+     *
+     * @return The type arguments
+     * @since 5.2.0
+     */
+    default List<Argument<?>> getTypeArguments() {
+        return getTypeArguments(getBeanType());
+    }
+
+    /**
+     * Return the type arguments this bean binds in the given interface or super type.
+     *
+     * <p>For example a type declared as {@code class Foo implements Function<String, Integer>} answers
+     * {@code [String T, Integer R]} for {@code Function.class}.</p>
+     *
+     * @param type The super class or interface type
+     * @return The type arguments, never {@code null}
+     * @since 5.2.0
+     */
+    default List<Argument<?>> getTypeArguments(@Nullable Class<?> type) {
+        if (type == null) {
+            return Collections.emptyList();
+        }
+        return getTypeArguments(type.getName());
+    }
+
+    /**
+     * Return the type arguments this bean binds in the given interface or super type.
+     *
+     * @param type The super class or interface type name
+     * @return The type arguments, never {@code null}
+     * @since 5.2.0
+     */
+    default List<Argument<?>> getTypeArguments(@Nullable String type) {
+        return Collections.emptyList();
+    }
+
+    /**
      * Obtain a property by name.
      *
      * @param name The name of the property
