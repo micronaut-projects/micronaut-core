@@ -101,6 +101,8 @@ import io.micronaut.python.processing.util.ObjectHelper;
 public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     public static final TypeDef POLYGLOT_VALUE = TypeDef.of(Value.class);
+
+    private static final String MEMBER_PRE_DESTROY = "preDestroy";
     public static final TypeDef POLYGLOT_CONTEXT = TypeDef.of(Context.class);
     public static final VariableDef.StaticField CLASS_OBJECT = ClassTypeDef.of(Object.class).getStaticField("class", TypeDef.CLASS);
     public static final String AS_POLYGLOT_VALUE = "asPolyglotValue";
@@ -619,6 +621,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(methodElement.hasDeclaredAnnotation(JUNIT_TEST)), builder, context, addedMethodNames);
         }
+        // A class can name its own pre-destroy callback with @Bean(preDestroy), the class-level counterpart of the
+        // factory case handled in addBridgeMethod. The generated bean definition invokes the callback directly on the
+        // stub, so it needs a bridge even though it carries no annotation of its own. A name that resolves to nothing
+        // is reported by DeclaredBeanElementCreator.
+        element.stringValue(Bean.class, MEMBER_PRE_DESTROY)
+            .filter(name -> !name.isEmpty())
+            .flatMap(name -> element.getEnclosedElement(
+                ElementQuery.ALL_METHODS
+                    .onlyAccessible()
+                    .onlyInstance()
+                    .named(name)
+                    .filter(method -> !method.hasParameters())))
+            .ifPresent(method -> addBridgeMethod(BridgeMethodSpec.of(method, element), builder, context, addedMethodNames));
         if (hasIntroductionAdviceMethod) {
             List<MethodElement> concreteDeclaredMethods = element.getEnclosedElements(
                 ElementQuery.ALL_METHODS
@@ -2704,7 +2719,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     "    def foo(self) -> Foo:");
             }
 
-            String preDestroy = methodElement.stringValue(Bean.class, "preDestroy").orElse(null);
+            String preDestroy = methodElement.stringValue(Bean.class, MEMBER_PRE_DESTROY).orElse(null);
             if (preDestroy != null && genericReturnType instanceof AbstractPythonClassElement) {
                 StubEntry stubEntry = this.classBuilders.get(genericReturnType.getName());
                 if (stubEntry != null) {
