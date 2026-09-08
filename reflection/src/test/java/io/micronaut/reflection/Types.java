@@ -23,4 +23,10 @@ public class Types {
     public <T> T identity(T value) {
         return value;
     }
+
+    public <T extends Comparable<String> & Cloneable> void several(T value, List<T> inside) {
+    }
+
+    public <T extends Comparable<T>> void recursive(T value) {
+    }
 }

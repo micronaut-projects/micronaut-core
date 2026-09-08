@@ -15,6 +15,9 @@
  */
 package io.micronaut.core.type;
 
+import io.micronaut.core.annotation.Experimental;
+
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -26,6 +29,27 @@ import java.util.Objects;
  * @since 3.2.0
  */
 public interface GenericPlaceholder<T> extends Argument<T> {
+
+    /**
+     * The bounds declared for the type variable this placeholder stands for: the {@code Payment} and
+     * {@code Refundable} of {@code <T extends Payment & Refundable>}.
+     *
+     * <p>The annotation processors compile a type variable to an argument of the type it erases to, so
+     * {@link #getType()} stays the first bound, or the type the variable was resolved to; the bounds are kept
+     * alongside, the way {@link java.lang.reflect.TypeVariable#getBounds()} reports them: a variable that
+     * declares no bound is bounded by {@code Object}. They are not considered by {@link #equals(Object)},
+     * {@link #equalsType(Argument)} or {@link #typeHashCode()}.</p>
+     *
+     * <p>A placeholder that carries no recorded bounds, one built by hand or compiled before the bounds were
+     * recorded, answers the type it erases to.</p>
+     *
+     * @return The bounds, never empty
+     * @since 5.2.0
+     */
+    @Experimental
+    default List<Argument<?>> getBounds() {
+        return List.of(Argument.of(getType(), (String) null, getTypeParameters()));
+    }
 
     /**
      * @return The variable name, never {@code null}.

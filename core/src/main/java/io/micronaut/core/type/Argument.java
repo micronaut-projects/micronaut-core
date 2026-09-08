@@ -376,6 +376,30 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
+     * Creates a new argument for the given type and name that is a type variable, keeping the bounds declared
+     * for the variable. See {@link GenericPlaceholder#getBounds()}.
+     *
+     * @param type               The type the variable erases to
+     * @param argumentName       The name of the argument
+     * @param variableName       The variable name, {@code null} when it is the argument name
+     * @param annotationMetadata The annotation metadata
+     * @param typeParameters     The type parameters
+     * @param bounds             The declared bounds, {@code null} when they are not recorded
+     * @param <T>                The generic type
+     * @return The argument instance
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    static <T> Argument<T> ofTypeVariable(Class<T> type,
+                                          @Nullable String argumentName,
+                                          @Nullable String variableName,
+                                          @Nullable AnnotationMetadata annotationMetadata,
+                                          Argument<?> @Nullable [] typeParameters,
+                                          Argument<?> @Nullable [] bounds) {
+        return new DefaultGenericPlaceholder<>(type, argumentName, variableName, annotationMetadata, typeParameters, bounds);
+    }
+
+    /**
      * Creates an argument that stands for a wildcard type argument, compiled to the type it is bounded by.
      * See {@link WildcardArgument}.
      *
