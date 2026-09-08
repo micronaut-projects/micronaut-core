@@ -8,6 +8,7 @@ bytebuddy = "1.18.12"
 caffeine = "2.9.3"
 classgraph = "4.8.192"
 compile-testing = "0.21.0"
+ecj = "3.46.100"
 
 geb = "7.0"
 h2 = "2.4.240"
@@ -211,6 +212,7 @@ caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "c
 classgraph = { module = "io.github.classgraph:classgraph", version.ref= "classgraph" }
 
 compile-testing = { module = "com.google.testing.compile:compile-testing", version.ref = "compile-testing" }
+ecj = { module = "org.eclipse.jdt:ecj", version.ref = "ecj" }
 
 geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
 groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.ref = "managed-groovy" }
