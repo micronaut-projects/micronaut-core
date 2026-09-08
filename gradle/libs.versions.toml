@@ -7,7 +7,7 @@ brotli4j = "1.23.0"
 bytebuddy = "1.18.12"
 caffeine = "2.9.3"
 classgraph = "4.8.192"
-compile-testing = "0.21.0"
+compile-testing = "0.23.0"
 ecj = "3.46.100"
 
 geb = "7.0"
