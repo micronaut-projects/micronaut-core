@@ -45,7 +45,7 @@ public final class DefaultServerCookieDecoder implements ServerCookieDecoder {
             addCookie(header, pos, end, cookies);
             pos = end + 1;
         }
-        return cookies;
+        return cookies.isEmpty() ? List.of() : List.copyOf(cookies);
     }
 
     private static void addCookie(String header, int start, int end, List<Cookie> cookies) {

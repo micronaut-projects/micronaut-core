@@ -24,6 +24,9 @@ class DefaultServerCookieDecoderTest {
         assertEquals("31d4d96e407aad42", cookies.get(0).getValue());
         assertNull(cookies.get(0).getPath());
         assertNull(cookies.get(0).getDomain());
+        assertFalse(cookies.get(0).isSecure());
+        assertFalse(cookies.get(0).isHttpOnly());
+        assertTrue(cookies.get(0).getSameSite().isEmpty());
         assertEquals("Path", cookies.get(1).getName());
         assertEquals("/", cookies.get(1).getValue());
         assertEquals("Domain", cookies.get(2).getName());
@@ -33,6 +36,10 @@ class DefaultServerCookieDecoderTest {
         cookies = decoder.decode("SID=31d4d96e407aad42; Path=/; Secure; HttpOnly");
         assertEquals(2, cookies.size());
         assertEquals("SID", cookies.get(0).getName());
+        assertNull(cookies.get(0).getPath());
+        assertFalse(cookies.get(0).isSecure());
+        assertFalse(cookies.get(0).isHttpOnly());
+        assertTrue(cookies.get(0).getSameSite().isEmpty());
         assertEquals("Path", cookies.get(1).getName());
     }
 
