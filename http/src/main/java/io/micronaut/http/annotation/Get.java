@@ -97,7 +97,9 @@ public @interface Get {
     boolean single() default false;
 
     /**
-     * @return True if a HEAD route should also be registered for the same method
+     * @return True if a HEAD route should also be registered for the same method. The route is
+     * implicit: if the controller also declares an explicit {@link Head} route that matches the
+     * same request, the explicit route takes precedence over this one.
      */
     boolean headRoute() default true;
 }

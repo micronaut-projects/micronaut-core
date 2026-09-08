@@ -56,6 +56,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final @Nullable Integer port;
     private final ConversionService conversionService;
     private final ExecutorSelector executorSelector;
+    private final boolean implicitHead;
 
     @Nullable
     private ExecutorService executorService;
@@ -74,12 +75,32 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                List<MediaType> consumesMediaTypes,
                                List<MediaType> producesMediaTypes,
                                List<Predicate<HttpRequest<?>>> predicates,
-                                @Nullable Integer port,
-
+                               @Nullable Integer port,
                                ConversionService conversionService,
                                ExecutorSelector executorSelector,
                                MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
+        this(httpMethod, uriMatchTemplate, defaultCharset, targetMethod, bodyArgumentName, bodyArgument,
+            consumesMediaTypes, producesMediaTypes, predicates, port, conversionService, executorSelector,
+            messageBodyHandlerRegistry, false);
+    }
+
+    @SuppressWarnings("ParameterNumber")
+    public DefaultUrlRouteInfo(HttpMethod httpMethod,
+                               UriMatchTemplate uriMatchTemplate,
+                               Charset defaultCharset,
+                               MethodExecutionHandle<T, R> targetMethod,
+                               @Nullable String bodyArgumentName,
+                               @Nullable Argument<?> bodyArgument,
+                               List<MediaType> consumesMediaTypes,
+                               List<MediaType> producesMediaTypes,
+                               List<Predicate<HttpRequest<?>>> predicates,
+                               @Nullable Integer port,
+                               ConversionService conversionService,
+                               ExecutorSelector executorSelector,
+                               MessageBodyHandlerRegistry messageBodyHandlerRegistry,
+                               boolean implicitHead) {
         super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, httpMethod.permitsRequestBody(), false, predicates, messageBodyHandlerRegistry);
+        this.implicitHead = implicitHead;
         this.httpMethod = httpMethod;
         this.uriMatchTemplate = uriMatchTemplate;
         this.uriTemplateMatcher = new UriTemplateMatcher(uriMatchTemplate.getTemplateString());
@@ -116,6 +137,11 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Override
     public @Nullable Integer getPort() {
         return port;
+    }
+
+    @Override
+    public boolean isImplicitHead() {
+        return implicitHead;
     }
 
     @Override
