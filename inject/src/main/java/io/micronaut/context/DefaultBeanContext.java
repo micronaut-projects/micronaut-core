@@ -2808,7 +2808,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 true,
                 null,
                 ReflectionUtils.EMPTY_CLASS_ARRAY,
-                java.util.Collections.emptyMap()
+                java.util.Collections.emptyMap(),
+                new DefaultRuntimeBeanDefinition.InjectionPointSpec[0]
             );
             return BeanRegistration.of(this, BeanIdentifier.of(beanClass.getName()), def, (T) this);
         }
