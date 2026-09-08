@@ -39,7 +39,6 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
 import io.micronaut.inject.ast.FieldElement;
-import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -1063,9 +1062,10 @@ final class BeanIntrospectionWriter implements OriginatingElements, Buildable<Li
                         getInstantiateMethod(constructor, INSTANTIATE_METHOD)
                     );
                 } else {
-                    boolean kotlinAllDefault = Arrays.stream(constructor.getParameters())
-                        .allMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
-                    if (kotlinAllDefault) {
+                    boolean allParametersHaveDefaults = MethodGenUtils.hasAllDefaultsParameters(
+                        Arrays.asList(constructor.getParameters())
+                    );
+                    if (allParametersHaveDefaults) {
                         classDefBuilder.addMethod(
                             getInstantiateMethod(constructor, INSTANTIATE_METHOD)
                         );

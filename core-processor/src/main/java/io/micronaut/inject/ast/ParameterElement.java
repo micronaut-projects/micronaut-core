@@ -67,6 +67,28 @@ public interface ParameterElement extends TypedElement {
         throw new IllegalStateException("Method element is not supported!");
     }
 
+    /**
+     * Whether the parameter declares a default value in the source language, and is therefore
+     * optional at the call site.
+     *
+     * <p>This reports only that a default <i>exists</i>. How the value is obtained is language
+     * specific and is deliberately not part of this contract:</p>
+     *
+     * <ul>
+     *     <li>some languages evaluate the default in the <i>caller</i>, in which case the language
+     *     module may contribute an {@code io.micronaut.inject.writer.ParameterDefaultValueProvider}
+     *     to supply it;</li>
+     *     <li>others evaluate it in the <i>callee</i> and require a dedicated calling convention,
+     *     as {@link KotlinParameterElement} does.</li>
+     * </ul>
+     *
+     * @return True if the parameter has a default value
+     * @since 5.2.0
+     */
+    default boolean hasDefault() {
+        return false;
+    }
+
     @Override
     default ParameterElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return (ParameterElement) TypedElement.super.withAnnotationMetadata(annotationMetadata);

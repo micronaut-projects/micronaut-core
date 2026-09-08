@@ -31,7 +31,6 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
-import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.WildcardElement;
@@ -702,7 +701,7 @@ public final class ArgumentExpUtils {
                 genericType.getTypeAnnotationMetadata()
             ).merge();
 
-            if (parameterElement instanceof KotlinParameterElement kp && kp.hasDefault()) {
+            if (parameterElement.hasDefault()) {
                 annotationMetadata.removeAnnotation(AnnotationUtil.NON_NULL);
                 annotationMetadata.addAnnotation(AnnotationUtil.NULLABLE, Map.of());
                 annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, Map.of());

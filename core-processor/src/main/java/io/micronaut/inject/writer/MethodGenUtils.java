@@ -48,6 +48,13 @@ public final class MethodGenUtils {
 
     private static final TypeDef KOTLIN_CONSTRUCTOR_MARKER = TypeDef.of("kotlin.jvm.internal.DefaultConstructorMarker");
 
+    private static final java.lang.reflect.Method REQUIRE_NON_NULL_ELSE_METHOD = ReflectionUtils.getRequiredMethod(
+            Objects.class,
+            "requireNonNullElse",
+            Object.class,
+            Object.class
+    );
+
     private static final java.lang.reflect.Method INSTANTIATE_METHOD = ReflectionUtils.getRequiredInternalMethod(
             InstantiationUtils.class,
             "instantiateReflectively",
@@ -81,6 +88,71 @@ public final class MethodGenUtils {
         return arguments.stream().anyMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
     }
 
+    /**
+     * Checks if any parameter declares a default that this class knows how to honour, either
+     * through Kotlin's calling convention or through a caller-side default value.
+     *
+     * @param arguments The arguments
+     * @return true if any argument has a default this class can generate code for
+     * @since 5.2.0
+     */
+    public static boolean hasDefaultsParameters(List<ParameterElement> arguments) {
+        return hasKotlinDefaultsParameters(arguments) || hasCallerSideDefaultsParameters(arguments);
+    }
+
+    /**
+     * Checks whether <i>every</i> parameter has a default that this class can supply, so that a
+     * call may omit all of the arguments.
+     *
+     * <p>This is stricter than every parameter merely reporting
+     * {@link ParameterElement#hasDefault()}: a language whose defaults are applied by the callee,
+     * without a calling convention this class implements, cannot have its arguments omitted here.
+     * Passing the default value of each parameter's type instead would silently construct an
+     * object with nulls and zeroes in place of the declared defaults.</p>
+     *
+     * @param arguments The arguments
+     * @return true if all arguments can be defaulted by generated code
+     * @since 5.2.0
+     */
+    public static boolean hasAllDefaultsParameters(List<ParameterElement> arguments) {
+        return !arguments.isEmpty() && arguments.stream().allMatch(
+            p -> p instanceof KotlinParameterElement kp && kp.hasDefault() || callerSideDefault(p) != null
+        );
+    }
+
+    /**
+     * Checks if any parameter has a default value that can be materialised at the call site.
+     *
+     * @param arguments The arguments
+     * @return true if any argument has a caller-side default value expression
+     * @since 5.2.0
+     */
+    public static boolean hasCallerSideDefaultsParameters(List<ParameterElement> arguments) {
+        return arguments.stream().anyMatch(p -> callerSideDefault(p) != null);
+    }
+
+    /**
+     * Resolves the caller-side default value expression of a parameter, if it has one.
+     *
+     * <p>Parameters using Kotlin's calling convention are excluded: their defaults are computed
+     * by the callee and cannot be materialised here.</p>
+     */
+    @Nullable
+    private static ExpressionDef callerSideDefault(ParameterElement parameter) {
+        if (parameter instanceof KotlinParameterElement || !parameter.hasDefault()) {
+            return null;
+        }
+        for (ParameterDefaultValueProvider provider : ParameterDefaultValueProviderLoader.load()) {
+            if (provider.supports(parameter)) {
+                ExpressionDef expression = provider.defaultValueExpression(parameter, null).orElse(null);
+                if (expression != null) {
+                    return expression;
+                }
+            }
+        }
+        return null;
+    }
+
     public static ExpressionDef invokeKotlinDefaultMethod(ClassElement declaringType,
                                                           MethodElement methodElement,
                                                           ExpressionDef target,
@@ -90,14 +162,14 @@ public final class MethodGenUtils {
 
     public static ExpressionDef invokeBeanConstructor(ClassElement callingType,
                                                       MethodElement constructor,
-                                                      boolean allowKotlinDefaults,
+                                                      boolean allowDefaults,
                                                       @Nullable
                                                       List<? extends ExpressionDef> values,
                                                       List<StatementDef> additionalStatements) {
         return invokeBeanConstructor(
             constructor,
             constructor.isReflectionRequired(callingType),
-            allowKotlinDefaults,
+            allowDefaults,
             values,
             values == null ? null : values.stream().map(ExpressionDef::isNonNull).toList(),
             additionalStatements
@@ -106,7 +178,7 @@ public final class MethodGenUtils {
 
     public static ExpressionDef invokeBeanConstructor(MethodElement constructor,
                                                       boolean requiresReflection,
-                                                      boolean allowKotlinDefaults,
+                                                      boolean allowDefaults,
                                                       @Nullable
                                                       List<? extends ExpressionDef> values,
                                                       @Nullable
@@ -117,9 +189,10 @@ public final class MethodGenUtils {
         boolean isConstructor = constructor.getName().equals("<init>");
         boolean isCompanion = constructor.getOwningType().getSimpleName().endsWith("$Companion");
         List<ParameterElement> constructorArguments = Arrays.asList(constructor.getParameters());
-        allowKotlinDefaults = allowKotlinDefaults && hasKotlinDefaultsParameters(constructorArguments);
+        boolean allowKotlinDefaults = allowDefaults && hasKotlinDefaultsParameters(constructorArguments);
+        boolean allowCallerSideDefaults = allowDefaults && !allowKotlinDefaults;
 
-        List<ExpressionDef> constructorValues = constructorValues(constructor.getParameters(), values, hasValuesExpressions, allowKotlinDefaults);
+        List<ExpressionDef> constructorValues = constructorValues(constructor.getParameters(), values, hasValuesExpressions, allowKotlinDefaults, allowCallerSideDefaults);
 
         if (requiresReflection && !isCompanion) { // Companion and reflection not implemented
             return ClassTypeDef.of(InstantiationUtils.class).invokeStatic(
@@ -159,16 +232,17 @@ public final class MethodGenUtils {
 
     public static StatementDef invokeSuperConstructor(ExpressionDef superVar,
                                                        MethodElement constructor,
-                                                       boolean allowKotlinDefaults,
+                                                       boolean allowDefaults,
                                                        @Nullable
                                                        List<? extends ExpressionDef> values,
                                                        @Nullable
                                                        List<? extends ExpressionDef> hasValuesExpressions,
                                                        List<StatementDef> additionalStatements) {
         List<ParameterElement> constructorArguments = Arrays.asList(constructor.getParameters());
-        allowKotlinDefaults = allowKotlinDefaults && hasKotlinDefaultsParameters(constructorArguments);
+        boolean allowKotlinDefaults = allowDefaults && hasKotlinDefaultsParameters(constructorArguments);
+        boolean allowCallerSideDefaults = allowDefaults && !allowKotlinDefaults;
 
-        List<ExpressionDef> constructorValues = constructorValues(constructor.getParameters(), values, hasValuesExpressions, allowKotlinDefaults);
+        List<ExpressionDef> constructorValues = constructorValues(constructor.getParameters(), values, hasValuesExpressions, allowKotlinDefaults, allowCallerSideDefaults);
         if (allowKotlinDefaults) {
             int numberOfMasks = calculateNumberOfKotlinDefaultsMasks(constructorArguments);
             return superVar.invokeConstructor(
@@ -222,43 +296,89 @@ public final class MethodGenUtils {
                                                          List<? extends ExpressionDef> values,
                                                          @Nullable
                                                          List<? extends ExpressionDef> hasValuesExpressions,
-                                                         boolean addKotlinDefaults) {
+                                                         boolean addKotlinDefaults,
+                                                         boolean addCallerSideDefaults) {
         List<ExpressionDef> expressions = new ArrayList<>(constructorArguments.length);
         for (int i = 0; i < constructorArguments.length; i++) {
-            ParameterElement constructorArgument = constructorArguments[i];
-            ExpressionDef value = values == null ? null : values.get(i);
-            ExpressionDef defaultValue = getDefaultValue(constructorArgument);
-            ExpressionDef nullExpression = ExpressionDef.nullValue();
-            if (value != null) {
-                if (!addKotlinDefaults || value instanceof ExpressionDef.Constant constant && constant.value() != null) {
-                    expressions.add(value);
-                } else if (hasValuesExpressions != null) {
-                    ExpressionDef expressionDef = hasValuesExpressions.get(i);
-                    if (defaultValue.equals(nullExpression)) {
-                        expressions.add(value); // Null value anyway
-                    } else {
-                        expressions.add(
-                            expressionDef.isTrue().doIfElse(value, defaultValue)
-                        );
-                    }
-                } else if (!constructorArgument.isPrimitive()) {
-                    expressions.add(value);
-                } else {
-                    expressions.add(
-                            ClassTypeDef.of(Objects.class)
-                                    .invokeStatic(
-                                            ReflectionUtils.getRequiredMethod(Objects.class, "requireNonNullElse", Object.class, Object.class),
-
-                                            value.cast(TypeDef.OBJECT), // Remove any previous casts
-                                        defaultValue
-                                    ).cast(value.type())
-                    );
-                }
-                continue;
-            }
-            expressions.add(defaultValue);
+            expressions.add(
+                constructorValue(
+                    constructorArguments[i],
+                    values == null ? null : values.get(i),
+                    hasValuesExpressions == null ? null : hasValuesExpressions.get(i),
+                    addKotlinDefaults,
+                    addCallerSideDefaults
+                )
+            );
         }
         return expressions;
+    }
+
+    private static ExpressionDef constructorValue(ParameterElement constructorArgument,
+                                                  @Nullable
+                                                  ExpressionDef value,
+                                                  @Nullable
+                                                  ExpressionDef hasValueExpression,
+                                                  boolean addKotlinDefaults,
+                                                  boolean addCallerSideDefaults) {
+        ExpressionDef callerSideDefault = addCallerSideDefaults ? callerSideDefault(constructorArgument) : null;
+        if (callerSideDefault != null) {
+            return callerSideDefaultValue(value, hasValueExpression, callerSideDefault);
+        }
+        ExpressionDef defaultValue = getDefaultValue(constructorArgument);
+        if (value == null) {
+            return defaultValue;
+        }
+        if (!addKotlinDefaults || value instanceof ExpressionDef.Constant constant && constant.value() != null) {
+            return value;
+        }
+        if (hasValueExpression != null) {
+            if (defaultValue.equals(ExpressionDef.nullValue())) {
+                return value; // Null value anyway
+            }
+            return hasValueExpression.isTrue().doIfElse(value, defaultValue);
+        }
+        if (!constructorArgument.isPrimitive()) {
+            return value;
+        }
+        return ClassTypeDef.of(Objects.class)
+            .invokeStatic(
+                REQUIRE_NON_NULL_ELSE_METHOD,
+
+                value.cast(TypeDef.OBJECT), // Remove any previous casts
+                defaultValue
+            ).cast(value.type());
+    }
+
+    /**
+     * Selects between the supplied value and the parameter's declared default, for a language
+     * that evaluates defaults in the caller.
+     *
+     * <p>Substitution requires a presence expression. Without one the supplied value is passed
+     * through unchanged, rather than treating a {@code null} value as absent — a language may
+     * allow an explicit {@code null} to be passed to a nullable parameter that also has a
+     * default, and that {@code null} must not silently become the default.</p>
+     *
+     * @param value             The supplied value, or {@code null} if no value is supplied at all
+     * @param hasValueExpression An expression that is true when the value is present, if known
+     * @param defaultValue      The declared default value expression
+     * @return The expression to pass in argument position
+     */
+    private static ExpressionDef callerSideDefaultValue(@Nullable ExpressionDef value,
+                                                        @Nullable ExpressionDef hasValueExpression,
+                                                        ExpressionDef defaultValue) {
+        if (value == null) {
+            // Nothing is supplied for this parameter, so the default always applies
+            return defaultValue;
+        }
+        if (value instanceof ExpressionDef.Constant constant && constant.value() != null) {
+            // A known non-null constant is always present
+            return value;
+        }
+        if (hasValueExpression == null) {
+            // Presence is unknown, so the value cannot be distinguished from an explicit null
+            return value;
+        }
+        return hasValueExpression.isTrue().doIfElse(value, defaultValue);
     }
 
     private static ExpressionDef getDefaultValue(ParameterElement constructorArgument) {
