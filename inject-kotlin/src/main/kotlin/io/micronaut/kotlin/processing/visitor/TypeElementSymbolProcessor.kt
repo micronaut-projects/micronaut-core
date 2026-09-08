@@ -363,7 +363,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 try {
                     visitor.visitMethod(memberElement, visitorContext)
                 } catch (e: Exception) {
-                    throw ProcessingException(memberElement, e.message)
+                    throw ProcessingException(memberElement, e.message, e)
                 }
             }
         }
@@ -375,7 +375,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 try {
                     visitor.visitField(memberElement, visitorContext)
                 } catch (e: Exception) {
-                    throw ProcessingException(memberElement, e.message)
+                    throw ProcessingException(memberElement, e.message, e)
                 }
             }
         }
@@ -392,7 +392,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 try {
                     visitor.visitConstructor(ctorElement, visitorContext)
                 } catch (e: Exception) {
-                    throw ProcessingException(ctorElement, e.message)
+                    throw ProcessingException(ctorElement, e.message, e)
                 }
             }
         }

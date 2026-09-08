@@ -74,6 +74,9 @@ public final class EvaluatedExpressionProcessor implements Buildable<List<Output
      */
     public static void reset() {
         DefaultExpressionCompilationContextFactory.reset();
+        // the processor classloader outlives a single compilation in a Gradle daemon; without this
+        // a later compilation needing the same expression class name would skip generating it
+        WRITTEN_CLASSES.clear();
     }
 
     /**

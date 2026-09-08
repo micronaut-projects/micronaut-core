@@ -35,6 +35,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -47,6 +48,9 @@ final class JavaCompilationTracker implements TaskListener {
     private final Map<String, Set<String>> declaredTypes = new LinkedHashMap<>();
     private final Map<String, String> generatedSourceOrigins = new LinkedHashMap<>();
     private final Set<String> pythonGeneratedSources = new LinkedHashSet<>();
+    // resolving a file object's real path costs two syscalls and is asked for once per recorded
+    // reference, so remember it; a compilation does not move its sources underneath itself
+    private final Map<URI, Optional<String>> sourceKeys = new LinkedHashMap<>();
 
     JavaCompilationTracker(JavacTask task) {
         this.trees = Trees.instance(task);
@@ -130,21 +134,30 @@ final class JavaCompilationTracker implements TaskListener {
         return current instanceof TypeElement typeElement ? typeElement : null;
     }
 
-    private static String fileSourceKey(JavaFileObject source) {
+    private String fileSourceKey(JavaFileObject source) {
         if (source == null) {
             return null;
         }
+        URI uri;
         try {
-            URI uri = source.toUri();
-            if (!"file".equalsIgnoreCase(uri.getScheme())) {
-                return null;
-            }
-            Path path = Path.of(uri);
-            return Files.exists(path)
-                ? path.toRealPath().normalize().toString()
-                : path.toAbsolutePath().normalize().toString();
+            uri = source.toUri();
         } catch (Exception e) {
             return null;
+        }
+        return sourceKeys.computeIfAbsent(uri, JavaCompilationTracker::resolveSourceKey).orElse(null);
+    }
+
+    private static Optional<String> resolveSourceKey(URI uri) {
+        try {
+            if (!"file".equalsIgnoreCase(uri.getScheme())) {
+                return Optional.empty();
+            }
+            Path path = Path.of(uri);
+            return Optional.of(Files.exists(path)
+                ? path.toRealPath().normalize().toString()
+                : path.toAbsolutePath().normalize().toString());
+        } catch (Exception e) {
+            return Optional.empty();
         }
     }
 
