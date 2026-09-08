@@ -250,38 +250,6 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         out.write('}');
     }
 
-    /**
-     * Resolves class elements by name and caches them for the duration of one write, so that
-     * a configuration class and its bean properties are resolved once instead of once per property.
-     */
-    private static final class TypeResolver {
-
-        private final @Nullable VisitorContext visitorContext;
-        private final Map<String, Optional<ClassElement>> resolved = new HashMap<>();
-        private final Map<String, List<PropertyElement>> properties = new HashMap<>();
-
-        TypeResolver(@Nullable VisitorContext visitorContext) {
-            this.visitorContext = visitorContext;
-        }
-
-        boolean hasVisitorContext() {
-            return visitorContext != null;
-        }
-
-        @Nullable
-        ClassElement resolve(String name) {
-            if (visitorContext == null) {
-                return null;
-            }
-            return resolved.computeIfAbsent(name, visitorContext::getClassElement).orElse(null);
-        }
-
-        List<PropertyElement> beanProperties(ClassElement classElement) {
-            return properties.computeIfAbsent(classElement.getName(), n -> classElement.getBeanProperties(
-                PropertyElementQuery.of(classElement).visibility(BeanProperties.Visibility.ANY)));
-        }
-    }
-
     private enum ContainerMode {
         MAP,
         LIST
@@ -901,5 +869,37 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
 
     private void comma(Writer out) throws IOException {
         out.write(',');
+    }
+
+    /**
+     * Resolves class elements by name and caches them for the duration of one write, so that
+     * a configuration class and its bean properties are resolved once instead of once per property.
+     */
+    private static final class TypeResolver {
+
+        private final @Nullable VisitorContext visitorContext;
+        private final Map<String, Optional<ClassElement>> resolved = new HashMap<>();
+        private final Map<String, List<PropertyElement>> properties = new HashMap<>();
+
+        TypeResolver(@Nullable VisitorContext visitorContext) {
+            this.visitorContext = visitorContext;
+        }
+
+        boolean hasVisitorContext() {
+            return visitorContext != null;
+        }
+
+        @Nullable
+        ClassElement resolve(String name) {
+            if (visitorContext == null) {
+                return null;
+            }
+            return resolved.computeIfAbsent(name, visitorContext::getClassElement).orElse(null);
+        }
+
+        List<PropertyElement> beanProperties(ClassElement classElement) {
+            return properties.computeIfAbsent(classElement.getName(), n -> classElement.getBeanProperties(
+                PropertyElementQuery.of(classElement).visibility(BeanProperties.Visibility.ANY)));
+        }
     }
 }
