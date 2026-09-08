@@ -25,6 +25,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.ast.annotation.MethodElementAnnotationsGuard;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import org.jspecify.annotations.Nullable;
@@ -38,6 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -62,7 +64,8 @@ public interface MethodElement extends MemberElement {
      * approximates the read side with {@link #getAnnotationMetadata()} and routes the write side to
      * {@link Element#annotate(String, java.util.function.Consumer)} and friends on this element. For an
      * element that does not support mutation either, the resulting exception names this element rather
-     * than the delegate.</p>
+     * than the delegate, and an element whose own mutators route back through this delegate is rejected
+     * rather than left to recurse.</p>
      *
      * @return The method annotation metadata
      * @since 4.0.0
@@ -76,32 +79,39 @@ public interface MethodElement extends MemberElement {
 
             @Override
             public <T extends Annotation> AnnotationMetadata annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-                MethodElement.this.annotate(annotationType, consumer);
-                return getAnnotationMetadata();
+                return write("adding", () -> MethodElement.this.annotate(annotationType, consumer));
             }
 
             @Override
             public <T extends Annotation> AnnotationMetadata annotate(AnnotationValue<T> annotationValue) {
-                MethodElement.this.annotate(annotationValue);
-                return getAnnotationMetadata();
+                return write("adding", () -> MethodElement.this.annotate(annotationValue));
             }
 
             @Override
             public AnnotationMetadata removeAnnotation(String annotationType) {
-                MethodElement.this.removeAnnotation(annotationType);
-                return getAnnotationMetadata();
+                return write("removing", () -> MethodElement.this.removeAnnotation(annotationType));
             }
 
             @Override
             public <T extends Annotation> AnnotationMetadata removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
-                MethodElement.this.removeAnnotationIf(predicate);
-                return getAnnotationMetadata();
+                return write("removing", () -> MethodElement.this.removeAnnotationIf(predicate));
             }
 
             @Override
             public AnnotationMetadata removeStereotype(String annotationType) {
-                MethodElement.this.removeStereotype(annotationType);
-                return getAnnotationMetadata();
+                return write("removing", () -> MethodElement.this.removeStereotype(annotationType));
+            }
+
+            /**
+             * An element may answer a mutation with a new instance rather than itself, so read the
+             * metadata back off whatever the mutation returned.
+             */
+            private AnnotationMetadata write(String operation, Supplier<Element> mutation) {
+                return MethodElementAnnotationsGuard.write(
+                    MethodElement.this,
+                    operation,
+                    () -> mutation.get().getAnnotationMetadata()
+                );
             }
         };
     }

@@ -50,6 +50,31 @@ class MethodElementAnnotationMetadataDefaultSpec extends Specification {
         e.message.contains(element.getClass().name)
     }
 
+    void "an element whose own mutators route back through the delegate is rejected rather than left to recurse"() {
+        given:
+        def element = new CircularTestMethodElement()
+
+        when:
+        element.getMethodAnnotationMetadata().annotate("example.ByName")
+
+        then:
+        def e = thrown(UnsupportedOperationException)
+        e.message.contains("route back through getMethodAnnotationMetadata()")
+        e.message.contains(CircularTestMethodElement.name)
+    }
+
+    void "the delegate reads the annotation metadata back off whatever the mutation returned"() {
+        given:
+        def element = new CopyOnWriteTestMethodElement()
+
+        when:
+        def metadata = element.getMethodAnnotationMetadata().annotate("example.ByName")
+
+        then: "the original is untouched and the returned metadata is the copy's"
+        !element.annotationMetadata.hasDeclaredAnnotation("example.ByName")
+        metadata.hasDeclaredAnnotation("example.ByName")
+    }
+
     /**
      * A method element that opts in to mutation through {@link Element#annotate} only, without overriding
      * {@link MethodElement#getMethodAnnotationMetadata()}.
@@ -115,6 +140,34 @@ class MethodElementAnnotationMetadataDefaultSpec extends Specification {
         <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
             annotationMetadata.addDeclaredAnnotation(annotationValue.annotationName, annotationValue.values)
             this
+        }
+    }
+
+    /**
+     * A method element that implements {@link Element#annotate} in terms of the very delegate that routes
+     * back to it. Nonsensical, but it used to fail with an exception rather than a {@link StackOverflowError}.
+     */
+    private static class CircularTestMethodElement extends MutableTestMethodElement {
+
+        @Override
+        <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+            getMethodAnnotationMetadata().annotate(annotationType, consumer)
+            this
+        }
+    }
+
+    /**
+     * A method element that answers a mutation with a new instance rather than mutating itself.
+     */
+    private static class CopyOnWriteTestMethodElement extends MutableTestMethodElement {
+
+        @Override
+        <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+            def copy = new CopyOnWriteTestMethodElement()
+            AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType)
+            consumer.accept(builder)
+            copy.annotationMetadata.addDeclaredAnnotation(annotationType, builder.build().values)
+            copy
         }
     }
 }
