@@ -414,6 +414,9 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * Whether the error response body should be buffered for streaming clients when no error type is set,
+     * configured by {@code micronaut.http.client.buffer-error-body-for-streaming}.
+     *
      * @return Whether the error response body should be buffered for streaming clients when no error type is set
      * @since 5.2.0
      */
@@ -423,8 +426,11 @@ public abstract class HttpClientConfiguration {
 
     /**
      * Sets whether the error response body should be buffered for streaming clients when no error type is set, so
-     * that {@code getResponse().getBody(..)} is populated on error. Default value
-     * ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_BUFFER_ERROR_BODY_FOR_STREAMING}).
+     * that {@code getResponse().getBody(..)} is populated on error. Configured by
+     * {@code micronaut.http.client.buffer-error-body-for-streaming}. Default value
+     * ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_BUFFER_ERROR_BODY_FOR_STREAMING}), because
+     * the error body has no size limit of its own: enabling this holds the whole of it in memory for every
+     * streaming request that fails.
      *
      * @param bufferErrorBodyForStreaming Whether the error response body should be buffered for streaming clients
      * @since 5.2.0

@@ -105,6 +105,7 @@ class ClientStreamSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(String).isPresent()
         ex.response.getBody(String).get() == "from server"
         ex.message == "from server"
 
