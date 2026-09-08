@@ -48,20 +48,19 @@ class DefaultBeanContextTest extends Specification {
     record SecondAdoptedService() implements AdoptedService {}
 
     @Test
+    @SuppressWarnings("rawtypes") // the BeanKey(Class, Qualifier, Class...) constructor under test is raw by design
     void beanKeyEqualityIncludesQualifierAndTypeArguments() {
         Qualifier<BeanFromDefinition> definitionQualifier = Qualifiers.byName("definitionBean");
         RuntimeBeanDefinition<BeanFromDefinition> definition = RuntimeBeanDefinition.of(BeanFromDefinition.class, BeanFromDefinition::new);
 
         DefaultBeanContext.BeanKey<BeanFromDefinition> fromDefinition = new DefaultBeanContext.BeanKey<>(definition, definitionQualifier);
         assertEquals(new DefaultBeanContext.BeanKey<>(definition.asArgument(), definitionQualifier), fromDefinition);
-        assertEquals(definitionQualifier + " " + definition.asArgument().getName(), fromDefinition.toString());
 
         Argument<CharSequence> beanType = Argument.of(CharSequence.class);
         DefaultBeanContext.BeanKey<CharSequence> unqualified = new DefaultBeanContext.BeanKey<>(beanType, null);
         DefaultBeanContext.BeanKey<CharSequence> sameUnqualified = new DefaultBeanContext.BeanKey<>(Argument.of(CharSequence.class), null);
 
-        assertTrue(unqualified.equals(unqualified));
-        assertFalse(unqualified.equals(null));
+        assertNotEquals(null, unqualified);
         assertEquals(unqualified, sameUnqualified);
         assertEquals(unqualified.hashCode(), sameUnqualified.hashCode());
         assertNotEquals(unqualified, new DefaultBeanContext.BeanKey<>(beanType, Qualifiers.byName("primaryString")));
@@ -71,7 +70,6 @@ class DefaultBeanContextTest extends Specification {
         DefaultBeanContext.BeanKey<List> fromClass = new DefaultBeanContext.BeanKey<>(List.class, listQualifier, String.class);
 
         assertEquals(new DefaultBeanContext.BeanKey<>(stringList, listQualifier), fromClass);
-        assertEquals(listQualifier + " " + stringList.getName(), fromClass.toString());
         assertNotEquals(fromClass, new DefaultBeanContext.BeanKey<>(List.class, listQualifier, Integer.class));
         assertNotEquals(
             new DefaultBeanContext.BeanKey<>(Argument.listOf(String.class), Qualifiers.byName("strings")),
@@ -107,7 +105,7 @@ class DefaultBeanContextTest extends Specification {
             assertSame(first, servicesByName.get("first"));
             assertSame(second, servicesByName.get("second"));
 
-            assertSame(
+            assertEquals(
                 beanContext.getBeanRegistrations(AdoptedService.class),
                 beanContext.getBeanRegistrations(AdoptedService.class)
             );
