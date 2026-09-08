@@ -75,7 +75,9 @@ final class InterceptedDisposeMethod<T> extends InterceptedMethod<T, T> {
      */
     @Override
     @Nullable
-    @SuppressWarnings("NullAway")
+    // NullAway and java:S2638 both flag the widening the javadoc above explains: it is deliberate, and narrower
+    // here than on the interface.
+    @SuppressWarnings({"NullAway", "java:S2638"})
     public Method getTargetMethod() {
         ExecutableMethod<T, ?> callback = described(disposableIntercepted);
         return callback == null ? null : callback.getTargetMethod();
