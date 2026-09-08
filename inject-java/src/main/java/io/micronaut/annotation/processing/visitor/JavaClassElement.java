@@ -778,12 +778,21 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         if (!staticCreators.isEmpty()) {
             return staticCreators;
         }
-        if (!isKotlinClass(classElement)) {
-            // only a Kotlin class can have a companion object; skip the lookup, which for a Java
-            // class is two guaranteed misses through the compiler's global type lookup
+        // a companion is a nested type of this class, so find it among the members already loaded
+        // rather than resolving "<name>$Companion" through the compiler's global type lookup, which
+        // for a class that has no companion is a guaranteed miss - and then a second one, because
+        // getClassElement retries the name with '$' replaced by '.'
+        TypeElement companion = null;
+        for (Element enclosed : classElement.getEnclosedElements()) {
+            if (enclosed instanceof TypeElement nested && nested.getSimpleName().contentEquals("Companion")) {
+                companion = nested;
+                break;
+            }
+        }
+        if (companion == null) {
             return List.of();
         }
-        return visitorContext.getClassElement(getName() + "$Companion", elementAnnotationMetadataFactory)
+        return Optional.of((ClassElement) visitorContext.getElementFactory().newClassElement(companion, elementAnnotationMetadataFactory))
             .filter(io.micronaut.inject.ast.Element::isStatic)
             .flatMap(typeElement -> typeElement.getEnclosedElements(ElementQuery.ALL_METHODS
                 .annotated(am -> am.hasStereotype(Creator.class))).stream().findFirst()
