@@ -23,4 +23,12 @@ public class Types {
     public <T> T identity(T value) {
         return value;
     }
+
+    public <T extends Comparable<String> & Cloneable> void several(T value, List<T> inside) {
+        // the signature is what is read, the body is never called
+    }
+
+    public <T extends Comparable<T>> void recursive(T value) {
+        // the signature is what is read, the body is never called
+    }
 }

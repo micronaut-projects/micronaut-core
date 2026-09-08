@@ -378,7 +378,8 @@ public final class ReflectionArguments {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static Argument<?> rebuild(Argument<?> argument, @Nullable String name, AnnotationMetadata metadata, Argument<?>[] typeParameters) {
         if (argument instanceof GenericPlaceholder<?> placeholder) {
-            return Argument.ofTypeVariable((Class) argument.getType(), name, placeholder.getVariableName(), metadata, typeParameters);
+            return Argument.ofTypeVariable((Class) argument.getType(), name, placeholder.getVariableName(), metadata, typeParameters,
+                placeholder.getBounds().toArray(Argument[]::new));
         }
         return Argument.of((Class) argument.getType(), name, metadata, typeParameters);
     }
@@ -584,14 +585,19 @@ public final class ReflectionArguments {
             if (resolving.contains(tv)) {
                 // a bound naming the variable it bounds - `T extends Comparable<T>` - would be converted for
                 // ever: inside its own bound the variable stands for the erasure of that bound
-                return Argument.ofTypeVariable(getRawType(tv.getBounds()[0]), name, tv.getName(), declared, Argument.ZERO_ARGUMENTS);
+                return Argument.ofTypeVariable(getRawType(tv.getBounds()[0]), name, tv.getName(), declared, Argument.ZERO_ARGUMENTS, null);
             }
             Set<TypeVariable<?>> nested = new HashSet<>(resolving);
             nested.add(tv);
             // an unresolved variable is a placeholder of its bound, as the processors generate it
-            Argument<?> bound = toArgument(null, tv.getAnnotatedBounds()[0], Map.of(), nested);
+            AnnotatedType[] annotatedBounds = tv.getAnnotatedBounds();
+            Argument<?>[] bounds = new Argument[annotatedBounds.length];
+            for (int i = 0; i < annotatedBounds.length; i++) {
+                bounds[i] = toArgument(null, annotatedBounds[i], Map.of(), nested);
+            }
+            Argument<?> bound = bounds[0];
             return Argument.ofTypeVariable(bound.getType(), name, tv.getName(),
-                combine(declared, bound.getAnnotationMetadata()), bound.getTypeParameters());
+                combine(declared, bound.getAnnotationMetadata()), bound.getTypeParameters(), bounds);
         } else {
             throw new IllegalArgumentException("Unsupported type " + type.getClass().getName());
         }

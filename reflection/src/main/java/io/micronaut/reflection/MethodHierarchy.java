@@ -201,7 +201,8 @@ public record MethodHierarchy(Declaration local,
         AnnotationMetadata metadata = mergeMetadata(levels.stream().map(Argument::getAnnotationMetadata).toList());
         if (local instanceof GenericPlaceholder<?> placeholder) {
             // a variable stays a variable: an overriding `<T> T id(T)` is a placeholder to a generated method
-            return Argument.ofTypeVariable((Class) local.getType(), local.getName(), placeholder.getVariableName(), metadata, typeParameters);
+            return Argument.ofTypeVariable((Class) local.getType(), local.getName(), placeholder.getVariableName(), metadata, typeParameters,
+                placeholder.getBounds().toArray(Argument[]::new));
         }
         return Argument.of((Class) local.getType(), local.getName(), metadata, typeParameters);
     }
@@ -529,7 +530,8 @@ public record MethodHierarchy(Declaration local,
             AnnotationMetadata declared = declaredOf(argument.getAnnotationMetadata());
             if (argument instanceof GenericPlaceholder<?> placeholder) {
                 // a variable stays a variable: `<T> T id(T)` returns a placeholder to a generated method
-                return Argument.ofTypeVariable((Class) returnType.getType(), null, placeholder.getVariableName(), declared, returnType.getTypeParameters());
+                return Argument.ofTypeVariable((Class) returnType.getType(), null, placeholder.getVariableName(), declared, returnType.getTypeParameters(),
+                    placeholder.getBounds().toArray(Argument[]::new));
             }
             return Argument.of((Class) returnType.getType(), declared, returnType.getTypeParameters());
         }

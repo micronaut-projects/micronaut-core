@@ -46,6 +46,46 @@ class ReflectionTypesSpec extends Specification {
         type.bounds == [Object] as Object[]
     }
 
+    void "a placeholder keeps every bound the variable declares"() {
+        given:
+        def arguments = ReflectionArguments.argumentsOf(Types.getDeclaredMethod("several", Comparable, List))
+
+        expect: "the argument still erases to the first bound"
+        arguments[0].type == Comparable
+        arguments[0] instanceof GenericPlaceholder
+
+        and: "and answers both bounds, the first with its own type arguments"
+        ((GenericPlaceholder) arguments[0]).bounds*.type == [Comparable, Cloneable]
+        ((GenericPlaceholder) arguments[0]).bounds[0].typeParameters[0].type == String
+
+        and: "the variable inside a type argument keeps them too"
+        def inside = arguments[1].typeParameters[0]
+        inside instanceof GenericPlaceholder
+        ((GenericPlaceholder) inside).bounds*.type == [Comparable, Cloneable]
+    }
+
+    void "a variable bounded by a type naming it answers that bound"() {
+        given:
+        def argument = ReflectionArguments.argumentsOf(Types.getDeclaredMethod("recursive", Comparable))[0]
+
+        expect:
+        ((GenericPlaceholder) argument).bounds*.type == [Comparable]
+    }
+
+    void "a placeholder with no recorded bounds answers the type it erases to"() {
+        given:
+        def placeholder = (GenericPlaceholder) Argument.ofTypeVariable(Number, "value")
+
+        expect:
+        placeholder.bounds*.type == [Number]
+
+        and: "the answer is the same list every time"
+        placeholder.bounds.is(placeholder.bounds)
+
+        and: "and renaming keeps the variable it stands for"
+        ((GenericPlaceholder) placeholder.withName("other")).variableName == "value"
+    }
+
     void "a placeholder renders as the type it is bounded by when the caller compares types"() {
         given:
         def method = Types.getDeclaredMethod("identity", Object)

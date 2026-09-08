@@ -119,6 +119,17 @@ public final class ArgumentExpUtils {
         Class.class
     );
 
+    private static final Method METHOD_CREATE_TYPE_VAR_WITH_BOUNDS = ReflectionUtils.getRequiredInternalMethod(
+        Argument.class,
+        "ofTypeVariable",
+        Class.class,
+        String.class,
+        String.class,
+        AnnotationMetadata.class,
+        Argument[].class,
+        Argument[].class
+    );
+
     private static final Method METHOD_CREATE_WILDCARD = ReflectionUtils.getRequiredInternalMethod(
         Argument.class,
         "ofWildcard",
@@ -258,6 +269,8 @@ public final class ArgumentExpUtils {
 
         boolean hasAnnotations = !annotationMetadata.isEmpty();
         boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
+        // The bounds are read from the placeholder, before it is replaced by the type it resolves to
+        List<? extends ClassElement> bounds = recordedBounds(argumentType);
         if (argumentType instanceof GenericPlaceholderElement placeholderElement) {
             // Persist resolved placeholder for backward compatibility
             argumentType = placeholderElement.getResolved().orElse(placeholderElement);
@@ -317,6 +330,18 @@ public final class ArgumentExpUtils {
         }
 
         if (isTypeVariable) {
+            if (!bounds.isEmpty()) {
+                // Argument.ofTypeVariable( .. ) keeping the bounds declared for the variable
+                return TYPE_ARGUMENT.invokeStatic(
+                    METHOD_CREATE_TYPE_VAR_WITH_BOUNDS,
+                    argumentTypeConstant,
+                    ExpressionDef.constant(argumentName),
+                    hasVariableName ? ExpressionDef.constant(variableName) : ExpressionDef.nullValue(),
+                    values.get(values.size() - 2),
+                    values.get(values.size() - 1),
+                    pushBounds(annotationMetadataWithDefaults, owningType, bounds, new HashSet<>(5), loadClassValueExpressionFn)
+                );
+            }
             // Argument.create( .. )
             return TYPE_ARGUMENT.invokeStatic(
                 hasVariableName ? METHOD_CREATE_GENERIC_PLACEHOLDER_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS,
@@ -417,7 +442,8 @@ public final class ArgumentExpUtils {
             Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
             if (CollectionUtils.isNotEmpty(typeArguments)
                 || !classElement.getAnnotationMetadata().isEmpty()
-                || classElement instanceof WildcardElement) {
+                || classElement instanceof WildcardElement
+                || !recordedBounds(classElement).isEmpty()) {
                 return buildArgumentWithGenerics(
                     annotationMetadataWithDefaults,
                     owningType,
@@ -455,6 +481,9 @@ public final class ArgumentExpUtils {
         ExpressionDef.Constant argumentTypeConstant = ExpressionDef.constant(TypeDef.erasure(resolveArgument(argumentType)));
 
         List<ExpressionDef> values = new ArrayList<>();
+
+        // The bounds are read from the placeholder, before it is replaced by the type it resolves to
+        List<? extends ClassElement> bounds = recordedBounds(argumentType);
 
         if (argumentType instanceof GenericPlaceholderElement placeholderElement) {
             // Persist resolved placeholder for backward compatibility
@@ -534,10 +563,24 @@ public final class ArgumentExpUtils {
                 upperBounds = wildcardElement.getUpperBounds();
             }
             // 5th and 6th arguments: the bounds
-            values.add(pushWildcardBounds(annotationMetadataWithDefaults, owningType, upperBounds, visitedTypes, loadClassValueExpressionFn));
-            values.add(pushWildcardBounds(annotationMetadataWithDefaults, owningType, lowerBounds, visitedTypes, loadClassValueExpressionFn));
+            values.add(pushBounds(annotationMetadataWithDefaults, owningType, upperBounds, visitedTypes, loadClassValueExpressionFn));
+            values.add(pushBounds(annotationMetadataWithDefaults, owningType, lowerBounds, visitedTypes, loadClassValueExpressionFn));
             // Argument.ofWildcard( .. )
             return TYPE_ARGUMENT.invokeStatic(METHOD_CREATE_WILDCARD, values);
+        }
+
+        if (typeVariable && !bounds.isEmpty()) {
+            // Argument.ofTypeVariable( .. ) keeping the bounds declared for the variable
+            return TYPE_ARGUMENT.invokeStatic(
+                METHOD_CREATE_TYPE_VAR_WITH_BOUNDS,
+                values.get(0),
+                values.get(1),
+                // The variable name is the argument name here, as it was before the bounds were kept
+                ExpressionDef.nullValue(),
+                values.get(2),
+                values.get(3),
+                pushBounds(annotationMetadataWithDefaults, owningType, bounds, visitedTypes, loadClassValueExpressionFn)
+            );
         }
 
         // Argument.create( .. )
@@ -547,11 +590,30 @@ public final class ArgumentExpUtils {
         );
     }
 
-    private static ExpressionDef pushWildcardBounds(AnnotationMetadata annotationMetadataWithDefaults,
-                                                    ClassTypeDef owningType,
-                                                    List<? extends ClassElement> bounds,
-                                                    Set<Object> visitedTypes,
-                                                    Function<String, ExpressionDef> loadClassValueExpressionFn) {
+    /**
+     * The bounds to record for a type variable, empty when the type the variable compiles to already says what
+     * they are: a variable with a single bound erases to that bound, so only several bounds, or a resolved
+     * variable whose erasure is no longer its bound, need them written out.
+     *
+     * @param element The element
+     * @return The bounds to record
+     */
+    private static List<? extends ClassElement> recordedBounds(TypedElement element) {
+        if (element instanceof WildcardElement || !(element instanceof GenericPlaceholderElement placeholderElement)) {
+            return List.of();
+        }
+        List<? extends ClassElement> bounds = placeholderElement.getBounds();
+        if (bounds.size() < 2 && placeholderElement.getResolved().isEmpty()) {
+            return List.of();
+        }
+        return bounds;
+    }
+
+    private static ExpressionDef pushBounds(AnnotationMetadata annotationMetadataWithDefaults,
+                                            ClassTypeDef owningType,
+                                            List<? extends ClassElement> bounds,
+                                            Set<Object> visitedTypes,
+                                            Function<String, ExpressionDef> loadClassValueExpressionFn) {
         if (bounds.isEmpty()) {
             return ExpressionDef.nullValue();
         }

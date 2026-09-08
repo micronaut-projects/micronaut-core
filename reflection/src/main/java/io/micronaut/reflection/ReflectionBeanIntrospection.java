@@ -929,7 +929,8 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         }
         if (argument instanceof GenericPlaceholder<?> placeholder) {
             // a property of type `T` stays a variable, as it is to a generated introspection
-            return Argument.ofTypeVariable((Class) argument.getType(), argument.getName(), placeholder.getVariableName(), metadata, typeParameters);
+            return Argument.ofTypeVariable((Class) argument.getType(), argument.getName(), placeholder.getVariableName(), metadata, typeParameters,
+                placeholder.getBounds().toArray(Argument[]::new));
         }
         return Argument.of(argument.getType(), argument.getName(), metadata, typeParameters);
     }
@@ -1549,7 +1550,8 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         @SuppressWarnings({"unchecked", "rawtypes"})
         public Argument<P> asArgument() {
             if (typed instanceof GenericPlaceholder<?> placeholder) {
-                return Argument.ofTypeVariable((Class) getType(), getName(), placeholder.getVariableName(), this.getAnnotationMetadata(), typed.getTypeParameters());
+                return Argument.ofTypeVariable((Class) getType(), getName(), placeholder.getVariableName(), this.getAnnotationMetadata(), typed.getTypeParameters(),
+                    placeholder.getBounds().toArray(Argument[]::new));
             }
             return super.asArgument();
         }
