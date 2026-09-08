@@ -290,13 +290,13 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
     @Nullable
     private Object resolveInjectionPoint(BeanResolutionContext resolutionContext, InjectionPointSpec injectionPoint) {
         Argument<Object> argument = (Argument<Object>) injectionPoint.argument();
-        Qualifier<Object> qualifier = (Qualifier<Object>) injectionPoint.qualifier();
+        Qualifier<Object> pointQualifier = (Qualifier<Object>) injectionPoint.qualifier();
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
             try {
                 if (argument.isDeclaredNullable()) {
-                    return resolutionContext.findBean(argument, qualifier).orElse(null);
+                    return resolutionContext.findBean(argument, pointQualifier).orElse(null);
                 }
-                return resolutionContext.getBean(argument, qualifier);
+                return resolutionContext.getBean(argument, pointQualifier);
             } catch (NoSuchBeanException e) {
                 throw new DependencyInjectionException(resolutionContext, e);
             }
@@ -311,27 +311,6 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
      */
     RuntimeBeanDefinition.DisposalContext newDisposalContext(BeanResolutionContext resolutionContext) {
         return new ResolutionLookupContext(resolutionContext);
-    }
-
-    /**
-     * Destroys the dependent objects a disposal resolved, in the reverse of the order they were resolved in
-     * and as dependents, the way the bean context destroys the dependents of a bean: what the disposer
-     * resolved is owned by the disposal, so a {@link LifeCycle} among them is no more stopped than one
-     * resolved for an injection point is.
-     *
-     * @param context    The bean context
-     * @param dependents The dependent registrations
-     */
-    private static void destroyDependents(BeanContext context, List<BeanRegistration<?>> dependents) {
-        ListIterator<BeanRegistration<?>> i = dependents.listIterator(dependents.size());
-        while (i.hasPrevious()) {
-            BeanRegistration<?> dependent = i.previous();
-            if (context instanceof DefaultBeanContext defaultBeanContext) {
-                defaultBeanContext.destroyDependentBean(dependent);
-            } else {
-                context.destroyBean(dependent);
-            }
-        }
     }
 
     /**
@@ -399,7 +378,7 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
 
         @Override
         public <V> V getBean(Argument<V> type, @Nullable Qualifier<V> qualifier) {
-            Objects.requireNonNull(type, "Bean type cannot be null");
+            Objects.requireNonNull(type, MSG_BEAN_TYPE_CANNOT_BE_NULL);
             try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(DefaultRuntimeBeanDefinition.this, type)) {
                 try {
                     return resolutionContext.getBean(type, qualifier);
@@ -411,7 +390,7 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
 
         @Override
         public <V> Optional<V> findBean(Argument<V> type, @Nullable Qualifier<V> qualifier) {
-            Objects.requireNonNull(type, "Bean type cannot be null");
+            Objects.requireNonNull(type, MSG_BEAN_TYPE_CANNOT_BE_NULL);
             try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(DefaultRuntimeBeanDefinition.this, type)) {
                 return resolutionContext.findBean(type, qualifier);
             }
@@ -419,7 +398,7 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
 
         @Override
         public <V> Collection<V> getBeansOfType(Argument<V> type, @Nullable Qualifier<V> qualifier) {
-            Objects.requireNonNull(type, "Bean type cannot be null");
+            Objects.requireNonNull(type, MSG_BEAN_TYPE_CANNOT_BE_NULL);
             try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(DefaultRuntimeBeanDefinition.this, type)) {
                 return resolutionContext.getBeansOfType(type, qualifier);
             }
@@ -532,6 +511,27 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
         @Override
         public T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
             return dispose(context, bean);
+        }
+
+        /**
+         * Destroys the dependent objects a disposal resolved, in the reverse of the order they were resolved in
+         * and as dependents, the way the bean context destroys the dependents of a bean: what the disposer
+         * resolved is owned by the disposal, so a {@link LifeCycle} among them is no more stopped than one
+         * resolved for an injection point is.
+         *
+         * @param context    The bean context
+         * @param dependents The dependent registrations
+         */
+        private static void destroyDependents(BeanContext context, List<BeanRegistration<?>> dependents) {
+            ListIterator<BeanRegistration<?>> i = dependents.listIterator(dependents.size());
+            while (i.hasPrevious()) {
+                BeanRegistration<?> dependent = i.previous();
+                if (context instanceof DefaultBeanContext defaultBeanContext) {
+                    defaultBeanContext.destroyDependentBean(dependent);
+                } else {
+                    context.destroyBean(dependent);
+                }
+            }
         }
     }
 
