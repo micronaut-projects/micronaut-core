@@ -46,9 +46,7 @@ final class AopIntroductionProxySupportedBeanElementCreator<R> extends DeclaredB
                                                     boolean isAopProxy,
                                                     ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilder) {
         super(classElement, visitorContext, isAopProxy, beanDefinitionBuilder);
-        if (classElement.isFinal()) {
-            throw new ProcessingException(classElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.getName());
-        }
+        ProxyableTypeValidator.validateProxyable(classElement, classElement);
         introductionProxyBuilder = beanDefinitionBuilderFactory.introductionProxy(classElement);
     }
 
