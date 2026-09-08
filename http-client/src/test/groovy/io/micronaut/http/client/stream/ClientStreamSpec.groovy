@@ -74,6 +74,45 @@ class ClientStreamSpec extends Specification {
         !ex.response.getBody(Map).isPresent()
     }
 
+    void "test a stream error body is buffered when buffer-error-body-for-streaming is enabled"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.http.client.buffer-error-body-for-streaming': true
+        ])
+        def client = server.applicationContext.getBean(BookClientNoErrorType)
+
+        when:
+        Flux.from(client.errorStream()).blockFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(Map).isPresent()
+        ex.response.getBody(Map).get().get("error") == "from server"
+
+        cleanup:
+        server.close()
+    }
+
+    void "test a buffered stream error body with a non-json content type is not forced into JsonError"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.http.client.buffer-error-body-for-streaming': true
+        ])
+        def client = server.applicationContext.getBean(BookClientNoErrorType)
+
+        when:
+        Flux.from(client.errorStreamText()).blockFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.response.getBody(String).isPresent()
+        ex.response.getBody(String).get() == "from server"
+        ex.message == "from server"
+
+        cleanup:
+        server.close()
+    }
+
     void "test a stream that returns an error response"() {
         when:
         Flux.from(bookClient.errorStream2()).blockFirst()
@@ -97,6 +136,9 @@ class ClientStreamSpec extends Specification {
 
         @Get("/error")
         Publisher<Book> errorStream()
+
+        @Get("/error-text")
+        Publisher<Book> errorStreamText()
     }
 
     @Controller("/rxjava/stream")
@@ -127,6 +169,12 @@ class ClientStreamSpec extends Specification {
         HttpResponse<Map> errorStream2() {
             return HttpResponse.serverError()
                     .contentLength(0)
+        }
+
+        @Get("/error-text")
+        HttpResponse<String> errorStreamText() {
+            return HttpResponse.serverError("from server")
+                    .contentType(MediaType.TEXT_PLAIN_TYPE)
         }
     }
 
