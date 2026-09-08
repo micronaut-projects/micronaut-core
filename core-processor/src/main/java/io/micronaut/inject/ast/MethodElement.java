@@ -55,6 +55,15 @@ public interface MethodElement extends MemberElement {
      * NOTE: For a constructor {@link #getAnnotationMetadata()} will not combine the class annotations.
      * See {@link #getDeclaredMethodAnnotationMetadata()} for the annotations of this declaration only.
      *
+     * <p>Implementations that support adding or removing annotations at compilation time are expected to
+     * override this method and return a delegate backed by the method's own mutable annotation metadata,
+     * typically built with {@link io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper}.
+     * The default returned here cannot separate the method annotations from the class annotations, so it
+     * approximates the read side with {@link #getAnnotationMetadata()} and routes the write side to
+     * {@link Element#annotate(String, java.util.function.Consumer)} and friends on this element. For an
+     * element that does not support mutation either, the resulting exception names this element rather
+     * than the delegate.</p>
+     *
      * @return The method annotation metadata
      * @since 4.0.0
      */
@@ -63,6 +72,36 @@ public interface MethodElement extends MemberElement {
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
                 return MethodElement.this.getAnnotationMetadata();
+            }
+
+            @Override
+            public <T extends Annotation> AnnotationMetadata annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+                MethodElement.this.annotate(annotationType, consumer);
+                return getAnnotationMetadata();
+            }
+
+            @Override
+            public <T extends Annotation> AnnotationMetadata annotate(AnnotationValue<T> annotationValue) {
+                MethodElement.this.annotate(annotationValue);
+                return getAnnotationMetadata();
+            }
+
+            @Override
+            public AnnotationMetadata removeAnnotation(String annotationType) {
+                MethodElement.this.removeAnnotation(annotationType);
+                return getAnnotationMetadata();
+            }
+
+            @Override
+            public <T extends Annotation> AnnotationMetadata removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+                MethodElement.this.removeAnnotationIf(predicate);
+                return getAnnotationMetadata();
+            }
+
+            @Override
+            public AnnotationMetadata removeStereotype(String annotationType) {
+                MethodElement.this.removeStereotype(annotationType);
+                return getAnnotationMetadata();
             }
         };
     }
@@ -399,6 +438,15 @@ public interface MethodElement extends MemberElement {
 
     /**
      * Creates a {@link MethodElement} for the given parameters.
+     *
+     * <p>The returned element is an immutable value object: it has no native type and its annotation
+     * metadata is fixed at creation, so it does not support adding or removing annotations at
+     * compilation time. It is intended for methods synthesised while writing generated code, which no
+     * {@link io.micronaut.inject.visitor.TypeElementVisitor} observes. For a synthetic method that is
+     * returned from {@link ClassElement#getEnclosedElements(ElementQuery)}, and hence can be visited
+     * and annotated, use
+     * {@link #of(ClassElement, ClassElement, io.micronaut.core.annotation.AnnotationMetadataProvider, io.micronaut.core.annotation.AnnotationMetadataProvider, AbstractAnnotationMetadataBuilder, ClassElement, ClassElement, String, boolean, boolean, ParameterElement...)}
+     * instead, which is backed by an annotation metadata builder.</p>
      *
      * @param declaredType       The declaring type
      * @param annotationMetadata The annotation metadata
