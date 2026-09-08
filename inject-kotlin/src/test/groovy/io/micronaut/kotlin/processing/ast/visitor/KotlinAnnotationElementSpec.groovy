@@ -29,6 +29,10 @@ class MyBean
         !InheritedVisitor.RESULTS['test.MyPlainAnn']
         InheritedVisitor.RESULTS[Introspected.name]
         !InheritedVisitor.RESULTS[Singleton.name]
+
+        and: "a copy of the element is still an annotation element and keeps the answer"
+        InheritedVisitor.RESULTS['test.MyInheritedAnn:copy']
+        !InheritedVisitor.RESULTS['test.MyPlainAnn:copy']
     }
 
     static class InheritedVisitor implements TypeElementVisitor<Object, Object> {
@@ -40,6 +44,8 @@ class MyBean
             for (String name : ['test.MyInheritedAnn', 'test.MyPlainAnn', Introspected.name, Singleton.name]) {
                 visitorContext.getClassElement(name).ifPresent { ClassElement ce ->
                     RESULTS.put(name, ((AnnotationElement) ce).isInherited())
+                    def copy = ce.withAnnotationMetadata(ce.getAnnotationMetadata())
+                    RESULTS.put(name + ':copy', ((AnnotationElement) copy).isInherited())
                 }
             }
         }

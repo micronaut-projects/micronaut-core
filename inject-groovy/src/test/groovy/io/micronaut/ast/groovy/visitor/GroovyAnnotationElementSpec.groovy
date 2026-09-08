@@ -40,6 +40,24 @@ package test
         !((AnnotationElement) element).isInherited()
     }
 
+    void "test isInherited survives a copy of the element"() {
+        given:
+        def element = (AnnotationElement) buildClassElement("""
+package test
+
+import java.lang.annotation.Inherited
+
+@Inherited
+@interface MyAnn {
+}
+""")
+        def copy = element.withAnnotationMetadata(element.getAnnotationMetadata())
+
+        expect:
+        copy instanceof AnnotationElement
+        ((AnnotationElement) copy).isInherited()
+    }
+
     void "test isInherited for annotations on the classpath"() {
         given:
         def visitorContext = newVisitorContext()

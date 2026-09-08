@@ -39,6 +39,29 @@ package test;
         !((AnnotationElement) element).isInherited()
     }
 
+    void "test isInherited survives a copy of the element"() {
+        given:
+        def element = (AnnotationElement) buildClassElement("""
+package test;
+
+import java.lang.annotation.Inherited;
+
+@Inherited
+@interface MyAnn {
+}
+""")
+        def copy = element.withAnnotationMetadata(element.getAnnotationMetadata())
+
+        expect:
+        copy instanceof AnnotationElement
+        ((AnnotationElement) copy).isInherited()
+    }
+
+    void "test the default isInherited implementation reports false"() {
+        expect: "an implementation with no native element to inspect cannot answer the question"
+        !new NoNativeTypeAnnotationElement().isInherited()
+    }
+
     void "test isInherited for annotations on the classpath"() {
         given:
         InheritedVisitor.RESULTS.clear()
@@ -58,6 +81,48 @@ class MyBean {
     @Override
     protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
         return [new InheritedVisitor()]
+    }
+
+    /**
+     * An {@link AnnotationElement} that doesn't override {@code isInherited()}, to pin the behaviour
+     * of the interface default.
+     */
+    static class NoNativeTypeAnnotationElement implements AnnotationElement {
+
+        @Override
+        String getName() {
+            return 'test.MyAnn'
+        }
+
+        @Override
+        boolean isProtected() {
+            return false
+        }
+
+        @Override
+        boolean isPublic() {
+            return true
+        }
+
+        @Override
+        Object getNativeType() {
+            return this
+        }
+
+        @Override
+        boolean isAssignable(String type) {
+            return false
+        }
+
+        @Override
+        ClassElement toArray() {
+            throw new UnsupportedOperationException()
+        }
+
+        @Override
+        ClassElement fromArray() {
+            throw new UnsupportedOperationException()
+        }
     }
 
     static class InheritedVisitor implements TypeElementVisitor<Object, Object> {
