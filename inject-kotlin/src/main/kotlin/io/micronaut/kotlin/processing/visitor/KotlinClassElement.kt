@@ -648,6 +648,14 @@ internal open class KotlinClassElement(
 
     override fun isAbstract(): Boolean = declaration.isAbstract()
 
+    override fun isSealed() = declaration.modifiers.contains(Modifier.SEALED)
+
+    override fun getPermittedSubclasses(): Collection<ClassElement> =
+        declaration.getSealedSubclasses()
+            .mapNotNull { it.qualifiedName?.asString() }
+            .mapNotNull { visitorContext.getClassElement(it).orElse(null) }
+            .toList()
+
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata) =
         super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ClassElement
 

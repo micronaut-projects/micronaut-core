@@ -15,7 +15,7 @@ One or many instances of api:aop.Interceptor[] can be associated with an ann:aop
 
 At an implementation level, the <<compilerArch, Micronaut Compiler>> will visit types that are meta-annotated with ann:aop.InterceptorBinding[] and construct a new instance of api:aop.writer.AopProxyWriter[] which uses the ASM bytecode generation library to generate a subclass (or an implementation in the case of interfaces) of the annotated type.
 
-NOTE: Micronaut at no point modifies existing user byte code, the use of build-time generated proxies allows Micronaut to generate additional code that sits alongside user code and enhances behaviour. This approach does have limitations however, for example it is required that annotated types are non-final and AOP advice cannot be applied to final or effectively final types such as Java 17 Records.
+NOTE: Micronaut at no point modifies existing user byte code, the use of build-time generated proxies allows Micronaut to generate additional code that sits alongside user code and enhances behaviour. This approach does have limitations however, for example it is required that annotated types are non-final and non-sealed, and AOP advice cannot be applied to final or effectively final types such as Java 17 Records, nor to sealed types, which permit only the subclasses they list.
 
 For example given the following annotation:
 

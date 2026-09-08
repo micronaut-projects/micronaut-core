@@ -214,6 +214,9 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
             if (originalProducedType.isFinal()) { // Test on the original type to avoid KSP annotations isFinal bypass, because of the new merged annotations
                 throw new ProcessingException(producingElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + producedType.getName());
             }
+            if (originalProducedType.isSealed()) {
+                throw new ProcessingException(producingElement, "Cannot apply AOP advice to sealed type. Type must be made non-sealed to support proxying: " + producedType.getName());
+            }
 
             MethodElement constructorElement = producedType.getPrimaryConstructor().orElse(null);
             MethodElement defaultConstructor = producedType.getDefaultConstructor().orElse(null);
