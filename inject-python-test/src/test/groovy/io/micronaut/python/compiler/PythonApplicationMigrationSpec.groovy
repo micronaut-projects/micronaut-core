@@ -27,9 +27,13 @@ class PythonApplicationMigrationSpec extends Specification {
         compileUsingOldFqcn()
 
         then:
+        // the annotation no longer resolves, so the compiler reports the missing symbol and where
+        // it was referenced; it used to surface as an IllegalArgumentException from the processor,
+        // which told the user nothing about the package having moved
         def e = thrown(RuntimeException)
-        e.cause instanceof IllegalArgumentException
-        e.cause.message.contains('The argument does not represent an annotation type')
+        e.message.contains('cannot find symbol')
+        e.message.contains('class PythonApplication')
+        e.message.contains('package io.micronaut.python.processing.annotation')
     }
 
     private static Iterable<JavaFileObject> compileUsingOldFqcn() {

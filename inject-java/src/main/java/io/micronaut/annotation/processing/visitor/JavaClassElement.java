@@ -90,6 +90,8 @@ import java.util.stream.Collectors;
 @Internal
 public class JavaClassElement extends AbstractTypeAwareJavaElement implements ArrayableClassElement {
     private static final String KOTLIN_METADATA = "kotlin.Metadata";
+    private static final Set<String> OPTIONAL_TYPE_NAMES = Set.of(
+        "java.util.Optional", "java.util.OptionalInt", "java.util.OptionalLong", "java.util.OptionalDouble");
     private static final String PREFIX_IS = "is";
     protected final TypeElement classElement;
     protected final int arrayDimensions;
@@ -667,7 +669,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         if (getName().equals(type)) {
             return true; // Same type
         }
-        TypeElement otherElement = visitorContext.getElements().getTypeElement(type);
+        TypeElement otherElement = visitorContext.getTypeElement(type);
         if (otherElement != null) {
             return isAssignable(otherElement);
         }
@@ -689,20 +691,28 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     @Override
+    public boolean isOptional() {
+        // the four optional types are final and isAssignable compares erasures, so matching the
+        // erased name is exactly what the default does - without four type lookups per property
+        return OPTIONAL_TYPE_NAMES.contains(erasedName());
+    }
+
+    @Override
     public Optional<ClassElement> getOptionalValueType() {
-        if (isAssignable(Optional.class)) {
-            return getFirstTypeArgument().or(() -> visitorContext.getClassElement(Object.class));
-        }
-        if (isAssignable(OptionalLong.class)) {
-            return visitorContext.getClassElement(Long.class);
-        }
-        if (isAssignable(OptionalDouble.class)) {
-            return visitorContext.getClassElement(Double.class);
-        }
-        if (isAssignable(OptionalInt.class)) {
-            return visitorContext.getClassElement(Integer.class);
-        }
-        return Optional.empty();
+        return switch (erasedName()) {
+            case "java.util.Optional" -> getFirstTypeArgument().or(() -> visitorContext.getClassElement(Object.class));
+            case "java.util.OptionalLong" -> visitorContext.getClassElement(Long.class);
+            case "java.util.OptionalDouble" -> visitorContext.getClassElement(Double.class);
+            case "java.util.OptionalInt" -> visitorContext.getClassElement(Integer.class);
+            default -> Optional.empty();
+        };
+    }
+
+    /**
+     * @return the qualified name of the erasure of this type, which is what {@link #isAssignable(String)} compares
+     */
+    private String erasedName() {
+        return classElement.getQualifiedName().toString();
     }
 
     private boolean isAssignable(TypeElement otherElement) {
@@ -767,6 +777,11 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         var staticCreators = new ArrayList<>(ArrayableClassElement.super.getAccessibleStaticCreators());
         if (!staticCreators.isEmpty()) {
             return staticCreators;
+        }
+        if (!isKotlinClass(classElement)) {
+            // only a Kotlin class can have a companion object; skip the lookup, which for a Java
+            // class is two guaranteed misses through the compiler's global type lookup
+            return List.of();
         }
         return visitorContext.getClassElement(getName() + "$Companion", elementAnnotationMetadataFactory)
             .filter(io.micronaut.inject.ast.Element::isStatic)

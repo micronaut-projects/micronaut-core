@@ -36,6 +36,7 @@ import java.io.Writer;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -98,12 +99,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             return;
         }
         // We need VisitorContext for richer type info where available.
-        final VisitorContext vc;
-        if (outputVisitor instanceof VisitorContext) {
-            vc = (VisitorContext) outputVisitor;
-        } else {
-            vc = null;
-        }
+        final TypeResolver vc = new TypeResolver(outputVisitor instanceof VisitorContext visitorContext ? visitorContext : null);
 
         // Build quick index of properties by path for efficient filtering
         final List<PropertyMetadata> props = metadataBuilder.getProperties();
@@ -128,7 +124,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
 
     private void writeSchemaFor(ConfigurationMetadata cm,
                                 List<PropertyMetadata> allProps,
-                                @Nullable VisitorContext vc,
+                                TypeResolver vc,
                                 Writer out) throws IOException {
         // Determine prefix and whether this is EachProperty
         String fullPrefix = cm.getName(); // may contain .* or [*]
@@ -189,7 +185,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             comma(out);
             emitAdditionalPropertiesRef(out);
             // defs entry schema
-            emitEntryDefs(cm, basePrefix, allProps, vc, out, true, vc != null ? vc.getClassElement(cm.getType()).orElse(null) : null);
+            emitEntryDefs(cm, basePrefix, allProps, vc, out, true, vc.resolve(cm.getType()));
         } else if (isEachList) {
             // type: array; minItems:1; items: $ref $defs.Entry
             attr(out, ATTR_TYPE);
@@ -200,7 +196,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             comma(out);
             attr(out, "items");
             refEntry(out);
-            emitEntryDefs(cm, basePrefix, allProps, vc, out, false, vc != null ? vc.getClassElement(cm.getType()).orElse(null) : null);
+            emitEntryDefs(cm, basePrefix, allProps, vc, out, false, vc.resolve(cm.getType()));
         } else {
             // Plain configuration object
             attr(out, ATTR_TYPE);
@@ -208,7 +204,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             comma(out);
             // properties: object
             attr(out, ATTR_PROPERTIES);
-            ClassElement classElement = vc != null ? vc.getClassElement(cm.getType()).orElse(null) : null;
+            ClassElement classElement = vc.resolve(cm.getType());
             Set<String> required = writePropertiesObject(out, cm, basePrefix, allProps, vc, /*containerMode*/ null, classElement);
             emitRequired(out, required);
             // keep additionalProperties default (omitted) or explicitly true
@@ -235,7 +231,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     private void emitEntryDefs(ConfigurationMetadata cm,
                                String basePrefix,
                                List<PropertyMetadata> allProps,
-                               @Nullable VisitorContext vc,
+                               TypeResolver vc,
                                Writer out,
                                boolean mapMode,
                                @Nullable ClassElement classElement) throws IOException {
@@ -254,6 +250,38 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         out.write('}');
     }
 
+    /**
+     * Resolves class elements by name and caches them for the duration of one write, so that
+     * a configuration class and its bean properties are resolved once instead of once per property.
+     */
+    private static final class TypeResolver {
+
+        private final @Nullable VisitorContext visitorContext;
+        private final Map<String, Optional<ClassElement>> resolved = new HashMap<>();
+        private final Map<String, List<PropertyElement>> properties = new HashMap<>();
+
+        TypeResolver(@Nullable VisitorContext visitorContext) {
+            this.visitorContext = visitorContext;
+        }
+
+        boolean hasVisitorContext() {
+            return visitorContext != null;
+        }
+
+        @Nullable
+        ClassElement resolve(String name) {
+            if (visitorContext == null) {
+                return null;
+            }
+            return resolved.computeIfAbsent(name, visitorContext::getClassElement).orElse(null);
+        }
+
+        List<PropertyElement> beanProperties(ClassElement classElement) {
+            return properties.computeIfAbsent(classElement.getName(), n -> classElement.getBeanProperties(
+                PropertyElementQuery.of(classElement).visibility(BeanProperties.Visibility.ANY)));
+        }
+    }
+
     private enum ContainerMode {
         MAP,
         LIST
@@ -263,21 +291,22 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
                                               ConfigurationMetadata cm,
                                               String basePrefix,
                                               List<PropertyMetadata> allProps,
-                                              @Nullable VisitorContext vc,
+                                              TypeResolver vc,
                                               @Nullable ContainerMode containerMode,
                                               @Nullable ClassElement classElement) throws IOException {
         // Build nested property tree from matching properties
         Map<String, Object> tree = new LinkedHashMap<>();
         Set<String> required = new java.util.LinkedHashSet<>();
+        final String matchPrefix;
+        if (containerMode == ContainerMode.MAP) {
+            matchPrefix = basePrefix + ".*.";
+        } else if (containerMode == ContainerMode.LIST) {
+            matchPrefix = basePrefix + "[*].";
+        } else {
+            matchPrefix = basePrefix + ".";
+        }
         for (PropertyMetadata pm : allProps) {
             String path = pm.getPath();
-            String matchPrefix = basePrefix + ".";
-            if (containerMode == ContainerMode.MAP) {
-                matchPrefix = basePrefix + ".*.";
-            }
-            if (containerMode == ContainerMode.LIST) {
-                matchPrefix = basePrefix + "[*].";
-            }
             if (!path.startsWith(matchPrefix)) {
                 continue;
             }
@@ -317,7 +346,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
         return required;
     }
 
-    private void emitProperties(Writer out, @Nullable VisitorContext vc, @Nullable ClassElement classElement, Map<String, Object> tree, Set<String> required) throws IOException {
+    private void emitProperties(Writer out, TypeResolver vc, @Nullable ClassElement classElement, Map<String, Object> tree, Set<String> required) throws IOException {
         out.write('{');
         Iterator<Map.Entry<String, Object>> it = tree.entrySet().iterator();
         while (it.hasNext()) {
@@ -333,7 +362,7 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     }
 
     @SuppressWarnings("unchecked")
-    private void writeSchemaNode(Writer out, Object node, @Nullable VisitorContext vc, @Nullable ClassElement classElement, @Nullable String currentKey, Set<String> requiredOut) throws IOException {
+    private void writeSchemaNode(Writer out, Object node, TypeResolver vc, @Nullable ClassElement classElement, @Nullable String currentKey, Set<String> requiredOut) throws IOException {
         if (node instanceof PropertyMetadata pm) {
             // Leaf property schema
             out.write('{');
@@ -370,9 +399,9 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
             out.write(',');
             attr(out, "x-micronaut-path");
             str(out, pm.getPath());
-            if (vc != null) {
+            if (vc.hasVisitorContext()) {
                 if (classElement != null) {
-                    PropertyElement pe = findProperty(classElement, currentKey, pm);
+                    PropertyElement pe = findProperty(vc, classElement, currentKey, pm);
                     if (pe != null) {
                         applyValidationConstraints(out, pe, currentKey, requiredOut);
                         if (!wroteDefault) {
@@ -426,20 +455,19 @@ public final class JsonSchemaConfigurationMetadataWriter implements Configuratio
     }
 
     @Nullable
-    private static PropertyElement findProperty(ClassElement classElement, @Nullable String currentKey, PropertyMetadata pm) {
-        return classElement.getBeanProperties(PropertyElementQuery.of(classElement)
-                .visibility(BeanProperties.Visibility.ANY))
+    private static PropertyElement findProperty(TypeResolver vc, ClassElement classElement, @Nullable String currentKey, PropertyMetadata pm) {
+        return vc.beanProperties(classElement)
             .stream().filter(p -> p.getName().equals(currentKey) || p.getName().equals(pm.getName()))
             .findFirst().orElse(null);
     }
 
-    private void writeTypeForProperty(Writer out, PropertyMetadata pm, @Nullable VisitorContext vc) throws IOException {
+    private void writeTypeForProperty(Writer out, PropertyMetadata pm, TypeResolver vc) throws IOException {
         String fqcn = pm.getType();
         // Try to refine via VisitorContext (generics, enums)
-        ClassElement ce = (vc != null) ? vc.getClassElement(pm.getDeclaringType()).orElse(null) : null;
+        ClassElement ce = vc.resolve(pm.getDeclaringType());
         PropertyElement pe = null;
         if (ce != null) {
-            pe = findProperty(ce, null, pm);
+            pe = findProperty(vc, ce, null, pm);
         }
         if (pe != null) {
             // Optional

@@ -244,7 +244,7 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
     }
 
     private boolean notProcessed(String prop, ClassElement declaringType) {
-        return metadataBuilder.getProperties().stream().noneMatch(p -> p.getName().equals(prop) && p.getDeclaringType().equals(declaringType.getName()));
+        return metadataBuilder.findProperty(declaringType.getName(), prop) == null;
     }
 
     private void visitConfigurationBuilder(String prefix, ConfigurationBuilderDefinition builderDefinition) {
@@ -308,7 +308,7 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
                                                      ParameterElement parameter,
                                                      VisitorContext visitorContext) {
         if (ConfigurationReaderVisitor.isPropertyParameter(parameter, visitorContext)) {
-            PropertyMetadata pm = metadataBuilder.getProperties().stream().filter(p -> p.getName().equals(parameter.getName()) && p.getDeclaringType().equals(declaringType.getName())).findFirst().orElse(null);
+            PropertyMetadata pm = metadataBuilder.findProperty(declaringType.getName(), parameter.getName());
             if (pm == null) {
                 pm = metadataBuilder.visitProperty(
                     parameter.getMethodElement().getOwningType(),
@@ -358,7 +358,7 @@ public class ConfigurationMetadataWriterVisitor implements TypeElementVisitor<Co
         boolean isPropertyParameter = isPropertyParameter(method.getGenericReturnType(), context);
         final String propertyName = propertyElement.getName();
         if (isPropertyParameter) {
-            PropertyMetadata pm = metadataBuilder.getProperties().stream().filter(p -> p.getName().equals(propertyName) && p.getDeclaringType().equals(method.getOwningType().getName())).findFirst().orElse(null);
+            PropertyMetadata pm = metadataBuilder.findProperty(method.getOwningType().getName(), propertyName);
             if (pm == null) {
                 pm = metadataBuilder.visitProperty(
                     method.getOwningType(),
