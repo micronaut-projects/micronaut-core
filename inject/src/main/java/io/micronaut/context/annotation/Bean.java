@@ -45,6 +45,10 @@ import java.lang.annotation.Target;
 public @interface Bean {
 
     /**
+     * The name of a public, no-argument method of the bean type to invoke when the bean is destroyed. Can be declared
+     * on the bean class itself or on the factory method or field that produces the bean. A name that resolves to no
+     * such method is a compilation error.
+     *
      * @return The method to invoke to destroy the bean
      */
     String preDestroy() default "";
