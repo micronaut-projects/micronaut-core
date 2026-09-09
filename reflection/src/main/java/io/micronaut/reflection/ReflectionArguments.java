@@ -357,7 +357,8 @@ public final class ReflectionArguments {
             arguments[i] = toType(typeParameters[i], typeVariables);
         }
         Class<?> rawType = argument.getType();
-        // a raw argument keeps the type arguments the type declares, and renders back as the bare type it was
+        // a raw argument keeps the type arguments the type declares, and renders back as the bare type it
+        // was written as, not as one parameterized by the variables it kept
         Type type = arguments.length == 0 || argument.isRawType() ? rawType : new ReflectionParameterizedType(rawType, arguments);
         if (typeVariables && argument instanceof GenericPlaceholder<?> placeholder) {
             return new ReflectionTypeVariable(placeholder.getVariableName(), type);

@@ -31,6 +31,12 @@ import org.jspecify.annotations.Nullable;
 @Internal
 final class DefaultRawArgument<T> extends DefaultArgument<T> {
 
+    /**
+     * The name this argument was given, which is not {@link #getName()}: an argument of no name answers the
+     * decapitalized simple name of its type there, and rebuilding through that would give the new argument a
+     * name the original did not have. {@link DefaultGenericPlaceholder} keeps the name it was given for the
+     * same reason.
+     */
     @Nullable
     private final String argumentName;
 

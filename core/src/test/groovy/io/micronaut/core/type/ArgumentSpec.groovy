@@ -191,6 +191,11 @@ class ArgumentSpec extends Specification {
         raw.withName('other').typeParameters*.type == [Object]
         raw.withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA).isRawType()
 
+        and: 'a raw argument of no name is not given one by being rebuilt, as a placeholder is not'
+        Argument.ofRawType(List, null, null, Argument.ZERO_ARGUMENTS)
+                .withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA).toString() ==
+                Argument.ofRawType(List, null, null, Argument.ZERO_ARGUMENTS).toString()
+
         and: 'rawness does not take part in equality, as it does not for a type variable'
         raw == Argument.of(List, 'raw', Argument.ofTypeVariable(Object, 'E'))
         raw.hashCode() == Argument.of(List, 'raw', Argument.ofTypeVariable(Object, 'E')).hashCode()

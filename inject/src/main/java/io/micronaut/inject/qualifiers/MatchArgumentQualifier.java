@@ -376,7 +376,7 @@ public final class MatchArgumentQualifier<T> implements Qualifier<T> {
         // a raw type keeps the type arguments the type declares, so it says it is raw rather than being
         // recognised by having none; an argument built without them is raw all the same
         return argument.isRawType()
-            || argument.getTypeParameters().length == 0 && argument.getType().getTypeParameters().length > 0;
+            || (argument.getTypeParameters().length == 0 && argument.getType().getTypeParameters().length > 0);
     }
 
     private static boolean isUnboundedTypeVariableCandidate(Argument<?> argument) {
