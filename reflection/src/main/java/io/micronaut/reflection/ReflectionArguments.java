@@ -357,7 +357,8 @@ public final class ReflectionArguments {
             arguments[i] = toType(typeParameters[i], typeVariables);
         }
         Class<?> rawType = argument.getType();
-        Type type = arguments.length == 0 ? rawType : new ReflectionParameterizedType(rawType, arguments);
+        // a raw argument keeps the type arguments the type declares, and renders back as the bare type it was
+        Type type = arguments.length == 0 || argument.isRawType() ? rawType : new ReflectionParameterizedType(rawType, arguments);
         if (typeVariables && argument instanceof GenericPlaceholder<?> placeholder) {
             return new ReflectionTypeVariable(placeholder.getVariableName(), type);
         }
@@ -373,13 +374,23 @@ public final class ReflectionArguments {
     }
 
     /**
-     * Rebuilds an argument with other metadata or type parameters, keeping a placeholder a placeholder.
+     * Rebuilds an argument with another name, metadata or type parameters, keeping what the argument is: a
+     * placeholder stays a placeholder with the bounds it was declared with, and a raw type stays raw.
+     *
+     * @param argument       The argument to rebuild
+     * @param name           The name of the returned argument, or {@code null}
+     * @param metadata       The metadata of the returned argument
+     * @param typeParameters The type parameters of the returned argument
+     * @return The rebuilt argument
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static Argument<?> rebuild(Argument<?> argument, @Nullable String name, AnnotationMetadata metadata, Argument<?>[] typeParameters) {
+    static Argument<?> rebuild(Argument<?> argument, @Nullable String name, AnnotationMetadata metadata, Argument<?>[] typeParameters) {
         if (argument instanceof GenericPlaceholder<?> placeholder) {
             return Argument.ofTypeVariable((Class) argument.getType(), name, placeholder.getVariableName(), metadata, typeParameters,
                 placeholder.getBounds().toArray(Argument[]::new));
+        }
+        if (argument.isRawType()) {
+            return Argument.ofRawType((Class) argument.getType(), name, metadata, typeParameters);
         }
         return Argument.of((Class) argument.getType(), name, metadata, typeParameters);
     }
@@ -572,7 +583,17 @@ public final class ReflectionArguments {
             Type[] bounds = lowerBounds.length == 0 ? wt.getUpperBounds() : lowerBounds;
             return toArgument(name, bounds.length == 0 ? Object.class : bounds[0], substitutions, resolving);
         } else if (type instanceof Class<?> cl) {
-            return Argument.of(cl, name);
+            TypeVariable<?>[] variables = cl.getTypeParameters();
+            if (variables.length == 0) {
+                return Argument.of(cl, name);
+            }
+            // a generic type named without its type arguments is a raw usage of it, and compiles to the type
+            // arguments the type declares, the way the processors write it
+            Argument<?>[] typeArgs = new Argument[variables.length];
+            for (int i = 0; i < typeArgs.length; i++) {
+                typeArgs[i] = toArgument(variables[i].getName(), variables[i], Map.of(), resolving);
+            }
+            return Argument.ofRawType(cl, name, null, typeArgs);
         } else if (type instanceof TypeVariable<?> tv) {
             AnnotatedType sub = substitutions.get(tv);
             if (sub != null) {

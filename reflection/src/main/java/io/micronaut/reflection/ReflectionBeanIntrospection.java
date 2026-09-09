@@ -927,12 +927,9 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         if (metadata.isEmpty() && !additional.isEmpty()) {
             metadata = additional;
         }
-        if (argument instanceof GenericPlaceholder<?> placeholder) {
-            // a property of type `T` stays a variable, as it is to a generated introspection
-            return Argument.ofTypeVariable((Class) argument.getType(), argument.getName(), placeholder.getVariableName(), metadata, typeParameters,
-                placeholder.getBounds().toArray(Argument[]::new));
-        }
-        return Argument.of(argument.getType(), argument.getName(), metadata, typeParameters);
+        // a property of type `T` stays a variable, as it is to a generated introspection, and a property of a
+        // type written raw stays raw
+        return ReflectionArguments.rebuild(argument, argument.getName(), metadata, typeParameters);
     }
 
     private static String decapitalize(String name) {
@@ -1544,14 +1541,14 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
 
         /**
          * The argument of the property, a placeholder when the property is of a variable type - {@code T} of a
-         * {@code Box<T>} - as the argument a generated property answers is one.
+         * {@code Box<T>} - as the argument a generated property answers is one, and raw when the type was
+         * written without its type arguments.
          */
         @Override
         @SuppressWarnings({"unchecked", "rawtypes"})
         public Argument<P> asArgument() {
-            if (typed instanceof GenericPlaceholder<?> placeholder) {
-                return Argument.ofTypeVariable((Class) getType(), getName(), placeholder.getVariableName(), this.getAnnotationMetadata(), typed.getTypeParameters(),
-                    placeholder.getBounds().toArray(Argument[]::new));
+            if (typed instanceof GenericPlaceholder<?> || typed.isRawType()) {
+                return (Argument<P>) ReflectionArguments.rebuild(typed, getName(), getAnnotationMetadata(), typed.getTypeParameters());
             }
             return super.asArgument();
         }

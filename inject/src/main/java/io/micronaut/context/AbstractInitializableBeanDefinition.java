@@ -551,7 +551,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                     fieldReference.argument.getType(),
                     fieldReference.argument.getName(),
                     fieldReference.argument.getAnnotationMetadata(),
-                    fieldReference.argument.getTypeParameters()
+                    fieldReference.argument.getTypeParameters(),
+                    fieldReference.argument.isRawType()
             );
             if (environment != null) {
                 ((EnvironmentConfigurable) fieldInjectionPoint).configure(environment);
