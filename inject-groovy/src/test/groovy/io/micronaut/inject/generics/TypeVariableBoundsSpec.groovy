@@ -23,6 +23,9 @@ import io.micronaut.inject.ExecutableMethod
 import spock.lang.Shared
 import spock.lang.Unroll
 
+import static io.micronaut.inject.test.Placeholders.bounds
+import static io.micronaut.inject.test.Placeholders.variableName
+
 class TypeVariableBoundsSpec extends AbstractBeanDefinitionSpec {
 
     private static final String SOURCE = '''
@@ -63,14 +66,6 @@ class Bean<T extends Payment & Refundable, S extends Payment, U, P extends List<
 
     def setupSpec() {
         definition = buildBeanDefinition('test.Bean', SOURCE)
-    }
-
-    private static List<String> bounds(Argument<?> argument) {
-        argument instanceof GenericPlaceholder ? ((GenericPlaceholder<?>) argument).bounds*.type*.name : null
-    }
-
-    private static String variableName(Argument<?> argument) {
-        argument instanceof GenericPlaceholder ? ((GenericPlaceholder<?>) argument).variableName : null
     }
 
     private Map<String, Argument<?>> constructorArguments() {

@@ -578,9 +578,9 @@ public final class ArgumentExpUtils {
                 METHOD_CREATE_TYPE_VAR_WITH_BOUNDS,
                 values.get(0),
                 values.get(1),
-                // The name the variable was declared with, which is not the name of the argument: the argument
-                // of a type argument is named after the parameter it stands in for - the E of List<E> - while
-                // the variable is the M of List<M>
+                // The name the variable was declared with, which is not the name of the argument: a type
+                // argument is named after the parameter it stands in for - the E of List<E> - while the
+                // variable is the M of List<M>
                 variableName == null ? ExpressionDef.nullValue() : ExpressionDef.constant(variableName),
                 values.get(2),
                 values.get(3),
