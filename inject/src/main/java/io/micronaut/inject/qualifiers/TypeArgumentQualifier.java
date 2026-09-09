@@ -87,16 +87,21 @@ public final class TypeArgumentQualifier<T> extends FilteringQualifier<T> {
             BeanDefinition<BT> definition = (BeanDefinition<BT>) candidate;
             return definition.getTypeArguments(beanType).stream().map(Argument::getType).collect(Collectors.toList());
         } else {
-            if (beanType.isInterface()) {
-                return Arrays.asList(GenericTypeUtils.resolveInterfaceTypeArguments(candidate.getBeanType(), beanType));
-            } else {
-                return Arrays.asList(GenericTypeUtils.resolveSuperTypeGenericArguments(candidate.getBeanType(), beanType));
-            }
+            return Arrays.asList(GenericTypeUtils.resolveTypeArguments(candidate.getBeanType(), beanType));
         }
     }
 
     /**
      * Are the given types compatible.
+     *
+     * <p>A candidate that answers no type argument matches any parameterization: it is raw, which is the
+     * equivalent of using {@link Object}. That rule holds a bean whose parameterization is not knowable rather
+     * than only a bean that has none - a definition that records no argument for this type, an open generic
+     * {@code class OpenRepo<T> implements Repo<T>} whose argument is bound at the injection point, a
+     * {@link io.micronaut.inject.BeanType} that is not a {@link BeanDefinition} and whose class implements the
+     * type raw - so it stays. What it must not hold any more is a bean whose parameterization simply failed to
+     * resolve; that is what {@link io.micronaut.core.reflect.GenericTypeUtils#resolveTypeArguments(Class, Class)}
+     * is for.</p>
      *
      * @param typeArguments The type arguments
      * @param classes       The classes to check for alignments
@@ -104,7 +109,6 @@ public final class TypeArgumentQualifier<T> extends FilteringQualifier<T> {
      */
     public static boolean areTypesCompatible(Class<?>[] typeArguments, List<Class<?>> classes) {
         if (classes.isEmpty()) {
-            // in this case the type doesn't specify type arguments, so this is the equivalent of using Object
             return true;
         } else {
             if (classes.size() != typeArguments.length) {
