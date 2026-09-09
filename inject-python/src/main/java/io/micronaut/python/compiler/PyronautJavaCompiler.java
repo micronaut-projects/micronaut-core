@@ -949,8 +949,12 @@ final class PyronautJavaCompiler {
         return null;
     }
 
-    private static ClassLoader createAnnotationProcessorClassLoader(List<File> annotationProcessorPath) {
-        ClassLoader classLoader = PythonAnnotationProcessor.class.getClassLoader();
+    static ClassLoader createAnnotationProcessorClassLoader(List<File> annotationProcessorPath) {
+        return createAnnotationProcessorClassLoader(annotationProcessorPath, PythonAnnotationProcessor.class.getClassLoader());
+    }
+
+    static ClassLoader createAnnotationProcessorClassLoader(List<File> annotationProcessorPath, ClassLoader parent) {
+        ClassLoader classLoader = parent;
         if (annotationProcessorPath != null) {
             List<URL> cp = annotationProcessorPath.stream().flatMap(f -> {
                 try {
@@ -959,9 +963,48 @@ final class PyronautJavaCompiler {
                     return Stream.empty();
                 }
             }).toList();
-            classLoader = new URLClassLoader(cp.toArray(new URL[0]), classLoader);
+            classLoader = new AnnotationProcessorClassLoader(cp.toArray(new URL[0]), classLoader);
         }
         return classLoader;
+    }
+
+    /**
+     * Keeps application annotation processors isolated from processors bundled
+     * with the launcher. Micronaut Data discovers its method matchers through
+     * {@code RepositoryTypeElementVisitor.class.getClassLoader()}; if the
+     * launcher has already loaded that visitor, a parent-first loader prevents
+     * it from seeing an application's document processor service entries.
+     */
+    private static final class AnnotationProcessorClassLoader extends URLClassLoader {
+        private static final List<String> CHILD_FIRST_PACKAGES = List.of(
+            "io.micronaut.data.processor.",
+            "io.micronaut.data.document."
+        );
+
+        private AnnotationProcessorClassLoader(URL[] urls, ClassLoader parent) {
+            super(urls, parent);
+        }
+
+        @Override
+        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if (!CHILD_FIRST_PACKAGES.stream().anyMatch(name::startsWith)) {
+                return super.loadClass(name, resolve);
+            }
+            synchronized (getClassLoadingLock(name)) {
+                Class<?> loaded = findLoadedClass(name);
+                if (loaded == null) {
+                    try {
+                        loaded = findClass(name);
+                    } catch (ClassNotFoundException ignored) {
+                        loaded = super.loadClass(name, false);
+                    }
+                }
+                if (resolve) {
+                    resolveClass(loaded);
+                }
+                return loaded;
+            }
+        }
     }
 
     private static void closeClassLoader(ClassLoader classLoader) {

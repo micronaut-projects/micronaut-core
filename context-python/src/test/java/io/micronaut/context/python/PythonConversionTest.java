@@ -28,10 +28,14 @@ import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import io.micronaut.http.HttpResponse;
+import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.context.ApplicationContext;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyObject;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -96,6 +100,36 @@ class PythonConversionTest {
     }
 
     @Test
+    void convertsPublisherValuesWithGeneratedElementConverter() {
+        Value pythonValue = context.eval("python", "'hello'");
+
+        List<String> result = new java.util.ArrayList<>();
+        PythonHttpConversion.convertPublisher(Publishers.just(pythonValue), Value::asString)
+            .subscribe(new Subscriber<>() {
+                @Override
+                public void onSubscribe(Subscription subscription) {
+                    subscription.request(1);
+                }
+
+                @Override
+                public void onNext(String value) {
+                    result.add(value);
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    throw new AssertionError(throwable);
+                }
+
+                @Override
+                public void onComplete() {
+                }
+            });
+
+        assertEquals(List.of("hello"), result);
+    }
+
+    @Test
     void testConvertPythonEnumValueToJavaEnum() {
         Value language = context.eval("python", """
             from enum import Enum
@@ -138,6 +172,69 @@ class PythonConversionTest {
     }
 
     @Test
+    void convertsMicronautJavaTypeFacadeToClassArgument() {
+        try (Context mappedContext = Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of()))
+            .build()) {
+            Value result = mappedContext.eval("python", """
+                import java
+
+                class _MicronautJavaType:
+                    def __init__(self, target, interface=False):
+                        self._target = target
+                        self._interface = interface
+
+                    def _resolved(self):
+                        if isinstance(self._target, str):
+                            self._target = java.type(self._target)
+                        return self._target
+
+                    def __getattr__(self, name):
+                        return getattr(self._resolved(), name)
+
+                    def __call__(self, *args, **kwargs):
+                        return self._resolved()(*args, **kwargs)
+
+                ClassAcceptor = java.type("io.micronaut.context.python.PythonConversionTest$ClassAcceptor")
+                ClassAcceptor.name(_MicronautJavaType(java.type("java.lang.String"), True))
+                """);
+
+            assertEquals("java.lang.String", result.asString());
+        }
+    }
+
+    @Test
+    void passesMicronautJavaTypeFacadeToApplicationContextFindBean() {
+        try (ApplicationContext applicationContext = ApplicationContext.run();
+             Context mappedContext = Context.newBuilder("python")
+                 .allowAllAccess(true)
+                 .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of()))
+                 .build()) {
+            mappedContext.getBindings("python").putMember("applicationContext", applicationContext);
+
+            assertEquals(false, mappedContext.eval("python", """
+                import java
+
+                class _MicronautJavaType:
+                    def __init__(self, target, interface=False):
+                        self._target = target
+                        self._interface = interface
+
+                    def _resolved(self):
+                        if isinstance(self._target, str):
+                            self._target = java.type(self._target)
+                        return self._target
+
+                    def __getattr__(self, name):
+                        return getattr(self._resolved(), name)
+
+                applicationContext.findBean(_MicronautJavaType("java.lang.String", True)).isPresent()
+                """).asBoolean());
+        }
+    }
+
+    @Test
     void testInvokePythonMethodBindsClassDescriptorWhenAttributeShadowsMethod() {
         Value instance = context.eval("python", """
             class Example:
@@ -172,6 +269,26 @@ class PythonConversionTest {
         assertEquals(
             "static",
             PythonInvocation.invokePythonMethod(instance, "staticName", new Object[0]).asString()
+        );
+    }
+
+    @Test
+    void testInvokePythonMethodUsesPythonOverrideOfJavaDefaultMethod() {
+        Value instance = context.eval("python", """
+            import java
+
+            AsyncSender = java.type("io.micronaut.context.python.PythonConversionTest$AsyncSender")
+
+            class Sender(AsyncSender):
+                def sendAsync(self, email):
+                    return "python:" + email
+
+            Sender()
+            """);
+
+        assertEquals(
+            "python:hello",
+            PythonInvocation.invokePythonMethod(instance, "sendAsync", new Object[] {"hello"}).asString()
         );
     }
 
@@ -707,11 +824,23 @@ class PythonConversionTest {
         void addAttribute(String name, Object value);
     }
 
+    public interface AsyncSender {
+        default String sendAsync(String email) {
+            return "default:" + email;
+        }
+    }
+
     static final class HostModel extends java.util.HashMap<String, Object> implements HostModelInterface {
 
         @Override
         public void addAttribute(String name, Object value) {
             put(name, value);
+        }
+    }
+
+    public static final class ClassAcceptor {
+        public static String name(Class<?> type) {
+            return type.getName();
         }
     }
 }

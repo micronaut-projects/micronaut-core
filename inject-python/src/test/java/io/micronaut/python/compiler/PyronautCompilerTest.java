@@ -19,12 +19,19 @@ import io.micronaut.context.python.annotation.PythonApplication;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.OutputStream;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
+import javax.tools.ToolProvider;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -62,6 +69,96 @@ final class PyronautCompilerTest {
     }
 
     @Test
+    void loadsApplicationDataProcessorsBeforeLauncherProcessors(@TempDir Path directory) throws Exception {
+        Path sourceDirectory = Files.createDirectories(directory.resolve("source/io/micronaut/data/processor"));
+        Path source = sourceDirectory.resolve("ProcessorClassLoaderMarker.java");
+        Files.writeString(source, """
+            package io.micronaut.data.processor;
+
+            public final class ProcessorClassLoaderMarker {
+                private ProcessorClassLoaderMarker() {}
+                public static String origin() { return "application"; }
+            }
+            """);
+        Path classes = Files.createDirectories(directory.resolve("classes"));
+        assertEquals(0, ToolProvider.getSystemJavaCompiler().run(
+            null,
+            null,
+            null,
+            "-d",
+            classes.toString(),
+            source.toString()
+        ));
+
+        Path launcherSourceDirectory = Files.createDirectories(directory.resolve("launcher-source/io/micronaut/data/processor"));
+        Path launcherSource = launcherSourceDirectory.resolve("ProcessorClassLoaderMarker.java");
+        Files.writeString(launcherSource, """
+            package io.micronaut.data.processor;
+
+            public final class ProcessorClassLoaderMarker {
+                private ProcessorClassLoaderMarker() {}
+                public static String origin() { return "launcher"; }
+            }
+            """);
+        Path launcherClasses = Files.createDirectories(directory.resolve("launcher-classes"));
+        assertEquals(0, ToolProvider.getSystemJavaCompiler().run(
+            null,
+            null,
+            null,
+            "-d",
+            launcherClasses.toString(),
+            launcherSource.toString()
+        ));
+
+        Path launcherJar = directory.resolve("launcher-processors.jar");
+        try (OutputStream output = Files.newOutputStream(launcherJar);
+             JarOutputStream jar = new JarOutputStream(output);
+             var paths = Files.walk(launcherClasses)) {
+            for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                String entryName = launcherClasses.relativize(path).toString().replace(java.io.File.separatorChar, '/');
+                jar.putNextEntry(new JarEntry(entryName));
+                Files.copy(path, jar);
+                jar.closeEntry();
+            }
+        }
+
+        Path processorJar = directory.resolve("application-processors.jar");
+        try (OutputStream output = Files.newOutputStream(processorJar);
+             JarOutputStream jar = new JarOutputStream(output)) {
+            try (var paths = Files.walk(classes)) {
+                for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                    String entryName = classes.relativize(path).toString().replace(java.io.File.separatorChar, '/');
+                    jar.putNextEntry(new JarEntry(entryName));
+                    Files.copy(path, jar);
+                    jar.closeEntry();
+                }
+            }
+        }
+
+        try (URLClassLoader launcherClassLoader = new URLClassLoader(
+            new URL[] {launcherJar.toUri().toURL()},
+            PyronautCompilerTest.class.getClassLoader());
+             URLClassLoader classLoader = (URLClassLoader) PyronautJavaCompiler
+                 .createAnnotationProcessorClassLoader(List.of(processorJar.toFile()), launcherClassLoader)) {
+            // Parent-first loading is the pre-fix behavior: the launcher's copy wins
+            // when both classpaths contain the same processor FQCN.
+            Class<?> parentMarker = Class.forName(
+                "io.micronaut.data.processor.ProcessorClassLoaderMarker",
+                true,
+                launcherClassLoader
+            );
+            assertEquals("launcher", parentMarker.getMethod("origin").invoke(null));
+
+            Class<?> marker = Class.forName(
+                "io.micronaut.data.processor.ProcessorClassLoaderMarker",
+                true,
+                classLoader
+            );
+            assertEquals("application", marker.getMethod("origin").invoke(null));
+        }
+    }
+
+    @Test
     void compilesPythonMethodsReturningHttpResponseSubtypes(@TempDir Path sourceDirectory) throws Exception {
         Files.writeString(sourceDirectory.resolve("responses.py"), """
             from micronaut.http import MutableHttpResponse
@@ -77,6 +174,99 @@ final class PyronautCompilerTest {
             .buildClassLoader();
 
         assertNotNull(classLoader.loadClass("pyronaut_application.PyronautMain"));
+    }
+
+    @Test
+    void compilesPythonListSubclass(@TempDir Path sourceDirectory) throws Exception {
+        Files.writeString(sourceDirectory.resolve("candidates.py"), """
+            class Candidates(list):
+                def __init__(self):
+                    super().__init__()
+            """);
+
+        Path outputDirectory = Files.createDirectories(sourceDirectory.resolve("output"));
+        PyronautCompiler.builder()
+            .pythonSrc(sourceDirectory.toString())
+            .targetDir(outputDirectory.toFile())
+            .build()
+            .compile();
+
+        String generated = Files.readString(findGeneratedSource(outputDirectory, "Candidates.java"));
+        assertTrue(generated.contains("Object[] toArray()"));
+        assertTrue(generated.contains("<T> T[] toArray(T[]"));
+    }
+
+    @Test
+    void generatedJavaInterfaceBridgeInvokesPythonMethod(@TempDir Path directory) throws Exception {
+        Path javaSource = Files.createDirectories(directory.resolve("java").resolve("callback"));
+        Files.writeString(javaSource.resolve("Callback.java"), """
+            package callback;
+
+            public interface Callback {
+                String invoke(String value);
+            }
+            """);
+        Path pythonSource = Files.createDirectories(directory.resolve("python"));
+        Files.writeString(pythonSource.resolve("implementation.py"), """
+            from callback import Callback
+
+            class Implementation(Callback):
+                def invoke(self, value: str) -> str:
+                    return value
+            """);
+        Path output = Files.createDirectories(directory.resolve("output"));
+
+        PyronautCompiler.builder()
+            .javaSrc(directory.resolve("java").toString())
+            .pythonSrc(pythonSource.toString())
+            .targetDir(output.toFile())
+            .build()
+            .compile();
+
+        String generated = Files.readString(findGeneratedSource(output, "Implementation.java"));
+        assertEquals(1, generated.split("PythonInvocation.invokePythonMethod", -1).length - 1);
+    }
+
+    @Test
+    void generatedBridgePreservesDefaultAsyncInterfaceMethod(@TempDir Path directory) throws Exception {
+        Path javaSource = Files.createDirectories(directory.resolve("java").resolve("callback"));
+        Files.writeString(javaSource.resolve("AsyncSender.java"), """
+            package callback;
+
+            import io.micronaut.core.naming.Named;
+            import java.util.function.Consumer;
+
+            public interface AsyncSender extends Named {
+                default String sendAsync(String email) {
+                    return sendAsync(email, ignored -> { });
+                }
+
+                String sendAsync(String email, Consumer<String> emailRequest);
+            }
+            """);
+        Path pythonSource = Files.createDirectories(directory.resolve("python"));
+        Files.writeString(pythonSource.resolve("sender.py"), """
+            from callback import AsyncSender
+
+            class Sender(AsyncSender):
+                def getName(self) -> str:
+                    return "sender"
+
+                def sendAsync(self, email: str, email_request=None) -> str:
+                    return email
+            """);
+        Path output = Files.createDirectories(directory.resolve("output"));
+
+        PyronautCompiler.builder()
+            .javaSrc(directory.resolve("java").toString())
+            .pythonSrc(pythonSource.toString())
+            .targetDir(output.toFile())
+            .build()
+            .compile();
+
+        String generated = Files.readString(findGeneratedSource(output, "Sender.java"));
+        assertEquals(0, generated.split("sendAsync\\(String email\\)", -1).length - 1);
+        assertEquals(1, generated.split("sendAsync\\(String email,", -1).length - 1);
     }
 
     @Test
