@@ -28,7 +28,6 @@ jobs:
       GH_USERNAME: ${{ secrets.GH_USERNAME }}
       TESTCONTAINERS_RYUK_DISABLED: true
       PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       OSS_INDEX_USERNAME: ${{ secrets.OSS_INDEX_USERNAME }}
       OSS_INDEX_PASSWORD: ${{ secrets.OSS_INDEX_PASSWORD }}
@@ -69,11 +68,6 @@ jobs:
         id: gradle
         run: |
           ./gradlew check jacocoReport --no-daemon --continue
-
-      - name: "🔎 Run static analysis"
-        if: env.SONAR_TOKEN != '' && matrix.java == '17'
-        run: |
-          ./gradlew sonar --no-parallel --continue
 
       - name: "📊 Publish Test Report"
         if: always()
