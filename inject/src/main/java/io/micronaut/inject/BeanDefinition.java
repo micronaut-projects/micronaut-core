@@ -450,6 +450,34 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
     }
 
     /**
+     * The types this definition can answer {@link #getTypeArguments(String)} for.
+     *
+     * <p>A definition computed at build time records the type arguments the compiler resolved for the bean type
+     * and for every super class and interface above it, keyed by type. This returns those keys, so a consumer that
+     * needs every super type the bean supplies arguments to can read what was recorded instead of rediscovering
+     * the hierarchy reflectively.</p>
+     *
+     * <p>A key is a class <em>name</em> in the form {@link Class#getName()} returns, which is what the definition
+     * stores; nothing here loads it. A caller that only needs the arguments passes the key straight back to
+     * {@link #getTypeArguments(String)}, and one that needs a {@link Class} loads the name itself. Every key answers
+     * that lookup, though the answer may be an empty list: a super type that carries no arguments of its own is
+     * still part of what was recorded.</p>
+     *
+     * <p>The iteration order is unspecified and is not the order of the hierarchy. A definition that records nothing
+     * answers empty - including for its own {@link #getBeanType()}, which {@link #getTypeArguments()} then answers
+     * empty for as well.</p>
+     *
+     * <p>A {@link ProxyBeanDefinition} answers for the hierarchy of the type it proxies rather than for the generated
+     * proxy class, so its keys name {@link ProxyBeanDefinition#getTargetType()} and the super types above it.</p>
+     *
+     * @return The recorded type keys, never {@code null}
+     * @since 5.2.0
+     */
+    default Collection<String> getTypeArgumentKeys() {
+        return Collections.emptySet();
+    }
+
+    /**
      * Finds a single {@link ExecutableMethod} for the given name and argument types.
      *
      * @param name          The method name

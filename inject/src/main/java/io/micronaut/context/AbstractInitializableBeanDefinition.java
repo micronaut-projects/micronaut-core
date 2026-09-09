@@ -238,6 +238,14 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
+    public final Collection<String> getTypeArgumentKeys() {
+        if (typeArgumentsMap == null) {
+            return Collections.emptySet();
+        }
+        return Collections.unmodifiableSet(typeArgumentsMap.keySet());
+    }
+
+    @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }

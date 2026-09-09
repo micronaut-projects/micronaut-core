@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanContextConditional;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
@@ -32,9 +33,11 @@ import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -79,6 +82,75 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
         } else {
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A runtime definition has no recorded arguments to look the name up in, so it resolves the name against the
+     * bean type's own hierarchy and then answers as {@link #getTypeArguments(Class)} does, which keeps the two
+     * lookups in agreement. A name that is not a super type of the bean answers empty.</p>
+     */
+    @Override
+    default List<Argument<?>> getTypeArguments(@Nullable String type) {
+        if (type == null) {
+            return Collections.emptyList();
+        }
+        for (Class<?> superType : superTypeClosure(getBeanType())) {
+            if (superType.getName().equals(type)) {
+                return getTypeArguments(superType);
+            }
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Nothing is recorded for a runtime definition, so this is the bean type and every super class and interface
+     * above it, which is the hierarchy a build time definition records for the same classes. It answers empty when
+     * none of them carries a type argument, again as a build time definition does.</p>
+     */
+    @Override
+    default Collection<String> getTypeArgumentKeys() {
+        Collection<Class<?>> superTypes = superTypeClosure(getBeanType());
+        boolean anyArguments = false;
+        for (Class<?> superType : superTypes) {
+            if (!getTypeArguments(superType).isEmpty()) {
+                anyArguments = true;
+                break;
+            }
+        }
+        if (!anyArguments) {
+            return Collections.emptySet();
+        }
+        Set<String> keys = CollectionUtils.newLinkedHashSet(superTypes.size());
+        for (Class<?> superType : superTypes) {
+            keys.add(superType.getName());
+        }
+        return Collections.unmodifiableSet(keys);
+    }
+
+    /**
+     * The given type and every super class and interface above it, excluding {@link Object}.
+     *
+     * @param beanType The type to walk
+     * @return The types, the given one first
+     */
+    private static Collection<Class<?>> superTypeClosure(Class<?> beanType) {
+        Set<Class<?>> collected = new LinkedHashSet<>();
+        collectSuperTypes(beanType, collected);
+        return collected;
+    }
+
+    private static void collectSuperTypes(@Nullable Class<?> type, Set<Class<?>> collected) {
+        if (type == null || type == Object.class || !collected.add(type)) {
+            return;
+        }
+        for (Class<?> anInterface : type.getInterfaces()) {
+            collectSuperTypes(anInterface, collected);
+        }
+        collectSuperTypes(type.getSuperclass(), collected);
     }
 
     @Override

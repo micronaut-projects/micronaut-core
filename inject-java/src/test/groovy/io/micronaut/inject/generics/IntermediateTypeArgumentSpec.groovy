@@ -63,6 +63,18 @@ class RawRepo implements Repo {}
         definition.getTypeArguments(repo)*.type == [Integer]
     }
 
+    void "test the recorded keys name the whole hierarchy of the intermediate case"() {
+        given:
+        def definition = buildBeanDefinition('intermediate.IntRepo', HIERARCHY)
+
+        expect: 'the reference key set that a runtime definition of the same classes has to match'
+        definition.typeArgumentKeys.collect { it.substring(it.lastIndexOf('.') + 1) }.toSet() ==
+                ['IntRepo', 'NumberRepo', 'Repo'].toSet()
+        definition.getTypeArguments('intermediate.NumberRepo')*.type == [Integer]
+        definition.getTypeArguments('intermediate.Repo')*.type == [Integer]
+        definition.getTypeArguments('intermediate.IntRepo').isEmpty()
+    }
+
     void "test a raw implementation binds nothing"() {
         given:
         def definition = buildBeanDefinition('intermediate.RawRepo', HIERARCHY)
