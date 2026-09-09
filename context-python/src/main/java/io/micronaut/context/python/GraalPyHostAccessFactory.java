@@ -235,15 +235,40 @@ final class GraalPyHostAccessFactory {
         builder.targetTypeMapping(
             Value.class,
             Class.class,
-            v -> pythonClassResolver.findPythonClass(v) != null,
+            v -> resolvePythonClass(v, pythonClassResolver) != null,
             v -> {
-                Class<?> target = pythonClassResolver.findPythonClass(v);
+                Class<?> target = resolvePythonClass(v, pythonClassResolver);
                 if (target == null) {
                     throw new IllegalArgumentException("Cannot resolve Python class to a generated Java stub");
                 }
                 return target;
             }
         );
+    }
+
+    private static @Nullable Class<?> resolvePythonClass(@Nullable Value value, PythonClassResolver pythonClassResolver) {
+        try {
+            if (value != null && !value.isNull() && value.hasMembers()
+                && value.hasMember("_target") && value.hasMember("_resolved")) {
+                Value target = value.getMember("_target");
+                if (target != null && target.isString()) {
+                    target = value.invokeMember("_resolved");
+                }
+                if (target != null && !target.isNull()) {
+                    Class<?> facadeTarget = target.as(Class.class);
+                    if (facadeTarget != null) {
+                        return facadeTarget;
+                    }
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // Fall through to regular generated Python class resolution.
+        }
+        try {
+            return pythonClassResolver.findPythonClass(value);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private static @Nullable TargetTypeMapping<?> findMapping(@Nullable Value value, PythonClassResolver pythonClassResolver) {

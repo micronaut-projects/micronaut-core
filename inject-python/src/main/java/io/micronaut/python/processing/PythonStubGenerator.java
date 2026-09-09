@@ -2737,8 +2737,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Map<String, ClassElement> inferredMethodBounds = inferMethodTypeBounds(signatureMethod, methodElement);
         Map<String, ClassElement> bridgeSignatureTypeArguments = withoutDeclaredMethodTypeVariables(signatureTypeArguments, signatureMethod);
         ClassElement effectiveReturnType = effectiveBridgeReturnType(methodElement, returnTypeOverride);
-        TypeDef methodSourceReturnType = bridgeSourceReturnType(methodElement, signatureMethod, resolvedSignatureMethod, effectiveReturnType, returnTypeOverride, isJunit5Test, bridgeSignatureTypeArguments);
-        boolean returnsMethodTypeVariable = !(methodElement instanceof PythonMethodElement) && !signatureMethod.getDeclaredTypeVariables().isEmpty();
+        boolean genericToArray = "toArray".equals(signatureMethod.getName())
+            && signatureMethod.getParameters().length == 1
+            && (signatureMethod.getDeclaredTypeVariables().size() == 1 || resolvedSignatureMethod.getDeclaredTypeVariables().size() == 1);
+        MethodElement sourceSignatureMethod = resolvedSignatureMethod.getDeclaredTypeVariables().size() == 1
+            ? resolvedSignatureMethod
+            : signatureMethod;
+        TypeDef methodSourceReturnType = genericToArray
+            ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
+            : bridgeSourceReturnType(methodElement, signatureMethod, resolvedSignatureMethod, effectiveReturnType, returnTypeOverride, isJunit5Test, bridgeSignatureTypeArguments);
+        boolean returnsMethodTypeVariable = !(methodElement instanceof PythonMethodElement) && !sourceSignatureMethod.getDeclaredTypeVariables().isEmpty();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .returns(methodSourceReturnType);
         if (methodElement.isStatic()) {
@@ -2746,7 +2754,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         } else {
             methodBuilder.addModifiers(Modifier.PUBLIC);
         }
-        addMethodTypeVariables(signatureMethod, methodBuilder, bridgeSignatureTypeArguments, inferredMethodBounds);
+        addMethodTypeVariables(sourceSignatureMethod, methodBuilder, bridgeSignatureTypeArguments, inferredMethodBounds);
 
         copyAnnotations(methodElement, methodBuilder, ANNOTATION_PACKAGES_TO_COPY, visitorContext);
         if (isJunit5Test && !methodElement.hasDeclaredAnnotation(JUNIT_TEST)) {
@@ -2760,8 +2768,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             @NonNull ParameterElement parameter = parameters[i];
             ParameterElement signatureParameter = i < signatureParameters.length ? signatureParameters[i] : parameter;
             ParameterElement resolvedSignatureParameter = i < resolvedSignatureParameters.length ? resolvedSignatureParameters[i] : signatureParameter;
+            TypeDef parameterType = genericToArray
+                ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
+                : bridgeSourceParameterType(signatureMethod, signatureParameter, resolvedSignatureParameter, parameter, bridgeSignatureTypeArguments);
             ParameterDef parameterDef = ParameterDef
-                .builder(parameter.getName(), bridgeSourceParameterType(signatureMethod, signatureParameter, resolvedSignatureParameter, parameter, bridgeSignatureTypeArguments)).build();
+                .builder(parameter.getName(), parameterType).build();
             methodBuilder.addParameter(parameterDef);
         }
 
@@ -2852,6 +2863,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         if (isJunit5Test) {
             return TypeDef.Primitive.VOID;
+        }
+        if ("toArray".equals(signatureMethod.getName()) && signatureMethod.getParameters().length == 0) {
+            return TypeDef.OBJECT.array();
         }
         ClassElement resolvedReturnType = signatureMethod == resolvedSignatureMethod
             ? methodElement.getGenericReturnType()
@@ -2987,6 +3001,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return null;
         }
         ClassElement genericReturnType = method.getGenericReturnType();
+        // Array return types (notably List.toArray() and List.toArray(T[]))
+        // must retain their array shape. The interface type argument fallback
+        // below is only valid for an erased scalar Object return type.
+        if (genericReturnType.isArray()) {
+            return null;
+        }
         if ("getAnnotationType".equals(method.getName())) {
             ClassElement annotationType = annotationTypeArgument(typeArguments);
             if (annotationType != null) {
@@ -3589,6 +3609,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 invokedValue, genericType), returnType);
                     } else if (returnType.isAssignable(PUBLISHER)) {
                         ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+                        if (componentType != null && isGeneratedWrapperType(allClasses, componentType)) {
+                            yield uncheckedCast(PYTHON_HTTP_CONVERSION.invokeStatic(
+                                "convertPublisher",
+                                List.of(POLYGLOT_VALUE, POLYGLOT_VALUE_CONVERTER),
+                                ClassTypeDef.of(PUBLISHER),
+                                invokedValue,
+                                generatedWrapperConverter(componentType)
+                            ), returnType);
+                        }
                         yield uncheckedCast(PYTHON_HTTP_CONVERSION.invokeStatic("convertPublisher", ClassTypeDef.of(PUBLISHER),
                                 invokedValue, toClassExpression(componentType)), returnType);
                     } else if (returnType.isAssignable(HTTP_RESPONSE)) {

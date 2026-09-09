@@ -67,6 +67,31 @@ public final class PythonHttpConversion {
     }
 
     /**
+     * Convert publisher items with a generated wrapper converter. A generated converter preserves
+     * the concrete Python wrapper type after the publisher crosses the reactive boundary.
+     *
+     * @param publisher The source publisher
+     * @param converter The generated item converter
+     * @param <T> The item type
+     * @return The converted publisher
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Publisher<T> convertPublisher(Publisher<?> publisher, PolyglotValueConverter<T> converter) {
+        return Publishers.map((Publisher<Object>) publisher, item -> {
+            if (item == null) {
+                return null;
+            }
+            if (item instanceof Value value) {
+                return converter.convert(value);
+            }
+            if (item instanceof ValueCoercible valueCoercible) {
+                return converter.convert(valueCoercible.asPolyglotValue());
+            }
+            return (T) item;
+        });
+    }
+
+    /**
      * Convert a GraalPy Value representing a publisher to a typed Java publisher.
      *
      * @param value The source polyglot publisher
@@ -80,6 +105,22 @@ public final class PythonHttpConversion {
             return null;
         }
         return convertPublisher(publisher, itemType);
+    }
+
+    /**
+     * Convert a GraalPy publisher with a generated item converter.
+     *
+     * @param value The source polyglot publisher
+     * @param converter The generated item converter
+     * @param <T> The item type
+     * @return The converted publisher
+     */
+    public static <T> @Nullable Publisher<T> convertPublisher(Value value, PolyglotValueConverter<T> converter) {
+        Publisher<?> publisher = PythonConversion.convertValue(value, Publisher.class);
+        if (publisher == null) {
+            return null;
+        }
+        return convertPublisher(publisher, converter);
     }
 
     /**

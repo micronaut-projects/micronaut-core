@@ -38,7 +38,7 @@ public final class ValueCoercibles {
      * Extracts a generated Java wrapper from a polyglot value when one is available.
      * <p>
      * This method recognizes both direct host objects and Micronaut's synthetic
-     * {@link #ValueCoercible.HOST_OBJECT_MEMBER} back-reference.
+     * {@link ValueCoercible#HOST_OBJECT_MEMBER} back-reference.
      *
      * @param value The polyglot value to inspect.
      * @return The generated wrapper, or {@code null} when the value is not backed by a
@@ -53,7 +53,7 @@ public final class ValueCoercibles {
      * Extracts a generated Java wrapper from a proxy object when one is available.
      * <p>
      * This overload is used when code already has a {@link ProxyObject} view and needs to inspect
-     * Micronaut's synthetic {@link #ValueCoercible.HOST_OBJECT_MEMBER} without first wrapping it as a
+     * Micronaut's synthetic {@link ValueCoercible#HOST_OBJECT_MEMBER} without first wrapping it as a
      * {@link Value}.
      *
      * @param value The proxy object to inspect.
@@ -68,7 +68,7 @@ public final class ValueCoercibles {
      * Extracts a host object of the requested type from a polyglot value.
      * <p>
      * The returned object may be a direct GraalPy host object or the generated Java wrapper
-     * recovered through {@link #ValueCoercible.HOST_OBJECT_MEMBER}.
+     * recovered through {@link ValueCoercible#HOST_OBJECT_MEMBER}.
      *
      * @param value The polyglot value to inspect.
      * @param targetType The required host object type.
@@ -82,7 +82,7 @@ public final class ValueCoercibles {
     /**
      * Extracts a host object of the requested type from a proxy object.
      * <p>
-     * This method checks Micronaut's synthetic {@link #ValueCoercible.HOST_OBJECT_MEMBER} and verifies the
+     * This method checks Micronaut's synthetic {@link ValueCoercible#HOST_OBJECT_MEMBER} and verifies the
      * recovered host object before returning it.
      *
      * @param value The proxy object to inspect.
@@ -139,7 +139,7 @@ public final class ValueCoercibles {
      * This quick check uses generated {@code ExecutableMethod} metadata and only boxes primitive
      * types through {@link ReflectionUtils}; it deliberately avoids reflective probing of the
      * generated proxy class while still letting Python-backed values expose their host wrapper via
-     * {@link #ValueCoercible.HOST_OBJECT_MEMBER}.
+     * {@link ValueCoercible#HOST_OBJECT_MEMBER}.
      *
      * @param value The Python argument
      * @param targetType The Java parameter type
