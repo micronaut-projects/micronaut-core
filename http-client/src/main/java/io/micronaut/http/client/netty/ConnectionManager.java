@@ -553,9 +553,6 @@ public class ConnectionManager {
                     holder = sslContextWrapperWs.takeRetained();
                 }
                 SslContext sslCtx = holder == null ? null : holder.sslContext();
-                if (holder != null && sslCtx == null) {
-                    holder.release();
-                }
                 // Allow wss requests to be sent without an SslHandler if a proxy is present
                 if (sslCtx == null && configuration.getProxyAddress().isEmpty()) {
                     throw decorate(new HttpClientException("Cannot send WSS request. SSL context is unavailable"));
