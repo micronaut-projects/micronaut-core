@@ -29,6 +29,10 @@ import org.jspecify.annotations.Nullable;
  * @since 5.2.0
  */
 @Internal
+// equals is the one DefaultArgument declares on purpose: rawness does not take part in it, any more than the
+// bounds or the variable name of DefaultGenericPlaceholder do, and the only field here is the name the
+// superclass was given
+@SuppressWarnings("java:S2160")
 final class DefaultRawArgument<T> extends DefaultArgument<T> {
 
     /**

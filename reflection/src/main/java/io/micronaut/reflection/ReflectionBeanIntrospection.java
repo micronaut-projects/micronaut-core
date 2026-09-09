@@ -1548,7 +1548,9 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         @SuppressWarnings({"unchecked", "rawtypes"})
         public Argument<P> asArgument() {
             if (typed instanceof GenericPlaceholder<?> || typed.isRawType()) {
-                return (Argument<P>) ReflectionArguments.rebuild(typed, getName(), getAnnotationMetadata(), typed.getTypeParameters());
+                // qualified, as the enclosing introspection declares a getAnnotationMetadata of its own
+                return (Argument<P>) ReflectionArguments.rebuild(
+                    typed, getName(), this.getAnnotationMetadata(), typed.getTypeParameters());
             }
             return super.asArgument();
         }

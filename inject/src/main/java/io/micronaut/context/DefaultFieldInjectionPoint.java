@@ -81,12 +81,12 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
      * @param rawType            Whether the field type was written raw
      */
     DefaultFieldInjectionPoint(
-        BeanDefinition declaringBean,
-        Class declaringType,
+        BeanDefinition<?> declaringBean,
+        Class<?> declaringType,
         Class<T> fieldType,
         String field,
         @Nullable AnnotationMetadata annotationMetadata,
-        Argument @Nullable [] typeArguments,
+        Argument<?> @Nullable [] typeArguments,
         boolean rawType) {
 
         this.rawType = rawType;
