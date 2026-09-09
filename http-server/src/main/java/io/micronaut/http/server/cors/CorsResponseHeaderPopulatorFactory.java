@@ -17,7 +17,6 @@ package io.micronaut.http.server.cors;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpHeaderTuple;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -53,17 +52,15 @@ final class CorsResponseHeaderPopulatorFactory {
      * header.
      *
      * @return A populator for the configured policy
-     * @throws DisabledBeanException If no resource policy is configured
      */
     @Named("crossOriginResourcePolicy")
     @Singleton
-    @Requires(property = "micronaut.server.cors.cross-origin-resource-policy")
+    @Requires(property = HttpServerConfiguration.PREFIX + ".cors.cross-origin-resource-policy")
     ResponseHeaderPopulator crossOriginResourcePolicy() {
-        CrossOriginResourcePolicy policy = corsConfiguration.getCrossOriginResourcePolicy();
-        if (policy == null) {
-            throw new DisabledBeanException("Cross-origin resource policy is not set");
-        }
-        return _ -> new HttpHeaderTuple(CROSS_ORIGIN_RESOURCE_POLICY, policy);
+        return _ -> {
+            CrossOriginResourcePolicy policy = corsConfiguration.getCrossOriginResourcePolicy();
+            return policy == null ? null : new HttpHeaderTuple(CROSS_ORIGIN_RESOURCE_POLICY, policy);
+        };
     }
 
     /**
@@ -71,16 +68,14 @@ final class CorsResponseHeaderPopulatorFactory {
      * header.
      *
      * @return A populator for the configured policy
-     * @throws DisabledBeanException If no embedder policy is configured
      */
     @Named("crossOriginEmbedderPolicy")
     @Singleton
-    @Requires(property = "micronaut.server.cors.cross-origin-embedder-policy")
+    @Requires(property = HttpServerConfiguration.PREFIX + ".cors.cross-origin-embedder-policy")
     ResponseHeaderPopulator crossOriginEmbedderPolicy() {
-        CrossOriginEmbedderPolicy policy = corsConfiguration.getCrossOriginEmbedderPolicy();
-        if (policy == null) {
-            throw new DisabledBeanException("Cross-origin embedder policy is not set");
-        }
-        return _ -> new HttpHeaderTuple(CROSS_ORIGIN_EMBEDDER_POLICY, policy);
+        return _ -> {
+            CrossOriginEmbedderPolicy policy = corsConfiguration.getCrossOriginEmbedderPolicy();
+            return policy == null ? null : new HttpHeaderTuple(CROSS_ORIGIN_EMBEDDER_POLICY, policy);
+        };
     }
 }

@@ -27,6 +27,8 @@ import io.micronaut.http.annotation.ResponseFilter
 import io.micronaut.http.annotation.ServerFilter
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.server.HttpServerConfiguration
+import io.micronaut.http.server.cors.CrossOriginEmbedderPolicy
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import spock.lang.Specification
@@ -45,6 +47,9 @@ class CrossOriginPolicySpec extends Specification {
     @Inject
     @Client("/")
     HttpClient httpClient
+
+    @Inject
+    HttpServerConfiguration.CorsConfiguration corsConfiguration
 
     void "configured cross-origin policies are included without an Origin header"() {
         given:
@@ -76,6 +81,20 @@ class CrossOriginPolicySpec extends Specification {
 
         then:
         response.headers.getAll(CROSS_ORIGIN_EMBEDDER_POLICY) == ["unsafe-none"]
+    }
+
+    void "configured cross-origin policies reflect configuration changes"() {
+        given:
+        corsConfiguration.setCrossOriginEmbedderPolicy(CrossOriginEmbedderPolicy.UNSAFE_NONE)
+
+        when:
+        HttpResponse<?> response = httpClient.toBlocking().exchange(HttpRequest.GET("/cross-origin-policy"))
+
+        then:
+        response.headers.get(CROSS_ORIGIN_EMBEDDER_POLICY) == "unsafe-none"
+
+        cleanup:
+        corsConfiguration.setCrossOriginEmbedderPolicy(CrossOriginEmbedderPolicy.REQUIRE_CORP)
     }
 
     @Requires(property = "spec.name", value = SPEC_NAME)
