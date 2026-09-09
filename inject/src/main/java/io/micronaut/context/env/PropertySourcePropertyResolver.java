@@ -193,9 +193,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     public Map<String, Object> diff(Runnable change) {
-        Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(state.catalog);
+        ResolverState before = state;
+        Map<String, DefaultPropertyEntry>[] copiedCatalog = copyCatalog(before.catalog);
         change.run();
-        return diffCatalog(copiedCatalog, state.catalog);
+        ResolverState after = state;
+        return diffCatalog(copiedCatalog, after.catalog);
     }
 
 
@@ -1084,7 +1086,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     protected final Map<String, DefaultPropertyEntry> resolveEntriesForKey(String name, boolean allowCreate, @Nullable PropertyCatalog propertyCatalog) {
         if (allowCreate) {
             // Writes go to the state being built, which is the published one outside of a refresh.
-            // Callers passing `true` must hold the catalog lock, as every write path here does.
+            // The lock guards the read of `writeState`; every write path already holds it, and the
+            // lock is reentrant, so this only ever matters to an external caller that does not.
             synchronized (catalogLock) {
                 return resolveEntriesForKey(writeState, name, true, propertyCatalog);
             }

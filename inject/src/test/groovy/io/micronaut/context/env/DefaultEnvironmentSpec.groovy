@@ -1508,5 +1508,6 @@ micronaut:
         executor.shutdownNow()
         assert executor.awaitTermination(5, TimeUnit.SECONDS)
         task.get(0, TimeUnit.MILLISECONDS)
+        env.stop()
     }
 }
