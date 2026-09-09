@@ -36,24 +36,14 @@ import static io.micronaut.http.HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY;
 @Factory
 @Internal
 final class CorsResponseHeaderPopulatorFactory {
-    private final HttpServerConfiguration.CorsConfiguration corsConfiguration;
-
-    /**
-     * @param corsConfiguration The CORS configuration containing the optional
-     *                          cross-origin response policies
-     */
-    CorsResponseHeaderPopulatorFactory(HttpServerConfiguration.CorsConfiguration corsConfiguration) {
-        this.corsConfiguration = corsConfiguration;
-    }
-
     /**
      * Creates a populator for the configured cross-origin policy headers.
-     *
+     * @param corsConfiguration The CORS configuration containing the optional cross-origin response policies
      * @return A populator for the configured policies
      * @throws DisabledBeanException If no cross-origin policy is configured
      */
     @Singleton
-    ResponseHeaderPopulator crossOriginPolicies() {
+    ResponseHeaderPopulator crossOriginPolicies(HttpServerConfiguration.CorsConfiguration corsConfiguration) {
         if (corsConfiguration.getCrossOriginResourcePolicy() == null
             && corsConfiguration.getCrossOriginEmbedderPolicy() == null) {
             throw new DisabledBeanException("No cross-origin response policies configured");
