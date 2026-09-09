@@ -1,5 +1,3 @@
-import java
-
 # tag::imports[]
 from micronaut.context.annotation import Requires
 from micronaut.http import HttpHeaderEntry, HttpRequest, HttpResponse
