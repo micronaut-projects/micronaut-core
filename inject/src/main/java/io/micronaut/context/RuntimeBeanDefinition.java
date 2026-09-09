@@ -73,15 +73,9 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
     default List<Argument<?>> getTypeArguments(Class<?> type) {
         Class<T> beanType = getBeanType();
         if (type != null && type.isAssignableFrom(beanType)) {
-            if (type.isInterface()) {
-                return Arrays.stream(GenericTypeUtils.resolveInterfaceTypeArguments(beanType, type))
-                    .map(Argument::of)
-                    .collect(Collectors.toList());
-            } else {
-                return Arrays.stream(GenericTypeUtils.resolveSuperTypeGenericArguments(beanType, type))
-                    .map(Argument::of)
-                    .collect(Collectors.toList());
-            }
+            return Arrays.stream(GenericTypeUtils.resolveTypeArguments(beanType, type))
+                .map(Argument::of)
+                .collect(Collectors.toList());
         } else {
             return Collections.emptyList();
         }
