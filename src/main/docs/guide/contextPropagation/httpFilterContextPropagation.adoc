@@ -17,3 +17,5 @@ To use the legacy reactive HTTP filters, simply modify and propagate the context
 ----
 include::{testsuitejava}/propagation/MdcLegacyFilter.java[tags="class", indent=0]
 ----
+
+NOTE: The context added by a filter only covers the work that happens *after* that filter runs. Framework log statements emitted earlier in the request - for example when the request is received - do not see it. An ordinary server filter also runs after the route has been matched, so route matching is not covered either. If you need the context in place for route matching, add it from a filter annotated with api:http.server.annotation.PreMatching[].
