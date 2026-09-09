@@ -109,19 +109,25 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
      *
      * <p>Nothing is recorded for a runtime definition, so this is the bean type and every super class and interface
      * above it, which is the hierarchy a build time definition records for the same classes. It answers empty when
-     * none of them carries a type argument, again as a build time definition does.</p>
+     * none of them <em>declares</em> a type parameter, again as a build time definition does.</p>
+     *
+     * <p>The test is what the hierarchy declares rather than what resolves, so that the keys do not depend on
+     * whether an argument could be resolved. A bean implementing a raw or unbound super type - {@code RawRepo
+     * implements Repo} - names {@code Repo} here exactly as a build time definition does, even though
+     * {@link #getTypeArguments(Class)} answers nothing for it where a build time definition answers the erased
+     * variable.</p>
      */
     @Override
     default Collection<String> getTypeArgumentKeys() {
         Collection<Class<?>> superTypes = superTypeClosure(getBeanType());
-        boolean anyArguments = false;
+        boolean anyDeclared = false;
         for (Class<?> superType : superTypes) {
-            if (!getTypeArguments(superType).isEmpty()) {
-                anyArguments = true;
+            if (superType.getTypeParameters().length > 0) {
+                anyDeclared = true;
                 break;
             }
         }
-        if (!anyArguments) {
+        if (!anyDeclared) {
             return Collections.emptySet();
         }
         Set<String> keys = CollectionUtils.newLinkedHashSet(superTypes.size());

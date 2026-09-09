@@ -75,6 +75,15 @@ class RawRepo implements Repo {}
         definition.getTypeArguments('intermediate.IntRepo').isEmpty()
     }
 
+    void "test a raw implementation still names its hierarchy in the recorded keys"() {
+        given:
+        def definition = buildBeanDefinition('intermediate.RawRepo', HIERARCHY)
+
+        expect: 'the reference for the runtime definition: the key is there even though the argument is unbound'
+        definition.typeArgumentKeys.collect { it.substring(it.lastIndexOf('.') + 1) }.toSet() ==
+                ['RawRepo', 'Repo'].toSet()
+    }
+
     void "test a raw implementation binds nothing"() {
         given:
         def definition = buildBeanDefinition('intermediate.RawRepo', HIERARCHY)

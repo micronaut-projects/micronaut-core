@@ -3,7 +3,9 @@ package io.micronaut.context
 import io.micronaut.context.generics.IntRepo
 import io.micronaut.context.generics.Marker
 import io.micronaut.context.generics.NumberRepo
+import io.micronaut.context.generics.OpenRepo
 import io.micronaut.context.generics.Plain
+import io.micronaut.context.generics.RawRepo
 import io.micronaut.context.generics.Repo
 import spock.lang.Specification
 
@@ -52,5 +54,15 @@ class RuntimeBeanDefinitionTypeArgumentKeysSpec extends Specification {
     void 'a bean with no type argument anywhere in its hierarchy answers no keys'() {
         expect:
         definitionOf(Plain).typeArgumentKeys.isEmpty()
+    }
+
+    void 'a raw or unbound super type is still named, as the compiled definition names it'() {
+        expect: 'the keys follow what the hierarchy declares, not what resolves'
+        definitionOf(RawRepo).typeArgumentKeys.toSet() == [RawRepo.name, Repo.name].toSet()
+        definitionOf(OpenRepo).typeArgumentKeys.toSet() == [OpenRepo.name, Repo.name].toSet()
+
+        and: 'the argument itself is the one place the two still differ - a compiled definition answers the erased\n         variable where a runtime definition answers nothing, which is what makes the bean match any parameterization'
+        definitionOf(RawRepo).getTypeArguments(Repo.name).isEmpty()
+        definitionOf(OpenRepo).getTypeArguments(Repo.name).isEmpty()
     }
 }
