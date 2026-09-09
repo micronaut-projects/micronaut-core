@@ -69,6 +69,6 @@ final class ResponseHeaderPopulatorFilter implements Ordered {
 
     @Override
     public int getOrder() {
-        return ServerFilterPhase.LAST.after();
+        return ServerFilterPhase.FIRST.before();
     }
 }
