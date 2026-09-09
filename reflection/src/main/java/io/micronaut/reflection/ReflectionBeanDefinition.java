@@ -60,6 +60,7 @@ import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
+import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -1149,12 +1150,26 @@ public final class ReflectionBeanDefinition<T> extends AbstractInitializableBean
         }
 
         /**
-         * The type arguments the type gives to each of its generic super types, by the name of the super type.
+         * The type arguments the type gives to each of its generic super types, by the name of the super type,
+         * and the parameters the type itself declares.
+         *
+         * <p>A bean read from a class binds nothing to its own parameters - there is no usage to read a binding
+         * from - so they are its own type arguments unbound, which is what a generated definition of the same
+         * class writes for itself and what {@code asArgument()} reads back.</p>
          */
         private static Map<String, Argument<?>[]> typeArgumentsOf(Class<?> type) {
             Map<String, Argument<?>[]> typeArguments = new LinkedHashMap<>();
             for (Class<?> superType : ClassUtils.resolveHierarchy(type)) {
-                if (superType == type || superType == Object.class || superType.getTypeParameters().length == 0) {
+                if (superType == Object.class || superType.getTypeParameters().length == 0) {
+                    continue;
+                }
+                if (superType == type) {
+                    TypeVariable<?>[] variables = type.getTypeParameters();
+                    var own = new Argument<?>[variables.length];
+                    for (int i = 0; i < own.length; i++) {
+                        own[i] = ReflectionArguments.of(variables[i].getName(), variables[i]);
+                    }
+                    typeArguments.put(type.getName(), own);
                     continue;
                 }
                 Argument<?> resolved = ReflectionArguments.resolveGenericToArgument(type, superType);

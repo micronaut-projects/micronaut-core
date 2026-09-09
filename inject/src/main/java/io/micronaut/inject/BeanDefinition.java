@@ -367,12 +367,23 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
         return Collections.emptyList();
     }
 
+    /**
+     * The bean type as an argument, with the type arguments the bean binds to the parameters its own type
+     * declares.
+     *
+     * <p>The arguments are the ones {@link #getTypeArguments()} answers, rather than being rebuilt from their
+     * erasures: a binding of a concrete type - the {@code String} of a {@code Box<String>} produced by a
+     * factory - reads as an ordinary argument, and only a parameter the bean leaves unbound - the {@code T} of
+     * a {@code class Box<T>} - reads as a {@link io.micronaut.core.type.GenericPlaceholder} of that name.</p>
+     *
+     * @return The bean type as an argument
+     */
     @Override
     default Argument<T> asArgument() {
         return Argument.of(
                 getBeanType(),
                 getAnnotationMetadata(),
-                getTypeParameters()
+                getTypeArguments().toArray(Argument.ZERO_ARGUMENTS)
         );
     }
 
