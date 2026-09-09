@@ -130,6 +130,15 @@ public final class ArgumentExpUtils {
         Argument[].class
     );
 
+    private static final Method METHOD_CREATE_RAW_TYPE = ReflectionUtils.getRequiredInternalMethod(
+        Argument.class,
+        "ofRawType",
+        Class.class,
+        String.class,
+        AnnotationMetadata.class,
+        Argument[].class
+    );
+
     private static final Method METHOD_CREATE_WILDCARD = ReflectionUtils.getRequiredInternalMethod(
         Argument.class,
         "ofWildcard",
@@ -271,6 +280,8 @@ public final class ArgumentExpUtils {
         boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
         // The bounds are read from the placeholder, before it is replaced by the type it resolves to
         List<? extends ClassElement> bounds = recordedBounds(argumentType);
+        // As is the rawness, which is a property of the usage rather than of the type it resolves to
+        boolean isRawType = isRawType(argumentType);
         if (argumentType instanceof GenericPlaceholderElement placeholderElement) {
             // Persist resolved placeholder for backward compatibility
             argumentType = placeholderElement.getResolved().orElse(placeholderElement);
@@ -290,7 +301,7 @@ public final class ArgumentExpUtils {
         // 2nd argument: The argument name
         values.add(ExpressionDef.constant(argumentName));
 
-        if (!hasAnnotations && !hasTypeArguments && !isTypeVariable) {
+        if (!hasAnnotations && !hasTypeArguments && !isTypeVariable && !isRawType) {
             return TYPE_ARGUMENT.invokeStatic(
                 METHOD_CREATE_ARGUMENT_SIMPLE,
                 values.stream().toList()
@@ -348,9 +359,9 @@ public final class ArgumentExpUtils {
                 values
             );
         } else {
-            // Argument.create( .. )
+            // Argument.ofRawType( .. ) / Argument.create( .. )
             return TYPE_ARGUMENT.invokeStatic(
-                METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
+                isRawType ? METHOD_CREATE_RAW_TYPE : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
                 values
             );
         }
@@ -443,6 +454,7 @@ public final class ArgumentExpUtils {
             if (CollectionUtils.isNotEmpty(typeArguments)
                 || !classElement.getAnnotationMetadata().isEmpty()
                 || classElement instanceof WildcardElement
+                || isRawType(classElement)
                 || !recordedBounds(classElement).isEmpty()) {
                 return buildArgumentWithGenerics(
                     annotationMetadataWithDefaults,
@@ -485,6 +497,8 @@ public final class ArgumentExpUtils {
         // The bounds and the variable's own name are read from the placeholder, before it is replaced by the
         // type it resolves to
         List<? extends ClassElement> bounds = recordedBounds(argumentType);
+        // As is the rawness, which is a property of the usage rather than of the type it resolves to
+        boolean isRawType = isRawType(argumentType);
         String variableName = argumentType instanceof GenericPlaceholderElement placeholder
             ? placeholder.getVariableName() : null;
 
@@ -517,7 +531,7 @@ public final class ArgumentExpUtils {
         values.add(ExpressionDef.constant(argumentName));
 
 
-        if (isRecursiveType || !isWildcard && !typeVariable && !hasAnnotationMetadata && typeArguments.isEmpty()) {
+        if (isRecursiveType || !isWildcard && !typeVariable && !isRawType && !hasAnnotationMetadata && typeArguments.isEmpty()) {
             // Argument.create( .. )
             return TYPE_ARGUMENT.invokeStatic(
                 METHOD_CREATE_ARGUMENT_SIMPLE,
@@ -588,11 +602,41 @@ public final class ArgumentExpUtils {
             );
         }
 
+        if (isRawType && !typeVariable) {
+            // Argument.ofRawType( .. )
+            return TYPE_ARGUMENT.invokeStatic(METHOD_CREATE_RAW_TYPE, values);
+        }
+
         // Argument.create( .. )
         return TYPE_ARGUMENT.invokeStatic(
             typeVariable ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS,
             values
         );
+    }
+
+    /**
+     * Whether the element is a type written without its type arguments, a raw type.
+     *
+     * <p>A raw usage compiles to the type arguments the declaring type declares, so it is otherwise
+     * indistinguishable from a usage written with those variables. Java marks the usage itself, while Groovy
+     * marks only the placeholders it compiles to, so both are asked. A wildcard is not asked: Kotlin marks the
+     * argument of a star projection raw, and {@code List<*>} is {@code List<?>} rather than a raw usage.</p>
+     *
+     * @param element The element
+     * @return true if the type is raw
+     */
+    private static boolean isRawType(TypedElement element) {
+        if (element instanceof GenericPlaceholderElement || element instanceof WildcardElement
+            || !(element instanceof ClassElement classElement)) {
+            // a variable or a wildcard is written as such, it is never a raw usage of a type
+            return false;
+        }
+        if (classElement.isRawType()) {
+            return true;
+        }
+        Collection<ClassElement> typeArguments = classElement.getTypeArguments().values();
+        return !typeArguments.isEmpty() && typeArguments.stream()
+            .allMatch(typeArgument -> typeArgument instanceof GenericPlaceholderElement && typeArgument.isRawType());
     }
 
     /**

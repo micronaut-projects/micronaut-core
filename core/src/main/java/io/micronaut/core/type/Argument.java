@@ -157,6 +157,22 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
+     * Whether this argument stands for a type written without its type arguments, a raw type: {@code List}
+     * rather than {@code List<String>} or {@code List<T>}.
+     *
+     * <p>A raw type keeps the type parameters the declaring type declares, so it reads like a usage written
+     * with those variables; this is what tells the two apart. It answers a different question than
+     * {@link #isTypeVariable()}, which says whether this argument itself stands where a type variable was
+     * written.</p>
+     *
+     * @return True if the type was written raw
+     * @since 5.2.0
+     */
+    default boolean isRawType() {
+        return false;
+    }
+
+    /**
      * Whether the given argument is an instance.
      *
      * @param o The object
@@ -397,6 +413,28 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
                                           Argument<?> @Nullable [] typeParameters,
                                           Argument<?> @Nullable [] bounds) {
         return new DefaultGenericPlaceholder<>(type, argumentName, variableName, annotationMetadata, typeParameters, bounds);
+    }
+
+    /**
+     * Creates a new argument for a type written without its type arguments, a raw type.
+     *
+     * <p>The type parameters are the ones the declaring type declares, the same as they are for a usage
+     * written with those variables; {@link Argument#isRawType()} is what tells the two apart.</p>
+     *
+     * @param type               The type
+     * @param name               The name
+     * @param annotationMetadata The annotation metadata
+     * @param typeParameters     The type parameters, as the declaring type declares them
+     * @param <T>                The generic type
+     * @return The argument instance
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    static <T> Argument<T> ofRawType(Class<T> type,
+                                     @Nullable String name,
+                                     @Nullable AnnotationMetadata annotationMetadata,
+                                     Argument<?> @Nullable [] typeParameters) {
+        return new DefaultRawArgument<>(type, name, annotationMetadata, typeParameters);
     }
 
     /**

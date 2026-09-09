@@ -58,10 +58,29 @@ class ArgumentOfTypeParitySpec extends Specification {
         field                | type | parameters
         "justString"         | String | []
         "stringList"         | List | [String]
-        "noTypeList"         | List | []
         "mapStringInteger"   | Map  | [String, Integer]
         "objectMap"          | Map  | [Object, Object]
-        "noTypeMap"          | Map  | []
+    }
+
+    @Unroll
+    void 'test of raw type #field'() {
+        given:
+        def type = getClass().getDeclaredField(field).genericType
+
+        expect: "a raw type keeps the type arguments the type declares, the way the processors record it"
+        ReflectionArguments.of(type).type == raw
+        ReflectionArguments.of(type).typeParameters*.type == parameters
+        ReflectionArguments.of(type).isRawType()
+
+        and: "where Argument.of gives the erasure, with no type arguments and nothing saying it was raw"
+        Argument.of(type).type == raw
+        Argument.of(type).typeParameters*.type == []
+        !Argument.of(type).isRawType()
+
+        where:
+        field        | raw  | parameters
+        "noTypeList" | List | [Object]
+        "noTypeMap"  | Map  | [Object, Object]
     }
 
     @Unroll
