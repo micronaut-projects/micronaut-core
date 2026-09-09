@@ -25,6 +25,7 @@ import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.filter.ServerFilterPhase;
 
+import java.util.Collection;
 import java.util.List;
 
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
@@ -60,9 +61,14 @@ final class ResponseHeaderPopulatorFilter implements Ordered {
     @Internal
     void filterResponse(HttpRequest<?> request, MutableHttpResponse<?> response) {
         for (ResponseHeaderPopulator responseHeaderPopulator : responseHeaderPopulators) {
-            HttpHeaderEntry httpHeader = responseHeaderPopulator.findHttpHeader(request);
-            if (httpHeader != null && !response.getHeaders().contains(httpHeader.name())) {
-                response.getHeaders().add(httpHeader.name(), httpHeader.value());
+            Collection<HttpHeaderEntry> httpHeaders = responseHeaderPopulator.findHttpHeaders(request, response);
+            if (httpHeaders == null) {
+                continue;
+            }
+            for (HttpHeaderEntry httpHeader : httpHeaders) {
+                if (!response.getHeaders().contains(httpHeader.name())) {
+                    response.getHeaders().add(httpHeader.name(), httpHeader.value());
+                }
             }
         }
     }

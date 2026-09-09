@@ -19,26 +19,30 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpHeaderEntry;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Collection;
+
 /**
- * Computes an optional response header from an HTTP request.
+ * Computes optional response headers from an HTTP request and response.
  *
- * <p>Implementations are invoked by {@link ResponseHeaderPopulatorFilter} for
- * every response. A returned header is added only when the response does not
- * already contain a header with the same name.</p>
+ * <p>Implementations are invoked by the response-header filter for every
+ * response. Returned headers are added only when the response does not already
+ * contain a header with the same name.</p>
  *
  * @since 5.2.0
  */
 @Experimental
 public interface ResponseHeaderPopulator extends Ordered {
     /**
-     * Finds the response header applicable to the request.
+     * Finds the response headers applicable to the request and response.
      *
      * @param request The current HTTP request
-     * @return The header to add, or {@code null} when this populator does not
-     * apply to the request
+     * @param response The current HTTP response
+     * @return The headers to add, or {@code null} when this populator does not
+     * apply to the request and response
      * @since 5.2.0
      */
-    @Nullable HttpHeaderEntry findHttpHeader(HttpRequest<?> request);
+    @Nullable Collection<HttpHeaderEntry> findHttpHeaders(HttpRequest<?> request, HttpResponse<?> response);
 }

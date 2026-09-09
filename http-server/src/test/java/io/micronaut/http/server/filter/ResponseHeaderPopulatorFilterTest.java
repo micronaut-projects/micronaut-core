@@ -16,17 +16,44 @@
 package io.micronaut.http.server.filter;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.http.HttpHeaderEntry;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpResponse;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 class ResponseHeaderPopulatorFilterTest {
 
     @Test
-    void filterIsNotLoadedWhenThereAreNoResponseHeaderPopulators() {
+    void responseHeaderPopulatorIsNotLoadedWhenNoPoliciesAreConfigured() {
         try (ApplicationContext context = ApplicationContext.run()) {
-            assertFalse(context.containsBean(ResponseHeaderPopulator.class));
-            assertFalse(context.containsBean(ResponseHeaderPopulatorFilter.class));
+            assertFalse(context.findBean(ResponseHeaderPopulator.class).isPresent());
         }
+    }
+
+    @Test
+    void filterPassesResponseToPopulatorAndAddsAllHeaders() {
+        HttpRequest<?> request = HttpRequest.GET("/");
+        MutableHttpResponse<?> response = HttpResponse.ok();
+        ResponseHeaderPopulator populator = (actualRequest, actualResponse) -> {
+            assertSame(request, actualRequest);
+            assertSame(response, actualResponse);
+            assertEquals(200, actualResponse.code());
+            return List.of(
+                new HttpHeaderEntry("X-First", "first"),
+                new HttpHeaderEntry("X-Second", "second")
+            );
+        };
+
+        new ResponseHeaderPopulatorFilter(List.of(populator)).filterResponse(request, response);
+
+        assertEquals("first", response.getHeaders().get("X-First"));
+        assertEquals("second", response.getHeaders().get("X-Second"));
     }
 }

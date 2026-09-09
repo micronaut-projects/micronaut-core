@@ -16,23 +16,22 @@
 package io.micronaut.http.server.cors;
 
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpHeaderEntry;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.filter.ResponseHeaderPopulator;
-import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static io.micronaut.http.HttpHeaders.CROSS_ORIGIN_EMBEDDER_POLICY;
 import static io.micronaut.http.HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY;
 
 /**
- * Creates response-header populators for the configured cross-origin
+ * Creates a response-header populator for the configured cross-origin
  * policies.
- *
- * <p>Each policy is exposed as an independent bean. When a policy is not
- * configured, its factory method disables only that bean.</p>
  */
 @Factory
 @Internal
@@ -48,34 +47,28 @@ final class CorsResponseHeaderPopulatorFactory {
     }
 
     /**
-     * Creates a populator for the configured Cross-Origin-Resource-Policy
-     * header.
+     * Creates a populator for the configured cross-origin policy headers.
      *
-     * @return A populator for the configured policy
+     * @return A populator for the configured policies
+     * @throws DisabledBeanException If no cross-origin policy is configured
      */
-    @Named("crossOriginResourcePolicy")
     @Singleton
-    @Requires(property = HttpServerConfiguration.PREFIX + ".cors.cross-origin-resource-policy")
-    ResponseHeaderPopulator crossOriginResourcePolicy() {
-        return _ -> {
+    ResponseHeaderPopulator crossOriginPolicies() {
+        if (corsConfiguration.getCrossOriginResourcePolicy() == null
+            && corsConfiguration.getCrossOriginEmbedderPolicy() == null) {
+            throw new DisabledBeanException("No cross-origin response policies configured");
+        }
+        return (request, response) -> {
+            List<HttpHeaderEntry> headers = new ArrayList<>(2);
             CrossOriginResourcePolicy policy = corsConfiguration.getCrossOriginResourcePolicy();
-            return policy == null ? null : new HttpHeaderEntry(CROSS_ORIGIN_RESOURCE_POLICY, policy.toString());
-        };
-    }
-
-    /**
-     * Creates a populator for the configured Cross-Origin-Embedder-Policy
-     * header.
-     *
-     * @return A populator for the configured policy
-     */
-    @Named("crossOriginEmbedderPolicy")
-    @Singleton
-    @Requires(property = HttpServerConfiguration.PREFIX + ".cors.cross-origin-embedder-policy")
-    ResponseHeaderPopulator crossOriginEmbedderPolicy() {
-        return _ -> {
-            CrossOriginEmbedderPolicy policy = corsConfiguration.getCrossOriginEmbedderPolicy();
-            return policy == null ? null : new HttpHeaderEntry(CROSS_ORIGIN_EMBEDDER_POLICY, policy.toString());
+            if (policy != null) {
+                headers.add(new HttpHeaderEntry(CROSS_ORIGIN_RESOURCE_POLICY, policy.toString()));
+            }
+            CrossOriginEmbedderPolicy embedderPolicy = corsConfiguration.getCrossOriginEmbedderPolicy();
+            if (embedderPolicy != null) {
+                headers.add(new HttpHeaderEntry(CROSS_ORIGIN_EMBEDDER_POLICY, embedderPolicy.toString()));
+            }
+            return headers.isEmpty() ? null : headers;
         };
     }
 }

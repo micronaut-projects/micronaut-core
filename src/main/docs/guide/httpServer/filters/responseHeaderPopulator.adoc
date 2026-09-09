@@ -1,14 +1,14 @@
-The api:http.server.filter.ResponseHeaderPopulator[] interface provides a lightweight way to add a response header without implementing a complete api:http.filter.HttpServerFilter[].
+The api:http.server.filter.ResponseHeaderPopulator[] interface provides a lightweight way to add response headers without implementing a complete api:http.filter.HttpServerFilter[].
 
-Register an implementation as a bean. The `findHttpHeader` method receives the current api:http.HttpRequest[] and returns the header to add:
+Register an implementation as a bean. The `findHttpHeaders` method receives the current api:http.HttpRequest[] and api:http.HttpResponse[] and returns the headers to add:
 
 snippet::io.micronaut.docs.server.filters.SecurityHeaderPopulator[tags="imports,clazz", indent=0, title="A ResponseHeaderPopulator example"]
 
 <1> The `@Singleton` annotation registers the populator as a bean.
-<2> `findHttpHeader` receives the current request.
-<3> The api:http.HttpHeaderEntry[] contains the response header name and value.
+<2> `findHttpHeaders` receives the current request and response.
+<3> Each api:http.HttpHeaderEntry[] contains a response header name and value.
 
-The HTTP server invokes each `ResponseHeaderPopulator` for every response. Return `null` when the header does not apply to the request. If the response already contains the returned header, its existing value takes precedence.
+The HTTP server invokes each `ResponseHeaderPopulator` for every response. Return `null` when no headers apply to the request and response. If the response already contains a returned header, its existing value takes precedence.
 
 `ResponseHeaderPopulator` extends api:core.order.Ordered[]. If multiple populators are registered, implement `getOrder()` to control their invocation order.
 

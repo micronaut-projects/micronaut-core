@@ -19,6 +19,7 @@ package io.micronaut.docs.server.filters
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpHeaderEntry
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.server.filter.ResponseHeaderPopulator
 import jakarta.inject.Singleton
 // end::imports[]
@@ -28,8 +29,8 @@ import jakarta.inject.Singleton
 @Singleton // <1>
 class SecurityHeaderPopulator implements ResponseHeaderPopulator {
     @Override
-    HttpHeaderEntry findHttpHeader(HttpRequest<?> request) { // <2>
-        new HttpHeaderEntry('X-Content-Type-Options', 'nosniff') // <3>
+    List<HttpHeaderEntry> findHttpHeaders(HttpRequest<?> request, HttpResponse<?> response) { // <2>
+        [new HttpHeaderEntry('X-Content-Type-Options', 'nosniff')] // <3>
     }
 }
 // end::clazz[]
