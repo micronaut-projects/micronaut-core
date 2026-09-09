@@ -345,7 +345,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         }
 
         @Get("/query-bean-nullable")
-        String queryBeanNullable(@QueryValue("filter") @Nullable Filter filter) {
+        String queryBeanNullable(@QueryValue @Nullable Filter filter) {
             return String.valueOf(filter)
         }
 
