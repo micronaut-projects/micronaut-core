@@ -431,6 +431,9 @@ public final class MethodGenUtils {
      */
     private static ClassTypeDef kotlinDefaultsType(ClassElement declaringType, MethodElement methodElement) {
         if (methodElement instanceof KotlinMethodElement kotlinMethodElement) {
+            // Both names are binary names, the form ClassElement#getName() and ClassTypeDef#getName()
+            // are in, so they compare directly; a name other than the declaring type is the nested
+            // DefaultImpls class of it
             String typeName = kotlinMethodElement.getKotlinDefaultsTypeName();
             if (!typeName.equals(declaringType.getName())) {
                 return ClassTypeDef.of(typeName, true);

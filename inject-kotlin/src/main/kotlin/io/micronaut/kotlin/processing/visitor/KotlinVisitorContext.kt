@@ -67,6 +67,14 @@ internal class KotlinVisitorContext(
     var resolver: Resolver
 ) : VisitorContext {
 
+    private companion object {
+        /**
+         * The `-jvm-default` modes emitting no `DefaultImpls` class: `no-compatibility` and the
+         * `-Xjvm-default=all` it replaced.
+         */
+        private val MODES_WITHOUT_DEFAULT_IMPLS = setOf("no-compatibility", "all")
+    }
+
     private val visitorAttributes: MutableConvertibleValues<Any> = MutableConvertibleValuesMap()
     private val elementFactory: KotlinElementFactory = KotlinElementFactory(this)
     private val outputVisitor = KotlinOutputVisitor(environment, this)
@@ -299,16 +307,15 @@ internal class KotlinVisitorContext(
      * which is where the synthetic `$default` method of an interface method with default
      * arguments then lives.
      *
-     * Only the `no-compatibility` mode (and its `-Xjvm-default=all` predecessor) drops
-     * `DefaultImpls`; every other mode emits it, including `enable`, which emits the `$default`
-     * method on the interface as well.
+     * Only the modes in [MODES_WITHOUT_DEFAULT_IMPLS] drop `DefaultImpls`; every other mode emits
+     * it, including `enable`, which emits the `$default` method on the interface as well. A
+     * compilation reporting no JVM platform at all is therefore taken to emit it, which is also
+     * what KSP's own default mode of `disable` would say.
      */
     val hasDefaultImpls: Boolean by lazy {
-        val jvmDefaultMode = environment.platforms
+        environment.platforms
             .filterIsInstance<JvmPlatformInfo>()
-            .firstOrNull()
-            ?.jvmDefaultMode
-        jvmDefaultMode != "no-compatibility" && jvmDefaultMode != "all"
+            .none { it.jvmDefaultMode in MODES_WITHOUT_DEFAULT_IMPLS }
     }
 
     val extraOpenAnnotations: Array<String> by lazy {

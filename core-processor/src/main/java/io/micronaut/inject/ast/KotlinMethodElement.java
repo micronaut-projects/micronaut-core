@@ -23,7 +23,14 @@ import io.micronaut.core.annotation.NonNull;
  *
  * <p>Implementing this interface signals that defaulted parameters follow <i>Kotlin's</i> calling
  * convention, and tells generated code where to find the synthetic {@code $default} overload that
- * convention relies on. See {@link KotlinParameterElement}.</p>
+ * convention relies on. It is the method-level companion of {@link KotlinParameterElement}, which
+ * marks that same convention on a parameter.</p>
+ *
+ * <p>This is not a way to describe a default <i>value</i>: a Kotlin default is computed by the
+ * callee, inside the {@code $default} body, and cannot be materialised by the caller. Languages
+ * evaluating their defaults in the caller supply an expression through
+ * {@code io.micronaut.inject.writer.ParameterDefaultValueProvider} instead, and need neither this
+ * interface nor the overload it locates.</p>
  *
  * @author Denis Stepanov
  * @since 5.2.0
@@ -40,7 +47,8 @@ public interface KotlinMethodElement extends MethodElement {
      * or on the interface's {@code DefaultImpls} class, depending on the {@code -jvm-default} mode
      * the interface was compiled with.</p>
      *
-     * @return The type name, in binary form (nested types separated by {@code $})
+     * @return The type name, in the binary form {@link Element#getName()} is in, with nested types
+     * separated by {@code $}
      */
     @NonNull
     String getKotlinDefaultsTypeName();
