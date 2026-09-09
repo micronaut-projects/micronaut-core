@@ -95,13 +95,20 @@ public final class TypeArgumentQualifier<T> extends FilteringQualifier<T> {
      * Are the given types compatible.
      *
      * <p>A candidate that answers no type argument matches any parameterization: it is raw, which is the
-     * equivalent of using {@link Object}. That rule holds a bean whose parameterization is not knowable rather
-     * than only a bean that has none - a definition that records no argument for this type, an open generic
-     * {@code class OpenRepo<T> implements Repo<T>} whose argument is bound at the injection point, a
-     * {@link io.micronaut.inject.BeanType} that is not a {@link BeanDefinition} and whose class implements the
-     * type raw - so it stays. What it must not hold any more is a bean whose parameterization simply failed to
-     * resolve; that is what {@link io.micronaut.core.reflect.GenericTypeUtils#resolveTypeArguments(Class, Class)}
-     * is for.</p>
+     * equivalent of using {@link Object}. The rule holds every bean whose parameterization is not knowable,
+     * not only one that has none:</p>
+     *
+     * <ul>
+     *   <li>a {@link BeanDefinition} that records no argument for this type;</li>
+     *   <li>an open generic - {@code class OpenRepo<T> implements Repo<T>} - whose argument is bound at the
+     *   injection point rather than by the bean;</li>
+     *   <li>a {@link io.micronaut.inject.BeanType} that is not a {@link BeanDefinition} and whose class
+     *   implements the type raw.</li>
+     * </ul>
+     *
+     * <p>What the rule must no longer hold is a bean whose parameterization simply failed to resolve. That is
+     * fixed at the resolution instead, by
+     * {@link io.micronaut.core.reflect.GenericTypeUtils#resolveTypeArguments(Class, Class)}.</p>
      *
      * @param typeArguments The type arguments
      * @param classes       The classes to check for alignments

@@ -24,6 +24,7 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
@@ -182,12 +183,13 @@ public class GenericTypeUtils {
      * {@code io.micronaut.reflection.ReflectionArguments#resolveGenericToArgument(Class, Class)} of the
      * {@code micronaut-reflection} module instead.</p>
      *
-     * @param type      The type to resolve from
-     * @param superType The super type, an interface or a class, to resolve the arguments of
+     * @param type      The type to resolve from, {@code null} answering nothing
+     * @param superType The super type, an interface or a class, to resolve the arguments of, {@code null}
+     *                  answering nothing
      * @return The type arguments, never {@code null}
      * @since 5.2
      */
-    public static Class<?>[] resolveTypeArguments(Class<?> type, Class<?> superType) {
+    public static Class<?>[] resolveTypeArguments(@Nullable Class<?> type, @Nullable Class<?> superType) {
         if (type == null || superType == null || !superType.isAssignableFrom(type)) {
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
         }
@@ -271,7 +273,7 @@ public class GenericTypeUtils {
                 return current;
             }
             if (seen == null) {
-                seen = new LinkedHashSet<>();
+                seen = new HashSet<>(4);
                 seen.add(variable);
             }
             current = bound;
