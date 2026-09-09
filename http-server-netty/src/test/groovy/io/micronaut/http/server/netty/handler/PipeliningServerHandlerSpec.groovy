@@ -5,6 +5,8 @@ import io.micronaut.http.body.AvailableByteBody
 import io.micronaut.http.body.ByteBody
 import io.micronaut.http.body.CloseableAvailableByteBody
 import io.micronaut.http.body.CloseableByteBody
+import io.micronaut.http.body.stream.BodySizeLimits
+import io.micronaut.http.exceptions.ContentLengthExceededException
 import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
@@ -14,6 +16,7 @@ import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.ChannelPromise
 import io.netty.channel.embedded.EmbeddedChannel
+import io.netty.handler.codec.compression.DecompressionException
 import io.netty.handler.codec.compression.SnappyFrameEncoder
 import io.netty.handler.codec.compression.ZlibCodecFactory
 import io.netty.handler.codec.compression.ZlibWrapper
@@ -530,6 +533,342 @@ class PipeliningServerHandlerSpec extends Specification {
         HttpHeaderValues.DEFLATE   | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
         HttpHeaderValues.X_DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
         HttpHeaderValues.SNAPPY    | new SnappyFrameEncoder()
+    }
+
+    def 'decompression enforces max body size before last content'(ChannelHandler compressor, CharSequence contentEncoding) {
+        given:
+        Throwable failure = null
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                Flux.from(body.toByteArrayPublisher()).subscribe({ }, { failure = it })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                failure = cause
+            }
+        })
+        handler.setBodySizeLimits(new BodySizeLimits(64, Integer.MAX_VALUE))
+        def ch = new EmbeddedChannel(handler)
+        def compChannel = new EmbeddedChannel(compressor)
+        compChannel.writeOutbound(Unpooled.wrappedBuffer(new byte[1024]))
+        compChannel.finish()
+        CompositeByteBuf compressed = Unpooled.compositeBuffer()
+        ByteBuf part
+        while ((part = compChannel.readOutbound()) != null) {
+            compressed.addComponent(true, part)
+        }
+
+        when:
+        def requestMessage = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        requestMessage.headers().set(HttpHeaderNames.CONTENT_ENCODING, contentEncoding)
+        ch.writeOneInbound(requestMessage)
+        ch.writeOneInbound(new DefaultHttpContent(compressed))
+
+        then:
+        failure instanceof ContentLengthExceededException
+
+        cleanup:
+        ch.finishAndReleaseAll()
+        compChannel.finishAndReleaseAll()
+
+        where:
+        contentEncoding          | compressor
+        HttpHeaderValues.GZIP    | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
+    }
+
+    def 'decompression limit is cumulative across chunks'(ChannelHandler compressor, CharSequence contentEncoding) {
+        given:
+        Throwable failure = null
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                Flux.from(body.toByteArrayPublisher()).subscribe({ }, { failure = it })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                failure = cause
+            }
+        })
+        handler.setBodySizeLimits(new BodySizeLimits(64, Integer.MAX_VALUE))
+        def ch = new EmbeddedChannel(handler)
+        def compChannel = new EmbeddedChannel(compressor)
+        def requestMessage = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        requestMessage.headers().set(HttpHeaderNames.CONTENT_ENCODING, contentEncoding)
+        ch.writeOneInbound(requestMessage)
+
+        when:
+        compChannel.writeOutbound(Unpooled.wrappedBuffer(new byte[48]))
+        forwardCompressed(compChannel, ch)
+
+        then:
+        failure == null
+
+        when:
+        compChannel.writeOutbound(Unpooled.wrappedBuffer(new byte[48]))
+        forwardCompressed(compChannel, ch)
+
+        then:
+        failure instanceof ContentLengthExceededException
+
+        cleanup:
+        ch.finishAndReleaseAll()
+        compChannel.finishAndReleaseAll()
+
+        where:
+        contentEncoding          | compressor
+        HttpHeaderValues.GZIP    | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
+    }
+
+    def 'streaming decompression limit is cumulative across chunks'(ChannelHandler compressor, CharSequence contentEncoding) {
+        given:
+        CloseableByteBody body = null
+        Throwable failure = null
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody requestBody, OutboundAccess outboundAccess) {
+                body = requestBody
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                failure = cause
+            }
+        })
+        handler.setBodySizeLimits(new BodySizeLimits(64, 64))
+        def ch = new EmbeddedChannel(handler)
+        def compChannel = new EmbeddedChannel(compressor)
+        def requestMessage = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        requestMessage.headers().set(HttpHeaderNames.CONTENT_ENCODING, contentEncoding)
+        ch.writeOneInbound(requestMessage)
+        ch.flushInbound()
+        Flux.from(body.toByteArrayPublisher()).subscribe({ }, { failure = it })
+
+        when:
+        compChannel.writeOutbound(Unpooled.wrappedBuffer(new byte[48]))
+        forwardCompressed(compChannel, ch)
+        compChannel.writeOutbound(Unpooled.wrappedBuffer(new byte[48]))
+        forwardCompressed(compChannel, ch)
+
+        then:
+        failure instanceof ContentLengthExceededException
+
+        cleanup:
+        body?.close()
+        ch.finishAndReleaseAll()
+        compChannel.finishAndReleaseAll()
+
+        where:
+        contentEncoding          | compressor
+        HttpHeaderValues.GZIP    | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
+    }
+
+    def 'decompression accepts body at max size'(ChannelHandler compressor, CharSequence contentEncoding) {
+        given:
+        CloseableAvailableByteBody body = null
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody requestBody, OutboundAccess outboundAccess) {
+                body = requestBody
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                throw cause
+            }
+        })
+        handler.setBodySizeLimits(new BodySizeLimits(64, Integer.MAX_VALUE))
+        def ch = new EmbeddedChannel(handler)
+        def compChannel = new EmbeddedChannel(compressor)
+        compChannel.writeOutbound(Unpooled.wrappedBuffer(new byte[64]))
+        compChannel.finish()
+        CompositeByteBuf compressed = Unpooled.compositeBuffer()
+        ByteBuf part
+        while ((part = compChannel.readOutbound()) != null) {
+            compressed.addComponent(true, part)
+        }
+
+        when:
+        def requestMessage = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/", compressed)
+        requestMessage.headers().set(HttpHeaderNames.CONTENT_ENCODING, contentEncoding)
+        ch.writeOneInbound(requestMessage)
+
+        then:
+        body.toByteArray().length == 64
+
+        cleanup:
+        body?.close()
+        ch.finishAndReleaseAll()
+        compChannel.finishAndReleaseAll()
+
+        where:
+        contentEncoding          | compressor
+        HttpHeaderValues.GZIP    | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
+    }
+
+    private static void forwardCompressed(EmbeddedChannel source, EmbeddedChannel destination) {
+        ByteBuf compressed
+        while ((compressed = source.readOutbound()) != null) {
+            destination.writeOneInbound(new DefaultHttpContent(compressed))
+        }
+    }
+
+    def 'malformed compressed request remains a decompression error'() {
+        given:
+        Throwable failure = null
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                Flux.from(body.toByteArrayPublisher()).subscribe({ }, { failure = it })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                failure = cause
+            }
+        })
+        handler.setBodySizeLimits(new BodySizeLimits(64, Integer.MAX_VALUE))
+        def ch = new EmbeddedChannel(handler)
+
+        when:
+        def requestMessage = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        requestMessage.headers().set(HttpHeaderNames.CONTENT_ENCODING, HttpHeaderValues.GZIP)
+        ch.writeOneInbound(requestMessage)
+        ch.writeOneInbound(new DefaultHttpContent(Unpooled.wrappedBuffer(new byte[32])))
+
+        then:
+        failure instanceof DecompressionException
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'decompression limit applies across concatenated gzip members'() {
+        given:
+        Throwable failure = null
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                Flux.from(body.toByteArrayPublisher()).subscribe({ }, { failure = it })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                failure = cause
+            }
+        })
+        handler.setBodySizeLimits(new BodySizeLimits(64, Integer.MAX_VALUE))
+        def ch = new EmbeddedChannel(handler)
+        CompositeByteBuf compressed = Unpooled.compositeBuffer()
+        3.times {
+            def compChannel = new EmbeddedChannel(ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP))
+            compChannel.writeOutbound(Unpooled.wrappedBuffer(new byte[48]))
+            compChannel.finish()
+            ByteBuf part
+            while ((part = compChannel.readOutbound()) != null) {
+                compressed.addComponent(true, part)
+            }
+            compChannel.finishAndReleaseAll()
+        }
+
+        when:
+        def requestMessage = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        requestMessage.headers().set(HttpHeaderNames.CONTENT_ENCODING, HttpHeaderValues.GZIP)
+        ch.writeOneInbound(requestMessage)
+        ch.writeOneInbound(new DefaultHttpContent(compressed))
+
+        then:
+        failure instanceof ContentLengthExceededException
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'oversized final content does not drop the next request'() {
+        given:
+        def requests = []
+        Throwable failure = null
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                requests << request.uri()
+                body.close()
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                failure = cause
+            }
+        })
+        handler.setBodySizeLimits(new BodySizeLimits(2, Integer.MAX_VALUE))
+        def ch = new EmbeddedChannel(handler)
+
+        when:
+        def oversized = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/oversized")
+        oversized.headers().set(HttpHeaderNames.CONTENT_LENGTH, 3)
+        ch.writeOneInbound(oversized)
+        ch.writeOneInbound(new DefaultLastHttpContent(Unpooled.wrappedBuffer(new byte[3])))
+        ch.writeOneInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/next"))
+
+        then:
+        failure instanceof ContentLengthExceededException
+        requests == ["/oversized", "/next"]
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'oversized compressed final content does not drop the next request'(ChannelHandler compressor, CharSequence contentEncoding) {
+        given:
+        def requests = []
+        Throwable failure = null
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                requests << request.uri()
+                body.close()
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                failure = cause
+            }
+        })
+        handler.setBodySizeLimits(new BodySizeLimits(64, Integer.MAX_VALUE))
+        def ch = new EmbeddedChannel(handler)
+        def compChannel = new EmbeddedChannel(compressor)
+        compChannel.writeOutbound(Unpooled.wrappedBuffer(new byte[1024]))
+        compChannel.finish()
+        CompositeByteBuf compressed = Unpooled.compositeBuffer()
+        ByteBuf part
+        while ((part = compChannel.readOutbound()) != null) {
+            compressed.addComponent(true, part)
+        }
+
+        when:
+        def oversized = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/oversized", compressed)
+        oversized.headers().set(HttpHeaderNames.CONTENT_ENCODING, contentEncoding)
+        ch.writeOneInbound(oversized)
+        ch.writeOneInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/next"))
+
+        then:
+        failure instanceof ContentLengthExceededException
+        requests == ["/oversized", "/next"]
+
+        cleanup:
+        ch.finishAndReleaseAll()
+        compChannel.finishAndReleaseAll()
+
+        where:
+        contentEncoding          | compressor
+        HttpHeaderValues.GZIP    | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
     }
 
     def 'empty streaming response while in queue'() {
