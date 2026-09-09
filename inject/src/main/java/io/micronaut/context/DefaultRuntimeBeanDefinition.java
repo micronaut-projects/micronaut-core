@@ -46,6 +46,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -289,17 +290,27 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
     @Nullable
     private Object resolveInjectionPoint(BeanResolutionContext resolutionContext, InjectionPointSpec injectionPoint) {
         Argument<Object> argument = (Argument<Object>) injectionPoint.argument();
-        Qualifier<Object> qualifier = (Qualifier<Object>) injectionPoint.qualifier();
+        Qualifier<Object> pointQualifier = (Qualifier<Object>) injectionPoint.qualifier();
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
             try {
                 if (argument.isDeclaredNullable()) {
-                    return resolutionContext.findBean(argument, qualifier).orElse(null);
+                    return resolutionContext.findBean(argument, pointQualifier).orElse(null);
                 }
-                return resolutionContext.getBean(argument, qualifier);
+                return resolutionContext.getBean(argument, pointQualifier);
             } catch (NoSuchBeanException e) {
                 throw new DependencyInjectionException(resolutionContext, e);
             }
         }
+    }
+
+    /**
+     * Creates the lookup context handed to a disposer that takes one.
+     *
+     * @param resolutionContext The resolution context of the disposal
+     * @return The disposal context
+     */
+    RuntimeBeanDefinition.DisposalContext newDisposalContext(BeanResolutionContext resolutionContext) {
+        return new ResolutionLookupContext(resolutionContext);
     }
 
     /**
@@ -345,21 +356,65 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
     }
 
     /**
-     * Implementation of {@link RuntimeBeanDefinition.CreationContext} over the resolution context of one
-     * creation and the beans resolved for the declared injection points.
+     * Implementation of {@link RuntimeBeanDefinition.LookupContext} over the resolution context of one creation
+     * or of one disposal.
+     *
+     * <p>Each lookup is resolved behind a segment of that context's path, so that a lookup made while the bean is
+     * being created participates in circularity detection and is reported as a dependency of this definition when
+     * it cannot be satisfied. The segment is a constructor argument segment for lack of anything more accurate: an
+     * undeclared lookup has no injection point of its own to name.</p>
      */
-    private final class DefaultCreationContext implements RuntimeBeanDefinition.CreationContext {
-        private final BeanResolutionContext resolutionContext;
-        private final Object[] resolved;
+    private class ResolutionLookupContext implements RuntimeBeanDefinition.DisposalContext {
+        protected final BeanResolutionContext resolutionContext;
 
-        DefaultCreationContext(BeanResolutionContext resolutionContext, Object[] resolved) {
+        ResolutionLookupContext(BeanResolutionContext resolutionContext) {
             this.resolutionContext = resolutionContext;
-            this.resolved = resolved;
         }
 
         @Override
         public BeanContext getBeanContext() {
             return resolutionContext.getContext();
+        }
+
+        @Override
+        public <V> V getBean(Argument<V> type, @Nullable Qualifier<V> qualifier) {
+            Objects.requireNonNull(type, MSG_BEAN_TYPE_CANNOT_BE_NULL);
+            try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(DefaultRuntimeBeanDefinition.this, type)) {
+                try {
+                    return resolutionContext.getBean(type, qualifier);
+                } catch (NoSuchBeanException e) {
+                    throw new DependencyInjectionException(resolutionContext, e);
+                }
+            }
+        }
+
+        @Override
+        public <V> Optional<V> findBean(Argument<V> type, @Nullable Qualifier<V> qualifier) {
+            Objects.requireNonNull(type, MSG_BEAN_TYPE_CANNOT_BE_NULL);
+            try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(DefaultRuntimeBeanDefinition.this, type)) {
+                return resolutionContext.findBean(type, qualifier);
+            }
+        }
+
+        @Override
+        public <V> Collection<V> getBeansOfType(Argument<V> type, @Nullable Qualifier<V> qualifier) {
+            Objects.requireNonNull(type, MSG_BEAN_TYPE_CANNOT_BE_NULL);
+            try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(DefaultRuntimeBeanDefinition.this, type)) {
+                return resolutionContext.getBeansOfType(type, qualifier);
+            }
+        }
+    }
+
+    /**
+     * Implementation of {@link RuntimeBeanDefinition.CreationContext} over the resolution context of one
+     * creation and the beans resolved for the declared injection points.
+     */
+    private final class DefaultCreationContext extends ResolutionLookupContext implements RuntimeBeanDefinition.CreationContext {
+        private final Object[] resolved;
+
+        DefaultCreationContext(BeanResolutionContext resolutionContext, Object[] resolved) {
+            super(resolutionContext);
+            this.resolved = resolved;
         }
 
         @Override
@@ -398,15 +453,23 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
      *
      * <p>Only this subclass is a {@link DisposableBeanDefinition}: the context disposes of a bean only when its
      * definition is one, so a definition built without a disposer keeps the behaviour it had before disposers
-     * existed. The disposer takes no {@link BeanResolutionContext} because a runtime built bean has no injection
-     * points or lifecycle advice of its own that a resolution context could carry into the disposal, so
-     * {@link #dispose(BeanContext, Object)} skips creating one.</p>
+     * existed.</p>
+     *
+     * <p>A disposer that takes only the {@link BeanContext} resolves nothing, so the disposal creates no
+     * {@link BeanResolutionContext} for it. A disposer that takes a
+     * {@link RuntimeBeanDefinition.DisposalContext} is given one created for the disposal alone rather than the
+     * one the context may pass in: that one belongs to the creation of the bean being disposed of, and the
+     * disposer is to share neither its dependents nor its instances. The dependent objects the disposer resolves
+     * through it are destroyed as soon as it returns.</p>
      *
      * @param <T> The bean type
      * @since 5.2.0
      */
     static final class Disposable<T> extends DefaultRuntimeBeanDefinition<T> implements DisposableBeanDefinition<T> {
+        @Nullable
         private final BiConsumer<BeanContext, T> disposer;
+        @Nullable
+        private final BiConsumer<RuntimeBeanDefinition.DisposalContext, T> injectedDisposer;
 
         Disposable(Argument<T> beanType,
                    Function<RuntimeBeanDefinition.CreationContext, T> beanFactory,
@@ -417,20 +480,58 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
                    Class<?>[] exposedTypes,
                    @Nullable Map<Class<?>, List<Argument<?>>> typeArguments,
                    InjectionPointSpec[] injectionPoints,
-                   BiConsumer<BeanContext, T> disposer) {
+                   @Nullable BiConsumer<BeanContext, T> disposer,
+                   @Nullable BiConsumer<RuntimeBeanDefinition.DisposalContext, T> injectedDisposer) {
             super(beanType, beanFactory, qualifier, annotationMetadata, isSingleton, scope, exposedTypes, typeArguments, injectionPoints);
-            this.disposer = Objects.requireNonNull(disposer, "Disposer cannot be null");
+            if ((disposer == null) == (injectedDisposer == null)) {
+                throw new IllegalArgumentException("Exactly one disposer form is required");
+            }
+            this.disposer = disposer;
+            this.injectedDisposer = injectedDisposer;
         }
 
         @Override
         public T dispose(BeanContext context, T bean) {
-            disposer.accept(context, bean);
+            BiConsumer<BeanContext, T> contextDisposer = disposer;
+            if (contextDisposer != null) {
+                contextDisposer.accept(context, bean);
+                return bean;
+            }
+            BiConsumer<RuntimeBeanDefinition.DisposalContext, T> resolvingDisposer = Objects.requireNonNull(injectedDisposer);
+            try (DefaultBeanResolutionContext disposalContext = new DefaultBeanResolutionContext(context, this)) {
+                try {
+                    resolvingDisposer.accept(newDisposalContext(disposalContext), bean);
+                } finally {
+                    destroyDependents(context, disposalContext.getAndResetDependentBeans());
+                }
+            }
             return bean;
         }
 
         @Override
         public T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
             return dispose(context, bean);
+        }
+
+        /**
+         * Destroys the dependent objects a disposal resolved, in the reverse of the order they were resolved in
+         * and as dependents, the way the bean context destroys the dependents of a bean: what the disposer
+         * resolved is owned by the disposal, so a {@link LifeCycle} among them is no more stopped than one
+         * resolved for an injection point is.
+         *
+         * @param context    The bean context
+         * @param dependents The dependent registrations
+         */
+        private static void destroyDependents(BeanContext context, List<BeanRegistration<?>> dependents) {
+            ListIterator<BeanRegistration<?>> i = dependents.listIterator(dependents.size());
+            while (i.hasPrevious()) {
+                BeanRegistration<?> dependent = i.previous();
+                if (context instanceof DefaultBeanContext defaultBeanContext) {
+                    defaultBeanContext.destroyDependentBean(dependent);
+                } else {
+                    context.destroyBean(dependent);
+                }
+            }
         }
     }
 
@@ -456,6 +557,8 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
         private Class<? extends B> replacesType;
         @Nullable
         private BiConsumer<BeanContext, B> disposer;
+        @Nullable
+        private BiConsumer<RuntimeBeanDefinition.DisposalContext, B> injectedDisposer;
 
         RuntimeBeanBuilder(Argument<B> beanType, Supplier<B> supplier) {
             this.beanType = Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
@@ -550,6 +653,14 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
         @Override
         public Builder<B> disposer(@Nullable BiConsumer<BeanContext, B> disposer) {
             this.disposer = disposer;
+            this.injectedDisposer = null;
+            return this;
+        }
+
+        @Override
+        public Builder<B> injectedDisposer(@Nullable BiConsumer<RuntimeBeanDefinition.DisposalContext, B> disposer) {
+            this.injectedDisposer = disposer;
+            this.disposer = null;
             return this;
         }
 
@@ -576,7 +687,7 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
             InjectionPointSpec[] declaredInjectionPoints = injectionPoints.isEmpty() ?
                 NO_INJECTION_POINTS :
                 injectionPoints.toArray(new InjectionPointSpec[0]);
-            if (disposer != null) {
+            if (disposer != null || injectedDisposer != null) {
                 return new Disposable<>(
                     beanType,
                     beanFactory,
@@ -587,7 +698,8 @@ sealed class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditio
                     exposedTypes,
                     typeArguments,
                     declaredInjectionPoints,
-                    disposer
+                    disposer,
+                    injectedDisposer
                 );
             }
             return new DefaultRuntimeBeanDefinition<>(
