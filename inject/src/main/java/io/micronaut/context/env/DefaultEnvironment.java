@@ -286,8 +286,12 @@ final class DefaultEnvironment implements Environment, PropertyResolverDelegate 
     }
 
     private void refreshProperties() {
-        dropProperties();
-        readProperties();
+        // Rebuild into a replacement catalog and publish it in one step, so a concurrent lookup
+        // sees the properties either as they were before the refresh or as they are after it.
+        propertyPlaceholderResolver.refresh(() -> {
+            dropProperties();
+            readProperties();
+        });
     }
 
     @Override
