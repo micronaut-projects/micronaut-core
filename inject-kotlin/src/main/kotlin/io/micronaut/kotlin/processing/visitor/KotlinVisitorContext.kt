@@ -19,6 +19,7 @@ import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getJavaClassByName
 import com.google.devtools.ksp.processing.Dependencies
+import com.google.devtools.ksp.processing.JvmPlatformInfo
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSAnnotated
@@ -291,6 +292,23 @@ internal class KotlinVisitorContext(
         val value = block()
         this[key] = value
         return value
+    }
+
+    /**
+     * Whether the sources of this compilation emit a `DefaultImpls` class for their interfaces,
+     * which is where the synthetic `$default` method of an interface method with default
+     * arguments then lives.
+     *
+     * Only the `no-compatibility` mode (and its `-Xjvm-default=all` predecessor) drops
+     * `DefaultImpls`; every other mode emits it, including `enable`, which emits the `$default`
+     * method on the interface as well.
+     */
+    val hasDefaultImpls: Boolean by lazy {
+        val jvmDefaultMode = environment.platforms
+            .filterIsInstance<JvmPlatformInfo>()
+            .firstOrNull()
+            ?.jvmDefaultMode
+        jvmDefaultMode != "no-compatibility" && jvmDefaultMode != "all"
     }
 
     val extraOpenAnnotations: Array<String> by lazy {

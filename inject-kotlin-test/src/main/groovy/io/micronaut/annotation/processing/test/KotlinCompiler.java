@@ -77,7 +77,7 @@ public class KotlinCompiler {
 
     static {
 
-        KOTLIN_COMPILATION.setJvmDefault("enable");
+        setJvmDefaultMode("enable");
         KOTLIN_COMPILATION.setInheritClassPath(true);
         KOTLIN_COMPILATION.setLanguageVersion("2.0");
         Ksp2Kt.useKsp2(KOTLIN_COMPILATION);
@@ -87,6 +87,19 @@ public class KotlinCompiler {
             new File(KSP_COMPILATION.getWorkingDir(), "ksp/classes"),
             new File(KSP_COMPILATION.getWorkingDir(), "ksp/sources/resources"),
             KOTLIN_COMPILATION.getClassesDir()));
+    }
+
+    /**
+     * Sets the {@code -jvm-default} mode both compilations run with. The mode decides whether the
+     * synthetic {@code $default} method of an interface method with default arguments is emitted
+     * on the interface, on its {@code DefaultImpls} class, or on both, so KSP has to see the same
+     * mode as the compilation producing the classes the generated code calls into.
+     *
+     * @param mode The mode, one of {@code disable}, {@code enable} or {@code no-compatibility}
+     */
+    public static void setJvmDefaultMode(String mode) {
+        KOTLIN_COMPILATION.setJvmDefault(mode);
+        KSP_COMPILATION.setJvmDefault(mode);
     }
 
     public static URLClassLoader buildClassLoader(String name, @Language("kotlin") String clazz) {
