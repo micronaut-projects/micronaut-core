@@ -62,6 +62,21 @@ class ReflectionTypesSpec extends Specification {
         def inside = arguments[1].typeParameters[0]
         inside instanceof GenericPlaceholder
         ((GenericPlaceholder) inside).bounds*.type == [Comparable, Cloneable]
+
+        and: "and is named as the variable was declared"
+        ((GenericPlaceholder) inside).variableName == "T"
+    }
+
+    void "a variable inside a type argument is named unlike the parameter it stands in for"() {
+        given:
+        def argument = ReflectionArguments.argumentsOf(Types.getDeclaredMethod("distinctlyNamed", List))[0]
+        def inside = argument.typeParameters[0]
+
+        expect: "the M of List<M>, rather than the E java.util.List declares"
+        inside instanceof GenericPlaceholder
+        ((GenericPlaceholder) inside).variableName == "M"
+        ((GenericPlaceholder) inside).bounds*.type == [Comparable, Cloneable]
+        inside.type == Comparable
     }
 
     void "a variable bounded by a type naming it answers that bound"() {
