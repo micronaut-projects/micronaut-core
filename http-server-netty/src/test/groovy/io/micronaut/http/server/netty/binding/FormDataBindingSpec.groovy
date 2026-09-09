@@ -87,13 +87,32 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         result == '[empty:, value:present]'
     }
 
-    void "test optional string property treats an empty form value as null"() {
+    void "test optional string property treats an empty form value as absent"() {
         when:
         String result = client.exchange(HttpRequest.POST('/form/optional-pojo', 'name=')
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).body()
 
         then:
-        result == 'null'
+        result == 'absent'
+    }
+
+    void "test optional string property still binds a non-empty form value"() {
+        when:
+        String result = client.exchange(HttpRequest.POST('/form/optional-pojo', 'name=Fred')
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).body()
+
+        then:
+        result == '[Fred]'
+    }
+
+    void "test empty form values are elided when the content type carries parameters"() {
+        when:
+        HttpResponse<?> response = client.exchange(HttpRequest.POST('/form/pojo', 'name=Fred&age=')
+                .contentType(MediaType.of('application/x-www-form-urlencoded;charset=UTF-8')), String)
+
+        then:
+        response.status == HttpStatus.OK
+        response.body.get() == 'name: Fred, age: null'
     }
 
     void "test multipart bean preserves an empty text field"() {
@@ -327,7 +346,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
         @Post('/optional-pojo')
         String optionalPojo(@Body OptionalPerson person) {
-            person.name.toString()
+            person.name == null ? 'absent' : "[${person.name.orElse('empty')}]"
         }
 
         @EqualsAndHashCode

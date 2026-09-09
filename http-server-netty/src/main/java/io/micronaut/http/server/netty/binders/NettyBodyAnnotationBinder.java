@@ -172,8 +172,10 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             }
             Map<String, Object> intermediate = io.micronaut.http.server.multipart.FormRouteCompleter.mapForGetBody(bodies, nhr.getCharacterEncoding());
             Class<T> targetType = context.getArgument().getType();
+            // Use matches() rather than equals() so that this stays consistent with the
+            // hasFormBody() check above, which also uses matches() to detect the form type.
             if (mediaType != null
-                    && mediaType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
+                    && mediaType.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
                     && !targetType.isInstance(intermediate)
                     && !context.getArgument().isContainerType()
                     && !ConvertibleValues.class.isAssignableFrom(targetType)) {

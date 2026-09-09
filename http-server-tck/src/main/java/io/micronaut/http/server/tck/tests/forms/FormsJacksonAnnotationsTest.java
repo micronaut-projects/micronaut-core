@@ -113,10 +113,10 @@ public class FormsJacksonAnnotationsTest {
     @ReflectiveAccess
     record Book(@JsonProperty("title") String title,
                 @JsonProperty("paginas") @Nullable Integer pages,
-                @JsonProperty("publishedAt") LocalDateTime publishedAt,
-                @JsonProperty("category") Category category,
-                @JsonProperty("notes") String notes,
-                @JsonProperty("tags") List<String> tags) {
+                @JsonProperty("publishedAt") @Nullable LocalDateTime publishedAt,
+                @JsonProperty("category") @Nullable Category category,
+                @JsonProperty("notes") @Nullable String notes,
+                @JsonProperty("tags") @Nullable List<String> tags) {
     }
 
     enum Category {
