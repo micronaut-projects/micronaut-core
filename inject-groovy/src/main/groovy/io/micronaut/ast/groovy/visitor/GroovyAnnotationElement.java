@@ -15,9 +15,12 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.AnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import org.codehaus.groovy.ast.AnnotationNode;
 
 /**
  * Groovy implementation of {@link io.micronaut.inject.ast.AnnotationElement}.
@@ -32,5 +35,21 @@ final class GroovyAnnotationElement extends GroovyClassElement implements Annota
                                    GroovyNativeElement nativeElement,
                                    ElementAnnotationMetadataFactory annotationMetadataFactory) {
         super(visitorContext, nativeElement, annotationMetadataFactory);
+    }
+
+    @Override
+    protected @NonNull GroovyClassElement copyConstructor() {
+        // an annotation type cannot be generic, so the type arguments can be ignored
+        return new GroovyAnnotationElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory);
+    }
+
+    @Override
+    public boolean isInherited() {
+        for (AnnotationNode annotationNode : classNode.getAnnotations()) {
+            if (AnnotationUtil.ANN_INHERITED.equals(annotationNode.getClassNode().getName())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

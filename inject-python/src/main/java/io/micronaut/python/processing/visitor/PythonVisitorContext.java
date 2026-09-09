@@ -42,6 +42,7 @@ import io.micronaut.inject.writer.GeneratedFile;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
 import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory;
+import io.micronaut.python.processing.element.PythonAnnotationElement;
 import io.micronaut.python.processing.element.PythonClassElement;
 import io.micronaut.python.processing.element.PythonElementFactory;
 import io.micronaut.python.processing.model.ArgumentsDef;
@@ -375,7 +376,7 @@ public final class PythonVisitorContext implements VisitorContext {
             List.of(),
             null
         );
-        return new PythonClassElement(annotationDef, processingEnvironment);
+        return new PythonAnnotationElement(annotationDef, processingEnvironment);
     }
 
     @Override

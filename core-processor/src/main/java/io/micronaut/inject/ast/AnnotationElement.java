@@ -23,4 +23,21 @@ package io.micronaut.inject.ast;
  * @since 3.1.0
  */
 public interface AnnotationElement extends ClassElement {
+
+    /**
+     * Is the annotation annotated with {@link java.lang.annotation.Inherited}?
+     *
+     * <p>Meta-annotations from the {@code java.lang.annotation} package are excluded from the
+     * annotation metadata (see {@link io.micronaut.core.annotation.AnnotationUtil#STEREOTYPE_EXCLUDES}),
+     * so the answer cannot be retrieved with
+     * {@link io.micronaut.core.annotation.AnnotationMetadata#hasDeclaredAnnotation(String)}. Implementations
+     * backed by a native element resolve it from that element instead; the default implementation, for
+     * implementations that have no native element to inspect, always returns {@code false}.</p>
+     *
+     * @return {@code true} if the annotation type is declared {@link java.lang.annotation.Inherited}
+     * @since 5.2.0
+     */
+    default boolean isInherited() {
+        return false;
+    }
 }
