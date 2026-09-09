@@ -523,7 +523,8 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         boolean.class, // isConfigurationProperties
         boolean.class, // isContainerType
         boolean.class,  // requiresMethodProcessing,
-        boolean.class // hasEvaluatedExpressions
+        boolean.class, // hasEvaluatedExpressions
+        boolean.class // isRawBeanType
     );
 
     private static final String FIELD_CONSTRUCTOR = "$CONSTRUCTOR";
@@ -2425,7 +2426,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                                 )
                             : ExpressionDef.constant(false),
                         // 9: hasEvaluatedExpressions
-                        ExpressionDef.constant(evaluatedExpressionProcessor.hasEvaluatedExpressions())
+                        ExpressionDef.constant(evaluatedExpressionProcessor.hasEvaluatedExpressions()),
+                        // 10: isRawBeanType - a producer of a type written without its type arguments
+                        ExpressionDef.constant(ArgumentExpUtils.isRawType(beanTypeElement))
 
                     )
                 )

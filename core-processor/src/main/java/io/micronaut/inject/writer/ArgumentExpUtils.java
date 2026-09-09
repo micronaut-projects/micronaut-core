@@ -625,7 +625,7 @@ public final class ArgumentExpUtils {
      * @param element The element
      * @return true if the type is raw
      */
-    private static boolean isRawType(TypedElement element) {
+    static boolean isRawType(TypedElement element) {
         if (element instanceof GenericPlaceholderElement || element instanceof WildcardElement
             || !(element instanceof ClassElement classElement)) {
             // a variable or a wildcard is written as such, it is never a raw usage of a type

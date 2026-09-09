@@ -225,6 +225,28 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return precalculatedInfo.hasEvaluatedExpressions();
     }
 
+    /**
+     * The bean type as an argument, raw when the bean type was written without its type arguments.
+     *
+     * <p>A raw usage compiles to the type arguments the type declares, so a raw producer's bean type is
+     * otherwise indistinguishable from one written with those variables; the rawness is recorded at compile
+     * time and answered here, as {@link Argument#isRawType()} answers it of a raw injection point.</p>
+     *
+     * @return The bean type as an argument
+     */
+    @Override
+    public Argument<T> asArgument() {
+        if (!precalculatedInfo.isRawBeanType()) {
+            return InstantiatableBeanDefinition.super.asArgument();
+        }
+        return Argument.ofRawType(
+            getBeanType(),
+            null,
+            getAnnotationMetadata(),
+            getTypeArguments().toArray(Argument.ZERO_ARGUMENTS)
+        );
+    }
+
     @Override
     public final List<Argument<?>> getTypeArguments(@Nullable String type) {
         if (type == null || typeArgumentsMap == null) {
@@ -2673,10 +2695,15 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         boolean isConfigurationProperties,
         boolean isContainerType,
         boolean requiresMethodProcessing,
-        boolean hasEvaluatedExpressions
+        boolean hasEvaluatedExpressions,
+        boolean isRawBeanType
     ) {
         public PrecalculatedInfo(Optional<String> scope, boolean isAbstract, boolean isIterable, boolean isSingleton, boolean isPrimary, boolean isConfigurationProperties, boolean isContainerType, boolean requiresMethodProcessing) {
-            this(scope, isAbstract, isIterable, isSingleton, isPrimary, isConfigurationProperties, isContainerType, requiresMethodProcessing, false);
+            this(scope, isAbstract, isIterable, isSingleton, isPrimary, isConfigurationProperties, isContainerType, requiresMethodProcessing, false, false);
+        }
+
+        public PrecalculatedInfo(Optional<String> scope, boolean isAbstract, boolean isIterable, boolean isSingleton, boolean isPrimary, boolean isConfigurationProperties, boolean isContainerType, boolean requiresMethodProcessing, boolean hasEvaluatedExpressions) {
+            this(scope, isAbstract, isIterable, isSingleton, isPrimary, isConfigurationProperties, isContainerType, requiresMethodProcessing, hasEvaluatedExpressions, false);
         }
     }
 
