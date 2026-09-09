@@ -189,7 +189,14 @@ public class ConnectionManager {
     private final HttpClientConfiguration configuration;
     private final SslContextAutoLoader sslContextWrapper;
     private final SslContextAutoLoader sslContextWrapperWs;
-    private volatile boolean wsContextLoaded;
+    /**
+     * Lock that guards the lazy initialization of {@link #sslContextWrapperWs}. Without mutual
+     * exclusion, concurrent first-time websocket connections can each trigger
+     * {@link SslContextAutoLoader#autoLoad()}, and the resulting generation conflict can leave the
+     * loader without a context.
+     */
+    private final Object wsContextLock;
+    private boolean wsContextLoaded;
     @Nullable
     private final String informationalServiceId;
 
@@ -217,6 +224,10 @@ public class ConnectionManager {
         this.certificateProviders = from.certificateProviders;
         this.sslContextWrapper = from.sslContextWrapper;
         this.sslContextWrapperWs = from.sslContextWrapperWs;
+        this.wsContextLock = from.wsContextLock;
+        synchronized (wsContextLock) {
+            this.wsContextLoaded = from.wsContextLoaded;
+        }
         this.running.set(from.running.get());
     }
 
@@ -248,6 +259,7 @@ public class ConnectionManager {
         } : builder.certificateProviders;
         this.sslContextWrapper = new ClientContextWrapper(false);
         this.sslContextWrapperWs = new ClientContextWrapper(true);
+        this.wsContextLock = new Object();
 
         if (builder.eventLoopGroup != null) {
             group = builder.eventLoopGroup;
@@ -268,8 +280,10 @@ public class ConnectionManager {
         } else {
             sslContextWrapper.clear();
         }
-        sslContextWrapperWs.clear();
-        wsContextLoaded = false;
+        synchronized (wsContextLock) {
+            sslContextWrapperWs.clear();
+            wsContextLoaded = false;
+        }
         initBootstrap();
         running.set(true);
         for (PoolHolder pool : pools.values()) {
@@ -433,7 +447,10 @@ public class ConnectionManager {
                 }
             }
             sslContextWrapper.clear();
-            sslContextWrapperWs.clear();
+            synchronized (wsContextLock) {
+                sslContextWrapperWs.clear();
+                wsContextLoaded = false;
+            }
             resolverGroup.close();
         }
     }
@@ -527,12 +544,23 @@ public class ConnectionManager {
     private SslContext buildWebsocketSslContext(NettyHttpClient.RequestKey requestKey) {
         if (requestKey.isSecure()) {
             if (configuration.getSslConfiguration().isEnabled()) {
-                if (!wsContextLoaded) {
-                    sslContextWrapperWs.autoLoad();
-                    wsContextLoaded = true;
+                SslContextHolder holder;
+                synchronized (wsContextLock) {
+                    if (!wsContextLoaded) {
+                        sslContextWrapperWs.autoLoad();
+                        wsContextLoaded = true;
+                    }
+                    holder = sslContextWrapperWs.takeRetained();
                 }
-                SslContextHolder holder = sslContextWrapperWs.takeRetained();
-                return holder == null ? null : holder.sslContext();
+                SslContext sslCtx = holder == null ? null : holder.sslContext();
+                if (holder != null && sslCtx == null) {
+                    holder.release();
+                }
+                // Allow wss requests to be sent without an SslHandler if a proxy is present
+                if (sslCtx == null && configuration.getProxyAddress().isEmpty()) {
+                    throw decorate(new HttpClientException("Cannot send WSS request. SSL context is unavailable"));
+                }
+                return sslCtx;
             } else if (configuration.getProxyAddress().isEmpty()) {
                 throw decorate(new HttpClientException("Cannot send WSS request. SSL is disabled"));
             }
@@ -556,13 +584,20 @@ public class ConnectionManager {
             protected void initChannel(Channel ch) {
                 addLogHandler(ch);
 
-                SslContext sslContext = buildWebsocketSslContext(requestKey);
-                if (sslContext != null) {
-                    try {
-                        ch.pipeline().addLast(configureSslHandler(sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort())));
-                    } finally {
-                        ReferenceCountUtil.release(sslContext);
+                try {
+                    SslContext sslContext = buildWebsocketSslContext(requestKey);
+                    if (sslContext != null) {
+                        try {
+                            ch.pipeline().addLast(configureSslHandler(sslContext.newHandler(ch.alloc(), requestKey.getHost(), requestKey.getPort())));
+                        } finally {
+                            ReferenceCountUtil.release(sslContext);
+                        }
                     }
+                } catch (Throwable e) {
+                    // report the failure instead of letting the channel close with a generic error
+                    initial.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + e.getMessage(), e));
+                    ch.close();
+                    return;
                 }
 
                 ch.pipeline()
