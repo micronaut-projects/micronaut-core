@@ -99,10 +99,12 @@ public class KotlinCompiler {
     }
 
     /**
-     * Sets the {@code -jvm-default} mode both compilations run with. The mode decides whether the
+     * Sets the {@code -jvm-default} mode the compilations run with. The mode decides whether the
      * synthetic {@code $default} method of an interface method with default arguments is emitted
-     * on the interface, on its {@code DefaultImpls} class, or on both, so KSP has to see the same
-     * mode as the compilation producing the classes the generated code calls into.
+     * on the interface, on its {@code DefaultImpls} class, or on both.
+     *
+     * <p>The mode does not reach KSP, which always reports the {@code disable} it defaults to, so
+     * only the modes emitting {@code DefaultImpls} can be told apart here.</p>
      *
      * @param mode The mode, one of {@code disable}, {@code enable} or {@code no-compatibility}
      */
