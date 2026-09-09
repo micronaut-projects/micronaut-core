@@ -29,9 +29,11 @@ import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
+import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.function.Supplier
 
 class SimpleTextWebSocketSpec extends Specification {
@@ -225,7 +227,7 @@ class SimpleTextWebSocketSpec extends Specification {
             wsClients.add(wsClient)
             List<CompletableFuture<ChatClientWebSocket>> futures = (1..8).collect { int i ->
                 CompletableFuture.supplyAsync({
-                    Flux.from(wsClient.connect(ChatClientWebSocket, "/chat/stuff/user" + i)).blockFirst()
+                    Flux.from(wsClient.connect(ChatClientWebSocket, "/chat/stuff/user" + i)).blockFirst(Duration.ofSeconds(30))
                 } as Supplier<ChatClientWebSocket>, executor)
             }
             clients.addAll(futures.collect { it.join() })
@@ -237,7 +239,8 @@ class SimpleTextWebSocketSpec extends Specification {
 
         cleanup:
         clients.each { it.close() }
-        executor.shutdown()
+        executor.shutdownNow()
+        executor.awaitTermination(30, TimeUnit.SECONDS)
         wsClients.each { it.close() }
         embeddedServer.close()
     }

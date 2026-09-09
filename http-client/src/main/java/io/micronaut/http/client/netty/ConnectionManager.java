@@ -569,6 +569,18 @@ public class ConnectionManager {
     }
 
     /**
+     * Describe a failure for an error message. Falls back to the exception type when the exception
+     * carries no message.
+     *
+     * @param e The failure
+     * @return The description
+     */
+    private static String describe(Throwable e) {
+        String message = e.getMessage();
+        return message == null ? e.toString() : message;
+    }
+
+    /**
      * Connect to a remote websocket. The given {@link ChannelHandler} is added to the pipeline
      * when the handshakes complete.
      *
@@ -595,7 +607,7 @@ public class ConnectionManager {
                     }
                 } catch (Throwable e) {
                     // report the failure instead of letting the channel close with a generic error
-                    initial.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + e.getMessage(), e));
+                    initial.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + describe(e), e));
                     ch.close();
                     return;
                 }
@@ -626,7 +638,7 @@ public class ConnectionManager {
                         return;
                     }
                 } catch (Throwable e) {
-                    initial.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + e.getMessage(), e));
+                    initial.tryEmitError(new WebSocketSessionException("Error opening WebSocket client session: " + describe(e), e));
                 }
                 // failed
                 ch.close();
