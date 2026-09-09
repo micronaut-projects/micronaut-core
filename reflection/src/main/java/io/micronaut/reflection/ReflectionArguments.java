@@ -510,8 +510,11 @@ public final class ReflectionArguments {
             Argument<?> component = toArgument(null, aat.getAnnotatedGenericComponentType(), substitutions, resolving);
             AnnotationMetadata combined = combine(component.getAnnotationMetadata(), ReflectionAnnotations.metadataOf(aat));
             // the type arguments of the component are the ones of the array: a `List<String>[]` is a `List[]`
-            // of `E -> String`, as the processors write it
-            return Argument.of(Array.newInstance(component.getType(), 0).getClass(), name, combined, component.getTypeParameters());
+            // of `E -> String`, as the processors write it, and an array of a raw component is raw the same way
+            Class<?> arrayType = Array.newInstance(component.getType(), 0).getClass();
+            return component.isRawType()
+                ? Argument.ofRawType(arrayType, name, combined, component.getTypeParameters())
+                : Argument.of(arrayType, name, combined, component.getTypeParameters());
         } else if (annotatedType instanceof AnnotatedWildcardType awt) {
             // a wildcard is the type it is bounded by, the lower bound first: `? super Book` is `Book`, which is
             // what the processors resolve it to, and only an unbounded wildcard is `Object`

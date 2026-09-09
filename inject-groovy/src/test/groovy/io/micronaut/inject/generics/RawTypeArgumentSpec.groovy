@@ -31,6 +31,7 @@ import jakarta.inject.Inject
 import jakarta.inject.Singleton
 
 class Box<B extends Number> {}
+class Two<A, B extends Number> {}
 
 @Singleton
 class Holder<T extends Number> {
@@ -41,7 +42,10 @@ class Holder<T extends Number> {
     @Inject public List<Object> object
     @Inject public List<?> wildcard
     @Inject public Box box
+    @Inject public Two two
     @Inject public Map<String, List> nested
+    @Inject public List[] rawArray
+    @Inject public List<String>[] concreteArray
 
     Holder(List rawConstructorArgument, List<T> variableConstructorArgument) {}
 
@@ -105,6 +109,27 @@ class Holder<T extends Number> {
         box.isRawType()
         box.typeParameters[0].type == Number
         ((GenericPlaceholder<?>) box.typeParameters[0]).variableName == 'B'
+    }
+
+    void "a raw usage of a type of several variables keeps every one of them"() {
+        given:
+        Argument<?> two = field('two')
+
+        expect:
+        two.isRawType()
+        two.typeParameters*.type == [Object, Number]
+        two.typeParameters.collect { ((GenericPlaceholder<?>) it).variableName } == ['A', 'B']
+    }
+
+    void "an array of a raw component is raw"() {
+        expect:
+        field('rawArray').isRawType()
+        field('rawArray').type == List[]
+        field('rawArray').typeParameters*.type == [Object]
+
+        and: 'an array of a component written with its type arguments is not'
+        !field('concreteArray').isRawType()
+        field('concreteArray').typeParameters*.type == [String]
     }
 
     void "a raw type argument of a parameterized type is raw"() {
