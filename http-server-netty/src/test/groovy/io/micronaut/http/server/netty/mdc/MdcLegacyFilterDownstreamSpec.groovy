@@ -23,6 +23,8 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.util.concurrent.atomic.AtomicReference
+
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN
 
 class MdcLegacyFilterDownstreamSpec extends Specification {
@@ -40,16 +42,15 @@ class MdcLegacyFilterDownstreamSpec extends Specification {
 
     void 'MDC propagated by a legacy filter is visible to the later filters, the route and the response filters'() {
         given:
-        LaterFilter.seenOnRequest = null
-        LaterFilter.seenOnResponse = null
+        LaterFilter laterFilter = embeddedServer.applicationContext.getBean(LaterFilter)
 
         when:
         String response = client.toBlocking().retrieve(HttpRequest.GET('/mdc-legacy'))
 
         then:
         response == '1234567890'
-        LaterFilter.seenOnRequest == '1234567890'
-        LaterFilter.seenOnResponse == '1234567890'
+        laterFilter.seenOnRequest.get() == '1234567890'
+        laterFilter.seenOnResponse.get() == '1234567890'
     }
 
     @Controller
@@ -81,17 +82,17 @@ class MdcLegacyFilterDownstreamSpec extends Specification {
     @ServerFilter(MATCH_ALL_PATTERN)
     @Requires(property = 'spec.name', value = 'MdcLegacyFilterDownstreamSpec')
     static class LaterFilter {
-        static String seenOnRequest
-        static String seenOnResponse
+        final AtomicReference<String> seenOnRequest = new AtomicReference<>()
+        final AtomicReference<String> seenOnResponse = new AtomicReference<>()
 
         @RequestFilter
         void filterRequest(HttpRequest<?> request) {
-            seenOnRequest = MDC.get('trace_id')
+            seenOnRequest.set(MDC.get('trace_id'))
         }
 
         @ResponseFilter
         void filterResponse(MutableHttpResponse<?> response) {
-            seenOnResponse = MDC.get('trace_id')
+            seenOnResponse.set(MDC.get('trace_id'))
         }
     }
 }

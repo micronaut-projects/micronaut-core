@@ -56,6 +56,7 @@ class MdcPreMatchingFilterSpec extends Specification {
 
         cleanup:
         logger.detachAppender(appender)
+        appender.stop()
         logger.setLevel(previousLevel)
     }
 
