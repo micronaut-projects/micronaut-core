@@ -18,7 +18,7 @@ package io.micronaut.http.server.filter;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.http.HttpHeaderTuple;
+import io.micronaut.http.HttpHeaderEntry;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.ResponseFilter;
@@ -60,7 +60,7 @@ final class ResponseHeaderPopulatorFilter implements Ordered {
     @Internal
     void filterResponse(HttpRequest<?> request, MutableHttpResponse<?> response) {
         for (ResponseHeaderPopulator responseHeaderPopulator : responseHeaderPopulators) {
-            HttpHeaderTuple httpHeader = responseHeaderPopulator.findHttpHeader(request);
+            HttpHeaderEntry httpHeader = responseHeaderPopulator.findHttpHeader(request);
             if (httpHeader != null && !response.getHeaders().contains(httpHeader.name())) {
                 response.getHeaders().add(httpHeader.name(), httpHeader.value());
             }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2206 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,15 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Experimental;
 
 /**
- * A response header name and value.
+ * An HTTP response header name and value.
  *
  * @param name  The HTTP header name
  * @param value The HTTP header value
  * @since 5.2.0
  */
-@Introspected
-public record HttpHeaderTuple(CharSequence name, CharSequence value) {
+@Experimental
+public record HttpHeaderEntry(String name, String value) {
 }

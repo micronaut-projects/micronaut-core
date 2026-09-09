@@ -6,7 +6,7 @@ snippet::io.micronaut.docs.server.filters.SecurityHeaderPopulator[tags="imports,
 
 <1> The `@Singleton` annotation registers the populator as a bean.
 <2> `findHttpHeader` receives the current request.
-<3> The api:http.HttpHeaderTuple[] contains the response header name and value.
+<3> The api:http.HttpHeaderEntry[] contains the response header name and value.
 
 The HTTP server invokes each `ResponseHeaderPopulator` for every response. Return `null` when the header does not apply to the request. If the response already contains the returned header, its existing value takes precedence.
 

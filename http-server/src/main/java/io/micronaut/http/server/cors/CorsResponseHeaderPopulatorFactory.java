@@ -18,7 +18,7 @@ package io.micronaut.http.server.cors;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.HttpHeaderTuple;
+import io.micronaut.http.HttpHeaderEntry;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.filter.ResponseHeaderPopulator;
 import jakarta.inject.Named;
@@ -59,7 +59,7 @@ final class CorsResponseHeaderPopulatorFactory {
     ResponseHeaderPopulator crossOriginResourcePolicy() {
         return _ -> {
             CrossOriginResourcePolicy policy = corsConfiguration.getCrossOriginResourcePolicy();
-            return policy == null ? null : new HttpHeaderTuple(CROSS_ORIGIN_RESOURCE_POLICY, policy);
+            return policy == null ? null : new HttpHeaderEntry(CROSS_ORIGIN_RESOURCE_POLICY, policy.toString());
         };
     }
 
@@ -75,7 +75,7 @@ final class CorsResponseHeaderPopulatorFactory {
     ResponseHeaderPopulator crossOriginEmbedderPolicy() {
         return _ -> {
             CrossOriginEmbedderPolicy policy = corsConfiguration.getCrossOriginEmbedderPolicy();
-            return policy == null ? null : new HttpHeaderTuple(CROSS_ORIGIN_EMBEDDER_POLICY, policy);
+            return policy == null ? null : new HttpHeaderEntry(CROSS_ORIGIN_EMBEDDER_POLICY, policy.toString());
         };
     }
 }

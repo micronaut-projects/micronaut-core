@@ -17,7 +17,7 @@ package io.micronaut.http.server.filter;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.http.HttpHeaderTuple;
+import io.micronaut.http.HttpHeaderEntry;
 import io.micronaut.http.HttpRequest;
 import org.jspecify.annotations.Nullable;
 
@@ -40,5 +40,5 @@ public interface ResponseHeaderPopulator extends Ordered {
      * apply to the request
      * @since 5.2.0
      */
-    @Nullable HttpHeaderTuple findHttpHeader(HttpRequest<?> request);
+    @Nullable HttpHeaderEntry findHttpHeader(HttpRequest<?> request);
 }
