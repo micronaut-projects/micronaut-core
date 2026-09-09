@@ -482,8 +482,11 @@ public final class ArgumentExpUtils {
 
         List<ExpressionDef> values = new ArrayList<>();
 
-        // The bounds are read from the placeholder, before it is replaced by the type it resolves to
+        // The bounds and the variable's own name are read from the placeholder, before it is replaced by the
+        // type it resolves to
         List<? extends ClassElement> bounds = recordedBounds(argumentType);
+        String variableName = argumentType instanceof GenericPlaceholderElement placeholder
+            ? placeholder.getVariableName() : null;
 
         if (argumentType instanceof GenericPlaceholderElement placeholderElement) {
             // Persist resolved placeholder for backward compatibility
@@ -575,8 +578,10 @@ public final class ArgumentExpUtils {
                 METHOD_CREATE_TYPE_VAR_WITH_BOUNDS,
                 values.get(0),
                 values.get(1),
-                // The variable name is the argument name here, as it was before the bounds were kept
-                ExpressionDef.nullValue(),
+                // The name the variable was declared with, which is not the name of the argument: a type
+                // argument is named after the parameter it stands in for - the E of List<E> - while the
+                // variable is the M of List<M>
+                variableName == null ? ExpressionDef.nullValue() : ExpressionDef.constant(variableName),
                 values.get(2),
                 values.get(3),
                 pushBounds(annotationMetadataWithDefaults, owningType, bounds, visitedTypes, loadClassValueExpressionFn)

@@ -742,6 +742,9 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
 
     @Override
     public void onDestroyed(BeanDestroyedEvent<Context> event) {
+        if (PythonContextRuntime.isReuseContext()) {
+            return;
+        }
         PythonContextRegistry.onNoActiveExecutionsAfterCurrentFrame(event.getBean(), this::closePool);
     }
 
