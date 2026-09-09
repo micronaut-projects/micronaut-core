@@ -70,6 +70,10 @@ class Bean<T, S : Payment, U, P>(
         argument instanceof GenericPlaceholder ? ((GenericPlaceholder<?>) argument).bounds*.type*.name : null
     }
 
+    private static String variableName(Argument<?> argument) {
+        argument instanceof GenericPlaceholder ? ((GenericPlaceholder<?>) argument).variableName : null
+    }
+
     private Map<String, Argument<?>> constructorArguments() {
         definition.constructor.arguments.collectEntries { [it.name, it] }
     }
@@ -79,7 +83,7 @@ class Bean<T, S : Payment, U, P>(
     }
 
     @Unroll
-    void "the type argument of constructor parameter #name erases to #type and keeps the bounds #declared"() {
+    void "the type argument of constructor parameter #name erases to #type, is the variable #variable and keeps the bounds #declared"() {
         given:
         Argument<?> typeArgument = constructorArguments()[name].typeParameters[0]
 
@@ -87,14 +91,17 @@ class Bean<T, S : Payment, U, P>(
         typeArgument.type.name == type
         typeArgument.isTypeVariable() == isVariable
         bounds(typeArgument) == declared
+        // the variable is named as it was declared, not after the parameter it stands in for: the T of
+        // Event<T> is the class's T, whether or not its bounds had to be written out
+        variableName(typeArgument) == variable
 
         where:
-        name                 | type               | isVariable | declared
-        'several'            | 'test.Payment'     | true       | ['test.Payment', 'test.Refundable']
-        'one'                | 'test.Payment'     | true       | ['test.Payment']
-        'none'               | 'java.lang.Object' | true       | ['java.lang.Object']
-        'parameterizedBound' | 'java.util.List'   | true       | ['java.util.List', 'test.Refundable']
-        'concrete'           | 'test.Payment'     | false      | null
+        name                 | type               | isVariable | declared                              | variable
+        'several'            | 'test.Payment'     | true       | ['test.Payment', 'test.Refundable']   | 'T'
+        'one'                | 'test.Payment'     | true       | ['test.Payment']                      | 'S'
+        'none'               | 'java.lang.Object' | true       | ['java.lang.Object']                  | 'U'
+        'parameterizedBound' | 'java.util.List'   | true       | ['java.util.List', 'test.Refundable'] | 'P'
+        'concrete'           | 'test.Payment'     | false      | null                                  | null
     }
 
     void "a bound keeps its own type arguments"() {
