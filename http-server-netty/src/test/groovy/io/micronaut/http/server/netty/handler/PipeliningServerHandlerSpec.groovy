@@ -986,22 +986,25 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.checkException()
     }
 
-    def 'responseWritten called once when a streaming response fails after some data'() {
+    def 'streaming response that fails after some data is cleaned up and discarded exactly once'() {
         given:
         def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
         resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
         def sink = Sinks.many().unicast().<ByteBuf> onBackpressureBuffer()
         def cleaned = 0
+        def discarded = 0
+        def errors = []
         def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
                 body.close()
-                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adaptNetty(sink.asFlux()))
+                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel())
+                        .adapt(sink.asFlux(), null, () -> discarded++))
             }
 
             @Override
             void handleUnboundError(Throwable cause) {
-                cause.printStackTrace()
+                errors << cause
             }
 
             @Override
@@ -1019,6 +1022,7 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.readOutbound() == resp
         ch.readOutbound() == new DefaultHttpContent(c1)
         cleaned == 0
+        discarded == 0
 
         when:
         sink.emitError(new RuntimeException("stream failed"), Sinks.EmitFailureHandler.FAIL_FAST)
@@ -1026,7 +1030,10 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.finishAndReleaseAll()
         then:
         ch.checkException()
+        // the request is cleaned up once, and the remaining response data is discarded once
         cleaned == 1
+        discarded == 1
+        errors.empty
     }
 
     def 'inbound state is reset when the request handler rejects a buffered request'() {

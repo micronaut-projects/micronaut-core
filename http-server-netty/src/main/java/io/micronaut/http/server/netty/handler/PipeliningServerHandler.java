@@ -1450,10 +1450,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     LOG.warn("Reactive response received an error before the response was written. This error cannot be forwarded to the client.", t);
                 }
             }
-            // clear the handler and clean up the request before closing, so that the cleanup does
-            // not happen a second time when the pipeline is torn down.
+            // detach the handler before discarding it, so that the discard does not happen a
+            // second time when the pipeline is torn down, and so that a reentrant onNext/onError
+            // triggered by the discard does not act on a response that is already done.
             outboundHandler = null;
-            markResponseWritten();
+            // this releases the resources of the failed response (the compression session and the
+            // remaining data of the body) and cleans up the request exactly once.
+            discardOutbound();
             requiredCtx().close();
         }
 
@@ -1491,8 +1494,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void discardOutbound() {
             super.discardOutbound();
             // this is safe because:
-            // - while cancel() may trigger onComplete/onError, `removed` is true at this point, so
-            //   they won't call responseWritten in turn
+            // - cancel() may trigger onComplete/onError, but by now this handler is either removed
+            //   or no longer the current outbound handler, so they do not write anything
             // - markResponseWritten only forwards the first call, so a response that already
             //   reported an error is not cleaned up twice
             markResponseWritten();
